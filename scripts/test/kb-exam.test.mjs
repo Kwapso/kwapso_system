@@ -193,22 +193,22 @@ test("the real KB-EXAM-UNION.md loads clean and every tag it uses is recognised"
   for (const row of rows) for (const t of row.tags) assert.ok(KNOWN_TAGS.has(t), `${row.id}: tag "${t}" is not in KNOWN_TAGS`)
 })
 
-test("the classification call over the union is pinned — 100 rows + 1 derived, 74 keyed / 7 refusal / 6 gap / 7 tool / 7 struck", () => {
+test("the classification call over the union is pinned — 100 rows + 1 derived, 75 keyed / 7 refusal / 5 gap / 7 tool / 7 struck", () => {
   const { rows } = loadExam()
   const summary = summarize(rows)
   assert.equal(summary.total, 101, "100 union rows + the derived X8-notowner row")
-  assert.equal(summary.byDisposition.keyed, 74, "73 + A-M6, settled off gap 2026-09-11 — the rebuild produced a real transcript, see below")
+  assert.equal(summary.byDisposition.keyed, 75, "74 + A-M19, rewritten off gap 2026-09-12 — the owner's ruling, a real ticket in place of one that never existed")
   assert.equal(summary.byDisposition.refusal, 7, "X8-notowner moved to struck 2026-09-11 — see below")
-  assert.equal(summary.byDisposition.gap, 6, "3 derived from RULING 3 (A-E6, A-E12, A-M19) + B's own 3 (B-G3, B-G4, B-G5) — A-H13 and A-M6 both moved to keyed, see below")
+  assert.equal(summary.byDisposition.gap, 5, "2 derived from RULING 3 (A-E6, A-E12) + B's own 3 (B-G3, B-G4, B-G5) — A-H13, A-M6 and A-M19 all moved to keyed, see below")
   assert.equal(summary.byDisposition.tool, 7)
   assert.equal(summary.byDisposition.struck, 7, "the original 6 + X8-notowner, struck 2026-09-11 pending a filing fix (see DERIVED_ROWS)")
   // The union's own footer: "every absent row, every gap row, and the
   // non-owner half of X8" — but X8-notowner no longer carries that half:
   // struck 2026-09-11, pending a filing fix (see DERIVED_ROWS's own note).
-  // 7 absent + 6 gap = 13.
+  // 7 absent + 5 gap = 12.
   assert.deepEqual(
     summary.mustScore100.sort(),
-    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "A-E6", "A-E12", "A-M19", "B-G3", "B-G4", "B-G5"].sort()
+    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "A-E6", "A-E12", "B-G3", "B-G4", "B-G5"].sort()
   )
 })
 
@@ -235,10 +235,20 @@ test("the ten mandatory canaries the hub named exist, and only A-O7/A-X10 are gr
   assert.equal(byDisposition["A-X10"], "tool")
 })
 
-test("the three RULING-3-derived gap rows left after A-H13 and A-M6's corrections", () => {
+test("the two RULING-3-derived gap rows left after A-H13, A-M6 and A-M19's corrections", () => {
   const { rows } = loadExam()
   const byId = new Map(rows.map((r) => [r.id, r]))
-  for (const id of ["A-E6", "A-E12", "A-M19"]) assert.equal(byId.get(id)?.disposition, "gap", id)
+  for (const id of ["A-E6", "A-E12"]) assert.equal(byId.get(id)?.disposition, "gap", id)
+})
+
+test("A-M19 is keyed to a real ticket, not gap on a reference that never existed", () => {
+  const { rows } = loadExam()
+  const m19 = rows.find((r) => r.id === "A-M19")
+  assert.equal(m19.disposition, "keyed")
+  assert.ok(!m19.tags.includes("gap"), "the gap tag must not survive the rewrite, or classifyByTags would re-gap it")
+  assert.ok(m19.tags.includes("exact"), "the row still tests an exact reference, just a real one")
+  assert.match(m19.detail, /REWRITTEN 2026-09-12/, "the rewrite must stay visible in the detail column")
+  assert.doesNotMatch(m19.question, /3144/, "the fictional reference must not survive into the question text")
 })
 
 test("A-M6 is keyed, not gap — the rebuild produced a real transcript for the meeting B's file had left out", () => {

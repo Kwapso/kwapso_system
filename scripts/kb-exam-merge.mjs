@@ -117,9 +117,7 @@ const MATCHES = [
  * `gap`-tagged B.G2/B.G1 and need no entry here — both cite exactly one
  * meeting, fully absent, so the corrected rule changes nothing about them
  * either. */
-const DERIVED_GAP_OVERRIDES = {
-  M19: { leftOut: "FluClinic task 3144 meeting 25 Aug", score: 0.5, note: "no B row exists for this meeting at all; its one MEETING source is fully absent — the 'ticket record' mention is a different door (the tickets module), never a candidate for the ≥15-piece transcript check, so it is not a candidate source under the corrected rule" },
-}
+const DERIVED_GAP_OVERRIDES = {}
 
 /** A-H13 moved OUT of DERIVED_GAP_OVERRIDES: it cites two MEETING sources
  * (pt 1, 25 Aug, absent; pt 2, 26 Aug, 23 pieces, present — cited by both
@@ -144,6 +142,28 @@ const THIN_EVIDENCE_NOTES = {
  * answer correctly and be marked wrong for it. */
 const SETTLED_NOTES = {
   M6: 'SETTLED, not gap: the rebuild produced a real transcript for "HORST: Claude Matchings test run" (12 pieces) — B\'s own file had this meeting left out, but it is not actually absent from the corpus. Keyed to that source; the row now grades as an ordinary keyed question.',
+}
+
+/** A-M19 REWRITTEN 2026-09-12, owner's ruling. It used to ask about "task
+ * 3144" as a `gap` row (see the DERIVED_GAP_OVERRIDES header above, and the
+ * git history for the entry that lived there) — but kb_B1 established the
+ * premise was simply wrong: there is no such ticket. "T3144" in the real
+ * ticket system is "Steps", an unrelated Kwapso-Portal ticket; "task 3144"
+ * was FluClinic's own internal number, carried only by a calendar event, a
+ * transcript and two mail mirrors — never a ticket record at all. A row
+ * cannot test "does an exact reference beat fuzzy matching" by pointing at
+ * a reference that resolves to nothing; it can only ever fail, honestly or
+ * not. Kept the tag (`exact`) and the shape of the test — a specific
+ * numbered reference among several similar ones — and pointed it at a real
+ * record: Kwapso's own ticket T1644, whose title and description both say
+ * "Ticket #1636" (imported numbering, not this app's `ref`). Same risk
+ * kb_B1 found in the original row's evidence — a second, unrelated
+ * "Customer signature" ticket also mentions "1636" in passing, and a
+ * numerically-close ticket (#1631, ref T1643) shares the same login/display
+ * vocabulary — so a system that resolves the reference by surface similarity
+ * rather than by the reference itself can still lose this one the same way. */
+const REWRITTEN_NOTES = {
+  M19: 'REWRITTEN 2026-09-12: "task 3144" never resolved to a real ticket (kb_B1) — no floor or prompt could have fixed a reference to nothing. Rewritten to a verified real ticket, Kwapso ref T1644 ("Ticket #1636 - Customer signature not visible", resolved) — chosen because a second, unrelated ticket about the same feature, and a numerically-close ticket (#1631, ref T1643, same bug category), both risk the same near-miss kb_B1 found in the original evidence.',
 }
 
 /** A KEYING confidence note, distinct from the two above (which are about
@@ -216,6 +236,7 @@ function buildUnion() {
     if (THIN_EVIDENCE_NOTES[a.id]) detail = `${detail} — [${THIN_EVIDENCE_NOTES[a.id]}]`
     if (SETTLED_NOTES[a.id]) detail = `${detail} — [${SETTLED_NOTES[a.id]}]`
     if (KEY_CONFIDENCE_NOTES[a.id]) detail = `${detail} — [${KEY_CONFIDENCE_NOTES[a.id]}]`
+    if (REWRITTEN_NOTES[a.id]) detail = `${detail} — [${REWRITTEN_NOTES[a.id]}]`
     unionRows.push({ id: `A-${a.id}`, section: a.section, level: a.level, question: a.question, tags, detail })
   }
   for (const b of B) {

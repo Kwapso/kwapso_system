@@ -224,13 +224,17 @@ export const MANDATORY_CANARIES = new Set(["A-O1", "A-O2", "A-O3", "A-O4", "A-O5
  * not an edit to this file. Ids are the union's namespaced ones; every one
  * of these six turned out to be a duplicate present in both source files
  * (scripts/kb-exam-merge.mjs's MATCHES table has the B-side partner), so
- * each keeps its A-side id under RULING 1. Two more rows (A-M6, A-M19)
- * are pushed to `gap` by scripts/kb-exam-merge.mjs itself (RULING 3's
- * derivation) rather than listed here — see the comment below. A-H13 was
- * briefly a third until the hub corrected the derivation's predicate: it
- * cites two meeting sources and only one is absent, so it is `keyed`
- * (plain, no override) with a thin-evidence note in its detail column
- * instead. */
+ * each keeps its A-side id under RULING 1. RULING 3's derivation once
+ * pushed two more rows (A-M6, A-M19) to `gap` from scripts/kb-exam-merge.mjs
+ * itself rather than here — see the comment below — but neither stayed
+ * one: A-H13 was the derivation's first false positive (corrected
+ * predicate, below), A-M6 and A-M19 turned out to be the second and
+ * third, discovered later and for two different reasons. A-M6: the
+ * rebuild produced a real transcript for a meeting the derivation had
+ * called absent. A-M19: the owner ruled the row's reference ("task 3144")
+ * never resolved to a real record at all and rewrote it around one that
+ * does. All three are `keyed` now, each with its own correction named in
+ * its detail column in KB-EXAM-UNION.md rather than here. */
 export const OVERRIDES = {
   "A-X1": {
     disposition: "struck",
@@ -264,21 +268,24 @@ export const OVERRIDES = {
   // RULING 3's corrected derivation (over KB-EXAM-TRANSCRIPTS.md's "left
   // out on purpose" footer — the only staging-checked oracle either file
   // has, and the predicate: gap only if ALL of a row's meeting sources are
-  // on that list) converts four A rows to `gap`. Two (A-E6, A-E12) get it
-  // for free because they merged with a B row carrying the tag natively
-  // (B-G2, B-G1); the other two (A-M6, A-M19) did not merge with anything,
-  // so scripts/kb-exam-merge.mjs writes `gap` straight into their tags —
-  // no override needed here either. `classifyByTags`'s tag rule is the
-  // ONE mechanism for all four; see each row's `detail` column in
-  // KB-EXAM-UNION.md for the derivation's reasoning (score, which
-  // left-out entry it resolved to, and — for A-M19 — why its "ticket
-  // record" mention does not count as a competing source). A-H13 was
-  // the derivation's one false positive under the ORIGINAL predicate
-  // ("resolves to" rather than "entirely resolves to") — it cites pt 1
-  // (absent) AND pt 2 (present, 23 pieces), so gapping it would have
-  // failed a system for correctly answering from pt 2. It is `keyed`
-  // instead, to pt 2, with the pt 1 gap named in its detail column — the
-  // exam's one row testing partial knowledge rather than absence.
+  // on that list) converted four A rows to `gap` at the time it ran. Two
+  // (A-E6, A-E12) get it for free because they merged with a B row
+  // carrying the tag natively (B-G2, B-G1) and still hold. The other two
+  // (A-M6, A-M19) did not merge with anything, so
+  // scripts/kb-exam-merge.mjs wrote `gap` straight into their tags — and
+  // both have since been corrected off it, for two different reasons
+  // (A-M6: the rebuild produced a transcript the derivation had never
+  // seen; A-M19: the owner rewrote the row after its reference turned out
+  // not to exist at all), so today only A-E6/A-E12 remain gap by this
+  // derivation. `classifyByTags`'s tag rule is still the ONE mechanism;
+  // see each row's `detail` column in KB-EXAM-UNION.md for its own
+  // history. A-H13 was the derivation's first false positive under the
+  // ORIGINAL predicate ("resolves to" rather than "entirely resolves
+  // to") — it cites pt 1 (absent) AND pt 2 (present, 23 pieces), so
+  // gapping it would have failed a system for correctly answering from
+  // pt 2. It is `keyed` instead, to pt 2, with the pt 1 gap named in its
+  // detail column — the exam's one row testing partial knowledge rather
+  // than absence.
 }
 
 /** X8's non-owner half is a real, gradeable claim the union's own footer
