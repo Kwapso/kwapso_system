@@ -207,6 +207,7 @@ import {
   eventNamedBy,
   GOOGLE_SOURCE_KINDS,
   googleStateKeys,
+  refileChatSources,
 } from "../src/lib/knowledge-google"
 
 const db = () => holder.db as DatabaseSync
@@ -642,6 +643,135 @@ describe("a-names/chat-filing: an unfiled chat space resolves its own name, the 
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     const filed = sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FIVE"))
     expect(filed?.account_id, "the declared account, not the name's own match").toBe(IDS.burglarAccount)
+  })
+})
+
+// fix/kb-chat-backfill (12 Sep 2026). `refileChatSources` brings the
+// BACK-CATALOGUE in line with what `resolveChatSpaceAccounts` decides today —
+// rows a live sweep never re-reads and so a-names/chat-filing's own logic
+// never reaches. Every case here writes stale `knowledge_sources` rows
+// DIRECTLY (bypassing the sweep entirely) to prove the repair, not the sweep.
+describe("fix/kb-chat-backfill: refileChatSources brings stale rows in line, idempotently", () => {
+  const cfg = {} as never
+  const guard = { databaseId: "db", userId: IDS.staffUser } as never
+
+  function nameSpace(id: string, externalId: string, name: string, accountId: string | null = null): void {
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('${id}', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', '${externalId}', '${name}', 'team', ${accountId ? `'${accountId}'` : "NULL"}, '2026-01-01', '${IDS.staffUser}');`
+    )
+  }
+  function seedName(name: string, refId: string): void {
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_${name}_${refId}', 'account', '${refId}', '${name}', NULL, 'account:${refId}', '2026-01-01');`
+    )
+  }
+  /** A source and its chunk, filed exactly where the OLD (pre-fix) sweep left
+   * it — written straight through SQL, never through a real sweep, which is
+   * the whole point: this proves the REPAIR, not the live filing path. */
+  function staleSource(id: string, externalId: string, accountId: string | null, compartment: string): void {
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, created_at)
+         VALUES ('${id}', 'message', 'google_chat', '${externalId}/threads/T1', '${compartment}', ${accountId ? `'${accountId}'` : "NULL"}, 'Stale — Ana', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_${id}', '${id}', '${compartment}', 0, 'left over from before the fix', '2026-01-01');`
+    )
+  }
+  function chunkCompartment(sourceId: string): string {
+    return (
+      db().prepare(`SELECT compartment FROM knowledge_chunks WHERE source_id = ?`).get(sourceId) as {
+        compartment: string
+      }
+    ).compartment
+  }
+
+  it("moves a stale source to the account its space resolves to today, source AND chunk together", async () => {
+    seedName("rarebackfillname", IDS.victimAccount)
+    nameSpace("S_BF1", "spaces/BF1", "RareBackfillName")
+    staleSource("SRC_BF1", "spaces/BF1", null, "agency")
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.byAccount).toEqual({ [IDS.victimAccount]: 1 })
+    expect(result.toAgency).toBe(0)
+
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF1'`).get() as {
+      account_id: string
+      compartment: string
+    }
+    expect(row.account_id).toBe(IDS.victimAccount)
+    expect(row.compartment).toBe(`account:${IDS.victimAccount}`)
+    expect(chunkCompartment("SRC_BF1"), "the CHUNK moved too — retrieval reads this column, not the source's").toBe(
+      `account:${IDS.victimAccount}`
+    )
+  })
+
+  it("a second run moves ZERO — idempotent, not merely repeatable", async () => {
+    seedName("idempotentname", IDS.victimAccount)
+    nameSpace("S_BF2", "spaces/BF2", "IdempotentName")
+    staleSource("SRC_BF2", "spaces/BF2", null, "agency")
+
+    const first = await refileChatSources(cfg, guard)
+    expect(first.moved).toBe(1)
+    const second = await refileChatSources(cfg, guard)
+    expect(second.moved, "nothing left to correct the second time").toBe(0)
+    expect(second.byAccount).toEqual({})
+  })
+
+  it("dryRun reports the move but writes nothing", async () => {
+    seedName("dryrunname", IDS.victimAccount)
+    nameSpace("S_BF3", "spaces/BF3", "DryRunName")
+    staleSource("SRC_BF3", "spaces/BF3", null, "agency")
+
+    const result = await refileChatSources(cfg, guard, { dryRun: true })
+    expect(result.moved).toBe(1)
+    expect(result.byAccount).toEqual({ [IDS.victimAccount]: 1 })
+
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF3'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id, "the dry run counted the move — it did not make it").toBeNull()
+    expect(row.compartment).toBe("agency")
+  })
+
+  it("a DECLARED account always wins over a stale name-matched filing", async () => {
+    seedName("shouldnotwin", IDS.burglarAccount)
+    nameSpace("S_BF4", "spaces/BF4", "ShouldNotWin", IDS.victimAccount)
+    // Filed under the WRONG account by the old code — the declared value is
+    // Bergman, but this row was somehow left on Delaval.
+    staleSource("SRC_BF4", "spaces/BF4", IDS.burglarAccount, `account:${IDS.burglarAccount}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF4'`).get() as {
+      account_id: string
+      compartment: string
+    }
+    expect(row.account_id, "the DECLARED account, never the name match").toBe(IDS.victimAccount)
+    expect(row.compartment).toBe(`account:${IDS.victimAccount}`)
+  })
+
+  it("a space now naming two clients reverts a previously-filed source back to agency", async () => {
+    // Filed to Bergman by an earlier, safe resolution — the space has since
+    // been renamed (or a second client's alias now also matches it), so today
+    // it is genuinely ambiguous and the safe answer is neither.
+    seedName("nowambiguous", IDS.victimAccount)
+    seedName("nowambiguous", IDS.burglarAccount)
+    nameSpace("S_BF5", "spaces/BF5", "NowAmbiguous")
+    staleSource("SRC_BF5", "spaces/BF5", IDS.victimAccount, `account:${IDS.victimAccount}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.toAgency).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF5'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id).toBeNull()
+    expect(row.compartment).toBe("agency")
+    expect(chunkCompartment("SRC_BF5")).toBe("agency")
   })
 })
 

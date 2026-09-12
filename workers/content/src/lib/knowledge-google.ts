@@ -67,7 +67,7 @@
 // what the old interpolation cost and why the fence moved with it.
 
 import { automationOff } from "@shared/workers/automations"
-import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { mendMojibake } from "@shared/workers/mojibake"
@@ -84,7 +84,14 @@ import { accessTokenFor, googleScope, knownChatPeople, listConnections, listName
 import { calendarEventIdInText, chatMessages, googlePresence, isConnectionLost, type ChatMessage, type ProbableService } from "./google-api"
 import { chatThreadItem, chatThreads, hydrateText, readGoogleMaterial, tokenOrNull } from "./google-read"
 import { BACKFILL_SLICE_DAYS, BACKFILL_YEARS_BACK } from "./meetings"
-import { accountsNamedIn, execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
+import {
+  accountCompartment,
+  accountsNamedIn,
+  AGENCY_COMPARTMENT,
+  execKnowledgeScript,
+  indexSource,
+  teamVisibleRecomputeSql,
+} from "./knowledge"
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
 import { recordWorkerError } from "@shared/workers/error-log"
@@ -965,6 +972,140 @@ async function writeChatSpaceBackfillError(
   )
 }
 
+/** WHICH ACCOUNT EACH OF THE CALLER'S NAMED CHAT SPACES FILES TO — declared,
+ * or the space's own NAME resolved the SAME WAY A QUESTION IS (a-names,
+ * 12 Sep 2026). Measured before this was built: of the team's real named
+ * chat spaces, exactly the ones already safe to narrow on resolve today (a
+ * rare, multi-syllable single token, or a declared ALLOW) and no others —
+ * "HOGO" stays agency until somebody declares it safe, the same way "green"
+ * and "demo" did before them, because a one-word client name said constantly
+ * in its own material is over `ACCOUNT_TOKEN_MAX_CHUNKS` like any other
+ * ordinary word. That is the rarity gate working, not a gap this reopens.
+ *
+ * NEVER A SECOND MATCHER. This calls `accountsNamedIn` — the exact function a
+ * question is resolved through — so kb_CD's DENY, the rarity ceiling, and
+ * the multi-company refusal all apply unchanged, for free. A space naming
+ * two clients resolves to neither, the same sentence a question naming two
+ * clients gets.
+ *
+ * A DECLARED `accountId` (`listNamedSources`'s own field — a human's filing
+ * decision, made when they shared the space) is NEVER second-guessed by a
+ * name match; skipping the lookup for it is a cost guard, not the
+ * correctness one (a declared value always wins wherever this map is read).
+ *
+ * ONE FUNCTION, TWO CALLERS (fix/kb-chat-backfill, 12 Sep 2026): the live
+ * sweep's chat kind, below, and `refileChatSources`'s backfill. A live
+ * thread and an already-filed one can never disagree about what a space
+ * means, because there is exactly one place that decides it. */
+export async function resolveChatSpaceAccounts(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<Map<string, string | null>> {
+  const resolved = new Map<string, string | null>()
+  for (const space of await listNamedSources(cfg, guard, "chat")) {
+    if (space.accountId) {
+      resolved.set(space.id, space.accountId)
+      continue
+    }
+    const matches = await accountsNamedIn(cfg, guard, space.name)
+    resolved.set(space.id, matches.length === 1 ? matches[0].id : null)
+  }
+  return resolved
+}
+
+/** BRING THE BACK-CATALOGUE IN LINE WITH WHAT THE SWEEP DECIDES TODAY
+ * (fix/kb-chat-backfill, 12 Sep 2026).
+ *
+ * THE GAP THIS CLOSES: `resolveChatSpaceAccounts` (above) only ever runs
+ * inside a chat THREAD's own read — so a space's filing only ever moves when
+ * that thread is re-read, and a windowed kind does not re-read its whole
+ * back-catalogue (`googleIngestKinds`'s own chat kind comment: a rewind only
+ * fires on a tick that finds nothing new, and a space with a steady trickle
+ * never has one). Measured live on staging: 32 of 407 moved across two real
+ * sweeps, whole spaces named after a client sitting untouched since the day
+ * before — correct code, asked about the wrong rows.
+ *
+ * ONE RESOLUTION, NOT A SECOND ONE. This calls `resolveChatSpaceAccounts` —
+ * the exact function the live sweep calls — and does nothing else to decide
+ * an account. Every clause that function already carries (declared always
+ * wins, the rarity gate, kb_CD's DENY, the multi-company refusal) is
+ * inherited, not re-implemented.
+ *
+ * `account_id` AND `compartment` MOVE TOGETHER, on `knowledge_sources` AND
+ * on `knowledge_chunks` — the denormalised copy retrieval actually reads
+ * (`knowledge.ts`'s own comment on `updateSource`: "the chunks and the
+ * vectors carry the compartment too... or the index would answer for a
+ * client whose material this no longer is"). No embedding call: the WORDS
+ * have not changed, only who they are filed under, so this is two UPDATEs
+ * per space that needs one, never a re-index.
+ *
+ * IDEMPOTENT BY CONSTRUCTION, not by a guard bolted on: every row's OLD
+ * value is read back before anything is written, and only a row whose
+ * account_id or compartment actually DIFFERS from today's fresh resolution
+ * is touched at all. A second run recomputes the same resolution (unless a
+ * space was renamed or a flag changed since) and finds nothing left to
+ * change — `moved` is the proof, not an assumption: it counts real rows
+ * that were wrong before this ran.
+ *
+ * `dryRun` computes and counts everything above and writes nothing — the
+ * seam this repo's own scripts use to show a diff before anyone approves
+ * one (`scripts/wipe-knowledge.mjs`'s own pattern). A SCRIPT calls this,
+ * never a door: this repairs data that predates a fix already shipped, not
+ * an ongoing job the app needs to run on its own — the shape
+ * `scripts/knowledge-backfill.mjs` already is for exactly this reason, and
+ * a permanent HTTP door onto "rewrite whatever a matcher currently says"
+ * is machinery this fix does not need once the back-catalogue is caught up. */
+export async function refileChatSources(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  opts: { dryRun?: boolean } = {}
+): Promise<{
+  moved: number
+  byAccount: Record<string, number>
+  toAgency: number
+  moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[]
+}> {
+  const spaces = await listNamedSources(cfg, guard, "chat")
+  const resolved = await resolveChatSpaceAccounts(cfg, guard)
+  const byAccount: Record<string, number> = {}
+  const moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[] = []
+  let toAgency = 0
+  for (const space of spaces) {
+    const accountId = resolved.get(space.id) ?? null
+    const compartment = accountId ? accountCompartment(accountId) : AGENCY_COMPARTMENT
+    const current = await d1Query<{ id: string; account_id: string | null; compartment: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: bounded by one named space's own conversations, not a team-wide
+      // scan — the thread id this space's own external id prefixes.
+      `SELECT id, account_id, compartment FROM knowledge_sources
+        WHERE origin_table = 'google_chat' AND origin_row_id LIKE ? ESCAPE '\\'`,
+      [`${likeLiteral(space.externalId)}/%`]
+    )
+    const toChange = current.filter((r) => r.account_id !== accountId || r.compartment !== compartment)
+    if (!toChange.length) continue
+    for (const r of toChange) moves.push({ sourceId: r.id, fromAccountId: r.account_id, toAccountId: accountId })
+    if (accountId) byAccount[accountId] = (byAccount[accountId] ?? 0) + toChange.length
+    else toAgency += toChange.length
+    if (opts.dryRun) continue
+    const ids = toChange.map((r) => sqlString(r.id)).join(", ")
+    const now = new Date().toISOString()
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_sources SET account_id = ?, compartment = ?, updated_at = ? WHERE id IN (${ids})`,
+      [accountId, compartment, now]
+    )
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_chunks SET compartment = ? WHERE source_id IN (${ids})`,
+      [compartment]
+    )
+  }
+  return { moved: moves.length, byAccount, toAgency, moves }
+}
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -1566,46 +1707,20 @@ export function googleIngestKinds(
       // that knows what a message is — so by the time an item reaches here it IS
       // a conversation, and this lane has nothing left to group.
       read: async (cfg, guard, cursor, limit) => {
-        // THE SPACE'S OWN NAME, RESOLVED THE SAME WAY A QUESTION IS (a-names,
-        // 12 Sep 2026). Measured before this was built: of the team's real
-        // named chat spaces, exactly the ones already safe to narrow on
-        // resolve today (a rare, multi-syllable single token, or a declared
-        // ALLOW) and no others — "HOGO" stays agency until somebody declares
-        // it safe, the same way "green" and "demo" did before them, because a
-        // one-word client name said constantly in its own material is over
-        // `ACCOUNT_TOKEN_MAX_CHUNKS` like any other ordinary word. That is the
-        // rarity gate working, not a gap this reopens.
+        // THE SPACE'S OWN NAME, RESOLVED THE SAME WAY A QUESTION IS — see
+        // `resolveChatSpaceAccounts`'s own header for the whole argument
+        // (rarity gate, DENY, ambiguity, all inherited from `accountsNamedIn`
+        // unchanged). RE-DECIDED EVERY TICK, off the space's CURRENT name —
+        // what makes a wrong resolution correct itself is the generic
+        // engine's own unconditional `account_id = excluded.account_id` on
+        // every upsert (already shipped, untouched here); this only ever
+        // changes what value that write gets.
         //
-        // NEVER A SECOND MATCHER. This calls `accountsNamedIn` — the exact
-        // function a question is resolved through — so kb_CD's DENY, the
-        // rarity ceiling, and the multi-company refusal all apply unchanged,
-        // for free. A space naming two clients resolves to neither, the same
-        // sentence a question naming two clients gets.
-        //
-        // A DECLARED `accountId` ALWAYS WINS, and this never runs to look one
-        // up: `listNamedSources` already carries it, and the loop below skips
-        // any space that has one. A human's own filing decision, made when
-        // they shared the space, is never second-guessed by a name match.
-        //
-        // RE-DECIDED EVERY TICK, NEVER A BACKFILL. This runs at the top of the
-        // read every time, off the space's CURRENT name — a space Google
-        // renames, or an account somebody declares ALLOW on after the fact,
-        // resolves differently on the very next sweep. What makes a wrong
-        // resolution correct itself is the generic engine's own unconditional
-        // `account_id = excluded.account_id` on every upsert (already shipped,
-        // untouched here) — this only ever changes what value that write
-        // gets, never whether it happens.
-        const spaceAccountId = new Map<string, string>()
-        for (const space of await listNamedSources(cfg, guard, "chat")) {
-          // A COST GUARD, NOT THE CORRECTNESS ONE — "declared always wins" is
-          // enforced below, in the row mapper's own `item.accountId ?? ...`
-          // order (mutation-proven directly against that line). Skipping here
-          // too just means an already-filed space never pays for a name-match
-          // query it can only ever lose.
-          if (space.accountId) continue
-          const matches = await accountsNamedIn(cfg, guard, space.name)
-          if (matches.length === 1) spaceAccountId.set(space.id, matches[0].id)
-        }
+        // THE SAME FUNCTION THE BACKFILL CALLS (fix/kb-chat-backfill, 12 Sep
+        // 2026, `refileChatSources`) — one resolution, two callers, so a live
+        // thread and an already-filed one can never disagree about what a
+        // space means.
+        const spaceAccountId = await resolveChatSpaceAccounts(cfg, guard)
         const toRows = (items: GoogleItem[]) =>
           items.map((item) => ({
             // The THREAD is the row, so the thread's own id is the key. A new
