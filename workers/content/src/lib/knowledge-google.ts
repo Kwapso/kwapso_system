@@ -728,22 +728,31 @@ export function risingBackfillWindow(now: Date, state: BackfillState): { from: s
 }
 
 /** MOVE THE RISING WALK ON, honestly — mirrors `meetings.ts`'s own
- * `advanceBackfill` exactly: a truncated read (ascending) has covered
+ * `advanceBackfill` exactly: an incomplete read (ascending) has covered
  * `[window.from, lastEntryAt]`, so the next call resumes there rather than
- * at `window.to`; a truncated read whose last entry starts no later than
+ * at `window.to`; an incomplete read whose last entry starts no later than
  * `window.from` (a pile of simultaneous entries) advances anyway rather
  * than stalling for ever, same degenerate case, same answer. Reaching `now`
  * returns `{done:true}` instead of a timestamp `now` would immediately be
  * behind on the very next call — see the header on `BACKFILL_DONE` for why a
- * moving `now` cannot be allowed to undo that once it is reached. */
+ * moving `now` cannot be allowed to undo that once it is reached.
+ *
+ * `incomplete`, NOT `truncated` (renamed, 12 Sep 2026 fix — see `slice`'s own
+ * header on the field this reads). The parameter used to be Google's own
+ * truncation flag alone, which asks only "did GOOGLE stop before its own page
+ * ceiling" — a window that Google answered in full but the ingest's own
+ * per-tick cap (`limit`, far below Google's ceiling) still could not fully
+ * FILE read as "complete" and this function advanced past it, silently,
+ * every time. The caller now passes the wider signal; nothing in the
+ * function's own logic needed to change once it is telling the truth. */
 function advanceRisingBackfill(
   now: Date,
   window: { from: string; to: string },
-  truncated: boolean,
+  incomplete: boolean,
   lastEntryAt: string | null
 ): BackfillState {
   let next = window.to
-  if (truncated) {
+  if (incomplete) {
     const at = Date.parse(lastEntryAt ?? "")
     if (Number.isFinite(at) && at > Date.parse(window.from)) next = new Date(at).toISOString()
   }
@@ -768,18 +777,28 @@ function fallingBackfillWindow(now: Date, state: BackfillState): { from: string;
 }
 
 /** MOVE THE FALLING WALK ON — the mirror image of `advanceRisingBackfill`:
- * the read starts at `window.to` (newest-first), so a truncated read has
+ * the read starts at `window.to` (newest-first), so an incomplete read has
  * covered `[firstEntryAt, window.to]` and the next call resumes at
  * `firstEntryAt` rather than at `window.from`. Reaching the floor returns
- * `{done:true}` for the same reason the rising walk does at `now`. */
+ * `{done:true}` for the same reason the rising walk does at `now`.
+ *
+ * `incomplete`, NOT `truncated` — see `advanceRisingBackfill`'s own header for
+ * the 12 Sep 2026 fix this mirrors: Google's own page ceiling and the ingest's
+ * per-tick filing cap are two different ceilings, and only the wider of the
+ * two answers "was this window actually covered". This is the direction that
+ * carried the fix's whole cost on real staging: gmail's `messages.list` has no
+ * ordering and always returns newest-first, so gmail has no live/forward read
+ * that could ever walk backward and quietly recover what a falling tick
+ * skipped — every window this advanced past on the old, narrower signal was
+ * gone for good. */
 function advanceFallingBackfill(
   now: Date,
   window: { from: string; to: string },
-  truncated: boolean,
+  incomplete: boolean,
   firstEntryAt: string | null
 ): BackfillState {
   let next = window.from
-  if (truncated) {
+  if (incomplete) {
     const at = Date.parse(firstEntryAt ?? "")
     if (Number.isFinite(at) && at < Date.parse(window.to)) next = new Date(at).toISOString()
   }
@@ -1068,13 +1087,31 @@ export function googleIngestKinds(
      * backward rather than watching the live one. Present ⇒ `readGoogleMaterial`
      * is bounded to it, `afterCursor` is skipped entirely (the window itself is
      * the bound; the forward cursor's position is irrelevant to material it has
-     * already passed by, ahead or behind), and `truncated` is handed back so the
+     * already passed by, ahead or behind), and `incomplete` is handed back so the
      * caller can advance the backfill honestly instead of guessing from the row
      * count alone. NOT recorded into `seen` — that map answers "what does
      * Google currently hold", and a bounded historical slice is a different,
      * much narrower question. */
-    window?: { from: string; to: string }
-  ): Promise<{ rows: IngestRow[]; truncated: boolean }> => {
+    window?: { from: string; to: string },
+    /** WHICH END OF THE WINDOW GETS FILED FIRST when the ingest's own cap bites
+     * — part of the same 12 Sep 2026 fix as `incomplete` below, and load-bearing
+     * in a way `incomplete` alone is not. `ordered` is ALWAYS ascending
+     * (oldest-first); a RISING walk wants exactly that — file the oldest-in-
+     * window first, resume from the newest FILED item, and the next window
+     * picks up right after it, moving correctly toward `now`. A FALLING walk
+     * is the mirror image and taking the same oldest-first slice is backward
+     * for it: it would file the FAR edge of the window (nearest the floor)
+     * first and leave the NEAR edge (nearest `window.to`, i.e. nearest the
+     * live boundary this walk is adjacent to) unfiled — and the watermark
+     * would then resume even FARTHER back, abandoning that near edge for
+     * good, on every tick a window's real volume exceeds `limit`. `true` here
+     * takes the NEWEST slice of the window instead (still ascending inside
+     * it, so `boundary[0]` stays meaningful), so the watermark only ever
+     * resumes at the edge of ground actually covered. `false`/absent for
+     * every other caller — the ordinary forward reads and the rising walk —
+     * whose existing oldest-first behaviour was always correct. */
+    fallingWindow = false
+  ): Promise<{ rows: IngestRow[]; incomplete: boolean }> => {
     const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
     const { items, truncated } = await readGoogleMaterial(env, cfg, guard, {
       services: [service],
@@ -1088,14 +1125,43 @@ export function googleIngestKinds(
     // "Google no longer has this" from "the cursor has already passed it".
     if (seen && !window) seen.set(service, new Map(items.map((i) => [i.externalId, i.shelf])))
     const ordered = inCursorOrder(toRows(items))
-    const wanted = (window ? ordered : afterCursor(ordered, cursor)).slice(0, limit)
+    // THE CANDIDATE POOL, BEFORE THE INGEST'S OWN CAP CUTS IT — kept apart from
+    // `wanted` so the cut can be MEASURED, not merely applied. This is the fix
+    // (backfill watermark undercounting, 12 Sep 2026): `truncated` above answers
+    // ONE question — did GOOGLE stop handing back items before ITS OWN page
+    // ceiling (`GMAIL_SWEEP_PAGES`/`CALENDAR_MAX_PAGES` × `GOOGLE_PAGE_SIZE`,
+    // ~200-250)? It says NOTHING about whether this tick actually FILED
+    // everything Google did hand back — `wanted` below is separately capped at
+    // `limit` (`INGEST_SOURCES_PER_TICK`, 25), far below Google's own ceiling.
+    // So a window holding, say, 60 real items read as "not truncated" (60 < 200)
+    // while only the first 25 were ever filed — and both `advanceFallingBackfill`
+    // and `advanceRisingBackfill` read "not truncated" as "this window is fully
+    // covered, move the watermark past it" (their own comments said "advance by
+    // what was ACTUALLY READ" — read, not FILED, is exactly the word that hid
+    // this). The remaining 35 were never filed and the watermark had already
+    // moved past the ground they sat on, so no later tick would ever revisit
+    // them: permanent, silent loss with the sweep reporting success throughout.
+    // Measured on real staging, 12 Sep 2026: gmail's history stopped 5 weeks
+    // back and calendar's own mirror (`event`) stopped 1 month back, both
+    // declaring themselves caught up, while the owner's real Google history
+    // goes back years.
+    const pool = window ? ordered : afterCursor(ordered, cursor)
+    // FALLING TAKES THE NEWEST SLICE, ASCENDING WITHIN IT — see `fallingWindow`'s
+    // own header above for why the direction has to differ here.
+    const wanted = fallingWindow ? pool.slice(Math.max(0, pool.length - limit)) : pool.slice(0, limit)
+    // NEITHER HALF ALONE IS ENOUGH: a window can be short of Google's own
+    // ceiling and still short of what this tick could file (the case above), or
+    // it can genuinely hit Google's ceiling with room still left under `limit`
+    // (a dense window handed back exactly `limit` items and Google says there
+    // was more). Either way the caller must not credit the window as covered.
+    const incomplete = truncated || pool.length > wanted.length
     // THE FOLD RIDES THE SAME EXIT `mended` DOES, and for the same reason: a
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
     const fold = (r: IngestRow) =>
       settledEvent(statedEvent(service, folded(service, mended(r), targets)), targets)
-    if (!hydrate || wanted.length === 0) return { rows: wanted.map(fold), truncated }
+    if (!hydrate || wanted.length === 0) return { rows: wanted.map(fold), incomplete }
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
@@ -1109,7 +1175,7 @@ export function googleIngestKinds(
       wanted.map((r) => byId.get(r.originRowId)).filter((i): i is GoogleItem => Boolean(i))
     )
     const textById = new Map(full.map((i) => [rowId(i), i.text]))
-    return { rows: wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body })), truncated }
+    return { rows: wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body })), incomplete }
   }
 
   /** ONE KIND'S BACKWARD WALK, folded into its regular forward read — the
@@ -1117,12 +1183,14 @@ export function googleIngestKinds(
    * `backfilled_through`, compute this tick's slice, read it through the
    * SAME `slice()` every regular read uses (same fold, same fencing, same
    * mojibake mend — a fifth backfilled kind gets all of that for free), and
-   * advance the watermark by what was ACTUALLY read, never by what was asked
-   * for. Merged with the forward rows by `originRowId` — an item both windows
-   * happen to see this tick is upserted once, not filed twice (the fold's own
-   * `ON CONFLICT`, R68, already makes a double-upsert harmless; this is
-   * simply not doing it twice on purpose). Returns `[]` and touches Google
-   * not at all once the walk is done — `risingBackfillWindow`/
+   * advance the watermark by what was ACTUALLY FILED, never by what was asked
+   * for or merely READ. ("Actually read" is the word this comment used to say,
+   * and it is exactly the gap the 12 Sep 2026 fix closed — see `incomplete`'s
+   * own header on `slice`.) Merged with the forward rows by `originRowId` — an
+   * item both windows happen to see this tick is upserted once, not filed
+   * twice (the fold's own `ON CONFLICT`, R68, already makes a double-upsert
+   * harmless; this is simply not doing it twice on purpose). Returns `[]` and
+   * touches Google not at all once the walk is done — `risingBackfillWindow`/
    * `fallingBackfillWindow` returning `null` is the whole of that. */
   const backfillRows = async (
     service: "calendar" | "gmail",
@@ -1136,11 +1204,11 @@ export function googleIngestKinds(
     const state = await backfilledThrough(cfg, guard, service, stateKey)
     const window = rising ? risingBackfillWindow(now, state) : fallingBackfillWindow(now, state)
     if (!window) return []
-    const { rows, truncated } = await slice(service, null, limit, toRows, hydrate, window)
+    const { rows, incomplete } = await slice(service, null, limit, toRows, hydrate, window, !rising)
     const boundary = rows.map((r) => r.sortAt).filter(Boolean).sort()
     const next = rising
-      ? advanceRisingBackfill(now, window, truncated, boundary[boundary.length - 1] ?? null)
-      : advanceFallingBackfill(now, window, truncated, boundary[0] ?? null)
+      ? advanceRisingBackfill(now, window, incomplete, boundary[boundary.length - 1] ?? null)
+      : advanceFallingBackfill(now, window, incomplete, boundary[0] ?? null)
     await writeBackfillThrough(cfg, guard, stateKey, next)
     return rows
   }
