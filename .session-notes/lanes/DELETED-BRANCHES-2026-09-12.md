@@ -37,3 +37,48 @@ fix/wipe-order                                       2d205b38034ed30e6df1c733bc4
 investigate/c-hijack-single-token-collapse           eb9ce4fa076f7ee820e99c2b64e1ca46140e8e37
 investigate/kb-english-german                        bfc5d0a436902c5985346d50d2e53c97960d722b
 test/app-fence-clause                                976e4143354ed49e3e0be704adde5dda858ab032
+
+## Second pass, same day — everything except main and the lanes still building
+
+The owner's instruction: "I just want one branch that has the latest version
+of everything, so it's clean." He is right that main carries the whole history.
+These are NOT all merged — several hold real unmerged work (the to-95 review
+branches, three rescue/stash-* branches recovered from near-loss, some spikes).
+That is exactly why every sha is written down: deleting the label is reversible,
+and this file is the means. git push origin <sha>:refs/heads/<name>
+
+BRANCH                                               AHEAD  SHA
+audit/design-swap-map                                2      915396cadbdf048bed16b0c4929f25e863764a8e
+docs/alt-names-seed-note                             1      41ac3840d4cf63c0383fca977f32aee57caee22f
+docs/heading-size-answered                           1      ff5ea3ab34e3185f63b9ddc4e68510dfe884481c
+docs/heading-size-settled                            1      2da94f506bc629f0a643b6fc563623b7ef957caf
+docs/kb-shared-with-design-brief                     1      6f9d60c9f680748310e1c00e924d03a12024a451
+docs/lane-briefs-and-portal-sweep                    1      075c2fa72f9edbd7272beab2b15307891de4303e
+docs/third-ruling-teams-stay                         1      658bc7e997868846f65605defb7a29776a825f72
+feat/kb-screens                                      1      b92241cc252cb8088b5130144b2ab8a74f113211
+feat/screen-builder                                  1      682d2fd1fbd0b80e23d49b455ce398cd3c7b81df
+fix/activity-log-to-95                               2      8168a69764aa13abdbdb6a6781dd368d31a94ecb
+fix/builder-chrome                                   1      f3b6809be3d74e69426dfee939e5f71843f944f1
+fix/docs-to-95                                       1      ee87119ce54c4bf33d3bf550bf933cac7df18d5d
+fix/first-run-to-95                                  1      94b2a0b8255fc1c0c5b2994388234d9e305f9191
+fix/kb-exact-and-count                               1      6b934c20535b36a2bfa77f73e36fea054ce0086e
+fix/kb-screens-wording                               2      1555738ddfbff65ab603f0a4b6f641066d19f40e
+fix/knowledge-base-control                           3      da95db60a99a9efa72ff3764bca8423b506be577
+fix/knowledge-rebuild                                1      1b88ed5e9edc3cf01fcb4d15c838706ca3d9c272
+fix/money-taint-outbound                             2      9da69cfec1112648e7eb7db562b27e72c951af8f
+fix/portal-toolbar                                   1      fd6272aef5c595a25b9e1ea79bded7c550468b95
+fix/realtime-health-binding-name                     1      8a53d29311b9720e62c2b79ac77a79442bec32c1
+fix/realtime-identity-headers                        1      de858261f2a3d23686a9c790fb09919b5a4aa7c1
+fix/record-toggle-names                              1      b4bb5fa6b1310c23d8c2c9d12ddbc194e7147638
+fix/security-to-95                                   1      d80f4bfd7d1843d63214d943862415e5ba7e7cdd
+fix/speed-to-95                                      2      0d303ad728f7c51e9dc3afb453e9e75d1f4a62c1
+fix/spend-errors-to-95                               2      2cc2f2beb5d966258aab55d96ab80b900686412b
+fix/structure-to-95                                  3      92628f96f4c2ef21612c612f972d9593237ffa83
+fix/tidiness-to-95                                   3      8a87dbb096b89c73847400c1df60eff686ead03d
+merge/speed-resolved                                 3      f6661d10b91877fffa5df4648bde04d65421e26a
+merge/structure-resolved                             4      68b40e28871841900e4b021711a0202dc785ffa0
+merge/tidiness-resolved                              4      8e12a54c0ea950dd13f68d75e1a2ca9c83f4f499
+rescue/stash-0-20260907                              3      b284f28618ab63a70dcbc54d26ad60f1e014b63f
+rescue/stash-1-20260819                              3      b61a43b6e66ed1e9c9eb3a3c8848b09f18ab15c1
+rescue/stash-2-20260818                              3      e9d41e27bf8c280c56a7d551ff4b8f0e423be72f
+spike/service-binding-streams                        1      40d569338b20cbab6452d24375bc30a98cae9650
