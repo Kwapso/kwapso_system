@@ -7,8 +7,8 @@
 // replaces it is the derived, read-only reach line — the true fact ("who has
 // actually sighted this") standing in for the setting nobody can pick anymore.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { KnowledgeFormDialog } from "@/components/knowledge/knowledge-form-dialog"
 
@@ -269,5 +269,132 @@ describe("KnowledgeFormDialog — a video link's three states", () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(closed).toBe(true)
+  })
+})
+
+// THE THEATRICAL NARRATION (owner's own ask, 12 Sep) AND ITS ONE CONDITION:
+// a predicted step that keeps claiming progress after the request has died
+// is what turns this from delightful into a lie. These two shapes — the
+// honesty timeout, and a settle that must stop the narration immediately —
+// are the whole point of the feature, per the hub's own brief, so they are
+// the two mutation-proved here rather than merely asserted once.
+describe("KnowledgeFormDialog — the video-link narration's honesty condition", () => {
+  const videoBase = {
+    title: "A talk",
+    visibility: "team" as const,
+    body: "",
+    sourceUrl: "https://www.youtube.com/watch?v=abc123",
+    accountId: "",
+    visibleToAppId: "",
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  async function settle(ms: number) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it("advances through the predicted steps while the request is still running", async () => {
+    const pending = new Promise<void>(() => {}) // never resolves for this test
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={() => pending}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={videoBase}
+      />
+    )
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    })
+    // Step 0 ("Reading the link…") is the button's own label, not drawn a
+    // second time here — see the component's own comment on that branch.
+    expect(screen.queryByText("Making sense of what it says…")).toBeNull()
+    await settle(1200)
+    expect(screen.getByText("Making sense of what it says…")).toBeTruthy()
+    await settle(1200)
+    expect(screen.getByText("Almost done…")).toBeTruthy()
+  })
+
+  // THE HONESTY BOUND, MUTATION-PROVED. If this fires before the real
+  // request has died, or never fires at all, a person is left staring at
+  // "Almost done…" for ever — the exact "spinner that lies" the owner named
+  // as the one unacceptable outcome.
+  it("stops advancing and names the wait once the honesty bound is crossed", async () => {
+    const pending = new Promise<void>(() => {})
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={() => pending}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={videoBase}
+      />
+    )
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    })
+    await settle(14_999)
+    expect(screen.queryByText("This is taking longer than it should.")).toBeNull()
+    await settle(1)
+    expect(screen.getByText("This is taking longer than it should.")).toBeTruthy()
+    // STOPS ADVANCING: once crossed, later timers firing (there are none left
+    // to fire, but time itself keeps moving) must not un-cross it or swap the
+    // sentence back to a predicted step.
+    await settle(60_000)
+    expect(screen.getByText("This is taking longer than it should.")).toBeTruthy()
+  })
+
+  // THE FAILURE PATH, MUTATION-PROVED. A request that dies must land on the
+  // truth immediately, not finish its predicted dance first — the owner's
+  // own words, "if there is some infinite delay or failure, you can catch
+  // that, then that's fine," name failure and the endless case in the same
+  // breath, and this is the failure half of that sentence.
+  it("a refusal lands immediately and clears the narration, even mid-step", async () => {
+    let resolveSubmit: (v: { refusedBecause: string }) => void = () => {}
+    const pending = new Promise<{ refusedBecause: string }>((r) => (resolveSubmit = r))
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={() => pending}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={videoBase}
+      />
+    )
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    })
+    await settle(1200)
+    expect(screen.getByText("Making sense of what it says…")).toBeTruthy()
+    await act(async () => {
+      resolveSubmit({ refusedBecause: "We recognise this host, but it publishes no transcript." })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(screen.getByText("We recognise this host, but it publishes no transcript.")).toBeTruthy()
+    expect(screen.queryByText("Making sense of what it says…")).toBeNull()
+    // AND THE REFUSAL KEEPS WINNING, however long the clock runs afterwards:
+    // a stray timer firing late (this request's, or a future one's) must
+    // never resurrect the timeout sentence over the real one the person is
+    // now reading — proof the refusal's priority in the render holds, not
+    // just true the instant it lands.
+    await settle(60_000)
+    expect(screen.queryByText("This is taking longer than it should.")).toBeNull()
+    expect(screen.getByText("We recognise this host, but it publishes no transcript.")).toBeTruthy()
   })
 })

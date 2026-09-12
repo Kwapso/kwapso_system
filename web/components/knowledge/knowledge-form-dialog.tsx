@@ -61,7 +61,48 @@ import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { isVideoLink } from "@shared/media-links"
 import { useT } from "@shared/web/language"
+import type { Translate } from "@shared/web/format"
 import { sightingsLine } from "@/components/knowledge/knowledge-source-card"
+
+/** THE THEATRICAL STEPS (owner's own ask, 12 Sep: "I would love to see the
+ * steps... show progress, where we are, and what's happening... so much
+ * better for the user to be transparent"). Predicted CLIENT-SIDE, never
+ * pushed from the door — he accepted that in writing ("Client-side
+ * narration — this is great") — so every step describes INTENT, never a
+ * RESULT: "Reading the transcript…" is a prediction anyone would make
+ * before reading it; "Read 1,873 words" is a fact only the door's own
+ * response may state (`linkReadSentence`, the one place a number appears).
+ *
+ * TIMED OFF A REAL MEASUREMENT, not a guess: the owner's own Tella recording
+ * (`content.kwapso.com/video/hogo-cv-upload-optimised-5snm`, 1,873 words —
+ * the exact number in his own report) took 2.4s end to end against the
+ * shipped reader, measured directly on 12 Sep 2026. Both later steps land
+ * inside that window; the honesty timeout below is nowhere near either. */
+const NARRATION_STEPS: { text: (t: Translate) => string }[] = [
+  { text: (t) => t("Reading the link…") },
+  { text: (t) => t("Making sense of what it says…") },
+  { text: (t) => t("Almost done…") },
+]
+/** When each step after the first is due, in the same order as the array
+ * above (the first is immediate). Kept beside the steps rather than folded
+ * into the same object so the STEPS read as prose and the TIMING reads as
+ * numbers — two different things a reviewer checks for two different
+ * reasons. */
+const NARRATION_STEP_DELAYS_MS = [1200, 2400]
+
+/** THE HONESTY BOUND (owner's own condition, 12 Sep: "if there is some
+ * infinite delay or failure, you can catch that, then that's fine"). Set
+ * off the DOOR'S OWN declared ceiling, never guessed: every link fetch this
+ * feature can reach is capped server-side at `LINK_FETCH_TIMEOUT_MS` (10s —
+ * `workers/content/src/lib/source-readers.ts`, R11), and YouTube, Loom and
+ * Tella are all statically known hosts (`LINK_TYPES`), so none of the three
+ * ever pays a second, discovery fetch on top of that one. 15s is that 10s
+ * ceiling plus a margin for the request's own round trip: long enough to
+ * never fire while the door is still legitimately inside its own guarantee
+ * (measured real case: 2.4s), short enough that a reply that never arrives
+ * — a dropped connection, a hung tab — is named rather than spun on
+ * forever. */
+const NARRATION_TIMEOUT_MS = 15_000
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
@@ -163,6 +204,47 @@ export function KnowledgeFormDialog({
   // changes the link — a stale refusal about the last URL would describe the
   // wrong thing the moment they paste a new one.
   const [linkRefusal, setLinkRefusal] = React.useState<string | null>(null)
+  // WHICH PREDICTED STEP IS SHOWING, and whether the honesty bound has been
+  // crossed. Both reset to their starting values the instant a save starts
+  // or settles (`startNarration`/`stopNarration` below) — neither survives
+  // past the request that scheduled it, which is what stops a stale "Almost
+  // done…" from outliving the request it was ever about.
+  const [narrationStep, setNarrationStep] = React.useState(0)
+  const [narrationTimedOut, setNarrationTimedOut] = React.useState(false)
+  const narrationTimers = React.useRef<ReturnType<typeof setTimeout>[]>([])
+
+  function stopNarration() {
+    // BELT ON TOP OF THE SUSPENDERS BELOW: the render itself never shows a
+    // predicted step once `busy` is false, and a `linkRefusal` is checked
+    // BEFORE any of the busy/narration branches — so the real outcome wins
+    // even in the hypothetical where `busy` got stuck. This function's own
+    // job is narrower: kill the pending timers so they cannot fire a
+    // `setState` into a component that has moved on to a different request
+    // (or, via the `useEffect` cleanup below, has unmounted) — not the sole
+    // guarantee that a stale step is never SEEN, which the render's own
+    // structure already provides on its own. Called from every exit of
+    // `submit()` (success, refusal, throw) via `finally`, and once more on
+    // unmount.
+    narrationTimers.current.forEach(clearTimeout)
+    narrationTimers.current = []
+    setNarrationStep(0)
+    setNarrationTimedOut(false)
+  }
+
+  function startNarration() {
+    stopNarration()
+    NARRATION_STEP_DELAYS_MS.forEach((delay, i) => {
+      narrationTimers.current.push(setTimeout(() => setNarrationStep(i + 1), delay))
+    })
+    narrationTimers.current.push(setTimeout(() => setNarrationTimedOut(true), NARRATION_TIMEOUT_MS))
+  }
+
+  // A REQUEST THAT NEVER GETS TO `finally` — the dialog itself unmounting
+  // mid-flight — must not leave a timer alive to call `setState` on a
+  // component that no longer exists. `FormShellDialog` already refuses to
+  // let a busy form be dismissed, so this is a backstop for a case that
+  // should not happen rather than the primary guard.
+  React.useEffect(() => stopNarration, [])
 
   // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE.
   //
@@ -190,6 +272,13 @@ export function KnowledgeFormDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
+    // A NEW ATTEMPT CLEARS THE LAST ONE'S ANSWER. Resubmitting the same URL
+    // after a refusal must not keep showing that refusal WHILE the new
+    // attempt is running — that would read as "still refusing" for a
+    // request that hasn't answered yet, the same honesty failure this
+    // whole feature exists to avoid, just on the other field.
+    setLinkRefusal(null)
+    if (willReadVideoLink) startNarration()
     try {
       const result = await onSubmit({
         title: values.title.trim(),
@@ -222,6 +311,12 @@ export function KnowledgeFormDialog({
             : t("Couldn't add it to the knowledge base.")
       )
     } finally {
+      // THE HONESTY CONDITION'S OTHER HALF: the request has settled — one way
+      // or another, success, refusal or throw — so whatever the narration was
+      // about is over. Stopped here rather than only inside the try's happy
+      // path, so a THROWN request lands on the real error immediately instead
+      // of finishing its predicted steps first.
+      stopNarration()
       setBusy(false)
     }
   }
@@ -311,6 +406,27 @@ export function KnowledgeFormDialog({
           // (a host we don't recognise vs. one that publishes no transcript)
           // and neither gets paraphrased into the other.
           <p className="text-warning mt-2 text-sm">{linkRefusal}</p>
+        ) : busy && willReadVideoLink && narrationTimedOut ? (
+          // THE HONESTY BOUND CROSSED. Not a paraphrase of a real error — the
+          // door has not answered at all — so this says exactly that, plainly,
+          // rather than a predicted step pretending it still knows what is
+          // happening. See `NARRATION_TIMEOUT_MS`'s own header for the
+          // measurement this bound is set against.
+          <p className="text-warning mt-2 text-sm">{t("This is taking longer than it should.")}</p>
+        ) : busy && willReadVideoLink && narrationStep > 0 ? (
+          // A PREDICTED STEP — INTENT, never a RESULT. See `NARRATION_STEPS`'s
+          // own header for why that is honest here and a word count would not
+          // be. Step 0 is never drawn here: the submit button already says
+          // "Reading the link…" (its own `loadingLabel`), and the same
+          // sentence in two places on screen at once is noise, not
+          // transparency — this line only speaks once there is something
+          // NEW to say.
+          <p className="text-muted-foreground mt-2 text-xs">{NARRATION_STEPS[narrationStep].text(t)}</p>
+        ) : busy && willReadVideoLink ? (
+          // Step 0, still in flight: nothing here yet, on purpose — see the
+          // branch above. Rendering the pre-submit hint below would say "we'll
+          // read this when you save it" about a save that is already running.
+          null
         ) : nothingToRead ? (
           <p className="text-warning mt-2 text-sm">
             {t(
