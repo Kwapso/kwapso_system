@@ -54,6 +54,12 @@ const holder = vi.hoisted(() => ({
   /** Extra chat messages one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   chat: [] as Record<string, unknown>[],
+  /** a-names/chat-filing: messages for a NAMED SPACE other than "spaces/AAA" —
+   * keyed by the space's own externalId, so a new fixture space can carry its
+   * own conversation without touching AAA's. Empty by default: every space
+   * this file already knows about keeps reading the AAA-shaped fixture below,
+   * unchanged. */
+  chatBySpace: new Map<string, Record<string, unknown>[]>(),
 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
@@ -162,7 +168,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
           ...holder.events,
         ],
     }),
-    chatMessages: async () => ({ learned: new Map<string, string>(), messages: [
+    chatMessages: async (_token: string, spaceName: string) => {
+      if (holder.chatBySpace.has(spaceName))
+        return { learned: new Map<string, string>(), messages: holder.chatBySpace.get(spaceName) }
+      return { learned: new Map<string, string>(), messages: [
       {
         id: "spaces/AAA/messages/MSG_2",
         space: "spaces/AAA",
@@ -186,7 +195,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         createdAt: "2026-08-03T10:00:00.000Z",
       },
       ...holder.chat,
-    ] }),
+    ] } },
   }
 })
 
@@ -315,6 +324,7 @@ beforeEach(() => {
   holder.mailTo = null
   holder.mailFrom = null
   holder.chat = []
+  holder.chatBySpace.clear()
   holder.driveText.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
@@ -509,6 +519,132 @@ describe("the compartment is decided, not guessed", () => {
   })
 })
 
+// a-names/chat-filing (12 Sep 2026). The owner's own complaint: a Chat space is
+// NAMED after the client it is about, and nothing joined that name to the
+// account it names — every chat source filed to the agency, whatever the space
+// was called. This is the fallback ONLY: a space with a DECLARED account_id
+// ("Delivery room", the shared fixture above) never reaches this code at all,
+// proven by every test above continuing to pass unchanged. `accountsNamedIn`
+// is the exact function a question is resolved through — no second matcher —
+// so the rarity gate, kb_CD's DENY and the multi-company refusal all apply
+// here for free, unmodified.
+describe("a-names/chat-filing: an unfiled chat space resolves its own name, the same way a question does", () => {
+  function nameSpace(id: string, externalId: string, name: string): void {
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('${id}', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', '${externalId}', '${name}', 'team', NULL, '2026-01-01', '${IDS.staffUser}');`
+    )
+  }
+  function seedName(name: string, refId: string): void {
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_${name}_${refId}', 'account', '${refId}', '${name}', NULL, 'account:${refId}', '2026-01-01');`
+    )
+  }
+  function chatFixture(spaceId: string, msgId: string, text: string, createdAt: string) {
+    return [
+      {
+        id: `${spaceId}/messages/${msgId}`,
+        space: spaceId,
+        sender: "Ana",
+        senderNamed: true,
+        senderIsApp: false,
+        thread: `${spaceId}/threads/T1`,
+        url: `https://chat.google.com/room/${msgId}`,
+        text,
+        createdAt,
+      },
+    ]
+  }
+
+  it("case 1 — a space named for ONE client files its material to that client", async () => {
+    seedName("rarespacename", IDS.victimAccount)
+    nameSpace("S_ONE", "spaces/ONE", "RareSpaceName")
+    holder.chatBySpace.set("spaces/ONE", chatFixture("spaces/ONE", "M1", "the room's own conversation", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("RareSpaceName"))
+    expect(filed?.account_id).toBe(IDS.victimAccount)
+    expect(filed?.compartment).toBe(`account:${IDS.victimAccount}`)
+  })
+
+  it("case 2 — a space matching no client, or the agency's own name, stays agency", async () => {
+    nameSpace("S_TWO", "spaces/TWO", "Team")
+    holder.chatBySpace.set("spaces/TWO", chatFixture("spaces/TWO", "M2", "general chatter", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("Team"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 3 — a space naming a word TWO clients share resolves to NEITHER, same as a question would", async () => {
+    seedName("ambigspace", IDS.victimAccount)
+    seedName("ambigspace", IDS.burglarAccount)
+    nameSpace("S_THREE", "spaces/THREE", "AmbigSpace")
+    holder.chatBySpace.set("spaces/THREE", chatFixture("spaces/THREE", "M3", "which client is this", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("AmbigSpace"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 3b — a space naming TWO DIFFERENT real clients by their own distinct names stays agency too, never picks one", async () => {
+    // Unlike case 3's ONE shared token (already resolved to neither INSIDE
+    // accountsNamedIn), this is the fan-out shape: two genuinely different,
+    // unambiguous two-word names, each safe on its own — the shape a
+    // scalar `account_id` column cannot hold two answers to, so the space
+    // stays agency exactly as an over-fragile single-token match would.
+    seedName("Alpha Beta", IDS.victimAccount)
+    seedName("Gamma Delta", IDS.burglarAccount)
+    nameSpace("S_THREEB", "spaces/THREEB", "Alpha Beta and Gamma Delta sync")
+    holder.chatBySpace.set(
+      "spaces/THREEB",
+      chatFixture("spaces/THREEB", "M3B", "a joint sync between two clients", "2026-08-05T09:00:00.000Z")
+    )
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("Alpha Beta"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 4 — RE-DECIDED on every sweep: a rename moves the filing on the very next tick, not a one-time backfill", async () => {
+    seedName("firstspacename", IDS.victimAccount)
+    nameSpace("S_FOUR", "spaces/FOUR", "FirstSpaceName")
+    holder.chatBySpace.set("spaces/FOUR", chatFixture("spaces/FOUR", "M4", "before the rename", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    // The THREAD's own id, not the message's — `chatThreads` folds messages
+    // into one row per conversation, and the thread id is what stays stable
+    // across the rename below (same room, same conversation, new name).
+    expect(sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FOUR"))?.account_id).toBe(
+      IDS.victimAccount
+    )
+
+    // Google renames the space (the owner renames the room) — the space's row
+    // is the SAME source, same origin id, new name and a new resolution.
+    seedName("secondspacename", IDS.burglarAccount)
+    db().exec(`UPDATE google_sources SET name = 'SecondSpaceName' WHERE id = 'S_FOUR';`)
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FOUR"))
+    expect(filed?.account_id, "the SAME conversation, refiled to the NEW resolution — not stuck on the first sweep's answer").toBe(
+      IDS.burglarAccount
+    )
+  })
+
+  it("a DECLARED account always wins, even when the space's own name would resolve to a different client", async () => {
+    // Named "RareSpaceName" (the exact string case 1 proves resolves to
+    // Bergman) but DECLARED to Delaval — a human's own filing decision, made
+    // when they shared the space, is never second-guessed by a name match.
+    seedName("rarespacename", IDS.victimAccount)
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('S_DECLARED', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', 'spaces/FIVE', 'RareSpaceName', 'team', '${IDS.burglarAccount}', '2026-01-01', '${IDS.staffUser}');`
+    )
+    holder.chatBySpace.set("spaces/FIVE", chatFixture("spaces/FIVE", "M5", "a declared space", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FIVE"))
+    expect(filed?.account_id, "the declared account, not the name's own match").toBe(IDS.burglarAccount)
+  })
+})
+
 describe("d-ingest-filing: accounts[] holds every client a thread concerns, account_id keeps the first", () => {
   it("an ordinary single-client thread still files itself in accounts[], not just account_id", async () => {
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
@@ -540,8 +676,14 @@ describe("d-ingest-filing: accounts[] holds every client a thread concerns, acco
   })
 
   it("a Drive file and a Chat conversation stay singly-filed — no signal to collect for either", async () => {
-    // Ruling, 11 Sep 2026: Drive/Chat's account is a human filing decision made
-    // once, not a text match, so there is nothing for accounts[] to add.
+    // Ruling, 11 Sep 2026, STILL TRUE OF accounts[] — the PLURAL array, not
+    // `account_id`. `account_id` for Chat is no longer only a human filing
+    // decision made once (a-names/chat-filing, 12 Sep 2026: a space with no
+    // declared account resolves its own NAME the same way a question does) —
+    // but that is one value, and there was never more than one candidate to
+    // collect into a second field the way a mail thread can name several
+    // known contacts at once. Drive's own account_id is still exactly the
+    // human decision this comment always described.
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     expect(JSON.parse(byTitle("Bergman dispatch rollout")!.accounts)).toEqual([])
   })

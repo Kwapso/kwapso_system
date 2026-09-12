@@ -2727,9 +2727,13 @@ export type GoogleItem = {
   /** EVERY account this item concerns, when the read that fetched it could tell
    * more than one — GMAIL and CALENDAR only, off the same address/attendee
    * match `accountId` uses, kept instead of discarded past the first hit
-   * (google-read.ts's `matchedAccounts`). Undefined on Drive and Chat, whose
-   * account is a human filing decision made once, at connect time, and is
-   * never more than one by construction — there is nothing to collect.
+   * (google-read.ts's `matchedAccounts`). Undefined on Drive and Chat: a
+   * Drive item's account is still a human filing decision made once, at
+   * connect time. A Chat item's is too, WHEN one was declared — but since
+   * a-names (12 Sep 2026) an undeclared space resolves its own name the same
+   * way a question does (`accountsNamedIn`, `knowledge-google.ts`'s chat
+   * kind), which is still exactly one candidate either way, never more than
+   * one by construction — there is nothing to collect for either kind.
    * Additive to `accountId` (migration 0073): the compartment stays the one
    * value it has to be, this is the wider "also concerns" list. */
   accounts?: string[]

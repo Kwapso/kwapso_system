@@ -84,7 +84,7 @@ import { accessTokenFor, googleScope, knownChatPeople, listConnections, listName
 import { calendarEventIdInText, chatMessages, googlePresence, isConnectionLost, type ChatMessage, type ProbableService } from "./google-api"
 import { chatThreadItem, chatThreads, hydrateText, readGoogleMaterial, tokenOrNull } from "./google-read"
 import { BACKFILL_SLICE_DAYS, BACKFILL_YEARS_BACK } from "./meetings"
-import { execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
+import { accountsNamedIn, execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
 import { brand } from "@shared/brand"
@@ -1459,7 +1459,47 @@ export function googleIngestKinds(
       // folding itself lives in google-read's `chatThreads`, beside the reader
       // that knows what a message is — so by the time an item reaches here it IS
       // a conversation, and this lane has nothing left to group.
-      read: async (_cfg, _guard, cursor, limit) => {
+      read: async (cfg, guard, cursor, limit) => {
+        // THE SPACE'S OWN NAME, RESOLVED THE SAME WAY A QUESTION IS (a-names,
+        // 12 Sep 2026). Measured before this was built: of the team's real
+        // named chat spaces, exactly the ones already safe to narrow on
+        // resolve today (a rare, multi-syllable single token, or a declared
+        // ALLOW) and no others — "HOGO" stays agency until somebody declares
+        // it safe, the same way "green" and "demo" did before them, because a
+        // one-word client name said constantly in its own material is over
+        // `ACCOUNT_TOKEN_MAX_CHUNKS` like any other ordinary word. That is the
+        // rarity gate working, not a gap this reopens.
+        //
+        // NEVER A SECOND MATCHER. This calls `accountsNamedIn` — the exact
+        // function a question is resolved through — so kb_CD's DENY, the
+        // rarity ceiling, and the multi-company refusal all apply unchanged,
+        // for free. A space naming two clients resolves to neither, the same
+        // sentence a question naming two clients gets.
+        //
+        // A DECLARED `accountId` ALWAYS WINS, and this never runs to look one
+        // up: `listNamedSources` already carries it, and the loop below skips
+        // any space that has one. A human's own filing decision, made when
+        // they shared the space, is never second-guessed by a name match.
+        //
+        // RE-DECIDED EVERY TICK, NEVER A BACKFILL. This runs at the top of the
+        // read every time, off the space's CURRENT name — a space Google
+        // renames, or an account somebody declares ALLOW on after the fact,
+        // resolves differently on the very next sweep. What makes a wrong
+        // resolution correct itself is the generic engine's own unconditional
+        // `account_id = excluded.account_id` on every upsert (already shipped,
+        // untouched here) — this only ever changes what value that write
+        // gets, never whether it happens.
+        const spaceAccountId = new Map<string, string>()
+        for (const space of await listNamedSources(cfg, guard, "chat")) {
+          // A COST GUARD, NOT THE CORRECTNESS ONE — "declared always wins" is
+          // enforced below, in the row mapper's own `item.accountId ?? ...`
+          // order (mutation-proven directly against that line). Skipping here
+          // too just means an already-filed space never pays for a name-match
+          // query it can only ever lose.
+          if (space.accountId) continue
+          const matches = await accountsNamedIn(cfg, guard, space.name)
+          if (matches.length === 1) spaceAccountId.set(space.id, matches[0].id)
+        }
         const toRows = (items: GoogleItem[]) =>
           items.map((item) => ({
             // The THREAD is the row, so the thread's own id is the key. A new
@@ -1544,6 +1584,14 @@ export function googleIngestKinds(
             // is what separates the two.
             retired: item.appOnly === true,
             ...fencing(item),
+            // THE FALLBACK, NEVER A SECOND DECISION. `fencing(item)` above
+            // already set `accountId` to whatever this space's OWN row
+            // declares (`item.accountId` = `space.accountId`) — that stays
+            // exactly as it was and is never touched. Only when nothing was
+            // ever declared (`item.accountId` null) does the name match this
+            // read resolved up front get a turn, and only for THIS space
+            // (`item.sourceId` is the space's own id, set by `chatThreadItem`).
+            accountId: item.accountId ?? spaceAccountId.get(item.sourceId ?? "") ?? null,
           }))
         // THE LIVE READ (unbounded, newest per space) plus CHAT'S OWN
         // per-space rising walk (`chatBackfillRows`, migration 0082) — two
