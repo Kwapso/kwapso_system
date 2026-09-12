@@ -92,6 +92,14 @@
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --reader
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --real
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --full-loop
+//   node --experimental-transform-types scripts/kb-exam-run.mjs --real --capture-baseline
+//   node --experimental-transform-types scripts/kb-exam-run.mjs --real --diff-baseline
+//
+// The last two read/write `kb-exam-baseline.json` (checked in) — every scored
+// row's citation ids, not counts, so a citation quietly swapped for a
+// different-but-equal-count one is visible. `--capture-baseline` overwrites
+// it; `--diff-baseline` reports which rows' citation SETS moved since it was
+// captured. Neither flag changes what a plain run prints or scores.
 //
 // KB_INDEX / KB_CORE / KB_TEAM point it at another environment, same as
 // kb-bench.mjs. `cf-exec` on every Cloudflare call this file makes — reads
@@ -99,7 +107,8 @@
 
 import "./lib/shared-alias.mjs"
 
-import { readFileSync } from "node:fs"
+import { execSync } from "node:child_process"
+import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
@@ -112,6 +121,26 @@ const VERBOSE = process.argv.includes("--verbose")
 const FULL_LOOP = process.argv.includes("--full-loop")
 const REAL = process.argv.includes("--real")
 const READER = FULL_LOOP || REAL || process.argv.includes("--reader")
+
+/** THE INSTRUMENT'S OWN BLIND SPOT, closed. A plain run only ever compared
+ * ROW COUNTS across two points in time ("6p/4c" vs "6p/4c") — a citation
+ * swapped for a different, equally-numbered one would pass unnoticed. Found
+ * 12 Sep 2026 comparing a corpus mid-refile against three same-digit
+ * baseline runs: proven at full identity for only 3 of 47 rows, because the
+ * baseline runs had never captured citation IDS, only counts.
+ *
+ * `--capture-baseline` writes every row's citation ids to
+ * `kb-exam-citation-baseline.json` (checked in, read back by
+ * `--diff-baseline`). NOT `kb-exam-baseline.json` — `kb-exam.mjs` already
+ * owns that name for a different baseline (the exam's own STRUCTURE: row
+ * counts by tag/level/disposition, `--update-baseline`), and this file very
+ * nearly overwrote it. `--diff-baseline` loads the citation file and reports
+ * which rows' citation SETS actually changed since it was captured — not
+ * which counts did. */
+const CAPTURE_BASELINE = process.argv.includes("--capture-baseline")
+const DIFF_BASELINE = process.argv.includes("--diff-baseline")
+const BASELINE_PATH = join(HERE, "kb-exam-citation-baseline.json")
+const citationCapture = {}
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
@@ -351,6 +380,33 @@ for (const row of rows) {
   resultsByRowId[row.id] = { found: answer.found, shortlistIds: shortlistFromAnswer(answer) }
   console.log(`${row.id.padEnd(14)} ${answer.found ? `${answer.passages.length}p/${answer.citations.length}c` : "refused"}${notScored ? "  (tool/struck — not scored here)" : ""}`)
   if (VERBOSE && answer.citations.length) for (const c of answer.citations) console.log(`      · ${c.title} (${c.sourceId})`)
+  if (CAPTURE_BASELINE || DIFF_BASELINE)
+    citationCapture[row.id] = { found: answer.found, citations: (answer.citations ?? []).map((c) => c.sourceId).sort() }
+}
+
+if (CAPTURE_BASELINE) {
+  const commit = execSync("git rev-parse HEAD", { cwd: REPO }).toString().trim()
+  writeFileSync(
+    BASELINE_PATH,
+    JSON.stringify({ capturedFrom: commit, capturedAt: new Date().toISOString(), rows: citationCapture }, null, 2) + "\n"
+  )
+  console.log(`\nBaseline captured -> ${BASELINE_PATH} (${commit})`)
+}
+
+if (DIFF_BASELINE) {
+  const baseline = JSON.parse(readFileSync(BASELINE_PATH, "utf8"))
+  console.log(`\nCITATION DIFF AGAINST BASELINE (captured ${baseline.capturedAt} from ${baseline.capturedFrom})`)
+  const changedRows = []
+  for (const [id, now] of Object.entries(citationCapture)) {
+    const before = baseline.rows[id]
+    if (!before) continue // row didn't exist, or wasn't scored, when the baseline was captured
+    if (before.found === now.found && before.citations.join(",") === now.citations.join(",")) continue
+    changedRows.push(id)
+    console.log(`  ${id}: found ${before.found} -> ${now.found}`)
+    console.log(`    before: ${before.citations.join(", ") || "(none)"}`)
+    console.log(`    after:  ${now.citations.join(", ") || "(none)"}`)
+  }
+  console.log(changedRows.length ? `${changedRows.length} row(s) changed citations since the baseline.` : "No row's citations changed since the baseline.")
 }
 
 const score = scoreExam(rows, resultsByRowId)
