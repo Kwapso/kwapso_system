@@ -3787,27 +3787,52 @@ async function recencyArm(
   kinds: string[] | null
 ): Promise<CandidateRow[]> {
   const owner = ownerClause(guard)
-  const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
-  const params: string[] = [...owner.params]
-  if (compartments.length) {
-    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
-    params.push(...compartments)
-  }
   // INTERPOLATED, NOT BOUND — matching `retrieve`'s own `chipClause` a few
   // lines below, which reads this exact list the same way: a source chip key
   // resolves through `kindsForChips` against `SOURCE_CHIP_KEYS`, a fixed,
   // code-declared vocabulary (shared/knowledge-chips.ts), never free text off
   // a request. Two spellings of "bind one per element" for the same
   // server-controlled list would be a second convention for the same fact.
-  if (kinds?.length) where.push(`kind IN (${kinds.map((k) => sqlString(k)).join(", ")})`)
-  const sources = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    // R14 hard cap: RECENCY_TOP_K, said here.
-    `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}
-      ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
-    params
-  )
+  const kindClause = kinds?.length ? ` AND kind IN (${kinds.map((k) => sqlString(k)).join(", ")})` : ""
+  // ONE COMPARTMENT AT A TIME — kb tag-diagnosis, 12 Sep 2026. This used to
+  // take RECENCY_TOP_K over the UNION of every searched compartment, and a
+  // client-named question always searches `[account:X, agency]` together
+  // (`deriveCompartment`'s own comment). `agency` is shared by EVERY client
+  // question and carries far more traffic than any one client's material —
+  // measured live: the newest 8 across `[account:HOGO, agency]` and the
+  // newest 8 across `[account:Padelbase, agency]` were THE IDENTICAL 8 ROWS,
+  // every one of them `agency`, every one dated the same day, because
+  // `agency`'s own volume fills an 8-row window before the account side ever
+  // gets a turn. Not a ranking flaw — a STARVATION one: a person asking
+  // "what's the latest on HOGO" got this morning's chat mirrors instead of
+  // HOGO's own material, every time, and the answer looked plausible enough
+  // that nobody would have reported it as a bug. Taking the newest
+  // `RECENCY_TOP_K` PER compartment (never a global cap moved instead) means
+  // the account side always gets its own share of the window regardless of
+  // how much `agency` traffic exists alongside it. `compartments.length ? … :
+  // [null]` — a null compartment means "no filter, search everything", the
+  // question-names-nobody case, and asking it once with no filter is
+  // BYTE-FOR-BYTE the query this function already ran for that case before
+  // this change; nothing about that shape moves. */
+  const sources: { id: string }[] = []
+  for (const compartment of compartments.length ? compartments : [null]) {
+    const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
+    const params: string[] = [...owner.params]
+    if (compartment !== null) {
+      where.push("compartment = ?")
+      params.push(compartment)
+    }
+    const rows = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap: RECENCY_TOP_K, said here — per compartment, not overall,
+      // which is the whole point; see the comment above.
+      `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}${kindClause}
+        ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
+      params
+    )
+    sources.push(...rows)
+  }
   if (!sources.length) return []
   // THE FIRST CHUNK OF EACH — a source's opening piece is its best single
   // representative when nothing else is narrowing which paragraph matters,

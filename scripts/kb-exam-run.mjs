@@ -64,6 +64,20 @@
 // judged on; `--reader` and the plain default stay useful only for saying
 // WHICH mechanism produced a given row's result.
 //
+// WHAT `--real` CANNOT SEE, and a reader should know this before trusting a
+// number from it as much as knowing which door it models. It never calls
+// `compose` (no `--full-loop` shape here), so every failure this column can
+// report is, by construction, a RETRIEVAL failure — the wrong passages came
+// back, or none did. It has no way to represent "retrieval was right and the
+// written answer was still wrong", because nothing here ever writes an
+// answer. Measured 12 Sep 2026, diagnosing `synth`/`latest`: every failing
+// row that tag-diagnosis classified sorted cleanly into "material missing
+// from the shortlist" or "reached the shortlist and lost to something else"
+// — the fourth classification a full diagnosis needs (a composition
+// problem) was not merely rare in that sample, it was STRUCTURALLY ABSENT
+// from what this instrument can report at all. Reach for `--full-loop` (and
+// its real cost) the day a row's failure needs to be told apart from that.
+//
 // ── HOW IT MEASURES A BRANCH WITHOUT DEPLOYING, same as scripts/kb-bench.mjs ──
 //
 // `retrieve` is imported straight from the working tree

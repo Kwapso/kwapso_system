@@ -624,6 +624,48 @@ describe("the recency arm — a question that wants what is new (KB-AUDIT.md §4
   })
 })
 
+// kb tag-diagnosis, 12 Sep 2026. MEASURED against real staging: a client-named
+// recency question searches `[account:X, agency]` together, and `agency` is
+// shared by EVERY client question and carries far more traffic than any one
+// client's own material — the newest 8 across `[account:HOGO, agency]` and
+// the newest 8 across `[account:Padelbase, agency]` were the IDENTICAL 8
+// rows, every one `agency`, every one dated the same day. A person asking
+// "what's the latest on HOGO" got this morning's chat mirrors instead of
+// HOGO's own material, every time, and the answer looked plausible enough
+// that nobody would have reported it as a bug. Fixed by taking the newest
+// RECENCY_TOP_K PER compartment rather than over their union, so the
+// high-traffic side of a search can never fill the account-specific side's
+// own share of the window.
+describe("the recency arm's window is per compartment, not per union (kb tag-diagnosis, 12 Sep 2026)", () => {
+  beforeEach(async () => {
+    // Bergman's OWN, older, real material — the account-specific side.
+    const bergmanId = await addSource(IDS.staffUser, {
+      title: "Bergman onboarding notes",
+      body: "Bergman S.A. asked about the invoice export timeline for their onboarding.",
+      accountId: IDS.victimAccount,
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-08-01' WHERE id = '${bergmanId}'`)
+    // FLOOD THE AGENCY COMPARTMENT — nine fresher, unrelated sources, one
+    // more than a single recency window (RECENCY_TOP_K), so a UNION'd top-K
+    // over both compartments would fill entirely with these and never reach
+    // Bergman's own material at all.
+    for (let i = 0; i < 9; i++) {
+      const id = await addSource(IDS.staffUser, {
+        title: `Agency chatter ${i}`,
+        body: "Ordinary agency-wide traffic with nothing to do with Bergman.",
+      })
+      db().exec(`UPDATE knowledge_sources SET record_date = '2026-09-${10 + i}' WHERE id = '${id}'`)
+    }
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+  })
+
+  it("a recency question naming a client still surfaces that client's own older material, despite heavy agency traffic crowding the union", async () => {
+    const answer = await ask(IDS.staffUser, "what's the latest on Bergman?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(true)
+    expect(titles(answer)).toContain("Bergman onboarding notes")
+  })
+})
+
 describe("the compartment is derived, and it is the reasoning that ships", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
