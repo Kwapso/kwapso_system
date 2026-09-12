@@ -1419,9 +1419,16 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // falling through to the generic "assistant can now use it" toast, a
   // promise the source's empty body would not keep. One more sentence for
   // that third state, said plainly instead.
-  de: 34,
-  es: 34,
-  ca: 34,
+  //
+  // RAISED 34 -> 37 in all three, same day: the owner's own ask ("I would
+  // love to see the steps... show progress, where we are, and what's
+  // happening") added the theatrical narration on the knowledge create
+  // dialog's video-link save — two predicted steps and the honesty-timeout
+  // sentence, three new sentences none translated yet, accepted debt in
+  // the same change that added them.
+  de: 37,
+  es: 37,
+  ca: 37,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
