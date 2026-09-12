@@ -35,6 +35,18 @@ the floor before tonight's fixes. A cap is not needed — `payToRead` meters and
 gates itself exactly as `compose` does, and a team out of units gets an honest
 refusal rather than a bill.
 
+**(2b) The floor moved DOWN on 12 Sep, which spends slightly more.** A rescue
+pass only calls the model when something clears `READER_HALLUCINATION_FLOOR`;
+below it there is nothing to read and the reader is skipped for free. That floor
+was raised 0.3 -> 0.4 and then put back to 0.3 the same day, because four
+measured questions showed no floor can separate the ones that must refuse from
+the ones that must answer, and 0.4 was silently killing a real answer at 0.399.
+Putting it back means questions scoring between 0.3 and 0.4 now DO reach the
+model on their rescue pass, where for a few hours they did not. One extra cheap
+call on each, on the questions least likely to be answerable — the honest cost
+of not throwing away correct answers to save them. `knowledge.ts`'s own header
+on that constant carries the four measurements.
+
 **(3) The meter under-reports this path to ZERO, and that is not fixed.**
 `payToRead` and `payToWrite` call `logUsage` without its optional `tokens`
 argument, so every knowledge-base question writes NULL token counts and
