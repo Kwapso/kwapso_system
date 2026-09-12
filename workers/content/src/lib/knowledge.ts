@@ -2847,6 +2847,22 @@ async function sourceTitles(
 /** The account a question names, or null. Reads `knowledge_names` (0073)
  * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
  *
+ * NAMED VIA A CONTACT NOW TOO (a-names, 12 Sep 2026): `knowledge_names` holds
+ * `kind = 'contact'` rows whose `ref_id` is the LINKED COMPANY's account id,
+ * never the contact's own — so a contact resolves through the exact same
+ * code below as an account does, no second path. COLLEAGUES are deliberately
+ * NOT here: every real colleague's name clears `ACCOUNT_TOKEN_MAX_CHUNKS` by
+ * two to three orders of magnitude (they are who the whole corpus is ABOUT),
+ * so there is no ceiling that admits one without also admitting "green" or
+ * "demo" — and a colleague has no single compartment to narrow to anyway
+ * (their own profile files under the agency compartment; the meetings they
+ * are actually in are filed under whichever CLIENT compartment each one
+ * belongs to, so narrowing to the agency would hide every one of them).
+ * `nameArm` already reaches colleagues correctly, at the chunk level, inside
+ * whichever compartment the router picked by other means — see its own
+ * header.
+ *
+
  * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
  * "DEMO" → "demo" — 26 of 134 staging accounts have a canonical name that
  * collapses to ONE surviving token (`tokenise` drops short words and shatters
@@ -2916,6 +2932,7 @@ export async function accountsNamedIn(
   const clauses = terms.map(() => `LOWER(kn.name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
   const candidates = await d1Query<{
+    kind: string
     ref_id: string
     name: string
     alias_of: string | null
@@ -2935,15 +2952,17 @@ export async function accountsNamedIn(
     // candidate failed to confirm.
     //
     // JOINED against `accounts` for `name_narrows_alone` (0085, c-hijack B) —
-    // every row here is `kind = 'account'` (the WHERE clause below), so
-    // `knowledge_names.ref_id` is always an `accounts.id`. No schema change to
-    // `knowledge_names` itself: the flag lives once, on the account it
-    // declares something about, and is read at match time rather than
-    // denormalised into a table `rebuildNameIndex` fully deletes and
-    // reinserts on every run.
-    `SELECT kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
+    // `knowledge_names.ref_id` is always an `accounts.id`, on BOTH kinds this
+    // reads now: an account row names itself, and a contact row (a-names)
+    // names the COMPANY it is linked to (`rebuildNameIndex`'s own header says
+    // why — nothing is ever indexed under a contact's own individual-account
+    // id). No schema change to `knowledge_names` itself: the flag lives once,
+    // on the account it declares something about, and is read at match time
+    // rather than denormalised into a table `rebuildNameIndex` fully deletes
+    // and reinserts on every run.
+    `SELECT kn.kind, kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
        FROM knowledge_names kn JOIN accounts a ON a.id = kn.ref_id
-      WHERE kn.kind = 'account' AND (${clauses.join(" OR ")})
+      WHERE kn.kind IN ('account', 'contact') AND (${clauses.join(" OR ")})
       ORDER BY LENGTH(kn.name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
     params
   )
@@ -2976,7 +2995,13 @@ export async function accountsNamedIn(
     // alias branch even asks whether this row has a code, or the same
     // declared spelling that made the alias branch fire in the first place
     // would still let it through.
-    if (c.name_narrows_alone === 2) continue
+    //
+    // `kind === "account"` GUARDS THIS TOO (a-names). The flag is the
+    // COMPANY's own declaration about the COMPANY's own name — a contact
+    // filed under a company that has declared its own name unsafe to narrow
+    // on has said nothing at all about whether ITS employee's surname is
+    // safe, so a contact row is never blocked by a deny it never made either.
+    if (c.kind === "account" && c.name_narrows_alone === 2) continue
     // AN ALIAS ROW (today, the account's code or a declared `alt_names`
     // spelling) — exact match or nothing, no token-count/rarity gate.
     // `alias_of` carries the canonical name back. NEVER fragile (c-hijack
@@ -3010,7 +3035,18 @@ export async function accountsNamedIn(
     // company, so A2 still resolves it to neither, whatever either declares.
     // Short-circuited so a declared account never pays for the FTS rarity
     // query at all. (`=== 2`, DENY, already `continue`d above this line.)
-    if (c.name_narrows_alone === 1 || (await isRareAccountToken(cfg, guard, nameTerms[0]))) {
+    //
+    // `kind === "account"` GUARDS THE ALLOW TOO (a-names), the same way it
+    // guards the DENY above: the flag lives on the COMPANY's own row and says
+    // the COMPANY's canonical name is safe (or unsafe) — it says nothing
+    // about whether one of that company's CONTACTS' names is, so a contact
+    // row never reads it either way and always pays for the live rarity
+    // check. Nobody has ever been asked to declare a person's name safe, and
+    // this is not the door that invents that decision for them.
+    if (
+      (c.kind === "account" && c.name_narrows_alone === 1) ||
+      (await isRareAccountToken(cfg, guard, nameTerms[0]))
+    ) {
       const token = nameTerms[0]
       const list = pendingByToken.get(token) ?? []
       list.push({ id: c.ref_id, name: c.name })
@@ -3082,13 +3118,135 @@ export async function accountsNamedIn(
  * reinserting is simpler than an upsert keyed on `(kind, ref_id, name)` —
  * which cannot express a RENAME, because the old name is part of the key an
  * upsert would leave behind as an orphan row. */
+/** One row this rebuild writes to `knowledge_names` — hoisted out of the
+ * function itself so `contactNameRows` can build the same shape. */
+type NameRow = {
+  id: string
+  kind: string
+  ref_id: string
+  name: string
+  alias_of: string | null
+  compartment: string
+}
+
+/** CONTACTS INTO THE NAME INDEX (a-names, 12 Sep 2026) — the same protection
+ * account names already have, extended to the individual people linked to a
+ * client company (`account_links`; "contact" is a role on that link, not an
+ * account_type — see the table's own header comment).
+ *
+ * REF_ID IS THE COMPANY, NEVER THE CONTACT'S OWN ID. Measured before this was
+ * written: 119 `knowledge_sources` are filed under an individual account, and
+ * all five of their chunks are notification emails on one QA fixture
+ * ("Alaap Kanchwala (portal test 1)") — against 3,235 sources filed under
+ * entity accounts. Nothing is ever indexed under a real contact's own id, so
+ * a compartment built from it would search a client's material and find none
+ * of it. Every row here carries the LINKED company's account id instead, so
+ * `accountsNamedIn` needs no separate path to read it — it is the same
+ * `kind`/`ref_id` shape an account row already has.
+ *
+ * ONE PERSON, MORE THAN ONE COMPANY — SKIPPED, NOT FANNED OUT. Two of the
+ * team's distinct contacts are linked to two different companies each (one is
+ * a c-hijack test fixture: "Marta Ruiz", filed under both "Bergman S.A." and
+ * "Bergmann GmbH"). A name that resolves to more than one company is evidence
+ * about the coincidence, not about either company — seeding it under either
+ * would narrow a search to a confidently WRONG client, so a contact linked to
+ * more than one company is not seeded at all, the same safe direction the
+ * single-collapsed-token ambiguity check in `accountsNamedIn` already takes.
+ *
+ * TWO ROWS PER SAFE CONTACT, NEVER THREE. The full "First Last" name rides
+ * the SAME multi-token bypass an account's two-word name already gets — two
+ * specific words together is not a coincidence, so no rarity check runs for
+ * it at all. The SURNAME ALONE gets a second row, but ONLY when it clears the
+ * live rarity check — never the free `name_narrows_alone` bypass (see
+ * `accountsNamedIn`'s own comment on why a contact never reads it: that flag
+ * describes the COMPANY's own name, not one of its contacts'). The FIRST NAME
+ * ALONE is never seeded, on purpose: it is the single most dangerous shape
+ * measured (Mark, Max, Alex, Peter — ordinary English words at 16 to 624
+ * chunks each on real staging), and the full name plus a rarity-gated surname
+ * already answers every question shape a person would actually ask.
+ *
+ * TOKENISE DECIDES WHAT SURVIVES, NOT A GUESS. A name part shorter than 3
+ * characters or holding a non-ASCII letter can collapse or vanish entirely
+ * (`tokenise`'s own rule — "Björn" survives as nothing at all); this reads
+ * `tokenise(fullName)` before deciding what to seed, exactly as an account's
+ * collapsed name is read, rather than assuming the written name is what a
+ * question would ever match.
+ *
+ * QA FIXTURES EXCLUDED BY NAME. The "(portal test N)" rows exist to exercise
+ * the portal's own account-switcher, not to be found by a question — seeded,
+ * they would teach the index to answer a real question about "Alaap
+ * Kanchwala" out of a notification-email fixture. */
+async function contactNameRows(cfg: D1Rest, guard: MemberGuard): Promise<NameRow[]> {
+  const links = await d1Query<{ person_id: string; person_name: string; company_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by how many contacts this team holds.
+    `SELECT p.id AS person_id, p.name AS person_name, al.account_id AS company_id
+       FROM account_links al
+       JOIN accounts p ON p.id = al.person_account_id
+       JOIN accounts c ON c.id = al.account_id
+      WHERE al.deactivated_at IS NULL AND p.deactivated_at IS NULL AND c.deactivated_at IS NULL
+        AND p.name IS NOT NULL
+      LIMIT 2000`
+  )
+  const byPerson = new Map<string, { name: string; companies: Set<string> }>()
+  for (const l of links) {
+    const entry = byPerson.get(l.person_id) ?? { name: l.person_name, companies: new Set<string>() }
+    entry.companies.add(l.company_id)
+    byPerson.set(l.person_id, entry)
+  }
+
+  const rows: NameRow[] = []
+  for (const { name, companies } of byPerson.values()) {
+    if (companies.size !== 1) continue
+    if (/\(portal test/i.test(name)) continue
+    const companyId = [...companies][0]
+    const compartment = accountCompartment(companyId)
+    const tokens = [...tokenise(name).keys()]
+    if (tokens.length >= 2) {
+      rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name, alias_of: null, compartment })
+      // The SURNAME — the LAST surviving token, per the steer that a surname
+      // is far more often rare than a first name. Rarity-checked here, at
+      // seed time, so a name that fails it is not written at all rather than
+      // written and refused on every read.
+      const surname = tokens[tokens.length - 1]
+      if (await isRareAccountToken(cfg, guard, surname))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: surname, alias_of: null, compartment })
+    } else if (tokens.length === 1) {
+      // A genuinely single-word identity (no surname on file) — the same
+      // treatment a collapsed account name already gets: seeded only if the
+      // one surviving token clears the rarity gate.
+      if (await isRareAccountToken(cfg, guard, tokens[0]))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: tokens[0], alias_of: null, compartment })
+    }
+    // tokens.length === 0: tokenise() kept nothing (e.g. every part under 3
+    // characters) — nothing safe to seed, and nothing seeded.
+  }
+  return rows
+}
+
 export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
   const accounts = await d1Query<{ id: string; name: string; code: string | null; alt_names: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: bounded by how many accounts this team holds — an
     // agency's own client roster, not a growing log.
-    "SELECT id, name, code, alt_names FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+    //
+    // `account_type = 'entity'` ONLY (a-names, 12 Sep 2026) — a REAL bug this
+    // change found rather than assumed fixed: this query had no such filter
+    // since 0073, so every INDIVIDUAL account (every contact) was already
+    // seeded here too, as an ordinary `kind = 'account'` row whose compartment
+    // was built from the CONTACT'S OWN id — a compartment nothing is ever
+    // filed under (see `contactNameRows`'s own header: 119 sources filed under
+    // an individual account, all five real chunks one QA fixture's own
+    // notification emails). A full "First Last" contact name is two tokens,
+    // which bypasses rarity unconditionally, so this fired on every question
+    // naming a contact by their full name — narrowing to a compartment
+    // guaranteed to hold nothing, silently rescued only by A3's retry when the
+    // narrow found nothing. `contactNameRows` is the real, correct route for
+    // this population now (`kind = 'contact'`, `ref_id` = the LINKED company),
+    // so a contact's own individual-account row has no business here at all.
+    "SELECT id, name, code, alt_names FROM accounts WHERE account_type = 'entity' AND deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
   const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
     cfg,
@@ -3096,14 +3254,6 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
     "SELECT id, name, account_id FROM apps WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
 
-  type NameRow = {
-    id: string
-    kind: string
-    ref_id: string
-    name: string
-    alias_of: string | null
-    compartment: string
-  }
   const rows: NameRow[] = []
   for (const a of accounts) {
     if (!a.name) continue
@@ -3130,6 +3280,7 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
       compartment: app.account_id ? accountCompartment(app.account_id) : AGENCY_COMPARTMENT,
     })
   }
+  for (const c of await contactNameRows(cfg, guard)) rows.push(c)
 
   const now = new Date().toISOString()
   await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_names")
