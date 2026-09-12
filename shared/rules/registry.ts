@@ -1403,9 +1403,25 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // cannot close an already-rare name, only a DENY can) — one field label
   // and three option words replaced the single checkbox sentence. Same
   // $0-spend reason as every entry above it.
-  de: 26,
-  es: 26,
-  ca: 26,
+  //
+  // RAISED 26 -> 33 in all three, 12 Sep 2026: the knowledge create dialog's
+  // three video-link states (owner's own words — "show me it's loading,
+  // show me what kind of transcript it's extracting, and then tell me when
+  // it's done") added seven new sentences (the loading label, the pre-submit
+  // hint, the two word-count sentences, and the three kind words) — none
+  // translated yet, accepted debt in the same change that added them,
+  // exactly as R44 asks.
+  //
+  // RAISED 33 -> 34 in all three, same day: the hub's own review of this
+  // branch found that "null-safe is not honest" — a bare video link whose
+  // door reply carried neither `read` nor `refusedBecause` (a door that
+  // hasn't landed the feature yet, or genuinely found nothing to say) was
+  // falling through to the generic "assistant can now use it" toast, a
+  // promise the source's empty body would not keep. One more sentence for
+  // that third state, said plainly instead.
+  de: 34,
+  es: 34,
+  ca: 34,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

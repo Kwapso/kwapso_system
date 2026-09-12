@@ -29,9 +29,12 @@ import {
 } from "@/lib/live-resources"
 import { invalidate, primeCache, readCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import type { Translate } from "@shared/web/format"
 import type { AccountFormValues } from "@/components/accounts/account-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import type { KnowledgeSource } from "@shared/types"
+import type { KnowledgeLinkRead } from "@/lib/api/content"
+import { isVideoLink } from "@shared/media-links"
 import { recordActivityKey } from "@/lib/use-record-activity"
 
 /** The four agency-internal record kinds, keyed by their URL segment (which is
@@ -85,6 +88,60 @@ const INTERNAL_WRITERS: Record<
     },
     setActive: (id, active) => contentApi.setMeetingPurposeActive(id, active).then((r) => r.purposes),
   },
+}
+
+// THE WARM SENTENCE FOR A VIDEO LINK THAT WORKED — the owner's own words, 12
+// Sep: "show me what kind of transcript it's extracting". `provider` is a
+// brand name (YouTube/Loom/Tella) and is never translated, passed straight
+// through as data; `kind` is an ordinary word from the door's own small,
+// fixed vocabulary and gets its own catalogued sentence PER VALUE — never
+// `t(kind)`, which the extraction script cannot see inside a variable (R28).
+function linkReadSentence(read: KnowledgeLinkRead, t: Translate): string {
+  const kind =
+    read.kind === "captions"
+      ? t("captions")
+      : read.kind === "transcript"
+        ? t("transcript")
+        : read.kind === "description"
+          ? t("description")
+          : read.kind
+  return read.words === 1
+    ? t("Read 1 word of {kind} from {provider}.", { kind, provider: read.provider })
+    : t("Read {words} words of {kind} from {provider}.", { words: String(read.words), kind, provider: read.provider })
+}
+
+/** WHICH OF THE THREE-PLUS-ONE THINGS TO SAY, after `createKnowledge`'s door
+ * call comes back — pulled out as a pure function (no hook, no `toast`) so it
+ * can be checked directly rather than through a rendered component, the same
+ * way `linkReadSentence` beside it is.
+ *
+ * FOUR OUTCOMES, not three: `read` (a warm, specific toast), `refused` (handed
+ * back to the dialog, never shown here — a toast disappears and this must
+ * not), the ordinary case (the ordinary toast), and a fourth the hub's own
+ * review of this branch found missing — a bare video link whose reply
+ * carried NEITHER field. `read`/`refusedBecause` both null-safe is not the
+ * same as both HONEST: that shape means the door read nothing and said
+ * nothing about the link, the source saved with an empty body exactly as
+ * unreadable as before this feature existed, and the ORDINARY toast would be
+ * a promise the source cannot keep — the same shape as a door answering 200
+ * while the thing a person wanted never happened. Said plainly instead, via
+ * `toast.warning` — the same idiom `uploadKnowledgeFile`'s own `fileNote`
+ * already uses for "saved, but here is the honest catch." */
+export function knowledgeCreateOutcome(
+  res: { read?: KnowledgeLinkRead | null; refusedBecause?: string | null },
+  values: Pick<KnowledgeFormValues, "title" | "sourceUrl" | "body">,
+  t: Translate
+): { kind: "refused"; refusedBecause: string } | { kind: "read" | "silent-video" | "ordinary"; message: string } {
+  if (res.refusedBecause) return { kind: "refused", refusedBecause: res.refusedBecause }
+  if (res.read) return { kind: "read", message: linkReadSentence(res.read, t) }
+  if (isVideoLink((values.sourceUrl ?? "").trim()) && !values.body?.trim())
+    return {
+      kind: "silent-video",
+      message: t(
+        "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet."
+      ),
+    }
+  return { kind: "ordinary", message: t('The assistant can now use "{title}".', { title: values.title }) }
 }
 
 export function useScreenActions(teamId: string | null) {
@@ -227,10 +284,19 @@ export function useScreenActions(teamId: string | null) {
   // now sits, and that same fetcher re-primes the exact total and the cursor
   // (accounts does the same thing for the same reason). Everyone else gets the
   // realtime "add" ping.
+  //
+  // A VIDEO LINK, READ FOR REAL (owner's own words, 12 Sep — see
+  // `KnowledgeFormDialog`'s own header): the door hands back `read` (what it
+  // got) or `refusedBecause` (why not), alongside the ordinary `source`/`total`
+  // it always returned. `read` becomes a warmer toast than the generic one
+  // below; `refusedBecause` is handed back to the dialog rather than shown
+  // here, because it must stay on screen until the person has read it, and a
+  // toast is exactly the thing that doesn't (`KnowledgeFormDialog`'s own
+  // `linkRefusal` state renders it verbatim instead).
   const createKnowledge = React.useCallback(
     async (values: KnowledgeFormValues) => {
       if (!teamId) return
-      await contentApi.createKnowledge({
+      const res = await contentApi.createKnowledge({
         title: values.title,
         body: values.body || null,
         sourceUrl: values.sourceUrl || null,
@@ -239,7 +305,10 @@ export function useScreenActions(teamId: string | null) {
         visibleToAppId: values.visibleToAppId || null,
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
-      toast.success(t('The assistant can now use "{title}".', { title: values.title }))
+      const outcome = knowledgeCreateOutcome(res, values, t)
+      if (outcome.kind === "refused") return { refusedBecause: outcome.refusedBecause }
+      if (outcome.kind === "silent-video") toast.warning(outcome.message)
+      else toast.success(outcome.message)
     },
     [teamId, t]
   )

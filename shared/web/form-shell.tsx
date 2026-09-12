@@ -266,6 +266,16 @@ export type SubmitConfig = {
   disabled?: boolean
   /** The optional glyph before the word, from the UI-CONVENTIONS §4 mapping. */
   icon?: React.ReactNode
+  /** THE ONE NAMED EXCEPTION TO "SUBMIT" (see `SubmitButton`'s own header) —
+   * the RESTING word ("Submit") is still not a prop, and still cannot be.
+   * This replaces only the transient, in-flight word for a save that is
+   * genuinely doing something a person would otherwise wait on wondering
+   * about (a real network read behind the button, seconds rather than a
+   * database write's milliseconds) — "Submitting…" everywhere else,
+   * unchanged, because leaving this undefined is the default. A form that
+   * sets it says why the wait is longer; a form that doesn't never notices
+   * this prop exists. */
+  loadingLabel?: string
 }
 
 /** EVERY FORM'S BUTTON SAYS "SUBMIT" (UI-RULEBOOK F1, CHECKLIST 2.9).
@@ -311,7 +321,7 @@ function SubmitButton({ submit }: { submit: SubmitConfig }) {
     <Button
       type="submit"
       loading={submit.busy}
-      loadingLabel={t("Submitting…")}
+      loadingLabel={submit.loadingLabel ?? t("Submitting…")}
       disabled={submit.disabled}
       className="gap-1"
     >
