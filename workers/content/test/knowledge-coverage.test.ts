@@ -1134,7 +1134,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // hashes the file, not a diff of meaning), and that is the correct,
 // conservative failure mode: the alternative is a check that trusts a
 // human's claim that "only a comment changed" instead of verifying it.
-const SHARED_DIGEST = "5d3f8dc8b4364fe6"
+// RE-PINNED, 12 Sep 2026: the shared upsert gained `shared_with` (0073's
+// tenth Vectorize label, written truthfully now — the owner's ruling, "keep
+// it for everything") in its INSERT column list and its ON CONFLICT SET
+// clause. NO textVersion BUMP: `shared_with` is a label copied off
+// `IngestRow.sharedWith`, never a word in `title` or `body` — nothing any
+// kind SAYS changed, only a column alongside the words it already says.
+const SHARED_DIGEST = "f97294a314aece84"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

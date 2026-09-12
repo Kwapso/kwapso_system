@@ -2640,3 +2640,53 @@ describe("a short answer is widened from the passages it already has", () => {
     expect(titles(answer)).not.toContain("Private cutover note")
   })
 })
+
+// shared_with (0073's tenth Vectorize label) — written truthfully now on every
+// path that knows the answer, the owner's ruling, 12 Sep 2026: "keep it for
+// everything." NOTHING READS THIS AS A FENCE (readerClause is ownerClause AND
+// appClause, full stop — see IngestRow.sharedWith's own header), so these are
+// mutation proofs of the WRITE, never of who may read what.
+describe("shared_with is written truthfully on the typed upload path (createSource/updateSource)", () => {
+  const rowSharedWith = (id: string) =>
+    (db().prepare("SELECT shared_with AS s FROM knowledge_sources WHERE id = ?").get(id) as { s: string }).s
+
+  it("a note marked private writes 'private' — the SAME boolean that sets owner_user_id", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "My own scratch note",
+      body: "Not for anyone else yet.",
+      visibility: "private",
+    })
+    expect(rowSharedWith(id)).toBe("private")
+  })
+
+  it("an ordinary note (no visibility sent) writes 'agency'", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "An ordinary team note",
+      body: "Everyone on the module can read this.",
+    })
+    expect(rowSharedWith(id)).toBe("agency")
+  })
+
+  it("editing an existing note's privacy moves shared_with with it — the seventh path, beyond the six named", async () => {
+    const id = await addSource(IDS.staffUser, { title: "Starts ordinary", body: "…" })
+    expect(rowSharedWith(id), "created without visibility: 'agency'").toBe("agency")
+
+    const toPrivate = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "private",
+    })
+    expect(toPrivate.status, await toPrivate.text()).toBe(200)
+    expect(rowSharedWith(id), "toggled private on EDIT, not just on create").toBe("private")
+
+    const backToTeam = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "team",
+    })
+    expect(backToTeam.status).toBe(200)
+    expect(rowSharedWith(id), "and back — shared_with is re-decided on every edit, not stuck at CREATE time").toBe(
+      "agency"
+    )
+  })
+})

@@ -666,6 +666,30 @@ function toSource(r: SourceRow): KnowledgeSource {
     // rather than reading an empty array as "filed nowhere".
     accounts: parseIdList(r.accounts),
     apps: parseIdList(r.apps),
+    // `shared_with` IS WRITTEN TRUTHFULLY NOW, on every path that knows the
+    // answer — the owner's ruling, 12 Sep 2026: "keep it for everything."
+    // NOTHING READS THIS AS A FENCE: the permission check is `readerClause`
+    // (`ownerClause AND appClause`), and this column, and its Vectorize
+    // 'shared' label, are not inputs to it, anywhere — a census confirmed
+    // zero WHERE clauses and zero Vectorize query predicates on it across
+    // both front doors and all eight workers. Whoever adds the FIRST real
+    // filter on this column must add it to `readerClause` deliberately, not
+    // assume it already gates something because a value already exists.
+    //
+    // SEVEN WRITE PATHS, all of them: `createSource` and `updateSource`
+    // (typed notes — the SAME `privateToMe` boolean that already sets
+    // `owner_user_id`), `createFileSource` (an uploaded file, identical
+    // shape), the shared upsert in knowledge-ingest.ts (every mirrored kind,
+    // reading `IngestRow.sharedWith` — see its own header for Gmail/
+    // Calendar's and Drive/Chat's two different rules, both set once in
+    // knowledge-google.ts's `fencing()`). PORTAL UPLOAD IS THE EIGHTH
+    // CANDIDATE AND DOES NOT EXIST: a client login has no door onto the
+    // knowledge base at all (R21 — `workers/portal-gateway/src/index.ts`'s
+    // own allow-list has no `/api/content/knowledge*` entry), so there is no
+    // gap here, only a door that was never opened. Every kind this app
+    // mirrors off its OWN tables (a ticket, a task, a role) has no sharing
+    // choice to report and is correctly left at the column's default,
+    // 'agency', by the same shared upsert.
     sharedWith: r.shared_with === "private" || r.shared_with === "agency_client" ? r.shared_with : "agency",
     generatedOnly: r.generated_only === 1,
     sightingsCount: r.sightings_count,
@@ -1436,8 +1460,8 @@ export async function createSource(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes, source_url,
-       owner_user_id, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, shared_with, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -1448,6 +1472,11 @@ export async function createSource(
       byteLength(v.body),
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id`, reused rather than
+      // recomputed — 0073's tenth Vectorize label, written truthfully now on
+      // every path that knows the answer (the owner's ruling, 12 Sep 2026).
+      // NOTHING READS THIS AS A FENCE — see IngestRow.sharedWith's own header.
+      v.privateToMe ? "private" : "agency",
       v.visibleToAppId,
       JSON.stringify(accountsFiled.map((a) => a.id)),
       JSON.stringify(appsFiled.map((a) => a.id)),
@@ -1564,9 +1593,9 @@ export async function createFileSource(
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
-       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
+       owner_user_id, shared_with, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
        accounts, apps)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       identity?.originTable ?? null,
@@ -1583,6 +1612,9 @@ export async function createFileSource(
       input.file.bytes,
       input.extract.note,
       input.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id` — see createSource's
+      // own comment beside the identical line.
+      input.privateToMe ? "private" : "agency",
       visibleToAppId,
       now,
       now,
@@ -1661,6 +1693,16 @@ export async function updateSource(
   // the stored body alone rather than writing an excerpt over the document.
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
   const owner = v.privateToMe ? guard.userId : null
+  // THE SAME BOOLEAN, reused rather than recomputed — 0073's tenth Vectorize
+  // label, written truthfully now on every path that knows the answer (the
+  // owner's ruling, 12 Sep 2026). A SEVENTH path beyond the six the census
+  // named: an existing note or file's privacy toggled here would otherwise
+  // leave `shared_with` describing the value it had on CREATE, silently wrong
+  // from the moment anyone edits the very field it is supposed to echo. Not
+  // written on the MIRRORED branch below, for the identical reason `owner`
+  // is not: the ingest sweep owns that column for a mirrored source and would
+  // overwrite this on its next tick regardless — see the comment above.
+  const sharedWith = v.privateToMe ? "private" : "agency"
   // WHO MAY READ IT is one decision with three answers, and the ACCOUNT/APP half
   // of it is editable on all three families — a MIRRORED source's filing is
   // exactly the thing that stays editable when its words do not, and limiting a
@@ -1698,7 +1740,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
-         owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
+         owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1706,6 +1748,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,
@@ -1721,7 +1764,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, body = ?, body_bytes = ?, summary = ?, source_url = ?,
-         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
+         account_id = ?, compartment = ?, owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
          updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1732,6 +1775,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,

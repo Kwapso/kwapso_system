@@ -71,7 +71,14 @@ import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { mendMojibake } from "@shared/workers/mojibake"
-import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService, type GoogleShelf } from "@shared/types"
+import {
+  GOOGLE_NAMED_SERVICES,
+  GOOGLE_SCOPED_SERVICES,
+  GOOGLE_SERVICES,
+  type GoogleItem,
+  type GoogleService,
+  type GoogleShelf,
+} from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, knownChatPeople, listConnections, listNamedSources } from "./google"
 import { calendarEventIdInText, chatMessages, googlePresence, isConnectionLost, type ChatMessage, type ProbableService } from "./google-api"
@@ -257,9 +264,33 @@ function afterCursor(rows: IngestRow[], cursor: { at: string; id: string } | nul
   return rows.filter((r) => r.sortAt > cursor.at || (r.sortAt === cursor.at && r.originRowId > cursor.id))
 }
 
-/** The fence and the filing, off one item. Two lines, in one place, because they
- * are the two things this whole module is for. */
-function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: string | null; accounts: string[] } {
+/** The fence, the filing, and the SHARING LABEL, off one item — three lines, in
+ * one place, because they are what this whole module reduces a raw Google item
+ * to. `sharedWith` (0073's tenth Vectorize label) is written truthfully here so
+ * it is written truthfully everywhere: the owner's ruling, 12 Sep 2026 — "keep
+ * it for everything" — after a census found NOTHING reads it as a fence
+ * (`readerClause` is `ownerClause AND appClause`, full stop), so writing it
+ * correctly cannot change who reads what; it only makes an inert column honest.
+ *
+ * TWO RULES, NOT ONE, because the two service PAIRS answer a different question:
+ *   • `GOOGLE_NAMED_SERVICES` (Drive, Chat) — sharing is the ACT. Nothing is
+ *     reachable until a person hands a folder or a space over, and what they
+ *     hand over carries its own `shelf` (declared at share time). `shelf` IS
+ *     the answer: 'private' names the sharer's own choice to keep it to
+ *     themselves, and there is no `accountId` reading to fall back on.
+ *   • `GOOGLE_SCOPED_SERVICES` (Gmail, Calendar) — there is no shelf to
+ *     declare, because there is nothing to hand over: connecting Gmail reaches
+ *     the whole mailbox (`shelf` is hardcoded 'private' for the OWNER fence
+ *     above, a structural fact about mail, never a choice about SHARING). So
+ *     `shared_with` asks the other question these two CAN answer: does this
+ *     thread or event concern a named client, or is it the agency's own —
+ *     exactly the `accountId` the address/attendee match already resolved. */
+function fencing(item: GoogleItem): {
+  ownerUserId: string | null
+  accountId: string | null
+  accounts: string[]
+  sharedWith: "private" | "agency_client" | "agency"
+} {
   return {
     // 'team' means NOBODY owns it — which is what a null owner means to every
     // read in lib/knowledge.ts. 'private' names the person whose connection it
@@ -271,6 +302,13 @@ function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: str
     // the migration calls the singular column "right for a mirrored record",
     // and the same reasoning holds for a source with only ever one account).
     accounts: item.accounts ?? [],
+    sharedWith: (GOOGLE_NAMED_SERVICES as readonly string[]).includes(item.service)
+      ? item.shelf === "private"
+        ? "private"
+        : "agency"
+      : item.accountId
+        ? "agency_client"
+        : "agency",
   }
 }
 
