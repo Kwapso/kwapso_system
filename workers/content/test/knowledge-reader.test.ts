@@ -219,6 +219,66 @@ describe("readShortlist — cite or drop: the claim is checked, not trusted", ()
   })
 })
 
+// A-X9, 12 Sep 2026. Cite-or-drop alone does not close A-X9: the model's
+// quote for "Okay, now let's say 14 fire. Then what happens?" is genuinely,
+// verbatim, in a real passage — grounding correctly confirms that and has
+// nothing more to say, because the passage is dated the 11th and the
+// question asks about the 14th. The date anchor is the second, separate
+// check that catches THIS shape: real evidence, wrong day. `now` is a fixed
+// reference date passed explicitly (see readShortlist's own comment) so
+// none of this needs a fake timer.
+describe("readShortlist — the date anchor: real evidence from the wrong day is still dropped", () => {
+  const NOW = new Date("2026-09-13T12:00:00.000Z")
+
+  it("MUTATION-PROVED (remove the anchor check): drops a genuinely-quoted passage dated the wrong day", async () => {
+    const wrongDay = passage("S1", "Padelbase Review", "Okay, now let's say 14 fire. Then what happens next in the app.")
+    wrongDay.recordDate = "2026-09-11T18:44:00.000Z"
+    const { env } = fakeAi(reply([{ id: "S1:0", quote: "now let's say 14 fire. Then what happens next" }]))
+    const out = await readShortlist(env, "What did Alaap discuss at dinner on the 14th?", [wrongDay], NOW)
+    expect(out).toEqual({ relevant: [] })
+  })
+
+  it("keeps a genuinely-quoted passage actually dated the day the question names", async () => {
+    const rightDay = passage("S2", "Dinner notes", "We talked about the new menu and the wine list at length.")
+    rightDay.recordDate = "2026-09-14T20:00:00.000Z"
+    const { env } = fakeAi(reply([{ id: "S2:0", quote: "we talked about the new menu and the wine list" }]))
+    const out = await readShortlist(env, "What did Alaap discuss at dinner on the 14th?", [rightDay], NOW)
+    expect(out).toEqual({ relevant: ["S2:0"] })
+  })
+
+  it("MUTATION-PROVED (treat a missing record_date as a mismatch): a source with no date at all is never excluded by the anchor", async () => {
+    const undated = passage("S3", "Undated note", "We discussed the new menu and the wine list at length.")
+    undated.recordDate = null
+    const { env } = fakeAi(reply([{ id: "S3:0", quote: "we discussed the new menu and the wine list" }]))
+    const out = await readShortlist(env, "What did Alaap discuss at dinner on the 14th?", [undated], NOW)
+    expect(out).toEqual({ relevant: ["S3:0"] })
+  })
+
+  it("MUTATION-PROVED (compare day-of-month only, drop the year/month check): a 14th from a DIFFERENT month is dropped, not admitted", async () => {
+    const wrongMonth = passage("S4", "August notes", "We discussed the new menu and the wine list at length.")
+    wrongMonth.recordDate = "2026-08-14T20:00:00.000Z"
+    const { env } = fakeAi(reply([{ id: "S4:0", quote: "we discussed the new menu and the wine list" }]))
+    const out = await readShortlist(env, "What did Alaap discuss at dinner on the 14th?", [wrongMonth], NOW)
+    expect(out).toEqual({ relevant: [] })
+  })
+
+  it("MUTATION-PROVED (fire the anchor on any question, not just an explicit date): a relative phrase never triggers it — a differently-dated real quote survives", async () => {
+    const anyDay = passage("S5", "Week recap", "We shipped the new pricing page and fixed the login bug this week.")
+    anyDay.recordDate = "2026-09-01T09:00:00.000Z"
+    const { env } = fakeAi(reply([{ id: "S5:0", quote: "we shipped the new pricing page and fixed the login bug" }]))
+    const out = await readShortlist(env, "what changed this week?", [anyDay], NOW)
+    expect(out).toEqual({ relevant: ["S5:0"] })
+  })
+
+  it("a question naming a date no source carries at all refuses honestly — not a bug", async () => {
+    const onlyWrongDay = passage("S6", "Notes", "We discussed the new menu and the wine list at length.")
+    onlyWrongDay.recordDate = "2026-09-11T20:00:00.000Z"
+    const { env } = fakeAi(reply([{ id: "S6:0", quote: "we discussed the new menu and the wine list" }]))
+    const out = await readShortlist(env, "What did Alaap discuss at dinner on the 14th?", [onlyWrongDay], NOW)
+    expect(out).toEqual({ relevant: [] })
+  })
+})
+
 describe("readShortlist — null on any failure it cannot recover from", () => {
   const shortlist = [passage("S1", "Team Assembly", "Aurora organises it.")]
 

@@ -215,18 +215,75 @@ function normaliseForQuoteCheck(s: string): string {
  * `READER_MAX_TOKENS` may only move against a fresh token measurement. */
 const MIN_QUOTE_CHARS = 20
 
+/** A bare ordinal day-of-month — "the 14th", "the 3rd" — and NOTHING wider.
+ * Deliberately narrow: this pattern cannot match a relative phrase ("this
+ * week", "recently", "last week") because none of them carry a digit
+ * immediately followed by an ordinal suffix, which is what keeps d-latest
+ * and d-followup (both keyed on a relative phrase) untouched by construction
+ * rather than by a second, hand-kept exclusion list. A month name ("14
+ * September", "Sep 14th") is deliberately NOT parsed here — nothing measured
+ * needs it yet, and guessing at a format nothing tests is exactly the
+ * invented complexity this codebase's own rule warns against; add it against
+ * a real question that needs it, not in advance of one. */
+const ORDINAL_DAY = /\b([1-9]|[12]\d|3[01])(?:st|nd|rd|th)\b/i
+
+/** THE DECISION "THE 14TH" MEANS, WRITTEN DOWN SO IT CAN BE DISAGREED WITH.
+ * No month is named, so the day alone is ambiguous across twelve candidates —
+ * resolved as THIS MONTH's occurrence, evaluated against `now`, because that
+ * is what a person means saying it in an ordinary live conversation ("dinner
+ * on the 14th", asked on the 11th, means the 14th just gone or just coming,
+ * not an arbitrary 14th from some other month this year or last). `now`
+ * is an explicit parameter rather than `new Date()` read here directly —
+ * the same reason `risingBackfillWindow` (knowledge-google.ts) takes it
+ * explicitly: a clock-dependent decision needs no fake timer to test, only
+ * a fixed `Date` handed in. */
+function explicitDateAnchor(question: string, now: Date): { year: number; month: number; day: number } | null {
+  const m = ORDINAL_DAY.exec(question)
+  if (!m) return null
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth(), day: Number(m[1]) }
+}
+
+/** DOES THIS SOURCE'S OWN DATE SURVIVE THE ANCHOR? Two ways it does, on
+ * purpose: an EXACT match (year, month and day-of-month all agree — never
+ * day alone, or "the 14th" would admit every source from every month that
+ * happens to have a 14th), or NO DATE AT ALL. `record_date` being null is
+ * silence about when a source is from, not evidence it is from the wrong
+ * day, and excluding a
+ * never-dated source here would be a new, unrelated way for real evidence to
+ * disappear. An unparseable string is treated the same as absent, for the
+ * same reason: a malformed date is not proof of a mismatched one. */
+function survivesDateAnchor(recordDate: string | null, anchor: { year: number; month: number; day: number }): boolean {
+  if (!recordDate) return true
+  const d = new Date(recordDate)
+  if (Number.isNaN(d.getTime())) return true
+  return d.getUTCFullYear() === anchor.year && d.getUTCMonth() === anchor.month && d.getUTCDate() === anchor.day
+}
+
 /** THE CHECK WITH TEETH. An entry survives only if: it names an id the
  * shortlist actually held (the old protection against an invented or
  * echoed-from-elsewhere id, folded in here rather than filtered separately);
  * it carries a quote at all (a bare string, or an object missing one, is
  * "the model asserted relevance and proved nothing" — dropped, never
- * trusted); the quote clears `MIN_QUOTE_CHARS` after normalising; and the
+ * trusted); the quote clears `MIN_QUOTE_CHARS` after normalising; the
  * normalised quote is actually a substring of THAT SAME PASSAGE'S OWN
  * text — the exact `READER_PASSAGE_CHARS` slice the model was shown, never
  * the full passage it was not shown and never another entry's passage
- * (cross-quoting). A model cannot honestly quote text it never read. */
-function groundedRelevant(entries: RawEntry[], shortlist: KnowledgePassage[]): string[] {
+ * (cross-quoting); and — A-X9, 12 Sep 2026 — if the QUESTION names an
+ * explicit calendar date, the passage's own `record_date` must be able to
+ * be that date. This last clause exists because the first four do not:
+ * "Okay, now let's say 14 fire. Then what happens?" is genuine, verbatim
+ * text from a real passage, correctly grounded by every check above it, and
+ * still not evidence about a dinner on the 14th — that passage is dated the
+ * 11th. Grounding a QUOTE proves the words are real; it says nothing about
+ * whether the source is from the day the question actually asked about,
+ * which is a fact this function already has and had never used.
+ *
+ * `now` is threaded through from `readShortlist` for the same reason
+ * `explicitDateAnchor` takes it explicitly rather than reading the clock —
+ * see that function's own comment. */
+function groundedRelevant(entries: RawEntry[], shortlist: KnowledgePassage[], question: string, now: Date): string[] {
   const byId = new Map(shortlist.map((p) => [passageId(p), p]))
+  const anchor = explicitDateAnchor(question, now)
   const kept: string[] = []
   for (const raw of entries) {
     if (typeof raw === "string") continue
@@ -239,6 +296,7 @@ function groundedRelevant(entries: RawEntry[], shortlist: KnowledgePassage[]): s
     if (normQuote.length < MIN_QUOTE_CHARS) continue
     const shown = normaliseForQuoteCheck(passage.text.slice(0, READER_PASSAGE_CHARS))
     if (!shown.includes(normQuote)) continue
+    if (anchor && !survivesDateAnchor(passage.recordDate, anchor)) continue
     kept.push(id)
   }
   return kept
@@ -249,7 +307,11 @@ function groundedRelevant(entries: RawEntry[], shortlist: KnowledgePassage[]): s
 export async function readShortlist(
   env: Env,
   question: string,
-  shortlist: KnowledgePassage[]
+  shortlist: KnowledgePassage[],
+  // Explicit, defaulted, never read from the clock inside `groundedRelevant`
+  // itself — see `explicitDateAnchor`'s own comment for why. Every real
+  // caller gets today; a test hands in a fixed date instead of faking a timer.
+  now: Date = new Date()
 ): Promise<{ relevant: string[] } | null> {
   if (!shortlist.length) return { relevant: [] }
   try {
@@ -281,7 +343,7 @@ export async function readShortlist(
     // dropped rather than believed. See `groundedRelevant`'s own comment for
     // the full check; an empty result here is a real, honest "looked and
     // found nothing", not a parse failure.
-    return { relevant: groundedRelevant(entries, shortlist) }
+    return { relevant: groundedRelevant(entries, shortlist, question, now) }
   } catch (e) {
     await recordWorkerError(env.DB, "content", "knowledge reader", e)
     return null
