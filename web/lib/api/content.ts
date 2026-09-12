@@ -136,6 +136,10 @@ async function sendFile<T>(path: string, module: string, dataUrl: string): Promi
 
 import type { PagedResponse } from "@shared/web/api"
 
+/** WHAT `createKnowledge` GOT OUT OF A VIDEO LINK — see `createKnowledge`'s own
+ * comment on the response it rides in. */
+export type KnowledgeLinkRead = { provider: string; kind: string; words: number }
+
 /** The facets the story list door parses — mirrored here so a caller cannot
  * invent one the server ignores in silence. */
 export type StoryQuery = {
@@ -990,7 +994,22 @@ export const content = {
     /** 12.3: limit it to the people staffed to one app. The door refuses an app
      * the caller is not on, so this can never lock somebody out of their own. */
     visibleToAppId?: string | null
-  }) => api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge", post(input)),
+  }) =>
+    api<{
+      source: KnowledgeSource | null
+      total: number
+      /** A VIDEO LINK, READ FOR REAL — present only when `sourceUrl` pointed at
+       * one the door recognised and could reach a transcript for. `null` on an
+       * ordinary note, exactly as before this field existed. */
+      read?: KnowledgeLinkRead | null
+      /** WHY IT COULDN'T, in the door's own words — a host it doesn't recognise
+       * versus one it does that simply publishes no transcript are two
+       * genuinely different sentences, composed server-side and rendered
+       * verbatim (same shape as `knowledgeAnswer`'s `reason`): DATA the
+       * response carries, not catalogued UI copy, so R28's walk never reaches
+       * it. `null` when there was nothing to read, or reading it worked. */
+      refusedBecause?: string | null
+    }>("/api/content/knowledge", post(input)),
   /** Hand the knowledge base a FILE. One call, one record: the bytes and the row
    * are written together, so closing the tab halfway can never leave a stored
    * file nothing points at. The answer is the source itself — read `fileNote` to

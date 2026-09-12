@@ -100,7 +100,11 @@ export function KnowledgeFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (values: KnowledgeFormValues) => Promise<void>
+  /** Void on an ordinary save (every EDIT, and a CREATE that isn't a bare video
+   * link) — closes and clears the draft, exactly as before this field existed.
+   * A CREATE that read a video link and couldn't returns `refusedBecause`
+   * instead, which keeps the dialog open and renders the sentence in place. */
+  onSubmit: (values: KnowledgeFormValues) => Promise<{ refusedBecause?: string | null } | void>
   /** the accounts this caller may file under — already fenced by their own read */
   /** the team whose clients the compartment picker searches (accounts PAGE, R14) */
   teamId: string | null
@@ -151,27 +155,43 @@ export function KnowledgeFormDialog({
     open
   )
   const [busy, setBusy] = React.useState(false)
+  // WHY IT COULDN'T READ THE LINK, verbatim from the door (see `onSubmit`'s own
+  // type) — two genuinely different sentences (a host we don't recognise vs.
+  // one we do that simply publishes no transcript), composed server-side and
+  // shown AS WRITTEN, never paraphrased into one generic failure and never a
+  // toast that disappears before it's read. Cleared the moment the person
+  // changes the link — a stale refusal about the last URL would describe the
+  // wrong thing the moment they paste a new one.
+  const [linkRefusal, setLinkRefusal] = React.useState<string | null>(null)
 
   // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE.
   //
   // Every unreadable thing that ever reached this knowledge base was accepted,
   // stored and quietly never read, and nobody was told. A link with nothing
-  // beside it is that shape exactly: a row that looks filed and holds nothing.
-  //
-  // THE GATE IS THE EMPTY BODY, NOT THE HOST. A list of video services is wrong
-  // the moment somebody uses one that is not on it — which is what happened, with
-  // a Tella recording behind a custom domain. `isVideoLink` still runs, but only
-  // to choose which sentence to show: "we can't watch a video" is the right thing
-  // to say about a recording and the wrong thing to say about a documentation
-  // page, and both are refused either way.
+  // beside it used to be that shape exactly — a row that looks filed and holds
+  // nothing — for EVERY host. It no longer is for a VIDEO link: the owner's own
+  // words, 12 Sep, "whether I paste Tella, Loom, or YouTube doesn't matter... it
+  // will paste [and] show me what kind of transcript it's extracting" — so a
+  // bare video link is now the expected, submittable shape, and the door reads
+  // it for real (`read`/`refusedBecause` on the response). An ordinary page is
+  // still refused with nothing beside it: this app does not fetch arbitrary
+  // pages, and "we don't open the page for you" stays true for everything that
+  // isn't a video.
   const link = values.sourceUrl.trim()
-  const nothingToRead = !!link && !richTextValue(values.body).trim()
+  const linkIsVideo = isVideoLink(link)
+  const nothingToRead = !!link && !linkIsVideo && !richTextValue(values.body).trim()
+  // THE ONE CASE THE SUBMIT BUTTON SAYS SOMETHING DIFFERENT FOR — a real read
+  // behind the door, seconds rather than an ordinary write's milliseconds. Only
+  // when there is no body already: a video link with words already pasted
+  // beside it is an ordinary note that happens to carry a link, and saving it
+  // is the same instant write every other source gets.
+  const willReadVideoLink = !!link && linkIsVideo && !richTextValue(values.body).trim()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
-      await onSubmit({
+      const result = await onSubmit({
         title: values.title.trim(),
         body: richTextValue(values.body),
         sourceUrl: values.sourceUrl.trim(),
@@ -182,6 +202,15 @@ export function KnowledgeFormDialog({
         // person did not choose.
         visibleToAppId: values.visibility === "app" ? values.visibleToAppId : "",
       })
+      // A REFUSAL IS NOT A THROW — the source still saved (as an ordinary,
+      // unreadable-video note), so closing the dialog and clearing the draft
+      // would be right for THAT fact and wrong for this one: the person asked
+      // for a transcript and needs to see why they didn't get one before the
+      // form disappears. Stays open; the sentence renders under the link field.
+      if (result && "refusedBecause" in result && result.refusedBecause) {
+        setLinkRefusal(result.refusedBecause)
+        return
+      }
       clearDraft()
       onOpenChange(false)
     } catch (err) {
@@ -217,6 +246,12 @@ export function KnowledgeFormDialog({
         // NOTHING PASTED MEANS NO SOURCE. The door says the same thing; this
         // stops a person getting there and being told no.
         disabled: !values.title.trim() || nothingToRead,
+        // THE OWNER'S OWN WORDS: "show me it's loading" — a video read is a
+        // real fetch behind this door, seconds rather than an ordinary save's
+        // milliseconds, and "Submitting…" would read as stuck. Every other
+        // save on this form (and every other form in the app) still says
+        // "Submitting…" — see `SubmitConfig.loadingLabel`'s own header.
+        loadingLabel: willReadVideoLink ? t("Reading the link…") : undefined,
       }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
@@ -257,19 +292,34 @@ export function KnowledgeFormDialog({
         <Input
           id="knowledge-link"
           value={values.sourceUrl}
-          onChange={(e) => setValues((v) => ({ ...v, sourceUrl: e.target.value }))}
+          onChange={(e) => {
+            const sourceUrl = e.target.value
+            setValues((v) => ({ ...v, sourceUrl }))
+            // A refusal describes the LAST url. The moment they change it, it
+            // describes nothing that's still true — cleared rather than left
+            // to read as an answer about whatever they've just typed instead.
+            if (linkRefusal) setLinkRefusal(null)
+          }}
           placeholder="https://…"
           disabled={busy || textOwnedElsewhere}
         />
-        {nothingToRead ? (
+        {linkRefusal ? (
+          // RENDERED AS WRITTEN, never wrapped in t() — this is the door's own
+          // composed sentence (see `onSubmit`'s type), the same shape as
+          // `knowledgeAnswer`'s `reason`: DATA the response carries, not
+          // catalogued UI copy. Two genuinely different sentences live here
+          // (a host we don't recognise vs. one that publishes no transcript)
+          // and neither gets paraphrased into the other.
+          <p className="text-warning mt-2 text-sm">{linkRefusal}</p>
+        ) : nothingToRead ? (
           <p className="text-warning mt-2 text-sm">
-            {isVideoLink(link)
-              ? t(
-                  "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
-                )
-              : t(
-                  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
-                )}
+            {t(
+              "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
+            )}
+          </p>
+        ) : willReadVideoLink ? (
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t("We'll read this video's captions or transcript when you save it.")}
           </p>
         ) : null}
       </Field>

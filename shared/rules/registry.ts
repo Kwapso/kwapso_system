@@ -1403,9 +1403,17 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // cannot close an already-rare name, only a DENY can) — one field label
   // and three option words replaced the single checkbox sentence. Same
   // $0-spend reason as every entry above it.
-  de: 26,
-  es: 26,
-  ca: 26,
+  //
+  // RAISED 26 -> 33 in all three, 12 Sep 2026: the knowledge create dialog's
+  // three video-link states (owner's own words — "show me it's loading,
+  // show me what kind of transcript it's extracting, and then tell me when
+  // it's done") added seven new sentences (the loading label, the pre-submit
+  // hint, the two word-count sentences, and the three kind words) — none
+  // translated yet, accepted debt in the same change that added them,
+  // exactly as R44 asks.
+  de: 33,
+  es: 33,
+  ca: 33,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

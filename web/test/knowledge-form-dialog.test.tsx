@@ -118,3 +118,156 @@ describe("KnowledgeFormDialog — a mirrored source's 'Only me' is gone, not jus
     expect(screen.queryByText(/reached us/i)).toBeNull()
   })
 })
+
+// THE THREE STATES A PERSON SEES pasting a video link (owner's own words, 12
+// Sep: "it will paste, show me it's loading, show me what kind of transcript
+// it's extracting, and then tell me when it's done"). `createKnowledge`'s own
+// warm-sentence composition and the toast it fires are use-screen-actions.ts's
+// job, not this component's — these tests are about what THIS file owns: the
+// button no longer refuses a bare video link, says something different while
+// it waits, and a refusal from the door stays on screen rather than vanishing
+// with the dialog.
+describe("KnowledgeFormDialog — a video link's three states", () => {
+  const base = { title: "", visibility: "team" as const, body: "", sourceUrl: "", accountId: "", visibleToAppId: "" }
+
+  it("a bare video link does not disable submit, unlike an ordinary bare link", () => {
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={noop}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={base}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A talk" } })
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://www.youtube.com/watch?v=abc123" },
+    })
+    expect((screen.getByRole("button", { name: /submit/i }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByText(/we'll read this video's captions or transcript/i)).toBeTruthy()
+
+    // An ordinary page, same shape (a title, a bare link, no body), is still
+    // refused — this app does not fetch arbitrary pages.
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://example.com/docs/handover" },
+    })
+    expect((screen.getByRole("button", { name: /submit/i }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(/we don't open the page for you/i)).toBeTruthy()
+  })
+
+  it("says 'Reading the link…' while a video-link save is in flight, not 'Submitting…'", async () => {
+    let resolveSubmit: () => void = () => {}
+    const pending = new Promise<void>((r) => (resolveSubmit = r))
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={() => pending}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={base}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A talk" } })
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://www.youtube.com/watch?v=abc123" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    expect(await screen.findByText("Reading the link…")).toBeTruthy()
+    expect(screen.queryByText("Submitting…")).toBeNull()
+    resolveSubmit()
+  })
+
+  it("an ordinary save (no video link) still says 'Submitting…', unchanged", async () => {
+    let resolveSubmit: () => void = () => {}
+    const pending = new Promise<void>((r) => (resolveSubmit = r))
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={() => pending}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={{ ...base, body: "Some words already written here." }}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A note" } })
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    expect(await screen.findByText("Submitting…")).toBeTruthy()
+    resolveSubmit()
+  })
+
+  it("renders a refusal from the door verbatim and keeps the dialog open", async () => {
+    const onOpenChange = () => {
+      throw new Error("must not close the dialog on a refusal")
+    }
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={onOpenChange}
+        onSubmit={async () => ({ refusedBecause: "We recognise this host, but it publishes no transcript." })}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={base}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A talk" } })
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://www.youtube.com/watch?v=abc123" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    expect(await screen.findByText("We recognise this host, but it publishes no transcript.")).toBeTruthy()
+  })
+
+  it("clears the refusal the moment the link changes, rather than describing the wrong URL", async () => {
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={noop as unknown as (open: boolean) => void}
+        onSubmit={async () => ({ refusedBecause: "We recognise this host, but it publishes no transcript." })}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={base}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A talk" } })
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://www.youtube.com/watch?v=abc123" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    await screen.findByText("We recognise this host, but it publishes no transcript.")
+    fireEvent.change(screen.getByPlaceholderText("https://…"), {
+      target: { value: "https://www.youtube.com/watch?v=xyz789" },
+    })
+    expect(screen.queryByText("We recognise this host, but it publishes no transcript.")).toBeNull()
+  })
+
+  it("an ordinary successful submit still clears the draft and closes, unchanged", async () => {
+    let closed = false
+    render(
+      <KnowledgeFormDialog
+        open
+        onOpenChange={(o) => {
+          if (!o) closed = true
+        }}
+        onSubmit={async () => {}}
+        teamId="T1"
+        accountOptions={[]}
+        appOptions={[]}
+        initial={{ ...base, body: "Some words already written here." }}
+      />
+    )
+    fireEvent.change(screen.getByPlaceholderText(/e\.g\. how we handle/i), { target: { value: "A note" } })
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(closed).toBe(true)
+  })
+})
