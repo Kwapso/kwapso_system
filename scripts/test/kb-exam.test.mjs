@@ -9,17 +9,22 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
+  applyKeys,
   classify,
+  enforceRefusalCeiling,
   findExamFile,
   grade,
   KNOWN_TAGS,
   loadExam,
+  loadKeys,
   MANDATORY_CANARIES,
   OVERRIDES,
   parseExam,
+  scoreExam,
   shortlistFromAnswer,
   summarize,
   validateExam,
+  validateKeys,
 } from "../kb-exam.mjs"
 
 const FIXTURE = `
@@ -188,20 +193,22 @@ test("the real KB-EXAM-UNION.md loads clean and every tag it uses is recognised"
   for (const row of rows) for (const t of row.tags) assert.ok(KNOWN_TAGS.has(t), `${row.id}: tag "${t}" is not in KNOWN_TAGS`)
 })
 
-test("the classification call over the union is pinned — 100 rows + 1 derived, 73 keyed / 8 refusal / 7 gap / 7 tool / 6 struck", () => {
+test("the classification call over the union is pinned — 100 rows + 1 derived, 75 keyed / 7 refusal / 5 gap / 7 tool / 7 struck", () => {
   const { rows } = loadExam()
   const summary = summarize(rows)
   assert.equal(summary.total, 101, "100 union rows + the derived X8-notowner row")
-  assert.equal(summary.byDisposition.keyed, 73, "72 + A-H13, corrected off gap after the hub's fix to RULING 3's predicate")
-  assert.equal(summary.byDisposition.refusal, 8)
-  assert.equal(summary.byDisposition.gap, 7, "4 derived from RULING 3, corrected (A-E6, A-E12, A-M6, A-M19) + B's own 3 (B-G3, B-G4, B-G5) — A-H13 moved to keyed, see below")
+  assert.equal(summary.byDisposition.keyed, 75, "74 + A-M19, rewritten off gap 2026-09-12 — the owner's ruling, a real ticket in place of one that never existed")
+  assert.equal(summary.byDisposition.refusal, 7, "X8-notowner moved to struck 2026-09-11 — see below")
+  assert.equal(summary.byDisposition.gap, 5, "2 derived from RULING 3 (A-E6, A-E12) + B's own 3 (B-G3, B-G4, B-G5) — A-H13, A-M6 and A-M19 all moved to keyed, see below")
   assert.equal(summary.byDisposition.tool, 7)
-  assert.equal(summary.byDisposition.struck, 6)
+  assert.equal(summary.byDisposition.struck, 7, "the original 6 + X8-notowner, struck 2026-09-11 pending a filing fix (see DERIVED_ROWS)")
   // The union's own footer: "every absent row, every gap row, and the
-  // non-owner half of X8" — 7 absent + 1 derived refusal + 7 gap = 15.
+  // non-owner half of X8" — but X8-notowner no longer carries that half:
+  // struck 2026-09-11, pending a filing fix (see DERIVED_ROWS's own note).
+  // 7 absent + 5 gap = 12.
   assert.deepEqual(
     summary.mustScore100.sort(),
-    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "X8-notowner", "A-E6", "A-E12", "A-M6", "A-M19", "B-G3", "B-G4", "B-G5"].sort()
+    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "A-E6", "A-E12", "B-G3", "B-G4", "B-G5"].sort()
   )
 })
 
@@ -228,10 +235,28 @@ test("the ten mandatory canaries the hub named exist, and only A-O7/A-X10 are gr
   assert.equal(byDisposition["A-X10"], "tool")
 })
 
-test("the four RULING-3-derived gap rows are exactly the ones left after the hub's correction", () => {
+test("the two RULING-3-derived gap rows left after A-H13, A-M6 and A-M19's corrections", () => {
   const { rows } = loadExam()
   const byId = new Map(rows.map((r) => [r.id, r]))
-  for (const id of ["A-E6", "A-E12", "A-M6", "A-M19"]) assert.equal(byId.get(id)?.disposition, "gap", id)
+  for (const id of ["A-E6", "A-E12"]) assert.equal(byId.get(id)?.disposition, "gap", id)
+})
+
+test("A-M19 is keyed to a real ticket, not gap on a reference that never existed", () => {
+  const { rows } = loadExam()
+  const m19 = rows.find((r) => r.id === "A-M19")
+  assert.equal(m19.disposition, "keyed")
+  assert.ok(!m19.tags.includes("gap"), "the gap tag must not survive the rewrite, or classifyByTags would re-gap it")
+  assert.ok(m19.tags.includes("exact"), "the row still tests an exact reference, just a real one")
+  assert.match(m19.detail, /REWRITTEN 2026-09-12/, "the rewrite must stay visible in the detail column")
+  assert.doesNotMatch(m19.question, /3144/, "the fictional reference must not survive into the question text")
+})
+
+test("A-M6 is keyed, not gap — the rebuild produced a real transcript for the meeting B's file had left out", () => {
+  const { rows } = loadExam()
+  const m6 = rows.find((r) => r.id === "A-M6")
+  assert.equal(m6.disposition, "keyed")
+  assert.ok(!m6.tags.includes("gap"), "the gap tag must not survive the correction, or classifyByTags would re-gap it")
+  assert.match(m6.detail, /SETTLED, not gap/, "the correction must stay visible in the detail column")
 })
 
 test("A-H13 is keyed, not gap — corrected predicate: gap only if ALL meeting sources are absent, and pt 2 is present", () => {
@@ -259,4 +284,141 @@ test("fence coverage is enumerable by tag — exactly the five rows the hub name
   // A-X8's persona split is untouched — still struck, still carrying its
   // own reason, not silently reinterpreted now that other rows are tagged.
   assert.equal(byId.get("A-X8").disposition, "struck")
+})
+
+/* ------------------------- the keying mechanism ------------------------- */
+
+test("loadKeys returns {} when the file does not exist — the mechanism works before any row is ever keyed", () => {
+  assert.deepEqual(loadKeys("/tmp/kb-exam-keys-does-not-exist.json"), {})
+})
+
+// The rebuild landed 2026-09-11 (~4,400 sources). The first keying pass ran
+// straight after: every row here was matched by a `meeting`-kind title (never
+// Google-derived — the backfill was still walking backward) AND corroborated
+// by an exact chunk-count match against the source's own annotated piece
+// count, both checked by hand before this file was written. It is a
+// deliberate under-count, not an exhaustive one: title punctuation (en-dashes,
+// colons, emoji) broke several real matches, left unkeyed rather than guessed.
+test("the shipped scripts/kb-exam-keys.json holds only real, corroborated matches", () => {
+  const keys = loadKeys()
+  assert.ok(Object.keys(keys).length > 0, "if this fails, every key was reverted — check that on purpose")
+  for (const [rowId, sourceIds] of Object.entries(keys)) {
+    assert.ok(Array.isArray(sourceIds) && sourceIds.length > 0, `${rowId} must key to a non-empty array`)
+    for (const id of sourceIds) assert.match(id, /^[0-9A-Z]{26}$/, `${rowId}: "${id}" doesn't look like a knowledge_sources ulid`)
+  }
+})
+
+test("applyKeys: a row absent from the keys file is untouched — grades exactly as it does today", () => {
+  const rows = [{ id: "A-O1", disposition: "keyed", sourceIds: null }]
+  assert.deepEqual(applyKeys(rows, {}), rows)
+})
+
+test("applyKeys: a row present in the keys file gets sourceIds from it, nothing else changed", () => {
+  const rows = [{ id: "A-O1", disposition: "keyed", sourceIds: null, question: "q" }]
+  const [result] = applyKeys(rows, { "A-O1": ["src_real_1"] })
+  assert.deepEqual(result.sourceIds, ["src_real_1"])
+  assert.equal(result.question, "q")
+})
+
+test("validateKeys catches a key naming a row that doesn't exist, one on a non-keyable disposition, and an empty array", () => {
+  const rows = [
+    { id: "A-O1", disposition: "keyed" },
+    { id: "A-X6", disposition: "refusal" },
+  ]
+  const problems = validateKeys(rows, { "A-GHOST": ["x"], "A-X6": ["x"], "A-O1": [] })
+  assert.ok(problems.some((p) => p.includes("A-GHOST does not exist")))
+  assert.ok(problems.some((p) => p.includes('A-X6 is disposition "refusal"')))
+  assert.ok(problems.some((p) => p.includes("A-O1 must key to a non-empty array")))
+})
+
+test("validateKeys is clean against the real keys file", () => {
+  const { rows } = loadExam()
+  assert.deepEqual(validateKeys(rows, loadKeys()), [])
+})
+
+/* ------------------- MUTATION PROOF — the keying mechanism actually grades ------------------- */
+//
+// The hub's own bar: "If you cannot make it fail, the grader is not
+// reading the keys and the whole mechanism is theatre." A FABRICATED row
+// (never added to the real exam) and a FABRICATED retrieval result (no
+// model call, no network — Half One needs neither) exercised through the
+// real, shipped `applyKeys` + `grade` path, not a hand-rolled stand-in.
+
+test("MUTATION PROOF — keyed to an absent source: FAILS", () => {
+  const fakeRow = { id: "FAKE-1", disposition: "keyed", sourceIds: null }
+  const keys = { "FAKE-1": ["src_definitely_absent_999"] }
+  const [keyedRow] = applyKeys([fakeRow], keys)
+  const fabricatedRetrieval = { found: true, shortlistIds: ["src_present_1", "src_present_2"] }
+  const result = grade(keyedRow, fabricatedRetrieval)
+  console.log("MUTATION PROOF (absent key):", JSON.stringify(result))
+  assert.equal(result.scored, true)
+  assert.equal(result.correct, false)
+})
+
+test("MUTATION PROOF — same row, keyed to a present source: PASSES", () => {
+  const fakeRow = { id: "FAKE-1", disposition: "keyed", sourceIds: null }
+  const keys = { "FAKE-1": ["src_present_1"] }
+  const [keyedRow] = applyKeys([fakeRow], keys)
+  const fabricatedRetrieval = { found: true, shortlistIds: ["src_present_1", "src_present_2"] }
+  const result = grade(keyedRow, fabricatedRetrieval)
+  console.log("MUTATION PROOF (present key):", JSON.stringify(result))
+  assert.equal(result.scored, true)
+  assert.equal(result.correct, true)
+})
+
+/* --------------------------- the refusal ceiling (tracker item e-refusals) --------------------------- */
+
+test("scoreExam: a partial run (no results yet) reports the ceiling as vacuously met, never a phantom failure", () => {
+  const rows = [{ id: "A-X6", disposition: "refusal", tags: ["absent"] }]
+  const score = scoreExam(rows, {})
+  assert.equal(score.scored, 0)
+  assert.equal(score.refusalGraded, 0)
+  assert.equal(score.refusalCeilingMet, true)
+})
+
+test("scoreExam: every refusal row correct — ceiling met, enforceRefusalCeiling does not throw", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-X5", disposition: "refusal", tags: ["absent"] },
+  ]
+  const results = { "A-X4": { found: false, shortlistIds: [] }, "A-X5": { found: false, shortlistIds: [] } }
+  const score = scoreExam(rows, results)
+  assert.equal(score.refusalGraded, 2)
+  assert.equal(score.refusalCeilingMet, true)
+  assert.doesNotThrow(() => enforceRefusalCeiling(score))
+})
+
+test("MUTATION PROOF — one refusal row answers instead of refusing: the gate goes red", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-X5", disposition: "refusal", tags: ["absent"] },
+  ]
+  // A-X5 "answers" — found: true — instead of refusing. Tracker item
+  // e-refusals: this must fail the row AND fail the build, not average
+  // out to "50%, mostly fine".
+  const results = {
+    "A-X4": { found: false, shortlistIds: [] },
+    "A-X5": { found: true, shortlistIds: ["hallucinated_src"] },
+  }
+  const score = scoreExam(rows, results)
+  console.log("MUTATION PROOF (refusal ceiling):", JSON.stringify(score))
+  assert.equal(score.refusalCeilingMet, false)
+  assert.deepEqual(score.refusalFailures, ["A-X5"])
+  assert.throws(() => enforceRefusalCeiling(score), /refusal ceiling breached: 1\/2.*A-X5/)
+})
+
+test("scoreExam computes per-tag pass rates across mixed dispositions", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-O1", disposition: "keyed", tags: ["para"], sourceIds: ["src_1"] },
+  ]
+  const results = {
+    "A-X4": { found: false, shortlistIds: [] },
+    "A-O1": { found: true, shortlistIds: ["src_1"] },
+  }
+  const score = scoreExam(rows, results)
+  assert.deepEqual(score.byTag.absent, { pass: 1, total: 1 })
+  assert.deepEqual(score.byTag.para, { pass: 1, total: 1 })
+  assert.equal(score.passed, 2)
+  assert.equal(score.scored, 2)
 })

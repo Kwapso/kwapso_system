@@ -1182,6 +1182,52 @@ describe("c-hijack (B): a declared name_narrows_alone bypasses the rarity gate, 
     expect(answer.compartments).not.toContain(`account:${PREMIUM}`)
     expect(answer.compartments).not.toContain(`account:${PREMIUM_2}`)
   })
+
+  // c-hijack (B), THE SECOND HALF (0086) — the owner's correction, the same
+  // night: `name_narrows_alone = 1` (ALLOW) is an `OR` against the rarity
+  // gate, so it can only ever ADD a narrow. It does NOTHING for a name that
+  // is already rare enough to narrow on its own — Bergman S.A.'s surname is
+  // one chunk, well under ACCOUNT_TOKEN_MAX_CHUNKS, and narrows on rarity
+  // alone whether or not anyone ever declares it. The residual that actually
+  // needed closing was the OPPOSITE: a way to say a word must NEVER narrow
+  // alone. `= 2` (DENY) is that control, checked FIRST, before either the
+  // rarity gate or the alias/code branch.
+  it("a DENY beats rarity — the shape an ALLOW alone could never close, and the one that would have caught the spec error", async () => {
+    const DENIED = "A_HIJACK_B_DENIED"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${DENIED}', 'entity', 'Wexford', NULL, '2026-01-01', 2);
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_DENIED_OWN', 'note', 'Onboarding notes', 'account:${DENIED}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_DENIED_OWN', 'S_DENIED_OWN', 'account:${DENIED}', 0, 'The Wexford onboarding finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_DENIED_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    // Same shape as the "already-rare name keeps narrowing UNDECLARED" test
+    // above (one chunk, no filler) — the ONLY difference is the DENY. Without
+    // it, this question would narrow exactly like Vandenbroucke's did.
+    const answer = await ask(IDS.staffUser, "what happened with the Wexford onboarding?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("a DENY beats an alias/code match too — a declared 'never narrow alone' must not be defeated by the account's own code", async () => {
+    const DENIED_CODE = "A_HIJACK_B_DENIED_CODE"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${DENIED_CODE}', 'entity', 'Wexford Logistics', 'WEXFORD', '2026-01-01', 2);
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_DENIED_CODE_OWN', 'note', 'Shipping notes', 'account:${DENIED_CODE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_DENIED_CODE_OWN', 'S_DENIED_CODE_OWN', 'account:${DENIED_CODE}', 0, 'The WEXFORD shipment finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_DENIED_CODE_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what happened with the WEXFORD shipment?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
 })
 
 // c-misspell. The owner asked the live assistant "What is happening with

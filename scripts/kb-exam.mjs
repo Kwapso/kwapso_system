@@ -224,13 +224,17 @@ export const MANDATORY_CANARIES = new Set(["A-O1", "A-O2", "A-O3", "A-O4", "A-O5
  * not an edit to this file. Ids are the union's namespaced ones; every one
  * of these six turned out to be a duplicate present in both source files
  * (scripts/kb-exam-merge.mjs's MATCHES table has the B-side partner), so
- * each keeps its A-side id under RULING 1. Two more rows (A-M6, A-M19)
- * are pushed to `gap` by scripts/kb-exam-merge.mjs itself (RULING 3's
- * derivation) rather than listed here — see the comment below. A-H13 was
- * briefly a third until the hub corrected the derivation's predicate: it
- * cites two meeting sources and only one is absent, so it is `keyed`
- * (plain, no override) with a thin-evidence note in its detail column
- * instead. */
+ * each keeps its A-side id under RULING 1. RULING 3's derivation once
+ * pushed two more rows (A-M6, A-M19) to `gap` from scripts/kb-exam-merge.mjs
+ * itself rather than here — see the comment below — but neither stayed
+ * one: A-H13 was the derivation's first false positive (corrected
+ * predicate, below), A-M6 and A-M19 turned out to be the second and
+ * third, discovered later and for two different reasons. A-M6: the
+ * rebuild produced a real transcript for a meeting the derivation had
+ * called absent. A-M19: the owner ruled the row's reference ("task 3144")
+ * never resolved to a real record at all and rewrote it around one that
+ * does. All three are `keyed` now, each with its own correction named in
+ * its detail column in KB-EXAM-UNION.md rather than here. */
 export const OVERRIDES = {
   "A-X1": {
     disposition: "struck",
@@ -264,21 +268,24 @@ export const OVERRIDES = {
   // RULING 3's corrected derivation (over KB-EXAM-TRANSCRIPTS.md's "left
   // out on purpose" footer — the only staging-checked oracle either file
   // has, and the predicate: gap only if ALL of a row's meeting sources are
-  // on that list) converts four A rows to `gap`. Two (A-E6, A-E12) get it
-  // for free because they merged with a B row carrying the tag natively
-  // (B-G2, B-G1); the other two (A-M6, A-M19) did not merge with anything,
-  // so scripts/kb-exam-merge.mjs writes `gap` straight into their tags —
-  // no override needed here either. `classifyByTags`'s tag rule is the
-  // ONE mechanism for all four; see each row's `detail` column in
-  // KB-EXAM-UNION.md for the derivation's reasoning (score, which
-  // left-out entry it resolved to, and — for A-M19 — why its "ticket
-  // record" mention does not count as a competing source). A-H13 was
-  // the derivation's one false positive under the ORIGINAL predicate
-  // ("resolves to" rather than "entirely resolves to") — it cites pt 1
-  // (absent) AND pt 2 (present, 23 pieces), so gapping it would have
-  // failed a system for correctly answering from pt 2. It is `keyed`
-  // instead, to pt 2, with the pt 1 gap named in its detail column — the
-  // exam's one row testing partial knowledge rather than absence.
+  // on that list) converted four A rows to `gap` at the time it ran. Two
+  // (A-E6, A-E12) get it for free because they merged with a B row
+  // carrying the tag natively (B-G2, B-G1) and still hold. The other two
+  // (A-M6, A-M19) did not merge with anything, so
+  // scripts/kb-exam-merge.mjs wrote `gap` straight into their tags — and
+  // both have since been corrected off it, for two different reasons
+  // (A-M6: the rebuild produced a transcript the derivation had never
+  // seen; A-M19: the owner rewrote the row after its reference turned out
+  // not to exist at all), so today only A-E6/A-E12 remain gap by this
+  // derivation. `classifyByTags`'s tag rule is still the ONE mechanism;
+  // see each row's `detail` column in KB-EXAM-UNION.md for its own
+  // history. A-H13 was the derivation's first false positive under the
+  // ORIGINAL predicate ("resolves to" rather than "entirely resolves
+  // to") — it cites pt 1 (absent) AND pt 2 (present, 23 pieces), so
+  // gapping it would have failed a system for correctly answering from
+  // pt 2. It is `keyed` instead, to pt 2, with the pt 1 gap named in its
+  // detail column — the exam's one row testing partial knowledge rather
+  // than absence.
 }
 
 /** X8's non-owner half is a real, gradeable claim the union's own footer
@@ -287,7 +294,21 @@ export const OVERRIDES = {
  * claim entirely, so this derives the one half of it this harness CAN
  * check without a persona model: asked as anyone but the owner, the
  * pickleball question must refuse. A-X8 itself is kept, unmodified,
- * alongside it — the brief says keep every row, this only adds one. */
+ * alongside it — the brief says keep every row, this only adds one.
+ *
+ * STRUCK 2026-09-11, pending a filing fix, not a fence fix. Run for real
+ * against the post-rebuild corpus (as Aurora, guard dumped and checked
+ * field-by-field against MemberGuard — the harness was not the problem):
+ * the owner's private "Pickleball" calendar entry IS correctly fenced (one
+ * `event` row, his own `owner_user_id`, his own sighting, refuses Aurora).
+ * But the same recurring game was ALSO filed into the `meetings` module as
+ * 59 ordinary meeting records — team material by construction, no personal
+ * owner, because a meeting isn't personal. Aurora's question never reaches
+ * the correctly-fenced calendar row; a team-owned meeting copy answers it
+ * first. The fence did exactly what it says; the filing put a private
+ * thing where only team things belong. Re-strike when that's fixed — this
+ * row's wording is still the right test, it just can't pass against today's
+ * data through no fault of the fence. */
 const DERIVED_ROWS = [
   {
     id: "X8-notowner",
@@ -297,7 +318,9 @@ const DERIVED_ROWS = [
     question: "When is pickleball this week?",
     tags: ["fence"],
     detail: "Aurora asking: refuse (private-shelf event)",
-    disposition: "refusal",
+    disposition: "struck",
+    reason:
+      "filing bug, not a fence bug (2026-09-11): the owner's private Pickleball calendar entry is correctly fenced, but the same game was also filed as 59 ordinary `meetings` records with no personal owner, and those answer the question instead. Un-strike once the filing fix lands.",
   },
 ]
 
@@ -306,10 +329,42 @@ export function classify(row) {
   return { ...row, ...decided, mandatory: MANDATORY_CANARIES.has(row.id) }
 }
 
-export function loadExam(path = findExamFile()) {
+/** THE KEYING MECHANISM. `.plans/KB-EXAM.md`'s own words: "key every row to
+ * the source id(s) that answer it... [until then] a row is graded by
+ * hand." Real ids cannot exist before Lane A/C's re-index runs, so this
+ * file starts EMPTY — `{}` — and is edited only during the post-reindex
+ * keying pass, one row id to one array of real source ids. It is
+ * DELIBERATELY SEPARATE from KB-EXAM-UNION.md: the union is the questions
+ * and their editorial classification (tags → disposition), which the hub
+ * rules on; the keys are a fact about the re-indexed database, which
+ * nobody can state until it exists. Keeping them apart means a keying
+ * pass is a diff to ONE small JSON file, never a hand-edit of the
+ * generated union markdown that scripts/kb-exam-merge.mjs would then
+ * flag as drifted. */
+const KEYS_PATH = join(HERE, "kb-exam-keys.json")
+
+export function loadKeys(path = KEYS_PATH) {
+  if (!existsSync(path)) return {}
+  return JSON.parse(readFileSync(path, "utf8"))
+}
+
+/** A row with NO entry in `keys` is untouched — its `sourceIds` stays
+ * whatever `classify()` set it to (null for `keyed`/`gap`), which is
+ * exactly today's behaviour: ungraded, reported only in the structural
+ * summary, "by hand" until the keying pass reaches it. A row WITH an
+ * entry gets `sourceIds` set from the file, so `grade()` can score it the
+ * moment a real (or, for the mutation proof, a fabricated) retrieval
+ * result exists. Applying this to every disposition uniformly is
+ * harmless — `grade()` only ever reads `sourceIds` for `keyed`/`gap`. */
+export function applyKeys(rows, keys) {
+  return rows.map((row) => (row.id in keys ? { ...row, sourceIds: keys[row.id] } : row))
+}
+
+export function loadExam(path = findExamFile(), keysPath = KEYS_PATH) {
   const markdown = readFileSync(path, "utf8")
   const rows = parseExam(markdown).map(classify)
-  return { path, rows: [...rows, ...DERIVED_ROWS.map((r) => ({ ...r }))] }
+  const all = [...rows, ...DERIVED_ROWS.map((r) => ({ ...r }))]
+  return { path, rows: applyKeys(all, loadKeys(keysPath)) }
 }
 
 /* ------------------------------- validation ------------------------------ */
@@ -332,6 +387,28 @@ export function validateExam({ rows }) {
       problems.push(`${row.id}: ${row.disposition} with no reason`)
   }
   for (const id of MANDATORY_CANARIES) if (!seen.has(id)) problems.push(`mandatory canary ${id} is missing from the exam`)
+  return problems
+}
+
+/** Catches a stale or typo'd key BEFORE it silently grades nothing (a key
+ * naming a row that no longer exists) or grades something it can't (a key
+ * on a `refusal`/`tool`/`struck` row, none of which read `sourceIds`). Run
+ * against the raw `keys` object, separately from `validateExam`, because
+ * a keys-file problem is a fact about the keying pass, not about the
+ * exam's own editorial structure. */
+export function validateKeys(rows, keys) {
+  const problems = []
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  for (const [id, sourceIds] of Object.entries(keys)) {
+    const row = byId.get(id)
+    if (!row) {
+      problems.push(`kb-exam-keys.json: ${id} does not exist in the loaded exam`)
+      continue
+    }
+    if (row.disposition !== "keyed" && row.disposition !== "gap")
+      problems.push(`kb-exam-keys.json: ${id} is disposition "${row.disposition}", which never reads sourceIds`)
+    if (!Array.isArray(sourceIds) || sourceIds.length === 0) problems.push(`kb-exam-keys.json: ${id} must key to a non-empty array of source ids`)
+  }
   return problems
 }
 
@@ -385,6 +462,63 @@ export function grade(row, result) {
  * only reduces it to what `grade` needs. */
 export function shortlistFromAnswer(answer) {
   return [...new Set((answer.passages ?? []).map((p) => p.sourceId).filter(Boolean))]
+}
+
+/* ---------------------------------- scoring --------------------------------- */
+
+/** THE ACTUAL GRADING RUN, over whatever retrieval results exist —
+ * fabricated (the mutation proof below, and every unit test), or real
+ * (Half Two's prepared retrieval-only pass, once the hub authorises it).
+ * `resultsByRowId` may be partial: a row with no result yet is skipped,
+ * never scored as a failure, so this can run against an in-progress pass
+ * without reporting phantom zeros. `tracker item e-refusals` requires
+ * every refusal-disposition row to score 100% — `refusalCeilingMet` is
+ * that assertion made checkable, not just a number a person has to eyeball
+ * in a percentage column. */
+export function scoreExam(rows, resultsByRowId) {
+  const graded = []
+  for (const row of rows) {
+    const result = resultsByRowId[row.id]
+    if (!result) continue
+    graded.push(grade(row, result))
+  }
+  const scored = graded.filter((g) => g.scored)
+  const byTag = {}
+  for (const g of scored) {
+    for (const t of g.row.tags) {
+      byTag[t] ??= { pass: 0, total: 0 }
+      byTag[t].total++
+      if (g.correct) byTag[t].pass++
+    }
+  }
+  const refusalGraded = scored.filter((g) => g.row.disposition === "refusal")
+  const refusalFailures = refusalGraded.filter((g) => !g.correct).map((g) => g.row.id)
+  return {
+    attempted: graded.length,
+    scored: scored.length,
+    passed: scored.filter((g) => g.correct).length,
+    byTag,
+    refusalGraded: refusalGraded.length,
+    refusalFailures,
+    // The gate tracker item e-refusals actually cares about: true only
+    // when every graded refusal row passed. Vacuously true (and reported
+    // as such) if none were graded yet — a partial run must not read as
+    // "the ceiling holds" when it never checked.
+    refusalCeilingMet: refusalFailures.length === 0,
+  }
+}
+
+/** THE BUILD-FAILING FORM of the assertion above. Exits nonzero and names
+ * every failing refusal row the moment one exists — this is what turns
+ * "the refusal tag scores 100%" from a number in a report into something
+ * that can actually fail a run. Called by Half Two's prepared script once
+ * real results exist; exercised now, with fabricated results, by the
+ * mutation proof in scripts/test/kb-exam.test.mjs. */
+export function enforceRefusalCeiling(score) {
+  if (score.refusalCeilingMet) return
+  throw new Error(
+    `refusal ceiling breached: ${score.refusalFailures.length}/${score.refusalGraded} refusal row(s) failed — ${score.refusalFailures.join(", ")}`
+  )
 }
 
 /* ---------------------------------- report --------------------------------- */
@@ -483,7 +617,7 @@ function statusLine(s) {
 function main() {
   const args = process.argv.slice(2)
   const { path, rows } = loadExam()
-  const problems = validateExam({ rows })
+  const problems = [...validateExam({ rows }), ...validateKeys(rows, loadKeys())]
   if (problems.length) {
     console.error(`kb-exam: ${problems.length} structural problem(s):`)
     for (const p of problems) console.error(`  ${p}`)

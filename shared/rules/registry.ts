@@ -1397,9 +1397,15 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // spellings, and the "may narrow alone" checkbox) and their placeholder
   // example. Same $0-spend reason as every entry above it — accepted debt,
   // not a regression to chase.
-  de: 23,
-  es: 23,
-  ca: 23,
+  //
+  // RAISED 23 -> 26 in all three, same day, 0086: the boolean checkbox
+  // became a tri-state control (the owner's correction — an ALLOW alone
+  // cannot close an already-rare name, only a DENY can) — one field label
+  // and three option words replaced the single checkbox sentence. Same
+  // $0-spend reason as every entry above it.
+  de: 26,
+  es: 26,
+  ca: 26,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

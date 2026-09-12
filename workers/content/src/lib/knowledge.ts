@@ -2943,11 +2943,23 @@ export async function accountsNamedIn(
   const seen = new Set<string>()
   const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
-    // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
-    // no token-count/rarity gate. `alias_of` carries the canonical name back.
-    // NEVER fragile (c-hijack A3's own boundary): a code is a deliberate,
-    // declared handle, and a search that finds nothing under it is a real
-    // answer about that account, not a bad guess to retry past.
+    // A DENY (c-hijack B's second half) BEATS EVERYTHING BELOW, INCLUDING
+    // AN ALIAS/CODE MATCH. The spec error this closes: the ALLOW half of
+    // `name_narrows_alone` is an `OR` against the rarity gate, so it can only
+    // ever ADD a narrow — it does nothing for an already-rare name like
+    // Bergman S.A.'s surname (1 chunk, well under the ceiling, narrows on
+    // rarity alone regardless of the flag). A person saying "this word must
+    // NOT narrow alone" needs the opposite shape: checked FIRST, before the
+    // alias branch even asks whether this row has a code, or the same
+    // declared spelling that made the alias branch fire in the first place
+    // would still let it through.
+    if (c.name_narrows_alone === 2) continue
+    // AN ALIAS ROW (today, the account's code or a declared `alt_names`
+    // spelling) — exact match or nothing, no token-count/rarity gate.
+    // `alias_of` carries the canonical name back. NEVER fragile (c-hijack
+    // A3's own boundary): a code is a deliberate, declared handle, and a
+    // search that finds nothing under it is a real answer about that
+    // account, not a bad guess to retry past.
     if (c.alias_of) {
       if (asked.has(c.name.toLowerCase()) && !seen.has(c.ref_id)) {
         seen.add(c.ref_id)
@@ -2968,12 +2980,13 @@ export async function accountsNamedIn(
       continue
     }
     // THE COLLAPSED CASE — one surviving token, held back for the second pass.
-    // `name_narrows_alone` (0085, c-hijack B) bypasses the RARITY gate exactly
-    // as `code` bypasses it above — a person decided, so corpus frequency
-    // stops being the question — but NOT the second pass below: a declared
-    // token shared by two accounts is still evidence about the WORD, not
-    // either company, so A2 still resolves it to neither. Short-circuited so
-    // a declared account never pays for the FTS rarity query at all.
+    // `name_narrows_alone = 1` (ALLOW) bypasses the RARITY gate exactly as
+    // `code` bypasses it above — a person decided, so corpus frequency stops
+    // being the question — but NOT the second pass below: a declared token
+    // shared by two accounts is still evidence about the WORD, not either
+    // company, so A2 still resolves it to neither, whatever either declares.
+    // Short-circuited so a declared account never pays for the FTS rarity
+    // query at all. (`=== 2`, DENY, already `continue`d above this line.)
     if (c.name_narrows_alone === 1 || (await isRareAccountToken(cfg, guard, nameTerms[0]))) {
       const token = nameTerms[0]
       const list = pendingByToken.get(token) ?? []
