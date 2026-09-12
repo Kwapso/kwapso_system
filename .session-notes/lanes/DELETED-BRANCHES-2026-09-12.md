@@ -82,3 +82,29 @@ rescue/stash-0-20260907                              3      b284f28618ab63a70dcb
 rescue/stash-1-20260819                              3      b61a43b6e66ed1e9c9eb3a3c8848b09f18ab15c1
 rescue/stash-2-20260818                              3      e9d41e27bf8c280c56a7d551ff4b8f0e423be72f
 spike/service-binding-streams                        1      40d569338b20cbab6452d24375bc30a98cae9650
+
+## Third pass — lane branches retired as their work landed
+
+BRANCH                                   AHEAD  SHA
+review-ax9-false-answer                  0 (in main) origin/review-ax9-false-answer
+already deleted
+fix/gmail-sharing-display                0 (in main) origin/fix/gmail-sharing-display
+already deleted
+fix/kb-tracker-b-upload-dup              0 (in main) origin/fix/kb-tracker-b-upload-dup
+already deleted
+test/a3-retry-fence-proof                0 (in main) origin/test/a3-retry-fence-proof
+already deleted
+fix/kb-reader-cite-or-drop               0 (in main) origin/fix/kb-reader-cite-or-drop
+already deleted
+feat/kb-names-contacts-colleagues        0 (in main) origin/feat/kb-names-contacts-colleagues
+already deleted
+fix/kb-exam-keys                         0 (in main) origin/fix/kb-exam-keys
+already deleted
+fix/kb-hijack-b-deny                     0 (in main) 02cf65a52109294ae56ca51e44aed76615e56e8f
+
+fix/kb-index is the one exception and deserves its sentence: it showed 2 commits
+ahead of main, but BOTH of its features — the tenth Vectorize label and the FTS5
+BM25 lexical arm — are in main already, reached by a later branch. What the diff
+still offered was an OLDER variant of code main has since moved past. Retired on
+that basis rather than on the ahead-count, which would have said keep it.
+fix/kb-index                             2      803d27eabd1a618675af78b9f89fc9ac7e06e3cd
