@@ -26,7 +26,7 @@
 // scripts/smoke-mcp.mjs reads it off this path to derive the R19 filter check,
 // and it is the one reader that cannot follow an import.
 
-import { B, N, obj, S, str } from "./tool-args"
+import { B, enumOf, N, obj, S, str } from "./tool-args"
 import { brand } from "../brand"
 
 /* ---------------------- the body builders a tool declares --------------------- */
@@ -573,10 +573,14 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit an account's own details by `id`, never its parent (that is set_account_parent). Send only what you change; an empty string clears a field.",
     detail:
-      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them. `altNames` is declared spellings of this account's own name the knowledge base should also recognise (re-sent WHOLE, the list you name replaces the one the account has) — each has to be one word, and a common word is refused unless `nameNarrowsAlone` is also true, because a declared spelling matches on its own with no rarity check at all. `nameNarrowsAlone` says this account's own name may narrow a knowledge-base search by itself even though it is an ordinary word.",
+      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them. `altNames` is declared spellings of this account's own name the knowledge base should also recognise (re-sent WHOLE, the list you name replaces the one the account has) — each has to be one word, and a common word is refused unless `nameNarrowsAlone` is 'allow', because a declared spelling matches on its own with no rarity check at all. `nameNarrowsAlone` is 'unreviewed' (the default), 'allow' (this account's own name may narrow a knowledge-base search on its own even though it is an ordinary word), or 'deny' (this word must never narrow a search on its own, even if it looks rare today).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
-      { id: S, name: S, ...ACCOUNT_FIELD_SCHEMA, commercialsVisible: B, altNames: { type: "array" }, nameNarrowsAlone: B },
+      {
+        id: S, name: S, ...ACCOUNT_FIELD_SCHEMA, commercialsVisible: B,
+        altNames: { type: "array" },
+        nameNarrowsAlone: enumOf(["unreviewed", "allow", "deny"]),
+      },
       ["id", "name"]
     ),
     buildBody: (i) => ({
@@ -585,7 +589,10 @@ export const SHARED_TOOLS: SharedTool[] = [
       ...accountFields(i),
       commercialsVisible: typeof i.commercialsVisible === "boolean" ? i.commercialsVisible : undefined,
       altNames: Array.isArray(i.altNames) ? i.altNames : undefined,
-      nameNarrowsAlone: typeof i.nameNarrowsAlone === "boolean" ? i.nameNarrowsAlone : undefined,
+      nameNarrowsAlone:
+        i.nameNarrowsAlone === "unreviewed" || i.nameNarrowsAlone === "allow" || i.nameNarrowsAlone === "deny"
+          ? i.nameNarrowsAlone
+          : undefined,
     }),
     // IDENTITY WRITE (accounts.email) → confirm. It carries the same field
     // create_account confirms for, and for the same stated reason: an account's

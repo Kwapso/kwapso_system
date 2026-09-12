@@ -1211,11 +1211,19 @@ export type Account = {
    * reasoning as `commercialsVisible`: this is a staff judgement about how
    * the corpus is searched, not the account's own record. */
   altNames: string[]
-  /** DECLARED (0085, c-hijack B): may this account's collapsed single-token
-   * name narrow a knowledge-base search on its own, bypassing the corpus
-   * rarity gate the way `code` already does. `false` on the way out to a
-   * client login, for the same reason `altNames` is `[]` there. */
-  nameNarrowsAlone: boolean
+  /** DECLARED (0085, c-hijack B), and TRI-STATE since the owner's second
+   * ruling the same night: a boolean can only ever ADD a narrow (bypass the
+   * corpus rarity gate the way `code` already does), which does nothing for
+   * an already-rare name — Bergman S.A.'s surname is one chunk, narrows on
+   * rarity alone regardless of any flag. The residual that actually needed
+   * closing is the OPPOSITE: a way to say this word must NEVER narrow alone,
+   * beating rarity AND an alias/code match. `"unreviewed"` is the default (A's
+   * rarity ceiling alone decides); `"allow"` bypasses the ceiling; `"deny"`
+   * refuses to narrow on this word at all, however it would otherwise
+   * qualify. `"unreviewed"` on the way out to a client login, the same
+   * reasoning as `altNames` and `commercialsVisible`: a staff judgement about
+   * how the corpus is searched, not the account's own record. */
+  nameNarrowsAlone: "unreviewed" | "allow" | "deny"
   /** WHERE THIS PERSON WORKS, AND WHAT THEY DO THERE — the contacts table's two
    * middle columns (client, 2026-09-09: "for contacts lets do view table, also
    * add column role after account").

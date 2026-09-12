@@ -348,7 +348,7 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   timezone: null,
   commercialsVisible: false,
   altNames: [],
-  nameNarrowsAlone: false,
+  nameNarrowsAlone: "unreviewed",
   active: true,
   ...over,
 })

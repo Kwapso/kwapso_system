@@ -407,29 +407,52 @@ const MIN_VECTOR_SCORE = 0.5
  * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
  * silent change to what "found" means for a caller that never asked for the
  * reader. See `retrieve`'s own comment at the point this is used. */
-/* RAISED 0.3 -> 0.4 ON 12 SEP 2026, on two measured numbers either side of the
- * new line, because 0.3 let a reader ANSWER A QUESTION THE BASE HAS NOTHING ON.
+/* PUT BACK TO 0.3 ON 12 SEP 2026, hours after I raised it, because the raise
+ * broke a question nobody was watching and FOUR measured points now show that
+ * no floor can do the job at all.
  *
- *   "What is the capital of France?"   top-1 0.335  MUST refuse
- *   A-M1 (the exam's own reader canary) top-1 0.444  MUST be rescued
+ *   "What is the capital of France?"                    top-1 0.335  MUST refuse
+ *   "what horsepower do we have and what is
+ *    everyone specialised in?"  (d-paraphrase's third)  top-1 0.399  MUST answer
+ *   A-M1 (the exam's own reader canary)                 top-1 0.444  MUST answer
+ *   A-X9 ("...at dinner on the 14th")                   top-1 0.466  MUST refuse
  *
- * The strict floor is 0.5, so both were refused before a reader existed. At 0.3
- * both entered the reader's pool — and the moment the reader became a model that
- * actually finishes (llama, 11 Sep), it looked at twelve unrelated passages for
- * the France question and picked one, citing a FluClinic transcript. That is the
- * exam's refusal ceiling broken: 6/7, on the one tag where a single failure is
- * worse than any number of content misses.
+ * A question that must be REFUSED sits BELOW one that must be ANSWERED, and
+ * another sits ABOVE both. There is no line through that set. The raise to 0.4
+ * was fitted to the first and third points alone, which is why it looked clean:
+ * the second point is not in the exam, so nothing went red when 0.399 fell one
+ * thousandth on the wrong side of it and d-paraphrase silently lost a question
+ * that had been proven working the day before.
  *
- * 0.4 separates the two measured cases cleanly. It is NOT claimed to be the
- * right number in general — it is the number that fits the only two points
- * anybody has measured, and the var (`KNOWLEDGE_READER_MIN_SCORE`) exists so the
- * next person can move it with more points rather than with an argument.
+ * SO THE FLOOR GOES BACK TO BEING WHAT ITS NAME SAYS — a guard against pure
+ * noise — and the DECISION moves to the reader, which now has to quote the
+ * words it is relying on (`knowledge-reader.ts`, cite-or-drop). Measured at 0.3
+ * with that in place: France refuses, horsepower answers again citing the Week
+ * recap, A-M1 and A-O1 answer. A-X9 still answers and is tracked as its own
+ * open failure; it did so identically at 0.4, so the floor never touched it.
  *
- * WHY A FLOOR AND NOT A BETTER PROMPT: the prompt already says "If NONE of the
- * candidates bear on the question, say so by returning an empty list". It said
- * that while this happened. A model's judgment is the thing being bought here,
- * and buying it does not mean handing it noise and hoping. */
-const READER_HALLUCINATION_FLOOR = 0.4
+ * ONE HONEST QUALIFICATION, because the obvious reading of that table is wrong.
+ * Cite-or-drop is NOT what refuses France. I checked by deleting it: with both
+ * the substring check and the length floor disabled and a logger on the raw
+ * model reply, the model claims NOTHING for France, twice over. What changed is
+ * that asking for a QUOTE alongside each id makes this model far more willing
+ * to return an empty list than asking for a bare id list did — a prompt effect,
+ * and prompt effects on this model have already failed twice tonight when leant
+ * on. What IS structural is the other direction: a fabricated or irrelevant
+ * claim can no longer be smuggled in behind an id, because the words have to be
+ * in the passage the model was shown.
+ *
+ * WHAT CATCHES IT IF THIS MODEL DRIFTS: France is a refusal row in the exam, and
+ * the refusal ceiling is now a THROW inside `npm run check` rather than a line
+ * in a report (`enforceRefusalCeiling`). A regression here turns the build red
+ * and names the row. That control, not this constant, is the reason 0.3 is safe
+ * to ship — and it is why the trade is worth making at all: at 0.4 a correct
+ * answer was certainly lost, where at 0.3 an incorrect one is caught if it comes
+ * back.
+ *
+ * `KNOWLEDGE_READER_MIN_SCORE` still overrides it, and still exists so the next
+ * person moves this with measurements rather than with an argument. */
+const READER_HALLUCINATION_FLOOR = 0.3
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
@@ -2873,6 +2896,22 @@ async function sourceTitles(
 /** The account a question names, or null. Reads `knowledge_names` (0073)
  * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
  *
+ * NAMED VIA A CONTACT NOW TOO (a-names, 12 Sep 2026): `knowledge_names` holds
+ * `kind = 'contact'` rows whose `ref_id` is the LINKED COMPANY's account id,
+ * never the contact's own — so a contact resolves through the exact same
+ * code below as an account does, no second path. COLLEAGUES are deliberately
+ * NOT here: every real colleague's name clears `ACCOUNT_TOKEN_MAX_CHUNKS` by
+ * two to three orders of magnitude (they are who the whole corpus is ABOUT),
+ * so there is no ceiling that admits one without also admitting "green" or
+ * "demo" — and a colleague has no single compartment to narrow to anyway
+ * (their own profile files under the agency compartment; the meetings they
+ * are actually in are filed under whichever CLIENT compartment each one
+ * belongs to, so narrowing to the agency would hide every one of them).
+ * `nameArm` already reaches colleagues correctly, at the chunk level, inside
+ * whichever compartment the router picked by other means — see its own
+ * header.
+ *
+
  * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
  * "DEMO" → "demo" — 26 of 134 staging accounts have a canonical name that
  * collapses to ONE surviving token (`tokenise` drops short words and shatters
@@ -2942,6 +2981,7 @@ export async function accountsNamedIn(
   const clauses = terms.map(() => `LOWER(kn.name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
   const candidates = await d1Query<{
+    kind: string
     ref_id: string
     name: string
     alias_of: string | null
@@ -2961,15 +3001,17 @@ export async function accountsNamedIn(
     // candidate failed to confirm.
     //
     // JOINED against `accounts` for `name_narrows_alone` (0085, c-hijack B) —
-    // every row here is `kind = 'account'` (the WHERE clause below), so
-    // `knowledge_names.ref_id` is always an `accounts.id`. No schema change to
-    // `knowledge_names` itself: the flag lives once, on the account it
-    // declares something about, and is read at match time rather than
-    // denormalised into a table `rebuildNameIndex` fully deletes and
-    // reinserts on every run.
-    `SELECT kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
+    // `knowledge_names.ref_id` is always an `accounts.id`, on BOTH kinds this
+    // reads now: an account row names itself, and a contact row (a-names)
+    // names the COMPANY it is linked to (`rebuildNameIndex`'s own header says
+    // why — nothing is ever indexed under a contact's own individual-account
+    // id). No schema change to `knowledge_names` itself: the flag lives once,
+    // on the account it declares something about, and is read at match time
+    // rather than denormalised into a table `rebuildNameIndex` fully deletes
+    // and reinserts on every run.
+    `SELECT kn.kind, kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
        FROM knowledge_names kn JOIN accounts a ON a.id = kn.ref_id
-      WHERE kn.kind = 'account' AND (${clauses.join(" OR ")})
+      WHERE kn.kind IN ('account', 'contact') AND (${clauses.join(" OR ")})
       ORDER BY LENGTH(kn.name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
     params
   )
@@ -2992,11 +3034,29 @@ export async function accountsNamedIn(
   const seen = new Set<string>()
   const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
-    // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
-    // no token-count/rarity gate. `alias_of` carries the canonical name back.
-    // NEVER fragile (c-hijack A3's own boundary): a code is a deliberate,
-    // declared handle, and a search that finds nothing under it is a real
-    // answer about that account, not a bad guess to retry past.
+    // A DENY (c-hijack B's second half) BEATS EVERYTHING BELOW, INCLUDING
+    // AN ALIAS/CODE MATCH. The spec error this closes: the ALLOW half of
+    // `name_narrows_alone` is an `OR` against the rarity gate, so it can only
+    // ever ADD a narrow — it does nothing for an already-rare name like
+    // Bergman S.A.'s surname (1 chunk, well under the ceiling, narrows on
+    // rarity alone regardless of the flag). A person saying "this word must
+    // NOT narrow alone" needs the opposite shape: checked FIRST, before the
+    // alias branch even asks whether this row has a code, or the same
+    // declared spelling that made the alias branch fire in the first place
+    // would still let it through.
+    //
+    // `kind === "account"` GUARDS THIS TOO (a-names). The flag is the
+    // COMPANY's own declaration about the COMPANY's own name — a contact
+    // filed under a company that has declared its own name unsafe to narrow
+    // on has said nothing at all about whether ITS employee's surname is
+    // safe, so a contact row is never blocked by a deny it never made either.
+    if (c.kind === "account" && c.name_narrows_alone === 2) continue
+    // AN ALIAS ROW (today, the account's code or a declared `alt_names`
+    // spelling) — exact match or nothing, no token-count/rarity gate.
+    // `alias_of` carries the canonical name back. NEVER fragile (c-hijack
+    // A3's own boundary): a code is a deliberate, declared handle, and a
+    // search that finds nothing under it is a real answer about that
+    // account, not a bad guess to retry past.
     if (c.alias_of) {
       if (asked.has(c.name.toLowerCase()) && !seen.has(c.ref_id)) {
         seen.add(c.ref_id)
@@ -3017,13 +3077,25 @@ export async function accountsNamedIn(
       continue
     }
     // THE COLLAPSED CASE — one surviving token, held back for the second pass.
-    // `name_narrows_alone` (0085, c-hijack B) bypasses the RARITY gate exactly
-    // as `code` bypasses it above — a person decided, so corpus frequency
-    // stops being the question — but NOT the second pass below: a declared
-    // token shared by two accounts is still evidence about the WORD, not
-    // either company, so A2 still resolves it to neither. Short-circuited so
-    // a declared account never pays for the FTS rarity query at all.
-    if (c.name_narrows_alone === 1 || (await isRareAccountToken(cfg, guard, nameTerms[0]))) {
+    // `name_narrows_alone = 1` (ALLOW) bypasses the RARITY gate exactly as
+    // `code` bypasses it above — a person decided, so corpus frequency stops
+    // being the question — but NOT the second pass below: a declared token
+    // shared by two accounts is still evidence about the WORD, not either
+    // company, so A2 still resolves it to neither, whatever either declares.
+    // Short-circuited so a declared account never pays for the FTS rarity
+    // query at all. (`=== 2`, DENY, already `continue`d above this line.)
+    //
+    // `kind === "account"` GUARDS THE ALLOW TOO (a-names), the same way it
+    // guards the DENY above: the flag lives on the COMPANY's own row and says
+    // the COMPANY's canonical name is safe (or unsafe) — it says nothing
+    // about whether one of that company's CONTACTS' names is, so a contact
+    // row never reads it either way and always pays for the live rarity
+    // check. Nobody has ever been asked to declare a person's name safe, and
+    // this is not the door that invents that decision for them.
+    if (
+      (c.kind === "account" && c.name_narrows_alone === 1) ||
+      (await isRareAccountToken(cfg, guard, nameTerms[0]))
+    ) {
       const token = nameTerms[0]
       const list = pendingByToken.get(token) ?? []
       list.push({ id: c.ref_id, name: c.name })
@@ -3095,13 +3167,135 @@ export async function accountsNamedIn(
  * reinserting is simpler than an upsert keyed on `(kind, ref_id, name)` —
  * which cannot express a RENAME, because the old name is part of the key an
  * upsert would leave behind as an orphan row. */
+/** One row this rebuild writes to `knowledge_names` — hoisted out of the
+ * function itself so `contactNameRows` can build the same shape. */
+type NameRow = {
+  id: string
+  kind: string
+  ref_id: string
+  name: string
+  alias_of: string | null
+  compartment: string
+}
+
+/** CONTACTS INTO THE NAME INDEX (a-names, 12 Sep 2026) — the same protection
+ * account names already have, extended to the individual people linked to a
+ * client company (`account_links`; "contact" is a role on that link, not an
+ * account_type — see the table's own header comment).
+ *
+ * REF_ID IS THE COMPANY, NEVER THE CONTACT'S OWN ID. Measured before this was
+ * written: 119 `knowledge_sources` are filed under an individual account, and
+ * all five of their chunks are notification emails on one QA fixture
+ * ("Alaap Kanchwala (portal test 1)") — against 3,235 sources filed under
+ * entity accounts. Nothing is ever indexed under a real contact's own id, so
+ * a compartment built from it would search a client's material and find none
+ * of it. Every row here carries the LINKED company's account id instead, so
+ * `accountsNamedIn` needs no separate path to read it — it is the same
+ * `kind`/`ref_id` shape an account row already has.
+ *
+ * ONE PERSON, MORE THAN ONE COMPANY — SKIPPED, NOT FANNED OUT. Two of the
+ * team's distinct contacts are linked to two different companies each (one is
+ * a c-hijack test fixture: "Marta Ruiz", filed under both "Bergman S.A." and
+ * "Bergmann GmbH"). A name that resolves to more than one company is evidence
+ * about the coincidence, not about either company — seeding it under either
+ * would narrow a search to a confidently WRONG client, so a contact linked to
+ * more than one company is not seeded at all, the same safe direction the
+ * single-collapsed-token ambiguity check in `accountsNamedIn` already takes.
+ *
+ * TWO ROWS PER SAFE CONTACT, NEVER THREE. The full "First Last" name rides
+ * the SAME multi-token bypass an account's two-word name already gets — two
+ * specific words together is not a coincidence, so no rarity check runs for
+ * it at all. The SURNAME ALONE gets a second row, but ONLY when it clears the
+ * live rarity check — never the free `name_narrows_alone` bypass (see
+ * `accountsNamedIn`'s own comment on why a contact never reads it: that flag
+ * describes the COMPANY's own name, not one of its contacts'). The FIRST NAME
+ * ALONE is never seeded, on purpose: it is the single most dangerous shape
+ * measured (Mark, Max, Alex, Peter — ordinary English words at 16 to 624
+ * chunks each on real staging), and the full name plus a rarity-gated surname
+ * already answers every question shape a person would actually ask.
+ *
+ * TOKENISE DECIDES WHAT SURVIVES, NOT A GUESS. A name part shorter than 3
+ * characters or holding a non-ASCII letter can collapse or vanish entirely
+ * (`tokenise`'s own rule — "Björn" survives as nothing at all); this reads
+ * `tokenise(fullName)` before deciding what to seed, exactly as an account's
+ * collapsed name is read, rather than assuming the written name is what a
+ * question would ever match.
+ *
+ * QA FIXTURES EXCLUDED BY NAME. The "(portal test N)" rows exist to exercise
+ * the portal's own account-switcher, not to be found by a question — seeded,
+ * they would teach the index to answer a real question about "Alaap
+ * Kanchwala" out of a notification-email fixture. */
+async function contactNameRows(cfg: D1Rest, guard: MemberGuard): Promise<NameRow[]> {
+  const links = await d1Query<{ person_id: string; person_name: string; company_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by how many contacts this team holds.
+    `SELECT p.id AS person_id, p.name AS person_name, al.account_id AS company_id
+       FROM account_links al
+       JOIN accounts p ON p.id = al.person_account_id
+       JOIN accounts c ON c.id = al.account_id
+      WHERE al.deactivated_at IS NULL AND p.deactivated_at IS NULL AND c.deactivated_at IS NULL
+        AND p.name IS NOT NULL
+      LIMIT 2000`
+  )
+  const byPerson = new Map<string, { name: string; companies: Set<string> }>()
+  for (const l of links) {
+    const entry = byPerson.get(l.person_id) ?? { name: l.person_name, companies: new Set<string>() }
+    entry.companies.add(l.company_id)
+    byPerson.set(l.person_id, entry)
+  }
+
+  const rows: NameRow[] = []
+  for (const { name, companies } of byPerson.values()) {
+    if (companies.size !== 1) continue
+    if (/\(portal test/i.test(name)) continue
+    const companyId = [...companies][0]
+    const compartment = accountCompartment(companyId)
+    const tokens = [...tokenise(name).keys()]
+    if (tokens.length >= 2) {
+      rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name, alias_of: null, compartment })
+      // The SURNAME — the LAST surviving token, per the steer that a surname
+      // is far more often rare than a first name. Rarity-checked here, at
+      // seed time, so a name that fails it is not written at all rather than
+      // written and refused on every read.
+      const surname = tokens[tokens.length - 1]
+      if (await isRareAccountToken(cfg, guard, surname))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: surname, alias_of: null, compartment })
+    } else if (tokens.length === 1) {
+      // A genuinely single-word identity (no surname on file) — the same
+      // treatment a collapsed account name already gets: seeded only if the
+      // one surviving token clears the rarity gate.
+      if (await isRareAccountToken(cfg, guard, tokens[0]))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: tokens[0], alias_of: null, compartment })
+    }
+    // tokens.length === 0: tokenise() kept nothing (e.g. every part under 3
+    // characters) — nothing safe to seed, and nothing seeded.
+  }
+  return rows
+}
+
 export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
   const accounts = await d1Query<{ id: string; name: string; code: string | null; alt_names: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: bounded by how many accounts this team holds — an
     // agency's own client roster, not a growing log.
-    "SELECT id, name, code, alt_names FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+    //
+    // `account_type = 'entity'` ONLY (a-names, 12 Sep 2026) — a REAL bug this
+    // change found rather than assumed fixed: this query had no such filter
+    // since 0073, so every INDIVIDUAL account (every contact) was already
+    // seeded here too, as an ordinary `kind = 'account'` row whose compartment
+    // was built from the CONTACT'S OWN id — a compartment nothing is ever
+    // filed under (see `contactNameRows`'s own header: 119 sources filed under
+    // an individual account, all five real chunks one QA fixture's own
+    // notification emails). A full "First Last" contact name is two tokens,
+    // which bypasses rarity unconditionally, so this fired on every question
+    // naming a contact by their full name — narrowing to a compartment
+    // guaranteed to hold nothing, silently rescued only by A3's retry when the
+    // narrow found nothing. `contactNameRows` is the real, correct route for
+    // this population now (`kind = 'contact'`, `ref_id` = the LINKED company),
+    // so a contact's own individual-account row has no business here at all.
+    "SELECT id, name, code, alt_names FROM accounts WHERE account_type = 'entity' AND deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
   const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
     cfg,
@@ -3109,14 +3303,6 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
     "SELECT id, name, account_id FROM apps WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
 
-  type NameRow = {
-    id: string
-    kind: string
-    ref_id: string
-    name: string
-    alias_of: string | null
-    compartment: string
-  }
   const rows: NameRow[] = []
   for (const a of accounts) {
     if (!a.name) continue
@@ -3143,6 +3329,7 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
       compartment: app.account_id ? accountCompartment(app.account_id) : AGENCY_COMPARTMENT,
     })
   }
+  for (const c of await contactNameRows(cfg, guard)) rows.push(c)
 
   const now = new Date().toISOString()
   await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_names")

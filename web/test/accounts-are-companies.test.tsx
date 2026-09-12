@@ -92,7 +92,7 @@ const PERSON: AccountFormValues = {
   coverUrl: "",
   locale: "",
   altNames: "",
-  nameNarrowsAlone: false,
+  nameNarrowsAlone: "unreviewed",
 }
 
 describe("the account form no longer asks what kind of account it is making", () => {

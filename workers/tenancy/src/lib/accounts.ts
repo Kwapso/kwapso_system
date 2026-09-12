@@ -183,6 +183,13 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
  * The one thing that must NOT come through here is a WRITE's before-image: an
  * edit compares against what is stored, not against what the caller may see.
  * `accountRowOrThrow` below is the raw read updateAccount uses for that. */
+/** THE WIRE WORD FOR THE STORED INTEGER (0086, c-hijack B's deny half) — 0/1/2
+ * on the column, `"unreviewed" | "allow" | "deny"` on the wire, so a caller
+ * reads a self-describing word rather than guessing what "2" means. */
+type NarrowsAlone = "unreviewed" | "allow" | "deny"
+const NARROWS_ALONE_WIRE: Record<number, NarrowsAlone> = { 0: "unreviewed", 1: "allow", 2: "deny" }
+const NARROWS_ALONE_COLUMN: Record<NarrowsAlone, number> = { unreviewed: 0, allow: 1, deny: 2 }
+
 /** A JSON array column, defensively — same shape as
  * `workers/content/src/lib/knowledge.ts`'s own `parseIdList`: anything that
  * isn't an array of strings reads as empty rather than throwing, because this
@@ -236,7 +243,7 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     // already carries. A client cannot review how their own name searches;
     // that is a staff judgement about corpus behaviour, not their record.
     altNames: ours ? [] : parseAltNames(r.alt_names),
-    nameNarrowsAlone: ours ? false : r.name_narrows_alone === 1,
+    nameNarrowsAlone: ours ? "unreviewed" : (NARROWS_ALONE_WIRE[r.name_narrows_alone] ?? "unreviewed"),
     // WHERE SHE WORKS AND WHAT SHE DOES THERE — the contacts table's two middle
     // columns, and the third pair of fields this projection withholds from a
     // client login. Not because a role is a secret: because a person can be a
@@ -878,9 +885,11 @@ export async function updateAccount(
      * token each, and a common one only alongside `nameNarrowsAlone`) —
      * this function trusts its caller the same way it trusts `name`. */
     altNames?: string[]
-    /** 0085/c-hijack B: may this account's collapsed single-token name
-     * narrow a knowledge-base search on its own, bypassing the rarity gate. */
-    nameNarrowsAlone?: boolean
+    /** 0085/0086, c-hijack B: whether this account's collapsed single-token
+     * name may narrow a knowledge-base search on its own — "allow" bypasses
+     * the rarity gate, "deny" refuses to narrow on it at all (beating rarity
+     * AND an alias/code match), "unreviewed" is the default. */
+    nameNarrowsAlone?: NarrowsAlone
   }
 ): Promise<{ supersededUrls: (string | null)[] }> {
   // THE STORED ROW, not the caller's view of it — see accountRowOrThrow.
@@ -937,7 +946,9 @@ export async function updateAccount(
         next.timezone,
         input.commercialsVisible === undefined ? before.commercials_visible : input.commercialsVisible ? 1 : 0,
         input.altNames === undefined ? before.alt_names : JSON.stringify(input.altNames),
-        input.nameNarrowsAlone === undefined ? before.name_narrows_alone : input.nameNarrowsAlone ? 1 : 0,
+        input.nameNarrowsAlone === undefined
+          ? before.name_narrows_alone
+          : NARROWS_ALONE_COLUMN[input.nameNarrowsAlone],
         ...audit.params,
         ...fence.params,
         id,
