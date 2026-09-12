@@ -76,23 +76,23 @@ describe("the alt_names write door (0083, c-misspell — no write door existed u
     expect(account().alt_names).toBe("[]")
   })
 
-  it("the SAME common word is accepted once nameNarrowsAlone is declared in the same request", async () => {
+  it("the SAME common word is accepted once nameNarrowsAlone is 'allow' in the same request", async () => {
     seedCommonWord("solutions")
     const res = await post({
       id: IDS.victimAccount,
       name: "Bergman S.A.",
       altNames: ["solutions"],
-      nameNarrowsAlone: true,
+      nameNarrowsAlone: "allow",
     })
     expect(res.status, await res.text()).toBe(200)
     expect(JSON.parse(account().alt_names as string)).toEqual(["solutions"])
     expect(account().name_narrows_alone).toBe(1)
   })
 
-  it("a common word is accepted without repeating the declaration, once the account already carries it", async () => {
+  it("a common word is accepted without repeating the declaration, once the account already carries 'allow'", async () => {
     seedCommonWord("solutions")
     // Declare it first, alone.
-    const first = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: true })
+    const first = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "allow" })
     expect(first.status).toBe(200)
     // A LATER edit, unrelated to the declaration, can still add the common word —
     // the account's own standing declaration is read, not just this request's body.
@@ -100,26 +100,50 @@ describe("the alt_names write door (0083, c-misspell — no write door existed u
     expect(res.status, await res.text()).toBe(200)
     expect(JSON.parse(account().alt_names as string)).toEqual(["solutions"])
   })
+
+  it("a common word is STILL refused when the account is 'deny' rather than 'allow' — deny is not a declaration to bypass rarity with", async () => {
+    seedCommonWord("solutions")
+    await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "deny" })
+    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", altNames: ["solutions"] })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { message: string }
+    expect(body.message).toContain("too common a word")
+  })
 })
 
-describe("name_narrows_alone (0085, c-hijack B)", () => {
-  it("defaults to 0 — not reviewed — and is left alone by an edit that never mentions it", async () => {
+describe("name_narrows_alone (0085/0086, c-hijack B) — tri-state, not a boolean", () => {
+  it("defaults to 0 — unreviewed — and is left alone by an edit that never mentions it", async () => {
     expect(account().name_narrows_alone).toBe(0)
     const res = await post({ id: IDS.victimAccount, name: "Bergman Renamed" })
     expect(res.status).toBe(200)
     expect(account().name_narrows_alone).toBe(0)
   })
 
-  it("is written when declared true", async () => {
-    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: true })
+  it("is written when set to 'allow'", async () => {
+    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "allow" })
     expect(res.status).toBe(200)
     expect(account().name_narrows_alone).toBe(1)
   })
 
-  it("can be un-declared again", async () => {
-    await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: true })
-    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: false })
+  it("is written when set to 'deny'", async () => {
+    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "deny" })
     expect(res.status).toBe(200)
+    expect(account().name_narrows_alone).toBe(2)
+  })
+
+  it("can be set back to 'unreviewed'", async () => {
+    await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "allow" })
+    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "unreviewed" })
+    expect(res.status).toBe(200)
+    expect(account().name_narrows_alone).toBe(0)
+  })
+
+  it("refuses a value outside the three — a wrong declaration is worse than a missing one", async () => {
+    const res = await post({ id: IDS.victimAccount, name: "Bergman S.A.", nameNarrowsAlone: "maybe" })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { message: string }
+    expect(body.message).toContain("unreviewed")
+    // Refused before the write — the column is untouched.
     expect(account().name_narrows_alone).toBe(0)
   })
 })

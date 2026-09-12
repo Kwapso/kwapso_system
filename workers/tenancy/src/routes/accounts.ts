@@ -395,7 +395,7 @@ async function declaredAltNames(
   scope: AccountScope,
   id: string,
   raw: unknown[] | undefined,
-  nameNarrowsAloneInThisRequest: boolean | undefined
+  nameNarrowsAloneInThisRequest: "unreviewed" | "allow" | "deny" | undefined
 ): Promise<string[] | undefined> {
   if (!raw) return undefined
   const clean = raw
@@ -411,15 +411,19 @@ async function declaredAltNames(
       )
   }
   if (!clean.length) return clean
-  const declared =
-    nameNarrowsAloneInThisRequest ?? (await getAccountRow(cfg, guard, scope, id)).nameNarrowsAlone
-  if (!declared)
+  // "allow" is the only state that bypasses the rarity gate below — "deny"
+  // and "unreviewed" both leave a common word refused, and "deny" additionally
+  // means this account has said its own name must never narrow alone at all,
+  // which a declared common spelling would otherwise defeat.
+  const allowed =
+    (nameNarrowsAloneInThisRequest ?? (await getAccountRow(cfg, guard, scope, id)).nameNarrowsAlone) === "allow"
+  if (!allowed)
     for (const spelling of clean)
       if (!(await isRareAccountToken(cfg, guard, spelling.toLowerCase())))
         throw new GuardError(
           400,
           "common_word",
-          `"${spelling}" is too common a word to declare as a spelling without also ticking "may narrow the knowledge base alone" for this account — declared, it would match on its own, everywhere, with no rarity check at all.`
+          `"${spelling}" is too common a word to declare as a spelling without also setting "may narrow alone" for this account — declared, it would match on its own, everywhere, with no rarity check at all.`
         )
   return clean
 }
@@ -435,7 +439,19 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   const patch = accountPatch(body)
-  const nameNarrowsAlone = typeof body.nameNarrowsAlone === "boolean" ? body.nameNarrowsAlone : undefined
+  // TRI-STATE (0086): "unreviewed" (the default), "allow" (bypasses the
+  // rarity gate), "deny" (refuses to narrow on this word at all, beating
+  // rarity AND an alias/code match — see accountsNamedIn). A value outside
+  // the three is refused outright rather than silently dropped: the whole
+  // point of a declared safety flag is that a wrong one is worse than a
+  // missing one.
+  const rawNarrowsAlone = typeof body.nameNarrowsAlone === "string" ? body.nameNarrowsAlone : undefined
+  const nameNarrowsAlone =
+    rawNarrowsAlone === "unreviewed" || rawNarrowsAlone === "allow" || rawNarrowsAlone === "deny"
+      ? rawNarrowsAlone
+      : undefined
+  if (body.nameNarrowsAlone !== undefined && nameNarrowsAlone === undefined)
+    return fail(400, "invalid_input", `nameNarrowsAlone must be "unreviewed", "allow" or "deny".`)
   const rawAltNames = Array.isArray(body.altNames) ? body.altNames : undefined
   const altNames = await declaredAltNames(cfg, guard, scope, id, rawAltNames, nameNarrowsAlone)
   // A NEW image only. `accountPatch` keeps absent/null/"" meaning what they mean

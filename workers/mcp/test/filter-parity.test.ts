@@ -304,20 +304,28 @@ const ALL_TOOLS: ToolView[] = [
 ]
 
 /** The schema's own properties, as the JSON-RPC caller sees them. */
-const propsOf = (tool: ToolView): Record<string, { type?: string }> =>
-  ((tool.schema as { properties?: Record<string, { type?: string }> }).properties ?? {})
+const propsOf = (tool: ToolView): Record<string, { type?: string; enum?: string[] }> =>
+  ((tool.schema as { properties?: Record<string, { type?: string; enum?: string[] }> }).properties ?? {})
 
 /** A FILLED-IN call of a tool, typed the way its own schema declares. R22's
  * forwarding half RUNS the builder on this rather than reading its source: a
  * builder that delegates (`(i) => brandAssetBody(i)`) forwards perfectly and
  * mentions not one field by name, so a substring scan would call it broken. What
  * the door actually receives is the only honest question, and it is answerable —
- * so ask it. */
+ * so ask it.
+ *
+ * AN ENUM FIELD (`enumOf`) gets one of its own DECLARED MEMBERS, not the bare
+ * "probe" string every other string field gets — a bare string is a legitimate
+ * probe for a field with no fixed set, but for an enum it is indistinguishable
+ * from a caller's typo, and a `buildBody` that (correctly) refuses an
+ * unrecognised value would otherwise fail this census for building the exact
+ * validation `checkArgTypes`'s own header asks every enum field to have. */
 function probeInput(tool: ToolView): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, spec] of Object.entries(propsOf(tool)))
     out[key] =
-      spec?.type === "boolean" ? true
+      spec?.enum?.length ? spec.enum[0]
+      : spec?.type === "boolean" ? true
       : spec?.type === "number" ? 1
       : spec?.type === "array" ? ["probe"]
       : spec?.type === "object" ? { probe: true }

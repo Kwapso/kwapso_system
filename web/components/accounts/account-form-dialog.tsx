@@ -70,7 +70,6 @@
 import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
-import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import {
   DialogDescription,
   DialogTitle,
@@ -79,7 +78,6 @@ import { Field } from "@shared/web/field"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Image } from "@shared/ui/components/image/image"
 import { Input } from "@shared/ui/components/input/input"
-import { Label } from "@shared/ui/components/label/label"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import {
   Select,
@@ -121,6 +119,19 @@ const coverField = { ...defaultFieldConfig, label: "Cover image", required: fals
 const altNamesField = {
   ...defaultFieldConfig,
   label: "Other spellings the knowledge base should also recognise",
+  required: false,
+}
+// TRI-STATE, not a checkbox — the owner's second ruling the same night a
+// boolean shipped: an ALLOW can only ever ADD a narrow (it bypasses the
+// rarity gate), so it does nothing for a name that is already rare enough to
+// narrow on its own — the residual that needed closing was the OPPOSITE, a
+// way to say a word must NEVER narrow alone. See accountsNamedIn's own header
+// for why "unreviewed"/"allow"/"deny" and not two independent booleans (a
+// second flag could be set alongside the first, and a name cannot both
+// always and never narrow alone).
+const narrowsAloneField = {
+  ...defaultFieldConfig,
+  label: "May this name narrow a knowledge base search on its own?",
   required: false,
 }
 
@@ -172,10 +183,10 @@ export type AccountFormValues = {
    * here and split to a list at the door — see `altNamesField` above. Always
    * "" on a create: a brand-new account has no misspellings on file yet. */
   altNames: string
-  /** 0085 — may this account's collapsed single-token name narrow a
-   * knowledge-base search on its own. Only ever shown, and therefore only
-   * ever meaningfully set, when `collapsesToOneWord(values.name)`. */
-  nameNarrowsAlone: boolean
+  /** 0085/0086 — whether this account's collapsed single-token name may
+   * narrow a knowledge-base search on its own. Only ever shown, and
+   * therefore only ever meaningfully set, when `collapsesToOneWord(values.name)`. */
+  nameNarrowsAlone: "unreviewed" | "allow" | "deny"
 }
 
 const EMPTY: AccountFormValues = {
@@ -193,7 +204,7 @@ const EMPTY: AccountFormValues = {
   coverUrl: "",
   locale: "",
   altNames: "",
-  nameNarrowsAlone: false,
+  nameNarrowsAlone: "unreviewed",
 }
 
 /** The first letters of a name, for the logo placeholder. */
@@ -469,17 +480,22 @@ export function AccountFormDialog({
           </Field>
 
           {collapsesToOneWord(values.name) && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="account-narrows-alone"
-                checked={values.nameNarrowsAlone}
-                onCheckedChange={(c) => set({ nameNarrowsAlone: c === true })}
+            <Field config={narrowsAloneField} htmlFor="account-narrows-alone" className={fieldSpacing}>
+              <Select
+                value={values.nameNarrowsAlone}
+                onValueChange={(v) => set({ nameNarrowsAlone: v as AccountFormValues["nameNarrowsAlone"] })}
                 disabled={busy}
-              />
-              <Label htmlFor="account-narrows-alone">
-                {t("This name may narrow a knowledge base search on its own")}
-              </Label>
-            </div>
+              >
+                <SelectTrigger id="account-narrows-alone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unreviewed">{t("Not reviewed")}</SelectItem>
+                  <SelectItem value="allow">{t("May narrow a search on its own")}</SelectItem>
+                  <SelectItem value="deny">{t("Must never narrow a search on its own")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           )}
         </>
       )}
