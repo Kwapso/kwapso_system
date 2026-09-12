@@ -667,6 +667,30 @@ function toSource(r: SourceRow): KnowledgeSource {
     // rather than reading an empty array as "filed nowhere".
     accounts: parseIdList(r.accounts),
     apps: parseIdList(r.apps),
+    // `shared_with` IS WRITTEN TRUTHFULLY NOW, on every path that knows the
+    // answer — the owner's ruling, 12 Sep 2026: "keep it for everything."
+    // NOTHING READS THIS AS A FENCE: the permission check is `readerClause`
+    // (`ownerClause AND appClause`), and this column, and its Vectorize
+    // 'shared' label, are not inputs to it, anywhere — a census confirmed
+    // zero WHERE clauses and zero Vectorize query predicates on it across
+    // both front doors and all eight workers. Whoever adds the FIRST real
+    // filter on this column must add it to `readerClause` deliberately, not
+    // assume it already gates something because a value already exists.
+    //
+    // SEVEN WRITE PATHS, all of them: `createSource` and `updateSource`
+    // (typed notes — the SAME `privateToMe` boolean that already sets
+    // `owner_user_id`), `createFileSource` (an uploaded file, identical
+    // shape), the shared upsert in knowledge-ingest.ts (every mirrored kind,
+    // reading `IngestRow.sharedWith` — see its own header for Gmail/
+    // Calendar's and Drive/Chat's two different rules, both set once in
+    // knowledge-google.ts's `fencing()`). PORTAL UPLOAD IS THE EIGHTH
+    // CANDIDATE AND DOES NOT EXIST: a client login has no door onto the
+    // knowledge base at all (R21 — `workers/portal-gateway/src/index.ts`'s
+    // own allow-list has no `/api/content/knowledge*` entry), so there is no
+    // gap here, only a door that was never opened. Every kind this app
+    // mirrors off its OWN tables (a ticket, a task, a role) has no sharing
+    // choice to report and is correctly left at the column's default,
+    // 'agency', by the same shared upsert.
     sharedWith: r.shared_with === "private" || r.shared_with === "agency_client" ? r.shared_with : "agency",
     generatedOnly: r.generated_only === 1,
     sightingsCount: r.sightings_count,
@@ -1485,8 +1509,8 @@ export async function createSource(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes, source_url,
-       owner_user_id, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, shared_with, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -1497,6 +1521,11 @@ export async function createSource(
       byteLength(body),
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id`, reused rather than
+      // recomputed — 0073's tenth Vectorize label, written truthfully now on
+      // every path that knows the answer (the owner's ruling, 12 Sep 2026).
+      // NOTHING READS THIS AS A FENCE — see IngestRow.sharedWith's own header.
+      v.privateToMe ? "private" : "agency",
       v.visibleToAppId,
       JSON.stringify(accountsFiled.map((a) => a.id)),
       JSON.stringify(appsFiled.map((a) => a.id)),
@@ -1613,9 +1642,9 @@ export async function createFileSource(
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
-       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
+       owner_user_id, shared_with, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
        accounts, apps)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       identity?.originTable ?? null,
@@ -1632,6 +1661,9 @@ export async function createFileSource(
       input.file.bytes,
       input.extract.note,
       input.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id` — see createSource's
+      // own comment beside the identical line.
+      input.privateToMe ? "private" : "agency",
       visibleToAppId,
       now,
       now,
@@ -1710,6 +1742,16 @@ export async function updateSource(
   // the stored body alone rather than writing an excerpt over the document.
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
   const owner = v.privateToMe ? guard.userId : null
+  // THE SAME BOOLEAN, reused rather than recomputed — 0073's tenth Vectorize
+  // label, written truthfully now on every path that knows the answer (the
+  // owner's ruling, 12 Sep 2026). A SEVENTH path beyond the six the census
+  // named: an existing note or file's privacy toggled here would otherwise
+  // leave `shared_with` describing the value it had on CREATE, silently wrong
+  // from the moment anyone edits the very field it is supposed to echo. Not
+  // written on the MIRRORED branch below, for the identical reason `owner`
+  // is not: the ingest sweep owns that column for a mirrored source and would
+  // overwrite this on its next tick regardless — see the comment above.
+  const sharedWith = v.privateToMe ? "private" : "agency"
   // WHO MAY READ IT is one decision with three answers, and the ACCOUNT/APP half
   // of it is editable on all three families — a MIRRORED source's filing is
   // exactly the thing that stays editable when its words do not, and limiting a
@@ -1747,7 +1789,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
-         owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
+         owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1755,6 +1797,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,
@@ -1770,7 +1813,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, body = ?, body_bytes = ?, summary = ?, source_url = ?,
-         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
+         account_id = ?, compartment = ?, owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
          updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1781,6 +1824,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,
@@ -3792,27 +3836,52 @@ async function recencyArm(
   kinds: string[] | null
 ): Promise<CandidateRow[]> {
   const owner = ownerClause(guard)
-  const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
-  const params: string[] = [...owner.params]
-  if (compartments.length) {
-    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
-    params.push(...compartments)
-  }
   // INTERPOLATED, NOT BOUND — matching `retrieve`'s own `chipClause` a few
   // lines below, which reads this exact list the same way: a source chip key
   // resolves through `kindsForChips` against `SOURCE_CHIP_KEYS`, a fixed,
   // code-declared vocabulary (shared/knowledge-chips.ts), never free text off
   // a request. Two spellings of "bind one per element" for the same
   // server-controlled list would be a second convention for the same fact.
-  if (kinds?.length) where.push(`kind IN (${kinds.map((k) => sqlString(k)).join(", ")})`)
-  const sources = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    // R14 hard cap: RECENCY_TOP_K, said here.
-    `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}
-      ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
-    params
-  )
+  const kindClause = kinds?.length ? ` AND kind IN (${kinds.map((k) => sqlString(k)).join(", ")})` : ""
+  // ONE COMPARTMENT AT A TIME — kb tag-diagnosis, 12 Sep 2026. This used to
+  // take RECENCY_TOP_K over the UNION of every searched compartment, and a
+  // client-named question always searches `[account:X, agency]` together
+  // (`deriveCompartment`'s own comment). `agency` is shared by EVERY client
+  // question and carries far more traffic than any one client's material —
+  // measured live: the newest 8 across `[account:HOGO, agency]` and the
+  // newest 8 across `[account:Padelbase, agency]` were THE IDENTICAL 8 ROWS,
+  // every one of them `agency`, every one dated the same day, because
+  // `agency`'s own volume fills an 8-row window before the account side ever
+  // gets a turn. Not a ranking flaw — a STARVATION one: a person asking
+  // "what's the latest on HOGO" got this morning's chat mirrors instead of
+  // HOGO's own material, every time, and the answer looked plausible enough
+  // that nobody would have reported it as a bug. Taking the newest
+  // `RECENCY_TOP_K` PER compartment (never a global cap moved instead) means
+  // the account side always gets its own share of the window regardless of
+  // how much `agency` traffic exists alongside it. `compartments.length ? … :
+  // [null]` — a null compartment means "no filter, search everything", the
+  // question-names-nobody case, and asking it once with no filter is
+  // BYTE-FOR-BYTE the query this function already ran for that case before
+  // this change; nothing about that shape moves. */
+  const sources: { id: string }[] = []
+  for (const compartment of compartments.length ? compartments : [null]) {
+    const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
+    const params: string[] = [...owner.params]
+    if (compartment !== null) {
+      where.push("compartment = ?")
+      params.push(compartment)
+    }
+    const rows = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap: RECENCY_TOP_K, said here — per compartment, not overall,
+      // which is the whole point; see the comment above.
+      `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}${kindClause}
+        ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
+      params
+    )
+    sources.push(...rows)
+  }
   if (!sources.length) return []
   // THE FIRST CHUNK OF EACH — a source's opening piece is its best single
   // representative when nothing else is narrowing which paragraph matters,

@@ -2533,7 +2533,7 @@ export type GoogleService = (typeof GOOGLE_SERVICES)[number]
  * folders and Chat spaces. Sharing is the act: nothing in a Drive or a Chat is
  * reachable until somebody hands it over, and what they hand over carries a
  * shelf and a client with it. */
-const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
+export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
 export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
 
 /** The two services that are reached WHOLESALE unless somebody narrows them —

@@ -624,6 +624,48 @@ describe("the recency arm — a question that wants what is new (KB-AUDIT.md §4
   })
 })
 
+// kb tag-diagnosis, 12 Sep 2026. MEASURED against real staging: a client-named
+// recency question searches `[account:X, agency]` together, and `agency` is
+// shared by EVERY client question and carries far more traffic than any one
+// client's own material — the newest 8 across `[account:HOGO, agency]` and
+// the newest 8 across `[account:Padelbase, agency]` were the IDENTICAL 8
+// rows, every one `agency`, every one dated the same day. A person asking
+// "what's the latest on HOGO" got this morning's chat mirrors instead of
+// HOGO's own material, every time, and the answer looked plausible enough
+// that nobody would have reported it as a bug. Fixed by taking the newest
+// RECENCY_TOP_K PER compartment rather than over their union, so the
+// high-traffic side of a search can never fill the account-specific side's
+// own share of the window.
+describe("the recency arm's window is per compartment, not per union (kb tag-diagnosis, 12 Sep 2026)", () => {
+  beforeEach(async () => {
+    // Bergman's OWN, older, real material — the account-specific side.
+    const bergmanId = await addSource(IDS.staffUser, {
+      title: "Bergman onboarding notes",
+      body: "Bergman S.A. asked about the invoice export timeline for their onboarding.",
+      accountId: IDS.victimAccount,
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-08-01' WHERE id = '${bergmanId}'`)
+    // FLOOD THE AGENCY COMPARTMENT — nine fresher, unrelated sources, one
+    // more than a single recency window (RECENCY_TOP_K), so a UNION'd top-K
+    // over both compartments would fill entirely with these and never reach
+    // Bergman's own material at all.
+    for (let i = 0; i < 9; i++) {
+      const id = await addSource(IDS.staffUser, {
+        title: `Agency chatter ${i}`,
+        body: "Ordinary agency-wide traffic with nothing to do with Bergman.",
+      })
+      db().exec(`UPDATE knowledge_sources SET record_date = '2026-09-${10 + i}' WHERE id = '${id}'`)
+    }
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+  })
+
+  it("a recency question naming a client still surfaces that client's own older material, despite heavy agency traffic crowding the union", async () => {
+    const answer = await ask(IDS.staffUser, "what's the latest on Bergman?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(true)
+    expect(titles(answer)).toContain("Bergman onboarding notes")
+  })
+})
+
 describe("the compartment is derived, and it is the reasoning that ships", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
@@ -2719,5 +2761,55 @@ describe("a short answer is widened from the passages it already has", () => {
     })
     const answer = await ask(IDS.staffUser, "Who owns the supplier list during the cutover window?")
     expect(titles(answer)).not.toContain("Private cutover note")
+  })
+})
+
+// shared_with (0073's tenth Vectorize label) — written truthfully now on every
+// path that knows the answer, the owner's ruling, 12 Sep 2026: "keep it for
+// everything." NOTHING READS THIS AS A FENCE (readerClause is ownerClause AND
+// appClause, full stop — see IngestRow.sharedWith's own header), so these are
+// mutation proofs of the WRITE, never of who may read what.
+describe("shared_with is written truthfully on the typed upload path (createSource/updateSource)", () => {
+  const rowSharedWith = (id: string) =>
+    (db().prepare("SELECT shared_with AS s FROM knowledge_sources WHERE id = ?").get(id) as { s: string }).s
+
+  it("a note marked private writes 'private' — the SAME boolean that sets owner_user_id", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "My own scratch note",
+      body: "Not for anyone else yet.",
+      visibility: "private",
+    })
+    expect(rowSharedWith(id)).toBe("private")
+  })
+
+  it("an ordinary note (no visibility sent) writes 'agency'", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "An ordinary team note",
+      body: "Everyone on the module can read this.",
+    })
+    expect(rowSharedWith(id)).toBe("agency")
+  })
+
+  it("editing an existing note's privacy moves shared_with with it — the seventh path, beyond the six named", async () => {
+    const id = await addSource(IDS.staffUser, { title: "Starts ordinary", body: "…" })
+    expect(rowSharedWith(id), "created without visibility: 'agency'").toBe("agency")
+
+    const toPrivate = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "private",
+    })
+    expect(toPrivate.status, await toPrivate.text()).toBe(200)
+    expect(rowSharedWith(id), "toggled private on EDIT, not just on create").toBe("private")
+
+    const backToTeam = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "team",
+    })
+    expect(backToTeam.status).toBe(200)
+    expect(rowSharedWith(id), "and back — shared_with is re-decided on every edit, not stuck at CREATE time").toBe(
+      "agency"
+    )
   })
 })

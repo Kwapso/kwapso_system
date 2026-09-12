@@ -46,6 +46,11 @@ const holder = vi.hoisted(() => ({
    * the first). Null by default, so every other test sees the fixture's own
    * single recipient and every count in this file stays what it was. */
   mailTo: null as string | null,
+  /** MAIL_1's `From` header, when a test needs the thread to name NO known
+   * contact at all (shared_with's "no client matched" branch — 0073's tenth
+   * Vectorize label). Null by default, so every other test sees the fixture's
+   * own Bergman sender and every count in this file stays what it was. */
+  mailFrom: null as string | null,
   /** Extra chat messages one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   chat: [] as Record<string, unknown>[],
@@ -113,7 +118,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       {
         id: "MAIL_1",
         threadId: "TH_1",
-        from: "Luis Vera <luis@bergman.example>",
+        from: holder.mailFrom ?? "Luis Vera <luis@bergman.example>",
         to: holder.mailTo ?? "me@kwapso.app",
         subject: holder.mailSubject ?? "Re: the dispatch screen — Ãlaap Kanchawala",
         snippet: "a snippet",
@@ -254,6 +259,7 @@ type SourceRow = {
   compartment: string
   account_id: string | null
   owner_user_id: string | null
+  shared_with: string
   title: string
   body: string
   source_url: string | null
@@ -263,7 +269,7 @@ type SourceRow = {
 const sources = (): SourceRow[] =>
   db()
     .prepare(
-      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url, accounts
+      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, shared_with, title, body, source_url, accounts
          FROM knowledge_sources WHERE origin_table LIKE 'google_%' ORDER BY origin_table, origin_row_id`
     )
     .all() as SourceRow[]
@@ -307,6 +313,7 @@ beforeEach(() => {
   holder.events = []
   holder.mailSubject = null
   holder.mailTo = null
+  holder.mailFrom = null
   holder.chat = []
   holder.driveText.clear()
   db().exec(
@@ -401,6 +408,77 @@ describe("the shelf is the fence", () => {
     // the old owner: the text is identical, so the hash-skip would have skipped
     // it — and the colleague this was just shared with would still find nothing.
     for (const c of chunks) expect(c.o, "the fence on the postings moved with it").toBeNull()
+  })
+})
+
+// shared_with (0073's tenth Vectorize label) — written truthfully now on
+// every path that knows the answer, the owner's ruling, 12 Sep 2026. TWO
+// RULES, because Drive/Chat and Gmail/Calendar answer a different question —
+// see knowledge-google.ts's fencing() for the reasoning; these are the
+// mutation proofs, both sides of both booleans.
+describe("shared_with is written truthfully on every Google path", () => {
+  it("Drive: a team-shelved folder's contents are 'agency'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Bergman dispatch rollout")?.shared_with).toBe("agency")
+  })
+
+  it("Drive: a private-shelved folder's contents are 'private'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with).toBe("private")
+  })
+
+  it("Chat: a team-shelved space is 'agency'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Delivery room")?.shared_with).toBe("agency")
+  })
+
+  it("Gmail: a thread with a known contact is 'agency_client' — accountId is set, never shelf", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Re: the dispatch screen")?.shared_with).toBe("agency_client")
+  })
+
+  it("Gmail: a thread naming NO known contact is 'agency' — never 'private', even though the mailbox itself is always privately owned", async () => {
+    holder.mailFrom = "A Stranger <stranger@nobody-we-know.example>"
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+    expect(mail.account_id, "the fixture's own premise — nobody matched").toBeNull()
+    expect(mail.owner_user_id, "still privately owned — shelf and shared_with answer different questions").toBe(
+      IDS.staffUser
+    )
+    expect(mail.shared_with).toBe("agency")
+  })
+
+  it("Calendar: an event with a client on the guest list is 'agency_client'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Quarterly review")?.shared_with).toBe("agency_client")
+  })
+
+  it("Calendar: an event with nobody known on the guest list is 'agency'", async () => {
+    holder.events = [
+      {
+        id: "EVENT_STRANGER",
+        summary: "Internal sync",
+        description: "Agreed to move the driver app forward.",
+        start: "2026-08-05T09:00:00.000Z",
+        end: "2026-08-05T09:30:00.000Z",
+        url: "https://calendar.example/EVENT_STRANGER",
+        attendees: [],
+      },
+    ]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const event = byTitle("Internal sync") as SourceRow
+    expect(event.account_id).toBeNull()
+    expect(event.shared_with).toBe("agency")
+  })
+
+  it("RE-DECIDED ON EVERY SWEEP, same as owner_user_id beside it: re-shelving a Drive folder moves shared_with too", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with).toBe("private")
+    db().exec(`UPDATE google_sources SET shelf = 'team' WHERE id = 'S_MINE_${IDS.staffUser}';`)
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with, "the label moved with the shelf, not stuck at CREATE time").toBe(
+      "agency"
+    )
   })
 })
 
