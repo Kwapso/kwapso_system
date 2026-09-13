@@ -327,12 +327,22 @@ describe("the grammar refuses what it cannot answer, in words a model can act on
     for (const s of HELP_STATUSES) expect(String(body.message)).toContain(s)
   })
 
-  it("a wrong field says to call describe_module", async () => {
+  // IT USED TO SAY "call describe_module", AND THAT COST A WHOLE TURN.
+  // Measured on staging 13 Sep 2026: the assistant called describe_module, read
+  // it, filtered `triagedById`, was told to call describe_module, called it
+  // again (answered from the turn's own cache — same words), guessed
+  // `assignedTo`, and ran out of steps. The list was in the refusal's own hand
+  // the whole time. Asserted off `QUERY_MODULES` rather than a list typed here,
+  // for the reason the status case above gives: a field added tomorrow must not
+  // be able to make this pass while the message omits it.
+  it("a wrong field names the fields, so the next call can be right", async () => {
     const { status, body } = await ask(
       q({ module: "tickets", where: [{ field: "urgency", op: "eq", value: "high" }] })
     )
     expect(status).toBe(400)
-    expect(String(body.message)).toContain("describe_module")
+    for (const f of QUERY_MODULES.tickets.fields) expect(String(body.message)).toContain(f.name)
+    // And it no longer sends the caller away to ask a question it just answered.
+    expect(String(body.message)).not.toContain("describe_module")
   })
 
   it("a wrong operator lists the operators", async () => {
