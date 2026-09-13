@@ -302,12 +302,37 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
         // add/edit [panel]". That panel is `FormShellDialog`'s Sheet
         // (shared/web/form-shell.tsx), fixed the same day to
         // `w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]` — 420px
-        // floor, 34% of the viewport in between, 640px ceiling, with the
-        // matching `max-w` so the floor and ceiling never fight on a view
-        // narrower than 420px either. Copied verbatim rather than re-derived,
-        // so the two surfaces track the SAME number if it ever changes again,
-        // not two numbers that happened to agree today.
-        "w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]",
+        // floor, 34% of the viewport in between, 640px ceiling, with a
+        // matching `max-w` meant to stop the floor and the ceiling fighting on
+        // a view narrower than 420px. Copied verbatim rather than re-derived,
+        // so the two surfaces track the SAME number if it ever changes again.
+        //
+        // AND THE COPY BROUGHT A CAP THAT CANNOT WORK HERE. Measured live on
+        // staging at a 375px viewport, 13 Sep 2026, while checking the owner's
+        // "on any screen size, I would never like to scroll horizontally in
+        // the chat": the panel was 473px wide with its right edge at 489 —
+        // 114px off the screen, clipped rather than scrollable, so the last
+        // characters of every line were simply unreachable.
+        //
+        // WHY `min(100%, 40rem)` NEVER PROTECTED ANYTHING ON THIS SURFACE. A
+        // percentage resolves against the CONTAINING BLOCK, and a Radix
+        // popover's content does not sit against the viewport — it sits inside
+        // `[data-radix-popper-content-wrapper]`, which is `position: fixed`
+        // with `min-width: max-content`. So the wrapper took its width from
+        // the content (473px, the 420px floor plus insets) and the content's
+        // `100%` then resolved against the wrapper: 100% of itself. Circular,
+        // and therefore no cap at all. Read off `getComputedStyle` rather than
+        // reasoned about — `max-width: min(100%, 720px)` on a box 472.5px wide.
+        // The SHEET is not affected and keeps its own line: a Dialog's content
+        // has no popper wrapper, so its `100%` is the viewport's.
+        //
+        // THE CAP HAS TO NAME THE VIEWPORT, then. `100vw` minus twice
+        // `collisionPadding` (16 each side, set just above) is the same gutter
+        // Radix would have left on its own, so the panel lands where collision
+        // handling already wanted it. Verified live at 375px before this was
+        // written: 339px wide, left 18, right 357, document scrollWidth equal
+        // to clientWidth, and no turn's right edge past 339.
+        "w-[clamp(26.25rem,34vw,40rem)] max-w-[min(calc(100vw-2rem),40rem)]",
         // ITEM 2 (owner, 31 Aug 2026): "make it taller until the top of the
         // page (while keeping its bubble behaviour)". `h-[100dvh]` is
         // deliberately larger than any viewport EVER is — the kit's own
