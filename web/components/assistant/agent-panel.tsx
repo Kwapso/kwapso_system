@@ -81,7 +81,14 @@ function SourceChips({
     articles: t("Knowledge articles"),
   }
   return (
-    <div className="flex flex-col gap-1 px-1">
+    // `pb-3` SEPARATES THE SCOPE FROM THE CONVERSATION (owner, 13 Sep 2026:
+    // "can we make sure that the data source chip selector and the first
+    // message sent by me have a little bit of padding between them?"). The
+    // host below is a plain `flex-col` with no gap of its own, so the last
+    // chip's own box was the only thing between this row and the first
+    // bubble — two different KINDS of thing (a control you set once for the
+    // thread, and the thread itself) reading as one stack.
+    <div className="flex flex-col gap-1 px-1 pb-3">
       {/* A VISIBLE caption, not just the group's aria-label — the owner saw
        * this row on staging with no other context ("i dont understand what
        * this black pills with sources are"): `aria-label` names the group for

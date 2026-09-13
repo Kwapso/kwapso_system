@@ -160,8 +160,23 @@ function checkValue(field: QueryField, op: QueryOp, raw: unknown, index: number)
   // a seven-value lifecycle is told the seven rather than handed nothing back. A
   // TEAM-EDITED vocabulary is NOT checked here: those words belong to the team
   // and change without a deploy, so the honest answer to a wrong one is no rows.
-  if (field.type === "enum" && field.values && op !== "contains" && !field.values.includes(value))
-    bad(`"${value}" isn't a ${field.name}. It is one of: ${field.values.join(", ")}.`)
+  //
+  // CAPITALISATION IS NOT A WRONG ANSWER. Measured on staging, 2026-09-13: asked
+  // "how many total open tickets (to be triaged) are there?", the model filtered
+  // `status = "New"` and was refused with the seven values — six of which it had
+  // just been shown, in lower case, by the refusal itself. It had read the word
+  // off the SCREEN, where the same value is drawn `New` because that is how a
+  // status is written for a person, and a model composing a sentence capitalises
+  // what a sentence capitalises. The list is the dictionary either way: matching
+  // it case-insensitively cannot invent a value, it can only recognise one, and
+  // what goes on to the statement is the DECLARED spelling, never the caller's.
+  // (A declared list holding two values that differ only in case would make this
+  // ambiguous; `query-vocabulary.test.ts` asserts no fixed enum in the app does.)
+  if (field.type === "enum" && field.values && op !== "contains") {
+    const declared = field.values.find((v) => v.toLowerCase() === value.toLowerCase())
+    if (!declared) bad(`"${value}" isn't a ${field.name}. It is one of: ${field.values.join(", ")}.`)
+    return declared as string
+  }
   if (field.type === "date") return dateBound(value, edgeFor(op, index))
   return value
 }
