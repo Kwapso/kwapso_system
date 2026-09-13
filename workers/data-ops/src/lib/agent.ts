@@ -691,8 +691,34 @@ export function pagingGuard() {
   }
 }
 
+/** WHAT THE SECOND AND THIRD IDENTICAL CALL ARE TOLD, on top of the answer.
+ *
+ * Handing back the cached bytes alone is correct and it is not enough: the model
+ * receives exactly what it received the first time, which is precisely the input
+ * that led it to ask again. Nothing in the reply says "you have been here
+ * before", so there is no signal to break the circuit on.
+ *
+ * Measured on staging 13 Sep 2026, on one question: `describe_module` for
+ * tickets was called SIX times in a turn, five of them answered from this cache.
+ * Each recall is silent, cheap and useless, and together they spent most of a
+ * twelve-step budget. (The thing that SENT it back each time — a field refusal
+ * that said "call describe_module" instead of naming the fields — is fixed at
+ * its own door in query-engine.ts. This is the belt beside that: the door can
+ * only fix the loops it is part of, and a model can repeat a call for reasons
+ * no door knows about.)
+ *
+ * The note is APPENDED to the real answer, never a replacement for it — the
+ * model must still be able to read the result — and it escalates, because a
+ * second ask is a slip and a fourth is a loop. */
+function repeatNote(n: number, name: string): string {
+  return n === 1
+    ? `\n\n(You already called ${name} with these exact arguments earlier in this turn. This is that same answer, unchanged. Use it — asking again will not produce anything new.)`
+    : `\n\n(This is the ${n + 1}th time you have called ${name} with these exact arguments this turn. The answer cannot change within one turn. You are in a loop: stop calling it, use the answer above, and if it does not contain what you need then say so in your reply rather than asking again.)`
+}
+
 export function repeatGuard() {
   const seen = new Map<string, string>()
+  const recalls = new Map<string, number>()
   // Key order must not make two identical calls look different, so the fields are
   // sorted: {scope,view} and {view,scope} are one call.
   const key = (tc: ToolCall): string =>
@@ -700,9 +726,17 @@ export function repeatGuard() {
       Object.fromEntries(Object.entries(tc.input ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)))
     )}`
   return {
-    /** The fenced result this exact read already produced this turn, or null. */
-    recall: (write: boolean, tc: ToolCall): string | null =>
-      write ? null : (seen.get(key(tc)) ?? null),
+    /** The fenced result this exact read already produced this turn, with a note
+     *  saying it is a repeat — or null when this call is new. */
+    recall: (write: boolean, tc: ToolCall): string | null => {
+      if (write) return null
+      const k = key(tc)
+      const cached = seen.get(k)
+      if (cached === undefined) return null
+      const n = (recalls.get(k) ?? 0) + 1
+      recalls.set(k, n)
+      return cached + repeatNote(n, tc.name)
+    },
     remember: (write: boolean, tc: ToolCall, content: string): void => {
       if (!write) seen.set(key(tc), content)
     },

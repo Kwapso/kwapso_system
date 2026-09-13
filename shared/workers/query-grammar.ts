@@ -44,7 +44,7 @@
 
 import { APP_STAGES } from "../app-stages"
 import { DELIVERABLE_KINDS } from "../selectable-groups"
-import { HELP_STATUSES, STORY_STATUSES, ticketTypeKeptForMigrationExcludedSql } from "../types"
+import { HELP_STATUSES, RETIRED_HELP_STATUSES, STORY_STATUSES, ticketTypeKeptForMigrationExcludedSql } from "../types"
 
 /** The comparisons a filter may make. `contains` is a case-insensitive substring
  * (and, on a reference field, a substring of the referenced record's NAME);
@@ -585,6 +585,52 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       UPDATED,
     ],
   },
+  ticket_moves: {
+    table: "help_status_events",
+    // THE TICKET'S OWN RIGHT, because these rows ARE the ticket book — one row
+    // per move, appended beside the UPDATE that made it. Nothing new is readable:
+    // a caller holding `help:read` can already open any ticket and read the same
+    // history off its stage strip.
+    module: "help",
+    summary:
+      "Every move a ticket made from one status to the next, with WHO moved it and WHEN. The ticket itself only remembers where it IS now, so this is the only place that answers 'who triaged the most', 'how many were triaged in July' or 'how long did it sit in new'. One row per move; a ticket has several.",
+    labelColumn: "creator_name",
+    defaultSort: "movedAt",
+    fields: [
+      ID,
+      { name: "ticketId", column: "help_id", type: "id", ref: "tickets" },
+      // FREE TEXT IN THE DATABASE, AND DELIBERATELY SO — this table is
+      // append-only and each row holds the vocabulary as it stood ON THE DAY,
+      // so a word here can outlive the list a ticket may currently be in
+      // (`HelpStatusEver`, and `awaiting_validation` has already done it). The
+      // enum declared here is therefore HELP_STATUSES *plus the retired ones*:
+      // declaring only the live seven would refuse a filter on a value this
+      // column really holds, and tell a caller a real answer cannot be asked
+      // for.
+      {
+        name: "fromStatus",
+        column: "from_status",
+        type: "enum",
+        values: [...HELP_STATUSES, ...RETIRED_HELP_STATUSES],
+        note: "empty on the row that records the ticket being raised — there was nothing before it",
+      },
+      {
+        name: "toStatus",
+        column: "to_status",
+        type: "enum",
+        values: [...HELP_STATUSES, ...RETIRED_HELP_STATUSES],
+        note: "the status it moved INTO — filter this by triaged to count triages",
+      },
+      { name: "movedAt", column: "created_at", type: "date", note: "when the move happened" },
+      { name: "movedById", column: "creator_id", type: "id" },
+      {
+        name: "movedBy",
+        column: "creator_name",
+        type: "text",
+        note: "the name of the person who made the move — groupBy this to rank people",
+      },
+    ],
+  },
   todos: {
     table: "todos",
     module: "todos",
@@ -919,23 +965,44 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
  * added tomorrow brings its own aliases and nobody has to remember. Two rules
  * keep it honest:
  *   · a name that is already a module KEY is never an alias (a key always wins);
- *   · a name claimed by TWO modules is no alias at all — `work` covers stories,
- *     sprints, work logs, tasks and waves, and guessing which one somebody meant
- *     would be worse than saying "which of these?".
+ *   · a TABLE name outranks a PERMISSION name, because the two are not the same
+ *     kind of claim. A table belongs to exactly one query module by
+ *     construction; a permission module can legitimately govern several. So
+ *     when both kinds claim one word, the table's claim is the unambiguous one
+ *     and it takes the word.
+ *   · among claims OF THE SAME KIND, a name claimed by TWO modules is no alias
+ *     at all — `work` covers stories, sprints, work logs, tasks and waves, and
+ *     guessing which one somebody meant would be worse than saying "which of
+ *     these?".
+ *
+ * THE TABLE-OVER-PERMISSION CLAUSE WAS EARNED, 13 Sep 2026. `ticket_moves`
+ * landed on the `help` permission (it is the ticket book — one row per move),
+ * which made `help` a two-claim permission name and therefore no alias at all.
+ * `help` is the word every other tool in this catalogue uses for tickets, and
+ * losing it silently 400'd `describe_module(help)` and `query_records(help)`.
+ * Ranking the kinds fixes it for every future module that shares a permission
+ * with the module that owns its table, rather than for this one.
  *
  * An alias can only ever resolve to a module that is already in the allow-list,
  * so this widens what a caller may SAY and not one row of what they may READ
  * (asserted in workers/tenancy/test/query-fence.test.ts). */
 export const MODULE_ALIASES: Record<string, string> = (() => {
-  const claims = new Map<string, string[]>()
-  for (const [key, mod] of Object.entries(QUERY_MODULES))
-    for (const other of [mod.module, mod.table]) {
-      if (other === key || Object.prototype.hasOwnProperty.call(QUERY_MODULES, other)) continue
-      claims.set(other, [...new Set([...(claims.get(other) ?? []), key])])
+  const free = (name: string, key: string) =>
+    name !== key && !Object.prototype.hasOwnProperty.call(QUERY_MODULES, name)
+  const claim = (pick: (mod: QueryModule) => string) => {
+    const claims = new Map<string, string[]>()
+    for (const [key, mod] of Object.entries(QUERY_MODULES)) {
+      const name = pick(mod)
+      if (!free(name, key)) continue
+      claims.set(name, [...new Set([...(claims.get(name) ?? []), key])])
     }
-  return Object.fromEntries(
-    [...claims].filter(([, keys]) => keys.length === 1).map(([alias, keys]) => [alias, keys[0]])
-  )
+    return Object.fromEntries(
+      [...claims].filter(([, keys]) => keys.length === 1).map(([alias, keys]) => [alias, keys[0]])
+    )
+  }
+  // Permission names first, then table names OVER them: a table's claim is the
+  // unambiguous kind, so where both speak the table decides.
+  return { ...claim((m) => m.module), ...claim((m) => m.table) }
 })()
 
 /** A name reduced to what a person meant by it: no case, no separators. Lets

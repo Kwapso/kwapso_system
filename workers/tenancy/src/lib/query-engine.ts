@@ -211,6 +211,35 @@ function normaliseClauseShape(raw: unknown): Record<string, unknown> | null {
   return raw.length === 2 ? { field, op } : { field, op, value }
 }
 
+/** THE REFUSAL SAYS THE FIELDS, rather than sending the caller to go and ask.
+ *
+ * Measured on staging, 13 Sep 2026, on the owner's own question ("who has triaged
+ * the maximum number of tickets? show me a graph by month"). The assistant called
+ * describe_module, read the answer, filtered `triagedById`, and got back
+ *
+ *   "triagedById" isn't a field here. Call describe_module to see what is.
+ *
+ * — so it called describe_module again. That call was a byte-identical repeat, so
+ * the agent answered it from its own cache, which is correct and which changed
+ * nothing: the model had the same words in front of it and guessed a second name,
+ * `assignedTo`, which is also not a field. Seven of the turn's twelve steps went
+ * on that circuit and the turn ended with no answer.
+ *
+ * The refusal had the list in its hand the whole time. `mod.fields` is right
+ * there — the same array describe_module reads — and printing it turns a round
+ * trip into a correction the model can act on in the same breath. Exactly the
+ * shape of `unknownModule` above, which was written for the same fault one level
+ * up, and of the status refusal beside it, which already named its seven values.
+ *
+ * NOT A WIDENING: it names what a caller with this module's read right may
+ * already ask describe_module for, and nothing else. Bulky columns included —
+ * they are askable, they are simply not in the default projection. */
+function unknownField(mod: QueryModule, asked: string): never {
+  return bad(
+    `"${asked}" isn't a field here. The fields are: ${mod.fields.map((f) => f.name).join(", ")}.`
+  )
+}
+
 /** One filter, checked end to end. */
 function parseClause(mod: QueryModule, raw: unknown): ParsedClause {
   const tupled = normaliseClauseShape(raw) ?? raw
@@ -228,7 +257,7 @@ function parseClause(mod: QueryModule, raw: unknown): ParsedClause {
   const fields = named.map((n) => {
     if (typeof n !== "string") bad("Each filter needs a `field` name.")
     const f = queryField(mod, n as string)
-    if (!f) bad(`"${String(n)}" isn't a field here. Call describe_module to see what is.`)
+    if (!f) unknownField(mod, String(n))
     return f as QueryField
   })
   if (typeof clause.op !== "string" || !(QUERY_OPS as readonly string[]).includes(clause.op))
@@ -287,7 +316,7 @@ export function parseQuery(
     return (raw as unknown[]).map((n) => {
       if (typeof n !== "string") bad(`\`${what}\` must be a list of field names.`)
       const f = queryField(mod, n as string)
-      if (!f) bad(`"${String(n)}" isn't a field here. Call describe_module to see what is.`)
+      if (!f) unknownField(mod, String(n))
       return f as QueryField
     })
   }
