@@ -2753,8 +2753,11 @@ export type CompartmentChoice = {
   reason: string
   /** the records this question looks like it is about, best first. It rides the
    * ANSWER and never the ranking (see §3 in the header) — a wrong guess here is
-   * something a reader can disagree with, not something that hid the passage. */
-  records: { sourceId: string; title: string }[]
+   * something a reader can disagree with, not something that hid the passage.
+   * `recordPath` reuses the SAME resolver a passage's own citation does, so a
+   * caller handed one of these is never stuck holding a knowledge-source id
+   * that no other door recognises. */
+  records: { sourceId: string; title: string; recordPath: string | null }[]
   /** c-hijack (A3). Present ONLY when the narrow came from a single
    * FRAGILE collapsed token (`accountsNamedIn`'s own flag) — never from an
    * alias/code match, never from a multi-token match, never from standing on
@@ -2851,10 +2854,10 @@ async function deriveRoute(
   // handed them over in whatever order the database returned, so "best first" —
   // which is what the sentence claims — was a coincidence of row order.
   const ids = near.map((h) => h.id.replace(/:summary$/, ""))
-  const titles = await sourceTitles(cfg, guard, ids)
+  const found = await sourceTitles(cfg, guard, ids)
   const records = ids.flatMap((sourceId) => {
-    const title = titles.get(sourceId)
-    return title ? [{ sourceId, title }] : []
+    const row = found.get(sourceId)
+    return row ? [{ sourceId, title: row.title, recordPath: row.recordPath }] : []
   })
   return {
     ...choice,
@@ -2909,22 +2912,38 @@ async function sourceTitles(
   cfg: D1Rest,
   guard: MemberGuard,
   ids: string[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, { title: string; recordPath: string | null }>> {
   if (!ids.length) return new Map()
   const owner = readerClause(guard)
-  const rows = await d1Query<{ id: string; title: string }>(
+  const rows = await d1Query<{
+    id: string
+    title: string
+    origin_table: string | null
+    origin_row_id: string | null
+    compartment: string
+  }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: `ids` is at most ROUTER_TOP_RECORDS, and the LIMIT says so
     // at the statement. The ids are ULIDs this worker wrote and read back, never
     // anything off a request, so they are interpolated like every other
     // server-owned value (CONVENTIONS) and the statement binds one parameter.
-    `SELECT id, title FROM knowledge_sources
+    //
+    // `origin_table`/`origin_row_id`/`compartment` ride this read for the same
+    // reason they ride `toPassage`'s (§ above `recordPath`): a `records` row
+    // names a knowledge SOURCE, in a namespace no other door recognises, and
+    // without these three columns the caller has no way to tell the two apart.
+    `SELECT id, title, origin_table, origin_row_id, compartment FROM knowledge_sources
       WHERE id IN (${ids.map((id) => sqlString(id)).join(", ")}) AND ${owner.sql} AND deactivated_at IS NULL
       LIMIT ${ROUTER_TOP_RECORDS}`,
     owner.params
   )
-  return new Map(rows.map((r) => [r.id, r.title]))
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      { title: r.title, recordPath: recordPath(r.origin_table, r.origin_row_id, r.compartment) },
+    ])
+  )
 }
 
 /** IS THIS TOKEN RARE ENOUGH TO NAME AN ACCOUNT ON ITS OWN — c-hijack, 11 Sep
@@ -3404,7 +3423,7 @@ export function knowledgeAnswer(input: {
   reason: string
   /** what the record summaries said this question is about. Evidence for the
    * reader, never an input to the ranking (§3). */
-  records: { sourceId: string; title: string }[]
+  records: { sourceId: string; title: string; recordPath: string | null }[]
   passages: KnowledgePassage[]
   candidates: number
   /** what the live rows say RIGHT NOW about the records being cited — see

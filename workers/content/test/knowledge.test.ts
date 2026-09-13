@@ -37,7 +37,7 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify, hasRecencyIntent, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
+import { diversify, hasRecencyIntent, indexSource, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
 import { passageId } from "../src/lib/knowledge-reader"
 import { d1Query } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
@@ -1780,6 +1780,57 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
       const answer = await ask(OTHER_STAFF, "why was the dispatch rollout paused?")
       expect(answer.found).toBe(false)
     })
+  })
+})
+
+// THE BUG, STAGING, 12 SEP 2026. The owner asked for "the latest jourfix",
+// `ask_knowledge` answered with `records: [{ sourceId: "01M27H…", title:
+// "🧭 Jourfix" }]`, and when he confirmed which one he meant the assistant
+// handed that SAME sourceId to `get_meeting_transcript` — which reads the
+// `meetings` table by primary key and answered "That meeting doesn't exist.",
+// true of the knowledge-source id and false of the meeting it mirrors.
+//
+// `records` is a router-level hint (`deriveRoute`'s covers, §3 in this file's
+// own header) built from `sourceTitles`, which read back only `id` and
+// `title` — nothing that told a caller the id it was holding named a SOURCE,
+// in a different id space from the meeting/ticket/process id every other
+// door on this id takes. `citations` and `passages` never had this hole:
+// `toPassage` already carries `recordPath` (one hop past the source, via the
+// exact same `recordPath()` function `sourceTitles` now calls too), so a
+// citation was always resolvable and a `records` entry never was.
+//
+// THE FIX IS THE SAME SEAM, not a second one: `sourceTitles` now reads
+// `origin_table`/`origin_row_id`/`compartment` off the row it already fetches
+// and resolves them through `recordPath()` — the identical function and the
+// identical inputs `toPassage` uses — so a `records` row and a `citations`
+// row for the same source can never disagree about where it points.
+describe("`records` carries a real path back to what it mirrors, not just a source id", () => {
+  const guard: MemberGuard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  it("a source that mirrors a meeting resolves through the SAME recordPath a citation would get", async () => {
+    const meetingId = "01MEETINGJOURFIXWXWXWXWXWX"
+    const sourceId = "01SOURCEJOURFIXWXWXWXWXWXW"
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, title, summary, body,
+         body_bytes, team_visible, created_at, creator_name)
+       VALUES ('${sourceId}', 'meeting', 'meetings', '${meetingId}', 'agency', 'Jourfix zzqoxdrix meeting',
+         'A weekly zzqoxdrix jourfix catch-up.', 'A weekly zzqoxdrix jourfix catch-up with the whole team.',
+         40, 1, '2026-09-01', 'kwapso');`
+    )
+    // Real indexing (chunks + the record-level cover vector `deriveRoute`
+    // searches) — a hand-written vector row would prove the resolver, not the
+    // pipeline that fed it the wrong shape on staging.
+    await indexSource(env(IDS.staffUser), {} as never, guard, sourceId)
+
+    const answer = await ask(IDS.staffUser, "what happens at the weekly zzqoxdrix jourfix?")
+    const record = (answer.records ?? []).find((r) => r.sourceId === sourceId)
+    expect(record, `records carried: ${JSON.stringify(answer.records)}`).toBeTruthy()
+    // THE MUTATION THIS PROVES: a `records` entry with no `recordPath`, or one
+    // built from the SOURCE's own id, is exactly the shape that sent
+    // `get_meeting_transcript` hunting for a meeting named "01SOURCE…" and got
+    // told it does not exist. This must resolve to the MEETING's own id.
+    expect(record?.recordPath).toBe(`meetings/${meetingId}`)
+    expect(record?.recordPath).not.toBe(`meetings/${sourceId}`)
   })
 })
 
