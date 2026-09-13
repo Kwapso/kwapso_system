@@ -1032,6 +1032,18 @@ export const FIELD_ALIASES: Record<string, string> = {
   // a real field.
   name: "title",
   title: "name",
+  // THE WORD THE OWNER ACTUALLY SAID. "Account" is the glossary's own term for
+  // this concept (shared/glossary.ts: the client rename, 10 Sep 2026 — "client
+  // is the company, so it's the account"), and it is the word the field's
+  // filterable name is BUILT from — `accountId`, `appId` — with an `Id` neither
+  // a person nor a model reliably remembers to append. Measured on staging,
+  // 2026-09-13: asked "avg per account and per app", the model filtered on the
+  // bare word twice and was refused both times with "isn't a field here" —
+  // once even after describe_module had already told it the real name this
+  // same turn. The glossary term for the concept and the column's own name
+  // should not require a lookup to connect.
+  account: "accountId",
+  app: "appId",
 }
 
 /** A module's field by the name the model uses — its own name, its COLUMN, a
