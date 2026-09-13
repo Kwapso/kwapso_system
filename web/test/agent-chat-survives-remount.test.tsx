@@ -6,11 +6,12 @@
 // width (a window drag, a tablet rotating through its own portrait width)
 // UNMOUNTS AgentPanel and mounts a fresh one. `useAgentChat` used to be plain
 // `React.useState` owned by that one component instance, so the crossing
-// silently destroyed the transcript, the thread, staged attachments and a
-// confirm the assistant was mid-way through waiting on.
+// silently destroyed the transcript, the thread and a confirm the assistant
+// was mid-way through waiting on. (Staged attachments were a fourth casualty
+// until the chat's file upload was removed on 13 Sep 2026.)
 //
 // This locks the fix directly, at the level the bug actually lived: build a
-// transcript with a staged attachment and a paused confirm, UNMOUNT the hook
+// transcript with a paused confirm, UNMOUNT the hook
 // (exactly what a breakpoint crossing does to the component that calls it),
 // mount it again, and check nothing was lost. No component or media query is
 // rendered here — agent-host.test.ts already locks that AgentHost picks the
@@ -49,29 +50,14 @@ vi.mock("@/lib/api", () => ({
 import { useAgentChat } from "@/lib/use-agent-chat"
 
 describe("the chat state survives AgentPanel's own component being torn down and rebuilt", () => {
-  it("keeps a staged attachment (not yet sent) across an unmount + remount", async () => {
-    const teamId = "team-remount-attach"
-    const first = renderHook(() => useAgentChat(teamId, true, true))
-
-    // A file staged for the NEXT message — the chat import — never sent in
-    // this test, so it must still be sitting there after the remount below.
-    const file = new File(["a,b\n1,2"], "rows.csv", { type: "text/csv" })
-    await act(async () => {
-      await first.result.current.addAttachments([file] as unknown as FileList)
-    })
-    expect(first.result.current.attached).toEqual([{ name: "rows.csv", csv: "a,b\n1,2" }])
-
-    // THE EXACT THING THE BUG DID: the component this hook lives in is torn
-    // down (AgentHost swaps subtrees crossing 768px) and a fresh one takes
-    // its place — same team, same "the panel is open" inputs.
-    first.unmount()
-    const second = renderHook(() => useAgentChat(teamId, true, true))
-
-    expect(second.result.current.attached, "a staged attachment must survive the remount").toEqual([
-      { name: "rows.csv", csv: "a,b\n1,2" },
-    ])
-  })
-
+  // THE STAGED-ATTACHMENT CASE USED TO BE THE FIRST TEST HERE, and it went with
+  // the chat's file upload (owner, 13 Sep 2026: "the file upload feature is
+  // pretty useless, so let's get rid of that completely at the moment" — see
+  // the comment over the composer in web/components/assistant/agent-panel.tsx).
+  // Removed rather than re-pointed at some other piece of state: it existed to
+  // prove ONE fact about ONE field, and the remount invariant it stood for is
+  // still proved below, over the transcript, the thread id and a pending
+  // confirm — which is the state the original bug actually destroyed.
   it("keeps the transcript, the thread id and a pending confirm across an unmount + remount", async () => {
     const teamId = "team-remount-confirm"
     const first = renderHook(() => useAgentChat(teamId, true, true))
