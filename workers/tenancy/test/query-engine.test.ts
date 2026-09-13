@@ -26,6 +26,8 @@
 // So the last test here IS that question, asked in two calls, with the answer
 // checked against rows counted by hand.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -393,6 +395,110 @@ describe("R14: the read is bounded, and it pages by key", () => {
   it("the group ceiling is a real number, said at the query", () => {
     expect(GROUP_CAP).toBeGreaterThan(50)
     expect(VALUES_PER_CLAUSE).toBeLessThan(100)
+  })
+})
+
+// THE BUG THIS CLOSES, measured on staging on 2026-09-13 against the owner's own
+// question ("how many total open tickets... avg per account and per app"). Every
+// filter the model sent was a bare positional array — `["status", "eq", "new"]"
+// — never the declared `{field, op, value}` object, and all three were refused
+// with the identical message. The model even diagnosed its own mistake out loud
+// in the wrap-up ("the filters I sent weren't in the right shape... let me run
+// them again properly") and the turn still ended with nothing, because that
+// retry never happened — the shape it reached for was simply never accepted.
+//
+// The fix has two parts, and this suite proves both: tool-catalog.ts's schema
+// for `where` now carries an `items` object (so a model reading the JSON schema
+// is told structurally that each filter is an object, not just "an array" —
+// see the schema itself for why that mattered), and parseClause here accepts
+// the positional tuple as the unambiguous equivalent it is, rather than
+// refusing a complete, well-formed question over a bracket vs. a brace.
+describe("a filter sent as a positional tuple is accepted, same as the object", () => {
+  it("[field, op, value] answers exactly as {field, op, value} would", async () => {
+    // Three "new" tickets in the fixture: T1 (Flu Clinic), T5 (Confia), T12 (Delaval).
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [["status", "eq", "new"]], countOnly: true })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(3)
+  })
+
+  it("a VALUELESS op needs only [field, op] — two elements, not three", async () => {
+    // Every ticket whose resolvedAt is still null: T1, T2, T5, T6, T7, T9, T12.
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [["resolvedAt", "isNull"]], countOnly: true })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(7)
+  })
+
+  it("an object and a tuple filter combine in the same `where`, ANDed as always", async () => {
+    // Open (isNull, tuple) AND belonging to Confia (object) — T5, T6, T7.
+    const { status, body } = await ask(
+      q({
+        module: "tickets",
+        where: [["resolvedAt", "isNull"], { field: "accountId", op: "eq", value: "A_CONFIA" }],
+        countOnly: true,
+      })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(3)
+  })
+
+  it("value may itself be a list inside the tuple — `in` takes its list at position 3", async () => {
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [["status", "in", ["new", "triaged"]]], countOnly: true })
+    )
+    expect(status).toBe(200)
+    // new: T1, T5, T12; triaged: T6 — four rows.
+    expect(body.total).toBe(4)
+  })
+
+  it("a array of the wrong length is not a tuple in disguise — still refused, still plainly", async () => {
+    const { status, body } = await ask(q({ module: "tickets", where: [[1, 2, 3, 4]] }))
+    expect(status).toBe(400)
+    expect(String(body.message)).toContain("Each filter must be an object")
+  })
+
+  it("MUTATION PROOF — reverting normaliseClauseShape makes this the exact old failure", () => {
+    // Not a live mutation (nothing here disables the fix at runtime); this pins
+    // the source shape the tests above depend on, so a revert of the accepting
+    // branch is caught by inspection as well as by the tests going red. Read
+    // together with the `it`s above: delete the `normaliseClauseShape` call in
+    // `parseClause` and every test in this describe block fails with "Each
+    // filter must be an object like {field, op, value}" — the identical string
+    // the owner saw three times on staging.
+    const src = readFileSync(join(__dirname, "../src/lib/query-engine.ts"), "utf8")
+    expect(src).toContain("normaliseClauseShape(raw)")
+  })
+})
+
+describe("the word the owner actually said reaches the field it means", () => {
+  // Measured the same turn as the tuple bug: asked for "avg per account and per
+  // app", the model filtered on the bare words `account` and `app` — the
+  // glossary's own terms (shared/glossary.ts: "client is the company, so it's
+  // the account") — and was refused both times with `"account" isn't a field
+  // here. Call describe_module to see what is.`, once even after describe_module
+  // had already told it the real name (`accountId`) earlier in the SAME turn.
+  it("`account` reaches `accountId`", async () => {
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [{ field: "account", op: "eq", value: "A_FLU" }], countOnly: true })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(4) // T1-T4, all Flu Clinic
+  })
+
+  it("`app` reaches `appId`", async () => {
+    db().exec(`
+      INSERT INTO apps (id, account_id, name, url, stage, tool_cost_cents_per_month, created_at, creator_id)
+        VALUES ('APP_ALIAS_TEST', 'A_FLU', 'Flu portal', 'https://flu.example', 'Development', 0, '2026-01-01', '${IDS.staffUser}');
+      UPDATE help SET app_id = 'APP_ALIAS_TEST' WHERE id = 'T1';
+    `)
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [{ field: "app", op: "eq", value: "APP_ALIAS_TEST" }], countOnly: true })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(1)
   })
 })
 

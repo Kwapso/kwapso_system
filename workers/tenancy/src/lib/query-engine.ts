@@ -171,11 +171,37 @@ function checkValue(field: QueryField, op: QueryOp, raw: unknown, index: number)
  * letting one filter turn into a scan of a whole row. */
 const FIELDS_PER_CLAUSE = 5
 
+/** THE POSITIONAL TUPLE, ACCEPTED AS THE UNAMBIGUOUS EQUIVALENT of the declared
+ * `{field, op, value}` object.
+ *
+ * Measured on staging, 2026-09-13: asked "how many total open tickets... avg per
+ * account and per app", the model sent three filters — each a bare
+ * `[field, op, value]` — and every one was refused with "Each filter must be an
+ * object like {field, op, value}." The model then diagnosed its own mistake out
+ * loud ("the filters I sent weren't in the right shape... let me run them again
+ * properly") and the turn still ended with nothing, because the shape it reaches
+ * for on its own was never accepted.
+ *
+ * There is no ambiguity to protect against: a clause has exactly three possible
+ * parts (field, op, value) and a VALUELESS op (isNull/notNull) has exactly two,
+ * so a 2- or 3-element array maps onto them one for one. Refusing an
+ * unambiguous, obviously-intended shape costs a whole turn for nothing the
+ * caller could have been more precise about — `tool-catalog.ts`'s schema now
+ * teaches the object shape structurally (an `items` object with `field`/`op`),
+ * and this is the belt beside those suspenders for a model that sends the tuple
+ * anyway. */
+function normaliseClauseShape(raw: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > 3) return null
+  const [field, op, value] = raw
+  return raw.length === 2 ? { field, op } : { field, op, value }
+}
+
 /** One filter, checked end to end. */
 function parseClause(mod: QueryModule, raw: unknown): ParsedClause {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
-    bad("Each filter must be an object like {field, op, value}.")
-  const clause = raw as Record<string, unknown>
+  const tupled = normaliseClauseShape(raw) ?? raw
+  if (typeof tupled !== "object" || tupled === null || Array.isArray(tupled))
+    bad("Each filter must be an object like {field, op, value} (or the equivalent list [field, op, value]).")
+  const clause = tupled as Record<string, unknown>
   // ONE FIELD, OR SEVERAL. Several means "any of these matches", which is what a
   // search box is: the accounts door looks in the name, the code and the email
   // and calls the three of them `q`. Without this the grammar could express

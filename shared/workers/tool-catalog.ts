@@ -320,9 +320,19 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj(
       {
         module: S,
-        where: { type: "array" },
-        groupBy: { type: "array" },
-        fields: { type: "array" },
+        // ITEMS, NOT A BARE ARRAY. A model told only "where is an array" has no
+        // structural reason to prefer `{field,op,value}` over the positional
+        // triple it reaches for on its own — measured on staging, 2026-09-13:
+        // three separate filters, each a bare `[field, op, value]`, refused by
+        // the same message three times running in the one turn that opened this
+        // fix. `items` is the cheapest fix available: it teaches "each filter is
+        // an OBJECT" structurally instead of leaving the model to infer it from
+        // prose. The parser (query-engine.ts, parseClause) also normalises the
+        // tuple as an accepted equivalent — belt and suspenders, since a model
+        // that ignores the schema is exactly the failure mode being fixed.
+        where: { type: "array", items: { type: "object", properties: { field: {}, op: S, value: {} }, required: ["field", "op"] } },
+        groupBy: { type: "array", items: S },
+        fields: { type: "array", items: S },
         countOnly: B,
         sort: S,
         dir: S,
