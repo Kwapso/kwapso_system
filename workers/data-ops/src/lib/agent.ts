@@ -1024,7 +1024,7 @@ async function refuseStep(
   tc: ToolCall,
   summary: string,
   reason: string
-): Promise<{ message: ChatMessage; ok: boolean }> {
+): Promise<{ message: ChatMessage; ok: boolean; terminal: true }> {
   ctx.emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
   ctx.emit?.({ t: "step_end", tool: tc.name, ok: false, summary, error: reason.slice(0, 140) })
   await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
@@ -1033,7 +1033,15 @@ async function refuseStep(
     toolCallsJson: JSON.stringify([{ tool: tc.name, summary, status: "failed" }]),
     source: ctx.source,
   })
-  return { message: { role: "tool", content: reason, toolCallId: tc.id, toolName: tc.name }, ok: false }
+  // TERMINAL, AND THE ONLY THING IN THIS FILE THAT IS. `refuseStep` is reached
+  // from exactly two places — an unticked source chip, and R24's outbound money
+  // taint — and both are FENCES rather than outcomes: the door was never asked,
+  // there is nothing for the model to fix, and asking again inside the same turn
+  // is precisely what must not happen. Everything else that comes back `ok:false`
+  // is a DOOR'S OWN ANSWER and is recoverable; see `runPlanLoop`'s failure budget
+  // for why that difference had to be made explicit rather than inferred from
+  // `ok` alone.
+  return { message: { role: "tool", content: reason, toolCallId: tc.id, toolName: tc.name }, ok: false, terminal: true }
 }
 
 /** WHAT A CONFIRM-NEEDING CALL IS TOLD when something else in its turn was
@@ -1072,7 +1080,10 @@ const HELD_BACK_BY_MONEY =
  * read-only turn titles by the prompt, not "List roles" (what usageTitle documents).
  * The confirm path loses nothing — requiresConfirm is false for every read, so a stored
  * proposal always holds at least one write to title the folded row. */
-async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatMessage; ok: boolean }> {
+async function runToolCall(
+  ctx: StepCtx,
+  tc: ToolCall
+): Promise<{ message: ChatMessage; ok: boolean; terminal?: boolean }> {
   const { emit, tally } = ctx
   const t = getTool(tc.name)
   const summary = t ? t.summarize(tc.input, ctx.names) : `Run ${tc.name}`
@@ -1519,6 +1530,36 @@ async function runPlanLoop(
     quota = await getQuota(env, guard.teamId)
   }
 
+  // HOW MANY STEPS MAY FAIL BEFORE THE TURN GIVES UP.
+  //
+  // Until 13 Sep 2026 the answer was ZERO: the first step in which any tool call
+  // came back `ok:false` ended the whole turn, with MAX_STEPS nowhere near
+  // exhausted. The owner hit it head-on — he asked "how many total open tickets
+  // are there? and avg per account and per app?", the model sent its filters in
+  // the wrong shape, every call was refused, and it then said, out loud, in the
+  // reply he actually read:
+  //
+  //     "All four lookups were refused - the filters I sent weren't in the right
+  //      shape... Let me run them again properly."
+  //
+  // It never ran them again. It could not: the turn was already over. The model
+  // had diagnosed its own mistake correctly and the loop had already decided the
+  // conversation was finished. That is the worst shape a failure can take - the
+  // fix was known, by the only party who could apply it, one step too late.
+  //
+  // A BUDGET RATHER THAN A REMOVAL, because zero and infinity are both wrong. A
+  // model that retries an impossible call would otherwise spend every remaining
+  // step, and each step is a real model call the team pays for. Two is what the
+  // evidence asks for: the reported failure needed exactly ONE retry, and a
+  // second covers a model that fixes one thing and trips on another. Past that
+  // the turn stops and explains itself exactly as it always did.
+  //
+  // IT COUNTS STEPS, NOT CALLS, and that distinction is the whole reason it
+  // works. The owner's step held FOUR failing calls; counting calls would have
+  // spent the budget inside the very step that earned the retry.
+  const RETRY_BUDGET = 2
+  let failedSteps = 0
+
   const startedAt = Date.now()
   for (let step = 0; step < MAX_STEPS; step++) {
     // BETWEEN steps, never inside one: a turn stopped here has a whole tool call
@@ -1697,6 +1738,15 @@ async function runPlanLoop(
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
     const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, context: convo, emit }
+    // TWO DIFFERENT WORDS FOR TWO DIFFERENT THINGS, and conflating them is the
+    // bug this loop had. `blocked` is a FENCE - a source chip the person
+    // unticked, or R24's outbound money taint. The door was never asked, there
+    // is nothing for the model to fix, and retrying inside the same turn is
+    // exactly what must not happen, so it ends the turn on the spot regardless
+    // of the budget. `failed` is a DOOR'S OWN ANSWER - a malformed filter, a
+    // field that does not exist, a permission the caller lacks, a 500. The model
+    // can see it in `convo` and act on it, which is what the budget buys.
+    let blocked = false
     let failed = false
     for (const tc of reply.toolCalls) {
       const t = getTool(tc.name)
@@ -1715,7 +1765,7 @@ async function runPlanLoop(
           HELD_BACK_BY_CHIPS
         )
         convo.push(message)
-        failed = true
+        blocked = true
         continue
       }
       // …AND THE SAME FOR THE MONEY, for the same reason and with its own
@@ -1732,12 +1782,20 @@ async function runPlanLoop(
           HELD_BACK_BY_MONEY
         )
         convo.push(message)
-        failed = true
+        blocked = true
         continue
       }
-      const { message, ok } = await runToolCall(stepCtx, tc)
+      const { message, ok, terminal } = await runToolCall(stepCtx, tc)
       convo.push(message)
-      if (!ok) failed = true
+      // `terminal` is set by `refuseStep` and by nothing else - see its own
+      // comment. Reading it here rather than re-deriving the fence keeps the two
+      // from ever drifting apart: a new fence added inside `runToolCall` arrives
+      // here already terminal, and a new DOOR failure arrives already
+      // recoverable, without this line being touched.
+      if (!ok) {
+        if (terminal) blocked = true
+        else failed = true
+      }
       // STAGE TWO OF THE CATALOGUE, and the widening is decided HERE rather than
       // inside the tool. `load_tools` returns a receipt; what the model may
       // actually call next step is read off the call's OWN INPUT by the same loop
@@ -1748,7 +1806,21 @@ async function runPlanLoop(
       if (ok && tc.name === "load_tools" && Array.isArray(tc.input.names))
         for (const n of tc.input.names) if (typeof n === "string") loaded.add(n)
     }
-    if (failed) {
+    if (failed) failedSteps++
+    // THE RETRY, AND THE ONE LINE THAT MAKES IT SAFE. A fence ends the turn
+    // immediately - `blocked` is never granted a retry, whatever the budget says,
+    // which is what keeps `source-chip-gate.test.ts`'s invariant ("the refusal
+    // must come back ok:false so the turn stops and explains itself") true word
+    // for word. An ordinary failure ends it only once the budget is spent, so
+    // the model gets the failing result back in `convo` and another turn of the
+    // loop to do what it already said it would.
+    //
+    // NOTHING IS RE-RUN BY THIS CODE. The retry is the MODEL's: it sees the
+    // door's own error text and decides. So a write that failed is not attempted
+    // again behind anybody's back - the next attempt is a fresh decision with
+    // the failure in front of it, and every gate, confirm and fence it has to
+    // pass is unchanged.
+    if (blocked || failedSteps > RETRY_BUDGET) {
       // The model explains (unmetered): the FAILED reasons are in the convo, so the
       // reply says what was refused and why — not a canned "something went wrong".
       const note = await failureWrapUp(model, convo, toolsNow(), opts.tally)
