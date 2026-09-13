@@ -20,6 +20,60 @@ and costs one command each.
 
 ---
 
+## The night the corpus was asked whether it was whole, 13 Sep 2026
+
+The knowledge base had been rebuilt from the ground up over the preceding
+days and scored 36/47 on its own exam. Then the owner opened one meeting and
+said the transcript "seems to get cut off at a weird point," and the evening
+turned into a lesson about what a test built on a corpus cannot see.
+
+**The corpus was a quarter missing and nothing could tell.** Two ceilings cut
+the same text in series, and only the second one spoke. `capToRow` exists to
+trim a document to what a D1 row holds AND SAY SO — its own header states the
+rule as "never silently trimmed", not "never trimmed". It was never given the
+chance: `driveFileText` cut every Google read to 100,000 characters first,
+fifteen times below the row's own 1.5 MB, so `capToRow` was handed a short
+document every time and always answered "nothing was cut." Ten live sources
+sat at exactly the cap, each ending mid-word, every note column NULL. The
+11 September Jourfix is 410 KB in Drive and was 100 KB in the base. The read
+ceiling IS the row ceiling now, and the four meeting transcripts were re-read
+on the spot: +42,357, +20,943, +25,331 and +69,928 characters.
+
+**Why the exam never caught it, which is the part worth remembering.** Every
+answer key was written by reading what was in the base. A meeting only a
+quarter present produces a key written from that quarter, and the base scores
+full marks. A test derived from the thing it tests finds ranking mistakes for
+ever and cannot find an absence.
+
+**The assistant's chat was drawing its own prose.** `agent-markdown.tsx`'s
+header said replies were styled like every other rich text in the app; that
+stopped being true the day `PROSE` was narrowed and `RichText` moved onto the
+kit's `ArticleBody` without this renderer following. Preflight zeroes `p`
+margins and strips `ul` markers, so every reply had shipped with no paragraph
+rhythm and no list bullets — the model's markdown was correct all along and
+the page was throwing it away. Both writers also gained a layout rule, the
+bubble got its padding back, and a panel measured at 473 px inside a 375 px
+viewport got a width cap that names the viewport rather than a Radix popover's
+own circular `100%`.
+
+**Three lanes closed three more.** `query_records` declared `where` as a bare
+array with no `items`, so nothing taught the model the filter shape
+structurally; it sent positional triples, was refused, diagnosed itself
+correctly and still lost the turn. The schema now teaches the shape, the
+parser accepts the unambiguous tuple, and `account`/`app` joined the field
+aliases. The knowledge answer's `records` was the one place that skipped
+`recordPath()` — so the model was handed a source id in a namespace no door
+recognises and told the owner his meeting did not exist. And R71 landed: a
+step-chip label may never echo the internal module alias, after
+`describe_module` spent the evening saying "See what help can be asked" on a
+product with no help section.
+
+**Also gone:** the chat's file upload, at the owner's ruling. The entrance
+only — `run_import_batch`, its confirm payload, its MCP twin and the Import
+screen are all untouched.
+
+---
+
 ## The first review round pays out, 25–26 Aug 2026
 
 The three review skills ran against the finished audit-module build and the
