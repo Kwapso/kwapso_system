@@ -112,20 +112,71 @@ describe("a failed step is not the end of the turn, but a fence still is", () =>
     expect(budget, "a retry costs a model call; this is not a place to be generous").toBeLessThanOrEqual(3)
   })
 
-  it("the budget counts STEPS, not CALLS — positionally, not by grep", () => {
+  it("NOTHING between the loop and the decision may un-block a fenced turn", () => {
+    // FOUND BY A FRESH-EYES REVIEWER, 13 Sep 2026, and it is the most useful
+    // thing that review produced. It edited the real file to insert one line
+    // immediately after the counter:
+    //
+    //     if (blocked && failedSteps <= RETRY_BUDGET) blocked = false
+    //
+    // which silently turns an unticked source chip and R24's money taint back
+    // into retryable failures — the exact regression this file exists to
+    // prevent — and ALL EIGHT tests here still passed. Every assertion checked
+    // that something was PRESENT and correctly ordered; none checked that
+    // nothing HARMFUL sat in between. A test that can only see what is there
+    // cannot see what has been added.
+    //
+    // So this reads the span between counting and deciding and requires it to
+    // contain no assignment to `blocked` at all. `blocked` is written in exactly
+    // two places — both `= true`, both inside the per-call loop — and there is
+    // no legitimate reason for a third anywhere in this span.
+    const increment = LOOP.indexOf("if (failed) failedSteps++")
+    const exit = LOOP.indexOf("if (blocked || failedSteps > RETRY_BUDGET)")
+    expect(increment).toBeGreaterThan(0)
+    expect(exit).toBeGreaterThan(increment)
+    const between = LOOP.slice(increment + "if (failed) failedSteps++".length, exit)
+    expect(between, "nothing may reassign `blocked` before the decision reads it").not.toMatch(
+      /\bblocked\s*=/
+    )
+    // And the same for the counter: a reset here would hand a turn an unlimited
+    // supply of retries one step at a time.
+    expect(between, "nor may the counter be reset behind the budget's back").not.toMatch(
+      /\bfailedSteps\s*=[^=]/
+    )
+  })
+
+  it("the budget counts STEPS, not CALLS — by BRACE MATCHING, not by index order", () => {
     // THE HALF A STRING SEARCH CANNOT SEE. The owner's failing step held FOUR
     // refused calls. If the counter were incremented per call it would have
     // spent the entire budget inside the one step that earned the retry, and the
     // fix would have changed nothing for the case that motivated it.
+    // THE SECOND REVIEWER FINDING. This used to assert only that the increment's
+    // index fell between the loop's OPENING and the exit — which is also true of
+    // an increment sitting INSIDE the loop, i.e. the per-call counter this test
+    // is named for. The reviewer moved the line inside the `for` body and the
+    // test stayed green. An index between two markers is not a statement about
+    // nesting; brace matching is.
     const perCall = LOOP.indexOf("for (const tc of reply.toolCalls) {")
+    expect(perCall, "the per-call loop is still there").toBeGreaterThan(0)
+    const open = LOOP.indexOf("{", perCall)
+    let depth = 0
+    let close = -1
+    for (let i = open; i < LOOP.length; i++) {
+      if (LOOP[i] === "{") depth++
+      else if (LOOP[i] === "}") {
+        depth--
+        if (depth === 0) {
+          close = i
+          break
+        }
+      }
+    }
+    expect(close, "the per-call loop's own closing brace is findable").toBeGreaterThan(open)
     const increment = LOOP.indexOf("if (failed) failedSteps++")
     const exit = LOOP.indexOf("if (blocked || failedSteps > RETRY_BUDGET)")
-    expect(perCall, "the per-call loop is still there").toBeGreaterThan(0)
     expect(increment, "the counter is incremented once per step").toBeGreaterThan(0)
-    // The increment sits AFTER the per-call loop opens and BEFORE the exit — i.e.
-    // between the loop's close and the decision, which is the only position that
-    // counts one step once.
-    expect(increment).toBeGreaterThan(perCall)
+    // OUTSIDE the loop body, not merely after its first line.
+    expect(increment, "the counter must sit OUTSIDE the per-call loop").toBeGreaterThan(close)
     expect(increment).toBeLessThan(exit)
     // And it appears exactly once: a second increment anywhere is a per-call
     // counter wearing a per-step name.
