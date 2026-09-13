@@ -1015,6 +1015,15 @@ again, which is the only property that matters here.
   never look alike. Four censuses hold it: every branded send, every
   `triggers.crons` entry in your `wrangler.jsonc`, every export of a file whose
   whole job is acting by itself, and every flag read.
+- **R71 `agent-label-vocabulary`** — if your module's query-grammar entry (or any
+  tool schema you add) declares an argument spelled `module`, `table` or
+  `targetTable`, its `summarize()` must never print the raw argument straight
+  onto a step chip or a confirm panel. Route it through
+  `shared/workers/tool-catalog.ts`'s `queryLabel` (which wraps
+  `canonicalModule`) first — a tool description is free to tell the model about
+  an internal alias (`query-grammar.ts`'s `MODULE_ALIASES`), but nothing SPOKEN
+  to a person may say it. The check runs every tool's `summarize()` with the
+  alias poisoned and reads the label back.
 
 **The words** (the ones that catch every new module, every time)
 
