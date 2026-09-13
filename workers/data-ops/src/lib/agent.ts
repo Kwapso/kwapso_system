@@ -621,15 +621,60 @@ function fence(result: ToolResult, allowance?: number): string {
  *
  * It does not lower MAX_STEPS or end the turn. It replaces ONE call's result with
  * a sentence naming the cheaper route, so the model still has its remaining steps
- * and now has something to do with them. */
+ * and now has something to do with them.
+ *
+ * ── AND IT COUNTED THE CHEAPER ROUTE AGAINST ITSELF (13 Sep 2026) ───────────
+ *
+ * The counter was keyed on the tool's NAME alone. That was right when a module
+ * had its own list tool: five calls to `list_meetings` really were five goes at
+ * one collection. `query_records` is not that — it is the ONE read door for
+ * every module, so "the same tool" stopped meaning "the same question" and the
+ * guard started firing on people asking DIFFERENT ones.
+ *
+ * Measured on staging the day it was found. The owner asked "how many total open
+ * tickets (to be triaged) are there? and avg per account and per app? and how
+ * many more than 1 week old?" — which is four genuinely different questions and
+ * correctly four calls. The fifth tripped the limit, and from then on EVERY call
+ * came back as the nudge. The model read it, agreed with it out loud — "I'm
+ * being throttled on repeated calls, let me run one clean query at a time",
+ * then "let me try one fresh query now, the paging guard may have reset" — and
+ * was nudged again, eleven times, until MAX_STEPS ended the turn with no answer.
+ * A livelock: the nudge hands back `ok: true`, so nothing counts it as a failure
+ * and nothing stops it.
+ *
+ * WORSE, IT WAS NUDGING TOWARD WHAT THE MODEL WAS ALREADY DOING. The sentence
+ * recommends `total` and `groupBy` as the cheap route — and two of the calls it
+ * refused were `groupBy` calls. It told him to do the thing it had just stopped
+ * him doing, which is the shape of advice that cannot be followed.
+ *
+ * SO A COUNT OR A GROUPBY IS NOT A PAGE. Those two shapes ARE the cheaper route:
+ * they read no rows, they answer in one call, and no number of them is a walk
+ * through a collection. They are not counted and never nudged. A ROW READ still
+ * is, which keeps every tooth the 30 Aug case earned — those twelve
+ * `list_meetings` calls were all row reads and would all still be caught.
+ *
+ * The sentence's own claim — "each time for another page" — is true again. */
 const SAME_TOOL_LIMIT = 4
+
+/** THE TWO SHAPES THAT ANSWER WITHOUT READING ROWS, and so cannot be paging.
+ * `countOnly` asks for the number alone; `groupBy` asks for counts per client or
+ * per month. Both are what the nudge itself recommends. */
+function asksWithoutReadingRows(input: Record<string, unknown> | undefined): boolean {
+  if (!input) return false
+  if (input.countOnly === true) return true
+  return Array.isArray(input.groupBy) && input.groupBy.length > 0
+}
 
 export function pagingGuard() {
   const calls = new Map<string, number>()
   return {
     /** null to run normally, or the sentence to hand back instead. */
-    check: (write: boolean, name: string): string | null => {
+    check: (write: boolean, name: string, input?: Record<string, unknown>): string | null => {
       if (write) return null
+      // Neither counted nor refused — see the paragraph above. A turn made
+      // entirely of counts and groupBys can run to MAX_STEPS without ever
+      // meeting this guard, which is correct: it never read a row.
+      if (asksWithoutReadingRows(input)) return null
       const n = (calls.get(name) ?? 0) + 1
       calls.set(name, n)
       if (n <= SAME_TOOL_LIMIT) return null
@@ -1126,7 +1171,7 @@ async function runToolCall(
   // THE SAME TOOL AGAIN, ARGUMENTS NUDGED — see pagingGuard. The step row is still
   // emitted and still written, for the same reason the repeat above is: the model
   // really did ask, and a trail that hid it would make the next one invisible.
-  const nudge = t ? ctx.paging.check(!!t.write, tc.name) : null
+  const nudge = t ? ctx.paging.check(!!t.write, tc.name, tc.input) : null
   if (nudge !== null) {
     const capped = `${summary} — asked again; narrowing is cheaper than the next page`
     emit?.({ t: "step_start", tool: tc.name, summary: capped, ids: traceIds(tc.input) })
