@@ -442,10 +442,19 @@ export function readBudget(total = TURN_READ_CHARS) {
  * result is data the model must never take orders from (TOOL_RESULT_TAG, and the
  * system prompt that names it), and that has to hold for the sentences we write
  * ourselves too. */
-export function trimResult(data: unknown, allowance: number = RECORD_CHARS): string {
+export function trimResult(data: unknown, allowance: number = RECORD_CHARS, contract = false): string {
   const whole = typeof data === "string" ? data : JSON.stringify(data)
   if (whole === undefined) return "" // a door that answered with nothing at all
   if (whole.length <= RESULT_CHARS) return whole
+  // A CONTRACT IS NEVER A PAGE. Its entries are not alike and the first eight
+  // do not stand for the rest — a schema with its tail dropped is a list of
+  // fields that tells the model the ones it cannot see do not exist. It still
+  // obeys the turn's reading allowance (nothing here may read without bound);
+  // it simply is not row-trimmed to fit a page budget it was never a page for.
+  if (contract)
+    return whole.length <= allowance
+      ? whole
+      : `${whole.slice(0, allowance)}\n[Trimmed here: the result was longer than ${allowance} characters, so what is above is incomplete.]`
   const rows = data && typeof data === "object" && !Array.isArray(data) ? rowList(data) : null
   // A RECORD READ: few rows, and the text in them is what was asked for.
   if (rows && rows[1].length <= LIST_ROWS) return record(data as Record<string, unknown>, rows, allowance)
@@ -572,10 +581,14 @@ function rowList(data: object): [string, unknown[]] | null {
   return null
 }
 
-/** Tool result → the fenced DATA string the model sees. */
-function fence(result: ToolResult, allowance?: number): string {
+/** Tool result → the fenced DATA string the model sees.
+ *
+ * `whole` is the tool's own `wholeResult` — a CONTRACT rather than a page, which
+ * must never arrive with half of it dropped. See `wholeResult` in tools.ts for
+ * the turn that earned it. */
+function fence(result: ToolResult, allowance?: number, whole = false): string {
   return result.ok
-    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data, allowance)}`
+    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data, allowance, whole)}`
     : `FAILED: ${result.error ?? "unknown error"}`
 }
 
@@ -1242,7 +1255,7 @@ async function runToolCall(
   if (t?.write) {
     tally.actions.push(result.ok ? summary : `${summary} (failed)`)
   }
-  const content = fence(result, ctx.budget.allowance())
+  const content = fence(result, ctx.budget.allowance(), t?.wholeResult === true)
   ctx.budget.spend(content.length)
   // Only a result worth replaying is remembered: a failure is not the answer to
   // the question, and a retry after a bad minute is a reasonable thing to do.
