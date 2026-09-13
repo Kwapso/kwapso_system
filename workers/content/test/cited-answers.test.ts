@@ -69,7 +69,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       question: "what did we agree?",
       compartments: ["account:A1", "agency"],
       reason: "The question names Bergman S.A., so I searched Bergman S.A.'s material and the agency's own.",
-      records: [{ sourceId: "S1", title: "Bergman rollout note" }],
+      records: [{ sourceId: "S1", title: "Bergman rollout note", recordPath: null }],
       passages: [passage("S1", "Bergman rollout note", 0), passage("S1", "Bergman rollout note", 1), passage("S2", "Process: rollouts")],
       candidates: 12,
       reread: false,

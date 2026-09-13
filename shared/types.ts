@@ -1540,7 +1540,21 @@ export type KnowledgeAnswer = {
   /** what the record summaries say this question is ABOUT. Evidence for the
    * reader; deliberately NOT an input to the ranking — see §3 of
    * workers/content/src/lib/knowledge.ts. */
-  records: { sourceId: string; title: string }[]
+  records: {
+    sourceId: string
+    title: string
+    /** THE RECORD ITSELF, one hop past the source — the SAME field a passage
+     * and its citation carry (`recordPath` in `KnowledgePassage`/
+     * `KnowledgeCitation`), computed by the same `recordPath()` function.
+     * `records` is a knowledge SOURCE id, in a different namespace from the
+     * meeting/ticket/process id a caller reaches through every other door —
+     * a model that had only `sourceId` to go on once handed one to
+     * `get_meeting_transcript` and was told "that meeting doesn't exist",
+     * true of the source id and false of the meeting it named. Null where
+     * there is no record screen to open, same as everywhere else this field
+     * appears. */
+    recordPath: string | null
+  }[]
   passages: KnowledgePassage[]
   citations: KnowledgeCitation[]
   /** how many chunks the search considered (the bounded candidate set) */
