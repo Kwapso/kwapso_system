@@ -435,7 +435,21 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       },
       { name: "title", column: "title_en", type: "text" },
       { name: "description", column: "description", type: "text", bulky: true },
-      { name: "status", column: "status", type: "enum", values: HELP_STATUSES },
+      {
+        name: "status",
+        column: "status",
+        type: "enum",
+        values: HELP_STATUSES,
+        // THE SIGNPOST, and it is the difference between a module existing and a
+        // module being FOUND. Measured on staging 13 Sep 2026, minutes after
+        // `ticket_moves` shipped: asked "who has triaged the most tickets?" the
+        // assistant called describe_module on TICKETS, saw a status field with no
+        // actor beside it, and went off to search the knowledge base for how
+        // triage works — a module list it never read past. A model asks the
+        // module the question is ABOUT; nothing was going to make it guess that
+        // the answer lives in a second table unless the first one said so.
+        note: "where the ticket is NOW, and nothing more — WHO moved it here and WHEN is not on this row at all. Ask the ticket_moves module for that: it has one row per move with the person's name on it, and it is the only place that answers 'who triaged the most' or 'how many moved to X last month'",
+      },
       { name: "helpType", column: "help_type", type: "enum", vocabulary: "Ticket type" },
       {
         name: "raisedAsType",
