@@ -257,10 +257,30 @@ signed-in member): the same altitude as the activity feed's "imported N rows" li
 row contents and rejection reasons stay on the creator-scoped batch. Shown as
 "Past imports" on the Import screen.
 
-## 8.5 · Import straight from the assistant chat
+## 8.5 · Import straight from the assistant chat — THE ENTRANCE IS CLOSED
 
-The user can also **attach CSV files in the assistant panel** (paperclip or drop).
-The files go straight into the SAME batch engine. Never into the model prompt
+**The chat's file upload was removed on 13 Sep 2026** at the owner's ruling:
+*"the file upload feature is pretty useless, so let's get rid of that completely
+at the moment."* The paperclip, the hidden file input, the panel-wide drop zone
+and the staged-file strip are gone from `web/components/assistant/agent-panel.tsx`,
+and so is the client plumbing behind them.
+
+**What is described below still EXISTS and still works** — it simply has no door
+in the chat any more. `run_import_batch` is a live tool on the catalogue with its
+own gate, its confirm payload and its MCP twin, and the Import screen
+(`web/components/screens/import-screen.tsx`) takes a spreadsheet the ordinary
+way. The server half was left standing deliberately: pulling it would have meant
+re-reasoning R9/R13/R19/R22/R27 parity and the MCP twin's own exemption line for
+a feature the owner asked to hide *"at the moment"*. Putting the entrance back is
+one commit reverted rather than a rebuild.
+
+Read the rest of this section as the description of a mechanism that is wired and
+unreachable from the chat, not as a feature a person can use there today.
+
+---
+
+When the entrance existed, the user could **attach CSV files in the assistant
+panel** (paperclip or drop). The files went straight into the SAME batch engine. Never into the model prompt
 (injection-safe by construction): the app creates + plans the batch (metered one AI
 unit, exactly like the wizard's plan step), then hands the model a compact
 `ATTACHED-IMPORT-PLAN` block (tables, counts, what will be skipped and why, the

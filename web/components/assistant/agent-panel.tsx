@@ -745,6 +745,34 @@ export function AgentPanel({
                 // that the paperclip is gone (see the comment above this
                 // element for the measurement).
                 "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:pe-14",
+                // AND THE CARET NEEDS SOMEWHERE TO STAND (owner, 13 Sep 2026:
+                // "the cursor is barely visible whenever I click inside the
+                // empty input box... why not just shift the placeholder that
+                // says 'Ask about your work' a tiny bit to the right so the
+                // cursor can start a bit later and not get cut off?"). His
+                // diagnosis was right and so was his fix.
+                //
+                // MEASURED on staging before and after, not reasoned about:
+                // the textarea's `padding-inline-start` computed to 0px, so
+                // the caret painted at x=0 of the content box — the exact
+                // column the placeholder's own first glyph starts in. A caret
+                // is one or two device pixels and a browser draws it centred
+                // on that offset, so half of it lands outside the box and the
+                // other half sits ON the "A". Nothing is clipping the pill:
+                // the textarea already starts 23px inside it. The collision is
+                // between the caret and the TEXT, which is why widening the
+                // pill would not have helped and a colour change would not
+                // either.
+                //
+                // `ps-1.5` (6px) is the whole fix, and it moves BOTH — caret
+                // and placeholder shift together, so the gap the owner asked
+                // for opens in front of the words rather than inside them. Set
+                // here rather than on the pill because the pill's own
+                // `padding-inline-start` is the kit's (22.5px) and is doing a
+                // different job; this is the text's own inset. Verified live
+                // at 6px: the textarea still fits its pill with the `pe-14`
+                // strip intact, and the caret stands clear of the "A".
+                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:ps-1.5",
                 // ITEM (owner, 1 Sep 2026, on the text-write field
                 // specifically): "this is the color of the text write field
                 // #F7F2EB (like everywhere else!)". #F7F2EB is `--kw-soft-
