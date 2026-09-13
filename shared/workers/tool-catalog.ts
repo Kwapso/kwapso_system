@@ -28,6 +28,22 @@
 
 import { B, enumOf, N, obj, S, str } from "./tool-args"
 import { brand } from "../brand"
+import { canonicalModule } from "./query-grammar"
+
+/** THE WORD A PERSON READS, never the alias the model was told it could type.
+ * `describe_module`/`query_records` accept a module by any of its aliases
+ * (`help` reaches tickets — CLAUDE.md's own "don't finish the rename": the
+ * permission module, the table and the tool names stay `help` on purpose, but
+ * nothing spoken TO a person may). The step chip and the confirm panel build
+ * their label from the model's raw argument, so an alias the tool description
+ * itself invites the model to use ("`help` reaches tickets") would otherwise
+ * print verbatim on screen. `canonicalModule` is query-grammar's own answer to
+ * "what did they actually mean" — reused rather than re-derived, so this can
+ * never name a module the query engine itself would refuse. Falls back to the
+ * raw text for a name canonicalModule doesn't recognise (never silently blank),
+ * and a stray underscore (a raw canonical key like `work_logs`) reads as a
+ * space, because a label is a sentence, not a column name. */
+const queryLabel = (raw: string): string => (raw ? (canonicalModule(raw) ?? raw).replace(/_/g, " ") : "")
 
 /* ---------------------- the body builders a tool declares --------------------- */
 
@@ -305,7 +321,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildQuery: (i) => (str(i, "module") ? `?module=${encodeURIComponent(str(i, "module"))}` : ""),
     agent: {
       write: false,
-      summarize: (i) => (str(i, "module") ? `See what ${str(i, "module")} can be asked` : "See what can be queried"),
+      summarize: (i) =>
+        str(i, "module") ? `See what ${queryLabel(str(i, "module"))} can be asked` : "See what can be queried",
     },
   },
   {
@@ -347,8 +364,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       write: false,
       summarize: (i) =>
         Array.isArray(i.groupBy) && i.groupBy.length
-          ? `Count ${str(i, "module")} by ${(i.groupBy as unknown[]).join(" and ")}`
-          : `Look up ${str(i, "module")}`,
+          ? `Count ${queryLabel(str(i, "module"))} by ${(i.groupBy as unknown[]).join(" and ")}`
+          : `Look up ${queryLabel(str(i, "module"))}`,
     },
   },
   {

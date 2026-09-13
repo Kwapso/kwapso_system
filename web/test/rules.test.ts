@@ -4497,6 +4497,7 @@ describe("RULES — the laws of the base", () => {
     "pinned-toolbar", // R63: the seam guard + the toolbar-owner census (R53's own list, plus the portal's door-searched rows) + the nobody-hand-rolls-the-offset scan + the four declarations of --pinned-chrome-h, above
       "one-identity-per-source", // R68: workers/content/test/one-identity-per-source.test.ts — 0073's migration SQL for the partial unique index, plus a source census over workers/content/src for any identity_key write missing the identityKey() import
       "automations-are-visible", // R70: web/test/automations.test.ts — the automation registry against four derivations: R30's own branded-send census (shared/rules/email-sites.ts), every wrangler cron, every export of the files that exist only to act, and every automationOff("…") read in worker source
+      "agent-label-vocabulary", // R71: workers/data-ops/test/agent-label-vocabulary.test.ts — every summarize() poisoned with the `help` alias on its module/table/targetTable field, derived off the schema field name
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

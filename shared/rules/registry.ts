@@ -638,6 +638,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "automations-are-visible",
     status: "enforced",
   },
+  {
+    id: "R71",
+    dimension: "ai",
+    law: "A HUMAN-FACING LABEL SPEAKS THE APP'S WORD, NEVER THE ALIAS A TOOL DESCRIPTION OFFERED THE MODEL. `describe_module` and `query_records` accept a module by any of its aliases — their own description says so, in words: \"`help` reaches tickets\" — because CLAUDE.md's own \"don't finish the rename\" keeps `help` as the permission module, the table, the API path and the MCP tool names on purpose. Nothing stops the model reaching for exactly the word its tool description just offered it, and the agent's step chip / confirm panel built its label straight from that raw argument, so the alias printed VERBATIM on a screen the product has no section named after. Any `summarize()` in `shared/workers/tool-catalog.ts` that builds a label from a schema field spelled `module`, `table` or `targetTable` must route the value through `queryLabel` (which wraps query-grammar's own `canonicalModule`) before it reaches a sentence — never the raw argument.",
+    why: "The owner's own report, 13 Sep 2026, reading the assistant's step chips on staging verbatim: \"See what help can be asked\", \"Look up help\", \"Count help by account\", \"Count help by app\". A person reads those, and the product has no help section — it has Tickets, and CLAUDE.md is explicit that the rename stops at the door: the module, the table, the API path and the tool names stay `help`, but nothing SPOKEN to a person may. The bug was not a typo — the tool's own description tells the model \"`help` reaches tickets\", so the model was following an instruction the catalogue itself gave it, and the label-building code echoed that instruction's own word back onto the screen. The fix reuses `canonicalModule`, the query engine's own answer to \"what did they actually mean\", rather than re-deriving a second map that could drift from the door's — the same reuse-a-seam discipline CLAUDE.md's planning ritual asks for. Checked by RUNNING every tool's `summarize()` with a poisoned alias, derived off the schema field NAME rather than a hand-list of the two tools that leaked, so a future module's `module`/`table`/`targetTable` argument is covered without anyone updating this law — the same shape R22's body-parity proof stands on (prove it by calling the function, not by reading it).",
+    checkId: "agent-label-vocabulary",
+    status: "enforced",
+  },
 ]
 
 /** R66 — A PICTOGRAPH THAT IS THE CONTENT AND IS NOT A FLAG. Keyed by
