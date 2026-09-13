@@ -592,8 +592,17 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     // a caller holding `help:read` can already open any ticket and read the same
     // history off its stage strip.
     module: "help",
+    // THE SUMMARY CARRIES THE START OF THE TAPE, and that sentence is the point
+    // of the entry rather than a footnote on it. This table is APPEND-ONLY and
+    // it began on 7 Sep 2026: every ticket raised before then — the 1,820
+    // carried over from the old system among them — has no move history at all,
+    // and a ticket moved once since has exactly one row. So "who has triaged the
+    // most" has a real answer and it is a real answer ABOUT ONE WEEK. Without
+    // this line the door hands back a correct small number that reads as the
+    // whole picture, which is the one failure worse than refusing: a wrong
+    // answer nobody has any reason to doubt.
     summary:
-      "Every move a ticket made from one status to the next, with WHO moved it and WHEN. The ticket itself only remembers where it IS now, so this is the only place that answers 'who triaged the most', 'how many were triaged in July' or 'how long did it sit in new'. One row per move; a ticket has several.",
+      "Every move a ticket made from one status to the next, with WHO moved it and WHEN. The ticket itself only remembers where it IS now, so this is the only place that answers 'who triaged the most', 'how many were triaged in July' or 'how long did it sit in new'. One row per move; a ticket has several. RECORDING BEGAN ON 7 SEPTEMBER 2026 — there is nothing here before that date and nothing at all for tickets carried over from the old system, so say what window your answer covers whenever you count these rows.",
     labelColumn: "creator_name",
     defaultSort: "movedAt",
     fields: [
