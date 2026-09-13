@@ -49,6 +49,26 @@ export type AgentTool = {
   confirm: boolean | ((input: Record<string, unknown>) => boolean)
   /** never exposed actions guard (identity acts) — true = always refuse. */
   identityBlocked?: boolean
+  /** THIS RESULT IS A CONTRACT, NOT A PAGE — never drop part of it.
+   *
+   * `trimResult` calls anything with more than LIST_ROWS entries a LIST and
+   * keeps as many as fit in RESULT_CHARS, dropping the rest from the end. That
+   * is right for fifty tickets, where the rows are alike and the first few
+   * answer the question. It is wrong for a SCHEMA, where every entry is a
+   * different fact and the missing half is exactly what the caller asked for.
+   *
+   * Measured on staging, 13 Sep 2026, and it explains the whole shape of the
+   * failure. `describe_module("tickets")` answers with 18 fields — more than
+   * LIST_ROWS (8) — so it went down the page path with a 2,000-character
+   * budget and the tail of the field list was dropped. The model asked what
+   * fields tickets has, got a short answer with a note at the end, and then
+   * did the only thing left: it guessed. `triagedById`, then `assignedTo`,
+   * then `triagedBy`, then `triageBy`, each refused, each costing a step.
+   *
+   * It is the same fault the row-trim was WRITTEN for (a count cut off the end
+   * of a result, so the model asked again) reappearing one layer up, on the
+   * one result whose whole purpose is to tell the model what it may say. */
+  wholeResult?: boolean
   /** A SECOND GOOGLE SERVICE THIS DOOR READS, where its own path does not say so.
    * The source chips gate a Google tool by the service in its path
    * (`googleServiceOfPath`), which is the truth for twenty of the twenty-one
@@ -88,6 +108,12 @@ function toAgentTool(s: SharedTool): AgentTool {
     buildBody: s.buildBody,
     buildQuery: s.buildQuery,
     summarize: s.agent.summarize,
+    // A DESCRIBE ANSWER IS THE CONTRACT ITSELF — see `wholeResult`. Derived
+    // from the name rather than hand-listed on each tool, because what makes
+    // these two different is not a property somebody chose, it is what they ARE:
+    // every other tool answers a question ABOUT the data, and these two answer
+    // what may be asked. A third `describe_*` tool is covered the day it lands.
+    ...(s.name.startsWith("describe_") ? { wholeResult: true } : {}),
   }
 }
 
