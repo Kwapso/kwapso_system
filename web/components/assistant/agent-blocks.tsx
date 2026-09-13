@@ -143,7 +143,24 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
 function TableBlock({ block }: { block: Extract<AgentBlock, { kind: "table" }> }) {
   return (
     <BlockFrame title={block.title}>
-      <div className="rounded-[var(--radius)] bg-surface-panel">
+      {/* CONTAINMENT, NOT A SECOND SCROLLER. The comment above is right that the
+          kit's `Table` already wraps itself in `overflow-x-auto` — so this does
+          NOT add another one, which would nest two scroll boxes around one
+          table. What that wrapper lacks is the half `agent-markdown.tsx`
+          measured on its own tables (its long comment has the numbers): a
+          scroll box only scrolls when its width is decided by something other
+          than its contents, and every ancestor between here and the panel is a
+          shrink-to-fit flex item, so `w-full` resolved against a parent that
+          had already grown. The table's own `whitespace-nowrap` headers and
+          reference-number cells then sized the bubble and pushed the
+          conversation sideways — the owner's "on any screen size, I would never
+          like to scroll horizontally in the chat", 13 Sep 2026. `contain:
+          inline-size` makes this box's width independent of what is in it, so
+          the kit's scroller finally has something to scroll against. The 14rem
+          floor is for the one case containment breaks on its own: a reply that
+          is NOTHING but a table, where a contained box contributes no width and
+          the bubble collapses to its own padding. */}
+      <div className="w-full min-w-[14rem] contain-inline-size rounded-[var(--radius)] bg-surface-panel">
         <Table>
           <TableHeader>
             <TableRow>

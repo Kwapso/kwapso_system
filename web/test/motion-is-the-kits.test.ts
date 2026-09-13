@@ -45,22 +45,25 @@ const HAND_ROLLED =
 
 /** Pinned, with the reason each. Rot-checked below.
  *
- * EMPTY, and that is the point. The one pin here was `record-chrome.tsx`'s
- * `transition-[height]` on the collapsing sticky record header, and its own
- * reason ended "Delete this pin the day the kit draws one." That day is
- * 2026-08-27: the header is the kit's `RecordChrome` now and the hand-rolled
- * collapse went with it, so the pin described nothing and this check said so
- * before anybody read the diff. The list can only shrink. */
-const HAND_ROLLED_OK: Record<string, string> = {
-  "web/components/assistant/agent-markdown.tsx":
-    "the assistant's rendered links transition `text-decoration-color` (rest " +
-    "`decoration-hair-strong`, hover `decoration-current`) — the one ink-swap " +
-    "case `motion-hover` does not cover (motion.css §13 lists background-color/" +
-    "border-color/color/fill, not text-decoration-color), so swapping the class " +
-    "would drop the transition rather than reuse it. Same duration/easing tokens " +
-    "(`--duration-colour`, `ease-kwapso`) as `motion-hover` itself, copied " +
-    "verbatim rather than re-derived per this file's own header note.",
-}
+ * EMPTY, and that is the point. It has now emptied TWICE, both times because
+ * the hand-rolled thing was replaced by a kit part rather than because anybody
+ * came looking for the pin.
+ *
+ * The first was `record-chrome.tsx`'s `transition-[height]` on the collapsing
+ * sticky record header, whose own reason ended "Delete this pin the day the kit
+ * draws one" — 2026-08-27, when the header became the kit's `RecordChrome`.
+ *
+ * The second was `agent-markdown.tsx`'s link transition. It described a
+ * `text-decoration-color` swap on the assistant's rendered links, hand-rolled
+ * because `motion-hover` covers background-color/border-color/color/fill and
+ * not that property — and the whole rule it belonged to was a VERBATIM COPY of
+ * `ArticleBody`'s own link treatment, kept (in that file's words) "so the two
+ * renderers say the same thing about a link once the kit ever unifies them".
+ * They were unified on 2026-09-13: the assistant's prose is drawn by
+ * `ArticleBody` now, the copy was deleted, and the transition went with it — to
+ * the kit's own identical one. So the pin described nothing, and this check
+ * said so before anybody read the diff. The list can only shrink. */
+const HAND_ROLLED_OK: Record<string, string> = {}
 
 describe("motion is the kit's, everywhere", () => {
   /** Both front doors and the host seams they share. `shared/ui/` is NOT walked:

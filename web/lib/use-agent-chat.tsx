@@ -5,7 +5,7 @@
 // resume via localStorage and cross-device resume via the server's newest
 // thread), the SSE stream consumer (text deltas, live step rows, the confirm
 // pause, the terminal settle), the broken-stream re-sync (show the SAVED truth,
-// never a false failure), staged file attachments (the chat import), and the
+// never a false failure), and the
 // send / confirm-resolve / new-chat / open-thread actions.
 
 import * as React from "react"
@@ -37,13 +37,11 @@ export type AgentChatItem =
   | (AgentChatMessage & { evidence?: TurnEvidence; createdAt?: string })
   | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
 import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
-import { toast } from "@shared/ui/components/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, ModelFailure, PendingCall } from "@shared/types"
 import { evidenceFromSaved, mergeEvidence, type TurnEvidence } from "@shared/agent-cites"
 import { SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
-import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
 import { traceFor } from "@/lib/agent-trace"
 import { emitTrace } from "@/lib/screen-trace"
@@ -63,7 +61,7 @@ const newId = () => `m${++nextId}`
    window crosses that width, or a tablet rotates through it (many sit
    exactly at 768px in portrait). Every field below used to be a plain
    `React.useState` owned by that one component instance, so crossing the
-   width silently destroyed the transcript, the thread, staged attachments
+   width silently destroyed the transcript, the thread
    and a confirm the assistant was mid-way through waiting on — with nobody
    told; the panel just came back empty.
 
@@ -113,7 +111,6 @@ function makeCell<T>(initial: T) {
 
 const itemsCell = makeCell<AgentChatItem[]>([])
 const threadIdCell = makeCell<string | undefined>(undefined)
-const attachedCell = makeCell<{ name: string; csv: string }[]>([])
 const sourcesCell = makeCell<string[]>([...SOURCE_CHIP_KEYS])
 const busyCell = makeCell(false)
 const quotaCell = makeCell<AgentQuota | null>(null)
@@ -191,7 +188,10 @@ const toChatItems = (messages: AgentMessage[]): AgentChatItem[] => {
       return {
         id: m.id,
         role: m.role,
-        content: <AgentMarkdown text={m.content ?? ""} />,
+        // `onInverse` — your own bubble is an inverse fill and the assistant's
+        // is not, and the prose registers paint absolute inks. See the comment
+        // over PROSE_RHYTHM in agent-markdown.tsx.
+        content: <AgentMarkdown text={m.content ?? ""} onInverse={m.role === "user"} />,
         evidence,
         createdAt: m.createdAt,
       }
@@ -222,17 +222,13 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   const t = useT()
   // Every field below reads/writes the module-level cells above, NOT a local
   // `React.useState` — see the block comment there for why: it is what lets
-  // the transcript, the thread, staged attachments and a pending confirm
+  // the transcript, the thread and a pending confirm
   // survive AgentHost swapping this hook's own component out from under it
   // when the docked/floating breakpoint crosses.
   const items = itemsCell.useValue()
   const setItems = itemsCell.set
   const threadId = threadIdCell.useValue()
   const setThreadId = threadIdCell.set
-  // CSV files staged for the NEXT message (the chat import): picked or dropped,
-  // sent with the message, planned server-side, run via the normal confirm panel.
-  const attached = attachedCell.useValue()
-  const setAttached = attachedCell.set
   // WHICH DOORS THIS CONVERSATION READS FROM — the source chips.
   //
   // ALL ON is the state a person who has never touched them is in, and the wire
@@ -554,60 +550,30 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     }
   }
 
-  async function addAttachments(list: FileList | null) {
-    if (!list || !list.length || busy) return
-    const next = [...attached]
-    for (const file of Array.from(list)) {
-      if (next.length >= 8) {
-        toast.error(t("Attach up to 8 files at a time."))
-        break
-      }
-      try {
-        const csv = await fileToCsv(file)
-        if (csv.length > 5_000_000) {
-          toast.error(`"${file.name}" is too large (up to about 5 MB).`)
-          continue
-        }
-        next.push({ name: file.name, csv })
-      } catch (err) {
-        toast.error(err instanceof UserFileError ? err.message : `Couldn't read "${file.name}".`)
-      }
-    }
-    setAttached(next)
-  }
-
-  function removeAttachment(index: number) {
-    setAttached((prev) => prev.filter((_, j) => j !== index))
-  }
-
   async function send(text: string) {
     if (busy) return
     // Before anything is appended: from here on, a resume that was already in
     // flight must leave this panel alone.
     started = true
     const assistantId = newId()
-    const files = attached.length ? attached : undefined
-    // Same attachment note the server saves, so the optimistic bubble matches history.
-    const shown = files ? `${text}\n(Attached: ${files.map((f) => f.name).join(", ")})` : text
     // Optimistic: the user's message appears instantly, and an empty assistant row
     // carries the animated 3-dot indicator (showTyping) until reply text streams.
     const now = new Date().toISOString()
     setItems((prev) => [
       ...prev,
-      { id: newId(), role: "user", content: shown, createdAt: now },
+      { id: newId(), role: "user", content: text, createdAt: now },
       { id: assistantId, role: "assistant", content: "", createdAt: now },
     ])
     setBusy(true)
     setPending(null)
     setFailure(null)
-    setAttached([])
     try {
       // The ticked set rides every turn. Sent only when it is a real narrowing:
       // all-on is the same request the panel made before the chips existed.
       const narrowed = sources.length < SOURCE_CHIP_KEYS.length ? sources : undefined
       await consume(
         (onEvent) =>
-          dataOps.agentChatStream({ message: text, threadId, files, sources: narrowed }, onEvent),
+          dataOps.agentChatStream({ message: text, threadId, sources: narrowed }, onEvent),
         assistantId
       )
     } catch (err) {
@@ -753,7 +719,6 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   return {
     items,
     threadId,
-    attached,
     busy,
     quota,
     pending,
@@ -763,8 +728,6 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     confirmSteps,
     quotaLabel,
     usageSummary,
-    addAttachments,
-    removeAttachment,
     sources,
     toggleSource,
     send,
