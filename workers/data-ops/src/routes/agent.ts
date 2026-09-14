@@ -203,10 +203,14 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
   const body = (await request.json().catch(() => ({}))) as {
     threadId?: unknown
     message?: unknown
+    continue?: unknown
     files?: unknown
     sources?: unknown
   }
-  const message = requireText(body.message, "Message", TEXT_LIMITS.message)
+  // CARRY ON: the last turn ran out of its request and the client is asking
+  // for the next segment. No message then — the question is already saved.
+  const carryOn = body.continue === true
+  const message = carryOn ? "" : requireText(body.message, "Message", TEXT_LIMITS.message)
   const threadId = optionalText(body.threadId, "Thread", 64)
   // Attached CSVs (the chat import): validated here at the boundary; the batch
   // engine re-enforces its own caps (file count, rows, bytes) when they're added.
@@ -242,7 +246,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
   const sources = Array.isArray(body.sources)
     ? body.sources.filter((k): k is string => typeof k === "string" && SOURCE_CHIP_KEYS.includes(k))
     : undefined
-  const opts = { threadId, message, source: callerSurface(user), files, sources, language: user.language }
+  const opts = { threadId, message, continue: carryOn, source: callerSurface(user), files, sources, language: user.language }
   if (wantsStream(request))
     return streamRun(env, (emit) => runChat(env, request, cfg, guard, actor, opts, emit))
   return json(await runChat(env, request, cfg, guard, actor, opts))
