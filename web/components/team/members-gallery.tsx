@@ -408,9 +408,25 @@ export function MembersGallery({
           on the page is this module's seven emails (R70, client 2026-09-11:
           *"I want no automation without visibility"*), three of which are the
           SIGN-IN messages, which belong to no module and are filed here because
-          this is the module about the people they are sent to. */}
-      <div className="flex items-center justify-between gap-2">
-        <Headline as="h2" size="h4">
+          this is the module about the people they are sent to.
+
+          THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
+          "remove members and roles titles too", read together with the same
+          day's Settings-tabs principle ("we will use the title only at the
+          top"). Both this section and Roles below sit inside ONE tab panel
+          already named "Team" (Radix's own tabpanel→tab `aria-labelledby`),
+          so that single name cannot tell a reader which of the two stacked
+          collections they are in — unlike Automations or Integrations, which
+          are the only collection on their own tab and lose nothing by going
+          fully headless. Keeping `<Headline as="h2">` as a real (if visually
+          hidden) heading, rather than an `aria-label` on `TeamPanel`'s own
+          `<section>`, is the kit's `sr-only` route the brief asks for: a
+          screen reader's heading list still reads "Members" then "Roles", a
+          sighted reader reads nothing extra, and R67's subject (the
+          `<section>` tag, containment only, no heading required since its
+          2026-09-11 amendment) is unaffected either way. */}
+      <div className="flex items-center justify-end gap-2">
+        <Headline as="h2" size="h4" className="sr-only">
           {t("Members")}
         </Headline>
         <ModuleSettingsGear teamId={teamId} segment="members" />

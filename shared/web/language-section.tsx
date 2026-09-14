@@ -9,26 +9,46 @@
 // it live: "What I meant by language first was inside the container, just to
 // make it the top section: Language · Size · Appearance · Background." One
 // container, four sections, in that order. So this file no longer draws a
-// `SettingsSection` of its own — that was the bug — and is now the same shape
-// as `ScaleSection` / `ThemeSection` / `SpineSection`: a bare micro-label plus
-// its control, meant to stand as the first group inside `AppearancePanel`'s
-// one box (`shared/web/appearance-panel.tsx`), which is where it is mounted
-// now. `settings-screen.tsx` no longer renders this component directly.
+// `SettingsSection` of its own — that was the bug — and stands as the first
+// group inside `AppearancePanel`'s one box (`shared/web/appearance-panel.tsx`),
+// which is where it is mounted now. `settings-screen.tsx` no longer renders
+// this component directly.
 //
-// WHY THE CONTROL COLUMN, NOT ABOVE THE PREVIEW ROW. `AppearancePreview`
-// pictures Size, Appearance and Background only — a language has no visual
-// analogue to preview (see the kit component's own header) — so there are two
-// places "top" could mean: a full-width row above the preview+controls grid,
-// or the first entry in the compact control column beside the preview. This
-// file (and `AppearancePanel`) takes the second reading. Her own list —
-// "Language · Size · Appearance · Background" — is a flat run of four
-// sections, the same shape Size/Appearance/Background already are in that
-// column; a full-width band above the grid would draw Language as a
-// DIFFERENT kind of thing from its three neighbours, which is a layout
-// decision she did not ask for. The sticky preview does not care which
-// control sits first above it — it already renders unmoved while any of the
-// three below it are picked — so nothing about the preview's own behaviour
-// changes by Language sitting over them instead of beside the box.
+// A PILL ROW NOW, MATCHING ITS THREE NEIGHBOURS — THIRD RULING, SAME DAY.
+// "Also, make the language choice also be like the rest: size, appearance,
+// background." Size/Appearance/Background all draw through
+// `AppearancePillGroup` (`shared/web/appearance-pill-group.tsx`); this control
+// drew the library's `<Select>` instead, the one row in the panel that did not
+// match its neighbours. `LANGUAGES` (`shared/i18n.ts`) is four entries, which
+// is exactly the shape a pill row is for — the twenty-nine-language argument
+// against pills, recorded below, does not apply to four. EACH PILL STILL
+// CARRIES ITS FLAG, in the swatch position the other three groups use for
+// their own colour mark (`AppearancePillOption.swatch`), so the four rows line
+// up. AND THE COVERAGE FIGURE IS KEPT, not dropped in the conversion: the old
+// `<Select>` said `{pct}%` beside a language only once its dropdown was OPEN;
+// a pill row has no closed state to hide it behind, so the same figure now
+// sits on every pill that needs it, visible without a click — closer to what
+// "so a person choosing needs it" (below) was actually asking for than the
+// menu it used to hide behind.
+//
+// LANGUAGE STAYS INSTANT — RULED ON DIRECTLY, NOT AN OVERSIGHT. Size,
+// Appearance and Background all became PENDING this same day (see
+// `AppearancePanel`'s own header): a press only moves the preview, and
+// nothing outside this tab changes until Save. Language was asked to stage
+// the same way and the asymmetry was put to her plainly — the preview shows a
+// chip, a title and a lorem body, none of which read differently in another
+// language, so staging Language would show her nothing changing while she
+// waited to press Save. Her answer: "keep language instant." So this control
+// alone keeps its pre-existing contract — `choose()` below still applies the
+// instant the pill is pressed and persists right behind it, exactly as it did
+// before Size/Appearance/Background staged — and it is NOT part of
+// `AppearancePanel`'s dirty/Save/Discard state: picking a language never
+// arms Save, and Discard never touches it. THE NEXT READER'S OWN INSTINCT
+// WILL BE TO "FIX" THIS BY FOLDING LANGUAGE INTO THE PENDING STATE, because
+// four pill rows that look alike and behave differently is the one thing
+// about this panel that reads as unfinished. It is not: it is the client's
+// own ruling, asked for directly and answered directly, and folding it back
+// in would be reverting a decision rather than completing one.
 //
 // NO SUBTITLE, THE 2026-09-14 preview-led RULING. She quoted this section's
 // own two sentences back verbatim and asked for them gone: "remove subtitle
@@ -39,11 +59,8 @@
 // own default ("no subtitle under a heading, unless she asks") is the reading
 // that explains why she saw ONE subtitle to name where this file drew three
 // sentences: they are the same shape, stacked. THE COVERAGE NUMBER IS NOT
-// LOST, only its own sentence — the option list below already carries it
-// per-language (`{pct}%` beside every row still learning the words), which
-// is where somebody CHOOSING a language needs it; the sentence existed to
-// tell somebody who had ALREADY chosen, which the badge on the trigger's own
-// resting row no longer needs to spell out in prose.
+// LOST, only its own sentence — see the pill-row note above for where it
+// lives now.
 //
 // IT SPENT THREE WEEKS ON THE PROFILE PAGE (17 Aug – 10 Sep 2026), on the
 // reading that a reading language is about a PERSON and Settings is about the
@@ -56,43 +73,21 @@
 // for "change my name" can still find them.
 //
 // The portal has no settings screen by design, so its own switcher is the
-// compact `language-menu.tsx` in the header. That one did not move.
+// compact `language-menu.tsx` in the header. That one did not move, and did
+// not become a pill row — it is a header control, not a Settings section, and
+// was never part of either ruling above.
 //
-// ONE DROPDOWN, NOT TWENTY-NINE BUTTONS. It began as a button per language,
-// wrapping, on the argument that a dropdown hides every choice but the current
-// one behind a click. That argument was right when the list was the agency's own
-// four; it stopped being right at twenty-nine, where the wrapped row was six
-// lines of flags that pushed the rest of Settings off the screen and read as
-// clutter rather than as a choice. A dropdown is one line at rest and the whole
-// list when it is open, which is the correct trade once the list is longer than
-// a person can take in at a glance.
-//
-// It is the LIBRARY's Select (R3 — nothing here hand-rolls a menu), and it stays
-// legible to somebody who cannot yet read a word on this screen: the flag, the
-// language's own name for itself, and its English name beside it, so a person
-// who knows their language only as "Punjabi" and a person who scans for ਪੰਜਾਬੀ
-// both find the row.
-//
-// HOW COMPLETE EACH LANGUAGE IS, still said, but only in the list now (see the
-// no-subtitle note above) — a bare `{pct}%` beside every row still learning
-// the words, where somebody choosing needs it.
-//
-// OPTIMISTIC, THEN PERSISTED. The choice re-renders the app instantly and the
-// save follows. If the save fails the language snaps back and says so, in the
-// language they were reading a moment ago rather than the one they asked for —
-// because the one they asked for is precisely what did not happen.
+// OPTIMISTIC, THEN PERSISTED — UNCHANGED, SEE "LANGUAGE STAYS INSTANT" ABOVE.
+// The choice re-renders the app instantly and the save follows. If the save
+// fails the language snaps back and says so, in the language they were
+// reading a moment ago rather than the one they asked for — because the one
+// they asked for is precisely what did not happen.
 
 import * as React from "react"
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
+import { AppearancePillGroup, type AppearancePillOption } from "./appearance-pill-group"
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"
 
@@ -111,13 +106,12 @@ export function LanguageSection({
   const { lang, setLang, t } = useLanguage()
   const [saving, setSaving] = React.useState(false)
   const done = React.useMemo(() => coverage(), [])
-  const current = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0]
 
   /** How much of the app this language can say, as a whole number — or null for
    * English, which IS the key and is therefore complete by definition. Saying
-   * "100% translated" under English would be noise. Read by the list below,
-   * per row — the one place this number is still said now that the sentence
-   * under the control is gone (see the header). */
+   * "100% translated" under English would be noise. Read per pill below, the
+   * one place this number is still said now that the sentence under the
+   * control is gone (see the header). */
   const percent = (code: string): number | null =>
     code === "en" ? null : Math.round((done[code as keyof typeof done] ?? 0) * 100)
 
@@ -144,6 +138,30 @@ export function LanguageSection({
     }
   }
 
+  // PILLS: flag in the swatch position (matching Background's own colour
+  // mark), the language's own name for itself, its English name beside it
+  // where the two differ, and the completion figure where it is under 100 —
+  // the same three facts the old trigger + dropdown carried, now all on one
+  // row instead of split between a closed control and an opened menu.
+  const options: readonly AppearancePillOption[] = LANGUAGES.map((l) => {
+    const pct = percent(l.code)
+    return {
+      value: l.code,
+      label: (
+        <span className="flex items-center gap-1.5">
+          <span>{l.native}</span>
+          {l.english !== l.native && (
+            <span className="text-muted-foreground text-xs">{l.english}</span>
+          )}
+          {pct !== null && pct < 100 && (
+            <span className="text-muted-foreground text-xs tabular-nums">{pct}%</span>
+          )}
+        </span>
+      ),
+      swatch: <span aria-hidden>{l.flag}</span>,
+    }
+  })
+
   return (
     /* R72 (no subtitle under a heading, unless she asked): the two sentences
        that used to stand here — one above the control, one below it — are
@@ -154,41 +172,13 @@ export function LanguageSection({
        control itself. */
     <div className="flex flex-col gap-2">
       <h3 className="text-muted-foreground text-micro uppercase">{t("Language")}</h3>
-      <Select value={lang} onValueChange={(next) => void choose(next as Language)} disabled={saving}>
-        <SelectTrigger className="sm:max-w-xs" aria-label={t("Language")}>
-          <SelectValue>
-            <span className="flex items-center gap-2 truncate">
-              <span aria-hidden>{current.flag}</span>
-              <span>{current.native}</span>
-              {current.english !== current.native && (
-                <span className="text-muted-foreground text-xs">{current.english}</span>
-              )}
-            </span>
-          </SelectValue>
-        </SelectTrigger>
-        {/* LANGUAGES' own order: the agency's own four first, then the world's
-         * by how many people speak them. The order is the engine's decision,
-         * not this screen's — see shared/i18n.ts. */}
-        <SelectContent>
-          {LANGUAGES.map((l) => {
-            const pct = percent(l.code)
-            return (
-              <SelectItem key={l.code} value={l.code}>
-                <span className="flex items-center gap-2">
-                  <span aria-hidden>{l.flag}</span>
-                  <span>{l.native}</span>
-                  {l.english !== l.native && (
-                    <span className="text-muted-foreground text-xs">{l.english}</span>
-                  )}
-                  {pct !== null && pct < 100 && (
-                    <span className="text-muted-foreground text-xs tabular-nums">{pct}%</span>
-                  )}
-                </span>
-              </SelectItem>
-            )
-          })}
-        </SelectContent>
-      </Select>
+      <AppearancePillGroup
+        options={options}
+        value={lang}
+        disabled={saving}
+        onValueChange={(next) => void choose(next as Language)}
+        ariaLabel={t("Language")}
+      />
     </div>
   )
 }

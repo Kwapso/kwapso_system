@@ -14,30 +14,39 @@
 // mechanism (one root font size, nothing added or removed) at a size worth
 // looking at instead of three 58px thumbnails.
 //
-// `onChosenChange` IS NEW AND IS THE WHOLE POINT: the preview beside this
-// group has to know what is chosen the instant a card is pressed, before the
-// save round-trip settles — the same "instant, then persisted" contract this
-// file already keeps for the person pressing the card, extended one level up
-// so the picture is never a frame behind the control that drives it.
+// STAGED, SAME DAY, SECOND RULING. "We need … some kind of save button so
+// that I can first preview it and, once I'm happy with what I see, implement
+// it across the app." This component used to be OPTIMISTIC — a press resized
+// the whole app immediately (`applyScale` on `<html>`) and the save followed,
+// reverting the size if it failed. That contract is gone: this file no
+// longer holds any state, calls `applyScale`, calls `save`, or shows a toast.
+// It is now a plain, controlled pill row — `value` is the PENDING step,
+// `onChange` asks `AppearancePanel` to hold a different one — and the panel
+// is the one place that seeds the pending step from the person's saved row,
+// calls `applyScale` and the `save` prop it is handed, and shows the result,
+// all on Save. See that file's own header for the fuller account.
 //
-// OPTIMISTIC, THEN PERSISTED, exactly as before. A card presses, the size
-// resizes instantly and the save follows; if the save fails the size snaps
-// back and says so. The preference lives on the person's own row, so it
-// follows them between devices rather than living in one browser
-// (UI-RULEBOOK S4), and it is the ONLY way to make this app bigger, because
-// the viewport is locked against pinch-zoom (S5).
+// `onChosenChange` IS GONE. It existed to tell the shared preview what was
+// chosen the instant a card was pressed, before the save settled. Now that
+// this component takes its pending value as a controlled `value` prop, the
+// panel already has that value the moment it changes state — there is
+// nothing left for a callback to forward.
+//
+// `applyScale` SURVIVES, EXPORTED, BUT NO LONGER CALLED FROM THIS FILE. It is
+// still the one function that puts a scale on the document
+// (`web/components/shell/app-shell.tsx` calls it on load, from the person's
+// SAVED preference) and `AppearancePanel` now calls it too, once, on Save —
+// never from a press in this file any more.
 
 import * as React from "react"
-
-import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { AppearancePillGroup, type AppearancePillOption } from "./appearance-pill-group"
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"
 
 /** Put the size on the document. One place, called by the provider on load and
- * by a click before the save, so the screen and the stored preference can never
- * be two different sizes for longer than one request. */
+ * by `AppearancePanel` on Save, so the screen and the stored preference can
+ * never be two different sizes for longer than one request. */
 export function applyScale(value: string | null | undefined, door: "agency" | "portal"): void {
   if (typeof document === "undefined") return
   document.documentElement.style.fontSize = `${scaleFontSize(value, door)}px`
@@ -56,49 +65,22 @@ export function previewScaleStep(value: string | null | undefined): "compact" | 
 }
 
 export function ScaleSection({
-  /** what the person currently reads at, from their own session row */
+  /** The PENDING step — `AppearancePanel`'s own state, not this component's.
+   * Never applied to the document by this file any more. */
   value,
-  /** Persist the choice. The agency app passes its own `auth.setScale`. */
-  save,
-  /** which front door's baseline the steps mean */
-  door = "agency",
-  /** Told the resting value on mount and again on every press, so the
-   * shared preview beside this group is never a frame behind it. */
-  onChosenChange,
+  /** A different card was pressed. The panel decides what happens next —
+   * update the pending value, and nothing else, until Save. */
+  onChange,
+  /** True while `AppearancePanel`'s own Save is in flight — frozen for the
+   * same reason a `saving` press used to freeze this row, just decided one
+   * level up now that the commit is the panel's, not this row's. */
+  disabled = false,
 }: {
-  value: string | null
-  save: (scale: string) => Promise<unknown>
-  door?: "agency" | "portal"
-  onChosenChange?: (value: string) => void
+  value: string
+  onChange: (next: string) => void
+  disabled?: boolean
 }) {
   const { t } = useLanguage()
-  // The chosen step is local so the buttons answer instantly; the session row
-  // catches up when `me` is re-read. Seeded from the session, and re-seeded if
-  // another device changes it while this tab is open.
-  const [chosen, setChosen] = React.useState(value)
-  const [saving, setSaving] = React.useState<string | null>(null)
-  React.useEffect(() => setChosen(value), [value])
-
-  const resting = chosen ?? SCALE_STEPS[1].value
-  React.useEffect(() => onChosenChange?.(resting), [resting, onChosenChange])
-
-  async function choose(next: string) {
-    if (next === chosen || saving) return
-    const previous = chosen
-    setChosen(next)
-    applyScale(next, door)
-    setSaving(next)
-    try {
-      await save(next)
-      toast.success(t("Size changed."))
-    } catch {
-      setChosen(previous)
-      applyScale(previous, door)
-      toast.error(t("That didn't save. Try again."))
-    } finally {
-      setSaving(null)
-    }
-  }
 
   // PILLS: no picture, no per-option description, no swatch — the live
   // preview beside this group carries the picture and Size has no colour of
@@ -114,9 +96,9 @@ export function ScaleSection({
       <h3 className="text-muted-foreground text-micro uppercase">{t("Size")}</h3>
       <AppearancePillGroup
         options={options}
-        value={resting}
-        disabled={saving !== null}
-        onValueChange={(next) => void choose(next)}
+        value={value}
+        disabled={disabled}
+        onValueChange={onChange}
         ariaLabel={t("Size")}
       />
     </div>

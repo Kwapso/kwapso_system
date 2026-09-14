@@ -132,8 +132,20 @@ export function ModuleAutomations({
    * custom properties for. Still a string and never a node, still drawn
    * inside the paper above everything else in the box: client, 2026-09-11,
    * "ticket types should be on top of the searchbar inside the container
-   * without subtitle, make this. always". */
-  title: string
+   * without subtitle, make this. always".
+   *
+   * OPTIONAL SINCE 2026-09-14, for the ONE mounting that has no module of
+   * its own to name: Settings › Automations (the `scope: "all"` call in
+   * settings-screen.tsx) sits directly under a tab already labelled
+   * "Automations" — the client's ruling that a container heading repeating
+   * its own tab strip says the word twice ("we will use the title only at
+   * the top"). `<ToolbarRow title>` already treats an absent title as "draw
+   * nothing" (its own `heading` const), so omitting it here needs no change
+   * there. The per-module mounting (module-settings-screen.tsx) keeps
+   * passing a real title — that page's own section name, not a tab repeat,
+   * and the thing that tells its Automations section apart from its
+   * Vocabulary one. */
+  title?: string
   /* NO `description`. It was the same fourteen-word sentence on all seven of
    * this component's mountings — "What this module does on its own. Some can be
    * switched off; the rest say why not." — and every row below already says
@@ -188,7 +200,13 @@ export function ModuleAutomations({
   const moduleOptions =
     scope.kind === "all" ? scope.modules.filter((m) => rows.some((a) => a.segment === m.segment)) : []
   const moduleTitle = (rowSegment: string): string =>
-    scope.kind === "all" ? (scope.modules.find((m) => m.segment === rowSegment)?.title ?? rowSegment) : title
+    scope.kind === "all"
+      ? (scope.modules.find((m) => m.segment === rowSegment)?.title ?? rowSegment)
+      : // The module-scoped mounting always passes a real `title` (its own
+        // settings page's section name); `title` only goes missing on the
+        // `"all"` mounting above, whose branch never reaches here. `?? rowSegment`
+        // is defensive, matching the sibling branch's own fallback, not a real path.
+        (title ?? rowSegment)
 
   // THE STORED BLOB, READ PER ROW'S OWN SEGMENT rather than one segment fixed
   // for the whole screen — a scoped mounting has exactly one and the

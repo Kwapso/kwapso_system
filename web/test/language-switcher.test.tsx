@@ -1,23 +1,40 @@
 // THE TWO LANGUAGE SWITCHERS — one shape rule and one sentence rule.
 //
-// THE SHAPE. Twenty-nine languages arrived as twenty-nine buttons, wrapping to
-// six lines of flags across the middle of Settings. The control is a Select now,
-// and it is the LIBRARY's Select (R3: nothing in this app hand-rolls a menu, and
-// a row of buttons that behaves like one is the shape R3 was written about). The
-// portal's compact twin is the library DropdownMenu for the same reason.
+// THE SHAPE, REWRITTEN 2026-09-14. Twenty-nine languages once arrived as
+// twenty-nine buttons, wrapping to six lines of flags across the middle of
+// Settings — the reason Settings moved to a Select in the first place, and
+// the reason this file used to assert one. `LANGUAGES` is FOUR entries now
+// (shared/i18n.ts's own header: "the twenty-five were only ever LARGE"), and
+// the client ruled on the shape directly the same day she staged Size,
+// Appearance and Background behind a Save button: "also, make the language
+// choice also be like the rest: size, appearance, background." Those three
+// already draw through `AppearancePillGroup`
+// (`shared/web/appearance-pill-group.tsx`) — a bare `<button role="radio">`
+// row, the SAME primitive R3 already blesses for exactly this shape (see
+// that file's own header: "never a `<Button variant={x===y?…}>` fake — R3's
+// own ban"), not a menu, so moving Language onto the identical row is R3
+// answered the same way its three neighbours already are, not a violation of
+// it. THE PORTAL'S COMPACT TWIN DID NOT MOVE — `language-menu.tsx` still
+// draws the library DropdownMenu, unrelated to either ruling and unaffected
+// by this change.
 //
-// THE SENTENCE, which is the one that was a real bug. A switch is OPTIMISTIC:
-// `setLang(next)` re-renders the app before the save comes back. But `t` was
-// bound when the component rendered, so a confirmation written through it says
-// "Language changed." in the language they just LEFT — a small thing that tells
-// somebody the feature is a veneer. And the FAILURE has to go the other way: a
-// switch to Catalan that did not happen must be reported in the language they
-// can still read, because telling somebody in Catalan that Catalan failed to
-// load is a joke at their expense. So the success is composed in `next` and the
-// refusal in `previous`, and both are asserted here rather than left as a
-// comment that was true once.
+// THE SENTENCE, which is the one that was a real bug and is untouched by any
+// of this. A switch is OPTIMISTIC: `setLang(next)` re-renders the app before
+// the save comes back — LANGUAGE ALONE KEPT THIS CONTRACT, deliberately, when
+// Size/Appearance/Background staged behind Save the same day (her own answer,
+// put to her directly: "keep language instant" — see
+// `appearance-panel.tsx`'s own header for the fuller account). But `t` was
+// bound when the component rendered, so a confirmation written through it
+// says "Language changed." in the language they just LEFT — a small thing
+// that tells somebody the feature is a veneer. And the FAILURE has to go the
+// other way: a switch to Catalan that did not happen must be reported in the
+// language they can still read, because telling somebody in Catalan that
+// Catalan failed to load is a joke at their expense. So the success is
+// composed in `next` and the refusal in `previous`, and both are asserted
+// here rather than left as a comment that was true once.
 //
-// Read off disk, this repo's house style for a rule about how a file is written.
+// Read off disk, this repo's house style for a rule about how a file is
+// written.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -35,38 +52,50 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8")
 const SECTION = "shared/web/language-section.tsx"
 const MENU = "shared/web/language-menu.tsx"
 
-describe("the switcher is a dropdown, from the library (R3)", () => {
-  it("Settings offers a Select, not a row of buttons", () => {
+describe("the switcher is a pill row in Settings, and a menu in the portal header", () => {
+  it("Settings matches Size/Appearance/Background — AppearancePillGroup, not the library Select", () => {
     const src = read(SECTION)
-    expect(src, "the switcher must use the library Select").toContain(
-      "components/select/select"
-    )
     expect(
-      src.includes("primitives/button/button"),
-      "a Button import here is the pill row growing back — twenty-nine of them is what this replaced"
+      src,
+      "Language now draws through the same pill row its three neighbours use"
+    ).toContain("AppearancePillGroup")
+    expect(
+      src.includes("components/select/select"),
+      "the library Select this replaced must not grow back here"
     ).toBe(false)
   })
 
-  it("the portal's compact twin is the library DropdownMenu", () => {
+  it("the portal's compact twin is still the library DropdownMenu — untouched by the Settings ruling", () => {
     expect(read(MENU)).toContain("components/dropdown-menu/dropdown-menu")
   })
 
-  it("Settings still says how complete a part-written language is, in the list", () => {
+  it("Settings still says how complete a part-written language is, on every pill that needs it", () => {
     // The honest half of shipping a machine-filled catalogue, still true after
     // the 2026-09-14 ruling deleted the sentence UNDER the control (the client
     // quoted it back verbatim and asked for it gone, alongside the preview-led
     // Settings · Appearance redesign — see language-section.tsx's own header).
-    // What survives is the per-row figure in the OPEN list, which is where
-    // somebody CHOOSING a language needs the number; `coverage()` is still the
-    // engine's one seam for it, so a component computing its own would still
-    // be a second answer to "how much of this can I read".
+    // The old Select said the number only inside its OPEN dropdown; a pill row
+    // has no closed state to hide behind, so the same figure now sits on every
+    // pill that needs it. `coverage()` is still the engine's one seam for it,
+    // so a component computing its own would still be a second answer to "how
+    // much of this can I read".
     const src = read(SECTION)
-    expect(src, "the per-row percentage in the open list").toContain("{pct}%")
+    expect(src, "the per-pill percentage").toContain("{pct}%")
     expect(src, "the number comes from the engine's own seam").toContain("coverage()")
     expect(
       src.includes("{percent}% translated"),
       "the sentence under the control was deleted by the 2026-09-14 ruling and must not grow back"
     ).toBe(false)
+  })
+
+  it("each pill carries its flag, in the swatch position Background's own pills use", () => {
+    // Her own instruction, the same message: "Each language already draws a
+    // flag — keep it, in the swatch position the other groups use for their
+    // colour swatch, so the four rows line up."
+    const src = read(SECTION)
+    expect(src, "the flag rides AppearancePillOption's own swatch slot").toMatch(
+      /swatch:\s*<span[^>]*>\{l\.flag\}<\/span>/
+    )
   })
 
   for (const [name, path] of [
@@ -116,8 +145,9 @@ describe("the confirmation speaks the language that was just chosen", () => {
 })
 
 // AND THE SAME THING, RENDERED. The check above reads the file; this one runs
-// it, because "imports Select" and "puts one control on the screen" are two
-// different claims and the second is the one the owner asked for.
+// it, because "imports AppearancePillGroup" and "puts a row of pills on the
+// screen" are two different claims and the second is the one the ruling was
+// actually about.
 describe("what Settings actually paints", () => {
   afterEach(cleanup)
 
@@ -128,23 +158,28 @@ describe("what Settings actually paints", () => {
       </LanguageProvider>
     )
 
-  it("is ONE control, not twenty-nine", () => {
+  it("is one radiogroup, one pill per language — matching Size/Appearance/Background's own shape", () => {
     paint("en")
-    expect(screen.getAllByRole("combobox"), "one Select").toHaveLength(1)
-    // The pill row put a button on the screen for every language in the engine.
-    // Anything close to that number here is it growing back.
+    // No `combobox` any more — the Select is gone. A `radiogroup` with one
+    // `radio` per entry is exactly what `AppearancePillGroup` draws for its
+    // three other callers, and `LANGUAGES` being four rather than
+    // twenty-nine is what makes painting one pill per language the RIGHT
+    // shape here rather than the wrapping row this file used to guard
+    // against.
+    expect(screen.queryAllByRole("combobox"), "the Select must be gone").toHaveLength(0)
+    expect(screen.getByRole("radiogroup"), "one pill row").toBeTruthy()
     expect(
-      screen.queryAllByRole("button").length,
-      `the switcher must not paint a control per language (${LANGUAGES.length} of them)`
-    ).toBeLessThan(LANGUAGES.length)
+      screen.getAllByRole("radio"),
+      "one pill per language, derived from LANGUAGES"
+    ).toHaveLength(LANGUAGES.length)
   })
 
   it("names the language in its own words AND in English", () => {
     paint("de")
-    const trigger = screen.getByRole("combobox")
-    expect(trigger.textContent, "the endonym, for somebody scanning for their own language")
-      .toContain("Deutsch")
-    expect(trigger.textContent, "and the English name, for somebody who cannot read the script")
+    const pills = screen.getAllByRole("radio")
+    const german = pills.find((p) => p.textContent?.includes("Deutsch"))
+    expect(german, "the endonym, for somebody scanning for their own language").toBeTruthy()
+    expect(german?.textContent, "and the English name, for somebody who cannot read the script")
       .toContain("German")
   })
 
@@ -154,6 +189,8 @@ describe("what Settings actually paints", () => {
     // out a screen later. English IS the key, so it is complete by definition and
     // saying so would be noise.
     paint("en")
-    expect(screen.queryByText(/% translated/), "nothing to report about English").toBeNull()
+    const pills = screen.getAllByRole("radio")
+    const english = pills.find((p) => p.textContent?.includes("English"))
+    expect(english?.textContent, "nothing to report about English").not.toMatch(/%/)
   })
 })

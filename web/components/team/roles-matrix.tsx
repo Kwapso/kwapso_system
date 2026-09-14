@@ -573,9 +573,22 @@ export function RolesMatrix({
           `ToolbarAction` so they fold to their glyph like every other toolbar
           action) and the one BLACK `+`, icon only. Not mango, not labelled,
           and not `AddButton`; this file's header has all three reasons and
-          the client's two messages that settle them. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Headline as="h2" size="h4">
+          the client's two messages that settle them.
+
+          THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
+          "remove members and roles titles too", the same call that took the
+          visible "Members" heading next door. Both sections stand inside
+          ONE tab panel already named "Team", so that shared name cannot
+          tell a reader which stacked collection they are in — see
+          `members-gallery.tsx`'s identical note for the fuller argument
+          (Automations and Integrations, by contrast, are the only
+          collection on their own tab and go fully headless). Keeping a real
+          `<Headline as="h2">`, only visually hidden, is the kit's `sr-only`
+          route: a screen reader's heading list still reads "Members" then
+          "Roles", nothing extra shows on screen, and R67 (containment only,
+          no heading required since its 2026-09-11 amendment) is untouched. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Headline as="h2" size="h4" className="sr-only">
           {t("Roles")}
         </Headline>
         <div className="flex items-center gap-2">

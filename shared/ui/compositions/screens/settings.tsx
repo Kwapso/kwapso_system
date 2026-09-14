@@ -566,6 +566,54 @@ export const ScalePicture = ({
         nothing is added or removed" than a short line ever was, because the
         reader can see the SAME words taking more room.
 
+   V1.2.81 — THE BREADCRUMB IS GONE. READ THIS BEFORE YOU REDRAW ONE. This is
+   the SECOND time the top chrome above the card has been replaced rather than
+   kept, and the second time is why removal, not another redesign, is the
+   right fix.
+
+     ROUND ONE (shipped v1.2.77). The top chrome was a single 2px bar at 32%
+     opacity. The client's own words for it: "a flat mango rectangle
+     containing one rounded white card with 'Record title / Status · 4 open'
+     and a grey bar" — she read it as a placeholder, not as navigation.
+
+     ROUND TWO (v1.2.78, THIS FILE'S OWN PREVIOUS FIX). Diagnosed as "the
+     shipped breadcrumb slot was a single 2px bar at 32% opacity … which is
+     exactly the 'grey bar' she named" and replaced with TWO segments —
+     "module › record", thicker and more opaque — on the reasoning that a
+     real trail with two parts would read as chrome rather than as a stray
+     line. See the diagnosis above, still kept verbatim as the historical
+     record of what round two tried and why.
+
+     ROUND TWO WAS ALSO REJECTED. She looked at the shipped two-segment
+     version live and asked for the bars on top of the preview to be removed,
+     full stop — not redrawn a third way. The lesson is not "the second
+     design was wrong in some fixable detail"; it is that a fake trail — any
+     number of opaque bars standing in for words nobody can read — reads as
+     placeholder furniture to her REGARDLESS of segment count or opacity, and
+     a third attempt at the same idea would be the second mistake shipped
+     twice. So this round is a DELETION: the rail now leads straight into the
+     floating card, with nothing standing in for a breadcrumb above it.
+     `APPEARANCE_PREVIEW_GROUND_INK` (the ink the two bars were drawn in) is
+     deleted with it rather than kept dormant — a fact this file's own
+     `spine.ts` sibling in the consuming app argues for elsewhere: a mapping
+     kept "to be safe" outlives the problem it solved and confuses the next
+     reader into thinking it is still needed.
+
+     WHAT THIS COSTS. The preview's top edge is now the rail meeting the
+     card directly — one fewer visual layer than a real screen has (a real
+     screen's card sits under a real breadcrumb). That is an honest
+     simplification, not a regression pretending otherwise: this preview's
+     job is the ground/rail/card/panel HIERARCHY (see this file's own header
+     above, "AppearancePreview"), and two rulings in a row say a fake trail
+     does not help that argument and reads as unfinished chrome instead.
+
+     THE CARD STAYS `flex-1` IN A `gap-3` COLUMN. With the breadcrumb gone the
+     column holds one child instead of two, so `gap-3` does nothing (nothing
+     to space) and the card's own `flex-1` fills the frame exactly as before
+     — if anything with slightly more room, never less. Nothing here needed
+     to change for the card to keep filling `AppearancePreview`'s own
+     `min-h-[17rem]` frame.
+
    PINNED HEX, NOT LIVE TOKENS — `ThemePicture`'s own fork, for the same
    reason. Dark-mode tokens bind at `:root[data-theme="dark"]` (tokens.css
    §6): a scoped descendant has no selector that says "be dark" while the
@@ -610,17 +658,6 @@ const APPEARANCE_PREVIEW_GROUND: Record<
   mango: { light: "#FED069", dark: "#FED069" },
 };
 
-/** `--spine-ink` per spine, tokens.css §7b — the ink a topbar mark reads on
-    the ground itself, before the floating card is reached. */
-const APPEARANCE_PREVIEW_GROUND_INK: Record<
-  "ink" | "paper" | "mango",
-  { light: string; dark: string }
-> = {
-  ink: { light: "#FFFEF9", dark: "#FFFEF9" },
-  paper: { light: "#1A1918", dark: "#FFFEF9" },
-  mango: { light: "#1A1918", dark: "#1A1918" },
-};
-
 /** `--card`, spine-independent — the one floating thing on any ground. */
 const APPEARANCE_PREVIEW_CARD = { light: "#FFFEF9", dark: "#26241F" };
 
@@ -628,8 +665,9 @@ const APPEARANCE_PREVIEW_CARD = { light: "#FFFEF9", dark: "#26241F" };
     rung quieter than the card it sits in. */
 const APPEARANCE_PREVIEW_PANEL = { light: "#F7F2EB", dark: "#1C1B18" };
 
-/** `--foreground` / `--muted-foreground`, read on the card and the panel
-    (never on the ground — see APPEARANCE_PREVIEW_GROUND_INK for that). */
+/** `--foreground` / `--muted-foreground`, read on the card and the panel —
+    never on the ground, which since v1.2.81 paints nothing of its own (see
+    "THE BREADCRUMB IS GONE" in this file's own header). */
 const APPEARANCE_PREVIEW_ROW_INK = { light: "#1A1918", dark: "#FFFEF9" };
 const APPEARANCE_PREVIEW_ROW_META = {
   light: "rgba(26, 25, 24, .55)",
@@ -675,7 +713,6 @@ export function AppearancePreview({
   ...props
 }: AppearancePreviewProps) {
   const ground = APPEARANCE_PREVIEW_GROUND[spine][theme];
-  const groundInk = APPEARANCE_PREVIEW_GROUND_INK[spine][theme];
   const card = APPEARANCE_PREVIEW_CARD[theme];
   const panel = APPEARANCE_PREVIEW_PANEL[theme];
   const rowInk = APPEARANCE_PREVIEW_ROW_INK[theme];
@@ -706,23 +743,10 @@ export function AppearancePreview({
         aria-hidden="true"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
-        {/* THE BREADCRUMB — two segments, not one: "module › record" is the
-            shape a real trail has, and it is what lets this read as
-            navigation rather than as a stray hairline. v1.2.78: the single
-            2px bar at 32% this replaces is the exact "grey bar" the client
-            named as looking like a placeholder. */}
-        <div className="flex items-center gap-2" aria-hidden="true">
-          <span
-            className="h-[0.375rem] w-[16%] rounded-pill"
-            style={{ background: groundInk, opacity: 0.55 }}
-          />
-          <span
-            className="h-[0.375rem] w-[26%] rounded-pill"
-            style={{ background: groundInk, opacity: 0.3 }}
-          />
-        </div>
         {/* THE FLOATING CARD — the one raised, shadowed thing on this
-            ground; `--shadow-lifted`, load-bearing on paper and mango. */}
+            ground; `--shadow-lifted`, load-bearing on paper and mango. NO
+            BREADCRUMB ABOVE IT — see "THE BREADCRUMB IS GONE" in this file's
+            own header for why. */}
         <div
           className="flex flex-1 flex-col rounded-[var(--radius)] p-3 shadow-[var(--shadow-lifted)]"
           style={{ background: card }}

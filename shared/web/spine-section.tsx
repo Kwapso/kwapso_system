@@ -34,13 +34,22 @@
 // (`SettingsRoute`, its six-tab shape) is what this app has deliberately not
 // adopted, never this part.
 //
-// OPTIMISTIC, THEN PERSISTED — `ScaleSection`'s own shape, copied rather than
-// reinvented. A card presses, the choice is live immediately (app-shell.tsx
-// reads this same preference off `active.user.spine` and repaints the rail on
-// its next render), and the save follows; if it fails the choice reverts and
-// says so. It lives on the person's own row for the same reason scale does
-// (UI-RULEBOOK S4's argument, one preference along). MANGO is the fallback
-// (shared/spine.ts) since the client's ruling of 2026-09-02.
+// STAGED, NOT OPTIMISTIC, CLIENT RULING 2026-09-14. `SpineSection` used to be
+// optimistic — a card pressed, the choice held locally, `save` fired, and the
+// choice reverted on failure. That is gone from THIS component (the compact
+// Settings · Appearance one): "we need … some kind of save button so that I
+// can first preview it and, once I'm happy with what I see, implement it
+// across the app." `SpineSection` no longer owns any state, calls `save`, or
+// shows a toast — it is a plain, controlled pill row exactly like
+// `ScaleSection`/`ThemeSection` now are. `value` is the PENDING spine,
+// `onChange` asks `AppearancePanel` to hold a different one, and the panel is
+// the one place that seeds the pending spine from the person's saved row and
+// calls the `save` prop it is handed, on Save — which is also the moment the
+// app-wide repaint happens (`app-shell.tsx` reads `active.user.spine`, and
+// the panel's own `saveSpine` already refreshes it; see that file's header).
+// MANGO stays the fallback (shared/spine.ts) since the client's ruling of
+// 2026-09-02, untouched by any of this. `SpineChoice`, below, is unchanged —
+// onboarding still owns its own submit and was never part of this ruling.
 //
 // RENAMED FROM "Sidebar" TO "Background", client instruction — untouched by
 // this pass; see the git history on this file for the fuller account.
@@ -56,7 +65,6 @@
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceOptionGroup, SpinePicture, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 
 import { AppearancePillGroup, SpineSwatch, type AppearancePillOption } from "./appearance-pill-group"
@@ -186,51 +194,28 @@ export function SpineChoice({
 }
 
 export function SpineSection({
-  /** what the rail paints today, from the person's own session row */
+  /** The PENDING spine — `AppearancePanel`'s own state, not this
+   * component's. Never saved or applied to the app by this file any more. */
   value,
-  /** Persist the choice. The agency app passes its own `auth.setSpine`. */
-  save,
-  /** Told the resting value on mount and again on every press, so the
-   * shared preview beside this group is never a frame behind it. */
-  onChosenChange,
+  /** A different card was pressed. The panel decides what happens next —
+   * update the pending value, and nothing else, until Save. */
+  onChange,
+  /** True while `AppearancePanel`'s own Save is in flight. */
+  disabled = false,
 }: {
-  value: string | null
-  save: (spine: Spine) => Promise<unknown>
-  onChosenChange?: (value: Spine) => void
+  value: Spine
+  onChange: (next: Spine) => void
+  disabled?: boolean
 }) {
   const { t } = useLanguage()
-
-  // Local, exactly as ScaleSection keeps its own: the card answers instantly,
-  // the session row catches up when `me` is re-read.
-  const [chosen, setChosen] = React.useState<Spine>(toSpine(value))
-  const [saving, setSaving] = React.useState<Spine | null>(null)
-  React.useEffect(() => setChosen(toSpine(value)), [value])
-
-  React.useEffect(() => onChosenChange?.(chosen), [chosen, onChosenChange])
-
-  async function choose(nextSpine: Spine) {
-    if (nextSpine === chosen || saving) return
-    const previous = chosen
-    setChosen(nextSpine)
-    setSaving(nextSpine)
-    try {
-      await save(nextSpine)
-      toast.success(t("Background changed."))
-    } catch {
-      setChosen(previous)
-      toast.error(t("That didn't save. Try again."))
-    } finally {
-      setSaving(null)
-    }
-  }
 
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-muted-foreground text-micro uppercase">{t("Background")}</h3>
       <SpineChoice
-        value={chosen}
-        disabled={saving !== null}
-        onChange={(next) => void choose(next)}
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
         badgeLabel={t("In use")}
         compact
       />

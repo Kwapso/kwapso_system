@@ -489,6 +489,28 @@ export function SettingsScreen({
             // follows them between devices; the portal keeps its own compact
             // twin in the header (`shared/web/language-menu.tsx`), because the
             // portal has no settings screen at all.
+            //
+            // NO INNER TITLE — the same ruling `module-automations.tsx`'s own
+            // call site answers a few lines below, about a different tab:
+            // "please remove the title inside the collection. We will use the
+            // title only at the top." The tab strip already names this panel
+            // "Appearance"; `AppearancePanel` passes `hideTitle` to its own
+            // `SettingsSection` now, so the box still labels itself for
+            // assistive tech (`aria-label`) without drawing a second,
+            // redundant "Appearance" heading one screen-height below the
+            // first. See `settings-section.tsx`'s own header for the prop.
+            //
+            // SIZE, APPEARANCE AND BACKGROUND NOW STAGE BEHIND A SAVE BUTTON
+            // — a second ruling the same day: "we need … some kind of save
+            // button so that I can first preview it and, once I'm happy with
+            // what I see, implement it across the app." `scaleValue`/
+            // `saveScale` and `spineValue`/`saveSpine` below are unchanged —
+            // still the same two doors, still read off `active.user` — but
+            // `AppearancePanel` now calls them once, from its own Save,
+            // rather than on every press. Language (`saveLanguage` below) is
+            // the one exception: it keeps applying and persisting the moment
+            // it is picked, her own explicit "keep language instant" —
+            // `appearance-panel.tsx`'s header has the full account.
             return (
               <AppearancePanel
                 saveLanguage={(lang) => auth.setLanguage(lang)}
@@ -1026,11 +1048,23 @@ export function SettingsScreen({
                 </div>
               )
 
+            // NO `title` — client ruling, 2026-09-14, naming this exact tab:
+            // "the title inside the collection" repeats the tab strip's own
+            // "Automations" word, and "we will use the title only at the
+            // top" is the whole of what she wants. `ModuleAutomations`'
+            // `title` is optional for exactly this call (see its own doc);
+            // omitting it leaves `<ToolbarRow title>`'s `heading` unbuilt, so
+            // the row draws no h2 here. Nothing else changes: this tab is
+            // the ONLY collection in its panel, and the panel is already
+            // named "Automations" for assistive tech through Radix's own
+            // tabpanel→tab `aria-labelledby` wiring, so there is no second
+            // name for an `sr-only` heading to add — unlike Team's stacked
+            // Members/Roles pair one tab over, which keeps one each because
+            // nothing else on that panel tells the two collections apart.
             return (
               <ModuleAutomations
                 teamId={teamId}
                 scope={{ kind: "all", modules: automationModules }}
-                title={t("Automations")}
               />
             )
           }
