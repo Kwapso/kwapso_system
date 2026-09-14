@@ -319,6 +319,7 @@ export async function getQueryRecords(request: Request, env: Env): Promise<Respo
     module: canonical,
     ...(canonical === name ? {} : { askedAs: name }),
     ...(answer.groups ? { groups: answer.groups, groupsTruncated: answer.groupsTruncated } : {}),
+    ...(answer.groupSummary ? { groupSummary: answer.groupSummary } : {}),
     // WHAT THE NUMBER EXCLUDES, beside the number. A filter value that named
     // nothing is a fact about the answer, not a detail of how it was computed —
     // see `Unmatched` in the engine for the sentence that made it necessary.
