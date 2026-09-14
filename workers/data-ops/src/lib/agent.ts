@@ -58,6 +58,11 @@ const MAX_STEPS = 12
  * the turn always ends on a whole tool call with its result recorded. */
 const TURN_DEADLINE_MS = 150_000
 
+/** The race's own loser, as an IDENTITY rather than an Error subclass: it is
+ * compared with `===` in exactly one place and must never be mistaken for a
+ * provider failure by any `instanceof` on the way past. */
+const TURN_RAN_OUT = Symbol("the turn ran out of time")
+
 /** THE VOCABULARY CONTRACT (R9). A dropdown write is gated on the option already
  * existing, so "create X and move everything onto it" is two calls whose ORDER is
  * not optional. Named, not inlined, because the model only obeys what BOTH surfaces
@@ -1653,18 +1658,24 @@ async function runPlanLoop(
   let failedSteps = 0
 
   const startedAt = Date.now()
+  /** THE ONE WAY A TURN STOPS FOR TIME — one sentence, one saved message, one
+   *  return, reached from BOTH places a turn can run out of it. It was inline in
+   *  the between-steps check and nowhere else, which is precisely why the second
+   *  place had no sentence at all. */
+  const stoppedPartway = async (): Promise<ChatOutcome> => {
+    const note =
+      "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
+      "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
+    say(note)
+    await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
+    await log()
+    return { done: true as const, threadId, reply: note, quota }
+  }
+
   for (let step = 0; step < MAX_STEPS; step++) {
     // BETWEEN steps, never inside one: a turn stopped here has a whole tool call
     // behind it whose result is already saved, so what it says is true.
-    if (step > 0 && Date.now() - startedAt > TURN_DEADLINE_MS) {
-      const note =
-        "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
-        "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
-      say(note)
-      await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
-      await log()
-      return { done: true, threadId, reply: note, quota }
-    }
+    if (step > 0 && Date.now() - startedAt > TURN_DEADLINE_MS) return await stoppedPartway()
     stepUnit = null
     if (!(loopOpts.prepaid && step === 0)) {
       const c = await consumeAiUnit(env, guard.teamId)
@@ -1684,22 +1695,60 @@ async function runPlanLoop(
 
     let reply: ModelReply
     try {
+      // ── AND THE DEADLINE COULD NOT SEE INSIDE A STEP (14 Sep 2026) ──────────
+      //
+      // `TURN_DEADLINE_MS` was checked BETWEEN steps and nowhere else, so one
+      // slow model call walked straight through it. Measured on staging on the
+      // owner's own five-part question: step 4 began at +88s (under the 150s
+      // bound, so the check correctly let it start) and the model did not answer
+      // until +230s. The assistant row for that step was written and then the
+      // request died — no tool results, no wrap-up, NO MESSAGE OF ANY KIND. The
+      // person got an empty bubble.
+      //
+      // Which is the exact outcome TURN_DEADLINE_MS was written to prevent, in
+      // this file's own words twenty lines above: "a 144-second one was killed
+      // by the platform mid-request and the person received an EMPTY BUBBLE —
+      // no answer, no error, no sign anything had happened." The bound existed
+      // and could not reach the only call long enough to need it.
+      //
+      // `env.AI.run` takes no abort signal, so the call is not cancelled — it is
+      // RACED. The provider may well finish and bill for it (which is why the
+      // step's credit is not refunded here: it really was spent). What changes
+      // is that the turn stops WAITING, and a person who asked a hard question
+      // gets the same honest sentence they would have got had the step boundary
+      // happened to fall a second earlier.
+      //
+      // It never shortens a turn that was going to finish: the budget handed to
+      // the race is whatever is LEFT of the same 150 seconds, so a call that
+      // would have returned inside the deadline is untouched.
+      const leftOfTurn = TURN_DEADLINE_MS - (Date.now() - startedAt)
+      if (leftOfTurn <= 0) return await stoppedPartway()
+      const inTime = <T,>(work: Promise<T>): Promise<T> =>
+        Promise.race([
+          work,
+          new Promise<never>((_, reject) => setTimeout(() => reject(TURN_RAN_OUT), leftOfTurn)),
+        ])
       if (streaming) {
         // First delta of a NEW model turn gets the blank-line separator when earlier
         // text already streamed (e.g. a lead-in before steps, then the wrap-up after).
         let first = true
-        reply = await model.stream!(convo, toolsNow(), (d) => {
+        reply = await inTime(model.stream!(convo, toolsNow(), (d) => {
           emit!({ t: "text", d: (first && spoke ? "\n\n" : "") + d })
           first = false
           spoke = true
-        })
+        }))
       } else {
-        reply = await model.complete(convo, toolsNow())
+        reply = await inTime(model.complete(convo, toolsNow()))
       }
       // Every model turn's tokens land on this command's one usage row — the
       // cache read/write split included, which is the whole measurement.
       opts.tally.tokens = addTokens(opts.tally.tokens, reply.usage)
     } catch (e) {
+      // THE TURN RAN OUT OF TIME, which is not a model failure and must not be
+      // reported as one: nothing is wrong with the provider, the key or the
+      // app. It takes the same exit the between-steps check takes, so a person
+      // cannot tell which side of a step boundary they happened to land on.
+      if (e === TURN_RAN_OUT) return await stoppedPartway()
       // A model/runtime hiccup becomes a friendly, saved turn — never an uncaught 500.
       // The OWNER must be able to see WHY, so the real error still goes to the store
       // (best-effort; never blocks the reply).
