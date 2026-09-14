@@ -5246,6 +5246,7 @@ describe("RULES — the laws of the base", () => {
       "registry-backed-exemptions", // R73: the exemption-shaped-const census, above, right after law-id-origin
       "import-opens-a-tab", // R74: web/test/import-opens-a-tab.test.ts — every go()/softNavigate() targeting the import wizard must be openInNewTab() instead, plus Home's own named clause
       "alphabetical-options", // R75: web/test/alphabetical-options.test.ts — the filter-bar.tsx central-seam guard, the SelectItem/options() census over both front doors, and roles-matrix.tsx's own named clause
+      "protected-is-active", // R76: workers/tenancy/test/selectable-protected-active.test.ts — both directions of the invariant, run against a real node:sqlite schema rather than a mocked d1Query
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

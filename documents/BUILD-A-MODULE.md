@@ -1064,6 +1064,15 @@ again, which is the only property that matters here.
   `ORDERED_OPTIONS_OK` (`shared/rules/registry.ts`) with the real reason. A
   collection's own "sort by" menu (`sortOptions`) is a different question this
   law does not reach.
+- **R76 `protected-is-active`** — if your module seeds a `selectable_data`
+  vocabulary with a protected (`is_default`) value, you need nothing: protect
+  and deactivate both go through `setSelectableDefault`/`setSelectableActive`
+  (`workers/tenancy/src/lib/selectable.ts`), and the door already refuses to
+  deactivate a protected value and reactivates one the moment it is
+  protected — "if it's protected, it's always active" is enforced at the
+  door, not something your module's own write path has to remember. Display
+  one word, `Protected`, standing in for the whole state; never a second
+  "Protected: yes/no" facet beside a Status facet that already offers it.
 
 **The words** (the ones that catch every new module, every time)
 

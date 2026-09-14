@@ -172,8 +172,23 @@ for (const file of sourceFiles(
   for (const line of file.source
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#") && !l.startsWith("!") && !l.includes("*")))
+    .filter((l) => l && !l.startsWith("#") && !l.startsWith("!"))) {
+    // A BARE `*` IGNORES THE WHOLE DIRECTORY — the one glob shape unambiguous
+    // enough to read without half-implementing gitignore's pattern language:
+    // no wildcard boundary to get wrong, no partial-segment match to fake, the
+    // whole directory is output. `verify/qa-walk-1/.gitignore` is exactly this
+    // (a QA walk's own report, read by the lane that ran it and never meant to
+    // be committed or ship to every checkout) — without this case the filter
+    // below (`!l.includes("*")`) dropped the line outright, so the directory
+    // read as ordinary tracked prose and a fresh worktree that never ran the
+    // walk failed on the very next source comment naming a file inside it.
+    if (line === "*") {
+      ANCHORED_OUTPUT.push(dir)
+      continue
+    }
+    if (line.includes("*")) continue
     ANCHORED_OUTPUT.push(`${dir}/${line.replace(/^\//, "").replace(/\/$/, "")}`)
+  }
 }
 
 /** Written out in full, an extension included, a path is one a person is meant
