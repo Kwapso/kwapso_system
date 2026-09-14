@@ -446,6 +446,56 @@ describe("docs agree with the roster on disk", () => {
     ).toEqual([])
   })
 
+  // THE RULEBOOK'S OWN HEADCOUNT, DERIVED, NEVER TYPED TWICE.
+  //
+  // Earned on 2026-09-14: W13 was added and the Copy row of the per-section
+  // table was bumped from "(12)" to "(13)" the same day, but the "**122
+  // rules.**" headline three lines above that table was not — a hand-typed
+  // total sitting right next to the disk-derivable one, and the two were left
+  // disagreeing with each other AND with the file. Nothing read either number
+  // against `### C1:` / `### W13:` / etc. on the page, so the drift shipped
+  // green.
+  //
+  // THREE NUMBERS, ONE ORACLE. The rule count on disk is `### <SECTION><n>:`
+  // headers, counted the same way `grep -oE "^### [A-Z]+[0-9]+:"` does. The
+  // headline sentence and the per-section table's own row totals — the
+  // "(12)", "(9)", "(13)" … in parentheses — are both read back out of the
+  // page and checked against that count, so a lane that adds a rule and
+  // forgets either number is caught the day it happens rather than the next
+  // time someone happens to run the grep by hand.
+  it("UI-RULEBOOK's stated rule total agrees with its own headers and its own section table", () => {
+    const book = read(join(ROOT, "documents", "UI-RULEBOOK.md"))
+    const headers = book.match(/^### [A-Z]+\d+:/gm) ?? []
+    expect(
+      headers.length,
+      "the header scan came back almost empty — the rule heading format changed " +
+        "(`### <SECTION><n>:`) or the read failed. Fix the derivation, never this number."
+    ).toBeGreaterThan(50)
+    const actual = headers.length
+
+    const headline = book.match(/\*\*(\d+) rules\.\*\*/)
+    expect(headline, 'UI-RULEBOOK.md must state its total as "**N rules.**" under Rule index').not.toBeNull()
+    const stated = Number(headline![1])
+    expect(
+      stated,
+      `documents/UI-RULEBOOK.md says "**${stated} rules.**" but the file holds ${actual} ` +
+        `\`### <id>:\` headings. Fix the sentence, not the count.`
+    ).toBe(actual)
+
+    const rows = [...book.matchAll(/\|\s*\d+\.[^|]*\|\s*[A-Z]+\d+ to [A-Z]+\d+ \((\d+)\)\s*\|/g)]
+    expect(
+      rows.length,
+      "the per-section table (### Rule index) came back with no rows — its row shape changed; " +
+        "fix the regex above, never this number"
+    ).toBeGreaterThan(5)
+    const tableTotal = rows.reduce((sum, m) => sum + Number(m[1]), 0)
+    expect(
+      tableTotal,
+      `the per-section table under Rule index sums to ${tableTotal} but the file holds ${actual} ` +
+        `headings — one section's "(n)" is stale. Fix the row, not the count.`
+    ).toBe(actual)
+  })
+
   // THE ONE NUMBER THAT PRICES A PLATFORM MOVE, DERIVED RATHER THAN REMEMBERED.
   //
   // PLATFORMS.md is the only document that estimates what leaving Cloudflare

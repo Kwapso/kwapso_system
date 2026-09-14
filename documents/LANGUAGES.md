@@ -81,7 +81,10 @@ reads it backwards (*does every position the walk reports sit inside a `t(...)`?
 1. **Write the whole sentence inside `t("…")`.** `const t = useT()` — the hook
    is in `shared/web/language.tsx`.
 2. **Run `npm run lang`** (extract, then prune) and commit the catalogue change
-   with the code change. `npm run lang:check` is the read-only version; both
+   with the code change. Extract writes what the app says now; prune removes
+   what it no longer says — a stale language column, and (since 14 Sep 2026) an
+   orphaned row in `shared/i18n-catalogue.ts` or `shared/i18n-seed.ts`, the same
+   walk read backwards. `npm run lang:check` is the read-only version; both
    `npm run deploy:staging` and `npm run deploy:production` run it and refuse on
    a stale catalogue.
 3. **Use the glossary's word** (`shared/glossary.ts`), never a synonym for it —
@@ -129,7 +132,7 @@ import ban on the library `Field` — go through the seam or the build goes red.
 | shape | what it is | what it costs |
 |---|---|---|
 | **MISSING** | a sentence the app says that is not in the catalogue | it ships in English to somebody who chose German — silently, on a screen that looks finished. English is the key, so nothing errors |
-| **ORPHAN** | a catalogue entry matching no string in the app | nothing breaks today, which is why it rots — into a record of what the app *used to* say, translated on every build |
+| **ORPHAN** | a catalogue entry matching no string in the app | nothing breaks today, which is why it rots — into a record of what the app *used to* say, translated on every build. `npm run lang`'s prune step removes it from all three files (`shared/i18n-strings.json` wholesale, `shared/i18n-catalogue.ts` and `shared/i18n-seed.ts` row by row), and `web/test/catalogued-strings.test.ts` holds all three to a hard zero — an orphan costs nothing to remove, so there is no debt here to bound the way R44 bounds one |
 | **UNREACHABLE** | a file under `web/`, `web-portal/` or `shared/` that says something and that the walk never opens | the same as MISSING, with nothing to grep for. Censused off the DISK, not off the graph; a reasoned `UNWALKED_OK` line is the only way out |
 | **UNANSWERED** | a string extracted and wrapped, with no entry for a translated language | English on screen. Bounded rather than banned — see § 6 |
 
@@ -158,6 +161,24 @@ regression behind the routine one.
 from it — and never for the two files that ACCUMULATE. A translation left on
 disk for a dropped language is dead weight that reads as current. `npm run lang`
 prunes; run it before you commit.
+
+**`scripts/i18n-prune.mjs` prunes two different things, and both are ORPHANS in
+the end.** A stale LANGUAGE column (this section) and a stale ROW (an entry
+whose English key no longer matches anything `appFiles()` + `visitStrings()`
+finds) are the same failure at two grains, and until 14 Sep 2026 only the
+first one was actually removed — the script's own job was named "prune the
+languages we speak," and a deleted screen's toasts ("Size changed.", "Theme
+changed.", "Background changed.": fully translated, said by nothing) sat in
+`shared/i18n-seed.ts` and `shared/i18n-catalogue.ts` forever, because nothing
+ever re-ran the walk the OTHER direction against those two files — only
+against `shared/i18n-strings.json`, which can't hold an orphan because
+`i18n-extract.mjs` rewrites it whole. Now the prune reuses that exact walk to
+drop an orphaned ROW too: `shared/i18n-catalogue.ts` (generated) is
+rewritten whole, minus the orphan; `shared/i18n-seed.ts` (hand-written) is cut
+by source span, one row at a time, and a row's own leading comment is cut
+with it only when the row is provably all that comment was ever for — never a
+comment that introduces a group, which is left standing even once every row
+under it is gone.
 
 ## 7 · Where each piece lives
 

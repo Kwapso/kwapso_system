@@ -21,7 +21,7 @@
             "port": 3001
         },
         {
-            "_": "The agency app on :3000 with every door and /media/* pointed at deployed STAGING, for looking at a branch against real rows before it is merged. See the DEV_API_ORIGIN note in web/next.config.ts. Reads only \u2014 a write is refused by the far door's CSRF check.",
+            "_": "The agency app on :3000 with every door and /media/* pointed at deployed STAGING, for looking at a branch against real rows before it is merged. See the DEV_API_ORIGIN note in web/next.config.ts. Reads only — a write is refused by the far door's CSRF check.",
             "name": "kwapso-vs-staging",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
@@ -35,7 +35,7 @@
             }
         },
         {
-            "_": "The CLIENT PORTAL on :3001 with every door and /media/* pointed at deployed STAGING. Same flag, same reasoning as the entry above \u2014 see the DEV_API_ORIGIN note in web-portal/next.config.ts. Reads only.",
+            "_": "The CLIENT PORTAL on :3001 with every door and /media/* pointed at deployed STAGING. Same flag, same reasoning as the entry above — see the DEV_API_ORIGIN note in web-portal/next.config.ts. Reads only.",
             "name": "kwapso-portal-vs-staging",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
@@ -48,7 +48,7 @@
             }
         },
         {
-            "_": "The design system's own demo, from the SIBLING repo Kwapso/kwapso-ui-ux (../kwapso-design). Not part of this workspace \u2014 run from here only to look at the kit.",
+            "_": "The design system's own demo, from the SIBLING repo Kwapso/kwapso-ui-ux (../kwapso-design). Not part of this workspace — run from here only to look at the kit.",
             "name": "kwapso-ui-kit-demo",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
@@ -64,7 +64,7 @@
             "port": 5301
         },
         {
-            "_": "Settings \u203a Appearance (preview-led) verify rig \u2014 a static build of verify/appearance-panel/, the same recipe as verify/pinned-corners/build.mjs. Run `node verify/appearance-panel/build.mjs` first; this just serves the output. Not app auth \u2014 mounts the real components directly.",
+            "_": "Settings › Appearance (preview-led) verify rig — a static build of verify/appearance-panel/, the same recipe as verify/pinned-corners/build.mjs. Run `node verify/appearance-panel/build.mjs` first; this just serves the output. Not app auth — mounts the real components directly.",
             "name": "verify-appearance-panel",
             "runtimeExecutable": "python3",
             "runtimeArgs": [
@@ -77,30 +77,17 @@
             "port": 4173
         },
         {
-            "_": "The Automations toolbar (search / sort by name / filter by status) verify rig \u2014 a static build of verify/automations-toolbar/, the same recipe as verify/toolbar-floor/build.mjs. Run `node verify/automations-toolbar/build.mjs` first; this just serves the output. Not app auth \u2014 mounts the real <ToolbarRow> directly, fed by shared/automations.ts's own automationStatus().",
-            "name": "verify-automations-toolbar",
+            "_": "Settings › Team — Members/Roles orphaned-row assessment (A/B/C) — a static build of verify/team-toolbar-fold/. Run `node verify/team-toolbar-fold/build.mjs` first; this just serves the output. Not app auth — mounts the real <MembersGallery> and <RolesMatrix> directly; B/C frames are CSS-simulated overlays on the real render, labelled SIMULATED on the page.",
+            "name": "verify-team-toolbar-fold",
             "runtimeExecutable": "python3",
             "runtimeArgs": [
                 "-m",
                 "http.server",
-                "4174",
+                "4176",
                 "--directory",
-                "verify/automations-toolbar"
+                "verify/team-toolbar-fold"
             ],
-            "port": 4174
-        },
-        {
-            "_": "Settings › Automations (the unscoped mounting) verify rig — a static build of verify/settings-automations-tab/. Run `node verify/settings-automations-tab/build.mjs` first; this just serves the output. Not app auth — mounts the real <ModuleAutomations> directly, scope: { kind: \"all\" }, side by side with the pre-existing scoped mounting.",
-            "name": "verify-settings-automations-tab",
-            "runtimeExecutable": "python3",
-            "runtimeArgs": [
-                "-m",
-                "http.server",
-                "4175",
-                "--directory",
-                "verify/settings-automations-tab"
-            ],
-            "port": 4175
+            "port": 4176
         }
     ]
 }

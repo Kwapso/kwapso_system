@@ -400,35 +400,71 @@ export function MembersGallery({
        therefore keeps `CardGrid`'s default `tone="bare"`: the ground is already
        paid for one level up and a second `bg-surface-panel` inside this one
        would be the 1.000 all over again. team-panel.tsx carries the argument
-       and the measured contrast in both palettes. */
-    <TeamPanel>
-      {/* THE GEAR (R61), beside the heading rather than in a toolbar — this
-          wall has none, and R50 would draw no toolbar on an empty team anyway,
-          which is exactly when somebody goes looking for the settings. What is
-          on the page is this module's seven emails (R70, client 2026-09-11:
-          *"I want no automation without visibility"*), three of which are the
-          SIGN-IN messages, which belong to no module and are filed here because
-          this is the module about the people they are sent to.
+       and the measured contrast in both palettes.
 
-          THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
-          "remove members and roles titles too", read together with the same
-          day's Settings-tabs principle ("we will use the title only at the
-          top"). Both this section and Roles below sit inside ONE tab panel
-          already named "Team" (Radix's own tabpanel→tab `aria-labelledby`),
-          so that single name cannot tell a reader which of the two stacked
-          collections they are in — unlike Automations or Integrations, which
-          are the only collection on their own tab and lose nothing by going
-          fully headless. Keeping `<Headline as="h2">` as a real (if visually
-          hidden) heading, rather than an `aria-label` on `TeamPanel`'s own
-          `<section>`, is the kit's `sr-only` route the brief asks for: a
-          screen reader's heading list still reads "Members" then "Roles", a
-          sighted reader reads nothing extra, and R67's subject (the
-          `<section>` tag, containment only, no heading required since its
-          2026-09-11 amendment) is unaffected either way. */}
-      <div className="flex items-center justify-end gap-2">
-        <Headline as="h2" size="h4" className="sr-only">
-          {t("Members")}
-        </Headline>
+       `className="relative"` — added 2026-09-14 so this section is the
+       positioning context for the docked gear below. `TeamPanel` forwards
+       `className` already; nothing in team-panel.tsx changed. */
+    <TeamPanel className="relative">
+      {/* THE GEAR (R61), DOCKED TO THE CARD'S OWN CORNER — not in a row of
+          its own any more. The heading went `sr-only` (client ruling,
+          2026-09-14: "remove members and roles titles too"), which left the
+          gear alone on a `flex justify-end` band: a full-width orphan row
+          with nothing else in it, sitting directly above the toolbar row
+          below. `verify/team-toolbar-fold/` assessed two fixes side by side
+          (frame-members-a/-b/-c.png) and the client's read chose corner
+          docking — the row is gone outright rather than tightened.
+
+          THE GEAR MUST STAY OUTSIDE `<ToolbarRow>`, on purpose, and that is
+          the whole reason this is a dock and not a fold into the row's own
+          `actions` slot. R50 makes `<ToolbarRow>` draw NOTHING — actions
+          included — the moment the collection it narrows is empty, and a
+          zero-member team is exactly when somebody goes looking for member
+          settings: `frame-members-a-empty.png` shows today's unconditional
+          gear surviving a zero-member team, which is what the paragraph two
+          below this one is for. Folding the gear into `actions` would
+          silently delete that route on an empty team and need a new kind of
+          `EMPTY_TOOLBAR_EXEMPT` entry to get it back. Docking it to the
+          card's corner keeps it a sibling of `<ToolbarRow>`, never a child
+          of it, so R50 is never touched and the empty-team guarantee holds
+          by construction rather than by a second exemption.
+
+          THE INSET IS THE KIT'S OWN DOCKING IDIOM, copied rather than
+          invented: `absolute top-[var(--space-6)] end-[var(--space-6)]
+          z-[1]` is the literal first line of `OVERLAY_CLOSE`
+          (shared/ui/components/sheet/sheet.tsx), the class string
+          `SheetContent`'s own close chip docks with — the one place this kit
+          already corners a control outside its content flow. `TeamPanel`'s
+          own inset is `p-6 lg:p-[var(--space-7)]` (team-panel.tsx), so
+          `--space-6` (24px) sits the gear flush with the panel's OWN inset
+          at the narrower step and pulls it 8px inside the wider one — never
+          outside the padded box either way.
+
+          R63 — THE ONE KNOWN TRADE-OFF: the gear was never inside
+          `PINNED_TOOLBAR` and still is not. It is `absolute` against this
+          `relative` section, which scrolls with the page exactly as it does
+          today; only the toolbar row beneath it pins. Making the gear sticky
+          too was not asked for and is not attempted here.
+
+          THE HEADING IS `sr-only`, NOT DELETED, and now a standalone sibling
+          rather than sharing a row with the gear — it draws no box of its
+          own and needs no row to sit in. Both this section and Roles below
+          sit inside ONE tab panel already named "Team" (Radix's own
+          tabpanel→tab `aria-labelledby`), so that single name cannot tell a
+          reader which of the two stacked collections they are in — unlike
+          Automations or Integrations, which are the only collection on
+          their own tab and lose nothing by going fully headless. Keeping
+          `<Headline as="h2">` as a real (if visually hidden) heading, rather
+          than an `aria-label` on `TeamPanel`'s own `<section>`, is the kit's
+          `sr-only` route the brief asks for: a screen reader's heading list
+          still reads "Members" then "Roles", a sighted reader reads nothing
+          extra, and R67's subject (the `<section>` tag, containment only, no
+          heading required since its 2026-09-11 amendment) is unaffected
+          either way. */}
+      <Headline as="h2" size="h4" className="sr-only">
+        {t("Members")}
+      </Headline>
+      <div className="absolute top-[var(--space-6)] end-[var(--space-6)] z-[1]">
         <ModuleSettingsGear teamId={teamId} segment="members" />
       </div>
 
@@ -466,8 +502,21 @@ export function MembersGallery({
            `position: sticky`, which is bounded by its own parent box: a wrapper
            around the toolbar by itself would leave it nothing to stick through.
            R63 measured that exact failure on the tickets Dashboard — a 32px
-           stuck range, i.e. no pin at all. */
-        <div className="flex min-w-0 flex-col">
+           stuck range, i.e. no pin at all.
+
+           `pt-[var(--space-8)]` — added 2026-09-14, MEASURED, not guessed.
+           The docked gear above (`top-[var(--space-6)] end-[var(--space-6)]`)
+           and this row's own top edge are close enough that without this the
+           gear's box lands directly on the row's rightmost control — the
+           Invite `+` and the gear share the same right edge, so any vertical
+           closeness is a horizontal collision too. Read off the rebuilt
+           `verify/team-toolbar-fold/` rig at all four widths this change was
+           checked at: the overlap was 22.5–30px at 1680/1280/1100 and 30px at
+           900 — present at EVERY width tested, not only the narrow one, so
+           the padding is unconditional rather than a breakpoint-only patch.
+           `--space-8` (48/3rem) clears the worst case with headroom to spare
+           rather than landing the two flush. */
+        <div className="flex min-w-0 flex-col pt-[var(--space-8)]">
           <ToolbarRow
             // R50 — the collection's RAW count, before any search or filter
             // narrows it, folded together with the loading state so an

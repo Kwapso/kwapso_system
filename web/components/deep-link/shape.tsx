@@ -374,10 +374,13 @@ const ACCOUNT_TYPE: Record<Account["accountType"], string> = {
 export function shapeAccountsList(
   accounts: Account[],
   /** Say which account each row sits under. FALSE when the rows are already
-   * standing under a heading that names it — the Contacts tab groups by company
-   * (contacts-by-company.tsx), and "under Bergman S.A." on every row of the
-   * Bergman group is the summary line spending a third of itself on the one fact
-   * the reader is looking at. K1 counts facts, not characters. */
+   * standing under a heading that names it, so "under Bergman S.A." on every
+   * row of a Bergman group would spend a third of the summary line on the one
+   * fact the reader is looking at. K1 counts facts, not characters. (The
+   * grouped-by-company caller this parameter was written for —
+   * `contacts-by-company.tsx` — was deleted 14 Sep 2026 as unreached dead
+   * code; kept here because it is still the correct shape for a heading that
+   * already names the parent, not a leftover.) */
   sayParent = true
 ): ScreenData {
   // The hierarchy, readable in the list itself: name the parent when it is on

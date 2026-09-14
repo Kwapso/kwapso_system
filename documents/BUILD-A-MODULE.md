@@ -1036,6 +1036,14 @@ again, which is the only property that matters here.
   state's explanation, and R70's own required `helpText` are not subtitles and
   are not caught (all three are real components, never a bare `<p>`); an
   actual subtitle needs a reasoned `SUBTITLE_OK` line, not a workaround.
+- **R73 `registry-backed-exemptions`** — if your module's own test suite needs
+  a reasoned exception to one of its rules (a screen that genuinely can't
+  spread a payload, a file that legitimately holds a raw control byte), that
+  deny-list is DATA in `shared/rules/registry.ts` — an `export const` your
+  test file IMPORTS — never a local `const` declared inside the test that
+  reads it, empty object included. A name ending `_OK` or `_EXEMPT` declared
+  with `const` anywhere under `web/test/` or `web-portal/test/` turns the
+  build red, naming the file, until it moves.
 
 **The words** (the ones that catch every new module, every time)
 

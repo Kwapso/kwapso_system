@@ -103,7 +103,7 @@ import { describe, expect, it } from "vitest"
 
 import ts from "typescript"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { UNCONTAINED_SECTION_OK } from "@shared/rules/registry"
+import { UNCONTAINED_SECTION_OK, OVERLAY_FAMILY_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -426,33 +426,153 @@ describe("R67 — a titled section stands on paper", () => {
   // `declText`/`fileTop` stay here, unmoved, because `isOverlay` and `isAct`
   // just below still read them and have nothing to do with painting.
 
-  /** An overlay does not stand on the page — it stands on the scrim. Derived
-   * in two steps, because almost nothing names a portal itself: a component
-   * whose DECLARING FILE renders through one is an overlay, and so is a
-   * component that renders an overlay. `<AddLinkDialog>` is a
-   * `<FormShellDialog>` is a kit `<Sheet>` is a Radix portal — three files, and
-   * stopping at the first would have reported a slide-in form as content lying
-   * on the page. */
-  const portalFile = new Map<string, boolean>()
+  // ── AMENDMENT 6 (2026-09-14) — AN OVERLAY IS ONE OF THE KIT'S OWN
+  //    SCRIM-STANDING SURFACES, NOT "RENDERS ANY PORTAL", AND IT IS ASKED OF
+  //    EVERY ROOT A COMPONENT CAN RETURN, NOT OF ANY TAG ITS TEXT MENTIONS ──
+  //
+  // THE OLD TEST WAS "DOES THE DECLARING FILE MENTION A PORTAL ANYWHERE",
+  // TRANSITIVELY, AND THAT CAUGHT SOMETHING THAT IS NOT AN OVERLAY AT ALL.
+  // `shared/ui/components/tooltip/tooltip.tsx` wraps its pill in
+  // `TooltipPrimitive.Portal` too — every floating Radix primitive does, it is
+  // how any of them escapes an `overflow: hidden` ancestor — but the kit's own
+  // header says why this one is not the rest of chapter 12: "THE TOOLTIP IS
+  // THE EXCEPTION TO THE OVERLAY SURFACE. Every other floating thing in
+  // chapter 12 is `--popover` at 24 under `--shadow-overlay`. This one is
+  // `--surface-inverse` … and it carries NO shadow." A tooltip portals so an
+  // icon-only button's label can clear a scroll container; it is never asked
+  // "what stands behind you", because nothing does — it describes the
+  // trigger, it does not present a surface a section's content could have
+  // been drawn into instead. `ToolbarRow`'s own row builds a `<SortControl>`
+  // (R53), the kit's own `SortControl` falls back to a `<Select>` below its
+  // narrowest breakpoint, and `Select`'s Radix primitive portals its listbox
+  // for the same reason a tooltip does — clearing whatever it is standing in
+  // — so the old, file-wide test could not tell "this is a modal" from "this
+  // floats one popup list", and `isOverlay("ToolbarRow")` came back `true`
+  // and cascaded to every component that draws a toolbar.
+  //
+  // SO THE TEST IS NARROWED FROM "PORTALS" TO A NAMED FAMILY: does the
+  // component RETURN one of the kit's actual modal-surface TAGS.
+  // `Sheet`/`SheetContent` and `AlertDialog`/`AlertDialogContent` are R59's
+  // own two shapes, verbatim: "A surface that COLLECTS — a form, an editor, a
+  // picker — presents as the kit's `Sheet` … A surface that ASKS a yes/no
+  // question about something that already exists is an `AlertDialog`,
+  // centred." Bare `Dialog`/`DialogContent` is R59's third, narrower shape —
+  // not a form's home any more, but still a live, if discouraged, centred
+  // surface (`CENTRED_DIALOG_OK`, R59's own reasoned way out) that still
+  // stands on the scrim and never on the page, so it belongs in the family
+  // for the same reason `AlertDialog` does.
+  //
+  // POPOVER WAS TRIED AND MEASURED OUT. R59's own tooltip sentence reads, from
+  // the other side, as the kit drawing one line between the tooltip and
+  // everything else that floats, Popover included — and a first pass put it
+  // in the family on that reading. IT REGRESSED THE LAW'S OWN EXEMPLAR: this
+  // very file names `CollectionFrame` as ONE OF THE TWO SHAPES A SECTION MAY
+  // STAND IN ("heading outside, content on paper … which is what
+  // `CollectionFrame` draws on every collection screen in the base"), and
+  // `CollectionFrame`'s own filter bar reaches for a `<Popover>` — a "more
+  // filters" trigger, one control among many real, paper-standing bodies.
+  // With Popover in the family, `isOverlay("CollectionFrame")` came back
+  // `true`: the law's own reference shape for "correctly contained" was
+  // reading as "stands on the scrim, skip it", and that false verdict
+  // cascaded into `RecordTable` (which draws one) and from there into
+  // `SettingsChoicesPanel` (Settings › Modules and Settings › Ticket types'
+  // own vocabulary tables) — a WORSE regression than the one this amendment
+  // exists to fix, because it hid the law's own worked example rather than
+  // one Tooltip cascade. A `<Popover>` in this codebase is exactly the same
+  // shape as `Select`/`DropdownMenu`/`ContextMenu`: a floating LIST or MENU
+  // hung off an ordinary in-flow trigger, not a surface a component's whole
+  // job is to present — none of its four call sites
+  // (`agent-host.tsx`, `agent-panel.tsx`, `record-picker.tsx`,
+  // `collection-frame.tsx`) puts a popover's content in place of a
+  // component's own body. So it is deliberately OUT, on the same reasoning
+  // that already keeps `Select`/`Combobox`/`DropdownMenu`/`ContextMenu` out:
+  // each is a CONTROL, its trigger is what stands in the section's flow, and
+  // R67's own ACT exclusion already covers a lone control.
+  //
+  // AND THE WALK ITSELF NARROWED FROM "ANY TAG THE TEXT MENTIONS" TO "EVERY
+  // ROOT THE COMPONENT CAN RETURN" — R67's OWN "PER BRANCH" CLAUSE, ASKED OF
+  // THIS QUESTION TOO. Even inside the four-name family, `isOverlay` still
+  // over-excused: `ScreenRenderer` (`shared/web/screen-engine/
+  // screen-renderer.tsx`) is the engine behind `contacts-by-company.tsx:164`
+  // and a hundred other call sites, and ONE of its several early-return
+  // branches — `recipe.type === "confirm"` — renders `<ScreenConfirm>`,
+  // which is genuinely nothing but an `<AlertDialog>`. The old "any tag the
+  // text mentions, transitively" scan found that one true branch and called
+  // the WHOLE component an overlay, so every call site that renders an
+  // ordinary list or detail screen (the overwhelming majority of them) was
+  // excused too — the identical failure shape this law's own foundational
+  // finding names for painting ("she was looking at the branch with nothing
+  // in it"), moved from the paint question to this one. So `isOverlay` now
+  // reuses `rootElements` (amendment 5's own helper, unchanged) to collect
+  // every element a component can RETURN — a ternary's two arms as two roots,
+  // exactly as `rootPaints` already does for painting — and requires EVERY
+  // root to resolve, transitively, to the family. `ScreenConfirm` has one
+  // root, `<AlertDialog>`, and passes. `ScreenRenderer` has several,
+  // including a bare `<div>` and a `<ScreenLayer>`, and fails — correctly,
+  // because most of what it renders is ordinary page content. A single-root
+  // wrapper like `AddLinkDialog` → `FormShellDialog` → `Sheet` still resolves
+  // in the same two hops it always did; a component with no returns TypeScript
+  // can find (rootless, e.g. one only reachable through `React.forwardRef`)
+  // resolves to `false` rather than `true`, the same under-reaching direction
+  // every other clause here takes.
+  const OVERLAY_SURFACE = /^(Sheet|SheetContent|Dialog|DialogContent|AlertDialog|AlertDialogContent)$/
+  const overlayRootDecl = new Map<string, ts.Node>()
   for (const f of all)
-    portalFile.set(f.rel, /\.Portal\b|<[A-Za-z]*Portal\b|createPortal\(/.test(readFileSync(f.path, "utf8")))
+    for (const st of f.tree.statements) {
+      if (ts.isVariableStatement(st))
+        for (const d of st.declarationList.declarations)
+          if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !overlayRootDecl.has(d.name.text))
+            overlayRootDecl.set(d.name.text, d)
+      if (
+        ts.isFunctionDeclaration(st) &&
+        st.name &&
+        /^[A-Z]/.test(st.name.text) &&
+        !overlayRootDecl.has(st.name.text)
+      )
+        overlayRootDecl.set(st.name.text, st)
+    }
   const overlayCache = new Map<string, boolean>()
   function isOverlay(name: string): boolean {
     const cached = overlayCache.get(name)
     if (cached !== undefined) return cached
+    if (OVERLAY_SURFACE.test(name)) {
+      overlayCache.set(name, true)
+      return true
+    }
     overlayCache.set(name, false) // recursion guard
-    const d = declText.get(name)
-    if (!d) return false
-    let hit = portalFile.get(d.rel) === true
-    if (!hit)
-      for (const m of d.text.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g))
-        if (m[1] !== name && isOverlay(m[1])) {
-          hit = true
-          break
-        }
+    const decl = overlayRootDecl.get(name)
+    if (!decl) return false
+    const roots = rootElements(decl)
+    const hit =
+      roots.length > 0 &&
+      roots.every((r) => {
+        const t = tagName(r)
+        return !!t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])
+      })
     overlayCache.set(name, hit)
     return hit
   }
+
+  // THE OVERLAY FAMILY'S OWN SKIP SET, PINNED — so a WIDENING is REVIEWED,
+  // never trusted. `isOverlay` decides which components excuse a body from
+  // R67 by standing on the scrim rather than the page, and a skip decision is
+  // exactly the kind of thing that used to be silent: the census below runs
+  // `isOverlay` on whatever tag names it meets and moves on. This is the
+  // house pattern `KIT_CONTAIN_CEILING` set for a NUMBER that may only fall —
+  // here the reviewed unit is the set of NAMES, not a count, because a name
+  // carries a reason and a count does not. Computed once, at census time (the
+  // two loops below populate `overlayCache` as they run), and asserted BOTH
+  // ways in the tripwire: a name `isOverlay` newly returns `true` for and
+  // this table does not know about turns the build red until it is named
+  // here with a real reason (a new component starting to portal a `Sheet`,
+  // say); a name below that `isOverlay` no longer agrees with is stale and
+  // must be deleted, the same rot-check `UNCONTAINED_SECTION_OK` already
+  // uses.
+  //
+  // OVERLAY_FAMILY_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+  // line 13's promise made true — this table's own note the day it was
+  // written said a later lane would move it here "rather than
+  // half-migrating"; this is that lane). Imported above.
 
   /** …AND AN ACT IS NOT CONTENT EITHER. A lone `<Button>` under a heading is
    * "Show older" or "Ask us something" — the same class of thing as the create
@@ -859,6 +979,34 @@ describe("R67 — a titled section stands on paper", () => {
        }`
     ),
   ]
+
+  // ── AMENDMENT 7's OWN FIXTURE — SAME REASON AS THE ONE ABOVE: A TRIPWIRE
+  //    PROVING `bodies()` STILL SEES A BARE IDENTIFIER SHOULD NOT DEPEND ON
+  //    THE APP HAPPENING TO CONTAIN ONE. `settings-section.tsx`'s own
+  //    `<section>{children}</section>` never reaches `bodies()` at all — its
+  //    `<section>` paints itself directly, so shape (a) resolves it before
+  //    `bodies()` is called — which is correct today and would say nothing
+  //    about whether the counter still fires the day a NEW chokepoint forwards
+  //    `{children}` without painting itself. Mirrors the real shape closely
+  //    enough to mean something (a `<section>` with no fill, whose only child
+  //    is a bare identifier) while owning its own file, so nothing the app
+  //    does can empty it out or fill it in by accident. */
+  const bareIdentifierFixture = parseFixture(
+    "bare-identifier-fixture.tsx",
+    `function FixtureChildrenPassthrough({ children }) {
+       return <section className="flex flex-col gap-2">{children}</section>
+     }`
+  )
+  function firstSection(f: Parsed): ts.JsxElement {
+    let found: ts.JsxElement | undefined
+    const walk = (n: ts.Node) => {
+      if (!found && ts.isJsxElement(n) && tagName(n) === "section") found = n
+      ts.forEachChild(n, walk)
+    }
+    walk(f.tree)
+    if (!found) throw new Error(`fixture ${f.rel} has no <section> — the fixture itself is broken`)
+    return found
+  }
   const subtreePaints = (n: ts.Node): boolean => {
     let hit = false
     const walk = (x: ts.Node) => {
@@ -883,10 +1031,51 @@ describe("R67 — a titled section stands on paper", () => {
     return hit
   }
 
+  // ── AMENDMENT 7 (2026-09-14) — A BARE IDENTIFIER IS AN UNRESOLVED BODY, NOT
+  //    A ZERO ONE ────────────────────────────────────────────────────────────
+  //
+  // `bodies()` RESOLVES A TERNARY, A `&&`, A `.map()` AND A JSX LITERAL — every
+  // shape a section's content actually takes IN THE FILE THAT WRITES IT. A
+  // CHOKEPOINT COMPONENT writes a different shape: `shared/web/
+  // settings-section.tsx` draws `<section …>{children}</section>`, and
+  // `{children}` is a bare `Identifier` expression, which `fromExpr` above
+  // does not match at all — not a ternary, not a JSX literal, not a call. The
+  // old behaviour was silence: the expression matched no branch, nothing was
+  // pushed, and `bodies()` returned however many OTHER bodies the section
+  // wrote (zero, for a chokepoint whose whole job is to forward its caller's
+  // content) — a section that hands its census-eligible content to its CALLER
+  // reported as a section with NOTHING to judge, which is not the same claim
+  // as "everything it draws is on paper." Nothing about that empty array said
+  // it was empty because the walk gave up rather than because the section is
+  // simple.
+  //
+  // TWO WAYS OUT, and this file takes the CHEAPER one on purpose. Resolving
+  // `{children}` for real means following it one hop to every CALL SITE of the
+  // component that declares it — `SettingsSection`'s own children are written
+  // at `ThemeSection`, `ScaleSection`, `SpineSection` and every module
+  // settings page, each a different file — and then asking whether every one
+  // of THOSE bodies stands on paper, which is a second census nested inside
+  // this one. It is not built here, and the reason is measured rather than
+  // assumed: `SettingsSection`'s own `<section>` carries `bg-surface-panel` on
+  // itself (this file's own `settings-section.tsx`), so shape (a) — "the
+  // section IS the box" — already resolves it correctly, TODAY, without ever
+  // calling `bodies()` on it: the ancestor walk in the two census loops below
+  // checks `paints(node)` before `bodies()` is reached at all, and a painted
+  // node short-circuits there. So the live risk is not this exact file, it is
+  // the NEXT chokepoint that forwards `{children}`/`{body}`/`{content}`
+  // without painting itself — the day one exists, its bodies must not read as
+  // zero. So a bare identifier expression is not dropped, it is COUNTED, the
+  // same move amendment 4 makes for `headless`/`proseBare`: a number this
+  // file owns and the tripwire below pins, so a widening of this blind spot
+  // (a new component reading `{children}` on a `<section>` that is NOT
+  // already boxed) is a reviewed change to the pin rather than a silent
+  // return to "zero bodies means clean."
+  //
   /** THE BODIES A SECTION ACTUALLY DRAWS — one per BRANCH, which is the clause
    * with the teeth. A ternary's two arms, a `&&`'s right-hand side and a
    * `.map()`'s row are each their own body, so a section cannot pass on the
    * strength of the one branch that happens to have a panel in it. */
+  const amendment7 = { unresolvedIdentifiers: 0 }
   function bodies(node: ts.JsxElement | ts.ArrowFunction | ts.FunctionExpression): ts.Node[] {
     const out: ts.Node[] = []
     const fromChild = (n: ts.Node) => {
@@ -908,13 +1097,26 @@ describe("R67 — a titled section stands on paper", () => {
         fromExpr(e.whenFalse)
         return
       }
+      // `&&`'s LEFT is a GUARD, never content — `scoping && <GoogleScopeDialog/>`
+      // asks "is scoping truthy", it does not offer `scoping` itself as
+      // something that could stand on the page. AMENDMENT 7 is what surfaced
+      // this: before it, a bare identifier on either side was silently
+      // dropped either way, so walking into `&&`'s left cost nothing and hid
+      // a category error in this walk. Once a bare identifier is COUNTED
+      // rather than dropped, that same walk turned two ordinary guards
+      // (`scoping && <GoogleScopeDialog/>`, `sharing && <GoogleSourceDialog/>`
+      // in `google-connections.tsx`) into false "unresolved body" counts —
+      // `scoping`/`sharing` are booleans standing in a CONDITION position, not
+      // a body this walk failed to see into. `||` and `??` keep both sides:
+      // `data.icon || <DefaultIcon/>` really does offer two candidate bodies,
+      // either of which could be what renders.
+      if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+        fromExpr(e.right)
+        return
+      }
       if (
         ts.isBinaryExpression(e) &&
-        [
-          ts.SyntaxKind.AmpersandAmpersandToken,
-          ts.SyntaxKind.BarBarToken,
-          ts.SyntaxKind.QuestionQuestionToken,
-        ].includes(e.operatorToken.kind)
+        [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(e.operatorToken.kind)
       ) {
         fromExpr(e.left)
         fromExpr(e.right)
@@ -940,6 +1142,17 @@ describe("R67 — a titled section stands on paper", () => {
             walk(b)
           } else fromExpr(b)
         }
+        return
+      }
+      // AMENDMENT 7 — a bare identifier (`{children}`, `{body}`, `{content}`)
+      // is a body this walk cannot see into, not an absent one. Counted
+      // rather than pushed: an untagged node would report as a literal
+      // `<null>` finding, which is not what it is — it is unmeasured, and the
+      // tripwire below is where that gets a reviewed number instead of a
+      // silent zero.
+      if (ts.isIdentifier(e)) {
+        amendment7.unresolvedIdentifiers++
+        return
       }
     }
     // A RENDER PROP's bodies are every expression it can RETURN — the same
@@ -1216,6 +1429,59 @@ describe("R67 — a titled section stands on paper", () => {
         "(the fourth overruled this file's own exemption); a zero here means the law has reverted to the " +
         "version she rejected while still passing"
     ).toBeGreaterThan(0)
+
+    // AMENDMENT 6's TRIPWIRE — THE OVERLAY FAMILY'S SKIP SET, BOTH WAYS. By
+    // the time this runs, the two census loops above have already called
+    // `isOverlay` on everything they met, so `overlayCache` holds today's real
+    // verdicts. A name it now says `true` for that `OVERLAY_FAMILY_OK` does
+    // not know about is a WIDENING that must be reviewed and named, not
+    // waved through; a pinned name it no longer agrees with is stale and the
+    // list can only shrink, the same rot-check `UNCONTAINED_SECTION_OK` uses.
+    const overlayTrueNow = [...overlayCache.entries()].filter(([, v]) => v).map(([k]) => k)
+    const newOverlay = overlayTrueNow.filter((n) => !(n in OVERLAY_FAMILY_OK))
+    expect(
+      newOverlay,
+      "isOverlay now returns true for a component OVERLAY_FAMILY_OK does not name — either it is a real " +
+        "scrim-standing surface (add it here with the chain that proves it) or the family has widened again " +
+        "the way Popover once did (narrow it back):"
+    ).toEqual([])
+    const staleOverlay = Object.keys(OVERLAY_FAMILY_OK).filter((n) => !overlayTrueNow.includes(n))
+    expect(
+      staleOverlay,
+      "these OVERLAY_FAMILY_OK entries match nothing isOverlay returns true for any more — delete them:"
+    ).toEqual([])
+
+    // AMENDMENT 7's TRIPWIRE, IN TWO HALVES LIKE AMENDMENT 4's. First the
+    // REVIEWED PIN against the real app: today it is zero, because the one
+    // live chokepoint that forwards `{children}` on a `<section>`
+    // (`settings-section.tsx`) paints itself directly and is resolved by
+    // shape (a) before `bodies()` is ever called on it — see that table's own
+    // comment. A rise here means a section's real content just went dark to
+    // this walk; resolve it one hop through the caller or explain the new
+    // count at this line.
+    expect(
+      amendment7.unresolvedIdentifiers,
+      "the real census now finds a bare identifier standing where a section's content should be — a " +
+        "component is forwarding `{children}`/`{body}`/`{content}` on an unpainted `<section>` the way " +
+        "`settings-section.tsx` almost does. Resolve it one hop through the caller, or explain the new " +
+        "count here (it must only ever rise together with a reason)"
+    ).toBe(0)
+    // …then the OWNED FIXTURE, so the counter's own wiring is proved without
+    // waiting for the app to grow a second chokepoint (this file's own most
+    // recent lesson, at amendment 5's `rootsFollowed` tripwire above).
+    const beforeFixture = amendment7.unresolvedIdentifiers
+    const fixtureBodies = bodies(firstSection(bareIdentifierFixture))
+    expect(
+      fixtureBodies,
+      "the owned fixture's `<section>{children}</section>` produced a real body — `bodies()` started " +
+        "resolving a bare identifier to JSX, which it cannot do; something upstream of this walk changed"
+    ).toEqual([])
+    expect(
+      amendment7.unresolvedIdentifiers - beforeFixture,
+      "the owned fixture's bare `{children}` was not counted — the AMENDMENT 7 branch in `fromExpr` stopped " +
+        "matching `ts.isIdentifier`, and a section that forwards its content invisibly is back to reading " +
+        "as a clean zero"
+    ).toBe(1)
   })
 
   it("sections-stand-on-paper: every titled section and every tab panel is contained, or says why not (R67)", () => {

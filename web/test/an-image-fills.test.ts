@@ -67,6 +67,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { OBJECT_FIT_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -124,30 +125,9 @@ const KIT = join(ROOT, "shared", "ui")
  *                                         not by three. */
 const KIT_CONTAIN_CEILING = 1
 
-/** THE ONE FIT THIS APP KEEPS, and the reason has to survive re-reading because
- * the ruling above has no exceptions clause in it.
- *
- * Rot-checked below: a line whose file no longer holds a non-`cover` fit turns
- * the build red, so this list can only shrink and can never become a place a
- * `contain` hides. */
-const OBJECT_FIT_OK: Record<string, string> = {
-  "shared/web/attachment-preview.tsx":
-    "The kit's media well showing a FILE somebody attached to a ticket — a " +
-    "screenshot of the thing that is broken, a scan, a photograph of a screen. " +
-    "Every other picture this law governs is a MARK: a logo, a face, a brand " +
-    "lockup, standing FOR a record whose name is written beside it, where a crop " +
-    "costs the edges of an identity the word already carries. This one IS the " +
-    "content, with no word beside it saying what was lost. The well is 16/9 and " +
-    "an attachment is not: a portrait screenshot cropped to it shows a band from " +
-    "the middle and hides the error message at the top, which is the reason the " +
-    "file was attached — and nothing on screen tells the reader that happened, " +
-    "because a crop looks exactly like a picture that was always that shape. " +
-    "The preview also OPENS the file, so containing it costs nothing a person " +
-    "cannot get past in one press. Flagged for the client rather than assumed: " +
-    "her ruling was made over marks in select components and filters, and this " +
-    "is the one site in the app it does not obviously describe. Delete this line " +
-    "the day she says it does.",
-}
+// OBJECT_FIT_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line
+// 13's promise made true — R60's own text already spoke of it as registry
+// data; moving makes that sentence true). Imported above.
 
 /** Every non-`cover` fit in one file, class-spelled or prop-spelled. Comments
  * are stripped first — a commented-out `object-contain` and a live one look

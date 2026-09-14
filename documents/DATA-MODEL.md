@@ -28,7 +28,7 @@ resumable ledger, and the size + rate watch) ·
 | Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
 | Content | `help` + `help_threads` (**Tickets**) · `help_status_events` · `help_ratings` · `help_stakeholders` · `team_ref_counters` · `ref_aliases` |
 | History + invites | `activity` · `invite_logs` |
-| Import | `data_import_sessions` · `data_import_batches` |
+| Import | `data_import_batches`. `data_import_sessions`, the table it superseded, was dropped 2026-09-14 (migration `0087`) |
 | The assistant | `agent_threads` + `agent_messages` |
 | The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
@@ -949,20 +949,25 @@ deactivations, milestones), superseding the earlier "edits/deactivations only",
 the SAME rows are surfaced four ways by the read path
 (`?scope=team|user|role|invite`).
 
-### data_import_sessions. KEEP (BUILT 2026-06-23, team migration `0004_modules`), the 3-stage import
-Real data: audit + the target (`table_key`/display), the column schema, a
-`reference_dataset_url`, an `overall_status`, and the three stages of the
-file → mapping → confirm session (uploaded CSV text + auto-mapped columns +
-preview + the write result). In the Kwapso System the data-ops worker drives the 3 stages
-(read → auto-map/validate → INSERT-ONLY write), writing **act-as-user** through
-the target's gated create endpoint (so each import respects the caller's
-permissions + the module's own validation). Gated by the target's `create`
-right, import has no key of its own. **Export needs READ, import needs CREATE**
-(the cross-cutting rule). A partial run is NOT a transaction: each row is an
-independent gated create, and confirm returns per-row truth, `{created,
-skipped, failed}` counts + up to five error messages, recorded on the session
-(rows missing required values are skipped at preview; a failed row never blocks
-the rest).
+### data_import_sessions. REMOVED (BUILT 2026-06-23, team migration `0004_modules`; DROPPED 2026-09-14, migration `0087`). THE ORIGINAL SINGLE-TARGET IMPORT
+
+**Superseded, not ruled on.** Unlike the rate cards below, nobody said "kill
+this" — `data_import_batches` (BUILT 2026-07-04, `0006_import_batches`) simply
+replaced it eleven days later with the agentic multi-file import
+(AGENTIC-IMPORT.md), and every door, lib and screen moved onto the new shape at
+the same time. The old table was never dropped when the new one landed; it was
+just the thing nothing pointed at any more, found by a read-only audit on
+14 Sep 2026.
+
+What it held, while it was live: audit + the target (`table_key`/display), the
+column schema, a `reference_dataset_url`, an `overall_status`, and the three
+stages of a file → mapping → confirm session (uploaded CSV text + auto-mapped
+columns + preview + the write result) — one file, one target, three stages as
+columns on one row. See `data_import_batches` below for the shape that replaced
+it, and its own migration `0087` for the two-method proof nothing read this
+table any more (a whole-repo grep and a read of the import pipeline's SQL
+literals both agreed) and why the drop needed no deploy ordering, unlike
+`0077`/`0078`.
 
 ### accounts + account_links + portal_users. KEEP (BUILT 2026-08-09, team migration `0007_customer_spine`). THE CUSTOMER SPINE
 Purpose: every company and every person kwapso works with, in **one** table
@@ -1112,8 +1117,9 @@ references, dependency order) and the per-row REPORT, all JSON columns here; per
 parsing reuses the single-target session engine. Real data: `id`, `overall_status`
 (draft→analyzing→planned→running→complete), `files_json`, `plan_json`, `report_json`,
 the audit block, `completed_at`. Creator-scoped (a batch belongs to who started it),
-like `data_import_sessions`. Lives in the TEAM database (the data being imported is the
-team's). Execution writes every row through the module's gated create endpoint
+the same way the single-target `data_import_sessions` it replaced was (that table
+was dropped 2026-09-14, migration `0087`; see above). Lives in the TEAM database
+(the data being imported is the team's). Execution writes every row through the module's gated create endpoint
 (act-as-user → audit parity); the plan step is metered on the AI credit pool.
 
 ### agent_threads + agent_messages. KEEP (BUILT 2026-06-23, team migration `0004_modules`), the AI agent's saved conversations
@@ -2227,7 +2233,8 @@ fact, not a record anybody curates.
   (per-team audit; BUILT 2026-06-22, M4). **Agent-modules build (BUILT
   2026-06-23)**: importable_databases, agent_usage, agent_credits, mcp_tokens (GLOBAL core
   0008/0009/0010); help, help_threads,
-  data_import_sessions, agent_threads, agent_messages (per-team `0004_modules`).
+  data_import_sessions (dropped 2026-09-14, `0087`, superseded by
+  data_import_batches below), agent_threads, agent_messages (per-team `0004_modules`).
   **Knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)**:
   knowledge_sources, knowledge_chunks, knowledge_terms, knowledge_ingest
   (per-team `0012_knowledge` + `0020_knowledge_vectors`). The search itself lives
@@ -2275,7 +2282,10 @@ fact, not a record anybody curates.
 
 Open questions Q1–Q4 (audit scope, selectable types, activity design, role
 defaults) were resolved before the foundation build; the "(later)" questions are
-now resolved too, import details are the 3-stage `data_import_sessions`, and
+now resolved too — import details shipped first as the 3-stage
+`data_import_sessions` (0004_modules, 2026-06-23), superseded by the agentic
+`data_import_batches` (0006_import_batches, 2026-07-04) and dropped in its own
+right 2026-09-14 (`0087`, see § *data_import_sessions* above) — and
 `importable_databases` stayed SEPARATE from the recipe/config system (an
 owner-maintained catalog).
 
@@ -2311,6 +2321,7 @@ owner-maintained catalog).
   dropped (it was a Glide limitation we don't have).
 
 Resolved in the agent-modules build (2026-06-23): the import-session details
-shipped as `data_import_sessions` (the 3-stage session); and
-`importable_databases` stayed SEPARATE from the recipe/config system (the locked
-decision above).
+shipped as `data_import_sessions` (the 3-stage session; superseded 2026-07-04 by
+`data_import_batches` and dropped 2026-09-14, `0087` — § *data_import_sessions*
+above); and `importable_databases` stayed SEPARATE from the recipe/config system
+(the locked decision above).

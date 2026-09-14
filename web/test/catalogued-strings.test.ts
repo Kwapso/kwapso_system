@@ -45,6 +45,7 @@ import {
   ROOT,
   VENDORED_UI,
   appFiles,
+  collapse,
   isUserVisible,
   parseFile,
   sourceFiles,
@@ -52,6 +53,7 @@ import {
 } from "../../scripts/lib/i18n-source.mjs"
 import { CATALOGUE, LANGUAGES, SEED, translate } from "@shared/i18n"
 import { formatRelative } from "@shared/web/format"
+import { UNWALKED_OK } from "@shared/rules/registry"
 
 /** What a whole-repo source scan is allowed to take. Stated once. */
 const SCAN_BUDGET_MS = 60_000
@@ -73,6 +75,50 @@ function stringsInSource(): Set<string> {
   const found = new Set<string>()
   for (const { tree } of walk())
     visitStrings(tree, ({ text }: { text: string }) => found.add(text))
+  return found
+}
+
+/** A literal first argument to a call named `translate` — used ONLY by the two
+ * orphan censuses below, never by the test above. `t(...)`'s sibling for the
+ * one shape `visitStrings`'s "toast" position cannot see: `shared/web/
+ * language-section.tsx` / `language-menu.tsx` compose the switch confirmation
+ * in the language just LEFT rather than the one bound to the render —
+ * `toast.success(translate("Language changed.", next))` — so a CallExpression
+ * sits where "toast" expects a literal and `literalTexts` never descends into
+ * it. `web/test/language-switcher.test.tsx` pins the sentence straight against
+ * `shared/i18n-seed.ts` because it has no other call site to be extracted
+ * from, and `scripts/i18n-prune.mjs` carries this exact same supplement (see
+ * its own `translateCallLiterals`) so the two agree about what a ROW prune may
+ * remove. Kept OUT of `stringsInSource()` above on purpose: that function feeds
+ * the i18n-strings.json census, and the plain extractor genuinely cannot see
+ * this position either, so widening it there would fail R28's MISSING check
+ * against a file `i18n-extract.mjs` (untouched here) still can't produce. */
+function translateCallLiterals(files: Walked[]): Set<string> {
+  const found = new Set<string>()
+  for (const { tree } of files) {
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "translate" &&
+        node.arguments.length > 0 &&
+        (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+      ) {
+        const text = collapse((node.arguments[0] as ts.StringLiteral).text)
+        if (isUserVisible(text)) found.add(text)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(tree)
+  }
+  return found
+}
+
+/** Every string the app still says, for deciding whether a CATALOGUE/SEED row
+ * is an orphan — `stringsInSource()` unioned with `translateCallLiterals`. */
+function stringsSaidByApp(): Set<string> {
+  const found = stringsInSource()
+  for (const text of translateCallLiterals(walk())) found.add(text)
   return found
 }
 
@@ -109,6 +155,46 @@ describe("R28 · the translation catalogue cannot rot", () => {
     // A whole-repo TypeScript parse, not a unit test: vitest's 5 s default is a
     // budget for arithmetic, and this one reads a few hundred files off disk
     // while fifty other suites share the machine.
+  }, SCAN_BUDGET_MS)
+
+  // THE ORPHAN CENSUS, OVER THE OTHER TWO FILES — R28's own text says "AN ENTRY
+  // MATCHING NO STRING IN THE APP IS AN ORPHAN AND GOES RED TOO", and until now
+  // that was true of exactly one of the three translation files.
+  // `shared/i18n-strings.json` is REGENERATED wholesale by the extractor, so it
+  // can never hold an orphan; `shared/i18n-catalogue.ts` and `shared/i18n-seed.ts`
+  // are the two files an orphan actually rots in, and neither was ever read here.
+  // "Size changed.", "Theme changed." and "Background changed." sat in the seed,
+  // fully translated into three languages, for as long as it took somebody to
+  // delete the toasts that said them — and nothing anywhere turned red.
+  //
+  // A HARD ZERO, not a ceiling like R44's. R44 bounds a DEBT (an untranslated
+  // string) that costs a person's time to pay down, so a hard zero there would
+  // fail the next ordinary PR that adds one label. An orphan costs nothing to
+  // remove — `node scripts/i18n-prune.mjs` deletes exactly the rows this census
+  // finds — so there is no debt here to bound, only a one-command fix a red
+  // build can name.
+  it("catalogued-strings: no orphaned row in shared/i18n-catalogue.ts — every key matches a string the app still says", () => {
+    const inApp = stringsSaidByApp()
+    const orphans = Object.keys(CATALOGUE)
+      .filter((k) => !inApp.has(k))
+      .sort()
+    expect(
+      orphans.slice(0, 20),
+      `${orphans.length} shared/i18n-catalogue.ts entr(ies) match no string in the app — translated on every ` +
+        `build for nothing, and free to remove. Run: node scripts/i18n-prune.mjs`
+    ).toEqual([])
+  }, SCAN_BUDGET_MS)
+
+  it("catalogued-strings: no orphaned row in shared/i18n-seed.ts — every key matches a string the app still says", () => {
+    const inApp = stringsSaidByApp()
+    const orphans = Object.keys(SEED)
+      .filter((k) => !inApp.has(k))
+      .sort()
+    expect(
+      orphans.slice(0, 20),
+      `${orphans.length} shared/i18n-seed.ts entr(ies) match no string in the app — translated on every ` +
+        `build for nothing, and free to remove. Run: node scripts/i18n-prune.mjs`
+    ).toEqual([])
   }, SCAN_BUDGET_MS)
 })
 
@@ -198,12 +284,9 @@ describe("R28 · what the one definition can see", () => {
 // A file the walk does not reach and that says something a person reads is a
 // reasoned line here, and the list is a ratchet: an entry that no longer
 // offends turns the build red, so it can only shrink.
-const UNWALKED_OK: Record<string, string> = {
-  "shared/workers/query-grammar.ts":
-    "the machine query grammar — what a MODEL may ask a module, and the words in it are FIELD NAMES and the other names a field answers to ('reference' for `ref`, 'name' for `title`), not copy. Nothing here reaches a screen: no front door imports it, the two doors that read it live on the tenancy worker, and its only human-facing prose is the one-line module summaries a MODEL reads in describe_module. Translating a field name would break the filter it names. The extractor is right that a quoted word sits in a position it watches; it is wrong about who reads it.",
-  "shared/workers/record-link.ts":
-    "R30's email button labels — 'Open the ticket', 'Open your requests'. A WORKER composes them into a message, for the recipient's own front door, and no front door imports this file. They are held by R30, not by a screen, and the pipeline that would translate them is the worker's per-request translator rather than the build-time catalogue. Widening R28 to reach them would put the email census under a law written about screens.",
-}
+//
+// UNWALKED_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line
+// 13's promise made true). Imported above.
 
 /** Every .ts/.tsx under the three roots that could hold front-door copy, minus
  * the ones no person ever reads: a test is not a screen, and neither is an
@@ -303,16 +386,23 @@ describe("R28 · what the walk can REACH", () => {
   it("a reader who chose German gets a German relative time", () => {
     // The proof, run rather than asserted about. Five days ago, in German, at
     // the two places it reaches a person: the formatter itself, and the record
-    // footer's one entry that joins a name and a time.
+    // footer's own name row.
+    //
+    // UPDATED 14 Sep 2026 alongside record-chrome.tsx's "THE DATE NOW RIDES THE
+    // LABEL SLOT" change: the record footer stopped joining a name and a time
+    // into one sentence ("Created by {name} · {when}") and started rendering
+    // them as two columns instead — `label: t("Created by {name}")` beside a
+    // bare `formatRelative` value — so that joined sentence retired from the
+    // catalogue, per R28, and this test's own assertion had to retire with it.
+    // The two surviving halves are checked separately, which is what the app
+    // itself now does.
     const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
     const de = (english: string, vars?: Record<string, string | number>) =>
       translate(english, "de", vars)
 
     expect(formatRelative(fiveDaysAgo, de, "de")).toBe("vor 5 Tagen")
     expect(formatRelative(new Date().toISOString(), de, "de")).toBe("gerade eben")
-    expect(de("Created by {name} · {when}", { name: "Aurora", when: formatRelative(fiveDaysAgo, de, "de") })).toBe(
-      "Erstellt von Aurora · vor 5 Tagen"
-    )
+    expect(de("Created by {name}", { name: "Aurora" })).toBe("Erstellt von Aurora")
 
     // Past a week it is an absolute date, which is `formatDate`'s job and the
     // reader's own locale — deliberately not a second time vocabulary.

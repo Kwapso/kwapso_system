@@ -31,6 +31,7 @@ import { describe, expect, it } from "vitest"
 import { join } from "node:path"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { ERROR_STATE_EXEMPT } from "@shared/rules/registry"
 
 const ROOT = join(__dirname, "..", "..")
 const COMPONENTS = join(ROOT, "web", "components")
@@ -78,26 +79,8 @@ const asksAbout = (guard: string): string[] => [
   ...new Set([...guard.matchAll(/\b(\w+Q)\.error/g)].map((m) => m[1])),
 ]
 
-/** THE ONE WAY OUT, and it carries the condition that deletes it.
- *
- * `knowledge-detail.tsx` is the third instance of exactly this bug — same two
- * queries, same missing term, same permanent skeleton as meeting-detail. It is
- * NOT fixed here because a separate session owns the knowledge base right now
- * and the owner asked for it to be left alone; editing this file from two
- * places at once is how a merge eats somebody's work.
- *
- * DELETE THIS ENTRY, and fix the screen, the moment that session's work lands.
- * It is rot-checked below in both directions: an entry naming a file that no
- * longer exists fails, and an entry naming a screen that has since been fixed
- * fails too — so it cannot quietly outlive its reason. */
-const ERROR_STATE_EXEMPT: Record<string, string> = {
-  "knowledge/knowledge-detail.tsx":
-    "A parallel session owns the knowledge base (owner's instruction, 2026-09-10), " +
-    "so this screen is not edited from here. Same bug as meeting-detail had: " +
-    "sourcesQ.error is asked, oneQ.error is not, and a failed by-id read holds the " +
-    "loading skeleton for ever. Delete this line and fix the guard once that " +
-    "session has landed.",
-}
+// ERROR_STATE_EXEMPT moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 describe("a record screen's error card catches every read it waits on", () => {
   const files = screenFiles()

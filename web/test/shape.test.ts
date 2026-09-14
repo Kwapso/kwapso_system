@@ -393,9 +393,12 @@ describe("shapeAccountsList", () => {
   })
 
   it("drops the parent from the line when a heading already names it", () => {
-    // The Contacts tab groups by company (contacts-by-company.tsx), so under the
-    // "Bergman S.A." heading every row saying "under Bergman S.A." would spend a
-    // third of a three-fact line on the fact the reader is looking AT.
+    // `sayParent=false` is for a caller that already groups rows under a
+    // heading naming the parent, so every row saying "under Bergman S.A."
+    // would spend a third of a three-fact line on the fact the reader is
+    // looking AT. (The one caller this was written for, contacts-by-company.tsx,
+    // was deleted 14 Sep 2026 as unreached dead code — this test keeps the
+    // shape covered on its own.)
     const rows = shapeAccountsList(
       [
         account({ id: "a1", name: "Bergman S.A." }),

@@ -71,6 +71,7 @@
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { RAW_DATE_EXEMPT } from "@shared/rules/registry"
 import { join } from "node:path"
 
 /** The formatters that make a date readable — all from the one file. A line
@@ -118,56 +119,8 @@ const ROOTS = [
   join(REPO_ROOT, "shared", "web"),
 ]
 
-/** Every reasoned exception to the two derivations above, one entry per
- * offending line. Rot-checked BOTH ways below: a line no longer matching the
- * pattern it was pinned for is a stale exemption, exactly as much a failure
- * as an unlisted offender — so the list can only shrink or stay current. */
-const RAW_DATE_EXEMPT: Record<string, string> = {
-  "web/components/records/record-calendar.tsx:149":
-    "the month heading needs the reader's own LONG month name + year — " +
-    "shared/web/format.ts has no formatter for that shape (formatMonth is " +
-    "the short-month AXIS one) — so it calls Intl directly, with the real " +
-    "`lang` (this line used to pass `undefined`, which is the bug R1 of this " +
-    "pass fixed).",
-  "web/components/records/record-calendar.tsx:159":
-    "the weekday headings need the reader's own weekday names alone, and no " +
-    "formatter in shared/web/format.ts produces that shape either — Intl " +
-    "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:167":
-    "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
-    "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
-    "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
-    "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
-    "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
-    "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
-  "web/components/deep-link/shape.tsx:100":
-    "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
-    "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
-    "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
-    "on 7 Sep 2026, when `shapeActivity` gained a named return type, and to :90 on 9 Sep 2026 when `TeamMeta` left the import block with the deleted team-overview shaper — " +
-    "`ActivityFeedRow` — and the import and its note landed above this line; " +
-    "and to :96 the same day, when the contacts TABLE landed and `REF_LEADS_NAME` " +
-    "joined the import block above it with the note saying why the class is " +
-    "shared rather than respelled; and to :94 on 10 Sep 2026, when kb_F deleted " +
-    "the knowledge section's two dead exports (`knowledgeFiledUnder`, " +
-    "`shapeKnowledgeList` — superseded by `KnowledgeSourceCard`) and their " +
-    "now-unused `Icon`/`IconName`/`KnowledgeSource` imports two lines above " +
-    "this one; and to :100 on 14 Sep 2026, when the system-wide Choices tab's " +
-    "own shaper (`shapeChoicesTable`) landed five single-line imports and a " +
-    "`SelectableValue` type import above this one, six lines net.)",
-  "web/components/work/work-panels.tsx:1500":
-    "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
-    "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
-    "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
-    "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
-    "from a `ref · title` string into the black reference chip beside the " +
-    "title, which is thirteen lines of JSX where there was one; from " +
-    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; " +
-    "back to :1491 the same day again, when the ticket panel above lost its " +
-    "`marks` prop and the `<RecordMark>` it drew — three lines net; and to " +
-    ":1500 on 9 Sep 2026, when R62 folded this file's two zero states into one " +
-    "`CollectionEmptyState` call and its note, nine lines net, landed above.)",
-}
+// RAW_DATE_EXEMPT moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 describe("no screen shows a raw timestamp", () => {
   /* THIS CENSUS ALREADY HAS ITS BLINDNESS TRIPWIRE, and it is the rot check —

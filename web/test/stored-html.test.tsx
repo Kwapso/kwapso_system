@@ -32,6 +32,7 @@ import { cleanup, render } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { MAY_INJECT } from "@shared/rules/registry"
 import { RichText } from "@shared/web/rich-text-view"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -41,24 +42,8 @@ afterEach(cleanup)
 
 /* ------------------------- 1 · the injection census ------------------------ */
 
-/**
- * The ONLY places either front door may hand a string to the browser as markup.
- * Data, not judgement in code — every entry is a visible line with the reason it
- * is safe, the same shape rich-text.test.ts's NOT_USER_TYPED uses. Anything else
- * is an offender, whatever it claims to have sanitised on the way in.
- */
-const MAY_INJECT: Record<string, string> = {
-  "shared/web/rich-text-view.tsx":
-    "THE seam. Both branches produce known-safe HTML: sanitizeRichHtml (parse detached → allow-list) for a body with tags, toHtml (escape-first markdown) for one without.",
-  "web/components/assistant/agent-markdown.tsx":
-    "the assistant's own reply, through the same escape-first toHtml — the text is escaped before any markup is added, so its output is safe by construction",
-  "shared/web/theme-provider.tsx":
-    "the pre-paint theme boot script — a module constant written in this repo (apply localStorage's stored data-theme before first paint, the design kit's own prescribed snippet). No value from a request or a row reaches it.",
-  "shared/web/mark-runtime.tsx":
-    "two module constants (the mark's CSS and its animator script) written in this repo — no value from a request or a row reaches them",
-  "shared/web/mark-loader.tsx":
-    "the mark's own markup, a module constant built from module constants (shared/web/splash.ts → splashInner). It is server-rendered on purpose: an empty box in the exported HTML is a blank screen until the bundle lands.",
-}
+// MAY_INJECT moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line 13's
+// promise made true). Imported above.
 
 describe("no screen injects markup except through the one seam", () => {
   it("every dangerouslySetInnerHTML on either front door is a reviewed site", () => {

@@ -77,59 +77,14 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { GONE_ON_PURPOSE } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 
-/** A path our own words name on purpose, knowing it is not there. */
-const GONE_ON_PURPOSE: Record<string, string> = {
-  // ── THE INTERNAL RATES, retired whole on 2026-09-10 at the client's ruling
-  // ("kill the whole internal rates thing … for now i iwanna wipe it clean").
-  // Three files went, and each is still NAMED somewhere precisely because it is
-  // gone — which is the shape this list exists for.
-  "workers/tenancy/src/lib/internal-money.ts":
-    "the file R24 was built around: the agency's own two cost cards and the margin, in ONE file nothing a client login could reach imported. RULES.md's R24 row, CLAUDE.md, the registry's law text, the retirement record in rules.test.ts, money.test.ts's retired margin block, BUILD-A-MODULE.md and team migration 0031's annotation all name it, and every one of those sentences is ABOUT its deletion — the law's structural half cannot be explained without naming the thing that was structural",
-  "web/components/money/internal-rate-card.tsx":
-    "the internal rate card screen, which also carried the role rate card. CONTROL-SWAP-LANES.md's lane manifest is a snapshot of the files that lane was handed and is left as counted, and a lane report in .session-notes/lanes/ measures its first-run copy — both are records of a moment, and rewriting a snapshot to match today is how a snapshot stops being evidence",
-  "web/components/money/margin-panel.tsx":
-    "the \"what this account leaves us\" figure on a client's Rates tab, the margin's only consumer, which could not survive the loss of its input. Named in a lane report that measured its empty-state copy — the same snapshot argument as the card above",
-  "web/components/team/role-detail.tsx":
-    "the per-role screen the client deleted on 2026-09-09 (\"I want to see the roles much differently… all the roles together\"). Every role's sheet is one grid on Settings › Team now (roles-matrix.tsx), and half a dozen comments — module-content.tsx's `roles` branch, the roles matrix's own header, web/lib/pages.ts, R36's screen clause in rules.test.ts — name this path precisely BECAUSE it is gone, which is what makes each of those sentences readable",
-  "web/lib/use-live-refetch.ts":
-    "R15's retired half. RULES.md, CACHING.md and the registry all say this hook was deleted when paging moved to cursors over the shared store — naming it is the whole point of the sentence",
-  "web/lib/live-bus.ts":
-    "CACHING.md, one sentence on from the hook above: the bus 'outlived its only subscriber and is now gone too'",
-  "web/components/condensed-title.tsx":
-    "the registry's R46 note on the kit's `useIsVisible`: its one caller in the app, removed when the client asked for the compressed title bar to go",
-  "web/components/knowledge-ask.tsx":
-    "CONTROL-SWAP-LANES.md's lane A manifest — a snapshot of the files that lane was handed, left as counted and annotated at the top of the file",
-  "shared/web/screen-engine/range-facet.tsx":
-    "CONTROL-SWAP-LANES.md's lane C manifest, same snapshot: it went when the filter row became the design kit's",
-  "shared/web/screen-engine/searchable-facet.tsx":
-    "CONTROL-SWAP-LANES.md's lane C manifest, same snapshot and the same commit",
-  "web-portal/components/auth-artwork.tsx":
-    "UI-GAPS.md row 23 records the file's own deletion — it says 'is deleted', which is the fact the row exists to carry",
-  "shared/ui/lib/recipe.ts":
-    "SCREEN-ENGINE-PLAN.md says the recipe type 'was' here while the engine lived in the library, and where it is now",
-  "shared/ui/styles.css":
-    "UI-CONVENTIONS.md says in so many words 'There is no shared/ui/styles.css'; OPERATIONS.md dates the vendoring that ended it, library-map.md is the superseded swap key that mapped its tokens, and both apps' globals.css and shared/brand.ts name it in the same past tense",
-  "shared/web/brand-theme.tsx":
-    "the `<style>` tag that stood six mango tokens in front of the old library's teal preset. RESKIN-REPORT.md records the end of it — 'the theme IS the kwapso palette now, so BrandTheme is gone' — and design/library-map.md, which carries a SUPERSEDED banner of its own, names the file twice as the middle layer of the three-deep chain that swap removed. Found only when the docs census learned to read markdown that lives outside documents/",
-  "web/components/temp/auth-card.tsx":
-    "the temp/ folder went when the kit shipped its own sign-in composition; `web/components/shell/auth-card.tsx`'s header says what it 'was'",
-  "web/components/temp/code-input.tsx":
-    "the same folder, named by the portal's own compile fence as the file whose planned deletion would once have broken the other app",
-  "workers/auth/test/session-read-seam.test.ts":
-    "`web/test/one-cookie-name.test.ts` records the two suites it was merged out of, on 6 Sep 2026 — the names are the record",
-  "web/components/help-status-stepper.tsx":
-    "COMPOSITION-MISMATCHES.md and NEEDS-A-SPEC.md both name it to say it is GONE: the client's 31 Aug 2026 ruling that nothing renders after the chips row put a status track below them out of bounds, and this wrapper was removed rather than relocated on 1 Sep 2026. Both entries were kept, not deleted, because the composition question survives the component",
-  "web/components/story-status-stepper.tsx":
-    "the other half of the same removal, named in the same two sentences for the same reason",
-  "web/lib/api.ts":
-    "the agency client became a directory; `workers/gateway/test/agency-door.test.ts` explains that it walks the directory precisely because it 'used to be' this one file",
-  "scripts/icon-art.mjs":
-    "the stage that stood lucide's glyphs in front of the kit's icon-name placeholders until v1.0.8 shipped 1,383 drawn glyphs. `scripts/sync-design.mjs` names it in the comment that replaced the call — 'is deleted rather than left switched off' — which is the sentence that tells the next reader the art stage is not merely disabled somewhere they have not looked",
-}
+// GONE_ON_PURPOSE moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true — a deny-list is DATA in the registry, not a
+// local const in the test that reads it). Imported above.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WHAT THE REPO KEEPS, versus WHAT THE REPO MAKES.

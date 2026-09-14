@@ -27,6 +27,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { sourceFiles, stripComments, stripJsoncComments } from "@shared/rules/source-scan"
+import { HAND_ROLLED_STRIPPER_OK, CONTROL_BYTE_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
@@ -103,28 +104,8 @@ describe("the one walker every law reads source through", () => {
   })
 })
 
-/** WHO MAY STRIP A COMMENT BY HAND. One entry, and it is not TypeScript at all:
- * a CSS comment is `/*` … `*\u200b/` and CSS has no line comment, so running the
- * TypeScript stripper over a token value would delete a `//` that CSS reads as
- * part of a URL. Everything else that used to do this has been moved onto the
- * shared one — see the census below for why. */
-const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
-  "web/test/theme-tokens.test.ts":
-    "strips a CSS comment out of a CSS custom property's VALUE, read from tokens.css. Not TypeScript: `//` is not a comment in CSS, it is the middle of a url(), so the shared stripper is the wrong tool here and would silently eat one",
-  /* THE ROT CHECK WORKED, AND THIS IS WHAT IT LOOKS LIKE — 8 Sep 2026.
-   *
-   * `build-tokens.mjs` was listed here on 7 Sep, with the note that "if a kit
-   * sync ever removes it this line goes red and gets deleted". Kit v1.2.69 did
-   * exactly that: it lifted the token walk out into `token-model.mjs` so the
-   * generator and the new contrast law resolve tokens through ONE reader, and
-   * the stripper went with it. The line went red on the first check after the
-   * sync and is deleted here. Nothing was lost — the same CSS case simply
-   * lives in different files now, named below. */
-  "shared/ui/foundations/tokens/token-model.mjs":
-    "the VENDORED KIT's token reader, and the same CSS case the entry above was written for: it walks `tokens.css`, where `//` is not a comment but the middle of a `url()`, so the shared TypeScript stripper is the wrong tool and would silently eat one. `shared/ui/` is a dependency this repo may not hand-edit at all — `web/test/vendored-kit.test.ts` recomputes its content hash — so this can only ever be fixed upstream, and a kit sync that moves it will turn this line red exactly as the last one did",
-  "shared/ui/foundations/tokens/check-contrast.mjs":
-    "the kit's contrast law, reading the same `tokens.css` through the same CSS rules as the reader above. It is the check that found three surfaces painting themselves onto themselves on 7-8 Sep 2026; it cannot import a TypeScript stripper from an app that vendors it, and the CSS case is not what that stripper is for",
-}
+// HAND_ROLLED_STRIPPER_OK moved to shared/rules/registry.ts, 14 Sep 2026
+// (RULES.md line 13's promise made true). Imported above.
 
 /** Every .ts/.tsx in the repo's own source — both front ends, every worker, and
  * shared/. Uses the walker under test, which is fine: if the walk were broken the
@@ -774,18 +755,8 @@ describe("no law reads a file the stripper quietly shortened", () => {
   })
 })
 
-/** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. Data, rot-checked both
- * ways, so a file that no longer has one turns this red and the line is deleted.
- *
- * EMPTY, AND IT GOT THERE THE WAY AN EXEMPTION IS SUPPOSED TO. It opened with
- * one entry, for the vendored kit's `use-remembered-view.ts`, and the reason
- * named the condition under which the line would disappear: the kit is a pinned
- * dependency this repo may not hand-edit (`web/test/vendored-kit.test.ts`
- * recomputes its content hash), so the fix could only be made upstream in
- * Kwapso/kwapso-ui-ux and a sync would clear it. That is what happened, the same
- * day, in kit v1.2.74. An exemption whose reason cannot be read as an
- * instruction is a permanent one. */
-const CONTROL_BYTE_OK: Record<string, string> = {}
+// CONTROL_BYTE_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 describe("no source file is invisible to a text search", () => {
   it("carries no raw control byte, which makes grep skip the WHOLE file in silence", () => {

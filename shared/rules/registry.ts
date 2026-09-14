@@ -330,7 +330,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R32",
     dimension: "ui",
-    law: "EVERY COLOUR RESOLVES THROUGH A TOKEN. No screen in `web/`, `web-portal/` or `shared/` may name a Tailwind colour ramp (`amber-*`, `emerald-*`, `red-*`, `green-*`, `blue-*`, `slate-*`, `gray-*`, `zinc-*` …) or write a hex literal. What a colour MEANS has a token — `warning`, `success`, `destructive`, `muted`, `primary`, `chart-1` to `chart-5` — and a mark comes from the chart series (UI-RULEBOOK C6). The five files that legitimately hold hexes are DATA in `PALETTE_LITERAL_OK`, each with its reason, and rot-checked so the list can only shrink.",
+    law: "EVERY COLOUR RESOLVES THROUGH A TOKEN. No screen in `web/`, `web-portal/` or `shared/` may name a Tailwind colour ramp (`amber-*`, `emerald-*`, `red-*`, `green-*`, `blue-*`, `slate-*`, `gray-*`, `zinc-*` …) or write a hex literal. What a colour MEANS has a token — `warning`, `success`, `destructive`, `muted`, `primary`, `chart-1` to `chart-5` — and a mark comes from the chart series (UI-RULEBOOK C6). The files that legitimately hold hexes are DATA in `PALETTE_LITERAL_OK`, each with its reason, and rot-checked so the list can only shrink.",
     why: "A hard-coded colour is invisible to a theme. `import-screen.tsx` said `amber-600` and `emerald-500` where it meant warning and success, so the one screen in the app that reports a result was the one screen a rebrand could not reach; `shared/departments.ts` held five hexes the LEGACY app had chosen, none of them one of kwapso's own seven, so a department dot was the single mark on screen that did not belong to this product's palette. Neither was a bug anybody would file — both look fine, in one theme, on one day. That is the whole argument for making it a law rather than a review note: colour drift is only ever visible in aggregate, and nobody sees the aggregate.",
     checkId: "closed-palette",
     status: "enforced",
@@ -609,7 +609,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R67",
     dimension: "ui",
-    law: "A TITLED SECTION \u2014 OR A TAB PANEL \u2014 STANDS ON PAPER; NOTHING IS DRAWN ON THE BARE PAGE GROUND. The FIRST subject is every `<section>` ELEMENT under `web/`, `web-portal/` or `shared/web/` \u2014 the source's own statement that this is a section of content. It was a `<section>` CARRYING A HEADING of its own (`<h1>`\u2026`<h4>`, the kit's `<Headline>`, or `<CollectionHeading>`) until amendment 4 (2026-09-11) dropped the heading requirement, because the client's fourth ruling DELETED two headings and under the old subject that would have taken both sections out of the law on the same commit that answered her \u2014 a heading was only ever a proxy for the `<section>` tag. A CONTAINER IS DERIVED, never listed: the paper family is read off the kit's own `shared/ui/foundations/tokens/tokens.css` \u2014 every `--surface-*` token, plus an alias MORE THAN ONE of them points at (which is `--card`, and is why `bg-card` counts and `bg-muted`, reached by `--surface-idle` alone, does not), MINUS `--surface-page`, which the kit defines as `var(--background)` and which IS the ground \u2014 AND MINUS EVERY FILL THAT RESOLVES TO THE GROUND'S OWN COLOUR IN EITHER PALETTE (amendment 1, 2026-09-11). The family used to subtract the ground by SPELLING, and four survivors are the page colour: in light `--card`, `--surface-raised`, `--surface-lift` and `--surface-selected` all resolve to #FFFEF9 and so does `--background`; `--surface-idle` and `--surface-record-footer` collide in dark at #141310. So a body painted `bg-card` and standing on the page was answering \"I am contained\" at CONTRAST 1.000 \u2014 the exact pairing this rule's own `why` cites as the bug it was written for. Values are resolved off `tokens.css` through its `var()` chains, per palette, with CSS COMMENTS STRIPPED FIRST because that file quotes declarations inside its own prose and an unstripped read fills the light map with sentences. BOTH palettes, not either: a container invisible in one theme is what this law exists to stop. This does not say `bg-card` is never a container \u2014 a raised card on soft paper is the kit's own \u00a72.6 pairing \u2014 it says `bg-card` cannot contain what stands on the PAGE, and by the time the set is consulted nothing above has painted. A section passes in exactly TWO shapes, and they are one sentence read from either end. Either the section IS the box \u2014 it or a JSX ancestor in its own file carries a paper fill, which is what `web/components/team/team-panel.tsx` does \u2014 or EVERY BODY it draws stands in one, which is what `CollectionFrame` does on every collection screen in the base: heading outside, content on paper. THE CLAUSE WITH THE TEETH IS \"every body\": containment is asked PER BRANCH, walking through fragments, ternaries, `&&` and `.map()`, so a section cannot pass on the strength of the one branch that happens to have a panel in it. FOUR THINGS ARE DELIBERATELY NOT CONTENT, each a decision rather than a convenience: the TITLE BLOCK (any child that itself carries the heading \u2014 a heading is not something that stands on anything, and the create button rides beside it); PROSE (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>` \u2014 a sentence under a heading is part of the title block, and every settings section in the app is heading + sentence + control); an ACT (a lone `<Button>`, or a component that renders nothing but one \u2014 \"Show older\", \"Try again\"; a control is pressed, not read); and an OVERLAY (a component that reaches a portal, resolved transitively \u2014 `<AddLinkDialog>` is a `<FormShellDialog>` is a kit `<Sheet>` is a Radix portal, and stopping at the first hop reported a slide-in form as content lying on the page). Anything `hidden`/`sr-only` is skipped for the same reason. The census is a real syntax tree, not a regex over indentation, and it resolves what a component paints through the module-scope constants its own file declares (`Skeleton` \u2192 `skeletonVariants` \u2192 `cva(PULSE, \u2026)` \u2192 `bg-surface-quiet`) \u2014 BUT WHERE THAT FILL COMES FROM A `cva`, THE VARIANT THE CALL SITE SELECTS DECIDES (amendment 2, 2026-09-11). Reading a component's whole text counts every variant's classes whether or not anybody reaches for them, so `<CardGrid>` \u2014 whose `tone` DEFAULTS to `bare`, which paints nothing \u2014 answered \"I paint\" off the `panel` option declared two lines below it, and that call was the wall the client reported. The literal a site passes decides, else `defaultVariants`; a prop that is not a literal stays \"may paint\" if any option does, so the walk keeps under-reaching, and a `cva` the component does not actually call is never read. THE SECOND SUBJECT IS A TAB PANEL (amendment 3, 2026-09-11): every body a `renderPanel` returns, per branch. A tab panel is titled by its STRIP, so it carries no heading of its own and the first subject could never reach it \u2014 14 hosts and 70 bodies outside the law by construction, including the settings tabs two of the client's three rulings were about. It passes the same two ways: the `<TabsView>` MOUNT is boxed by an ancestor (11 of 14 are, because a record detail hands its whole strip to `RecordScreen`'s card; without the ancestor walk the clause reports 18 offenders and 14 are that container seen from inside), or every body stands on paper. Panel exemptions are keyed `path#tabValue` rather than per file, because one file's tabs are not one decision. Exceptions are data in `UNCONTAINED_SECTION_OK` with a reason each, rot-checked, so the list can only shrink. A blindness tripwire fails the build if the derived fill family, the file walk, or the heading census ever comes back empty, if no section passes at all, if the panel census finds no hosts or boxes all of them \u2014 and, for amendment 1, if the two palettes resolve `--background` to the same literal or the by-value subtraction stops dropping `--card`, because a resolver that has quietly stopped resolving returns the old family and passes exactly like a law that works. AMENDMENT 4 (2026-09-11) \u2014 PROSE IS CONTENT WHEN IT IS NOT INSIDE THE THING IT DESCRIBES, AND A SECTION DOES NOT LEAVE THIS LAW BY DELETING ITS TITLE. This is the first amendment that is not a hole being closed: it is THIS LAW'S OWN WRITTEN EXEMPTION, OVERRULED BY THE PERSON IT WAS WRITTEN FOR. The PROSE exclusion above used to read, in full, \"`<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>`. A sentence directly under a heading is part of the title block. Every settings section in this app is heading + sentence + control, and boxing the sentence would be a different design, not this rule\" \u2014 a prediction about what the client wanted, made on her behalf, in a lane she was not in. On 2026-09-11, looking at the screen that exemption blessed, she ruled the opposite. So prose is exempt only where it is IN the title block (already skipped as a unit) or inside a body that paints (already skipped by the subtree walk); a sentence that is its OWN body, standing on the page ground BESIDE the box it describes, is content and fails. TWO TAGS SURVIVE, neither for being prose: `<br>` draws nothing readable, and `<a>` is an ACT \u2014 \"a control is pressed, not read\" is this law's own sentence about a lone `<Button>`, and catching the link beside the button would be the law disagreeing with itself about one decision. AND THE SUBJECT LOST ITS HEADING REQUIREMENT IN THE SAME AMENDMENT, which is the sharpest argument here for deriving a subject rather than picking one: her fix DELETED two headings, so under the old subject the very commit that answered her would have taken both sections out of the law. A law you leave by deleting your title rewards the wrong fix. The subject is now every `<section>` ELEMENT \u2014 the source's own statement that this is a section of content, which the heading was only ever a proxy for. WHAT THIS STILL CANNOT SEE, measured rather than assumed: the seven MODULE SETTINGS pages, which are the app's largest heading+sentence-on-the-ground surface and are outside for two independent reasons \u2014 their root is a `<div>`, and their words arrive as PROPS off the `MODULE_SETTINGS` table rather than as literals at the position that draws them. A variant that also judged prose inside the title block was written and measured the same day and is NOT here because the census came back byte-identical: every title block in this repo that pairs a heading with a sentence lives in a `<div>`-rooted component, so the clause would have enforced nothing, and a clause that measures zero is what this file's tripwire refuses. AMENDMENT 4 HAS ITS OWN TRIPWIRE, because both of its halves are SUBTRACTIONS from what used to be waved through and a subtraction that stops subtracting is invisible: at least one `<section>` with no heading must be in the census (else the widening admitted nothing and the two un-titled sections are outside the law again), and at least one bare body must be a readable sentence (else the narrowed exemption catches nothing and the law has silently reverted to the version she rejected, while passing). AMENDMENT 5 (2026-09-11) \u2014 A COMPONENT PAINTS WHAT ITS OWN ROOT PAINTS, AND THIS AMENDMENT EXISTS BECAUSE THIS LAW TURNED RED ON THE COMMIT THAT FIXED FOUR SCREENS. The client, a FIFTH time, over a screenshot of Settings \u203a Ticket settings: \"ticket types should be on top of the searchbar inside the container without subtitle, make this. always\" \u2014 the first of the five that says where a title GOES rather than only where it may not stand. THE ANSWER IS A CHOKEPOINT, NOT A SIXTH REPAIR, and it is the move amendment 4's own blind-spot note called for: the fourteen module settings sections are unreachable here because their root is a `<div>` and their words are PROPS, and reaching them means judging a component by the props it is handed \u2014 a different oracle with a real cost, and \"we fixed fourteen sections and nothing stops the fifteenth\" is the state that produced this week. So the title stopped being something a call site can PLACE. `<ToolbarRow title>` takes a STRING (never a node, the same move R53 made for the sort control) and draws it inside the pinned band; `shared/web/settings-section.tsx` owns the box AND the heading everywhere there is no toolbar; and `MODULE_SETTINGS` lost its `description` COLUMN with the sentences, so a fifteenth section has nowhere to declare a subtitle. A fault that cannot be written beats a census that catches it afterwards. WHAT THAT COST THIS LAW, AND WHAT THE AMENDMENT IS. `componentPaints` reads a component's own text and its own file's constants and deliberately does NOT follow what it RENDERS \u2014 the version that did was thrown away because `CollectionEmptyState` resolves a fill two files away and every uncontained zero register in the app came back green. The moment `ThemeSection`, `ScaleSection`, `SpineSection` and `LanguageSection` stood in a shared box instead of spelling `bg-surface-panel` themselves, Settings \u203a Appearance \u2014 which had passed since the day this law was written \u2014 reported as a bare `<div>` on the page ground. A law that reddens when four screens are fixed by one component is measuring the WRITING and not the SCREEN. SO THE WALK FOLLOWS ONE EDGE: the single element a component RETURNS, resolved the same way, transitively (`ThemeSection` \u2192 `SettingsSection` \u2192 `<section className=\"\u2026 bg-surface-panel \u2026\">`, three files, one edge each). THIS IS NOT THE THROWN-AWAY VERSION and the difference is in kind: that one followed every component a component renders, so a fill anywhere in the subtree answered for all of it; this follows the box the component IS, which is the box its caller is standing in too. `CollectionEmptyState` roots at a bare `<div data-slot=\"collection-empty-body\">` and still does not paint. EVERY return, not the last one \u2014 a component with an early `return <ErrorPanel/>` has more than one root and they are not interchangeable, which is this law's per-branch clause read one level down, keeping the same under-reaching direction. MEASURED: the root walk changed exactly ONE verdict in the whole census, the false one it was written for. ITS TRIPWIRE PULLS BOTH WAYS, because a widening fails invisibly in two directions: at least one component must be found to paint through its own root (else the amendment admitted nothing and the chokepoint has been unpicked), and `CollectionEmptyState` must NOT paint (else the thrown-away version is back and every uncontained zero register is green again). AND `UNCONTAINED_SECTION_OK` LOST SIX LINES ON THE SAME DAY THEY WERE WRITTEN \u2014 the three Appearance sections, both work-module sections and the portal's savings page, which had been a census \"awaiting ONE ruling\" and got one. The outlier (\"The section description: no, I want to keep it\", 2026-09-10) is OVERRULED by the two clearer \"no subtitle\" statements either side of it, the later one drawn on a screenshot; the reasoning is recorded at each deletion rather than only here. `impact-screen.tsx` is the one file the portal block has ever lost: its own source argued in writing that \"one fewer drawn line is worth having\" on the screen a client shows other people, that comment is KEPT verbatim beside the container it lost to, and what decided it is that a screen arguing itself out of a law in its own comment is the pattern all five rulings overturned somewhere else.",
+    law: "A TITLED SECTION \u2014 OR A TAB PANEL \u2014 STANDS ON PAPER; NOTHING IS DRAWN ON THE BARE PAGE GROUND. The FIRST subject is every `<section>` ELEMENT under `web/`, `web-portal/` or `shared/web/` \u2014 the source's own statement that this is a section of content. It was a `<section>` CARRYING A HEADING of its own (`<h1>`\u2026`<h4>`, the kit's `<Headline>`, or `<CollectionHeading>`) until amendment 4 (2026-09-11) dropped the heading requirement, because the client's fourth ruling DELETED two headings and under the old subject that would have taken both sections out of the law on the same commit that answered her \u2014 a heading was only ever a proxy for the `<section>` tag. A CONTAINER IS DERIVED, never listed: the paper family is read off the kit's own `shared/ui/foundations/tokens/tokens.css` \u2014 every `--surface-*` token, plus an alias MORE THAN ONE of them points at (which is `--card`, and is why `bg-card` counts and `bg-muted`, reached by `--surface-idle` alone, does not), MINUS `--surface-page`, which the kit defines as `var(--background)` and which IS the ground \u2014 AND MINUS EVERY FILL THAT RESOLVES TO THE GROUND'S OWN COLOUR IN EITHER PALETTE (amendment 1, 2026-09-11). The family used to subtract the ground by SPELLING, and four survivors are the page colour: in light `--card`, `--surface-raised`, `--surface-lift` and `--surface-selected` all resolve to #FFFEF9 and so does `--background`; `--surface-idle` and `--surface-record-footer` collide in dark at #141310. So a body painted `bg-card` and standing on the page was answering \"I am contained\" at CONTRAST 1.000 \u2014 the exact pairing this rule's own `why` cites as the bug it was written for. Values are resolved off `tokens.css` through its `var()` chains, per palette, with CSS COMMENTS STRIPPED FIRST because that file quotes declarations inside its own prose and an unstripped read fills the light map with sentences. BOTH palettes, not either: a container invisible in one theme is what this law exists to stop. This does not say `bg-card` is never a container \u2014 a raised card on soft paper is the kit's own \u00a72.6 pairing \u2014 it says `bg-card` cannot contain what stands on the PAGE, and by the time the set is consulted nothing above has painted. A section passes in exactly TWO shapes, and they are one sentence read from either end. Either the section IS the box \u2014 it or a JSX ancestor in its own file carries a paper fill, which is what `web/components/team/team-panel.tsx` does \u2014 or EVERY BODY it draws stands in one, which is what `CollectionFrame` does on every collection screen in the base: heading outside, content on paper. THE CLAUSE WITH THE TEETH IS \"every body\": containment is asked PER BRANCH, walking through fragments, ternaries, `&&` and `.map()`, so a section cannot pass on the strength of the one branch that happens to have a panel in it. FOUR THINGS ARE DELIBERATELY NOT CONTENT, each a decision rather than a convenience: the TITLE BLOCK (any child that itself carries the heading \u2014 a heading is not something that stands on anything, and the create button rides beside it); PROSE (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>` \u2014 a sentence under a heading is part of the title block, and every settings section in the app is heading + sentence + control); an ACT (a lone `<Button>`, or a component that renders nothing but one \u2014 \"Show older\", \"Try again\"; a control is pressed, not read); and an OVERLAY (a component that reaches a portal, resolved transitively \u2014 `<AddLinkDialog>` is a `<FormShellDialog>` is a kit `<Sheet>` is a Radix portal, and stopping at the first hop reported a slide-in form as content lying on the page). Anything `hidden`/`sr-only` is skipped for the same reason. The census is a real syntax tree, not a regex over indentation, and it resolves what a component paints through the module-scope constants its own file declares (`Skeleton` \u2192 `skeletonVariants` \u2192 `cva(PULSE, \u2026)` \u2192 `bg-surface-quiet`) \u2014 BUT WHERE THAT FILL COMES FROM A `cva`, THE VARIANT THE CALL SITE SELECTS DECIDES (amendment 2, 2026-09-11). Reading a component's whole text counts every variant's classes whether or not anybody reaches for them, so `<CardGrid>` \u2014 whose `tone` DEFAULTS to `bare`, which paints nothing \u2014 answered \"I paint\" off the `panel` option declared two lines below it, and that call was the wall the client reported. The literal a site passes decides, else `defaultVariants`; a prop that is not a literal stays \"may paint\" if any option does, so the walk keeps under-reaching, and a `cva` the component does not actually call is never read. THE SECOND SUBJECT IS A TAB PANEL (amendment 3, 2026-09-11): every body a `renderPanel` returns, per branch. A tab panel is titled by its STRIP, so it carries no heading of its own and the first subject could never reach it \u2014 14 hosts and 70 bodies outside the law by construction, including the settings tabs two of the client's three rulings were about. It passes the same two ways: the `<TabsView>` MOUNT is boxed by an ancestor (11 of 14 are, because a record detail hands its whole strip to `RecordScreen`'s card; without the ancestor walk the clause reports 18 offenders and 14 are that container seen from inside), or every body stands on paper. Panel exemptions are keyed `path#tabValue` rather than per file, because one file's tabs are not one decision. Exceptions are data in `UNCONTAINED_SECTION_OK` with a reason each, rot-checked, so the list can only shrink. A blindness tripwire fails the build if the derived fill family, the file walk, or the heading census ever comes back empty, if no section passes at all, if the panel census finds no hosts or boxes all of them \u2014 and, for amendment 1, if the two palettes resolve `--background` to the same literal or the by-value subtraction stops dropping `--card`, because a resolver that has quietly stopped resolving returns the old family and passes exactly like a law that works. AMENDMENT 4 (2026-09-11) \u2014 PROSE IS CONTENT WHEN IT IS NOT INSIDE THE THING IT DESCRIBES, AND A SECTION DOES NOT LEAVE THIS LAW BY DELETING ITS TITLE. This is the first amendment that is not a hole being closed: it is THIS LAW'S OWN WRITTEN EXEMPTION, OVERRULED BY THE PERSON IT WAS WRITTEN FOR. The PROSE exclusion above used to read, in full, \"`<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>`. A sentence directly under a heading is part of the title block. Every settings section in this app is heading + sentence + control, and boxing the sentence would be a different design, not this rule\" \u2014 a prediction about what the client wanted, made on her behalf, in a lane she was not in. On 2026-09-11, looking at the screen that exemption blessed, she ruled the opposite. So prose is exempt only where it is IN the title block (already skipped as a unit) or inside a body that paints (already skipped by the subtree walk); a sentence that is its OWN body, standing on the page ground BESIDE the box it describes, is content and fails. TWO TAGS SURVIVE, neither for being prose: `<br>` draws nothing readable, and `<a>` is an ACT \u2014 \"a control is pressed, not read\" is this law's own sentence about a lone `<Button>`, and catching the link beside the button would be the law disagreeing with itself about one decision. AND THE SUBJECT LOST ITS HEADING REQUIREMENT IN THE SAME AMENDMENT, which is the sharpest argument here for deriving a subject rather than picking one: her fix DELETED two headings, so under the old subject the very commit that answered her would have taken both sections out of the law. A law you leave by deleting your title rewards the wrong fix. The subject is now every `<section>` ELEMENT \u2014 the source's own statement that this is a section of content, which the heading was only ever a proxy for. WHAT THIS STILL CANNOT SEE, measured rather than assumed: the seven MODULE SETTINGS pages, which are the app's largest heading+sentence-on-the-ground surface and are outside for two independent reasons \u2014 their root is a `<div>`, and their words arrive as PROPS off the `MODULE_SETTINGS` table rather than as literals at the position that draws them. A variant that also judged prose inside the title block was written and measured the same day and is NOT here because the census came back byte-identical: every title block in this repo that pairs a heading with a sentence lives in a `<div>`-rooted component, so the clause would have enforced nothing, and a clause that measures zero is what this file's tripwire refuses. AMENDMENT 4 HAS ITS OWN TRIPWIRE, because both of its halves are SUBTRACTIONS from what used to be waved through and a subtraction that stops subtracting is invisible: at least one `<section>` with no heading must be in the census (else the widening admitted nothing and the two un-titled sections are outside the law again), and at least one bare body must be a readable sentence (else the narrowed exemption catches nothing and the law has silently reverted to the version she rejected, while passing). AMENDMENT 5 (2026-09-11) \u2014 A COMPONENT PAINTS WHAT ITS OWN ROOT PAINTS, AND THIS AMENDMENT EXISTS BECAUSE THIS LAW TURNED RED ON THE COMMIT THAT FIXED FOUR SCREENS. The client, a FIFTH time, over a screenshot of Settings \u203a Ticket settings: \"ticket types should be on top of the searchbar inside the container without subtitle, make this. always\" \u2014 the first of the five that says where a title GOES rather than only where it may not stand. THE ANSWER IS A CHOKEPOINT, NOT A SIXTH REPAIR, and it is the move amendment 4's own blind-spot note called for: the fourteen module settings sections are unreachable here because their root is a `<div>` and their words are PROPS, and reaching them means judging a component by the props it is handed \u2014 a different oracle with a real cost, and \"we fixed fourteen sections and nothing stops the fifteenth\" is the state that produced this week. So the title stopped being something a call site can PLACE. `<ToolbarRow title>` takes a STRING (never a node, the same move R53 made for the sort control) and draws it inside the pinned band; `shared/web/settings-section.tsx` owns the box AND the heading everywhere there is no toolbar; and `MODULE_SETTINGS` lost its `description` COLUMN with the sentences, so a fifteenth section has nowhere to declare a subtitle. A fault that cannot be written beats a census that catches it afterwards. WHAT THAT COST THIS LAW, AND WHAT THE AMENDMENT IS. `componentPaints` reads a component's own text and its own file's constants and deliberately does NOT follow what it RENDERS \u2014 the version that did was thrown away because `CollectionEmptyState` resolves a fill two files away and every uncontained zero register in the app came back green. The moment `ThemeSection`, `ScaleSection`, `SpineSection` and `LanguageSection` stood in a shared box instead of spelling `bg-surface-panel` themselves, Settings \u203a Appearance \u2014 which had passed since the day this law was written \u2014 reported as a bare `<div>` on the page ground. A law that reddens when four screens are fixed by one component is measuring the WRITING and not the SCREEN. SO THE WALK FOLLOWS ONE EDGE: the single element a component RETURNS, resolved the same way, transitively (`ThemeSection` \u2192 `SettingsSection` \u2192 `<section className=\"\u2026 bg-surface-panel \u2026\">`, three files, one edge each). THIS IS NOT THE THROWN-AWAY VERSION and the difference is in kind: that one followed every component a component renders, so a fill anywhere in the subtree answered for all of it; this follows the box the component IS, which is the box its caller is standing in too. `CollectionEmptyState` roots at a bare `<div data-slot=\"collection-empty-body\">` and still does not paint. EVERY return, not the last one \u2014 a component with an early `return <ErrorPanel/>` has more than one root and they are not interchangeable, which is this law's per-branch clause read one level down, keeping the same under-reaching direction. MEASURED: the root walk changed exactly ONE verdict in the whole census, the false one it was written for. ITS TRIPWIRE PULLS BOTH WAYS, because a widening fails invisibly in two directions: at least one component must be found to paint through its own root (else the amendment admitted nothing and the chokepoint has been unpicked), and `CollectionEmptyState` must NOT paint (else the thrown-away version is back and every uncontained zero register is green again). AND `UNCONTAINED_SECTION_OK` LOST SIX LINES ON THE SAME DAY THEY WERE WRITTEN \u2014 the three Appearance sections, both work-module sections and the portal's savings page, which had been a census \"awaiting ONE ruling\" and got one. The outlier (\"The section description: no, I want to keep it\", 2026-09-10) is OVERRULED by the two clearer \"no subtitle\" statements either side of it, the later one drawn on a screenshot; the reasoning is recorded at each deletion rather than only here. `impact-screen.tsx` is the one file the portal block has ever lost: its own source argued in writing that \"one fewer drawn line is worth having\" on the screen a client shows other people, that comment is KEPT verbatim beside the container it lost to, and what decided it is that a screen arguing itself out of a law in its own comment is the pattern all five rulings overturned somewhere else. AMENDMENT 6 (2026-09-14) — AN OVERLAY IS ONE OF THE KIT'S NAMED SCRIM-STANDING SURFACES, NOT \"RENDERS ANY PORTAL\", AND IT IS ASKED PER ROOT RATHER THAN OF ANY TAG THE TEXT MENTIONS. The OVERLAY exclusion above was defined as \"a component whose declaring file renders through a portal\", and every floating Radix primitive portals — a tooltip clears an overflow ancestor exactly the way a modal clears the page, for a different reason. An instrumented run of the file-wide test found 44 titled sections and 15 tab panels judged, with 20 skip decisions, of which nine excused a component that is plainly not an overlay: `<PagedFind>`, `<ScreenRenderer>`, `<TodosPanel>`, `<AppSavingsChart>`, `<MatchKind>`/`<StepKind>`, `<BrandPanel>`, `<ModuleAutomations>` and `<SettingsChoicesPanel>` — several of them because the OLD test read \"does this component's DECLARING FILE contain a portal anywhere\", so one modal declared anywhere in a multi-panel file (`kwapso-screen.tsx`, `settings-screen.tsx`) marked every OTHER component in that same file, whether or not it draws one. So the test is narrowed to a named family — `Sheet`/`SheetContent` and `AlertDialog`/`AlertDialogContent`, R59's own two shapes (\"a surface that COLLECTS presents as Sheet, a surface that ASKS a yes/no question is AlertDialog\"), plus bare `Dialog`/`DialogContent`, R59's third, discouraged-but-live centred shape — and asked of EVERY ROOT a component can return (amendment 5's own `rootElements`, reused, so a ternary's two arms are two roots), not of any tag its text merely mentions: `ScreenConfirm` (one root, an `AlertDialog`) still resolves true in two hops; `ScreenRenderer`, whose OTHER branches are a bare `<div>` and an ordinary `ScreenLayer`, no longer inherits its one confirm branch's verdict. POPOVER WAS TRIED AND MEASURED OUT: a first pass read R59's own tooltip sentence (\"every OTHER floating thing is `--popover` under `--shadow-overlay`\") as putting Popover in the family, and it regressed the law's own reference shape — `CollectionFrame`, named above as one of the two ways a section may stand, reaches for a `<Popover>` on its filter bar, and with Popover included `isOverlay(\"CollectionFrame\")` came back true, which is a worse failure than the one this amendment fixes. Popover is deliberately out, the same reasoning that already keeps `Select`/`Combobox`/`DropdownMenu`/`ContextMenu` out: each is a CONTROL whose trigger stands in the section's flow, already covered by the ACT exclusion. THE SKIP SET IS PINNED, in the test file (`OVERLAY_FAMILY_OK`), names rather than a bare count, rot-checked both ways, so a component that starts returning one of these tags is a reviewed addition rather than a silent skip. AMENDMENT 7 (2026-09-14) — A BARE IDENTIFIER IS AN UNRESOLVED BODY, NOT A ZERO ONE. The per-branch walk (`bodies()`) resolves a ternary, a `&&`, a `.map()` and a JSX literal, and nothing else — a bare `{children}`/`{body}`/`{content}` expression matched none of those branches and was silently dropped, so a chokepoint that forwards its caller's content without painting itself would report zero bodies, which reads as \"nothing to judge\" rather than \"the walk could not see in\". `shared/web/settings-section.tsx` draws exactly that shape and is unaffected today only because its own `<section>` carries `bg-surface-panel` directly, resolved by shape (a) before `bodies()` is ever reached — a fact the test's own header states rather than assumes. A bare identifier is now COUNTED, not pushed (a literal `<null>` finding would misdescribe what happened), pinned at zero against the real app and proved alive against an owned fixture, the same two-part discipline amendments 4 and 5 already use. THE CORRECTED CENSUS, RUN: three sections the widened family newly reaches. `web/components/accounts/contacts-by-company.tsx`'s per-company `<ScreenRenderer>` and `web/components/screens/kwapso-screen.tsx#brand`'s `BrandPanel` are named in `UNCONTAINED_SECTION_OK` with real reasons (the first is unreached dead code awaiting a wiring decision, not a styling one; the second matches its already-exempted `#team`/`#default` siblings on the same mid-change screen). `web-portal/components/impact-screen.tsx`'s `<AppSavingsChart>` is FIXED — wrapped in `bg-surface-panel`, the same tone the rest of that file already uses — rather than exempted under N6 (\"a block earns a container only with two or more rows/fields\"), because this exact file's own history already records the client overruling that argument once, in her own words: \"a screen that argues itself out of a law in its own comment is the pattern five rulings in three days have each overturned somewhere else\".",
     why: "THE CLIENT, THREE TIMES IN THREE DAYS. THE SECOND TIME SHE ASKED FOR THE LAW; THE THIRD TIME SHE POINTED AT A SCREEN THE LAW COULD NOT SEE. 2026-09-09, over the Team tab: \"more members in each row, too much blank space. needs container!! nothing on top of white background, its a rule!\" 2026-09-10, over Settings \u203a Integrations: \"but give it a container. once again, nothing shoudl sit on the white, everything contained! (make this a law)\". \"Once again\" is the load-bearing word, exactly as it was in R50: the first ruling was answered at ONE screen (team-panel.tsx, which carries the measured tones), and a fix at one screen is how the same fault reaches the next tab. WHY IT IS NOT \"EVERY SCREEN'S ROOT IS A PANEL\". That version was written first and thrown away: it is either trivially true, or it forbids the shape the whole app already uses and she has already approved \u2014 a heading outside, the content on paper under it. Both shapes pass here. WHAT THE FIRST RUN FOUND, and it is the argument for the law: 22 uncontained sections across both front doors. Eleven were in the AGENCY app and every one of them was an inconsistency WITHIN a screen that already used paper \u2014 the zero register of three lists on the client's org chart, a stakeholder panel's zero, a meeting's calendar zero, the Google connections section's error and skeleton beside rows that DID stand on paper, the profile page's whole activity feed, a sprint board's hand-grouped rows, and the three Appearance option groups on the very tab she was looking at. That last one is the sharpest: the kit's option card is `Card`'s DEFAULT variant, and in LIGHT `--card`, `--background` and `--surface-raised` are all #FFFEF9 \u2014 so those cards measured contrast 1.000 against the page and were held up by a hairline, the identical pairing team-panel.tsx documents from the Team tab the day before. Nobody would have filed any of them as a bug, because a missing surface is only visible in the aggregate and nobody sees the aggregate. All eleven were fixed the same day. THE ELEVENTH FINDING IS THE ONE TO READ: `web/components/team/access-tokens.tsx` drew its ROWS on soft paper and its error, its skeleton and its zero on the page. A check asking \"does this section have a panel in it anywhere\" answers yes and describes the wrong screen \u2014 she was looking at the branch with nothing in it. That is why containment is asked per branch, and it is the difference between a law that catches her bug and one that reports success over it. The remaining nine are the whole CLIENT PORTAL, six files, and they are exempted rather than fixed because the portal is consistent with ITSELF: stacking titled sections on `portal-shell.tsx`'s unpainted `<main>` is its visual language, not six oversights, so giving it panels is a redesign of the client-facing app and belongs in a deliberate pass with her looking at it. Read `UNCONTAINED_SECTION_OK`, not this sentence. THE THIRD RULING, 2026-09-11: \"remember in settings modules card, needs container background.\" Settings \u203a Modules, a wall of `Card variant=\"raised\"` cells on the bare page \u2014 and the law was already written, already enforced, already GREEN over it. THREE INDEPENDENT HOLES HID ONE SCREEN, and closing any two of them would still have left it hidden. (i) THE SUBJECT: a `<section>` carrying a heading of its own, which a tab panel never does \u2014 it is titled by its strip. Every settings tab and every record sub-tab, 14 hosts and 70 bodies, was outside the law the day the law was written, and TWO OF HER THREE RULINGS WERE ABOUT A SETTINGS TAB. (ii) THE FAMILY: `--card` was a container by NAME, and in light `--card` IS `--background` (#FFFEF9), so a wall of raised cards on the page reported \"contained\" at CONTRAST 1.000 \u2014 the identical pairing this very paragraph already cited as the bug the law was written for. The law described the fault in prose and blessed it in code. (iii) THE PAINT TEST: it matched a component's whole text, and `CardGrid`'s `cva` declares a `panel` tone it only draws when asked \u2014 so `<CardGrid>` with no `tone`, which paints nothing at all, answered \"I paint\". Fixed at the screen with `tone=\"panel\"`, the kit's own answer, whose source states this exact failure: \"`panel` is for a wall standing on the PAGE, where a `--card` cell measures 1.000 against the page tone and would be held up by its shadow alone.\" MEASURED on the running stylesheet, both palettes: light panel #F7F2EB on page #FFFEF9 = 1.103 and raised card #FFFEF9 on panel = 1.103; dark panel #1C1B18 on page #141310 = 1.079 and card #26241F on panel = 1.111 \u2014 against the 1.000 it was shipping in light, where the bug lived, DARK HAVING MEASURED A PERFECTLY VISIBLE 1.198 THE WHOLE TIME. That asymmetry is why nobody caught it by looking. THE WIDENING'S OWN FIND, and the argument for having done it rather than fixing one screen a third time: `web/components/apps/apps-screen.tsx` draws its stage groups' `AppTiles` at `bg-card` on the page \u2014 the SAME 1.000, on a busier screen, and flat, because a tile is deliberately `motion-hover` rather than `motion-hover-lift` and has no shadow holding it up either. Nobody has reported it. It is written down rather than restyled because the lane that found it had Settings as its subject, which is the same reasoning the portal block below states. WHAT THE CENSUS DOES NOT SEE, written down rather than discovered later: it resolves components by NAME, so where two libraries share one (recharts' `Tooltip` and the kit's) it takes the first and under-reaches \u2014 and the same collision put TWO `TeamPanel`s in this repo, the kit-shaped container and a local one on the Kwapso screen \u2014 the portal's savings chart is a real uncontained section this walk lets through. Under-reaching is the deliberate direction: a false offender in a build gate is worse than a section the law stays quiet about. THE FOURTH RULING, 2026-09-11, AND IT IS NOT A GAP IN THE LAW \u2014 IT IS THE LAW, OVERRULED. Over a screenshot of Settings \u203a Integrations: \"i said nothing on white backgorund. remove this text Access tokens / Let an outside tool (an AI agent, a script, an automation) work in your team as you, capped by your role, in the team the token was made for. for google replicate the no tokens yet, sth like 'connect to google' and the button to do so. remove the text directly on white background.\" The fourth time she has said one sentence (Team tab, Integrations, Settings \u203a Modules, Integrations again), and the first time she has pointed at something this law EXPLICITLY ALLOWED rather than something it could not see. Three amendments landed the day before, each widening the subject, and every one of them left the reported sentence standing \u2014 because the PROSE exemption said it could. WHAT SHIPPED. Access tokens: the eyebrow and the sentence DELETED outright, her instruction and the right one \u2014 the contained register below already titles the section (\"No tokens yet.\") and already carries the one first-add, so they were a second title for one thing, floating; a section titled twice is not fixed by boxing the spare title. The create `+` came inside the panel with them, because a lone `+` over a box on the white is the same complaint one control along. Google: the eyebrow, the sentence and the connect-everything row are now ONE card drawing `CollectionEmptyState` \u2014 the neighbour's own register, not a second thing shaped like it \u2014 titled \"Connect to Google\", with the privacy promise and the one-approval fact inside it and \"Connect everything\" as its one act. Her own words were \"replicate the no tokens yet\", which is an instruction about a COMPONENT and was read as one. THE COST, AND IT IS PAID IN `UNCONTAINED_SECTION_OK` RATHER THAN HIDDEN: seven more files, all read as a census awaiting ONE ruling. Three are Settings \u203a Appearance, the same heading + sentence + contained-cards shape, HALF-FIXED on 2026-09-10 \u2014 that pass moved the option cards off `bg-card`'s contrast 1.000 and left the title block on the white, because the law said prose was not content. The other four are the work module and the portal, found by the dropped heading requirement rather than by the prose clause. AND SHE HAS RULED THE OTHER WAY, ONCE, ON 2026-09-10, about the module settings pages' own descriptions: \"The section description: no, I want to keep it.\" The two rulings reconcile \u2014 keep the words, stop leaving them on the white, which is a container and not a deletion \u2014 but which of the two she means for each screen is hers, so every one of them is written down and shown to her as a picture instead of guessed at by a lane whose subject was Integrations.",
     checkId: "sections-stand-on-paper",
     status: "enforced",
@@ -649,9 +649,17 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R72",
     dimension: "ui",
-    law: "NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED. The client's ruling, 2026-09-14, over Settings › Modules' own intro sentence: \"In settings, modules: delete this. Generally, I don't like subtitles, so stop putting them unless I ask.\" The second sentence is the wider one and the one this law enforces — she had already said the narrower version twice the same week about two other screens (\"in ticket settings (or any other module) no subtilte\", 10 Sep; \"ticket types should be … without subtitle, make this. always\", 11 Sep), and both landed as one-screen fixes: `shared/web/settings-section.tsx` deleted the field outright, and `MODULE_SETTINGS` lost its `description` column with it. This is the third saying, about a fourth screen neither fix touched, and it is not about one screen any more — it is a DEFAULT for the whole app. A SUBTITLE IS, PRECISELY: a prose element (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>` — R67's own `READABLE_PROSE` set, reused for the same reason R67 reused it: a real kit component is always Capitalised, so `<Text>`, `<CollectionEmptyState>`, `<NothingYet>` and every other genuine-content component are invisible to a lowercase-tag census by construction) standing as the immediate next SIGNIFICANT sibling of a heading (`<h1>`-`<h4>`, the kit's `<Headline>`) inside the same JSX children array — blank text and a `{/* comment */}` are transparent to the pair, the same move R67's own walk makes. THREE SHAPES ARE DELIBERATELY NOT A SUBTITLE: a form field's helper text (rendered through the kit's `Field`, which has no heading sibling to stand beside — a label, not a title); an empty state's explanation (`CollectionEmptyState`/`PortalEmpty`/`NothingYet`/`ShapeStateBody`, Capitalised, so already outside the census); and the reason a switched-off automation cannot be turned on, which R70 *requires* as `helpText` and which answers \"why can I not change this\" rather than \"what is this section for\". A REAL BLIND SPOT, WRITTEN DOWN: a heading a CHOKEPOINT COMPONENT draws for its caller (`SettingsSection`, `ToolbarRow`'s `title`, `CollectionHeading`) is invisible to the sibling census if a caller passes prose as that component's `children` — heading and prose then sit in two different JSX children arrays. Those three are held shut the narrower way instead: none may re-grow a prop shaped like a subtitle (`subtitle`/`description`/`subheading`/`caption`, matched as a declared TYPE member so a comment merely discussing the word does not trip it), which is the only door wide enough to let the blind spot matter — `shared/web/settings-section.tsx`'s own header states the argument this check imports: \"a section cannot declare a subtitle it has nowhere to put.\" `SUBTITLE_OK` (this file) is the way out `SUBTITLE_OK`'s own way out for the rest of the app — a reasoned, file-keyed line, rot-checked both ways so the list can only shrink, the same discipline `UNCONTAINED_SECTION_OK` (R67) and `HAND_ROLLED_OK` (the kit-motion check) already use. AMENDMENT 1 (2026-09-14, the same day, over the Modules card itself): the founding case passed this census on the day it was written — the card's name drew through the kit's `CardTitle`, which `HEADING` did not recognise, so the pair with the `<span>` beneath it never formed; the miss was on the heading side, not the prose side, and the prose was a bare `<span>` the original set already matched. `HEADING` gains `CardTitle` and `PROSE` gains `CardDescription`, both on the kit's own word for what each is (`shared/ui/components/card/card.tsx`: \"it is a heading\" / \"it is prose\") — nothing wider, and checked by hand against every call site of either in the app: the Modules card (fixed outright), `members-gallery.tsx` (structurally outside the pair — its `CardTitle` sits inside its own wrapper span, paired with a `Badge`, so the email line beneath is never `CardTitle`'s sibling), and `screen-renderer.tsx`'s generic `display: \"cards\"` branch (a real pair, `SUBTITLE_OK`'d as unreached dead code rather than ruled on, because no recipe reaches it today).",
+    law: "NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED. The client's ruling, 2026-09-14, over Settings › Modules' own intro sentence: \"In settings, modules: delete this. Generally, I don't like subtitles, so stop putting them unless I ask.\" The second sentence is the wider one and the one this law enforces — she had already said the narrower version twice the same week about two other screens (\"in ticket settings (or any other module) no subtilte\", 10 Sep; \"ticket types should be … without subtitle, make this. always\", 11 Sep), and both landed as one-screen fixes: `shared/web/settings-section.tsx` deleted the field outright, and `MODULE_SETTINGS` lost its `description` column with it. This is the third saying, about a fourth screen neither fix touched, and it is not about one screen any more — it is a DEFAULT for the whole app. A SUBTITLE IS, PRECISELY: a prose element (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>` — R67's own `READABLE_PROSE` set, reused for the same reason R67 reused it: a real kit component is always Capitalised, so `<Text>`, `<CollectionEmptyState>`, `<NothingYet>` and every other genuine-content component are invisible to a lowercase-tag census by construction) standing as the immediate next SIGNIFICANT sibling of a heading (`<h1>`-`<h4>`, the kit's `<Headline>`) inside the same JSX children array — blank text and a `{/* comment */}` are transparent to the pair, the same move R67's own walk makes. THREE SHAPES ARE DELIBERATELY NOT A SUBTITLE: a form field's helper text (rendered through the kit's `Field`, which has no heading sibling to stand beside — a label, not a title); an empty state's explanation (`CollectionEmptyState`/`PortalEmpty`/`NothingYet`/`ShapeStateBody`, Capitalised, so already outside the census); and the reason a switched-off automation cannot be turned on, which R70 *requires* as `helpText` and which answers \"why can I not change this\" rather than \"what is this section for\". A REAL BLIND SPOT, WRITTEN DOWN: a heading a CHOKEPOINT COMPONENT draws for its caller (`SettingsSection`, `ToolbarRow`'s `title`, `CollectionHeading`) is invisible to the sibling census if a caller passes prose as that component's `children` — heading and prose then sit in two different JSX children arrays. Those three are held shut the narrower way instead: none may re-grow a prop shaped like a subtitle (`subtitle`/`description`/`subheading`/`caption`, matched as a declared TYPE member so a comment merely discussing the word does not trip it), which is the only door wide enough to let the blind spot matter — `shared/web/settings-section.tsx`'s own header states the argument this check imports: \"a section cannot declare a subtitle it has nowhere to put.\" `SUBTITLE_OK` (this file) is the way out `SUBTITLE_OK`'s own way out for the rest of the app — a reasoned, file-keyed line, rot-checked both ways so the list can only shrink, the same discipline `UNCONTAINED_SECTION_OK` (R67) and `HAND_ROLLED_OK` (the kit-motion check) already use. AMENDMENT 1 (2026-09-14, the same day, over the Modules card itself): the founding case passed this census on the day it was written — the card's name drew through the kit's `CardTitle`, which `HEADING` did not recognise, so the pair with the `<span>` beneath it never formed; the miss was on the heading side, not the prose side, and the prose was a bare `<span>` the original set already matched. `HEADING` gains `CardTitle` and `PROSE` gains `CardDescription`, both on the kit's own word for what each is (`shared/ui/components/card/card.tsx`: \"it is a heading\" / \"it is prose\") — nothing wider, and checked by hand against every call site of either in the app: the Modules card (fixed outright), `members-gallery.tsx` (structurally outside the pair — its `CardTitle` sits inside its own wrapper span, paired with a `Badge`, so the email line beneath is never `CardTitle`'s sibling), and `screen-renderer.tsx`'s generic `display: \"cards\"` branch, a real pair `SUBTITLE_OK`'d as unreached dead code rather than ruled on, because no recipe reached it that day. THAT BRANCH IS GONE, 2026-09-14 — deleted outright once the `SUBTITLE_OK` entry's own words (\"the honest fix is not a subtitle ruling, it is a dead-code one\") were finally acted on rather than merely believed; its exemption line went with it, the same census this amendment's own list can only shrink.",
     why: "R67 already polices a titled section, and the two laws share a census file and a house term (\"title block\") without being the same law. R67's subject is WHERE content stands: a sentence inside the title block is explicitly exempt from R67 (amendment 4's `carriesHeading` skip) because R67 has nothing to say about whether the sentence should exist, only about the ground it stands on if it does — a boxed subtitle passes R67 outright. This law's subject is whether the sentence exists at all, independent of containment; an unboxed subtitle fails both laws, and a BOXED one now fails only this one, which is the proof they are answering different questions rather than one question twice. R67's own header makes the same point from the other side, about the seven module settings pages it cannot reach: \"reaching them means judging a component by the PROPS it is handed rather than the JSX it writes, which is a different check with a different oracle.\" That is what this file does, and it is why the fix is a new law rather than a sixth amendment to R67. Getting the boundary right mattered more than catching every case: a census that flagged a field's helper text, an empty-state sentence or R70's required automation reason would be turned off within a day, so each of the three is excluded STRUCTURALLY — by tag name (a real component is Capitalised, a bare `<p>` is not) or by having no heading sibling at all — rather than by a growing list of exceptions somebody has to keep arguing for.",
     checkId: "no-default-subtitles",
+    status: "enforced",
+  },
+  {
+    id: "R73",
+    dimension: "arch",
+    law: "A DENY-LIST IS DATA IN THE REGISTRY, NEVER A CONST IN THE TEST THAT READS IT. This repo's own opening sentence, RULES.md line 13: \"Deny-lists (the reviewed exceptions for each law) live as DATA in the registry, so every exception is a visible, conscious line.\" A census off `web/test/**` and `web-portal/test/**` on 14 Sep 2026 found twenty exemption-shaped lists declared INSIDE the test files that read them — some at module scope, some nested inside a `describe`/`it` block — invisible to `shared/rules/registry.ts` and to anyone reading that opening sentence and believing it. Moved, each keeping its exact shape, entries and reasons, each test now importing its list from the registry instead. WHAT COUNTS AS ONE OF THESE, derived off what the census actually found rather than guessed at: a top-level (or per-test) `const` whose name ends `_OK` or `_EXEMPT` (`FOO_OK`, `FOO_EXEMPT`), or is one of the seven irregular names this base already uses for the same shape — `GONE_ON_PURPOSE`, `DEFERRED_UPLOAD_FORMS`, `PARKED`, `MAY_INJECT`, `BY_HAND`, `NOT_A_WORK_PICKER`, `NO_RECORD_BEHIND_IT`. A test file may reference any of those names only by IMPORTING it from `@shared/rules/registry` — a local `const` matching the shape is the fault, whatever value it holds, empty object included. Checked by a plain source scan over both test trees: no `const` declaration anywhere may carry one of these names, full stop, because a real import statement declares no `const` at all and the two are syntactically impossible to confuse. Proven by mutation, the same discipline every census here stands on: a throwaway `const FOO_OK = {}` dropped into any test file must turn this red, naming the file, before it is removed again.",
+    why: "The keystone law (`registry-integrity`) already proves RULES.md and `RULES_REGISTRY` cannot drift from each other, but it only reads the TABLE — it has never asked whether the deny-lists the table's own opening sentence promises are actually registry DATA, and for twenty lists across this base they were not: a reviewer reading RULES.md's first paragraph and then `shared/rules/registry.ts` would find a smaller set of exemptions than the build actually enforces, because a fifth of them lived somewhere the promise never looked. Three of the twenty were already spoken of in RULES.md's own prose as if they were registry data (`GONE_ON_PURPOSE` in R58, `OBJECT_FIT_OK` in R60, `HAND_ROLLED_OK` in CLAUDE.md's planning ritual) while actually living in a test file each — the documentation had quietly gotten ahead of the code. And one of the twenty (`OVERLAY_FAMILY_OK`) carried its own comment, written the same day it was added, promising a later lane would move it here \"rather than half-migrating\" — a promise with no check behind it is exactly the shape that rots, because nothing but a person remembering enforces it. The pattern is derived rather than hand-typed for the reason every census in this base derives its subject: a hand-kept list of twenty names is itself the next place this fact goes stale, the moment a twenty-first exemption list is born inside a test file and nobody remembers to add its name here too.",
+    checkId: "registry-backed-exemptions",
     status: "enforced",
   },
 ]
@@ -1747,6 +1755,25 @@ export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = 
   { word: "knowledge article", term: "source", why: "one piece of material in the knowledge base is a Source — a note, or something the app keeps in step. \"Article\" says somebody wrote it, which is true of about half of them" },
   { word: "subtask", term: "task", why: "a Task has no children in this product, and a word for a thing that does not exist is a promise on screen" },
   { word: "sub-task", term: "task", why: "the hyphenated spelling of the above" },
+  // `{ word: "see", term: "permission" }` STOOD HERE, 14 Sep 2026, for a few
+  // hours. The client's ruling was real (11 Sep 2026: the permissions matrix
+  // column reads "Read", not "See") and the fix at the one screen it was about
+  // — `roles-matrix.tsx`'s `capabilities()` — was real and stays. But banning
+  // the WORD needed twenty-one `GLOSSARY_SYNONYM_OK` exemptions for ordinary
+  // English the moment R34's check ran over the whole catalogue: "can't see
+  // the team", "see everything", Google's own OAuth copy. R34's own doctrine
+  // is the reason to revert rather than keep excusing — "a word earns a line
+  // only when it can mean nothing else here" — and "edit" is already excluded
+  // from this list for exactly that reason (see its own note above). Twenty-one
+  // exemptions is the law telling us the word does not qualify: "see" is
+  // ordinary, correctly-used English on all twenty-one of the sentences that
+  // needed excusing, the EFFECT of a right rather than a competing label for
+  // it, the same shape "edit" already survives under. The ruling itself is
+  // unchanged and is protected the narrow way instead — a targeted assertion
+  // in `web/test/roles-matrix-boxes.test.tsx` that the read-right column's
+  // label is literally `t("Read")`, never `t("See")` — because a client's
+  // ruling about ONE column's label is not evidence that a common English verb
+  // has stopped meaning anything else in a whole product's copy.
 ]
 
 /** R33 — the sentences that keep a banned word, and why. Rot-checked in both
@@ -1755,12 +1782,28 @@ export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = 
  * exemption that has stopped being needed is a record of an argument nobody is
  * having any more.
  *
- * EMPTY IS THE RIGHT ANSWER TODAY, and it is worth saying why rather than
- * deleting the table. The five words the app really was saying were changed
- * rather than excused, because each was a straight swap for the term the
- * dictionary already had. The table exists for the case that is not — a sentence
- * where the banned word is genuinely the right one — and it costs a line of
- * prose to use, which is the correct price. */
+ * EMPTY IS THE RIGHT ANSWER. The first five words the app was saying were
+ * changed rather than excused, because each was a straight swap for the term
+ * the dictionary already had — the table exists only for the case that is
+ * not, a sentence where the banned word is genuinely the right one. `see` was
+ * added and reverted the SAME DAY, 14 Sep 2026, and is the clearest
+ * demonstration of why the table stayed empty for the other four: banning it
+ * (in favour of `permission`'s own "read, create, update, or delete") needed
+ * TWENTY-ONE entries here the moment R34's check ran over the whole
+ * catalogue — "you can't see the team", "see everything", Google's own OAuth
+ * copy — every one of them ordinary, correctly-used English, the EFFECT of a
+ * right rather than a competing label for it, the same shape "edit" already
+ * survives under with NO exemptions at all. Twenty-one lines in this table for
+ * one banned word is not a list of reasoned exceptions, it is the law telling
+ * you the word does not qualify — `GLOSSARY_SYNONYMS`' own doctrine, "a word
+ * earns a line only when it can mean nothing else here". So `see` came off
+ * `GLOSSARY_SYNONYMS` (its own note there says why) and every one of these
+ * twenty-one lines came off with it, rather than being kept as a wall of
+ * permissions nobody needed. The client's actual ruling — the roles matrix's
+ * read-right column reads "Read", not "See" — is unchanged and is protected
+ * the narrow way that earns no line here: a targeted assertion in
+ * `web/test/roles-matrix-boxes.test.tsx` that the column's label is literally
+ * `t("Read")`. */
 export const GLOSSARY_SYNONYM_OK: Record<string, string> = {}
 
 /** R31 — the radii admitted BESIDE `rounded-xl` and `rounded-full`, and why each
@@ -2054,22 +2097,18 @@ export const TWO_READS_ONE_DOOR: Record<string, string> = {
  * R67's tab dispatch at all. Flagged so a merge treats this as an addition
  * beside R67, never as a competing edit to it. */
 export const SUBTITLE_OK: Record<string, string> = {
-  "shared/web/screen-engine/screen-renderer.tsx":
-    "amendment 1 (2026-09-14) widened HEADING to `CardTitle` and PROSE to `CardDescription`, both on the " +
-    "kit's own word for what each is — and this file's generic `display: \"cards\"` branch pairs them " +
-    "directly (`<CardTitle>{…}</CardTitle><CardDescription>{…}</CardDescription>`), the second field a " +
-    "recipe configures for a card. It is NOT genuinely earning a second line the way helper text or an " +
-    "empty-state explanation do: nobody has ruled on whether this card should keep showing one. It is here " +
-    "because nobody can see it to ask — `display: \"cards\"` is declared by exactly one recipe in the whole " +
-    "app (`knowledgeListRecipe`, web/lib/screens.ts), and `web/components/deep-link/collection-content.tsx`'s " +
-    "`if (module === \"knowledge\")` branch routes that module to a bespoke component " +
-    "(`KnowledgeSourceCard`) before `ScreenRenderer` ever sees it — so this branch renders to no live screen " +
-    "today. R72 asks whether a PERSON reading a heading is shown an unasked-for sentence under it; that " +
-    "question has no answer here because no person reaches this JSX. The honest fix is not a subtitle " +
-    "ruling, it is a dead-code one (CLAUDE.md's \"too much code is a defect\") — flagged for that instead of " +
-    "guessed at here. Delete this line the day either happens: a recipe declares `display: \"cards\"` again " +
-    "and reaches this branch for real (then it is a live R72 question), or the branch is confirmed dead and " +
-    "removed outright.",
+  // THE "shared/web/screen-engine/screen-renderer.tsx" ENTRY THAT STOOD HERE
+  // IS GONE, 2026-09-14 — deleted along with the dead code it excused rather
+  // than left to rot the moment the branch disappeared. It said the honest
+  // fix was deletion, not a subtitle ruling: `display: "cards"` was declared
+  // by exactly one recipe (`knowledgeListRecipe`, web/lib/screens.ts), and
+  // `collection-content.tsx`'s `module === "knowledge"` branch routed that
+  // module to `KnowledgeSourceCard` before `ScreenRenderer` was ever reached,
+  // so the branch rendered to no live screen. The branch is deleted
+  // (screen-renderer.tsx); this line would otherwise have gone stale the
+  // instant the file it named stopped containing a `CardTitle`/`CardDescription`
+  // pair for the rot check to find, which is precisely the shape this
+  // registry's own "the list can only shrink" discipline exists to catch.
   "web/components/screens/kwapso-screen.tsx":
     "the agency's own team-area header, `<Headline as=\"h1\">{team.name}</Headline>` followed by " +
     "\"Who we are: our material, our team, and the details that go on a contract.\" R67's own " +
@@ -2187,9 +2226,11 @@ export const UNCONTAINED_SECTION_OK: Record<string, string> = {
   "web/components/screens/kwapso-screen.tsx#team":
     "the agency's own team tab: `TeamPanel` (the LOCAL one at line 178, not `web/components/team/team-panel.tsx` " +
     "— two components share the name) returns a bare `<ul className=\"divide-border flex flex-col divide-y\">` " +
-    "of members straight onto the page, and its error and skeleton branches with it. The sibling `BrandPanel` " +
-    "on the same strip already paints, so this is an inconsistency INSIDE one screen — the shape the law was " +
-    "earned by. Left because this screen is the agency's own housekeeping and is mid-change in another lane.",
+    "of members straight onto the page, and its error and skeleton branches with it. UPDATED 2026-09-14: the " +
+    "sibling `BrandPanel` does NOT already paint — that was this table's own stale claim, never true of the " +
+    "component and only ever true of R67's old, file-wide `isOverlay` (see the `#brand` line below for the " +
+    "mechanism). All three panels on this strip are bare. Left because this screen is the agency's own " +
+    "housekeeping and is mid-change in another lane.",
   "web/components/screens/kwapso-screen.tsx#default":
     "the same screen's fall-through Overview panel: an `OverviewList` on the page ground. `OverviewList` draws " +
     "no ground of its own BY RULING — the client rejected a nested card inside a record's panel (\"no nested " +
@@ -2197,6 +2238,38 @@ export const UNCONTAINED_SECTION_OK: Record<string, string> = {
     "because `RecordScreen` hands the whole strip to a card. This screen is not a record detail and hands it " +
     "nothing, so the one component is right in eleven places and bare here. The fix is this screen's mount, " +
     "not that component.",
+  "web/components/screens/kwapso-screen.tsx#brand":
+    "NEWLY JUDGED 2026-09-14 by R67's corrected `isOverlay` (amendment 6): the agency's own brand-library tab, " +
+    "`BrandPanel` (line 243), returns a bare header row plus either `<CollectionEmptyState>` or a bare " +
+    "`<ul className=\"divide-border flex flex-col divide-y\">` of recent assets straight onto the page, and " +
+    "its error and skeleton branches with it — the identical shape as its `#team` and `#default` siblings " +
+    "above. It was never actually an overlay; the OLD `isOverlay` tested \"does this component's DECLARING " +
+    "FILE contain a portal anywhere\", and `kwapso-screen.tsx` is one file holding several panels, so any " +
+    "modal declared anywhere else in it (an invite dialog, a role picker) marked every OTHER component in " +
+    "the same file — `BrandPanel` included — as standing on a scrim it never draws. The narrowed, per-root " +
+    "`isOverlay` no longer makes that mistake, and this is the panel it had been hiding. Left, like its two " +
+    "siblings, because this screen is the agency's own housekeeping and is mid-change in another lane — " +
+    "three bare panels get one fix at the mount, not three separate patches ahead of it.",
+
+  // ── THE `contacts-by-company.tsx` LINE STOOD HERE (added 2026-09-14 by
+  // amendment 6, above), and it said in writing what should happen to it: "the
+  // honest fix here is not a container, it is a wiring decision — either
+  // `ContactsByCompany` is wired back in ... or it is deleted with
+  // `UI-GAPS.md #24` closed as abandoned — and it is not this law's call to
+  // make either one silently." `web/test/orphan-components.test.ts`'s own
+  // census had missed the component entirely — its "test" root let the
+  // component's own dedicated spec file (`web/test/contacts-by-company.test.tsx`)
+  // count as a "mount", which is not evidence the app renders it — and once
+  // that blind spot was fixed (14 Sep 2026, dropping "test" from the census
+  // roots) the component came back a genuine, unparked orphan: nothing in
+  // web/app, web/components, web/lib or shared/web imports it, and the
+  // contacts-screen.tsx comment that had kept it around ("the obvious second
+  // view if she wants one back") was never entered into `PARKED`, the one
+  // mechanism this base uses to keep an unreached file alive on purpose. So
+  // the wiring decision this entry deferred is made: deleted, with UI-GAPS.md
+  // #24 closed as abandoned. This is the rot-check doing exactly what it is
+  // for — an entry whose file is gone cannot be left standing.
+
   // THE `settings-screen.tsx#choices` LINE STOOD HERE, and it said in writing
   // what happened to it: "this tab is being RETIRED in the lane rolling module
   // settings out across the app … If the tab survives, this line becomes the
@@ -3822,4 +3895,517 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
     "GAP, a real finding. This app has no way to search across everything from anywhere — the only search-like control (`record-picker.tsx`) is a per-field relation picker scoped inside one form, not global search. Worth the owner's consideration as a genuinely useful, separately-scoped feature for a multi-module tool; not something to fold into a UI-adoption pass.",
   "templates/stat-strip.tsx":
     "REALIZED DIFFERENTLY. `pulse.tsx`'s `PulseBand` already draws its headline numbers through the kit's own `StatGrid` component directly — the exact primitive this composition is itself built on top of. The one thing this file adds beyond `StatGrid` is the optional per-tile `spark` mini-chart, and using it on these tiles is exactly the fusion `pulse.tsx`'s own law forbids ('aggregate into a big NUMBER or reach for a CHART, never fuse them') — the tiles that want a chart already draw one as a separate `BandCard`, by design.",
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MOVED FROM TEST FILES, 14 Sep 2026 — RULES.md line 13 made true.
+//
+// These twenty deny-lists used to be declared INSIDE the test files that read
+// them: invisible to this file, invisible to anyone reading RULES.md's claim
+// that "deny-lists ... live as DATA in the registry ... every exception is a
+// visible, conscious line". A census off `web/test/**` and `web-portal/test/**`
+// found them (`registry-backed-exemptions.test.ts` is the check that now keeps
+// the census honest — every exemption-shaped const in a test file must be an
+// IMPORT off this module, not a local declaration). Each keeps its exact shape,
+// entries and reasons; each test now imports its list from here. Grouped near
+// the law or census each serves.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── R58 (named-paths) ───────────────────────────────────────────────────────
+
+/** R58 — a path our own words name on purpose, knowing it is not there.
+ * `web/test/named-paths.test.ts` walks every `.md` this repo writes and every
+ * text file of our own source for a path shaped like `root/segment/file.ext`,
+ * and demands it resolve on disk — a document or a comment naming a GUARD that
+ * is not there reassures a reader who checks, which is the dangerous shape.
+ * Rot-checked twice: a path that comes back, or one nothing names any more,
+ * turns the build red, so the list can only shrink. */
+export const GONE_ON_PURPOSE: Record<string, string> = {
+  "workers/tenancy/src/lib/internal-money.ts":
+    "the file R24 was built around: the agency's own two cost cards and the margin, in ONE file nothing a client login could reach imported. RULES.md's R24 row, CLAUDE.md, the registry's law text, the retirement record in rules.test.ts, money.test.ts's retired margin block, BUILD-A-MODULE.md and team migration 0031's annotation all name it, and every one of those sentences is ABOUT its deletion — the law's structural half cannot be explained without naming the thing that was structural",
+  "web/components/money/internal-rate-card.tsx":
+    "the internal rate card screen, which also carried the role rate card. CONTROL-SWAP-LANES.md's lane manifest is a snapshot of the files that lane was handed and is left as counted, and a lane report in .session-notes/lanes/ measures its first-run copy — both are records of a moment, and rewriting a snapshot to match today is how a snapshot stops being evidence",
+  "web/components/money/margin-panel.tsx":
+    "the \"what this account leaves us\" figure on a client's Rates tab, the margin's only consumer, which could not survive the loss of its input. Named in a lane report that measured its empty-state copy — the same snapshot argument as the card above",
+  "web/components/team/role-detail.tsx":
+    "the per-role screen the client deleted on 2026-09-09 (\"I want to see the roles much differently… all the roles together\"). Every role's sheet is one grid on Settings › Team now (roles-matrix.tsx), and half a dozen comments — module-content.tsx's `roles` branch, the roles matrix's own header, web/lib/pages.ts, R36's screen clause in rules.test.ts — name this path precisely BECAUSE it is gone, which is what makes each of those sentences readable",
+  "web/lib/use-live-refetch.ts":
+    "R15's retired half. RULES.md, CACHING.md and the registry all say this hook was deleted when paging moved to cursors over the shared store — naming it is the whole point of the sentence",
+  "web/lib/live-bus.ts":
+    "CACHING.md, one sentence on from the hook above: the bus 'outlived its only subscriber and is now gone too'",
+  "web/components/condensed-title.tsx":
+    "the registry's R46 note on the kit's `useIsVisible`: its one caller in the app, removed when the client asked for the compressed title bar to go",
+  "web/components/knowledge-ask.tsx":
+    "CONTROL-SWAP-LANES.md's lane A manifest — a snapshot of the files that lane was handed, left as counted and annotated at the top of the file",
+  "shared/web/screen-engine/range-facet.tsx":
+    "CONTROL-SWAP-LANES.md's lane C manifest, same snapshot: it went when the filter row became the design kit's",
+  "shared/web/screen-engine/searchable-facet.tsx":
+    "CONTROL-SWAP-LANES.md's lane C manifest, same snapshot and the same commit",
+  "web-portal/components/auth-artwork.tsx":
+    "UI-GAPS.md row 23 records the file's own deletion — it says 'is deleted', which is the fact the row exists to carry",
+  "shared/ui/lib/recipe.ts":
+    "SCREEN-ENGINE-PLAN.md says the recipe type 'was' here while the engine lived in the library, and where it is now",
+  "shared/ui/styles.css":
+    "UI-CONVENTIONS.md says in so many words 'There is no shared/ui/styles.css'; OPERATIONS.md dates the vendoring that ended it, library-map.md is the superseded swap key that mapped its tokens, and both apps' globals.css and shared/brand.ts name it in the same past tense",
+  "shared/web/brand-theme.tsx":
+    "the `<style>` tag that stood six mango tokens in front of the old library's teal preset. RESKIN-REPORT.md records the end of it — 'the theme IS the kwapso palette now, so BrandTheme is gone' — and design/library-map.md, which carries a SUPERSEDED banner of its own, names the file twice as the middle layer of the three-deep chain that swap removed. Found only when the docs census learned to read markdown that lives outside documents/",
+  "web/components/temp/auth-card.tsx":
+    "the temp/ folder went when the kit shipped its own sign-in composition; `web/components/shell/auth-card.tsx`'s header says what it 'was'",
+  "web/components/temp/code-input.tsx":
+    "the same folder, named by the portal's own compile fence as the file whose planned deletion would once have broken the other app",
+  "workers/auth/test/session-read-seam.test.ts":
+    "`web/test/one-cookie-name.test.ts` records the two suites it was merged out of, on 6 Sep 2026 — the names are the record",
+  "web/components/help-status-stepper.tsx":
+    "COMPOSITION-MISMATCHES.md and NEEDS-A-SPEC.md both name it to say it is GONE: the client's 31 Aug 2026 ruling that nothing renders after the chips row put a status track below them out of bounds, and this wrapper was removed rather than relocated on 1 Sep 2026. Both entries were kept, not deleted, because the composition question survives the component",
+  "web/components/story-status-stepper.tsx":
+    "the other half of the same removal, named in the same two sentences for the same reason",
+  "web/lib/api.ts":
+    "the agency client became a directory; `workers/gateway/test/agency-door.test.ts` explains that it walks the directory precisely because it 'used to be' this one file",
+  "scripts/icon-art.mjs":
+    "the stage that stood lucide's glyphs in front of the kit's icon-name placeholders until v1.0.8 shipped 1,383 drawn glyphs. `scripts/sync-design.mjs` names it in the comment that replaced the call — 'is deleted rather than left switched off' — which is the sentence that tells the next reader the art stage is not merely disabled somewhere they have not looked",
+  // ── CONTACTSBYCOMPANY, deleted 14 Sep 2026 as unreached dead code (Part 3b
+  // of the same pass that made this whole table registry data): R67's own
+  // `UNCONTAINED_SECTION_OK` history, UI-GAPS.md #24 and
+  // `web/test/orphan-components.test.ts`'s own header (explaining the census
+  // fix that finally caught it) all name the file precisely BECAUSE it is
+  // gone.
+  "web/components/accounts/contacts-by-company.tsx":
+    "the grouped-by-company Contacts arrangement, host-composed from ScreenRenderer + a <section> per group. R67's law text (amendment 7) records the day it was JUDGED as an uncontained section and found unreached; UI-GAPS.md #24 records it as the closed-app-side-abandoned feature; web/lib/screens.ts, web/components/accounts/contacts-screen.tsx and web/components/deep-link/shape.tsx each explain, in their own comments, what they used to point at",
+  "web/test/contacts-by-company.test.tsx":
+    "the deleted component's own dedicated spec file — deleted with it. Named in web/test/orphan-components.test.ts's own header as the reason the census missed the component in the first place: the file's import let the component's own test count as a 'mount', which is not evidence the app renders it",
+}
+
+// ── dates-are-formatted ─────────────────────────────────────────────────────
+
+/** The genuine exceptions to "every date a person reads goes through
+ * shared/web/format.ts" — a `dateTime:` key feeding the DOM's own machine-
+ * readable `<time dateTime>` attribute (paired with a separately formatted
+ * field for the words a person sees), or a long-month/weekday-alone formatter
+ * shared/web/format.ts does not carry. One entry per offending line, named
+ * "path:line" so a file that moves or a line that shifts is caught by the rot
+ * check rather than silently kept alive. Rot-checked BOTH ways: a line no
+ * longer matching the pattern it was pinned for is as much a failure as an
+ * unlisted offender. */
+export const RAW_DATE_EXEMPT: Record<string, string> = {
+  "web/components/records/record-calendar.tsx:149":
+    "the month heading needs the reader's own LONG month name + year — " +
+    "shared/web/format.ts has no formatter for that shape (formatMonth is " +
+    "the short-month AXIS one) — so it calls Intl directly, with the real " +
+    "`lang` (this line used to pass `undefined`, which is the bug R1 of this " +
+    "pass fixed).",
+  "web/components/records/record-calendar.tsx:159":
+    "the weekday headings need the reader's own weekday names alone, and no " +
+    "formatter in shared/web/format.ts produces that shape either — Intl " +
+    "directly, with the real `lang` (also used to pass `undefined`).",
+  "web/lib/use-record-activity.ts:167":
+    "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
+    "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
+    "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
+    "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
+    "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
+    "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
+  "web/components/deep-link/shape.tsx:100":
+    "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
+    "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
+    "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
+    "on 7 Sep 2026, when `shapeActivity` gained a named return type, and to :90 on 9 Sep 2026 when `TeamMeta` left the import block with the deleted team-overview shaper — " +
+    "`ActivityFeedRow` — and the import and its note landed above this line; " +
+    "and to :96 the same day, when the contacts TABLE landed and `REF_LEADS_NAME` " +
+    "joined the import block above it with the note saying why the class is " +
+    "shared rather than respelled; and to :94 on 10 Sep 2026, when kb_F deleted " +
+    "the knowledge section's two dead exports (`knowledgeFiledUnder`, " +
+    "`shapeKnowledgeList` — superseded by `KnowledgeSourceCard`) and their " +
+    "now-unused `Icon`/`IconName`/`KnowledgeSource` imports two lines above " +
+    "this one; and to :100 on 14 Sep 2026, when the system-wide Choices tab's " +
+    "own shaper (`shapeChoicesTable`) landed five single-line imports and a " +
+    "`SelectableValue` type import above this one, six lines net.)",
+  "web/components/work/work-panels.tsx:1500":
+    "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
+    "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
+    "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
+    "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
+    "from a `ref · title` string into the black reference chip beside the " +
+    "title, which is thirteen lines of JSX where there was one; from " +
+    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; " +
+    "back to :1491 the same day again, when the ticket panel above lost its " +
+    "`marks` prop and the `<RecordMark>` it drew — three lines net; and to " +
+    ":1500 on 9 Sep 2026, when R62 folded this file's two zero states into one " +
+    "`CollectionEmptyState` call and its note, nine lines net, landed above.)",
+}
+
+// ── stored-html (the one injection seam) ───────────────────────────────────
+
+/** The ONLY places either front door may hand a string to the browser as
+ * markup. Data, not judgement in code — every entry is a visible line with the
+ * reason it is safe, the same shape rich-text.test.ts's NOT_USER_TYPED uses.
+ * Anything else is an offender, whatever it claims to have sanitised on the
+ * way in. */
+export const MAY_INJECT: Record<string, string> = {
+  "shared/web/rich-text-view.tsx":
+    "THE seam. Both branches produce known-safe HTML: sanitizeRichHtml (parse detached → allow-list) for a body with tags, toHtml (escape-first markdown) for one without.",
+  "web/components/assistant/agent-markdown.tsx":
+    "the assistant's own reply, through the same escape-first toHtml — the text is escaped before any markup is added, so its output is safe by construction",
+  "shared/web/theme-provider.tsx":
+    "the pre-paint theme boot script — a module constant written in this repo (apply localStorage's stored data-theme before first paint, the design kit's own prescribed snippet). No value from a request or a row reaches it.",
+  "shared/web/mark-runtime.tsx":
+    "two module constants (the mark's CSS and its animator script) written in this repo — no value from a request or a row reaches them",
+  "shared/web/mark-loader.tsx":
+    "the mark's own markup, a module constant built from module constants (shared/web/splash.ts → splashInner). It is server-rendered on purpose: an empty box in the exported HTML is a blank screen until the bundle lands.",
+}
+
+// ── forms-forward-everything ────────────────────────────────────────────────
+
+/** PAYLOADS THAT ARE BUILT BY HAND ON PURPOSE, each with the reason.
+ *
+ * These four name every field their form declares TODAY — they are the shape
+ * the bug came out of, not the bug. Each also TRANSFORMS on the way through
+ * (`values.sprintId || undefined`, a null for a cleared picker), so a blind
+ * spread would change what reaches the door rather than tidy it.
+ *
+ * The list is rot-checked: an entry whose payload starts spreading, or
+ * whose call disappears, turns the build red. It can only shrink. */
+export const BY_HAND: Record<string, string> = {
+  "process-detail.tsx → addStep":
+    "the step form answers three shape questions (a split, an arm, a loop) that become four different fields, and the mapping is the point of the handler",
+  "process-detail.tsx → updateStep":
+    "the same mapping in reverse, plus `position`, which is DERIVED from the shape rather than sent by the form",
+  "stories-screen.tsx → createStory":
+    "empty string means 'not chosen' on this form and `undefined` means 'leave it' at the door — the conversion is deliberate and cannot be spread",
+  "story-detail.tsx → updateStory":
+    "the same conversion on the edit half",
+}
+
+// ── one-black-chip (the one reference mark) ─────────────────────────────────
+
+/** EVERY SURFACE THAT LEGITIMATELY BUILDS A BLACK CHIP OF ITS OWN, with the
+ * reason it is not a record's reference. One line, and it should stay that
+ * way. */
+export const INVERSE_BADGE_OK: Record<string, string> = {
+  "web/components/process/process-map.tsx":
+    "NOT A REFERENCE. The two badges there are a LEGEND KEY — the short code " +
+    "(`A`, `B`) standing in front of each side's label on a comparison bar, " +
+    "paired with a `secondary` badge for the other side so the two sides read " +
+    "as opposites. It is charcoal because it is the loud half of a pair, not " +
+    "because it names a record; nothing on that map has a `ref` at all.",
+}
+
+/** A slot typed `string` (a picker option's label, a `recordLabel`, a
+ * `CalendarEntry.title`, a React list key) where a black chip genuinely cannot
+ * go, so the reference is glued in front of the name instead — keyed by WHAT
+ * THE LINE SAYS rather than by "path:line", because a pin that only moves
+ * whenever an unrelated line is added above it does not identify a call site.
+ * A `contains` fragment matching more than one site in its file is refused: one
+ * reviewed exemption must not silently cover a second site nobody looked at. */
+export interface RefAsString {
+  file: string
+  contains: string
+  why: string
+}
+
+export const REF_AS_STRING_OK: RefAsString[] = [
+  {
+    file: "web/lib/picker-sources.ts",
+    contains: "label: t.ref ?",
+    why:
+      "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
+      "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
+      "its name from this one field. A ticket option leads with its number " +
+      "because that is what somebody types to find it. (feat/ui-ux grew the " +
+      "line above this one so an account option routes through the one " +
+      "`accountOption` seam — the kind of edit that used to re-pin this entry " +
+      "and now does nothing to it.)",
+  },
+  {
+    file: "web/lib/picker-sources.ts",
+    contains: "label: s.ref ?",
+    why: "same slot, a story option — see the ticket one above.",
+  },
+  {
+    file: "web/components/work/stories-screen.tsx",
+    contains: "label: t.ref ?",
+    why:
+      "the ticket picker on the story form, building the same `PickerOption.label` " +
+      "the two lines in picker-sources.ts build.",
+  },
+  {
+    file: "web/components/tickets/help-detail.tsx",
+    contains: "recordLabel={[ticket.ref",
+    why:
+      "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
+      "entry is being logged against, inside sentences and a dialog title, not on " +
+      "a row of its own.",
+  },
+  {
+    file: "web/components/tickets/help-detail.tsx",
+    contains: "label: [ticket.ref",
+    why:
+      "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
+      "string slot as picker-sources.ts, for the ticket the form is pinned to.",
+  },
+  {
+    file: "web/components/work/story-detail.tsx",
+    contains: "recordLabel={story.ref ?",
+    why: "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx above.",
+  },
+  {
+    file: "web/components/work/sprints-screen.tsx",
+    contains: "title: s.ref ?",
+    why:
+      "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
+      "the chip would be wrong even if the slot allowed it: a day cell is a few " +
+      "characters wide and a lozenge in it is furniture, not information.",
+  },
+  {
+    file: "web-portal/components/delivery-block.tsx",
+    contains: "s.ref ?? s.name",
+    why:
+      "A REACT LIST KEY (`id:`), never rendered — the client reads `s.name` and " +
+      "the dates on that row. Kept as the key because a sprint's reference is the " +
+      "stablest thing about it.",
+  },
+]
+
+// ── source-scan (the law machinery's own guard) ─────────────────────────────
+
+/** WHO MAY STRIP A COMMENT BY HAND. Every entry here is a CSS case rather than
+ * a TypeScript one: CSS's block-comment syntax has no line comment counterpart,
+ * so running the TypeScript stripper over a token value would delete a `//`
+ * that CSS reads as part of a URL. Everything else that used to do this has
+ * been moved onto the shared `stripComments`. */
+export const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
+  "web/test/theme-tokens.test.ts":
+    "strips a CSS comment out of a CSS custom property's VALUE, read from tokens.css. Not TypeScript: `//` is not a comment in CSS, it is the middle of a url(), so the shared stripper is the wrong tool here and would silently eat one",
+  "shared/ui/foundations/tokens/token-model.mjs":
+    "the VENDORED KIT's token reader, and the same CSS case the entry above was written for: it walks `tokens.css`, where `//` is not a comment but the middle of a `url()`, so the shared TypeScript stripper is the wrong tool and would silently eat one. `shared/ui/` is a dependency this repo may not hand-edit at all — `web/test/vendored-kit.test.ts` recomputes its content hash — so this can only ever be fixed upstream, and a kit sync that moves it will turn this line red exactly as the last one did",
+  "shared/ui/foundations/tokens/check-contrast.mjs":
+    "the kit's contrast law, reading the same `tokens.css` through the same CSS rules as the reader above. It is the check that found three surfaces painting themselves onto themselves on 7-8 Sep 2026; it cannot import a TypeScript stripper from an app that vendors it, and the CSS case is not what that stripper is for",
+}
+
+/** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. `grep` classifies a
+ * file holding one as BINARY and skips it in silence — indistinguishable from
+ * an honest zero matches — so a raw byte makes a file invisible to the exact
+ * tool a person reaches for. Rot-checked both ways, so a file that no longer
+ * holds one turns this red and the line is deleted.
+ *
+ * EMPTY, AND IT GOT THERE THE WAY AN EXEMPTION IS SUPPOSED TO. It opened with
+ * one entry, for the vendored kit's `use-remembered-view.ts`, and the reason
+ * named the condition under which the line would disappear: the kit is a
+ * pinned dependency this repo may not hand-edit, so the fix could only be made
+ * upstream and a sync would clear it. That happened, the same day, in kit
+ * v1.2.74. An exemption whose reason cannot be read as an instruction is a
+ * permanent one. */
+export const CONTROL_BYTE_OK: Record<string, string> = {}
+
+// ── R28 (catalogued-strings) ────────────────────────────────────────────────
+
+/** R28 — a file the translation walk does not reach and that says something a
+ * person reads anyway. `appFiles()` is the front doors' own import closure, so
+ * a file the walk cannot see is a reasoned line here rather than a silent gap.
+ * A ratchet: an entry that no longer offends turns the build red, so it can
+ * only shrink. */
+export const UNWALKED_OK: Record<string, string> = {
+  "shared/workers/query-grammar.ts":
+    "the machine query grammar — what a MODEL may ask a module, and the words in it are FIELD NAMES and the other names a field answers to ('reference' for `ref`, 'name' for `title`), not copy. Nothing here reaches a screen: no front door imports it, the two doors that read it live on the tenancy worker, and its only human-facing prose is the one-line module summaries a MODEL reads in describe_module. Translating a field name would break the filter it names. The extractor is right that a quoted word sits in a position it watches; it is wrong about who reads it.",
+  "shared/workers/record-link.ts":
+    "R30's email button labels — 'Open the ticket', 'Open your requests'. A WORKER composes them into a message, for the recipient's own front door, and no front door imports this file. They are held by R30, not by a screen, and the pipeline that would translate them is the worker's per-request translator rather than the build-time catalogue. Widening R28 to reach them would put the email census under a law written about screens.",
+}
+
+// ── detail-error-states ─────────────────────────────────────────────────────
+
+/** THE ONE WAY OUT, and it carries the condition that deletes it.
+ *
+ * `knowledge/knowledge-detail.tsx` is the third instance of exactly this bug —
+ * same two queries, same missing term, same permanent skeleton as
+ * meeting-detail. It is NOT fixed here because a separate session owns the
+ * knowledge base right now and the owner asked for it to be left alone;
+ * editing this file from two places at once is how a merge eats somebody's
+ * work.
+ *
+ * DELETE THIS ENTRY, and fix the screen, the moment that session's work lands.
+ * Rot-checked both ways: an entry naming a file that no longer exists fails,
+ * and an entry naming a screen that has since been fixed fails too — so it
+ * cannot quietly outlive its reason. */
+export const ERROR_STATE_EXEMPT: Record<string, string> = {
+  "knowledge/knowledge-detail.tsx":
+    "A parallel session owns the knowledge base (owner's instruction, 2026-09-10), " +
+    "so this screen is not edited from here. Same bug as meeting-detail had: " +
+    "sourcesQ.error is asked, oneQ.error is not, and a failed by-id read holds the " +
+    "loading skeleton for ever. Delete this line and fix the guard once that " +
+    "session has landed.",
+}
+
+// ── R60 (image-fills) ───────────────────────────────────────────────────────
+
+/** R60 — THE ONE FIT THIS APP KEEPS, and the reason has to survive re-reading
+ * because the client's ruling ("everywhere for images: do fill, not fit!") has
+ * no exceptions clause in it. Rot-checked: a line whose file no longer holds a
+ * non-`cover` fit turns the build red, so this list can only shrink and can
+ * never become a place a `contain` hides. */
+export const OBJECT_FIT_OK: Record<string, string> = {
+  "shared/web/attachment-preview.tsx":
+    "The kit's media well showing a FILE somebody attached to a ticket — a " +
+    "screenshot of the thing that is broken, a scan, a photograph of a screen. " +
+    "Every other picture this law governs is a MARK: a logo, a face, a brand " +
+    "lockup, standing FOR a record whose name is written beside it, where a crop " +
+    "costs the edges of an identity the word already carries. This one IS the " +
+    "content, with no word beside it saying what was lost. The well is 16/9 and " +
+    "an attachment is not: a portrait screenshot cropped to it shows a band from " +
+    "the middle and hides the error message at the top, which is the reason the " +
+    "file was attached — and nothing on screen tells the reader that happened, " +
+    "because a crop looks exactly like a picture that was always that shape. " +
+    "The preview also OPENS the file, so containing it costs nothing a person " +
+    "cannot get past in one press. Flagged for the client rather than assumed: " +
+    "her ruling was made over marks in select components and filters, and this " +
+    "is the one site in the app it does not obviously describe. Delete this line " +
+    "the day she says it does.",
+}
+
+// ── dead-exports ────────────────────────────────────────────────────────────
+
+/** Exported values that nothing names, each with the decision that keeps it.
+ * Rot-checked both ways: an entry whose export has gained a user, or whose
+ * export no longer exists, turns the build red — so the list can only
+ * shrink. */
+export const DEAD_EXPORT_OK: Record<string, string> = {
+  "web/components/tickets/mail-reply-dialog.tsx::MailReplyDialog":
+    "the file is PARKED in web/test/orphan-components.test.ts (now `PARKED`, this module) with the decision that parks " +
+    "it — it is the only place either front end holds a Gmail draft id, kept for the day a " +
+    "screen opens it. An unmounted file has an unimported export by construction; this line " +
+    "is that same decision seen from one level down, and both go together or neither does.",
+  "shared/rules/registry.ts::DEAD_EXPORT_OK":
+    "this census's own structural blind spot, not a real orphan. `web/test/dead-exports.test.ts` " +
+    "excludes ITSELF from the `others` corpus on purpose — its own placeholder no-such-export " +
+    "string (its positive control, proving the matcher can still see a dead export at all) would " +
+    "otherwise match itself and silently break that control. `DEAD_EXPORT_OK` moved out of that file and into " +
+    "this registry, 14 Sep 2026 (RULES.md line 13's promise made true), and dead-exports.test.ts is " +
+    "the ONLY file that imports it — so the one file legitimately reading it is also the one file " +
+    "this census refuses to count as a reader. This is exactly the shape this file's own header " +
+    "names as sanctioned: \"a registry read only by the law that enforces it\" (RULES_REGISTRY, " +
+    "STORED_FILES, PALETTE_LITERAL_OK…). Delete this line only if the census's own self-exclusion " +
+    "is ever removed.",
+}
+
+// ── ancestors-have-names (breadcrumb faces) ─────────────────────────────────
+
+/** Segments that never carry a record id, with the reason each. Data, and
+ * rot-checked below, so the list can only shrink. */
+export const NO_RECORD_BEHIND_IT: Record<string, string> = {
+  time: "the work-log collection. A log is read on the record it was booked against, never at /time/<id>.",
+  import: "the CSV importer — a workflow, not a collection. Nothing under it has an id.",
+  brand: "brand assets open in a panel on the section itself rather than at an address of their own.",
+  purposes: "meeting purposes are edited in place on their section, like dropdown values.",
+}
+
+// ── assignable-members ──────────────────────────────────────────────────────
+
+/**
+ * The screens that read the members list and are NOT asking "who can do this
+ * work". A client login is a member: the screens that MANAGE members have to
+ * show them, or nobody could see a grant, change a role, or take one away.
+ * Every one is a visible line with a reason; anything else must go through the
+ * one seam.
+ */
+export const NOT_A_WORK_PICKER: Record<string, string> = {
+  "screens/kwapso-screen.tsx":
+    "the team roster on the agency's own record — a list of who is here, not a list of who can be given something",
+}
+
+// ── orphan-components ───────────────────────────────────────────────────────
+
+/** Components that are unmounted ON PURPOSE, each with the decision that parks
+ * it. Rot-checked below: a line whose file has gained an importer (or lost its
+ * file) turns the build red, so the list records real decisions only. */
+export const PARKED: Record<string, string> = {
+  "tickets/mail-reply-dialog":
+    "the only place either front end ever holds a Gmail draft id. Parked, not dead: " +
+    "the reachable-screens exemption for POST /google/gmail/trash names this file as " +
+    "where a person's own 'bin it' belongs the day a screen opens it — delete this " +
+    "line and the dialog together with that one.",
+}
+
+// ── R41 (picked-files-are-sent) ─────────────────────────────────────────────
+
+/** R41 — the dialogs that hold a picked file until submit because the record
+ * they belong to does not exist yet, each with the maker whose id they need
+ * back. DATA, and it is the one hand-written thing in this law — everything
+ * about whether a call site is correct is derived from it. Rot-checked: a
+ * component that stops deferring loses its line. */
+export const DEFERRED_UPLOAD_FORMS: { component: string; maker: string; why: string }[] = [
+  {
+    component: "StoryFormDialog",
+    maker: "createStoryFrom",
+    why: "a story's attachments are addressed by story id, which does not exist until the create door answers — so the picked files wait for the id the submit hands back",
+  },
+]
+
+// ── R1 (publish-seam) ───────────────────────────────────────────────────────
+
+/** R1 — the one worker CLAUDE.md and CACHING.md rule 5 already name as the
+ * reviewed exception to "every worker that publishes has a publish-seam
+ * suite": auth publishes on the per-user identity channel, not a team
+ * resource, so there is no ROUTES-table mutation set for a seam test to
+ * walk. */
+export const AUTH_PUBLISH_EXEMPT: Record<string, string> = {
+  auth: "publishes on the per-user identity channel, not a team resource — no ROUTES mutation set to walk (CACHING.md rule 5)",
+}
+
+// ── motion-is-the-kits ──────────────────────────────────────────────────────
+
+/** Hand-rolled Tailwind transitions pinned in place of the kit's own
+ * `motion-*` vocabulary, with the reason each. Rot-checked: a pin whose file no
+ * longer carries a transition turns this red, so the list can only shrink.
+ *
+ * EMPTY, and that is the point. It has now emptied TWICE, both times because
+ * the hand-rolled thing was replaced by a kit part rather than because anybody
+ * came looking for the pin: `record-chrome.tsx`'s collapsing sticky header
+ * (2026-08-27, once the kit shipped `RecordChrome`) and
+ * `agent-markdown.tsx`'s link transition (2026-09-13, once the assistant's
+ * prose and `ArticleBody`'s were unified onto one renderer). */
+export const HAND_ROLLED_OK: Record<string, string> = {}
+
+// ── tab-shape (rules.test.ts) ───────────────────────────────────────────────
+
+/** "There can never be 2 rows of tabs … just never" — the client's ruling, no
+ * exceptions clause. EMPTY ON PURPOSE: tickets-collection.tsx was the one
+ * screen that ever stacked two `<TabsView>` strips, and it was redesigned to
+ * one strip (the old All-tickets/Archived strip became the "Archived" filter
+ * in COLLECTION_FILTERS) rather than given an inner strip to satisfy this list.
+ * An entry here again means somebody has re-accepted the stacked-strip cost
+ * with their eyes open — which, after this ruling, means asking the client
+ * first. */
+export const TWO_STRIPS_OK: Record<string, string> = {}
+
+// ── R67 (sections-stand-on-paper) ───────────────────────────────────────────
+
+/** R67 amendment 6 — the named family of overlay surfaces `isOverlay` treats as
+ * "not content standing on the page", asked per ROOT a component can return
+ * rather than of any tag its text merely mentions. Names rather than a bare
+ * count, rot-checked both ways: a component that starts returning one of these
+ * tags is a reviewed addition rather than a silent skip, and a name
+ * `isOverlay` no longer agrees with is stale and must be deleted — the same
+ * rot-check `UNCONTAINED_SECTION_OK` already uses. */
+export const OVERLAY_FAMILY_OK: Record<string, string> = {
+  Sheet: "the kit's own slide-in surface — the family's direct base case, R59's form shape.",
+  AlertDialog: "the kit's own centred yes/no surface — the family's direct base case, R59's warning shape.",
+  FormShellDialog:
+    "shared/web/form-shell.tsx — the app's one form-dialog seam. Its only root is the kit's `Sheet`, " +
+    "unconditionally (R59's own history: it moved ~35 forms off `Dialog` onto `Sheet` on 2026-08-31).",
+  AddLinkDialog: "web-portal/components/add-link-dialog.tsx — a portal ticket's link-adding form; its only root is `FormShellDialog`.",
+  GoogleScopeDialog: "web/components/knowledge/google-scope-dialog.tsx — the Google-scope picking form; its only root is `FormShellDialog`.",
+  TimeFormDialog: "web/components/work/time-form-dialog.tsx — the work module's time-entry form; its only root is `FormShellDialog`.",
+  // THE `ScreenConfirm` LINE STOOD HERE and went 14 Sep 2026, in the same
+  // change that deleted `web/components/accounts/contacts-by-company.tsx`
+  // (Part 3b of the pass that moved this whole table into the registry).
+  // `isOverlay("ScreenConfirm")` was only ever reached, during a real census
+  // run, through `isOverlay("ScreenRenderer")` resolving its own branches —
+  // and `ContactsByCompany`'s `<section><h2>…</h2><ScreenRenderer .../></section>`
+  // was the one titled section in the whole app with a RAW, unwrapped
+  // `<ScreenRenderer>` as a body's root tag; every other call site
+  // (module-content.tsx, apps-screen.tsx, …) wraps it in a container
+  // component first, so `isOverlay` is asked of THAT wrapper's name instead
+  // and never recurses into `ScreenRenderer`/`ScreenConfirm` at all. Deleting
+  // the one file that asked the question removed the only path that reached
+  // this name, and the rot-check caught it the moment the file went — the
+  // same "an entry whose condition is no longer true fails the build" that
+  // every other list in this registry is held to.
 }

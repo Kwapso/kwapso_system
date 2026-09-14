@@ -138,13 +138,10 @@ it. If it's this-app-specific assembly, it belongs in `web/components/`.
 ### Where in `web/components/` — one folder per module or kind
 
 `web/components/` has **no top-level files**. Every component sits in a folder named
-for the module it serves (`tickets/`, `work/`, `accounts/`, `apps/`, `process/`,
-`money/`, `team/`, `knowledge/`, `meetings/`, `choices/`) or for the kind of thing
-it is (`shell/` the chrome, `records/` the parts every record screen reuses,
-`deep-link/` the one client-resolved host, `assistant/` the agent column,
-`screens/` the whole-page screens with no module of their own). A new component
-joins the folder its module already has; a new module gets a folder. **This is law R57**
-(`component-folders`): the permitted set is DERIVED from `web/components/README.md`'s own
+for the module it serves or for the kind of thing it is — `web/components/README.md`
+lists each one, one line apiece, and is the list to trust over this paragraph. A new
+component joins the folder its module already has; a new module gets a folder. **This is
+law R57** (`component-folders`): the permitted set is DERIVED from that README's own
 rows, so the paragraph a person reads and the rule a build enforces cannot disagree —
 a component left loose at the top level, a folder nobody described, or a described folder
 nobody has all turn the build red (UI-RULEBOOK U3). Basenames are

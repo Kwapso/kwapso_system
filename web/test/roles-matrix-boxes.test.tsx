@@ -228,5 +228,30 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
           `roles-matrix.tsx no longer maps ${ours} → ${kits}; this suite's copy of the mapping is stale`
         ).toMatch(new RegExp(`${ours}:\\s*"${kits}"`))
     })
+
+    it("the read-right column speaks the glossary's word, never the kit's", () => {
+      // The client's ruling, 11 Sep 2026: the READ column reads "Read", not
+      // "See" — the glossary was already on her side (`permission` is "a
+      // single thing a role can do: read, create, update, or delete"). The
+      // kit's own capability id stays `see` (vendored, hash-pinned, mapped by
+      // `RIGHT_TO_KIT` above); this checks the WORD a person reads, never the
+      // identifier.
+      //
+      // Protected the narrow way, on purpose: `see` was tried as a
+      // GLOSSARY_SYNONYMS entry the same day and reverted within hours — R34's
+      // check needed 21 GLOSSARY_SYNONYM_OK exemptions for ordinary English
+      // ("can't see the team", Google's OAuth copy) the moment it ran over the
+      // whole catalogue, which is R34's own doctrine ("a word earns a line
+      // only when it can mean nothing else here") saying the word does not
+      // qualify. The ruling is real and is exactly this one label, on exactly
+      // this one screen — so it is a targeted assertion here, not a
+      // whole-catalogue ban with twenty-one holes cut in it.
+      const src = source()
+      expect(src).toMatch(/\{\s*id:\s*"see",\s*label:\s*t\("Read"\),/)
+      expect(
+        /label:\s*t\("See"\)/.test(src),
+        'roles-matrix.tsx labels a capability "See" — the client\'s ruling is "Read", not the kit\'s default word'
+      ).toBe(false)
+    })
   })
 })

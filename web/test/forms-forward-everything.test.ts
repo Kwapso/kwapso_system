@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { BY_HAND } from "@shared/rules/registry"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -30,25 +31,8 @@ describe("a form's payload is forwarded, never transcribed", () => {
    * hand for one of these is where a field goes missing. */
   const DOORS = /\b(updateHelp|createHelp|updateStory|createStory|saveAccount|addStep|updateStep)\(\{/g
 
-  /** PAYLOADS THAT ARE BUILT BY HAND ON PURPOSE, each with the reason.
-   *
-   * These four name every field their form declares TODAY — they are the shape
-   * the bug came out of, not the bug. Each also TRANSFORMS on the way through
-   * (`values.sprintId || undefined`, a null for a cleared picker), so a blind
-   * spread would change what reaches the door rather than tidy it.
-   *
-   * The list is rot-checked below: an entry whose payload starts spreading, or
-   * whose call disappears, turns the build red. It can only shrink. */
-  const BY_HAND: Record<string, string> = {
-    "process-detail.tsx → addStep":
-      "the step form answers three shape questions (a split, an arm, a loop) that become four different fields, and the mapping is the point of the handler",
-    "process-detail.tsx → updateStep":
-      "the same mapping in reverse, plus `position`, which is DERIVED from the shape rather than sent by the form",
-    "stories-screen.tsx → createStory":
-      "empty string means 'not chosen' on this form and `undefined` means 'leave it' at the door — the conversion is deliberate and cannot be spread",
-    "story-detail.tsx → updateStory":
-      "the same conversion on the edit half",
-  }
+  // BY_HAND moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line 13's
+  // promise made true). Imported above.
 
   it("no submit payload names the form's fields one at a time without spreading", () => {
     const offenders: string[] = []

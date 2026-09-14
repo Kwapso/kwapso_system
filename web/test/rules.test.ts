@@ -20,6 +20,7 @@ import {
   ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  AUTH_PUBLISH_EXEMPT,
   CARD_CHIP_BELOW_OK,
   CENTRED_DIALOG_OK,
   CLIENT_REACHABLE_EXEMPT,
@@ -41,6 +42,7 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TWO_READS_ONE_DOOR,
+  TWO_STRIPS_OK,
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
   EMPTY_TOOLBAR_EXEMPT,
@@ -527,6 +529,73 @@ describe("RULES — the laws of the base", () => {
       `our newest law is ${highest} and the base has minted up to ${BASE_LAW_CEILING} — ` +
         `mint above the ceiling, or raise it after re-reading ${BASE_REPOSITORY}`
     ).toBeGreaterThan(BASE_LAW_CEILING)
+  })
+
+  // R73 — RULES.md line 13's promise, kept: a deny-list is DATA in the
+  // registry, never a `const` in the test file that reads it. A census off
+  // web/test/** and web-portal/test/** on 14 Sep 2026 found twenty exemption
+  // lists declared locally instead — moved to shared/rules/registry.ts, each
+  // test now importing its list. This is the check that keeps it moved: no
+  // test file may declare (rather than import) a `const` shaped like one of
+  // these lists, ever again.
+  it("registry-backed-exemptions: a deny-list in a test file is an import, never a declaration", () => {
+    // THE SHAPE, DERIVED OFF WHAT THE CENSUS ACTUALLY FOUND rather than
+    // guessed at: every one of the twenty ended `_OK` or `_EXEMPT`, or was one
+    // of seven irregular names this base already uses for the identical
+    // job — a deny-list that names what it excuses rather than restating "is
+    // this OK". Both are real spellings already live in the registry, so the
+    // pattern is read off `RULES_REGISTRY`'s own subject rather than typed
+    // twice: the suffix rule, plus the irregular names, which is exactly the
+    // set `web/test/named-paths.test.ts`, `web/test/picked-files-are-sent.test.ts`,
+    // `web/test/orphan-components.test.ts`, `web/test/stored-html.test.tsx`,
+    // `web/test/forms-forward-everything.test.ts`, `web/test/assignable-members.test.ts`
+    // and `web/test/ancestors-have-names.test.ts` used to declare locally.
+    const IRREGULAR_NAMES = [
+      "GONE_ON_PURPOSE",
+      "DEFERRED_UPLOAD_FORMS",
+      "PARKED",
+      "MAY_INJECT",
+      "BY_HAND",
+      "NOT_A_WORK_PICKER",
+      "NO_RECORD_BEHIND_IT",
+    ]
+    const EXEMPTION_SHAPED = new RegExp(
+      `^(?:[A-Z][A-Z0-9]*_(?:OK|EXEMPT)|${IRREGULAR_NAMES.join("|")})$`
+    )
+    // A `const` (or `let`) DECLARATION — never matches an `import { NAME }`
+    // line, which is the whole discriminator: a real import statement
+    // declares no `const` at all, so the two shapes cannot be confused. Any
+    // indentation, because the fault has shipped both at module scope
+    // (`GONE_ON_PURPOSE`) and nested inside a `describe`/`it` block
+    // (`BY_HAND`, `OVERLAY_FAMILY_OK`, the rules.test.ts-local `EXEMPT` this
+    // very file used to carry) — a walk that only read column zero would have
+    // missed three of the twenty the census found.
+    const DECLARES_EXEMPTION = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::|=)/g
+
+    const files = [
+      ...sourceFiles(join(ROOT, "web", "test"), { extensions: [".ts", ".tsx"], relativeTo: ROOT }),
+      ...sourceFiles(join(ROOT, "web-portal", "test"), { extensions: [".ts", ".tsx"], relativeTo: ROOT }),
+    ]
+    // Tripwire: a walk that found no test files would pass this by finding
+    // nothing to offend, indistinguishable from a clean sweep.
+    expect(files.length, "the test-file walk found nothing — it has gone blind").toBeGreaterThan(80)
+
+    const offenders: string[] = []
+    for (const file of files) {
+      const src = stripComments(file.source)
+      for (const m of src.matchAll(DECLARES_EXEMPTION)) {
+        const name = m[1]
+        if (!EXEMPTION_SHAPED.test(name)) continue
+        offenders.push(`${file.rel} declares \`const ${name}\` locally`)
+      }
+    }
+    expect(
+      offenders,
+      "a deny-list is DATA in the registry (RULES.md line 13), never a local const in the " +
+        "test that reads it — move this list's entries, reasons and header comment into " +
+        "shared/rules/registry.ts as an `export const`, and import it here instead:\n  " +
+        offenders.join("\n  ")
+    ).toEqual([])
   })
 
   // R2 — every record-detail screen exposes Overview + Activity tabs. The
@@ -1563,13 +1632,13 @@ describe("RULES — the laws of the base", () => {
     // The scan must not go blind: three workers are the known floor.
     expect(publishers.length, "the publisher scan found almost nothing").toBeGreaterThanOrEqual(3)
 
-    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name:
-    // it publishes on the USER channel (identity events + a forced sign-out), not a
-    // team resource, so there is no ROUTES-table mutation set for a seam to walk.
-    const EXEMPT: Record<string, string> = {
-      auth: "publishes on the per-user identity channel, not a team resource — no ROUTES mutation set to walk (CACHING.md rule 5)",
-    }
-    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !EXEMPT[w])
+    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name
+    // (AUTH_PUBLISH_EXEMPT, shared/rules/registry.ts — renamed here from the
+    // anonymous local `EXEMPT` it used to be, 14 Sep 2026, RULES.md line 13's
+    // promise made true): it publishes on the USER channel (identity events + a
+    // forced sign-out), not a team resource, so there is no ROUTES-table
+    // mutation set for a seam to walk.
+    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !AUTH_PUBLISH_EXEMPT[w])
     expect(
       unguarded,
       `these workers publish and have no publish-seam suite — add one and list them in ` +
@@ -1585,7 +1654,7 @@ describe("RULES — the laws of the base", () => {
         `MUTATING_WORKERS lists ${w}, which has no publish-seam.test.ts`
       ).toBe(true)
     }
-    for (const w of Object.keys(EXEMPT))
+    for (const w of Object.keys(AUTH_PUBLISH_EXEMPT))
       expect(publishers, `${w} is exempted from R1's roster but publishes nothing`).toContain(w)
   })
 
@@ -5082,6 +5151,7 @@ describe("RULES — the laws of the base", () => {
       "automations-are-visible", // R70: web/test/automations.test.ts — the automation registry against four derivations: R30's own branded-send census (shared/rules/email-sites.ts), every wrangler cron, every export of the files that exist only to act, and every automationOff("…") read in worker source
       "agent-label-vocabulary", // R71: workers/data-ops/test/agent-label-vocabulary.test.ts — every summarize() poisoned with the `help` alias on its module/table/targetTable field, derived off the schema field name
       "no-default-subtitles", // R72: web/test/no-default-subtitles.test.ts — the heading-adjacent prose sibling census over both front doors, plus the three heading-drawing chokepoints read directly for a re-grown subtitle/description prop
+      "registry-backed-exemptions", // R73: the exemption-shaped-const census, above, right after law-id-origin
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -5560,7 +5630,9 @@ describe("a tab strip is not nested inside another one", () => {
   // entry here again means somebody has re-accepted the stacked-strip cost
   // with their eyes open — which, after this ruling, means asking the client
   // first.
-  const TWO_STRIPS_OK: Record<string, string> = {}
+  //
+  // TWO_STRIPS_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+  // line 13's promise made true). Imported above.
 
   it("tab-shape: any screen with two strips is a reasoned exception, never a default", () => {
     // THE SANITY CHECK IS ON FILE ENUMERATION, not on finding an offender.

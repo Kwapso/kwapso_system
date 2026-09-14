@@ -39,22 +39,12 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { DEFERRED_UPLOAD_FORMS } from "@shared/rules/registry"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
 
-/** The dialogs that hold a picked file until submit because the record they
- * belong to does not exist yet, each with the maker whose id they need back.
- *
- * DATA, and it is the one hand-written thing here. A dialog earns a line by
- * deferring an upload; everything about whether its call sites are correct is
- * derived below. Rot-checked: a component that stops deferring loses its line. */
-const DEFERRED_UPLOAD_FORMS: { component: string; maker: string; why: string }[] = [
-  {
-    component: "StoryFormDialog",
-    maker: "createStoryFrom",
-    why: "a story's attachments are addressed by story id, which does not exist until the create door answers — so the picked files wait for the id the submit hands back",
-  },
-]
+// DEFERRED_UPLOAD_FORMS moved to shared/rules/registry.ts, 14 Sep 2026
+// (RULES.md line 13's promise made true). Imported above.
 
 /** The JSX attribute's whole expression, brace-balanced.
  *

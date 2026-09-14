@@ -455,9 +455,15 @@ const accountsListRecipe: ScreenRecipe = {
  * so there is one door and one detail screen for both, never a second
  * `/contacts/<id>` address for a record that already has one.
  *
- * Grouped by company on screen (`components/accounts/contacts-by-company.tsx`,
- * UI-GAPS #24), promoted from the tab it used to live on rather than rebuilt —
- * the same component, drawing the same row, at the same right. */
+ * A flat list, not grouped by company: `contacts-screen.tsx`'s own
+ * `module === "contacts"` dispatch renders this recipe through the plain
+ * `RecordTable`. A per-company GROUPED arrangement was built once
+ * (`ContactsByCompany`, host-composed from `ScreenRenderer` + a `<section>`
+ * per group) but never wired to a live screen after the tab it used to live on
+ * was promoted to this page — deleted 14 Sep 2026 as unreached dead code
+ * (`web/test/orphan-components.test.ts`'s census, widened the same day to stop
+ * counting a component's own unit test as a mount), UI-GAPS.md #24 closed as
+ * abandoned rather than left as a live TODO nothing points at. */
 const contactsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
@@ -493,18 +499,21 @@ const contactsListRecipe: ScreenRecipe = {
  * above. */
 const knowledgeListRecipe: ScreenRecipe = {
   type: "list",
-  // CARDS, not a list, and this is the one collection that earns them.
-  //
-  // Every other collection here is a list of ONE kind of thing — tickets, or
-  // stories, or accounts — where the rows differ by their words. The knowledge
-  // base is the opposite: a calendar entry beside a ticket beside a file
-  // somebody uploaded, and until 19 Aug 2026 every one of them looked identical,
-  // a title over "From a calendar entry · The agency" in grey. The thing that
-  // tells them apart was the third thing your eye reached and it was a WORD.
-  //
-  // A card gives the source's own glyph room to be seen before the title is
-  // read, which is the whole point of drawing it (R35).
-  display: "cards",
+  // WAS "cards", not a list — the one collection that earned them, because
+  // every other collection here is ONE kind of thing (tickets, or stories, or
+  // accounts) where the rows differ by their words, and the knowledge base is
+  // a calendar entry beside a ticket beside a file somebody uploaded. Removed
+  // 14 Sep 2026: `collection-content.tsx`'s `module === "knowledge"` branch
+  // has always routed this module to the bespoke `KnowledgeSourceCard` before
+  // `ScreenRenderer` is ever reached, so this recipe's own `display` never
+  // rendered to a live screen — `screen-renderer.tsx`'s "cards" branch was
+  // deleted the same day as dead code, and this recipe is the only other
+  // place the value was declared. `display: "list"` is what this falls back
+  // to for a reader who reaches this recipe by another path (the agent's
+  // capability catalog, a future screen); if the card-per-source treatment is
+  // wanted again on a live screen, that is a fresh decision to make then, not
+  // a value to leave dangling here for.
+  display: "list",
   surface: "none",
   binding: { module: "knowledge" },
   gate: { module: "knowledge", right: "read" },

@@ -59,8 +59,6 @@ import {
   ActivityFeed,
   type ActivityFeedItem,
 } from "@shared/ui/components/activity-feed/activity-feed"
-import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
 import { Gallery, type GalleryTile } from "@shared/ui/components/gallery/gallery"
 import { DotsThree } from "@shared/ui/foundations/icons"
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
@@ -766,8 +764,8 @@ function renderList(
     // `hover:bg-accent`), which is the client's own ruling of 2026-08-26 read
     // off two live screenshots and written into data-table.tsx. So the row
     // display had a hover the client ruled against, on every recipe-driven
-    // table in both front doors, while the `list` and `cards` displays below
-    // already let the kit own it (`List onItemClick`, `Card interactive`).
+    // table in both front doors, while the `list` display below already lets
+    // the kit own it (`List onItemClick`).
     const columns: Array<DataTableColumn<Row>> = fields.map((f) => ({
       key: f.column,
       header: f.field.label,
@@ -900,63 +898,18 @@ function renderList(
               onIntent?.({ kind: "open", module: recipe.binding.module, id: tile.id })
             }
           />
-        ) : display === "cards" ? (
-          /* The kit's CardGrid is the LAYOUT; the cards are children. A card
-             still opens its record exactly as a list row does — the whole
-             card is the press target, drawn from the kit's own Card.
-
-             `interactive` is the kit's own word for "this card is a target",
-             and it is what buys the `--accent` hover wash and motion.css's
-             `motion-hover-lift`. This used to say `className="cursor-pointer"`
-             instead: the cursor changed and nothing else did, so every card
-             collection in the app — accounts, apps, knowledge, the lot — was a
-             grid of boxes that did not react to being pointed at. The kit had
-             the prop the whole time. */
-          <CardGrid>
-            {page.map((row) => {
-              const id = String(row.id ?? "")
-              return (
-                // RAISED, BECAUSE THE CARD BEHIND THIS ONE IS A PANEL.
-                // A grid card is drawn inside `CollectionCard`, which is a
-                // `<Card>` at the default variant — `bg-surface-panel`. This one
-                // was too, so it was `var(--surface-panel)` against
-                // `var(--surface-panel)`: contrast 1.000, and not a coincidence
-                // of two tokens that happen to share a value but the SAME token
-                // on both sides, so 1.000 in every palette present and future.
-                // Measured on /knowledge on 2026-08-28: 51 cards, 50 of them
-                // nested, 50 of 50 rgb(247,242,235) on rgb(247,242,235) — the
-                // one collection in the app given cards deliberately (R35, so
-                // the source's own glyph has room to be seen) drawing no cards
-                // at all. `raised` is the kit's answer by name: `bg-card` plus
-                // `--shadow-rest`, and its own header says it "only reads as
-                // raised when it sits inside a --surface-panel band", which is
-                // exactly where this sits.
-                <Card
-                  key={id}
-                  role="button"
-                  tabIndex={0}
-                  variant="raised"
-                  interactive
-                  onClick={() =>
-                    onIntent?.({ kind: "open", module: recipe.binding.module, id })
-                  }
-                  onKeyDown={(e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault()
-                      onIntent?.({ kind: "open", module: recipe.binding.module, id })
-                    }
-                  }}
-                >
-                  <CardHeader>
-                    {leadingOf(row)}
-                    <CardTitle>{String(row[fields[0]?.column ?? "id"] ?? "")}</CardTitle>
-                    <CardDescription>{String(row[fields[1]?.column ?? ""] ?? "")}</CardDescription>
-                  </CardHeader>
-                </Card>
-              )
-            })}
-          </CardGrid>
         ) : (
+          // DEAD "cards" BRANCH REMOVED, 2026-09-14. `display: "cards"` was
+          // declared by exactly one recipe (`knowledgeListRecipe`,
+          // web/lib/screens.ts), and `collection-content.tsx`'s
+          // `module === "knowledge"` branch routes that module to
+          // `KnowledgeSourceCard` before `ScreenRenderer` is ever reached —
+          // so this branch rendered to no live screen. `SUBTITLE_OK`'s own
+          // entry for this file said so and said the honest fix was
+          // deletion (shared/rules/registry.ts); this is that deletion,
+          // never a subtitle ruling. If a future recipe wants a card grid
+          // again, it is a live decision to make then, not a branch to
+          // un-delete blind.
           <List
             surface={recipe.surface}
             items={page.map((row) => ({

@@ -37,18 +37,18 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L9)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L10)
 - [3. Detail screens](#3-detail-screens) (D1 to D12)
 - [4. Collections](#4-collections) (K1 to K16)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B10)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
 - [7. Typography](#7-typography) (T1 to T8)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S6)
 - [9. Mobile](#9-mobile) (M1 to M6)
-- [10. Copy](#10-copy) (W1 to W13)
+- [10. Copy](#10-copy) (W1 to W14)
 - [11. Record type glyphs](#11-record-type-glyphs) (G1 to G6)
 - [12. Density: the glance budget](#12-density-the-glance-budget-n1-to-n12) (N1 to N12)
-- [13. The kit, and what counts as using it](#13-the-kit-and-what-counts-as-using-it-u1-to-u3) (U1 to U3)
+- [13. The kit, and what counts as using it](#13-the-kit-and-what-counts-as-using-it-u1-to-u4) (U1 to U4)
 - [What the old app did better](#what-the-old-app-did-better)
 - [Do not do](#do-not-do)
 - [Conflicts to settle before building](#conflicts-to-settle-before-building)
@@ -171,6 +171,20 @@ the second one. `styles.css:84,87` already carries both.
 > lifts, and it lifts because somebody asked for it. Do not reintroduce `hover-lift-none`:
 > it is defined in no stylesheet the kit ships, so it reads as a class that does something
 > and does nothing.
+>
+> **AMENDED A THIRD TIME (14 Sep 2026): a card that is a DOOR in a WALL of many at once
+> acknowledges the pointer with a FILL, never the kit's `interactive` lift.** Settings'
+> module cards and the members gallery both draw `hover:bg-accent motion-hover` rather than
+> `interactive` — the client, over the modules wall: *"we are missing a hover state for the
+> cards. For example, in settings modules, I would need to see a hover when I hover over a
+> card."* `interactive` also grants `motion-hover-lift` (motion.css §13), and a GRID of many
+> cards lifting at once is exactly "the page of reacting boxes" this rule exists to
+> prevent — the same argument `app-tiles.tsx` had already settled the identical way.
+> `--accent` is the same token `interactive` would have reached for (`card.tsx`: "Hover,
+> where a card is a target, is `--accent`"), just without the shadow; `motion-hover` is the
+> kit's own transition class for the fill alone. The kit's lift stays reserved for a card
+> that is genuinely a single, standalone target — a draggable card, the copilot launcher —
+> never a wall of many.
 
 ```tsx
 <Card className="hover-lift-none shadow-none">
@@ -579,6 +593,32 @@ that moment nothing in the app opened it, and a screen with an import door, an e
 a record split sat unreachable for ten days.
 
 **Law.** [R64](../RULES.md) (`sections-have-a-door`).
+
+### L10: a screen's title comes from the nav registry, never typed by hand
+
+**The rule.** *"On the page settings accounts, put only the name of the module. You don't
+need to put settings. For example, instead of account settings, just accounts. Make sure
+you use the name exactly as in the navigation bar. Most of the time, it's a plural."* —
+client, 2026-09-14. Every `MODULE_SETTINGS` page's title is `navPageTitle(segment)`
+(`web/components/screens/module-settings-screen.tsx`) — a LOOKUP into `TEAM_SECTIONS`
+(`web/lib/pages.ts`), the one place a destination's nav word is already decided, since the
+sidebar, the team area's own tab strip ([L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place))
+and the breadcrumb all read that same table — never a second spelling typed at the settings
+page itself. "Ticket settings" and "Account settings" are gone; what is left is "Tickets"
+and "Accounts," her own worked example, word for word.
+
+**Throws rather than guessing.** A segment `TEAM_SECTIONS` does not carry is a genuine gap,
+not a silent fallback: `navPageTitle` throws, naming the segment, rather than teaching the
+lookup to invent something nobody asked for. The one page with no nav word to read
+(`"team"`, which never navigated anywhere) states its title as a literal — "Housekeeping" —
+with a comment saying why, rather than being taught a fallback that would go stale the day
+a second nav-less page appears.
+
+**Nothing censuses this yet.** Unlike [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant),
+which a check holds every detail screen to one constant, no check today asks whether every
+settings page's title actually IS a `navPageTitle` call rather than a literal string typed
+back in agreement with it by hand — this entry states the ruling as she gave it and the
+mechanism as it is built, honestly short of a census over every settings page in the app.
 
 ---
 
@@ -1274,7 +1314,7 @@ the **Modules tab** in Settings, and those are two doors onto ONE page — becau
 *"everything around settings should be under settings screen concentrated (and 'quick
 access' through the gear in each module) but not in random places across the app."*
 
-Three things follow, and none of them is a per-screen decision:
+Four things follow, and none of them is a per-screen decision:
 
 1. every module named in `MODULE_SETTINGS` has **exactly one** gear mounted in `web/`, and
    every gear mounted names a module that table declares. Both directions, because each
@@ -1289,8 +1329,88 @@ Three things follow, and none of them is a per-screen decision:
    row all ask it. Her sentence, held structurally rather than restated three times: *"a
    reader who may see tickets but not the vocabulary should not be offered a door that
    refuses them."*
+4. **inside one module's own page, a tab is drawn only where something is behind it, and
+   its count counts GROUPS, never values.** A module that owns both an Automations section
+   and a Choices section gets two tabs; a module with only one kind gets a single tab,
+   never a second, empty one beside it — the standing refusal against a control that
+   decides nothing, read onto a tab instead of a switch
+   (`module-settings-screen.tsx`, reasoned from R36/R50/R61). The badge on each follows R16
+   through the one `formatCount` seam, and what it counts is a fact about
+   `MODULE_SETTINGS` itself rather than a query: the Automations count is the module's own
+   row count in the `AUTOMATIONS` registry, and the Choices count is how many GROUPS
+   (categories) the page's vocabulary sections declare, never how many values sit inside
+   them — client, 2026-09-14, pointing at the two tabs: *"show the total count for
+   Automations and for Choice Components categories, not for the amount of choices."*
 
 **Law.** [R61](../RULES.md) (`module-settings-two-doors`).
+
+### B11: a settings area gets one aggregate tab per cross-module concern
+
+**The rule.** Beside each module's own scoped settings ([B10](#b10-a-modules-settings-have-two-entrances-and-one-page-behind-them)),
+Settings draws ONE tab per CROSS-MODULE concern the client asked to see gathered in one
+place — every automation in the system, filtered by module and status; every choice value
+in the system, together, as a table — never a second, competing home for the same concern.
+
+*Automations*, client, 2026-09-14: *"On Settings, add a tab for Automations and show all
+the automations in the system, filtered by module and by status."* One mounting answers
+it: the same `ModuleAutomations` (`web/components/screens/module-automations.tsx`) a
+module's own settings page mounts with `scope: { kind: "module", segment }` is mounted once
+more on the Automations tab with `scope: { kind: "all", modules }`, reading the identical
+`AUTOMATIONS` registry and the identical `moduleSettingsIndex(can)` gate — never a second
+list built by hand.
+
+*Choices*, client, 2026-09-14, pointing at the Contacts table: *"create a tab in settings
+with choices where we see all the choices together… the value itself · module with the
+icon · status: active, inactive, and are protected."* `SettingsChoicesPanel`
+(`web/components/screens/settings-choices-panel.tsx`) answers it — reading the SAME door
+and the SAME cache key (`tenancy.selectable()` under `selectable:<teamId>`) every module's
+own `SelectableScreen` already opens, so an edit on a module's own page is seen here live
+(R56). It is a NEW component rather than a third mounting of `SelectableScreen`: the shape
+asked for is a table with three named columns, not the grouped lists and chip walls
+`SelectableScreen` draws. What is shared is the fetch and the door's own idea of what a
+value IS; what differs is the presentation.
+
+**The shape repeats even where the component does not.** Automations reuses one component
+under a second `scope`; Choices reuses one door under a new presentation component. Both
+answer the same brief B10 already answers twice over — a reader who wants the whole
+picture across every module never has to open each module's settings page in turn — and
+both are gated the identical way B10 already is: `moduleSettingsIndex(can)`, never a second
+`can(` call.
+
+### B12: settings changes preview first and apply on Save
+
+**The rule.** *"We need, in Settings › Appearance, when I'm changing it, to have some kind
+of save button so that I can first preview it and, once I'm happy with what I see,
+implement it across the app."* — client, 2026-09-14. Size, Appearance (light/dark) and
+Background now stage a PENDING value each; `AppearancePreview` renders the pending three,
+and nothing outside the tab moves until Save — the real font size, the real `data-theme`,
+the real rail colour all keep showing the SAVED three until she presses it.
+
+**The contract.**
+
+- **Save** commits whichever of the three actually changed, in one pass — the same two
+  persistence doors (`saveScale`, `saveSpine`) and the same device-local write
+  (`applyThemeMode` + `localStorage`) this panel always called, just called once, from one
+  place, instead of once per press.
+- **Discard** sets all three pending values back to saved; nothing is sent anywhere.
+- **Both are inert with nothing staged** (`dirty` false) — a Save that would do nothing is
+  a lie about state, so the row disables both rather than leaving a press with nothing to
+  commit.
+- **The seam that moves is WHEN, never WHERE.** Size and Background were already persisted
+  on the person's own session row; Appearance was already device-local. Both are reused
+  exactly as they were — only the moment of writing moves, from every press to one Save.
+
+**The one documented exception, in her own words: *"keep language instant."*** Language is
+the fourth section of the same panel and stays wired the way it always was — applied and
+persisted the instant a pill is pressed, never staged, never part of `dirty`, untouched by
+Discard. Put to her plainly before it shipped that way: the preview shows a chip, a title
+and a lorem body, none of which read differently in another language, so staging Language
+would show her nothing changing while she waited to press Save — the one control where
+"preview it first" has nothing to preview. Recorded here as a decision rather than left to
+read as an inconsistency the next reader notices between Language and its three
+neighbours.
+
+**Code.** `shared/web/appearance-panel.tsx`.
 
 ---
 
@@ -1972,6 +2092,50 @@ should exist at all — a boxed subtitle passes C12 and fails this one.
 
 **Law.** [R72](../RULES.md) (`no-default-subtitles`).
 
+### W14: no heading inside a container repeats the tab's own name
+
+**The rule.** *"Please remove the title inside the collection. We will use the title only
+at the top."* — client, 2026-09-14, over Settings › Automations. Follow-up, the same day,
+over Settings › Team: *"remove members and roles titles too."* A `TabsView` panel is
+already named once, by the tab that opens it; a heading inside the panel repeating that
+same word is a second, redundant copy — the same "second Appearance" `settings-section.tsx`'s
+own header describes, read one screen-height apart rather than side by side, which is what
+makes it easy to miss until somebody points at both.
+
+**Three mechanisms, one principle, because no two of the app's settings containers are
+built the same way.** Redundant to a sighted reader; still real to a screen reader, so none
+of the three simply deletes the heading:
+
+- **Settings › Appearance** — `AppearancePanel` passes `hideTitle` to its `SettingsSection`
+  (`shared/web/settings-section.tsx`); the box still labels its `<section>` landmark via
+  `aria-label`, it just draws no visible `<Headline>`.
+- **Settings › Automations, the aggregate tab** — `ModuleAutomations`'s `title` prop
+  (`web/components/screens/module-automations.tsx`) is simply left unpassed on the
+  `scope: "all"` mounting; `<ToolbarRow title>` already treats an absent title as "draw
+  nothing," so nothing else had to change. The per-module mounting keeps passing a real
+  title — the thing that tells its Automations section apart from its Vocabulary one.
+- **Settings › Team, Members and Roles** — `sr-only`, not deleted: both collections stack
+  inside ONE tab panel already named "Team," so that single name cannot tell a reader which
+  of the two stacked collections they are in, the way it can for Automations or
+  Integrations, each the only collection on its own tab. A screen reader's heading list
+  still reads "Members" then "Roles"; a sighted reader reads nothing extra.
+
+**Distinct from [W13](#w13-no-subtitle-under-a-heading-unless-she-asked)**, which asks
+whether a sentence UNDER a heading should exist at all, and from R67's containment (a
+titled section OR a headless one both pass, as long as the body stands on paper) — this
+asks whether the heading ITSELF is a second copy of a name the panel already carries.
+
+**Whether this is a LAW.** Considered, and left rulebook-only. The honest census — for
+every tab panel in a `TabsView` on Settings, no visible heading whose text equals the tab's
+own label — would have to reconcile three unrelated mechanisms (a prop that hides and
+relabels, a prop that is simply omitted, and a hand-written `sr-only` class) across three
+unrelated components, with no shared prop or attribute a scan can key on without
+hand-listing every call site. That is exactly the shape of a check that cannot be made to
+fail honestly: the day a fourth mechanism is invented the census goes silently blind
+instead of red, rather than catching it the way breaking a real law's check is supposed to.
+A rulebook entry a person reads before inventing a fourth pattern is the honest tool here;
+a hand-list wearing a regex is not.
+
 ---
 
 ## 11. Record type glyphs
@@ -2560,7 +2724,7 @@ to be removed, and none of it needs a library change.
 
 ---
 
-## 13. The kit, and what counts as using it (U1 to U3)
+## 13. The kit, and what counts as using it (U1 to U4)
 
 The twelve sections above decide how a screen is arranged. This one is about the lego
 itself: which parts of the kit this app has taken up, and where a part of the app lives
@@ -2645,6 +2809,32 @@ finds a screen by name still finds it after a move, while a literal path in a do
 test has to be moved by hand (UI-CONVENTIONS.md §1).
 
 **Law.** [R57](../RULES.md) (`component-folders`).
+
+### U4: an app-side override targets a token the kit owns, never a class name it happens to emit
+
+**The rule.** The team-chip colour ruling — client, 2026-08-31, pointing at a Contact's
+"Contact"/"Can sign in" pills: *"there's a color that you keep getting wrong on the pills.
+use this color #F7F2EB (the main token for beige)"* — was correctly made that day and was
+DEAD for two weeks without anyone knowing. The fix matched `Badge`'s literal
+`bg-surface-quiet` class; a later kit resync (v1.2.13 → v1.2.15) turned that class into
+`bg-[var(--badge-quiet-fill, var(--surface-quiet))]`, a custom property with a fallback,
+and the old class selector matched nothing from that point on. Every plain badge app-wide
+quietly kept drawing the kit's default grey, invisibly, because a dead selector fails
+green — nothing asserted the class it targeted still existed. The client re-flagged the
+identical colour a second time, Settings › Team, 2026-09-14: *"the chips in team this color
+#F7F2EB."*
+
+**The fix moved to the seam.** `[--badge-quiet-fill:var(--surface-panel)]` on `<body>` in
+both front doors' root layouts (`web/app/layout.tsx`, `web-portal/app/layout.tsx`) —
+`Badge`'s own documented escape hatch, ordinary CSS custom-property inheritance, no class
+string to go stale the next time the kit's build changes its generated output.
+
+**The rule is the lesson, not the colour.** A CLASS the kit emits is compiled output and is
+nobody's contract; a TOKEN or a custom property the kit documents as an override point is
+the contract. An app-side override that matches the former dies silently on the kit's next
+resync; one that rebinds the latter survives it — the same seam `IDENTITY_ROW`
+(`web/components/records/record-chrome.tsx`) and the tickets triage card already use for a
+LOCAL rebind of the identical property.
 
 ---
 
@@ -2785,23 +2975,23 @@ library, not a synthesised weight in the host.
 
 ## Rule index
 
-**122 rules.**
+**128 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L9 (9) |
+| 2. Page layout and width | L1 to L10 (10) |
 | 3. Detail screens | D1 to D12 (12) |
 | 4. Collections | K1 to K16 (16) |
-| 5. Buttons and actions | B1 to B10 (10) |
+| 5. Buttons and actions | B1 to B12 (12) |
 | 6. Forms and dialogs | F1 to F10 (10) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
-| 10. Copy | W1 to W13 (13) |
+| 10. Copy | W1 to W14 (14) |
 | 11. Record type glyphs | G1 to G6 (6) |
 | 12. Density: the glance budget | N1 to N12 (12) |
-| 13. The kit, and what counts as using it | U1 to U3 (3) |
+| 13. The kit, and what counts as using it | U1 to U4 (4) |
 
 ### Where each enforced UI law is written down
 
