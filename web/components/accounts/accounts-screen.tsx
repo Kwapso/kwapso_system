@@ -205,7 +205,8 @@ function accountGalleryBody({
                       column carries. */}
                   <RecordMark picture={row.logoUrl} name={row.name} size="band" />
                   <CardTitle className="text-sm">{row.name}</CardTitle>
-                  {row.manager}
+                  {/* W2: a card hides an empty field; a table cell keeps its column */}
+                  {row.manager !== "—" && row.manager}
                 </CardContent>
               </InAppLink>
             </Card>

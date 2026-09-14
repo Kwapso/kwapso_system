@@ -96,9 +96,12 @@ export function MemberHead({ teamId, member }: { teamId: string; member: TeamMem
     { label: t("Joined"), value: formatDate(member.joinedAt, lang) },
     ...(mayReadProfile
       ? [
-          { label: t("Birthday"), value: profile?.birthday ? formatDate(profile.birthday, lang) : undefined },
-          { label: t("Position"), value: profile?.position ?? undefined },
-          { label: t("Phone number"), value: profile?.phone ?? undefined },
+          // W2: empty fields hidden. Only add Birthday row if birthday exists
+          ...(profile?.birthday ? [{ label: t("Birthday"), value: formatDate(profile.birthday, lang) }] : []),
+          // W2: empty fields hidden. Only add Position row if position exists
+          ...(profile?.position ? [{ label: t("Position"), value: profile.position }] : []),
+          // W2: empty fields hidden. Only add Phone row if phone exists
+          ...(phone ? [{ label: t("Phone number"), value: phone }] : []),
         ]
       : []),
     { label: t("Email"), value: member.email },
