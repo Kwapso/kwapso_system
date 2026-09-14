@@ -1410,10 +1410,9 @@ export function TodosPanel({
    * `StoriesPanel`/`SprintsPanel`/etc. above). Omitted, the row stays plain
    * text: this panel mounts from a caller with no `host`/`onIntent` wiring of
    * its own too (`account-detail.tsx`, `contact-detail.tsx`), and a row with
-   * genuinely nowhere to go should not draw an affordance that leads nowhere
-   * (item 6, verify/qa-walk-1/REPORT.md — "looks identical to every other
-   * clickable record row" is the bug when there IS a destination and nothing
-   * points to it; it is correct, not a bug, on the rows that truly have none). */
+   * nowhere to go must not draw an affordance that looks identical to a clickable
+   * one — that false cue is the bug. The rows that truly have no destination draw
+   * no link, and that is correct. */
   onOpenTicket?: (ticketId: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -1576,10 +1575,9 @@ export function TodosPanel({
               {/* A to-do has no detail screen of its own, but one raised on a
                   ticket carries `ticketId` — opening that IS opening what the
                   row is about, the same "record it carries" reasoning R35 uses
-                  elsewhere. A row with no ticket to open stays plain text: it
-                  had no affordance before and gets none now, rather than one
-                  that looks pressable and leads nowhere (item 6,
-                  verify/qa-walk-1/REPORT.md). */}
+                  elsewhere. A row with no ticket stays plain text: it had no
+                  affordance before and gets none now, rather than one that looks
+                  pressable and leads nowhere. */}
               {todo.ticketId && onOpenTicket ? (
                 <span className={`${REF_LEADS_NAME} text-sm`}>
                   <RecordRef value={todo.ref} />

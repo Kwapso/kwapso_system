@@ -1607,25 +1607,14 @@ export const STICKY_TABS =
   "lg:[&>[role=tablist]]:w-[calc(100%_+_var(--space-7)_+_var(--space-7))] " +
   "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   "lg:gap-[var(--space-7)] " +
-  /* A DESKTOP SCROLL AFFORDANCE — item 3, QA walk 1 (verify/qa-walk-1/REPORT.md).
-   * The kit's `TabsList` (tabs.tsx) already scrolls this strip on overflow
-   * (`overflow-x-auto`) — a live measurement on App detail at 1280 found
-   * `scrollWidth 1307 / clientWidth 973`, genuinely draggable, `scrollLeft`
-   * clamping at exactly the 334px overflow. So this is not a kit gap in the
-   * SCROLLING (M3's mechanism is present and works at every width, desktop
-   * included) — it is a kit gap in the HINT: `[scrollbar-width:none]` +
-   * `[&::-webkit-scrollbar]:hidden` (tabs.tsx) hide the one native affordance
-   * unconditionally, which is right for a touch strip (M3: "short enough to
-   * be dragged") and wrong for a mouse, which has no drag-to-reveal gesture
-   * and no other cue that the last tab is cut mid-word rather than just
-   * short. Filed as a KIT GAP in FIXES.md (K8/item-3 memo): the kit should
-   * offer a scroll-hint (a thin scrollbar, or an edge fade) at
-   * `(pointer:fine)` widths rather than hiding it everywhere. Smallest
-   * app-side answer that does not fork `TabsList` or add a second tab
-   * component (R39) — un-hide the native scrollbar, thin, ONLY where a mouse
-   * is present, through the same descendant-selector technique already used
-   * on this exact strip (the dark-mode fill fix above). Touch/M3 is
-   * untouched: `(pointer:fine)` excludes it. */
+  /* A DESKTOP SCROLL AFFORDANCE — the kit hides the tab strip's scrollbar
+   * unconditionally via `[scrollbar-width:none]` + `[&::-webkit-scrollbar]:hidden`
+   * (tabs.tsx), which is correct for touch (short enough to be dragged) but wrong
+   * for a mouse lacking both drag-to-reveal and another cue that the last tab is
+   * cut mid-word. The scrolling itself works (measured 1307px / 973px = 334px range
+   * at 1280), the gap is in the hint. The app un-hides the scrollbar (thin) only at
+   * `(pointer:fine)` widths through a descendant selector on this exact strip, the
+   * same technique the dark-mode fill fix above uses. Touch stays hidden. */
   "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]]:[scrollbar-width:thin] " +
   "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar]:!block " +
   "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar]:!h-1.5 " +

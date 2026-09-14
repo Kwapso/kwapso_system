@@ -1742,25 +1742,14 @@ export function AppShell({
               }`}
             >
               <Icon className="size-5 shrink-0" />
-              {/* ITEM 7, verify/qa-walk-1/REPORT.md — walk-mobile.mjs's own
-                  check 4 (NAV-WRAPS): "Knowledge base"/"Wissensdatenbank"/
-                  "Base de conocimiento"/"Base de coneixement" all need more
-                  ink than a fifth of 375px gives them, and with no
-                  `white-space` rule here the label wrapped to two lines. L10
-                  ("titles equal the nav's names") rules out shortening the
-                  word, so this is `truncate` (nowrap + ellipsis), not a
-                  smaller phrase: the row stays ONE line at every width, and
-                  the FULL name is still the real text a screen reader reads —
-                  ellipsis clips paint, not content. `title` adds the same
-                  full name as a native tooltip for a mouse, the cheapest form
-                  of "the label as tooltip" this needs. NOTE FOR THE REPORT:
-                  this does not silence NAV-WRAPS itself — that check measures
-                  ink-width against the slot for the word in isolation,
-                  independent of `white-space`/`text-overflow`, so it still
-                  (correctly) reports that Spanish's 121px does not fit a
-                  72–76px slot at any legible font size — see the K8/item-7
-                  memo in FIXES.md for the full arithmetic and why a smaller
-                  font or fewer nav items was rejected. */}
+              {/* MOBILE NAV LABELS: Localized names like "Knowledge base" /
+                  "Wissensdatenbank" / "Base de conocimiento" / "Base de coneixement"
+                  exceed the available space (fifth of 375px) and wrap to two lines
+                  without `white-space` control. Titles must equal nav names (L10),
+                  so shortening is ruled out. `truncate` (nowrap + ellipsis) keeps
+                  one line at every width while preserving the full text for screen
+                  readers — ellipsis is paint, not content. `title` provides the
+                  same full name as a native tooltip for hovering. */}
               <span className="w-full truncate text-center leading-tight" title={item.title}>
                 {item.title}
               </span>

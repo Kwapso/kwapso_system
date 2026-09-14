@@ -105,6 +105,178 @@ const APP_ORDER_2026_09_01: { name: string; account: string; alsoKnownAs?: strin
   { name: "Players", account: "Padelbase" }, // matches nothing live — see 0072's header
 ]
 
+/** THE PICTOGRAPH RANGES, AS DATA — measured the same way the old OR-chain
+ * was (`optionalMark`'s own \p{Extended_Pictographic}|\p{Regional_Indicator}
+ * pattern, plus its three combiners, walked codepoint by codepoint through
+ * Node's ICU build and compressed into contiguous runs — 0088's own header,
+ * above, has the full account). Moving this out of the WHERE clause and into
+ * a table is the whole fix: `pictographMarksSql` below tests membership with
+ * one EXISTS/BETWEEN join, whose depth does not grow with this array's
+ * length, in place of the 160-term OR chain D1 refused to compile.
+ */
+const PICTOGRAPH_MARK_RANGES: readonly (readonly [number, number])[] = [
+  [0xA9, 0xA9],
+  [0xAE, 0xAE],
+  [0x200D, 0x200D],
+  [0x203C, 0x203C],
+  [0x2049, 0x2049],
+  [0x20E3, 0x20E3],
+  [0x2122, 0x2122],
+  [0x2139, 0x2139],
+  [0x2194, 0x2199],
+  [0x21A9, 0x21AA],
+  [0x231A, 0x231B],
+  [0x2328, 0x2328],
+  [0x23CF, 0x23CF],
+  [0x23E9, 0x23F3],
+  [0x23F8, 0x23FA],
+  [0x24C2, 0x24C2],
+  [0x25AA, 0x25AB],
+  [0x25B6, 0x25B6],
+  [0x25C0, 0x25C0],
+  [0x25FB, 0x25FE],
+  [0x2600, 0x2604],
+  [0x260E, 0x260E],
+  [0x2611, 0x2611],
+  [0x2614, 0x2615],
+  [0x2618, 0x2618],
+  [0x261D, 0x261D],
+  [0x2620, 0x2620],
+  [0x2622, 0x2623],
+  [0x2626, 0x2626],
+  [0x262A, 0x262A],
+  [0x262E, 0x262F],
+  [0x2638, 0x263A],
+  [0x2640, 0x2640],
+  [0x2642, 0x2642],
+  [0x2648, 0x2653],
+  [0x265F, 0x2660],
+  [0x2663, 0x2663],
+  [0x2665, 0x2666],
+  [0x2668, 0x2668],
+  [0x267B, 0x267B],
+  [0x267E, 0x267F],
+  [0x2692, 0x2697],
+  [0x2699, 0x2699],
+  [0x269B, 0x269C],
+  [0x26A0, 0x26A1],
+  [0x26A7, 0x26A7],
+  [0x26AA, 0x26AB],
+  [0x26B0, 0x26B1],
+  [0x26BD, 0x26BE],
+  [0x26C4, 0x26C5],
+  [0x26C8, 0x26C8],
+  [0x26CE, 0x26CF],
+  [0x26D1, 0x26D1],
+  [0x26D3, 0x26D4],
+  [0x26E9, 0x26EA],
+  [0x26F0, 0x26F5],
+  [0x26F7, 0x26FA],
+  [0x26FD, 0x26FD],
+  [0x2702, 0x2702],
+  [0x2705, 0x2705],
+  [0x2708, 0x270D],
+  [0x270F, 0x270F],
+  [0x2712, 0x2712],
+  [0x2714, 0x2714],
+  [0x2716, 0x2716],
+  [0x271D, 0x271D],
+  [0x2721, 0x2721],
+  [0x2728, 0x2728],
+  [0x2733, 0x2734],
+  [0x2744, 0x2744],
+  [0x2747, 0x2747],
+  [0x274C, 0x274C],
+  [0x274E, 0x274E],
+  [0x2753, 0x2755],
+  [0x2757, 0x2757],
+  [0x2763, 0x2764],
+  [0x2795, 0x2797],
+  [0x27A1, 0x27A1],
+  [0x27B0, 0x27B0],
+  [0x27BF, 0x27BF],
+  [0x2934, 0x2935],
+  [0x2B05, 0x2B07],
+  [0x2B1B, 0x2B1C],
+  [0x2B50, 0x2B50],
+  [0x2B55, 0x2B55],
+  [0x3030, 0x3030],
+  [0x303D, 0x303D],
+  [0x3297, 0x3297],
+  [0x3299, 0x3299],
+  [0xFE0F, 0xFE0F],
+  [0x1F004, 0x1F004],
+  [0x1F02C, 0x1F02F],
+  [0x1F094, 0x1F09F],
+  [0x1F0AF, 0x1F0B0],
+  [0x1F0C0, 0x1F0C0],
+  [0x1F0CF, 0x1F0D0],
+  [0x1F0F6, 0x1F0FF],
+  [0x1F170, 0x1F171],
+  [0x1F17E, 0x1F17F],
+  [0x1F18E, 0x1F18E],
+  [0x1F191, 0x1F19A],
+  [0x1F1AE, 0x1F1E5],
+  [0x1F1E6, 0x1F1FF],
+  [0x1F201, 0x1F20F],
+  [0x1F21A, 0x1F21A],
+  [0x1F22F, 0x1F22F],
+  [0x1F232, 0x1F23A],
+  [0x1F23C, 0x1F23F],
+  [0x1F249, 0x1F25F],
+  [0x1F266, 0x1F321],
+  [0x1F324, 0x1F393],
+  [0x1F396, 0x1F397],
+  [0x1F399, 0x1F39B],
+  [0x1F39E, 0x1F3F0],
+  [0x1F3F3, 0x1F3F5],
+  [0x1F3F7, 0x1F3FA],
+  [0x1F400, 0x1F4FD],
+  [0x1F4FF, 0x1F53D],
+  [0x1F549, 0x1F54E],
+  [0x1F550, 0x1F567],
+  [0x1F56F, 0x1F570],
+  [0x1F573, 0x1F57A],
+  [0x1F587, 0x1F587],
+  [0x1F58A, 0x1F58D],
+  [0x1F590, 0x1F590],
+  [0x1F595, 0x1F596],
+  [0x1F5A4, 0x1F5A5],
+  [0x1F5A8, 0x1F5A8],
+  [0x1F5B1, 0x1F5B2],
+  [0x1F5BC, 0x1F5BC],
+  [0x1F5C2, 0x1F5C4],
+  [0x1F5D1, 0x1F5D3],
+  [0x1F5DC, 0x1F5DE],
+  [0x1F5E1, 0x1F5E1],
+  [0x1F5E3, 0x1F5E3],
+  [0x1F5E8, 0x1F5E8],
+  [0x1F5EF, 0x1F5EF],
+  [0x1F5F3, 0x1F5F3],
+  [0x1F5FA, 0x1F64F],
+  [0x1F680, 0x1F6C5],
+  [0x1F6CB, 0x1F6D2],
+  [0x1F6D5, 0x1F6E5],
+  [0x1F6E9, 0x1F6E9],
+  [0x1F6EB, 0x1F6F0],
+  [0x1F6F3, 0x1F6FF],
+  [0x1F7DA, 0x1F7FF],
+  [0x1F80C, 0x1F80F],
+  [0x1F848, 0x1F84F],
+  [0x1F85A, 0x1F85F],
+  [0x1F888, 0x1F88F],
+  [0x1F8AE, 0x1F8AF],
+  [0x1F8BC, 0x1F8BF],
+  [0x1F8C2, 0x1F8CF],
+  [0x1F8D9, 0x1F8FF],
+  [0x1F90C, 0x1F93A],
+  [0x1F93C, 0x1F945],
+  [0x1F947, 0x1F9FF],
+  [0x1FA58, 0x1FA5F],
+  [0x1FA6E, 0x1FAFF],
+  [0x1FC00, 0x1FFFD],
+]
+
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
     version: "0001_team_base",
@@ -6090,6 +6262,61 @@ DROP TABLE IF EXISTS data_import_sessions;
     // it reaches every character of an 8-character mark without ever writing a
     // term count D1 will refuse.
     //
+    // ── WHY THE RANGES ARE A ROW SET, NOT AN OR CHAIN ────────────────────────
+    //
+    // THE INCIDENT, 15 Sep 2026: this migration originally tested "is this
+    // codepoint a pictograph" with 160 `BETWEEN`s OR-ed into ONE expression —
+    // ordinary SQL, and stock SQLite (the local test suite's engine, ceiling
+    // 1000) ran it without complaint. D1 refused it: "D1_ERROR: Expression
+    // tree is too large (maximum depth 100): SQLITE_ERROR" on the native
+    // binding, "Cloudflare D1 API failed: Expression tree is too large
+    // (maximum depth 100): SQLITE_ERROR" on the REST path — the same statement,
+    // both execution doors, because a chain of N `OR`ed terms is a LEFT-DEEP
+    // binary tree N nodes deep, and 160 is past D1's 100. The migrate-teams
+    // robot recorded nothing for either team it tried (`d1ExecScript` sends a
+    // migration's whole script — every statement in it, plus the trailing
+    // `_migrations` stamp — through `native.batch()` on the bound path and as
+    // one multi-statement body to D1's REST `/query` endpoint on the other;
+    // both run it as ONE transaction, so a statement D1 refuses at compile time
+    // rolls the whole script back rather than leaving a partial write behind).
+    // Both teams sat at 0087 with 0088 unattempted — this is the SAME CLASS as
+    // 0018's compound-SELECT lesson two sections up: D1's limits are lower than
+    // SQLite's defaults, and a migration that only ran against local SQLite
+    // never learns that.
+    //
+    // SHRINKING THE CHAIN is not the fix — it is the same shape at a smaller N,
+    // certain to fail again the next time this census grows (R66's own sweeps
+    // have grown it before). THE FIX MAKES THE DEPTH CONSTANT: the ranges move
+    // out of the EXPRESSION and into a ROW SET, `_pictograph_ranges_0088`, and
+    // membership becomes one `EXISTS (… WHERE unicode(ch) BETWEEN r.lo AND
+    // r.hi)` — a fixed three-term shape however many rows the table holds,
+    // because the row COUNT is DATA now, not SYNTAX. SQLite (and D1) has no
+    // depth ceiling on how many rows a table may hold.
+    //
+    // THE TABLE ITSELF IS BUILT ONE ROW PER STATEMENT, not one multi-row
+    // `VALUES` list — `appAndWaveNumberSql`'s own header (this file, below)
+    // already measured that a multi-row `VALUES` compiles as a compound SELECT
+    // too, and D1's compound-SELECT ceiling is FIVE terms (0018's lesson
+    // again). A 160-row `VALUES` CTE would only trade the expression-depth wall
+    // for the compound-SELECT wall. One `INSERT … VALUES (lo, hi);` per range,
+    // generated from `PICTOGRAPH_MARK_RANGES` below, costs nothing against
+    // either ceiling — each statement is its own single-row insert.
+    //
+    // IDEMPOTENT BY CONSTRUCTION, the same idiom 0072's `_numbering_0072`
+    // scratch table already proves out in this exact file: `CREATE TABLE IF
+    // NOT EXISTS` + `DELETE FROM` before the INSERTs, so a robot re-run that
+    // finds the table already sitting there (created by an earlier attempt
+    // that failed on a LATER statement) clears it before repopulating instead
+    // of accumulating duplicate rows or wedging on a second `CREATE TABLE`; the
+    // mark-nulling UPDATE is naturally a no-op the second time a row's `mark`
+    // is already NULL; the reactivation UPDATE already keys on `deactivated_at
+    // IS NOT NULL`, itself a no-op once cleared; and `DROP TABLE` at the end
+    // means a schema census run against a healthy team never finds the scratch
+    // table at all — 0072's own reason for dropping its own.
+    // `team-schema.test.ts`'s "replay every migration twice" suite and this
+    // migration's own test both run 0088 a second time on the same handle and
+    // assert the second run changes nothing and throws nothing.
+    //
     // ── THE OTHER HALF: PROTECTED IS ALWAYS ACTIVE ───────────────────────────
     //
     // The same client sentence, second half: "also, the status: if it's
@@ -6131,204 +6358,7 @@ DROP TABLE IF EXISTS data_import_sessions;
     // nothing here can ask the door's own predicate directly, so the two are
     // kept in step by a person reading both.
     version: "0088_a_pictograph_is_not_a_mark_and_protected_is_always_active",
-    sql: `
-WITH RECURSIVE
-  mark_chars(id, mark, pos, ch) AS (
-    SELECT id, mark, 1, substr(mark, 1, 1) FROM selectable_data WHERE mark IS NOT NULL
-    UNION ALL
-    SELECT id, mark, pos + 1, substr(mark, pos + 1, 1)
-      FROM mark_chars
-     WHERE pos < length(mark)
-  ),
-  flagged(id) AS (
-    SELECT DISTINCT id FROM (SELECT id, unicode(ch) AS cp FROM mark_chars)
-     WHERE cp = 0xA9
-                  OR cp = 0xAE
-                  OR cp = 0x200D
-                  OR cp = 0x203C
-                  OR cp = 0x2049
-                  OR cp = 0x20E3
-                  OR cp = 0x2122
-                  OR cp = 0x2139
-                  OR cp BETWEEN 0x2194 AND 0x2199
-                  OR cp BETWEEN 0x21A9 AND 0x21AA
-                  OR cp BETWEEN 0x231A AND 0x231B
-                  OR cp = 0x2328
-                  OR cp = 0x23CF
-                  OR cp BETWEEN 0x23E9 AND 0x23F3
-                  OR cp BETWEEN 0x23F8 AND 0x23FA
-                  OR cp = 0x24C2
-                  OR cp BETWEEN 0x25AA AND 0x25AB
-                  OR cp = 0x25B6
-                  OR cp = 0x25C0
-                  OR cp BETWEEN 0x25FB AND 0x25FE
-                  OR cp BETWEEN 0x2600 AND 0x2604
-                  OR cp = 0x260E
-                  OR cp = 0x2611
-                  OR cp BETWEEN 0x2614 AND 0x2615
-                  OR cp = 0x2618
-                  OR cp = 0x261D
-                  OR cp = 0x2620
-                  OR cp BETWEEN 0x2622 AND 0x2623
-                  OR cp = 0x2626
-                  OR cp = 0x262A
-                  OR cp BETWEEN 0x262E AND 0x262F
-                  OR cp BETWEEN 0x2638 AND 0x263A
-                  OR cp = 0x2640
-                  OR cp = 0x2642
-                  OR cp BETWEEN 0x2648 AND 0x2653
-                  OR cp BETWEEN 0x265F AND 0x2660
-                  OR cp = 0x2663
-                  OR cp BETWEEN 0x2665 AND 0x2666
-                  OR cp = 0x2668
-                  OR cp = 0x267B
-                  OR cp BETWEEN 0x267E AND 0x267F
-                  OR cp BETWEEN 0x2692 AND 0x2697
-                  OR cp = 0x2699
-                  OR cp BETWEEN 0x269B AND 0x269C
-                  OR cp BETWEEN 0x26A0 AND 0x26A1
-                  OR cp = 0x26A7
-                  OR cp BETWEEN 0x26AA AND 0x26AB
-                  OR cp BETWEEN 0x26B0 AND 0x26B1
-                  OR cp BETWEEN 0x26BD AND 0x26BE
-                  OR cp BETWEEN 0x26C4 AND 0x26C5
-                  OR cp = 0x26C8
-                  OR cp BETWEEN 0x26CE AND 0x26CF
-                  OR cp = 0x26D1
-                  OR cp BETWEEN 0x26D3 AND 0x26D4
-                  OR cp BETWEEN 0x26E9 AND 0x26EA
-                  OR cp BETWEEN 0x26F0 AND 0x26F5
-                  OR cp BETWEEN 0x26F7 AND 0x26FA
-                  OR cp = 0x26FD
-                  OR cp = 0x2702
-                  OR cp = 0x2705
-                  OR cp BETWEEN 0x2708 AND 0x270D
-                  OR cp = 0x270F
-                  OR cp = 0x2712
-                  OR cp = 0x2714
-                  OR cp = 0x2716
-                  OR cp = 0x271D
-                  OR cp = 0x2721
-                  OR cp = 0x2728
-                  OR cp BETWEEN 0x2733 AND 0x2734
-                  OR cp = 0x2744
-                  OR cp = 0x2747
-                  OR cp = 0x274C
-                  OR cp = 0x274E
-                  OR cp BETWEEN 0x2753 AND 0x2755
-                  OR cp = 0x2757
-                  OR cp BETWEEN 0x2763 AND 0x2764
-                  OR cp BETWEEN 0x2795 AND 0x2797
-                  OR cp = 0x27A1
-                  OR cp = 0x27B0
-                  OR cp = 0x27BF
-                  OR cp BETWEEN 0x2934 AND 0x2935
-                  OR cp BETWEEN 0x2B05 AND 0x2B07
-                  OR cp BETWEEN 0x2B1B AND 0x2B1C
-                  OR cp = 0x2B50
-                  OR cp = 0x2B55
-                  OR cp = 0x3030
-                  OR cp = 0x303D
-                  OR cp = 0x3297
-                  OR cp = 0x3299
-                  OR cp = 0xFE0F
-                  OR cp = 0x1F004
-                  OR cp BETWEEN 0x1F02C AND 0x1F02F
-                  OR cp BETWEEN 0x1F094 AND 0x1F09F
-                  OR cp BETWEEN 0x1F0AF AND 0x1F0B0
-                  OR cp = 0x1F0C0
-                  OR cp BETWEEN 0x1F0CF AND 0x1F0D0
-                  OR cp BETWEEN 0x1F0F6 AND 0x1F0FF
-                  OR cp BETWEEN 0x1F170 AND 0x1F171
-                  OR cp BETWEEN 0x1F17E AND 0x1F17F
-                  OR cp = 0x1F18E
-                  OR cp BETWEEN 0x1F191 AND 0x1F19A
-                  OR cp BETWEEN 0x1F1AE AND 0x1F1E5
-                  OR cp BETWEEN 0x1F1E6 AND 0x1F1FF
-                  OR cp BETWEEN 0x1F201 AND 0x1F20F
-                  OR cp = 0x1F21A
-                  OR cp = 0x1F22F
-                  OR cp BETWEEN 0x1F232 AND 0x1F23A
-                  OR cp BETWEEN 0x1F23C AND 0x1F23F
-                  OR cp BETWEEN 0x1F249 AND 0x1F25F
-                  OR cp BETWEEN 0x1F266 AND 0x1F321
-                  OR cp BETWEEN 0x1F324 AND 0x1F393
-                  OR cp BETWEEN 0x1F396 AND 0x1F397
-                  OR cp BETWEEN 0x1F399 AND 0x1F39B
-                  OR cp BETWEEN 0x1F39E AND 0x1F3F0
-                  OR cp BETWEEN 0x1F3F3 AND 0x1F3F5
-                  OR cp BETWEEN 0x1F3F7 AND 0x1F3FA
-                  OR cp BETWEEN 0x1F400 AND 0x1F4FD
-                  OR cp BETWEEN 0x1F4FF AND 0x1F53D
-                  OR cp BETWEEN 0x1F549 AND 0x1F54E
-                  OR cp BETWEEN 0x1F550 AND 0x1F567
-                  OR cp BETWEEN 0x1F56F AND 0x1F570
-                  OR cp BETWEEN 0x1F573 AND 0x1F57A
-                  OR cp = 0x1F587
-                  OR cp BETWEEN 0x1F58A AND 0x1F58D
-                  OR cp = 0x1F590
-                  OR cp BETWEEN 0x1F595 AND 0x1F596
-                  OR cp BETWEEN 0x1F5A4 AND 0x1F5A5
-                  OR cp = 0x1F5A8
-                  OR cp BETWEEN 0x1F5B1 AND 0x1F5B2
-                  OR cp = 0x1F5BC
-                  OR cp BETWEEN 0x1F5C2 AND 0x1F5C4
-                  OR cp BETWEEN 0x1F5D1 AND 0x1F5D3
-                  OR cp BETWEEN 0x1F5DC AND 0x1F5DE
-                  OR cp = 0x1F5E1
-                  OR cp = 0x1F5E3
-                  OR cp = 0x1F5E8
-                  OR cp = 0x1F5EF
-                  OR cp = 0x1F5F3
-                  OR cp BETWEEN 0x1F5FA AND 0x1F64F
-                  OR cp BETWEEN 0x1F680 AND 0x1F6C5
-                  OR cp BETWEEN 0x1F6CB AND 0x1F6D2
-                  OR cp BETWEEN 0x1F6D5 AND 0x1F6E5
-                  OR cp = 0x1F6E9
-                  OR cp BETWEEN 0x1F6EB AND 0x1F6F0
-                  OR cp BETWEEN 0x1F6F3 AND 0x1F6FF
-                  OR cp BETWEEN 0x1F7DA AND 0x1F7FF
-                  OR cp BETWEEN 0x1F80C AND 0x1F80F
-                  OR cp BETWEEN 0x1F848 AND 0x1F84F
-                  OR cp BETWEEN 0x1F85A AND 0x1F85F
-                  OR cp BETWEEN 0x1F888 AND 0x1F88F
-                  OR cp BETWEEN 0x1F8AE AND 0x1F8AF
-                  OR cp BETWEEN 0x1F8BC AND 0x1F8BF
-                  OR cp BETWEEN 0x1F8C2 AND 0x1F8CF
-                  OR cp BETWEEN 0x1F8D9 AND 0x1F8FF
-                  OR cp BETWEEN 0x1F90C AND 0x1F93A
-                  OR cp BETWEEN 0x1F93C AND 0x1F945
-                  OR cp BETWEEN 0x1F947 AND 0x1F9FF
-                  OR cp BETWEEN 0x1FA58 AND 0x1FA5F
-                  OR cp BETWEEN 0x1FA6E AND 0x1FAFF
-                  OR cp BETWEEN 0x1FC00 AND 0x1FFFD
-  )
-UPDATE selectable_data
-   SET mark = NULL
- WHERE id IN (SELECT id FROM flagged)
-   AND NOT (
-     -- THE ONE EXEMPTION: a well-formed flag, exactly two Regional Indicator
-     -- codepoints and nothing else — R66's fourth ruling, "keep emojis for
-     -- countries and languages only" — left alone even though a lone
-     -- Regional Indicator (no pair) is still refused above.
-     length(mark) = 2
-     AND unicode(substr(mark, 1, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
-     AND unicode(substr(mark, 2, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
-   );
-
-UPDATE selectable_data
-   SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL
- WHERE is_default = 1 AND deactivated_at IS NOT NULL
-   -- deactivator_id IS NOT NULL — see this migration's own header. Reserved
-   -- for a row a PERSON deactivated through the door, never one a migration
-   -- retired on purpose (0026's duplicates, 0034/0044's retired ticket and
-   -- story words, 0042's Account status) — every one of those writes a
-   -- deactivator_name and leaves deactivator_id untouched (still NULL),
-   -- because a migration has no actor. Reactivating on that signal alone
-   -- would have resurrected Bug, Feedback and every deduplicated value this
-   -- ledger already retired on purpose.
-   AND deactivator_id IS NOT NULL;
-`,
+    sql: pictographMarksSql(),
   },
   {
     // ── THE CLIENT'S RULING, ON A MEMBER'S OWN DETAIL PAGE ───────────────────
@@ -6458,6 +6488,99 @@ CREATE INDEX idx_accounts_manager ON accounts (account_manager_user_id);
 `,
   },
 ]
+
+/** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for
+ * the 15 Sep 2026 incident and the two D1 ceilings this shape has to answer at
+ * once: an expression's depth (100, "Expression tree is too large") and a
+ * compound SELECT's term count (5, 0018's lesson, restated at
+ * `appAndWaveNumberSql` below). Neither ceiling can see a ROW, so the ranges
+ * move into `_pictograph_ranges_0088`, a scratch table built ONE ROW PER
+ * STATEMENT — the same rule `appAndWaveNumberSql`'s own `_numbering_0072`
+ * states for exactly this reason.
+ */
+function pictographMarksSql(): string {
+  const ranges = PICTOGRAPH_MARK_RANGES.map(
+    ([lo, hi]) =>
+      `INSERT INTO _pictograph_ranges_0088 (lo, hi) VALUES (0x${lo.toString(16).toUpperCase()}, 0x${hi.toString(16).toUpperCase()});`
+  ).join("\n")
+
+  return `
+-- THE RANGE TABLE, not the expression tree — 0088's own header (in
+-- TEAM_MIGRATIONS, above) explains why. \`IF NOT EXISTS\` + \`DELETE\` on entry is
+-- \`_numbering_0072\`'s own idiom (below, at \`appAndWaveNumberSql\`) for exactly
+-- this situation: a robot re-run that finds this table already sitting here
+-- (an earlier attempt that got THIS far and then failed on a later statement)
+-- clears it and starts over instead of wedging on a second CREATE or
+-- doubling every range.
+CREATE TABLE IF NOT EXISTS _pictograph_ranges_0088 (
+  lo INTEGER NOT NULL,
+  hi INTEGER NOT NULL
+);
+DELETE FROM _pictograph_ranges_0088;
+
+-- ONE STATEMENT PER RANGE, generated from PICTOGRAPH_MARK_RANGES — never one
+-- multi-row VALUES list. A multi-row VALUES compiles as a compound SELECT too
+-- (\`appAndWaveNumberSql\`'s own header, below), and D1's compound-SELECT
+-- ceiling is FIVE terms: a 160-row VALUES CTE would only swap the expression-
+-- depth wall this migration exists to get under for the compound-SELECT wall
+-- 0018 already hit once.
+${ranges}
+
+WITH RECURSIVE
+  mark_chars(id, mark, pos, ch) AS (
+    SELECT id, mark, 1, substr(mark, 1, 1) FROM selectable_data WHERE mark IS NOT NULL
+    UNION ALL
+    SELECT id, mark, pos + 1, substr(mark, pos + 1, 1)
+      FROM mark_chars
+     WHERE pos < length(mark)
+  ),
+  flagged(id) AS (
+    -- CONSTANT DEPTH regardless of how many rows PICTOGRAPH_MARK_RANGES holds:
+    -- one EXISTS wrapping one BETWEEN, the same three-term shape whether the
+    -- range table holds 160 rows or 1,000. The row COUNT is DATA now, and
+    -- SQLite has no depth ceiling on how many rows a table may hold — only on
+    -- how deep an EXPRESSION nests, which this no longer does.
+    SELECT DISTINCT mc.id
+      FROM mark_chars mc
+     WHERE EXISTS (
+       SELECT 1 FROM _pictograph_ranges_0088 r
+        WHERE unicode(mc.ch) BETWEEN r.lo AND r.hi
+     )
+  )
+UPDATE selectable_data
+   SET mark = NULL
+ WHERE id IN (SELECT id FROM flagged)
+   AND NOT (
+     -- THE ONE EXEMPTION: a well-formed flag, exactly two Regional Indicator
+     -- codepoints and nothing else — R66's fourth ruling, "keep emojis for
+     -- countries and languages only" — left alone even though a lone
+     -- Regional Indicator (no pair) is still refused above.
+     length(mark) = 2
+     AND unicode(substr(mark, 1, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
+     AND unicode(substr(mark, 2, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
+   );
+
+-- DROPPED HERE, not left behind — \`_numbering_0072\`'s own reason (below): no
+-- schema census run against a healthy team ever finds a scratch table, and a
+-- re-run of this migration (idempotent throughout: the CREATE/DELETE above,
+-- this UPDATE itself, and the reactivation UPDATE below all no-op cleanly on
+-- rows already fixed) recreates it from nothing.
+DROP TABLE _pictograph_ranges_0088;
+
+UPDATE selectable_data
+   SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL
+ WHERE is_default = 1 AND deactivated_at IS NOT NULL
+   -- deactivator_id IS NOT NULL — see this migration's own header. Reserved
+   -- for a row a PERSON deactivated through the door, never one a migration
+   -- retired on purpose (0026's duplicates, 0034/0044's retired ticket and
+   -- story words, 0042's Account status) — every one of those writes a
+   -- deactivator_name and leaves deactivator_id untouched (still NULL),
+   -- because a migration has no actor. Reactivating on that signal alone
+   -- would have resurrected Bug, Feedback and every deduplicated value this
+   -- ledger already retired on purpose.
+   AND deactivator_id IS NOT NULL;
+`
+}
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
  *

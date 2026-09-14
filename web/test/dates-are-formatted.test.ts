@@ -57,8 +57,10 @@
 // short-month AXIS shape) — both pass the reader's own `lang`, never
 // `undefined`, which is the one thing that made them a bug in the first
 // place. `RAW_DATE_EXEMPT` is that list, one entry per offending line, named
-// "path:line" so a file that moves or a line that shifts is caught by the rot
-// check below rather than silently kept alive.
+// "path: expression" — the file plus the offending line's own text, comment
+// stripped and whitespace collapsed — rather than "path:line", because a line
+// number is a position in the FILE and every edit above it moves it, while the
+// expression is a position in the CODE. (See the 14 Sep 2026 rekey below.)
 //
 // The check is still deliberately narrow about what it calls an offence: it
 // says nothing about a date used as DATA (a comparison, a sort key, a form
@@ -121,6 +123,17 @@ const ROOTS = [
 
 // RAW_DATE_EXEMPT moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
 // line 13's promise made true). Imported above.
+//
+// REKEYED from "path:line" to "path: expression" on 15 Sep 2026. The
+// `work-panels.tsx` entry drifted THREE times in one night — :1500 → :1513
+// when a lane added a block above it, then the pin went stale again at :1512
+// when another lane shortened a comment above it — each drift a false-red on
+// an unrelated edit. A line number is a position in the FILE; every edit
+// above it moves it. The key is now the file plus the offending line's own
+// text (comment stripped, `\s+` collapsed to one space) — the same text the
+// scan below matched to call it an offence in the first place, so the key
+// moves only when the offending code itself changes, never when something
+// merely lands above it.
 
 describe("no screen shows a raw timestamp", () => {
   /* THIS CENSUS ALREADY HAS ITS BLINDNESS TRIPWIRE, and it is the rot check —
@@ -153,15 +166,21 @@ describe("no screen shows a raw timestamp", () => {
       lines.forEach((raw, i) => {
         // Skip anything commented out.
         const line = raw.replace(/\/\/.*$/, "")
-        const key = `${file.rel}:${i + 1}`
         const isRaw = RAW_TOLOCALE.test(line)
         const isFieldOffence = !FORMATTED.test(line) && (INTERP_DATE.test(line) || KEY_DATE.test(line))
         if (!isRaw && !isFieldOffence) return
+        // POSITIONAL key: the file plus the offending line's own text (comment
+        // stripped, same as the match above; whitespace collapsed so
+        // re-indenting the block around it is not a re-pin). Never the line
+        // number — that is a position in the file, not in the code, and every
+        // edit above it moves it.
+        const expr = line.trim().replace(/\s+/g, " ")
+        const key = `${file.rel}: ${expr}`
         if (key in RAW_DATE_EXEMPT) {
           exemptUsed.add(key)
           return
         }
-        offenders.push(`${key} — ${raw.trim().slice(0, 100)}`)
+        offenders.push(`${file.rel}:${i + 1} — ${raw.trim().slice(0, 100)}`)
       })
     }
     expect(

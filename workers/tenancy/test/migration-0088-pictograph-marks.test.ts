@@ -283,3 +283,84 @@ describe("0088 must NOT reactivate a row a MIGRATION deliberately retired — th
     expect(rowOf(db, "duplicate_retired").deactivated_at, "0026's retirement must survive 0088").not.toBeNull()
   })
 })
+
+// ── IDEMPOTENT BY CONSTRUCTION — the robot may call this SQL twice on the
+// same database. Not hypothetical: `d1ExecScript` sends a migration's whole
+// script (this SQL plus the trailing `_migrations` stamp) through D1 as ONE
+// transaction, so a genuinely partial write needs a statement-level failure
+// INSIDE that same transaction to survive it — but the robot itself retries
+// a team that failed on version N by replaying every migration from N again
+// on its NEXT run (`workers/tenancy/src/routes/admin.ts`'s `missing` loop),
+// and nothing stops that next run from being 0088 a second time if an
+// operator re-invokes the route, or a future migration bundled alongside it
+// fails and 0088 is replayed as part of retrying the batch. Either way this
+// SQL has to meet a database it has already run against and do nothing extra
+// — the same bar 0072's `_numbering_0072` scratch table and 0039's back-fill
+// (both in this file's sibling `team-schema.test.ts`) already have to clear.
+describe("0088 is idempotent — a second run on the same handle changes nothing and drops its scratch table", () => {
+  function selectableSnapshot(db: DatabaseSync) {
+    return db
+      .prepare(
+        `SELECT id, mark, is_default, deactivated_at, deactivator_id, deactivator_email, deactivator_name
+           FROM selectable_data ORDER BY id`
+      )
+      .all()
+  }
+
+  it("running 0088 twice leaves selectable_data byte-for-byte identical to running it once", () => {
+    const db = freshDbThroughBefore0088()
+    insertRow(db, "warn", WARNING_SIGN)
+    insertRow(db, "warnvs", WARNING_SIGN_VS16)
+    insertRow(db, "us_flag", US_FLAG)
+    insertRow(db, "lone_ri", LONE_REGIONAL_INDICATOR)
+    insertRow(db, "stuck", null, { isDefault: true, deactivated: true, deactivatedBy: "person" })
+    insertRow(db, "migration_retired", null, { isDefault: true, deactivated: true, deactivatedBy: "system" })
+    insertRow(db, "just_off", null, { isDefault: false, deactivated: true, deactivatedBy: "person" })
+
+    db.exec(MIGRATION_0088.sql)
+    const afterFirstRun = selectableSnapshot(db)
+
+    // THE RE-RUN. Neither statement-count nor row-count assumptions here —
+    // just "does it throw, and does the data move".
+    expect(() => db.exec(MIGRATION_0088.sql), "a re-run must not throw (e.g. on a second CREATE TABLE)").not.toThrow()
+
+    expect(selectableSnapshot(db), "a second run must be a pure no-op on selectable_data").toEqual(afterFirstRun)
+  })
+
+  it("does not leave the scratch table behind after a successful run — twice over", () => {
+    const db = freshDbThroughBefore0088()
+    insertRow(db, "warn", WARNING_SIGN)
+    const scratchTableExists = () =>
+      db
+        .prepare("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = '_pictograph_ranges_0088'")
+        .get() as { present: number } | undefined
+
+    db.exec(MIGRATION_0088.sql)
+    expect(scratchTableExists(), "the scratch table must be dropped by the end of a successful run").toBeUndefined()
+
+    db.exec(MIGRATION_0088.sql)
+    expect(
+      scratchTableExists(),
+      "a second successful run must also leave no scratch table behind"
+    ).toBeUndefined()
+  })
+
+  it("a robot re-run that finds the scratch table already sitting there (a genuinely partial prior attempt) recovers rather than wedging", () => {
+    // THE SHAPE A PARTIAL FAILURE WOULD LEAVE, reproduced directly rather than
+    // through a contrived mid-script throw: the scratch table exists, already
+    // holds SOME of the range rows (an earlier attempt that got partway through
+    // the 160 one-row INSERTs before whatever killed it), and no product row has
+    // been touched yet. `CREATE TABLE IF NOT EXISTS` + `DELETE FROM` on entry is
+    // exactly what has to turn this into a clean run rather than a duplicate-row
+    // wedge or a stale range set silently missing coverage.
+    const db = freshDbThroughBefore0088()
+    insertRow(db, "warn", WARNING_SIGN)
+    db.exec(`
+      CREATE TABLE _pictograph_ranges_0088 (lo INTEGER NOT NULL, hi INTEGER NOT NULL);
+      INSERT INTO _pictograph_ranges_0088 (lo, hi) VALUES (${0x26a0}, ${0x26a0});
+    `)
+
+    expect(() => db.exec(MIGRATION_0088.sql), "a leftover partial scratch table must not wedge the retry").not.toThrow()
+    expect(markOf(db, "warn"), "the retry must still reach the row the partial attempt never got to").toBeNull()
+  })
+})

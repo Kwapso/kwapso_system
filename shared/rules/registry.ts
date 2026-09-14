@@ -4030,23 +4030,32 @@ export const GONE_ON_PURPOSE: Record<string, string> = {
  * shared/web/format.ts" — a `dateTime:` key feeding the DOM's own machine-
  * readable `<time dateTime>` attribute (paired with a separately formatted
  * field for the words a person sees), or a long-month/weekday-alone formatter
- * shared/web/format.ts does not carry. One entry per offending line, named
- * "path:line" so a file that moves or a line that shifts is caught by the rot
- * check rather than silently kept alive. Rot-checked BOTH ways: a line no
- * longer matching the pattern it was pinned for is as much a failure as an
- * unlisted offender. */
+ * shared/web/format.ts does not carry.
+ *
+ * REKEYED 15 Sep 2026, "path:line" → "path: expression". The `work-panels.tsx`
+ * entry below drifted THREE times in one night under this key's old shape —
+ * :1500 → :1513 when a lane added a block above it, then stale again at :1512
+ * when another lane shortened a comment above it — turning the build red on
+ * an edit that never touched the offending line, and costing a re-pin each
+ * time. A line number names a position in the FILE; every edit above it moves
+ * it. The key is now the file plus the offending line's own text (comment
+ * stripped, whitespace collapsed to one space) — the exact text
+ * `web/test/dates-are-formatted.test.ts` matched to call the line an offence,
+ * so the key only moves when that code itself changes, never when something
+ * merely lands above it. Rot-checked BOTH ways: an entry whose expression no
+ * longer matches anything is as much a failure as an unlisted offender. */
 export const RAW_DATE_EXEMPT: Record<string, string> = {
-  "web/components/records/record-calendar.tsx:149":
+  'web/components/records/record-calendar.tsx: return month.toLocaleDateString(lang, { month: "long", year: "numeric" })':
     "the month heading needs the reader's own LONG month name + year — " +
     "shared/web/format.ts has no formatter for that shape (formatMonth is " +
     "the short-month AXIS one) — so it calls Intl directly, with the real " +
     "`lang` (this line used to pass `undefined`, which is the bug R1 of this " +
     "pass fixed).",
-  "web/components/records/record-calendar.tsx:159":
+  'web/components/records/record-calendar.tsx: new Date(1970, 0, 5 + i).toLocaleDateString(lang, { weekday: "short" })':
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:186":
+  "web/lib/use-record-activity.ts: dateTime: a.createdAt,":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
     "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
@@ -4057,8 +4066,8 @@ export const RAW_DATE_EXEMPT: Record<string, string> = {
     "\"we see the avatars of the people\" ruling) gave the row an `avatarSrc` " +
     "field — a `safeSrc(...)` call and its own comment — between `initials` " +
     "and this line, nineteen lines net.)",
-  "web/components/deep-link/shape.tsx:106":
-    "same shape as use-record-activity.ts:186 — `dateTime: a.createdAt` " +
+  "web/components/deep-link/shape.tsx: dateTime: a.createdAt,":
+    "same shape as use-record-activity.ts's `dateTime: a.createdAt` — " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
     "on 7 Sep 2026, when `shapeActivity` gained a named return type, and to :90 on 9 Sep 2026 when `TeamMeta` left the import block with the deleted team-overview shaper — " +
@@ -4082,7 +4091,7 @@ export const RAW_DATE_EXEMPT: Record<string, string> = {
     "fed it went too — and the twelve deleted lines landed one net line " +
     "SHORTER than this comment expected, because the blank line the function " +
     "left behind stayed. One line net.)",
-  "web/components/work/work-panels.tsx:1513":
+  "web/components/work/work-panels.tsx: dateTime: todo.completedAt ?? undefined,":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
@@ -4096,7 +4105,11 @@ export const RAW_DATE_EXEMPT: Record<string, string> = {
     "`CollectionEmptyState` call and its note, nine lines net, landed above; " +
     "to :1513 on 15 Sep 2026 when the Waiting on clients row's label became a " +
     "conditional OpenLink for to-dos raised on a ticket, thirteen lines of JSX " +
-    "added above this line.)",
+    "added above this line — and stale again within the same night, to :1512, " +
+    "when a second lane shortened a comment above it. Three re-pins in one " +
+    "night on the same line is what moved this whole list off `path:line` " +
+    "onto the expression key above: the code this entry actually pins is " +
+    "this `dateTime:` assignment, not whatever line it happens to sit on.)",
 }
 
 // ── stored-html (the one injection seam) ───────────────────────────────────
