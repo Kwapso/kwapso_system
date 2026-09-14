@@ -286,6 +286,10 @@ describe("a grouped count is one call, and it comes back labelled", () => {
       "HORSt Logistik",
     ])
     expect(body.groupsTruncated).toBe(false)
+    // …AND THE ARITHMETIC RIDES THE ANSWER: four accounts, seven rows, 1.75
+    // rounded to one decimal, nobody unassigned. The model reads this off;
+    // it never divides for itself (a-grouped-answer-does-its-own-arithmetic).
+    expect(body.groupSummary).toEqual({ groups: 4, rows: 7, average: 1.8, unassigned: 0 })
   })
 
   it("…and by a plain value, where there is nothing to label", async () => {

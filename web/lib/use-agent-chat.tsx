@@ -363,10 +363,14 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
    * text deltas fill it, steps insert tool rows before it, and the terminal event
    * settles the turn. Shared by send() and resolve() so behaviour is identical
    * across the confirm boundary. */
+  /** Returns what the terminal event said about carrying on — `continues` is the
+   * server saying the turn ran out of its REQUEST, not of work, and `threadId`
+   * is where to ask for the rest (state may not have settled when it is read). */
   async function consume(
     run: (onEvent: (ev: AgentStreamEvent) => void) => Promise<void>,
     assistantId: string
-  ) {
+  ): Promise<{ continues: boolean; threadId?: string }> {
+    let handover: { continues: boolean; threadId?: string } = { continues: false }
     // The assistant reply text accrues here so we don't chase stale state on each
     // rapid delta; step rows are keyed by tool so step_end can flip the right one.
     let replyText = ""
@@ -532,6 +536,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           const text = replyText || finalText
           if (text) writeAssistant(<AgentMarkdown text={text} />)
           else setItems((prev) => prev.filter((it) => it.id !== assistantId))
+          if (out.done && out.continues) handover = { continues: true, threadId: out.threadId }
           break
         }
         case "error": {
@@ -555,6 +560,22 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         }
       }
     })
+    return handover
+  }
+
+  /** A TURN CAN OUTLIVE ITS REQUEST. One request holds a turn for a bounded
+   * time; when the server says it ran out of request before it ran out of
+   * work, ask the same door for the next segment at once, into the SAME
+   * bubble, until it finishes or the cap is reached. The cap here mirrors the
+   * server's MAX_SEGMENTS and is not the one that enforces it — the server
+   * stops saying `continues` on its last permitted segment. */
+  const MAX_SEGMENTS = 4
+  async function carryOn(first: { continues: boolean; threadId?: string }, assistantId: string) {
+    let next = first
+    for (let segment = 1; next.continues && next.threadId && segment < MAX_SEGMENTS; segment++) {
+      const id = next.threadId
+      next = await consume((onEvent) => dataOps.agentChatStream({ threadId: id, continue: true }, onEvent), assistantId)
+    }
   }
 
   /** The stream broke mid-turn (phones drop long-held connections when the screen
@@ -609,11 +630,12 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
       // The ticked set rides every turn. Sent only when it is a real narrowing:
       // all-on is the same request the panel made before the chips existed.
       const narrowed = sources.length < SOURCE_CHIP_KEYS.length ? sources : undefined
-      await consume(
+      const first = await consume(
         (onEvent) =>
           dataOps.agentChatStream({ message: text, threadId, sources: narrowed }, onEvent),
         assistantId
       )
+      await carryOn(first, assistantId)
     } catch (err) {
       // The person sees the failure in the bubble; the error store must see it
       // too — a chat drop was the one user-facing crash that left no row

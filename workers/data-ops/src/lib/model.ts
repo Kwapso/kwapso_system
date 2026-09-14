@@ -458,13 +458,18 @@ class WorkersAiModel implements Model {
    *      {"prompt_tokens":26806,...,"prompt_tokens_details":{"cached_tokens":0}}
    *      ... 27117, 27185, 26839, 27604 — cached_tokens 0 every time
    *
-   *  So the field IS reported by the binding and is genuinely zero: the meter
-   *  works and the cache is not hitting. The header stays because it is correct,
-   *  costs nothing, and starts working the day the binding forwards it. The
-   *  alternative — calling the REST door from the worker with a token — is a new
-   *  secret and a second code path for the same call, and is the owner's decision
-   *  rather than a silent one. Delete this note the day a deployed turn reports a
-   *  non-zero cached_tokens. */
+   *  So the field IS reported by the binding and was genuinely zero then.
+   *
+   *  AND ON 14 SEP 2026 IT WAS NOT ZERO. Deployed staging turns on kimi-k2.6
+   *  reported `cache_read_tokens` 33,216 and 24,320 (agent_usage_log), so the
+   *  binding does forward the header now and the cache hits on a model that
+   *  has one. gpt-oss-120b — the engine since that day — reported 0 on every
+   *  turn, and Cloudflare publishes no cached rate for it: it has no prompt
+   *  cache to hit. So on the current engine every step re-reads the stage-one
+   *  preamble (~9,000 tokens) at full price, and the lever on cost is FEWER
+   *  STEPS — the system prompt now tells the model to ask for several lookups
+   *  in one step — rather than this header, which stays because it is correct
+   *  and costs nothing. */
   private affinity(): Record<string, unknown> {
     return this.sessionKey ? { extraHeaders: { "x-session-affinity": this.sessionKey } } : {}
   }

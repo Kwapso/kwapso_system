@@ -926,7 +926,13 @@ export type AgentMessage = {
   threadId: string
   role: "user" | "assistant" | "tool"
   content: string | null
-  toolCalls?: { tool: string; status: "pending" | "done" | "failed"; summary?: string }[]
+  /** On an ASSISTANT row, since 14 Sep 2026, each call also carries the `id`
+   * the model gave it and the `input` it asked with — which is what lets a turn
+   * be picked up again after its request died: the saved rows ARE the
+   * conversation, tool results paired to the calls that made them, so a
+   * continuation resumes from the last result instead of starting over. Older
+   * rows have neither and are replayed as prose only. */
+  toolCalls?: { tool: string; status: "pending" | "done" | "failed"; summary?: string; id?: string; input?: Record<string, unknown> }[]
   source: string | null
   createdAt: string
 }
@@ -1087,6 +1093,14 @@ export type ChatOutcome =
        * gentle notice from this; without it a failure is indistinguishable from
        * a short reply. */
       failure?: ModelFailure
+      /** THE TURN RAN OUT OF ITS REQUEST, NOT OF WORK. One web request holds a
+       * turn for at most `TURN_DEADLINE_MS`; a question needing more steps
+       * than fit is saved as far as it got and this says "ask for the rest":
+       * the client immediately sends `{ threadId, continue: true }` to the
+       * same door and the turn resumes from its saved rows, streaming into the
+       * same bubble, up to `MAX_SEGMENTS` requests in all. Never set on the
+       * last permitted segment — that one ends with the honest sentence. */
+      continues?: boolean
     }
   | {
       done: false

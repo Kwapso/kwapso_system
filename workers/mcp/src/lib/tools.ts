@@ -306,8 +306,8 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "agent_chat",
     description:
-      "Talk to the team's assistant, it can answer from live data or act (as the token's owner, capped by their permissions). If it proposes a guarded action, call agent_confirm with the returned threadId. `sources` narrows which doors the assistant may read the KNOWLEDGE BASE through for this whole conversation — a list of any of: meetings, mail, drive, chat, records, articles. It is ENFORCED rather than suggested: the named set is put onto every retrieval the assistant makes on this turn, so a door left out cannot be read from however the assistant phrases its own call. Leave it off and it reads all of them, which is the normal case.",
-    inputSchema: obj({ message: S, threadId: S, sources: { type: "array" } }, ["message"]),
+      "Talk to the team's assistant, it can answer from live data or act (as the token's owner, capped by their permissions). If it proposes a guarded action, call agent_confirm with the returned threadId. `sources` narrows which doors the assistant may read the KNOWLEDGE BASE through for this whole conversation — a list of any of: meetings, mail, drive, chat, records, articles. It is ENFORCED rather than suggested: the named set is put onto every retrieval the assistant makes on this turn, so a door left out cannot be read from however the assistant phrases its own call. Leave it off and it reads all of them, which is the normal case. A reply whose outcome says it is still carrying on ran out of its request before it ran out of work: call again with the same `threadId` and `continue` true (the `message` is ignored then) and it carries on from the results it already saved, up to four requests in all.",
+    inputSchema: obj({ message: S, threadId: S, sources: { type: "array" }, continue: { type: "boolean" } }, ["message"]),
     binding: "DATAOPS",
     method: "POST",
     path: "/api/data-ops/agent/chat",
@@ -315,6 +315,7 @@ const MCP_ONLY: McpTool[] = [
       message: i.message,
       ...(i.threadId ? { threadId: i.threadId } : {}),
       ...(Array.isArray(i.sources) && i.sources.length ? { sources: i.sources } : {}),
+      ...(i.continue === true ? { continue: true } : {}),
     }),
   },
   {

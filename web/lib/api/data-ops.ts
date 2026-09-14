@@ -111,8 +111,10 @@ export const dataOps = {
    * The non-streaming agentChat above stays as a fallback. */
   agentChatStream: (
     body: {
-      message: string
+      message?: string
       threadId?: string
+      /** The last turn ran out of its request; ask for the next segment. */
+      continue?: boolean
       files?: { name: string; csv: string }[]
       /** WHICH DOORS this conversation may read the knowledge base through — the
        * source chips, as chip keys. Omitted means all of them. It is ENFORCED at
