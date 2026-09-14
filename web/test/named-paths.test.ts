@@ -198,7 +198,8 @@ const ROOTS = readdirSync(ROOT, { withFileTypes: true })
 // after them was supposed to copy that convention, but the root parse above
 // never actually READ a nested file, so a rig that did copy it (or forgot to)
 // looked identical to this scan: git hid the bundle either way, and only the
-// root file's word was law here. `verify/appearance-panel/index.html` is what
+// root file's word was law here. The appearance-panel rig's bundle (an
+// `index.html` under `verify/`, untracked, ignored by its own nested file) is what
 // that gap cost — an esbuild bundle that inlined the kit's own comments,
 // dangling path and all, into a file this scan read as if it were prose we
 // wrote. Fixed at the root of it: read every `.gitignore` under a real ROOT
