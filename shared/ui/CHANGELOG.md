@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added — `ThemeSwatch`, a small colour mark for Settings › Appearance's Light/Dark/System pills
+
+The consuming app (kwapso_system), 2026-09-14, the same day as the two
+entries below: the client rejected the shipped Settings › Appearance panel a
+second time, pointing at her own design lane's comparison artifact
+(`appearance-layouts.html`, option 3) and, separately, "also in appearance
+add colors (like in background)" — the Background pills already carry a
+small colour swatch before the word, and Appearance's Light/Dark/System pills
+should too, matched in size, shape and position.
+
+Background's swatch is a ROLE token, `--spine-fill`, resolved through
+`SpinePicture`'s own `[data-spine]` cascade — reachable from the consuming
+app's code because it is a semantic token, not a raw palette one. Appearance
+has no equivalent: a light/dark swatch is PALETTE-FIXED by definition (the
+same reason `ThemePicture`, two exports up, pins hex rather than riding the
+theme cascade — a swatch of what dark mode looks like must not flip when the
+reader is already in dark mode), and the consuming app's own closed-palette
+law (R32) forbids a raw `--kw-*` reference outside this package. So the mark
+is drawn here, at swatch scale rather than `ThemePicture`'s thumbnail one —
+13px, `--radius-sm`, `ThemePicture`'s own three hex sets transcribed rather
+than re-derived — and the app reaches it as a part.
+
 ### Changed — `AppearancePreview`'s specimen is a chip, a title and a body, in lorem
 
 The client, 2026-09-14, the same day as the two entries below: *"on the

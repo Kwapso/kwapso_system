@@ -59,6 +59,7 @@ import * as React from "react"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { AppearanceOptionGroup, SpinePicture, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 
+import { AppearancePillGroup, SpineSwatch, type AppearancePillOption } from "./appearance-pill-group"
 import { toSpine, type Spine } from "../spine"
 import { useLanguage } from "./language"
 
@@ -147,19 +148,35 @@ export function SpineChoice({
     },
   ]
 
-  /* COMPACT: same three names and the same order, no picture and no
-     description — Settings · Appearance's own shared preview carries that
-     argument now. Never used by onboarding, which passes no `compact`. */
-  const compactOptions: readonly AppearanceOption[] = [
-    { value: "ink", label: t("Ink") },
-    { value: "paper", label: t("Paper") },
-    { value: "mango", label: t("Mango") },
+  /* COMPACT: the artifact's tidy pill row, not the kit's card grid — same
+     three names and the same order, no picture and no description (Settings
+     · Appearance's own shared preview carries that argument now), but a
+     swatch survives (her own "also in appearance add colors (like in
+     background)" names this group as the reference). Never used by
+     onboarding, which passes no `compact`. */
+  const compactOptions: readonly AppearancePillOption[] = [
+    { value: "ink", label: t("Ink"), swatch: <SpineSwatch spine="ink" /> },
+    { value: "paper", label: t("Paper"), swatch: <SpineSwatch spine="paper" /> },
+    { value: "mango", label: t("Mango"), swatch: <SpineSwatch spine="mango" /> },
   ]
+
+  if (compact) {
+    return (
+      <AppearancePillGroup
+        className={className}
+        options={compactOptions}
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => onChange(toSpine(next))}
+        ariaLabel={t("Background")}
+      />
+    )
+  }
 
   return (
     <AppearanceOptionGroup
       className={className}
-      options={compact ? compactOptions : short ? onboardingOptions : settingsOptions}
+      options={short ? onboardingOptions : settingsOptions}
       value={value}
       disabled={disabled}
       onValueChange={(next) => onChange(toSpine(next))}

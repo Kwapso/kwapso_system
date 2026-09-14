@@ -41,9 +41,9 @@
 import * as React from "react"
 
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { AppearanceOptionGroup, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 import { type ThemeMode } from "@shared/ui/components/mode-toggle/mode-toggle"
 
+import { AppearancePillGroup, ThemeSwatch, type AppearancePillOption } from "./appearance-pill-group"
 import { useLanguage } from "./language"
 
 /** The one attribute name `ModeToggle`'s own header states tokens.css §6 and
@@ -99,12 +99,15 @@ export function ThemeSection({
 }) {
   const { t } = useLanguage()
 
-  // COMPACT: no picture, no per-option description — the live preview beside
-  // this group carries that argument now.
-  const options: readonly AppearanceOption[] = [
-    { value: "light", label: t("Light") },
-    { value: "dark", label: t("Dark") },
-    { value: "system", label: t("System") },
+  // PILLS: no picture, no per-option description — the live preview beside
+  // this group carries that argument now. A swatch survives, though — her
+  // own second instruction, "also in appearance add colors (like in
+  // background)": the same mark Background's own pills carry, same size,
+  // same shape, same position, resolved through `ThemeSwatch`'s own tokens.
+  const options: readonly AppearancePillOption[] = [
+    { value: "light", label: t("Light"), swatch: <ThemeSwatch tone="light" /> },
+    { value: "dark", label: t("Dark"), swatch: <ThemeSwatch tone="dark" /> },
+    { value: "system", label: t("System"), swatch: <ThemeSwatch tone="system" /> },
   ]
 
   // Seeded "system" for the server render and the hydrating first paint —
@@ -158,11 +161,11 @@ export function ThemeSection({
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-muted-foreground text-micro uppercase">{t("Appearance")}</h3>
-      <AppearanceOptionGroup
+      <AppearancePillGroup
         options={options}
         value={chosen}
         onValueChange={choose}
-        badgeLabel={t("In use")}
+        ariaLabel={t("Appearance")}
       />
     </div>
   )

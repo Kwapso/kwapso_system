@@ -51,6 +51,39 @@
 //      reference she liked better — see that repo's CHANGELOG.md and this
 //      repo's own lane report for both round trips.
 //
+// THE THIRD ROUND, SAME DAY: "appearance display still not right. do it like
+// in the artifact." — pointing at the design lane's own comparison page,
+// `appearance-layouts.html`, option 3 · "Preview-led". Diagnosed against it
+// directly: the artifact's Size/Appearance/Background groups are a tidy
+// horizontal row of small pill buttons, never the kit's own card grid
+// `AppearanceOptionGroup` draws once a card holds nothing but a word — no
+// picture, no description, the live preview above having taken over both
+// arguments — which is what read as "loose two-column rows with a floating
+// badge". `ScaleSection` / `ThemeSection` / `SpineSection` (its `compact`
+// path only; onboarding is untouched) now draw through the new
+// `AppearancePillGroup` (`shared/web/appearance-pill-group.tsx`) instead — a
+// bare `<button role="radio">` row styled off kit tokens, app-side rather
+// than a kit round-trip, because the shape neither the card grid nor a
+// hand-rolled toggle already covers is this file's problem to solve, not the
+// vendored kit's. The artifact's own caption, "Live preview — updates as you
+// press a control", is added under the frame here for the same reason it sat
+// under the artifact's mock: nothing in the preview announces itself as
+// reactive on its own. AND HER SECOND SENTENCE THE SAME MESSAGE — "also in
+// appearance add colors (like in background)" — is `ThemeSwatch`, the same
+// file: Light/Dark/System now carry a small colour mark before the word,
+// matched to Background's own `SpineSwatch` in size, shape and position,
+// through the kit's palette-fixed tokens (`--kw-off-beige` / `--kw-unlit-
+// page`), never a hex written here (R32).
+//
+// WHY THE PREVIEW ITSELF DID NOT MOVE. `AppearancePreview` already carries
+// the artifact's own diagnosis from the PREVIOUS round: "on the settings
+// appearance display, do it with chip, title and body — use lorem ipsums"
+// (v1.2.79, see that file's own header) — the spine ground, the rail, the
+// floating card and the placeholder rows the artifact's mock argues for are
+// already drawn there, in lorem. This round's complaint was about the
+// CONTROLS beside it, not the picture itself, so no kit round-trip was
+// needed here.
+//
 // WHY THE PREVIEW NEEDS THREE RESOLVED VALUES, LIVE. `AppearancePreview`
 // takes `theme` ("light"/"dark", already resolved — never "system": a
 // picture has no clock), `spine` and `scale`, and is pure and prop-driven —
@@ -105,12 +138,20 @@ export function AppearancePanel({
   return (
     <SettingsSection title={t("Appearance")}>
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-        <AppearancePreview
-          theme={previewTheme}
-          spine={previewSpine}
-          scale={previewScaleStep(previewScale)}
-          className="lg:sticky lg:top-4"
-        />
+        <div className="flex flex-col gap-2 lg:sticky lg:top-4">
+          <AppearancePreview
+            theme={previewTheme}
+            spine={previewSpine}
+            scale={previewScaleStep(previewScale)}
+          />
+          {/* THE CAPTION — the artifact's own option 3 (`appearance-layouts.html`,
+              "Preview-led"), centred beneath the frame: nothing here reacts to
+              a control on its own, so the sentence says what the picture is
+              for before somebody presses one. */}
+          <p className="text-muted-foreground text-center text-xs">
+            {t("Live preview — updates as you press a control")}
+          </p>
+        </div>
         <div className="flex flex-col gap-5">
           {/* LANGUAGE, FIRST — her correction, verbatim in the header above:
               "Language · Size · Appearance · Background", inside this one

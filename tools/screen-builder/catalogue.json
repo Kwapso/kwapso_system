@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.79",
-  "sha": "2d6c423f07de5bee9d64655c039c50860ac72b26",
+  "tag": "v1.2.80",
+  "sha": "7fa9327f15467663f1c732120e86c1ba3808a263",
   "syncedAt": "2026-09-14"
  },
- "generatedAt": "2026-09-14T10:03:53.508Z",
+ "generatedAt": "2026-09-14T12:13:44.344Z",
  "counts": {
   "components": 119,
   "hooks": 2,
@@ -9056,6 +9056,7 @@
    "file": "compositions/screens/settings.tsx",
    "exports": [
     "ThemePicture",
+    "ThemeSwatch",
     "SpinePicture",
     "ScalePicture",
     "AppearancePreview",

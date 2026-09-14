@@ -316,6 +316,36 @@ export const ThemePicture = ({ tone }: { tone: "light" | "dark" | "system" }) =>
   );
 };
 
+/** THE THEME SWATCH — a small colour mark, not a picture: 13px, radius
+    `--radius-sm`, `ThemePicture`'s own `light`/`dark`/`system` fills at a
+    dot's scale rather than a thumbnail's. Built for the consuming app's
+    Settings › Appearance pill row (`shared/web/appearance-pill-group.tsx`,
+    kwapso_system): its own Background pills already carry a swatch, resolved
+    through `SpinePicture`'s `[data-spine]` cascade (a ROLE token, `--spine-
+    fill`, reachable from app code); Appearance's three pills have no
+    equivalent role token to reach for, because a light/dark swatch is
+    PALETTE-FIXED by definition — the same reason `ThemePicture` pins hex
+    rather than riding the cascade two paragraphs up. So the fixed hex stays
+    here, in the one file the app's own R32 already exempts for exactly this
+    shape ("a swatch of what dark mode looks like must not flip when you are
+    in dark mode"), and the app reaches it as a part rather than reinventing
+    the pin. Same three hex sets as `ThemePicture`, transcribed rather than
+    re-derived. */
+export const ThemeSwatch = ({ tone }: { tone: "light" | "dark" | "system" }) => {
+  const drawn = {
+    light: "#FFFEF9",
+    dark: "#141310",
+    system: "linear-gradient(90deg,#FFFEF9 50%,#141310 50%)",
+  }[tone];
+  return (
+    <span
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-sm)] shadow-[var(--hairline)]"
+      style={{ background: drawn }}
+    />
+  );
+};
+
 /** The spine pictures: the rail column in each of its fills, rows beside it.
     Token-drawn, as the kit's own markup draws them.
 

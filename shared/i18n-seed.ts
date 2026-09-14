@@ -165,6 +165,16 @@ export const SEED: Catalogue = {
   /* ── The language switcher itself ────────────────────────────────────────── */
   Language: { de: "Sprache", es: "Idioma", ca: "Idioma" },
   "Language changed.": { de: "Sprache geändert.", es: "Idioma cambiado.", ca: "Idioma canviat." },
+
+  /* ── Settings › Appearance's own live preview caption, added 2026-09-14 —
+   * the artifact's own sentence (`appearance-layouts.html`, option 3), kept
+   * neutral in every language rather than switching to direct address, the
+   * same register "That didn't save. Try again." already keeps below. */
+  "Live preview — updates as you press a control": {
+    de: "Live-Vorschau — aktualisiert sich mit jeder Auswahl.",
+    es: "Vista previa en directo — se actualiza con cada selección.",
+    ca: "Previsualització en directe — s'actualitza amb cada selecció.",
+  },
   "The knowledge base has nothing on this.": {
     de: "Die Wissensdatenbank hat dazu nichts.",
     es: "La base de conocimiento no tiene nada sobre esto.",

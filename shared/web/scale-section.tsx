@@ -30,8 +30,8 @@
 import * as React from "react"
 
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { AppearanceOptionGroup, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 
+import { AppearancePillGroup, type AppearancePillOption } from "./appearance-pill-group"
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"
 
@@ -100,10 +100,10 @@ export function ScaleSection({
     }
   }
 
-  // COMPACT: no picture, no per-option description — the live preview beside
-  // this group carries that argument now. Only the label and the "In use"
-  // ring survive on the card.
-  const options: readonly AppearanceOption[] = [
+  // PILLS: no picture, no per-option description, no swatch — the live
+  // preview beside this group carries the picture and Size has no colour of
+  // its own to show. Only the label and the pressed ring survive.
+  const options: readonly AppearancePillOption[] = [
     { value: SCALE_STEPS[0].value, label: t("Compact") },
     { value: SCALE_STEPS[1].value, label: t("Regular") },
     { value: SCALE_STEPS[2].value, label: t("Large") },
@@ -112,12 +112,12 @@ export function ScaleSection({
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-muted-foreground text-micro uppercase">{t("Size")}</h3>
-      <AppearanceOptionGroup
+      <AppearancePillGroup
         options={options}
         value={resting}
         disabled={saving !== null}
         onValueChange={(next) => void choose(next)}
-        badgeLabel={t("In use")}
+        ariaLabel={t("Size")}
       />
     </div>
   )
