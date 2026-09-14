@@ -1434,9 +1434,18 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // dialog's video-link save — two predicted steps and the honesty-timeout
   // sentence, three new sentences none translated yet, accepted debt in
   // the same change that added them.
-  de: 37,
-  es: 37,
-  ca: 37,
+  // RAISED 37 -> 39 in all three on 14 Sep 2026. Two sentences, and they are
+  // the SAME sentence said in the one place a reader can act on it. The owner
+  // opened a 142,429-character transcript, scrolled to the bottom, and found it
+  // stopping mid-word — the screen only ever asked for the first 20,000, and
+  // the notice saying so sat at the TOP of the tab, thousands of pixels above
+  // the cut he actually hit. The cap is raised (200,000 now, which holds every
+  // source in the base whole) and past it the cut speaks WHERE IT HAPPENS.
+  // Accepted debt in the same change that added them, per this law's own
+  // sanctioned move.
+  de: 39,
+  es: 39,
+  ca: 39,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

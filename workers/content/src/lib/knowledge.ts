@@ -593,15 +593,44 @@ const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_i
 
 /** The columns ONE source carries. The body comes too — but only as far as a
  * person can read (see BODY_INLINE_CHARS), because a detail screen is a screen. */
+// Declared ABOVE `DETAIL_COLS`, which reads it at module load: the constant it
+// replaced was an import and so already initialised, and leaving it below put
+// the whole file in a temporal dead zone — 75 suites failed to LOAD, which is
+// the failure shape that reports as a red build rather than a red test.
+const BODY_INLINE_CHARS = 200_000
+
 const DETAIL_COLS = LIST_COLS.replace("NULL AS body", `substr(body, 1, ${bodyInlineChars()}) AS body`)
 
 /** How much of a source's material a screen is handed inline. This is a DISPLAY
  * decision and nothing else: the whole document is stored and every word of it
  * is searchable. `bodyBytes` on the row says how much there really is, so the
  * screen can say "showing the first part of 412 KB" rather than quietly
- * presenting an excerpt as the whole thing. */
+ * presenting an excerpt as the whole thing.
+ *
+ * IT USED TO BE `TEXT_LIMITS.long` (20,000), AND THAT WAS A CATEGORY ERROR.
+ * `TEXT_LIMITS.long` is the cap on what a person may TYPE into a description or
+ * an article — a WRITE validator, borrowed here to decide how much of somebody
+ * else's two-hour transcript they may READ. The two numbers have nothing to do
+ * with each other, and the borrowed one was the smaller by an order of
+ * magnitude.
+ *
+ * THE OWNER FOUND IT ON THE SAME MEETING TWICE, 13-14 Sep 2026. The first time
+ * was the real silent cut in the READER (`DRIVE_TEXT_CAP`), which threw away
+ * three quarters of the document before it was ever stored; that is fixed and
+ * this meeting is 142,429 characters in the database, ending where the
+ * transcript itself ends. He reloaded the page and it still stopped mid-word,
+ * because the SCREEN was only ever asking for the first 20,000 of them — 14% —
+ * and the notice explaining that sat at the top of the tab, thousands of pixels
+ * above the place he actually hit the cut. Same experience, entirely different
+ * cause, and the second one looked exactly like the first one not being fixed.
+ *
+ * 200,000 characters holds every source in the base whole (the largest today is
+ * 170,015) and a two-hour transcript with room to spare. Past it the screen
+ * still cuts — a screen has to — and now SAYS SO WHERE THE CUT IS rather than
+ * only in a preface. Only the DETAIL read carries body at all (`LIST_COLS`
+ * selects `NULL AS body`), so no list pays for this. */
 function bodyInlineChars(): number {
-  return TEXT_LIMITS.long
+  return BODY_INLINE_CHARS
 }
 
 /** A JSON array column, defensively — same shape as `sharding.ts`'s
