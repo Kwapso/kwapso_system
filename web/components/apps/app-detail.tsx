@@ -393,8 +393,9 @@ export function AppDetailScreen({
     // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
     // sits where an icon sits and never inside a sentence") — it already draws
     // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
-    // No "—" fallback: `undefined` lets `OverviewList`'s `emptyValueLabel={null}`
-    // drop the row instead (W2 — an unset fact is dropped, not dashed).
+    // No "—" fallback: `undefined` lets `OverviewList` filter the row out
+    // entirely instead (W2 — an unset fact is dropped, label and all, not
+    // dashed and not left as an empty value beside its own label).
     { label: t("Stage"), value: app.stage || undefined },
     { label: t("About"), value: app.about ? <RichText html={app.about} /> : undefined },
     {

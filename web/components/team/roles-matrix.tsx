@@ -857,49 +857,60 @@ export function RolesMatrix({
           <h3 className="text-muted-foreground text-micro uppercase">
             {t("Deactivated roles")}
           </h3>
-          {inactiveRoles.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("No deactivated roles.")}</p>
-          ) : (
-            <List
-              surface="none"
-              // OFF-BEIGE, NOT SOFT PAPER — the same reasoning
-              // `members-gallery.tsx`'s Invites list carries: this panel is
-              // `narrowGround={false}` soft paper below 45rem and a bare kit
-              // `<Table>` above it, so a `bg-card` row is the OTHER paper
-              // tone either way, never the 1.000 pairing RULES.md §2.6 warns
-              // against.
-              className="rounded-[var(--radius)] bg-card"
-              items={inactiveRoles.map((role) => ({
-                id: role.id,
-                initials: role.title.slice(0, 1).toUpperCase(),
-                title: role.title,
-                subtitle: role.description?.trim() ? role.description : undefined,
-                // REACTIVATE, ON THE ROW ITSELF — the same one-step act
-                // `RolePanel`'s own `onToggleActive` already takes for
-                // switching a role back ON (no confirm: turning access back
-                // on gives nothing away, unlike switching it off). Icon-only,
-                // Phosphor's `Power`, the app's one deactivate/reactivate
-                // glyph either direction. Drawn only for `member_roles:update`
-                // — a control that always fails is worse than no control.
-                trailing: canSave ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`${t("Activate")} — ${role.title}`}
-                        disabled={busyActive}
-                        onClick={() => void setActive(role, true)}
-                      >
-                        <Power className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("Activate")}</TooltipContent>
-                  </Tooltip>
-                ) : undefined,
-              }))}
-            />
-          )}
+          {/* R67/C12 — THE BOX IS THE LIST'S, IN EVERY BRANCH, NOT JUST THE
+              POPULATED ONE. This used to fork: a bare `<p>` on the page ground
+              when `inactiveRoles` was empty, and only the populated branch
+              wrapped in `bg-card`. A team with no deactivated roles is the
+              ordinary state (Smoke team included), so that was the branch a
+              QA walk actually saw on staging — "the DEACTIVATED ROLES
+              disclosure text sits on bare page ground between two cards."
+              The kit's own `List` already draws its zero state INSIDE the
+              same shell as its rows (`emptyTitle` renders through
+              `ScreenRegister` inside the identical `className`/`shell` div,
+              shared/ui/components/list/list.tsx), so handing it `empty`
+              instead of hand-rolling the branch means there is only ONE
+              `bg-card` box, and it covers both states by construction —
+              nothing left for a future branch to fall outside of. */}
+          <List
+            surface="none"
+            // OFF-BEIGE, NOT SOFT PAPER — the same reasoning
+            // `members-gallery.tsx`'s Invites list carries: this panel is
+            // `narrowGround={false}` soft paper below 45rem and a bare kit
+            // `<Table>` above it, so a `bg-card` row is the OTHER paper
+            // tone either way, never the 1.000 pairing RULES.md §2.6 warns
+            // against.
+            className="rounded-[var(--radius)] bg-card"
+            empty={t("No deactivated roles.")}
+            items={inactiveRoles.map((role) => ({
+              id: role.id,
+              initials: role.title.slice(0, 1).toUpperCase(),
+              title: role.title,
+              subtitle: role.description?.trim() ? role.description : undefined,
+              // REACTIVATE, ON THE ROW ITSELF — the same one-step act
+              // `RolePanel`'s own `onToggleActive` already takes for
+              // switching a role back ON (no confirm: turning access back
+              // on gives nothing away, unlike switching it off). Icon-only,
+              // Phosphor's `Power`, the app's one deactivate/reactivate
+              // glyph either direction. Drawn only for `member_roles:update`
+              // — a control that always fails is worse than no control.
+              trailing: canSave ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${t("Activate")} — ${role.title}`}
+                      disabled={busyActive}
+                      onClick={() => void setActive(role, true)}
+                    >
+                      <Power className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("Activate")}</TooltipContent>
+                </Tooltip>
+              ) : undefined,
+            }))}
+          />
         </div>
       )}
 

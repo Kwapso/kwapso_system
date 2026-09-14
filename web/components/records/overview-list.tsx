@@ -35,14 +35,27 @@ export function OverviewList({ items }: { items: DescriptionItem[] }) {
   return (
     <DescriptionList
       layout="rows"
-      // W2: an unset fact is DROPPED, not shown as "Not set" or a dash. The
-      // kit's own default (OVERRIDE 21) went the other way — it now shows
-      // "Not set" for an absent value unless the caller opts out — so every
-      // record's Overview panel opts back into "a missing row is right" by
-      // passing `null` here, once, rather than every call site inventing its
-      // own placeholder for a value it never got.
-      emptyValueLabel={null}
-      items={items.map((i, n) => ({ id: i.id ?? `${n}-${i.label}`, label: i.label, value: i.value }))}
+      // W2: an unset fact is DROPPED, ENTIRELY — no dash, and no `<dt>` label
+      // standing beside an empty `<dd>` either.
+      //
+      // `emptyValueLabel={null}` (the line that stood here) does NOT do that.
+      // Read the kit's own row filter (`shared/ui/components/description-list/
+      // description-list.tsx`): `item.loading === true || emptyValueLabel !==
+      // undefined || item.value is set`. A default parameter
+      // (`emptyValueLabel = "Not set"`) means the destructured value is
+      // NEVER `undefined` once the call site passes anything at all — `null`
+      // included — so `emptyValueLabel !== undefined` is always true here and
+      // the row is ALWAYS kept; only the value cell blanks. That is "hide the
+      // VALUE", not "hide the FIELD" — the bug an App record's Overview tab
+      // shipped with, an `<dt>` rendered beside a genuinely empty `<dd>`
+      // while this comment claimed the row was dropped. The kit has no knob
+      // that drops a row (only `hideWhenEmpty`, which hides the WHOLE list
+      // when every pair is empty, not one pair among many), so the honest
+      // fix is here, once, for every caller: filter the empty pairs out
+      // BEFORE they reach `DescriptionList` at all.
+      items={items
+        .filter((i) => i.value !== undefined && i.value !== null)
+        .map((i, n) => ({ id: i.id ?? `${n}-${i.label}`, label: i.label, value: i.value }))}
     />
   )
 }

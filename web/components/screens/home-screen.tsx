@@ -191,8 +191,16 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
         <div className="min-w-0">
           {/* display-m — CLIENT CORRECTION, 2026-08-31: a main screen's title
               is the kit's own named "Page title" step (56/500), see
-              collection-heading.tsx's own note for the full ruling. */}
-          <Headline as="h1" size="display-m" className="truncate">{ctx.team?.name}</Headline>
+              collection-heading.tsx's own note for the full ruling.
+              T5: a title wraps, it never clips — `truncate` (nowrap +
+              ellipsis) hid the end of a real team name on narrow screens.
+              `line-clamp-2 break-words` is the same seam record-heading.tsx
+              uses for a record's own name: it wraps to two lines rather than
+              cutting mid-glyph, and `title` keeps the full string reachable
+              on a pointer or a screen reader once it clamps. */}
+          <Headline as="h1" size="display-m" className="line-clamp-2 break-words" title={ctx.team?.name}>
+            {ctx.team?.name}
+          </Headline>
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
             {ctx.role && <Badge variant="secondary">{ctx.role.title}</Badge>}
             <span>

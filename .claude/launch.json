@@ -127,6 +127,19 @@
                 "verify/roles-unsaved"
             ],
             "port": 4179
+        },
+        {
+            "_": "QA walk 2026-09-15 — four staging findings (home h1 wrap, roles Deactivated disclosure, overview empty-row) — a static build of verify/qa-walk-fixes/. Run `node verify/qa-walk-fixes/build.mjs` first; this just serves the output. Not app auth — mounts the real Headline, List and OverviewList directly; the BEFORE frames reproduce deleted code and are labelled as such on the page.",
+            "name": "verify-qa-walk-fixes",
+            "runtimeExecutable": "python3",
+            "runtimeArgs": [
+                "-m",
+                "http.server",
+                "4180",
+                "--directory",
+                "verify/qa-walk-fixes"
+            ],
+            "port": 4180
         }
     ]
 }
