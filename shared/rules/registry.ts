@@ -1466,20 +1466,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // model's own reasoning into a disclosure a person may open. Two sentences,
   // English-only until the next translation pass.
   //
-  // RAISED 41 -> 43 in all three on 14 Sep 2026: Settings › Appearance's Save
-  // bar. "Discard" (the reset button beside Save) and the one caption
-  // explaining why Language keeps acting instantly while Size, Appearance and
-  // Background wait for Save ("Language changes right away. Size, appearance
-  // and background wait for Save."). Net new to the app, not renamed — three
-  // OLDER strings this same change deleted ("Size changed.", "Theme changed.",
-  // "Background changed.", the three per-control toasts the old
-  // instant-apply controls used to show) were all already translated in every
-  // language and are gone from the catalogue with the code that said them, so
-  // they cost nothing here; only the two genuinely new sentences do. Two
-  // sentences, English-only until the next translation pass.
-  de: 43,
-  es: 43,
-  ca: 43,
+  de: 41,
+  es: 41,
+  ca: 41,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

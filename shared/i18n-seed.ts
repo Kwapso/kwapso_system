@@ -175,6 +175,28 @@ export const SEED: Catalogue = {
     es: "Vista previa en directo — se actualiza con cada selección.",
     ca: "Previsualització en directe — s'actualitza amb cada selecció.",
   },
+
+  /* ── Settings › Appearance's Save bar, added 2026-09-14 alongside the panel
+   * itself — the debt R44 let in on the same day (`TRANSLATION_CEILING`'s own
+   * "RAISED 41 -> 43" note) paid back here rather than left for the next
+   * translation pass. "Discard" reads as Save's natural partner in each
+   * language — the same infinitive-as-label register Save and Cancel already
+   * use (`Speichern`/`Abbrechen`, `Guardar`/`Cancelar`, `Desar`/`Cancel·lar`)
+   * — and shares its root with "Discarded" already in the catalogue
+   * (`Verworfen`/`Descartado`/`Descartat`). The caption stays in the neutral,
+   * third-person register the Live preview caption above already set rather
+   * than switching to direct address, and reuses the section headers exactly
+   * as this same panel and its toasts already translate them (Language/Size/
+   * Appearance/Background → Sprache·Größe·Darstellung·Hintergrund,
+   * Idioma·Tamaño·Apariencia·Fondo, Idioma·Mida·Aparença·Fons; Save →
+   * Speichern/Guardar/Desar). */
+  Discard: { de: "Verwerfen", es: "Descartar", ca: "Descartar" },
+  "Language changes right away. Size, appearance and background wait for Save.": {
+    de: "Die Sprache ändert sich sofort. Größe, Darstellung und Hintergrund warten auf Speichern.",
+    es: "El idioma cambia de inmediato. Tamaño, apariencia y fondo esperan a guardar.",
+    ca: "L'idioma canvia de seguida. Mida, aparença i fons esperen a desar.",
+  },
+
   "The knowledge base has nothing on this.": {
     de: "Die Wissensdatenbank hat dazu nichts.",
     es: "La base de conocimiento no tiene nada sobre esto.",
