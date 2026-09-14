@@ -394,7 +394,29 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * figures as the number to plan with. Cloudflare does bill neurons and a metered
  * model can exceed its price sheet (deepseek-v4-pro metered 24x), which is an
  * argument for reading the meter — never for reading it once. */
-export const DEFAULT_AGENT_MODEL = "@cf/moonshotai/kimi-k2.6"
+/** ── AND ON 14 SEP 2026 IT WENT BACK TO gpt-oss-120b, MEASURED ON THE OWNER'S OWN
+ *    QUESTION ────────────────────────────────────────────────────────────────
+ *
+ * The 21/22 above is a retrieval bench (`kb-bench-is-title-anchored`: 22/22
+ * green while paraphrases refuse), and it never asked how long a step takes.
+ * On the owner's five-part ticket question — four tool steps, nine parallel
+ * queries on one of them, every result correct — kimi-k2.6 on this binding
+ * measured, off `agent_messages` on staging:
+ *
+ *     one step (nine query_records, all green)   109 s
+ *     the composing step, every figure in hand   still writing at +210 s
+ *     the same question in the owner's thread    three deadline exits, one stall
+ *
+ * It thinks ~10,000 characters per step (2,700 completion tokens, read off the
+ * REST door), at ~25 tokens a second, so any question needing four steps runs
+ * past the 210-second bound that must stay under the platform's ~230-second
+ * kill. And once, having decided its tool calls inside that thinking, it emitted
+ * nothing at all (agent.ts, STALLED_TURN_NOTE). gpt-oss-120b, replayed on the
+ * identical context: 6.9 s, tool calls on the wire, a third of the neurons per
+ * token. Speed is the whole finding — kimi is the better reader and the
+ * assistant could not finish a sentence on it. Both wrangler pins moved with
+ * this line, which is `no-quiet-downgrade`'s own rule. */
+export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true
