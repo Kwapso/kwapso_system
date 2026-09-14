@@ -25,7 +25,19 @@
 // whole time. The line that holds is not person-vs-app, it is IDENTITY (your
 // name, your email address, what you have done) against DISPLAY (how the app
 // looks to you and which words it says), and language was on the wrong side of
-// it. It is the fourth card in the Appearance tab now; nothing else moved.
+// it. It was the fourth card in the Appearance tab; see the note below (the
+// 2026-09-14 preview-led ruling) for where it stands now.
+//
+// PREVIEW-LED, 2026-09-14. Four Settings · Appearance layouts, one client
+// ruling: "for the settings design use preview led — put language first …
+// Represent in the preview better the background … Create a new component
+// in ui-ux if needed." LANGUAGE MOVED TO FIRST, above the other three, on
+// her own word — she did not argue the order and neither does this file.
+// SIZE, APPEARANCE (light/dark/system) AND BACKGROUND collapsed from three
+// boxes of option cards into ONE shared live preview
+// (`AppearancePreview`, kit v1.2.77) beside compact controls —
+// `shared/web/appearance-panel.tsx` is that shape; see its own header for
+// the full account, including the kit round trip.
 //
 // THE FOURTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a section.
 // (It was the FIFTH of five until 11 Sep 2026, when Choices was retired in front
@@ -91,10 +103,11 @@
 // FIVE TABS, in the order `tabsConfig` below declares them — which is the ONLY
 // place that order lives. This list is the description, never the definition:
 //
-//   1. Appearance     — Mode, Sidebar and Scale, exactly as they were on the
-//                        flat page, plus Language since 2026-09-10 (see the
-//                        ruling above): four choices about how the app looks
-//                        and reads to one person.
+//   1. Appearance     — Language first, then one shared live preview beside
+//                        compact Size / Appearance / Background controls
+//                        since the 2026-09-14 preview-led ruling above: four
+//                        choices about how the app looks and reads to one
+//                        person, still, just no longer four separate boxes.
 //   2. Team           — the team's PEOPLE and their RIGHTS, in two containers
 //                        on one page: the members gallery
 //                        (web/components/team/members-gallery.tsx) and the
@@ -176,9 +189,7 @@ import { usePermissions } from "@/lib/perms"
 import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import type { ActiveTeam } from "@/lib/use-active-team"
-import { ThemeSection } from "@shared/web/theme-section"
-import { ScaleSection } from "@shared/web/scale-section"
-import { SpineSection } from "@shared/web/spine-section"
+import { AppearancePanel } from "@shared/web/appearance-panel"
 import { LanguageSection } from "@shared/web/language-section"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
@@ -368,28 +379,29 @@ export function SettingsScreen({
           if (panel.value === "appearance") {
             return (
               <div className="flex flex-col gap-8">
-                {/* HOW BIG THE APP IS (CHECKLIST 10.3). One root font size moves
-                    text and spacing together, and because the viewport is
-                    locked against pinch to zoom this is the only way anybody
-                    can make this app bigger. */}
-                <ScaleSection value={active.user?.scale ?? null} save={(scale) => auth.setScale(scale)} />
+                {/* LANGUAGE, FIRST — client ruling, 2026-09-14, choosing the
+                    preview-led layout: "put language first". It has no visual
+                    analogue a preview can show (see `AppearancePanel`'s own
+                    header), so it keeps its own plain control in its own box,
+                    above the three settings a picture CAN show. Persisted the
+                    same way the others are, on the person's own row, so it
+                    follows them between devices; the portal keeps its own
+                    compact twin in the header (`shared/web/language-menu.tsx`),
+                    because the portal has no settings screen at all. */}
+                <LanguageSection save={(lang) => auth.setLanguage(lang)} />
 
-                {/* LIGHT / DARK / SYSTEM. The owner's own instruction: a
-                    preference about how the app looks, in the one place a
-                    person goes to change how the app looks. `ThemeSection`
-                    draws the same visual option cards Sidebar and Size do
-                    here; the profile menu keeps the plain `<ModeToggle />`
-                    segmented control, which is the right shape for a menu
-                    reached mid-task rather than a settings page. */}
-                <ThemeSection />
-
-                {/* THE SIDEBAR'S COLOUR — mango or quiet (client ruling
-                    D3, cut from three to two at v1.2.28). Persisted the same way Scale is, on the person's own
-                    row, so it follows them between devices. `app-shell.tsx`
-                    reads this same field to paint the real rail. */}
-                <SpineSection
-                  value={active.user?.spine ?? null}
-                  save={async (spine) => {
+                {/* SIZE, APPEARANCE AND BACKGROUND — one shared live preview
+                    beside compact controls, replacing three separate boxes of
+                    option cards. Same ruling, same day: "Represent in the
+                    preview better the background … Create a new component in
+                    ui-ux if needed" — `AppearancePreview` (kit v1.2.77) is
+                    that component. See `shared/web/appearance-panel.tsx`'s own
+                    header for the full account. */}
+                <AppearancePanel
+                  scaleValue={active.user?.scale ?? null}
+                  saveScale={(scale) => auth.setScale(scale)}
+                  spineValue={active.user?.spine ?? null}
+                  saveSpine={async (spine) => {
                     // Unlike Scale, applying the choice has no document-level
                     // side effect to fire optimistically (app-shell.tsx reads
                     // the rail's spine off `active.user`, not off a DOM
@@ -402,25 +414,6 @@ export function SettingsScreen({
                     await active.refresh()
                   }}
                 />
-
-                {/* THE LANGUAGE YOU READ KWAPSO IN — the fourth choice a person
-                    makes about how this app looks to them, and the client's own
-                    ruling on 2026-09-10: *"language shoudl be in settings
-                    somewhere, not in my porfile"*. Size, light or dark, the
-                    sidebar's colour and the words themselves are one kind of
-                    thing — each is per-person, each follows you between devices
-                    off your own row, and none of them changes what anybody else
-                    sees — so they belong on one panel rather than one here and
-                    one on a page you reach from the profile menu.
-
-                    LAST, because it is the choice made once and then forgotten,
-                    while the three above it are the ones somebody comes back to.
-                    It brings its own container (`bg-surface-panel`) where the
-                    three above draw option cards, which is the shape a Select
-                    needs; the portal keeps its own compact twin in the header
-                    (`shared/web/language-menu.tsx`), because the portal has no
-                    settings screen at all. */}
-                <LanguageSection save={(lang) => auth.setLanguage(lang)} />
               </div>
             )
           }

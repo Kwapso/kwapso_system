@@ -148,7 +148,11 @@ const GONE_ON_PURPOSE: Record<string, string> = {
 // that starts with `/` or contains a `/` is anchored to the repo root, and a
 // bare name matches that segment at any depth. Globs and negations are skipped
 // rather than half-implemented — a pattern this cannot read is a pattern that
-// exempts nothing, which is the safe direction.
+// exempts nothing, which is the safe direction. `.gitignore` is not only the one
+// at the repo root: a folder that ignores its own build output locally (see
+// `verify/pinned-corners/.gitignore` below) is read the same way, just scoped to
+// the directory that wrote it — this half was added when a rig's bundle proved
+// the root-only read was blind to a convention this repo already practiced.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const IGNORE_LINES = readFileSync(join(ROOT, ".gitignore"), "utf8")
@@ -187,6 +191,34 @@ const ROOTS = readdirSync(ROOT, { withFileTypes: true })
   .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !isOutput(e.name))
   .map((e) => e.name)
   .sort()
+
+// A NESTED `.gitignore` is git's answer too. `verify/pinned-corners/` and
+// `verify/toolbar-floor/` already ignore their own multi-megabyte bundle
+// locally rather than growing the root file one line per rig — and every rig
+// after them was supposed to copy that convention, but the root parse above
+// never actually READ a nested file, so a rig that did copy it (or forgot to)
+// looked identical to this scan: git hid the bundle either way, and only the
+// root file's word was law here. `verify/appearance-panel/index.html` is what
+// that gap cost — an esbuild bundle that inlined the kit's own comments,
+// dangling path and all, into a file this scan read as if it were prose we
+// wrote. Fixed at the root of it: read every `.gitignore` under a real ROOT
+// (never the whole tree — a lane worktree, `.session-notes/`, `credentials/`
+// and a Glide data symlink all sit outside ROOTS already, the same fence
+// docFiles()/codeFiles() below trust) and anchor each line to the DIRECTORY
+// THAT WROTE IT — narrower than git's own any-depth-below rule for a bare
+// name, on purpose, the same "a pattern this cannot read exempts nothing"
+// bias the root parse above already takes.
+for (const file of sourceFiles(
+  ROOTS.map((d) => join(ROOT, d)),
+  { extensions: [".gitignore"], relativeTo: ROOT }
+)) {
+  const dir = dirname(file.rel)
+  for (const line of file.source
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#") && !l.startsWith("!") && !l.includes("*")))
+    ANCHORED_OUTPUT.push(`${dir}/${line.replace(/^\//, "").replace(/\/$/, "")}`)
+}
 
 /** Written out in full, an extension included, a path is one a person is meant
  * to open. These are every text extension this repo's own files carry. */

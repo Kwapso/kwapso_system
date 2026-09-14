@@ -164,67 +164,91 @@ export function ModuleAutomations({
               key={a.key}
               className="flex items-start justify-between gap-4 rounded-[var(--radius)] bg-card p-4"
             >
-              <div className="flex min-w-0 flex-col gap-1">
-                {/* THE MARK AND THE REASON, ABOVE THE TITLE, AND ONE BRANCH ON
-                    PURPOSE. Her ruling, 2026-09-14: "put the chip on top of the
-                    title, the protected chip." R65 is the law that already says
-                    a chip sits above a record's title, but R65's own census is
-                    anchored to the kit `<Card key=>` — a card drawn one per row
-                    of a collection — and this row is a hand-rolled `<li>`, not
-                    a kit Card, so it never entered R65's walk. The SENTENCE
-                    reaches this row; the CHECK's chosen oracle does not, on
-                    purpose — R65 tried and rejected a "Card wrapping a Badge"
-                    oracle and a hand-list before settling on `key=`, precisely
-                    because those wider oracles catch panels that are not
-                    records. An automation row is a config line, not a record
-                    with its own screen, so it is left out here rather than
-                    widened into blind guesswork; this move is the ruling
-                    answered directly, by hand, on the one file it names.
+              {/* THE MARK, ABOVE THE TITLE, AND THE REASON LAST — AND ONE
+                  BRANCH FOR THE WHOLE ROW ON PURPOSE. Her ruling, 2026-09-14:
+                  "put the chip on top of the title, the protected chip." A
+                  first pass moved the reason up beside the badge, because R70's
+                  check reads the mark and the reason off ONE guarded branch and
+                  splitting them failed the build — the right instinct, the
+                  wrong reading order: a three-line explanation ahead of the
+                  title it explains. The reading order she actually asked for is
+                  badge, title, description, reason — reason LAST, because a
+                  reason is only legible once you know what it is a reason FOR.
 
-                    R70 requires the reason on every row that cannot be switched
-                    and forbids it on every row that can, so this branch can
-                    never be a row that quietly says nothing.
+                  So the guard now wraps the WHOLE unswitchable row rather than
+                  just the badge+reason pair, with a sibling branch carrying the
+                  switchable row's own title+description+switch. The
+                  title/description JSX is written twice — that is the cost —
+                  and what it buys back is the same thing R70 already had: the
+                  badge is structurally unwriteable without its reason, because
+                  they are still lines inside one `!a.switchable` branch: no
+                  edit can leave the badge standing alone in this branch without
+                  also deleting the reason two lines below it. Guarding only the
+                  badge+reason pair and leaving title/description outside both
+                  branches was the alternative — it would have put the reason
+                  back beside the badge, because a badge-only branch cannot sit
+                  between an unconditional title and an unconditional
+                  description without becoming two branches, which is exactly
+                  the split R70 forbids.
 
-                    THE WORD IS THE DICTIONARY'S (client, 2026-09-11, shown this
-                    list): *"like we have protected choices to have protected
-                    automations! Still have the visibility, but cannot change
-                    it"*. It is `protectedChoice` in `shared/glossary.ts` — one
-                    word for one concept across both halves of a module's
-                    settings page — and it is the same kit part the Choices half
-                    draws (`Badge variant="secondary"` in
-                    `web/components/choices/selectable-screen.tsx`), because two
-                    different-looking badges for one concept on one page would
-                    defeat the ruling that asked for the word.
+                  R65 is the law that already says a chip sits above a record's
+                  title, but R65's own census is anchored to the kit `<Card
+                  key=>` — a card drawn one per row of a collection — and this
+                  row is a hand-rolled `<li>`, not a kit Card, so it never
+                  entered R65's walk. The SENTENCE reaches this row; the CHECK's
+                  chosen oracle does not, on purpose — R65 tried and rejected a
+                  "Card wrapping a Badge" oracle and a hand-list before settling
+                  on `key=`, precisely because those wider oracles catch panels
+                  that are not records. An automation row is a config line, not
+                  a record with its own screen, so it is left out here rather
+                  than widened into blind guesswork; this move is the ruling
+                  answered directly, by hand, on the one file it names.
 
-                    THE MARK MAY NEVER APPEAR WITHOUT THE REASON BESIDE IT, and
-                    that is structural rather than a convention: the two render
-                    from ONE guard, so there is no edit that leaves the badge
-                    behind on its own — which is why moving the chip above the
-                    title moved the reason with it rather than splitting the
-                    guard in two. It matters because the word carries a
-                    DIFFERENT promise on each half — take the protection off a
-                    choice and it can be switched off; an automation's never
-                    comes off, at this door as well as on this screen — and the
-                    sentence beside the badge is what says which one this is.
-                    R70 reads all of it off this file. */}
-                {!a.switchable && a.helpText ? (
+                  THE WORD IS THE DICTIONARY'S (client, 2026-09-11, shown this
+                  list): *"like we have protected choices to have protected
+                  automations! Still have the visibility, but cannot change
+                  it"*. It is `protectedChoice` in `shared/glossary.ts` — one
+                  word for one concept across both halves of a module's
+                  settings page — and it is the same kit part the Choices half
+                  draws (`Badge variant="secondary"` in
+                  `web/components/choices/selectable-screen.tsx`), because two
+                  different-looking badges for one concept on one page would
+                  defeat the ruling that asked for the word.
+
+                  THE MARK MAY NEVER APPEAR WITHOUT THE REASON BESIDE IT, and
+                  that is structural rather than a convention: the two render
+                  from ONE guard, so there is no edit that leaves the badge
+                  behind on its own. It matters because the word carries a
+                  DIFFERENT promise on each half — take the protection off a
+                  choice and it can be switched off; an automation's never
+                  comes off, at this door as well as on this screen — and the
+                  sentence at the foot of the row is what says which one this
+                  is. R70 reads all of it off this file. */}
+              {!a.switchable && a.helpText ? (
+                <div className="flex min-w-0 flex-col gap-1">
                   <div className="flex flex-wrap items-start gap-2">
                     <Badge variant="secondary" className="shrink-0">
                       {t("Protected")}
                     </Badge>
-                    <Text className="text-muted-foreground">{t(a.helpText)}</Text>
                   </div>
-                ) : null}
-                <Text className="font-medium">{t(a.title)}</Text>
-                <Text className="text-muted-foreground">{t(a.description)}</Text>
-              </div>
+                  <Text className="font-medium">{t(a.title)}</Text>
+                  <Text className="text-muted-foreground">{t(a.description)}</Text>
+                  <Text className="text-muted-foreground">{t(a.helpText)}</Text>
+                </div>
+              ) : null}
               {a.switchable ? (
-                <Switch
-                  checked={!off}
-                  aria-label={t(a.title)}
-                  disabled={!mayChange || busyKey === a.key || settingsQ.loading}
-                  onCheckedChange={(v: boolean) => void flip(a, v)}
-                />
+                <>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <Text className="font-medium">{t(a.title)}</Text>
+                    <Text className="text-muted-foreground">{t(a.description)}</Text>
+                  </div>
+                  <Switch
+                    checked={!off}
+                    aria-label={t(a.title)}
+                    disabled={!mayChange || busyKey === a.key || settingsQ.loading}
+                    onCheckedChange={(v: boolean) => void flip(a, v)}
+                  />
+                </>
               ) : null}
             </li>
           )

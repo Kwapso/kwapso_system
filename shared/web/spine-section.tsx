@@ -1,12 +1,21 @@
 "use client"
 
-// THE APP'S BACKGROUND — three cards, shown not described, exactly the shape
-// the kit's own Appearance panel draws Theme in (26.05, "a choice that
-// changes how the app looks is never a row of pills … one card per option: a
-// small picture of the thing itself, the option's name, one line of prose,
-// and a mango badge on the one that is set"). Mode and Scale, on either side
-// of this section, are the same cards now too — `theme-section.tsx` and
-// `scale-section.tsx` copy this file's shape rather than reinventing it.
+// THE APP'S BACKGROUND — a compact card row in Settings, beside the shared
+// Appearance preview; still the full picture+description cards on
+// onboarding, which this pass does not touch.
+//
+// PREVIEW-LED, CLIENT RULING 2026-09-14. She chose the preview-led layout of
+// four Settings · Appearance options a lane put in front of her, and ruled on
+// the one thing wrong with the layout it replaces: "Represent in the preview
+// better the background (currently it's the old coloured navbar only)." The
+// picture that used to carry this argument, `SpinePicture`, is a 44px
+// `THUMB_RAIL` swatch — never built to show what the setting actually does
+// since `screen-shell.tsx`'s 2026-09-02 reshape: the spine is the ground the
+// WHOLE window stands on, not a stripe down one edge. `AppearancePreview`
+// (`shared/ui/compositions/screens/settings.tsx`, kit v1.2.77) draws that
+// hierarchy — ground, rail, floating card, panel, row — and is the shared
+// preview beside this group now; the three cards below carry only the name
+// and the ring.
 //
 // THREE, CUT TO TWO, THEN REVERSED BACK TO THREE. v1.2.28 (2026-09-02) cut
 // `ink` and `paper` to one muted rail, `quiet`, the same day the client ruled
@@ -17,91 +26,54 @@
 // — and explained why, which is the point of the reversal: "my goal is that
 // in light i can choose to have a 'dark' background option". Appearance
 // decides light or dark; Background decides the colour behind everything;
-// Ink is how a person running a LIGHT app gets a dark window. The three
-// cards below are `SpinePicture`'s own `"ink" | "paper" | "mango"` union
-// again, and the copy is the kit's, verbatim, from
-// `compositions/screens/settings.tsx`'s `SPINES` — unchanged from before
-// v1.2.28, because the cut never touched what the surviving option (mango)
-// said about itself.
+// Ink is how a person running a LIGHT app gets a dark window.
 //
-// THE CARDS ARE THE KIT'S OWN, not reinvented. `AppearanceOptionGroup` and
-// `SpinePicture` are `compositions/screens/settings.tsx`'s own sub-primitives
-// — COMPOSITION-MISMATCHES.md names both reusable standalone (`options`, a
-// sub-primitive, not the route itself"): the ROUTE around them (`SettingsRoute`,
-// its six-tab shape) is what this app has deliberately not adopted, never
-// these two parts. The three cards below read exactly as they would inside
-// the kit's own Settings composition, words and pictures both.
+// THE CARDS ARE THE KIT'S OWN, not reinvented. `AppearanceOptionGroup` is
+// `compositions/screens/settings.tsx`'s own sub-primitive — COMPOSITION-
+// MISMATCHES.md names it reusable standalone: the ROUTE around it
+// (`SettingsRoute`, its six-tab shape) is what this app has deliberately not
+// adopted, never this part.
 //
-// OPTIMISTIC, THEN PERSISTED — `ScaleSection`'s own shape, directly above
-// this section, copied rather than reinvented. A card presses, the choice is
-// live immediately (app-shell.tsx reads this same preference off
-// `active.user.spine` and repaints the rail on its next render — there is no
-// document-level side effect to fire here, unlike `applyScale`, because the
-// spine is an ordinary React prop, not a CSS variable), and the save follows;
-// if it fails the choice reverts and says so. It lives on the person's own
-// row for the same reason scale does (UI-RULEBOOK S4's argument, one
-// preference along): it should follow them between devices, not live in one
-// browser. MANGO is the fallback (shared/spine.ts) since the client's ruling
-// of 2026-09-02 — this section used to say paper here, on the argument that a
-// person who had never opened it should keep seeing exactly the rail they
-// always had, and that argument was overruled; spine.ts keeps it in full.
+// OPTIMISTIC, THEN PERSISTED — `ScaleSection`'s own shape, copied rather than
+// reinvented. A card presses, the choice is live immediately (app-shell.tsx
+// reads this same preference off `active.user.spine` and repaints the rail on
+// its next render), and the save follows; if it fails the choice reverts and
+// says so. It lives on the person's own row for the same reason scale does
+// (UI-RULEBOOK S4's argument, one preference along). MANGO is the fallback
+// (shared/spine.ts) since the client's ruling of 2026-09-02.
 //
-// RENAMED FROM "Sidebar" TO "Background", client instruction (verbatim: "on
-// settings, we need to rename that last section — it's no longer the sidebar
-// but the ground/background (you choose the word)"). The fill this section
-// picks paints the rail, the ground around the floating content card, and
-// everything else behind the app — not one rail any more — so the heading,
-// the helper line and both card captions below said "sidebar" for a scope the
-// choice had already outgrown. The word is checked against `shared/glossary.ts`
-// (R34) and does not collide with an existing term. The kit's own copy
-// (`compositions/screens/settings.tsx`'s `FIELD_LABELS`/`FIELD_HELP`/`SPINES`)
-// carries the same words now, verbatim, per the note above.
+// RENAMED FROM "Sidebar" TO "Background", client instruction — untouched by
+// this pass; see the git history on this file for the fuller account.
 //
-// THE CARDS ARE DRAWN IN TWO PLACES NOW, FROM ONE `SpineChoice`. The other is
-// the onboarding screen, which is the "during the onboarding" half of the same
-// ruling. The group is exported and the SECTION around it — heading, prose,
-// save-on-press — is what stays here. Onboarding wants none of those: it has
-// no room for a heading of its own, and its choice rides the form's one
-// submit rather than saving on press.
-//
-// AND ONBOARDING WANTS SHORTER WORDS, WHICH IS THE KIT'S OWN SPLIT, NOT ONE
-// INVENTED HERE. `compositions/screens/settings.tsx` and
-// `compositions/screens/onboarding.tsx` each carry their own `SPINES` array —
-// the same three names, two different lengths of caption — because a
-// one-screen sign-up has less room than a settings panel does; the kit's own
-// onboarding composition already draws the shorter three. `SpineChoice`'s
-// `short` prop switches between the two verbatim transcriptions below, so the
-// two callers can disagree about caption LENGTH (the kit's own choice) while
-// staying unable to disagree about the NAMES, the pictures, or the order —
-// the drift R34 exists to stop, and the only drift no law catches inside a
-// component.
+// THE CARDS ARE DRAWN IN TWO PLACES, FROM ONE `SpineChoice`, AND THEY NOW
+// DISAGREE ABOUT MORE THAN CAPTION LENGTH. Onboarding
+// (`web/app/onboarding/page.tsx`) keeps the full picture+description cards —
+// it has no live app preview beside it to carry that argument instead, and
+// this pass is Settings · Appearance only. `SpineChoice`'s new `compact`
+// prop is what lets the two keep disagreeing about PICTURE, same as `short`
+// already lets them disagree about caption LENGTH, while staying unable to
+// disagree about the names, the values or the order.
 
 import * as React from "react"
 
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AppearanceOptionGroup,
-  SpinePicture,
-  type AppearanceOption,
-} from "@shared/ui/compositions/screens/settings"
+import { AppearanceOptionGroup, SpinePicture, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 
 import { toSpine, type Spine } from "../spine"
 import { useLanguage } from "./language"
-import { SettingsSection } from "./settings-section"
 
-/** THE THREE CARDS AND NOTHING ELSE — no heading, no prose, no save.
+/** THE CARDS AND NOTHING ELSE — no heading, no save.
  *
  * Both places a person picks a spine draw this: Settings · Appearance through
- * `SpineSection` below, and the onboarding screen
- * (`web/app/onboarding/page.tsx`), which is the "during the onboarding" half of
- * the client's 2026-09-02 ruling. It is a CONTROLLED control and it persists
- * nothing, because the two callers disagree about when the choice is saved —
- * Settings saves on press and can revert a failure, onboarding folds it into
- * the one submit that also writes the name. What they must NOT disagree about
- * is the names, the pictures and the order, which is why those live here
- * once; the caption LENGTH is the one thing the kit itself lets differ (see
- * `short` below), so this file carries both of the kit's own transcriptions
- * rather than picking one. */
+ * `SpineSection` below, and the onboarding screen. It is a CONTROLLED control
+ * and it persists nothing, because the two callers disagree about when the
+ * choice is saved — Settings saves on press and can revert a failure,
+ * onboarding folds it into the one submit that also writes the name. What
+ * they must NOT disagree about is the names, the values and the order; what
+ * they MAY disagree about is caption length (`short`) and, since the
+ * preview-led redesign, whether the card carries its own picture at all
+ * (`compact` — Settings' shared `AppearancePreview` carries that argument
+ * for it now; onboarding has no preview beside it and keeps the picture). */
 export function SpineChoice({
   /** the spine the cards show as set */
   value,
@@ -114,6 +86,9 @@ export function SpineChoice({
   /** onboarding's captions — `compositions/screens/onboarding.tsx`'s own
    * shorter SPINES, verbatim, not settings.tsx's longer ones truncated here. */
   short = false,
+  /** Settings · Appearance only: no picture, no description — the shared
+   * `AppearancePreview` beside this group carries that argument instead. */
+  compact = false,
   className,
 }: {
   value: Spine
@@ -121,6 +96,7 @@ export function SpineChoice({
   disabled?: boolean
   badgeLabel: React.ReactNode
   short?: boolean
+  compact?: boolean
   className?: string
 }) {
   const { t } = useLanguage()
@@ -171,10 +147,19 @@ export function SpineChoice({
     },
   ]
 
+  /* COMPACT: same three names and the same order, no picture and no
+     description — Settings · Appearance's own shared preview carries that
+     argument now. Never used by onboarding, which passes no `compact`. */
+  const compactOptions: readonly AppearanceOption[] = [
+    { value: "ink", label: t("Ink") },
+    { value: "paper", label: t("Paper") },
+    { value: "mango", label: t("Mango") },
+  ]
+
   return (
     <AppearanceOptionGroup
       className={className}
-      options={short ? onboardingOptions : settingsOptions}
+      options={compact ? compactOptions : short ? onboardingOptions : settingsOptions}
       value={value}
       disabled={disabled}
       onValueChange={(next) => onChange(toSpine(next))}
@@ -188,9 +173,13 @@ export function SpineSection({
   value,
   /** Persist the choice. The agency app passes its own `auth.setSpine`. */
   save,
+  /** Told the resting value on mount and again on every press, so the
+   * shared preview beside this group is never a frame behind it. */
+  onChosenChange,
 }: {
   value: string | null
   save: (spine: Spine) => Promise<unknown>
+  onChosenChange?: (value: Spine) => void
 }) {
   const { t } = useLanguage()
 
@@ -199,6 +188,8 @@ export function SpineSection({
   const [chosen, setChosen] = React.useState<Spine>(toSpine(value))
   const [saving, setSaving] = React.useState<Spine | null>(null)
   React.useEffect(() => setChosen(toSpine(value)), [value])
+
+  React.useEffect(() => onChosenChange?.(chosen), [chosen, onChosenChange])
 
   async function choose(nextSpine: Spine) {
     if (nextSpine === chosen || saving) return
@@ -217,28 +208,15 @@ export function SpineSection({
   }
 
   return (
-    <SettingsSection title={t("Background")}>
-      {/* R67, AND NOW THE TITLE WITH IT — client, 2026-09-11: "ticket types
-       * should be on top of the searchbar inside the container without
-       * subtitle, make this. always". Said of a module settings page and
-       * applied here because it is the same shape: a heading and a sentence on
-       * the white above a box that could have held them.
-       *
-       * THIS SECTION WAS HALF-FIXED ON 2026-09-10 and this is the other half.
-       * That pass moved the option cards off `bg-card` — in LIGHT `--card`,
-       * `--background` and `--surface-raised` are all #FFFEF9, so they measured
-       * CONTRAST 1.000 against the page and were held up by their hairline
-       * alone — and left the title block standing on the white, because R67
-       * said prose was not content. The box is now `SettingsSection`'s, the
-       * heading is drawn INSIDE it, and the sentence is DELETED (it said what
-       * the title says). Soft paper on page measures 1.103 light / 1.079 dark;
-       * the raised option cards on it, 1.103 light / 1.111 dark. */}
+    <div className="flex flex-col gap-2">
+      <h3 className="text-muted-foreground text-micro uppercase">{t("Background")}</h3>
       <SpineChoice
         value={chosen}
         disabled={saving !== null}
         onChange={(next) => void choose(next)}
         badgeLabel={t("In use")}
+        compact
       />
-    </SettingsSection>
+    </div>
   )
 }

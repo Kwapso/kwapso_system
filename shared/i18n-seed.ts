@@ -164,66 +164,6 @@ export const SEED: Catalogue = {
 
   /* ── The language switcher itself ────────────────────────────────────────── */
   Language: { de: "Sprache", es: "Idioma", ca: "Idioma" },
-  "Choose the language you want {brand} in.": {
-    de: "Wählen Sie die Sprache, in der Sie {brand} sehen möchten.",
-    es: "Elige el idioma en el que quieres ver {brand}.",
-    ca: "Tria l'idioma en què vols veure {brand}.",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
-  "What people type stays in the language they typed it.": {
-    de: "Was Menschen schreiben, bleibt in der Sprache, in der sie es geschrieben haben.",
-    es: "Lo que las personas escriben permanece en el idioma en que lo escribieron.",
-    ca: "El que la gent escriu es manté en l'idioma en què ho va escriure.",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
   "Language changed.": { de: "Sprache geändert.", es: "Idioma cambiado.", ca: "Idioma canviat." },
   "The knowledge base has nothing on this.": {
     de: "Die Wissensdatenbank hat dazu nichts.",
@@ -234,66 +174,6 @@ export const SEED: Catalogue = {
     de: "Das wurde nicht gespeichert. Bitte erneut versuchen.",
     es: "No se ha guardado. Inténtalo de nuevo.",
     ca: "No s'ha desat. Torna-ho a provar.",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
-  "{percent}% translated": {
-    de: "{percent}% übersetzt",
-    es: "{percent}% traducido",
-    ca: "{percent}% traduït",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
-  "The rest is shown in English.": {
-    de: "Der Rest wird auf Englisch angezeigt.",
-    es: "El resto se muestra en inglés.",
-    ca: "La resta es mostra en anglès.",
     
     
     
@@ -3954,9 +3834,6 @@ export const SEED: Catalogue = {
   "1 contact matches": { de: "1 Kontakt passt", es: "1 contacto coincide", ca: "1 contacte coincideix" },
   "1 entry matches": { de: "1 Eintrag passt", es: "1 entrada coincide", ca: "1 entrada coincideix" },
   "1 input matches": { de: "1 Angabe passt", es: "1 aportación coincide", ca: "1 aportació coincideix" },
-  "13px root, tight rows.": { de: "13px Grundgröße, enge Zeilen.", es: "13px base, filas ajustadas.", ca: "13px base, files ajustades." },
-  "15px root, the default in both doors.": { de: "15px Grundgröße, der Standard in beiden Apps.", es: "15px base, el valor predeterminado en ambas aplicaciones.", ca: "15px base, el valor predeterminat en totes dues aplicacions." },
-  "17px root, roomy rows.": { de: "17px Grundgröße, großzügige Zeilen.", es: "17px base, filas amplias.", ca: "17px base, files amples." },
   "A calm, light background that lets the work stand out.": { de: "Ein ruhiger, heller Hintergrund, der die Arbeit hervorhebt.", es: "Un fondo claro y tranquilo que hace destacar el trabajo.", ca: "Un fons clar i tranquil que fa destacar la feina." },
   "A colleague": { de: "Ein Kollege", es: "Un compañero", ca: "Un company" },
   "A company or a person you work with. Everything else hangs off one.": { de: "Ein Unternehmen oder eine Person, mit der Sie zusammenarbeiten. Alles andere hängt daran.", es: "Una empresa o una persona con la que trabajas. Todo lo demás cuelga de ahí.", ca: "Una empresa o una persona amb qui treballes. Tota la resta penja d'aquí." },
@@ -4024,7 +3901,6 @@ export const SEED: Catalogue = {
   "Everyone": { de: "Alle", es: "Todos", ca: "Tots" },
   "Filed as {type}.": { de: "Als {type} eingeordnet.", es: "Clasificado como {type}.", ca: "Classificat com a {type}." },
   "Filter by who logged it": { de: "Nach Erfasser filtern", es: "Filtrar por quién lo registró", ca: "Filtrar per qui ho ha registrat" },
-  "Follow the machine, switch at dusk.": { de: "Folgt dem System, wechselt in der Dämmerung.", es: "Sigue el sistema, cambia al anochecer.", ca: "Segueix el sistema, canvia al capvespre." },
   "Formatting": { de: "Formatierung", es: "Formato", ca: "Format" },
   "Give access to someone and they'll see this account's own work.": { de: "Geben Sie jemandem Zugriff und er sieht die Arbeit dieses Kontos.", es: "Dale acceso a alguien y verán el propio trabajo de esta cuenta.", ca: "Dona accés a algú i veurà el treball propi d'aquest compte." },
   "Given": { de: "Erteilt", es: "Concedido", ca: "Concedit" },
@@ -4097,7 +3973,6 @@ export const SEED: Catalogue = {
   "Nothing recorded for {name} yet.": { de: "Für {name} wurde noch nichts erfasst.", es: "Aún no hay nada registrado para {name}.", ca: "Encara no hi ha res enregistrat per a {name}." },
   "Nothing waiting.": { de: "Nichts wartet.", es: "Nada en espera.", ca: "Res en espera." },
   "Nothing's on the go right now. Any one of these is a good place to start.": { de: "Gerade ist nichts in Arbeit. Jeder dieser Punkte ist ein guter Anfang.", es: "Ahora mismo no hay nada en marcha. Cualquiera de estos es un buen punto de partida.", ca: "Ara mateix no hi ha res en marxa. Qualsevol d'aquests és un bon punt de partida." },
-  "Off-beige paper, charcoal ink.": { de: "Cremefarbenes Papier, kohlefarbene Tinte.", es: "Papel beige, tinta carbón.", ca: "Paper beix, tinta carbó." },
   "Open the recording": { de: "Aufzeichnung öffnen", es: "Abrir la grabación", ca: "Obrir la gravació" },
   "Paper": { de: "Papier", es: "Papel", ca: "Paper" },
   "Picked": { de: "Ausgewählt", es: "Elegido", ca: "Triat" },
@@ -4164,7 +4039,6 @@ export const SEED: Catalogue = {
   "Try fewer words, or clear the search to see everything.": { de: "Weniger Wörter versuchen, oder die Suche löschen, um wieder alles zu sehen.", es: "Prueba con menos palabras, o borra la búsqueda para ver todo.", ca: "Prova amb menys paraules, o esborra la cerca per veure-ho tot." },
   "Undo": { de: "Rückgängig machen", es: "Deshacer", ca: "Desfer" },
   "Undo the last one": { de: "Die letzte rückgängig machen", es: "Deshacer la última", ca: "Desfer l'última" },
-  "Unlit paper, off-beige type.": { de: "Unbeleuchtetes Papier, cremefarbene Schrift.", es: "Papel apagado, texto beige.", ca: "Paper apagat, text beix." },
   "Unnamed account": { de: "Unbenannter Kunde", es: "Cuenta sin nombre", ca: "Compte sense nom" },
   "Up to {limit}.": { de: "Bis zu {limit}.", es: "Hasta {limit}.", ca: "Fins a {limit}." },
   "View": { de: "Ansicht", es: "Vista", ca: "Vista" },
@@ -4410,23 +4284,6 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "No modules match what you're looking for.": { de: "Keine Module passen zu Ihrer Suche.", es: "Ningún módulo coincide con lo que buscas.", ca: "Cap mòdul coincideix amb el que busques." },
-  /* ── WHAT THE MEMBERS WALL LEAVES OUT (client, 2026-09-10) ────────────────
-   * *"we should not see cliets in team, no? thats for staff"*. Settings › Team
-   * now shows the agency's own staff, and this is the line that keeps the
-   * subtraction from being silent — how many client logins are not on the wall,
-   * and the screen that owns them. BOTH grammatical numbers are whole sentences
-   * with a hole in them (R28): a count glued to a translated noun is the one
-   * shape a translator cannot reorder, and German, Spanish and Catalan all want
-   * a different verb here.
-   *
-   * THE VOCABULARY IS THE SEED'S OWN. "Mandant" is this agency's word for a
-   * client, lifted from their legacy data at the top of this file, and
-   * "Portalzugang" / "Acceso al portal" / "Accés al portal" is the glossary's
-   * `portalAccess` exactly as it is seeded above — never "Portal login", which
-   * GLOSSARY_SYNONYMS bans by name. Seeded in all three so TRANSLATION_CEILING
-   * stays at 0/0/0 (R44 — the pin falls and never rises). */
-  "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.": { de: "{count} Mandanten-Login wird hier nicht angezeigt. Team zeigt Ihre eigenen Mitarbeitenden; der Portalzugang eines Mandanten steht auf dessen Kontakt.", es: "{count} inicio de sesión de cliente no se muestra aquí. Equipo es tu propio personal; el acceso al portal de un cliente está en su contacto.", ca: "{count} inici de sessió de client no es mostra aquí. Equip és el teu propi personal; l'accés al portal d'un client és al seu contacte." },
-  "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.": { de: "{count} Mandanten-Logins werden hier nicht angezeigt. Team zeigt Ihre eigenen Mitarbeitenden; der Portalzugang eines Mandanten steht auf dessen Kontakt.", es: "{count} inicios de sesión de cliente no se muestran aquí. Equipo es tu propio personal; el acceso al portal de un cliente está en su contacto.", ca: "{count} inicis de sessió de client no es mostren aquí. Equip és el teu propi personal; l'accés al portal d'un client és al seu contacte." },
 
   /* ── EVERY AUTOMATION IN THE BASE, ON ITS MODULE'S PAGE (client, 2026-09-11) ─
    * *"include absolutely all of those in settings by module. I want no

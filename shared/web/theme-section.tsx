@@ -1,30 +1,35 @@
 "use client"
 
-// LIGHT, DARK OR THE MACHINE'S OWN — three cards, shown not described, the
-// same visual treatment `SpineSection` and `ScaleSection` give their own
-// choices. This REPLACES `AppearanceSection`'s plain `<ModeToggle />` on the
-// Settings page only — the profile menu keeps the plain segmented control,
-// because that context wants the compact toggle, not a three-card grid.
+// LIGHT, DARK OR THE MACHINE'S OWN — a compact card row, beside the shared
+// Appearance preview rather than carrying its own picture.
 //
-// THE CARDS ARE THE KIT'S OWN. `AppearanceOptionGroup` and `ThemePicture` are
-// `compositions/screens/settings.tsx`'s own sub-primitives, lifted standalone
-// exactly as `SpineSection` lifts `AppearanceOptionGroup` and `SpinePicture`
-// — see that file's own header for the fuller reasoning.
+// PREVIEW-LED, CLIENT RULING 2026-09-14. She chose the preview-led layout of
+// four Settings · Appearance options a lane put in front of her: one live
+// `AppearancePreview` (kit v1.2.77) beside compact controls, replacing
+// twelve small option pictures with one shared preview that is always
+// current. This section used to draw its own `SettingsSection` box and a
+// `ThemePicture` on every card; both are gone — the box is now the shared
+// panel's (`shared/web/appearance-panel.tsx`) and the picture's job is the
+// live preview's.
 //
-// DEVICE-LOCAL, NOT ON THE PERSON'S ROW. `AppearanceSection`'s own header
-// said it plainly: "It is remembered on this device." So unlike
-// `SpineSection` and `ScaleSection` there is no `value`/`save` pair here —
+// DEVICE-LOCAL, NOT ON THE PERSON'S ROW — untouched by this pass.
+// `AppearanceSection`'s own header said it plainly: "It is remembered on
+// this device." So there is no `value`/`save` pair here, same as before —
 // this component owns its own state, seeded from `localStorage` and applied
 // straight to the document, using exactly the mechanism `ModeToggle` itself
 // documents as its public contract: the `data-theme` attribute on
 // `document.documentElement`, values `"light"` / `"dark"` (system removes
 // the attribute entirely), `documentElement.style.colorScheme` set
-// alongside it, and the `"theme"` `localStorage` key. Applying that
-// mechanism directly here — rather than steering a hidden `<ModeToggle
-// mode={...} />` through its controlled props — does not fork it: the file's
-// own comments state these exact tokens as the contract `tokens.css` §6/§7
-// depend on, so anything that keeps to them is a legal second writer, not a
-// second mechanism.
+// alongside it, and the `"theme"` `localStorage` key.
+//
+// `onResolvedChange` IS NEW. The shared preview beside this group takes an
+// ALREADY RESOLVED `"light" | "dark"` — `AppearancePreview`'s own header
+// states why it cannot take `"system"` itself: a picture has no clock. So
+// this file resolves "system" the one place that already knows how —
+// `matchMedia`, the same source `ModeToggle`'s own dusk-switch reads — and
+// reports the answer up, live: a `change` listener keeps the preview correct
+// across a system flip while the tab is open on "System", which nothing
+// before this pass needed to do.
 //
 // SSR-GUARDED THE SAME WAY `ModeToggle` GUARDS ITSELF. Its own
 // `getServerSnapshot` answers "system" for the server render and the
@@ -36,15 +41,10 @@
 import * as React from "react"
 
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AppearanceOptionGroup,
-  ThemePicture,
-  type AppearanceOption,
-} from "@shared/ui/compositions/screens/settings"
+import { AppearanceOptionGroup, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 import { type ThemeMode } from "@shared/ui/components/mode-toggle/mode-toggle"
 
 import { useLanguage } from "./language"
-import { SettingsSection } from "./settings-section"
 
 /** The one attribute name `ModeToggle`'s own header states tokens.css §6 and
  * §7 are written against. Transcribed rather than imported: the kit exports
@@ -88,30 +88,23 @@ function applyThemeMode(mode: ThemeMode): void {
   }
 }
 
-export function ThemeSection() {
+export function ThemeSection({
+  /** Told the resolved value ("light"/"dark", never "system") on mount,
+   * on every press, and again whenever the machine's own scheme flips while
+   * "System" is chosen — so the shared preview beside this group is never a
+   * frame behind it. */
+  onResolvedChange,
+}: {
+  onResolvedChange?: (resolved: "light" | "dark") => void
+}) {
   const { t } = useLanguage()
 
-  /* 26.05's own Appearance cards, verbatim — transcribed from settings.tsx's
-     THEMES, the words this app has not adopted the route to draw itself. */
+  // COMPACT: no picture, no per-option description — the live preview beside
+  // this group carries that argument now.
   const options: readonly AppearanceOption[] = [
-    {
-      value: "light",
-      label: t("Light"),
-      description: t("Off-beige paper, charcoal ink."),
-      picture: <ThemePicture tone="light" />,
-    },
-    {
-      value: "dark",
-      label: t("Dark"),
-      description: t("Unlit paper, off-beige type."),
-      picture: <ThemePicture tone="dark" />,
-    },
-    {
-      value: "system",
-      label: t("System"),
-      description: t("Follow the machine, switch at dusk."),
-      picture: <ThemePicture tone="system" />,
-    },
+    { value: "light", label: t("Light") },
+    { value: "dark", label: t("Dark") },
+    { value: "system", label: t("System") },
   ]
 
   // Seeded "system" for the server render and the hydrating first paint —
@@ -121,6 +114,21 @@ export function ThemeSection() {
   React.useEffect(() => {
     setChosen(readStoredMode())
   }, [])
+
+  // The resolved value the preview actually draws, kept correct across a
+  // live system flip while "System" is the resting choice.
+  const [systemDark, setSystemDark] = React.useState(false)
+  React.useEffect(() => {
+    if (chosen !== "system" || typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const mql = window.matchMedia("(prefers-color-scheme: dark)")
+    setSystemDark(mql.matches)
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mql.addEventListener("change", onChange)
+    return () => mql.removeEventListener("change", onChange)
+  }, [chosen])
+
+  const resolved: "light" | "dark" = chosen === "system" ? (systemDark ? "dark" : "light") : chosen
+  React.useEffect(() => onResolvedChange?.(resolved), [resolved, onResolvedChange])
 
   // Applies immediately: there is no server round trip for a device-local
   // preference, so the card's own selection state IS the source of truth
@@ -141,35 +149,21 @@ export function ThemeSection() {
       }
     }
     // There is no save round trip to wait on (see the header — this is
-    // device-local), but SpineSection and ScaleSection both confirm their
-    // own card presses with a toast, and a card that applies instantly with
+    // device-local), but the other two cards in this panel both confirm
+    // their own presses with a toast, and a card that applies instantly with
     // no feedback at all reads as broken next to those two.
     toast.success(t("Theme changed."))
   }
 
   return (
-    <SettingsSection title={t("Appearance")}>
-      {/* R67, AND NOW THE TITLE WITH IT — client, 2026-09-11: "ticket types
-       * should be on top of the searchbar inside the container without
-       * subtitle, make this. always". Said of a module settings page and
-       * applied here because it is the same shape: a heading and a sentence on
-       * the white above a box that could have held them.
-       *
-       * THIS SECTION WAS HALF-FIXED ON 2026-09-10 and this is the other half.
-       * That pass moved the option cards off `bg-card` — in LIGHT `--card`,
-       * `--background` and `--surface-raised` are all #FFFEF9, so they measured
-       * CONTRAST 1.000 against the page and were held up by their hairline
-       * alone — and left the title block standing on the white, because R67
-       * said prose was not content. The box is now `SettingsSection`'s, the
-       * heading is drawn INSIDE it, and the sentence is DELETED (it said what
-       * the title says). Soft paper on page measures 1.103 light / 1.079 dark;
-       * the raised option cards on it, 1.103 light / 1.111 dark. */}
+    <div className="flex flex-col gap-2">
+      <h3 className="text-muted-foreground text-micro uppercase">{t("Appearance")}</h3>
       <AppearanceOptionGroup
         options={options}
         value={chosen}
         onValueChange={choose}
         badgeLabel={t("In use")}
       />
-    </SettingsSection>
+    </div>
   )
 }
