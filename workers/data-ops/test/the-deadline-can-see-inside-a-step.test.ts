@@ -1,8 +1,8 @@
 // A DEADLINE THAT COULD NOT REACH THE ONLY CALL LONG ENOUGH TO NEED IT.
 //
-// `TURN_DEADLINE_MS` (150s) exists because of one measured outcome, recorded in
-// agent.ts's own header: "a 144-second one was killed by the platform
-// mid-request and the person received an EMPTY BUBBLE — no answer, no error, no
+// `TURN_DEADLINE_MS` (210s, and 150s when this was written) exists because of
+// one measured outcome, recorded in agent.ts's own header: "a 144-second one
+// was killed by the platform mid-request and the person received an EMPTY BUBBLE — no answer, no error, no
 // sign anything had happened. That is the worst outcome available: a failure
 // that looks like the assistant ignoring you."
 //

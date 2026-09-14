@@ -55,8 +55,28 @@ const MAX_STEPS = 12
  * A ceiling the app owns turns that into a sentence. It is generous on purpose —
  * a genuine four-step job with a document read in it is allowed to take a minute
  * and a half — and it is checked BETWEEN steps rather than interrupting one, so
- * the turn always ends on a whole tool call with its result recorded. */
-const TURN_DEADLINE_MS = 150_000
+ * the turn always ends on a whole tool call with its result recorded.
+ *
+ * ── 150s -> 210s ON 14 Sep 2026, AND THE NUMBER IS MEASURED ────────────────
+ *
+ * 52 model calls on one staging thread: median 9 SECONDS, p90 48, slowest 170.
+ * At the median a turn affords sixteen steps and the bound is irrelevant; the
+ * variance is the whole problem, and three calls in fifty-two took over a
+ * minute. The owner's five-part question needs five or six steps and hit two
+ * slow ones.
+ *
+ * WHY 210 AND NOT MORE. The app's bound exists to fire BEFORE the platform's,
+ * because the platform's exit is the empty bubble. We have one observation of
+ * where that is: the 14 Sep turn wrote its last row at +230s and died there.
+ * One observation is not a limit, so this stays comfortably under it rather
+ * than creeping up to it — 210 buys 40% more room and still stops first. If a
+ * turn is ever killed below 210, this comes DOWN, not the other way.
+ *
+ * IT COSTS NOTHING EXTRA. A step is one AI credit and MAX_STEPS is unchanged at
+ * twelve, so the most a turn can spend is exactly what it could spend before.
+ * This only lets a turn reach steps it had already paid for the right to take
+ * when the calls happen to be slow. */
+const TURN_DEADLINE_MS = 210_000
 
 /** The race's own loser, as an IDENTITY rather than an Error subclass: it is
  * compared with `===` in exactly one place and must never be mistaken for a
