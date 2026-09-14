@@ -210,6 +210,13 @@ export const TAB_ICONS: Record<string, IconName> = {
   members: "users-three",
   integrations: "key",
   choices: "git-commit",
+  // A MODULE SETTINGS PAGE'S OWN TWO TABS (client ruling, 2026-09-11/14: "on
+  // every module settings page, add two tabs: 1. Automations 2. Choice
+  // components"), module-settings-screen.tsx. `choices` above already carries
+  // the word this app's glossary uses for the second tab
+  // (`dropdownValues.term`, shared/glossary.ts); `automations` is new — the
+  // bolt is the ordinary shorthand for "this happens by itself".
+  automations: "lightning",
 }
 
 /** What a tab actually draws. Every tab resolves an icon now: the vocabulary

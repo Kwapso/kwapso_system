@@ -1015,6 +1015,18 @@ again, which is the only property that matters here.
   never look alike. Four censuses hold it: every branded send, every
   `triggers.crons` entry in your `wrangler.jsonc`, every export of a file whose
   whole job is acting by itself, and every flag read.
+- **R71 `no-default-subtitles`** — your module's settings page gets ONE
+  heading and no sentence explaining it underneath. "Generally, I don't like
+  subtitles, so stop putting them unless I ask" (client, 2026-09-14) is the
+  default now, not a per-screen choice: a prose element standing directly
+  under a heading (`<h1>`–`<h4>`, the kit's `Headline`) is a subtitle whether
+  or not you meant it as one. This costs you nothing if your section goes
+  through `shared/web/settings-section.tsx` or `<ToolbarRow title>` — neither
+  has anywhere to put one — but a hand-rolled heading with a sentence beside
+  it is exactly the shape the check reads. A field's own helper text, an empty
+  state's explanation, and R70's own required `helpText` are not subtitles and
+  are not caught (all three are real components, never a bare `<p>`); an
+  actual subtitle needs a reasoned `SUBTITLE_OK` line, not a workaround.
 
 **The words** (the ones that catch every new module, every time)
 

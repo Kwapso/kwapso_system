@@ -244,7 +244,15 @@ export function RolePanel({
                 })}
               </p>
               <p className="text-muted-foreground text-sm">
-                {t("Can edit {count} of {total} modules", {
+                {/* FOLLOWED THE COLUMN A SECOND TIME, 14 Sep 2026. The grid's
+                    Edit column renamed to Update (client: "rename edit to
+                    update"), and this sentence's whole argument, above, is that
+                    its word MIRRORS that column's label rather than inventing a
+                    fourth name for the same idea — so the word here moves with
+                    it. `summary.changes` still sums the identifier `edit`
+                    alongside `create`/`delete` (RightSet.edit, unrenamed, see
+                    roles-matrix.tsx); only the sentence a person reads changed. */}
+                {t("Can update {count} of {total} modules", {
                   count: String(summary.changes),
                   total: String(summary.total),
                 })}

@@ -206,15 +206,18 @@ const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
   delete: "delete",
 }
 
-/** THE FOUR MARKS ARE FIXED — S · C · E · D — AND THE WORDS ARE TRANSLATED.
+/** THE FOUR MARKS ARE FIXED — R · C · U · D — AND THE WORDS ARE TRANSLATED.
  *
  * The kit derives a slot's letter from the first character of its label unless a
  * capability names its own `initial`, and its doc says exactly why the prop
  * exists: "a language whose four words share an initial needs to choose its own
- * four marks". Two of ours do. Spanish is Ver · Crear · Editar · Eliminar and
- * Catalan is Veure · Crear · Editar · Eliminar — Editar and Eliminar collide on
- * E in both, which would put two identical letters in the same run and destroy
- * the one reading this drawing exists for.
+ * four marks". THE PAIR THAT COLLIDES MOVED, IT DID NOT DISAPPEAR. Until
+ * 14 Sep 2026 the danger was Spanish/Catalan Editar · Eliminar, both on E; now
+ * the right that used to read Edit reads Update, and German is the one that
+ * collides — Lesen · Erstellen · Aktualisieren · Löschen puts Lesen and
+ * Löschen on the same L. Whichever language it is this build, a fixed mark
+ * still means the four letters are never derived from whatever word a reader's
+ * own language happens to put there.
  *
  * So the marks are the four the client named ("I really need to see the create
  * letters", 2026-09-09) and they do not move between languages; the LEGEND under
@@ -224,7 +227,7 @@ function capabilities(t: (s: string) => string): PermissionCapability[] {
   return [
     // READ, NOT "SEE" — the client's ruling, 11 Sep 2026, and the glossary was
     // already on her side: `permission` is defined as "A single thing a role can
-    // do: READ, create, edit, or delete." Three of the four columns already said
+    // do: READ, create, update, or delete." Three of the four columns already said
     // the glossary's word and this one did not, so the screen that TEACHES people
     // what a right is was the one screen using a synonym for it. The kit's own
     // capability id stays `see` (it is vendored and hash-pinned, and the app maps
@@ -232,7 +235,31 @@ function capabilities(t: (s: string) => string): PermissionCapability[] {
     // upstream: the kit's default label for this capability says "See" too.
     { id: "see", label: t("Read"), initial: "R" },
     { id: "create", label: t("Create"), initial: "C" },
-    { id: "edit", label: t("Edit"), initial: "E" },
+    // UPDATE, NOT "EDIT" — the client's ruling, 14 Sep 2026: "for permissions,
+    // rename edit to update (this way we have the full CRUD concept)". Same
+    // shape as the READ ruling above and the same boundary: the glossary's
+    // `permission` entry now reads "...create, UPDATE, or delete", the kit's
+    // own capability id stays `edit` (vendored, hash-pinned — `RIGHT_TO_KIT`
+    // maps it either way) and so does the app's own `RightSet.edit` and every
+    // `requireRight`/`TOOL_GATES` pair that names it — a rename there is a
+    // migration and a door change for zero benefit, the same ruling CLAUDE.md
+    // already records for `help`/Tickets and for `is_default`/Protected. Only
+    // the WORD a person reads moves. Owed upstream: the kit's default label
+    // for this capability still says "Edit" too (same debt as "See" above,
+    // same fix — a kit release, not a local patch).
+    //
+    // "EDIT" DOES NOT JOIN THE R34 DENY-LIST. It competes with nothing here:
+    // the word is ordinary, correctly-used English on dozens of unrelated
+    // sentences — the pencil-icon action on every record screen ("Edit"),
+    // "Edit name and logo", "Edit this role" two files over in
+    // `role-panel.tsx` — none of which mean this permission column, all of
+    // which mean "open this one record and change it". R34 is deliberately
+    // narrow: a word earns a line only when, in this app, it can mean nothing
+    // else — the way "teammate" could only ever mean Member. "Edit" fails that
+    // test on its face, and banning it would need a GLOSSARY_SYNONYM_OK line
+    // for nearly every one of those sentences, which is the shape the
+    // deny-list exists to avoid, not the shape it exists to hold.
+    { id: "edit", label: t("Update"), initial: "U" },
     { id: "delete", label: t("Delete"), initial: "D" },
   ]
 }

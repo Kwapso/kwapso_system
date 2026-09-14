@@ -655,25 +655,22 @@ export function SettingsScreen({
                  is a change to R63 and R67 together, not to this panel.
 
                  R67 IS UNTOUCHED AND STRICTER. This branch's body still stands
-                 on paper; the caption came INSIDE the box with it, which is
-                 where amendment 4 (2026-09-11) put a sentence that would
-                 otherwise be its own body on the page ground. */
+                 on paper.
+
+                 THE CAPTION IS GONE — client, 2026-09-14, over this exact
+                 sentence: *"In settings, modules: delete this. Generally, I
+                 don't like subtitles, so stop putting them unless I ask."*
+                 What it said is now R71's own job: *"The modules with
+                 something to set. Each row opens the same page as the gear
+                 on that module's own screen, and a module with nothing to
+                 set is not listed"* is R61, verbatim, restated in prose
+                 under a wall it was never asked to explain — the same
+                 paraphrase shape settings-section.tsx's header found in all
+                 fourteen module-settings descriptions ("every one of them
+                 is a paraphrase of its own title"). A rule proven by a
+                 machine does not also need to be narrated on the page. */
               <Card>
                 <CardContent className="flex min-w-0 flex-col gap-4">
-                  {/* THE SENTENCE THAT SAYS WHAT THE LIST IS FOR. It says three
-                      things and each is load-bearing: the list holds the modules
-                      with something to set (so a short list is the answer, not a
-                      truncation), a row is the same page as that module's gear (so
-                      a reader who found it the other way is not looking at a
-                      second copy), and a module with nothing to set is absent (her
-                      own ruling, *"Only the ones with something to set"*, said out
-                      loud rather than left to be inferred from a gap). */}
-                  <p className="text-muted-foreground text-sm">
-                    {t(
-                      "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed."
-                    )}
-                  </p>
-
                   {/* THE ROW AND THE WALL IN ONE UNGAPPED COLUMN — R49. The gap
                       between a toolbar and what it sits above is ONE number and
                       the row pays it itself (`mb-[var(--toolbar-content-gap)]` on
@@ -683,11 +680,15 @@ export function SettingsScreen({
                       double-spend R49 was written about, and it is invisible to
                       R49's own census here, which reads the nearest open
                       `<div>`/`<section>` and stops at a COMPONENT wrapper — see
-                      this lane's report. So the pair gets its own column with no
-                      gap of its own, and the `CardContent`'s `gap-4` is spent where it
-                      belongs: between the caption and the collection. The same
-                      shape `contact-panels.tsx` already uses round its three
-                      rows. */}
+                      this lane's report. So the pair still gets its own inner
+                      column, unspent by `gap-4`, which the caption this file
+                      used to hold below `<Card>`'s open tag was the last thing
+                      that number reached (R71 removed it, 2026-09-14) — the
+                      panel's own `gap-4` is now unclaimed rather than wrong,
+                      and left rather than pulled, because a single-child flex
+                      `gap` spends nothing and the wrapper still keeps this
+                      pair's own layout independent of whatever `CardContent`
+                      grows next to it. */}
                   <div className="flex min-w-0 flex-col">
                     {/* THE TOOLBAR — client, 11 Sep 2026: *"to modules in
                         settings, also add toolbar / no add buton / sort by -
@@ -860,7 +861,27 @@ export function SettingsScreen({
                       emptyLabel={t("No modules match what you're looking for.")}
                     >
                       {shownModules.map(({ page, sections }) => (
-                        <Card key={page.segment} variant="raised">
+                        <Card
+                          key={page.segment}
+                          variant="raised"
+                          // A CARD THAT IS A LINK ACKNOWLEDGES THE POINTER —
+                          // client, 2026-09-14, over this exact wall: "we are
+                          // missing a hover state for the cards. For example,
+                          // in settings modules, I would need to see a hover
+                          // when I hover over a card."
+                          //
+                          // NOT `interactive` — see `members-gallery.tsx`'s
+                          // identical note beside its own wall: that prop also
+                          // grants `motion-hover-lift` (motion.css §13), and
+                          // this is a WALL, the shape `app-tiles.tsx` already
+                          // argued down to a fill-only wash for the same
+                          // reason ("a grid of them lifting is the page of
+                          // reacting boxes UI-RULEBOOK C2 exists to prevent").
+                          // `--accent` is the same token `interactive` would
+                          // have reached for; `motion-hover` is the kit's own
+                          // transition class for it. Nothing here is invented.
+                          className="hover:bg-accent motion-hover"
+                        >
                           <InAppLink href={`/settings/${page.segment}`} className="block">
                             <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
                               <Icon

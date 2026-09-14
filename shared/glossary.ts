@@ -31,7 +31,23 @@ export const GLOSSARY = {
   // are not members — the contact who raised a ticket, the name on an account.
   member: { term: "Member", def: "A person on your team." },
   role: { term: "Role", def: "What a member is allowed to see and do." },
-  permission: { term: "Access right", def: "A single thing a role can do: read, create, edit, or delete." },
+  // THE FOURTH WORD MOVED (client's ruling, 14 Sep 2026): "for permissions,
+  // rename edit to update (this way we have the full CRUD concept)". Read ·
+  // Create · Update · Delete is the standard four, named the standard way —
+  // the same rename the roles matrix already carries once, 11 Sep 2026, when
+  // "See" became "Read" and this very sentence was the glossary's side of the
+  // argument for it ("the glossary was already on her side").
+  //
+  // THE IDENTIFIER STAYS `edit`. `RightSet.edit` (shared/types.ts), every
+  // `requireRight`/`gated` pair, every `TOOL_GATES` string and the four
+  // permission columns in the database are unchanged — a rename there is a
+  // migration and a door change for zero benefit, the same ruling this file
+  // already records for `help`/Tickets (CLAUDE.md) and for
+  // `is_default`/Protected two entries down. Only the word a person reads
+  // moves, here and on the roles matrix (`web/components/team/roles-matrix.tsx`,
+  // which carries the fuller account of the column, the kit's own still-"Edit"
+  // default owed upstream, and why "edit" does not join R34's deny-list).
+  permission: { term: "Access right", def: "A single thing a role can do: read, create, update, or delete." },
   invite: { term: "Invite", def: "An email asking someone to join your team in a role you choose." },
   revoke: { term: "Revoke", def: "Cancel an invite before it's accepted." },
   // ONE VERB FOR SWITCHING A RECORD OFF (R6, decided 2026-08-19). The word

@@ -249,6 +249,21 @@ export function MembersGallery({
 }) {
   const t = useT()
   const [query, setQuery] = React.useState("")
+  // A→Z OR Z→A ON THE WALL, and it is the client's own later ruling applied to
+  // the identical shape rather than a preference of this lane's. This gallery
+  // carried a `TOOLBAR_SORT_EXEMPT` line until 2026-09-11 arguing that "a sort
+  // picker offering a single option over a bounded, alphabetical wall is a
+  // control that answers nothing" — and on 2026-09-10 she asked for exactly
+  // that control, on exactly that shape, one tab over: *"sort by - name"* on
+  // Settings › Modules, a bounded alphabetical wall of twelve cards. The
+  // argument the entry made is answered by `SortControl` itself: it draws a
+  // DIRECTION button beside the field unless a caller passes
+  // `showDirection: false`, and `ToolbarRow` never does, so one field is still
+  // a real choice between two orders. One field and not two for the same
+  // reason the Modules wall has one: a person's NAME is the row here, and the
+  // other three facts a card carries (the mark, the role chip, the email) are
+  // either that name again or the Role FILTER one slot to the left.
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
   const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [invitesOpen, setInvitesOpen] = React.useState(false)
@@ -314,16 +329,22 @@ export function MembersGallery({
   // SEARCHED FIRST, THEN NARROWED — the same order every collection screen in
   // the app applies, so the facet's own count describes what the search left.
   const q = query.trim().toLowerCase()
-  const matching = staff.filter((m) => {
-    const role = facetValues.role
-    if (role && m.roleTitle !== role) return false
-    if (!q) return true
-    return (
-      staffFullName(m).toLowerCase().includes(q) ||
-      m.email.toLowerCase().includes(q) ||
-      m.roleTitle.toLowerCase().includes(q)
-    )
-  })
+  const matching = staff
+    .filter((m) => {
+      const role = facetValues.role
+      if (role && m.roleTitle !== role) return false
+      if (!q) return true
+      return (
+        staffFullName(m).toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        m.roleTitle.toLowerCase().includes(q)
+      )
+    })
+    // ORDERED LAST, over our OWN copy — `.filter()` above already returns a
+    // fresh array, so this never reorders `members` under the caller that
+    // handed it to us. Same seam and same order of operations as the Modules
+    // wall on `web/components/screens/settings-screen.tsx`.
+    .sort((a, b) => staffFullName(a).localeCompare(staffFullName(b)) * (sortDir === "asc" ? 1 : -1))
 
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
     facets,
@@ -399,7 +420,30 @@ export function MembersGallery({
           }
         />
       ) : (
-        <>
+        /* R49 — THE ROW'S OWN NUMBER, AND NOBODY ELSE'S HAND ON IT. This column
+           is GAPLESS on purpose, and that is the whole reason it is a box at all
+           rather than the fragment it replaced. `TeamPanel` (team-panel.tsx) is
+           a `flex flex-col gap-4` container, and a fragment paints nothing — so
+           the toolbar, the invites disclosure, the subtraction sentence and the
+           wall were all DIRECT children of that column, and the row was pushed
+           off the first thing under it by 16px ON TOP OF the
+           `mb-[var(--toolbar-content-gap)]` it already pays as its own trailing
+           margin. Two hands on one number, which is exactly the drift R49 was
+           written to end — and invisible to that law until 11 Sep 2026, because
+           its call-site census read `<div>` and `<section>` wrappers and this
+           one is a COMPONENT.
+
+           The three things BELOW the row still want the panel's rhythm between
+           EACH OTHER, so they keep it in a column of their own further down —
+           the same nesting `client-org-panel.tsx` uses for its heading/row pair,
+           read the other way round.
+
+           AND IT HAS TO HOLD THE WALL, not the row alone. `PINNED_TOOLBAR` is
+           `position: sticky`, which is bounded by its own parent box: a wrapper
+           around the toolbar by itself would leave it nothing to stick through.
+           R63 measured that exact failure on the tickets Dashboard — a 32px
+           stuck range, i.e. no pin at all. */
+        <div className="flex min-w-0 flex-col">
           <ToolbarRow
             // R50 — the collection's RAW count, before any search or filter
             // narrows it, folded together with the loading state so an
@@ -421,6 +465,15 @@ export function MembersGallery({
               )
             }
             filters={(membersLoading || staff.length > 0) && filterPill}
+            // R53 — the row builds the control; this hands it the answers. See
+            // `sortDir` above for the ruling that put it here.
+            sort={{
+              options: [{ value: "name", label: t("Name") }],
+              value: "name",
+              onValueChange: () => undefined,
+              direction: sortDir,
+              onDirectionChange: setSortDir,
+            }}
             toolbarPanel={(membersLoading || staff.length > 0) && filterPanel}
             actions={
               canSeeInvites && (
@@ -479,218 +532,246 @@ export function MembersGallery({
             }
           />
 
-          {/* THE INVITES, IN PLACE — the button above reveals them BESIDE the
-              wall rather than opening /t/<teamId>/invites, because "not taken
-              anywhere else" is the whole instruction this tab was rebuilt on.
-              It is an EXPAND, not a new surface: the same shape the client
-              ruled for the filter panel one slot along ("more like expand
-              behaviour rather than open-a-new-one behaviour", 2026-09-03).
+          {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE THREE AND NOWHERE ELSE
+              — `gap-4`, the number `TeamPanel` spends on its children, which
+              they were getting from it directly until this column took it over.
+              The row above is not in here, so R49's one gap is the only thing
+              between it and the invites block. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            {/* THE INVITES, IN PLACE — the button above reveals them BESIDE the
+                wall rather than opening /t/<teamId>/invites, because "not taken
+                anywhere else" is the whole instruction this tab was rebuilt on.
+                It is an EXPAND, not a new surface: the same shape the client
+                ruled for the filter panel one slot along ("more like expand
+                behaviour rather than open-a-new-one behaviour", 2026-09-03).
 
-              AND IT IS NO LONGER READ-ONLY, 2026-09-10. This comment used to
-              end: "revoking one is still the Invites section's own job, and
-              adding a destructive action to a disclosure she has not seen would
-              be inventing a decision rather than building one." The first half
-              had stopped being true the moment the section it named lost its
-              door — nothing in the app links to /t/<teamId>/invites, so the
-              "job" belonged to a screen nobody could open. And the second half
-              had it backwards: leaving the act out was not restraint, it was
-              the capability going missing. A list of pending invites you cannot
-              revoke is the shape of the bug, not a smaller surface.
+                AND IT IS NO LONGER READ-ONLY, 2026-09-10. This comment used to
+                end: "revoking one is still the Invites section's own job, and
+                adding a destructive action to a disclosure she has not seen would
+                be inventing a decision rather than building one." The first half
+                had stopped being true the moment the section it named lost its
+                door — nothing in the app links to /t/<teamId>/invites, so the
+                "job" belonged to a screen nobody could open. And the second half
+                had it backwards: leaving the act out was not restraint, it was
+                the capability going missing. A list of pending invites you cannot
+                revoke is the shape of the bug, not a smaller surface.
 
-              WHAT IS ACTUALLY NEW HERE IS ONE ROW CONTROL AND NO NEW SURFACE:
-              the warning is the app's existing `ConfirmAction` (R59 — a yes/no
-              question about something that exists is a centred `AlertDialog`),
-              and `Prohibit` is the app's one revoke glyph. */}
-          {invitesOpen && canSeeInvites && (
-            <div className="flex flex-col gap-2">
-              <h3 className="text-muted-foreground text-micro uppercase">
-                {t("Invites waiting to be accepted")}
-              </h3>
-              {invitesQ.loading && pending.length === 0 ? (
-                <Skeleton variant="list" lines={2} />
-              ) : pending.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t("No invites are waiting.")}</p>
-              ) : (
-                <List
-                  surface="none"
-                  /* OFF-BEIGE, NOT SOFT PAPER — this line said
-                     `bg-surface-panel` while the section had no ground of its
-                     own, which was right then and is the 1.000 bug now that the
-                     section IS a soft-paper panel. RULES.md §2.6 in one edit: a
-                     block takes the OTHER paper tone from the band it stands
-                     in. Measured on the panel: 1.103 light, 1.111 dark. */
-                  className="rounded-[var(--radius)] bg-card"
-                  items={pending.map((i) => ({
-                    id: i.id,
-                    initials: i.email.slice(0, 1).toUpperCase(),
-                    title: i.email,
-                    subtitle: i.roleTitle,
-                    // REVOKE, ON THE ROW ITSELF. Icon-only with the sentence as
-                    // its accessible name and tooltip — the app's own narrow-row
-                    // convention (CLAUDE.md's action-icon mapping: revoke =
-                    // `Prohibit`), and the same treatment `RolePanel`'s two acts
-                    // take. Drawn only for `team_members:delete`; the door
-                    // refuses anybody else anyway, and a control that always
-                    // fails is worse than no control.
-                    trailing: canRemoveMembers ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`${t("Revoke invite")} — ${i.email}`}
-                            onClick={() =>
-                              setConfirm({ kind: "invites.revoke", inviteId: i.id })
-                            }
-                          >
-                            <Prohibit className="text-destructive size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("Revoke invite")}</TooltipContent>
-                      </Tooltip>
-                    ) : undefined,
-                  }))}
-                />
-              )}
-            </div>
-          )}
+                WHAT IS ACTUALLY NEW HERE IS ONE ROW CONTROL AND NO NEW SURFACE:
+                the warning is the app's existing `ConfirmAction` (R59 — a yes/no
+                question about something that exists is a centred `AlertDialog`),
+                and `Prohibit` is the app's one revoke glyph. */}
+            {invitesOpen && canSeeInvites && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-muted-foreground text-micro uppercase">
+                  {t("Invites waiting to be accepted")}
+                </h3>
+                {invitesQ.loading && pending.length === 0 ? (
+                  <Skeleton variant="list" lines={2} />
+                ) : pending.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">{t("No invites are waiting.")}</p>
+                ) : (
+                  <List
+                    surface="none"
+                    /* OFF-BEIGE, NOT SOFT PAPER — this line said
+                       `bg-surface-panel` while the section had no ground of its
+                       own, which was right then and is the 1.000 bug now that the
+                       section IS a soft-paper panel. RULES.md §2.6 in one edit: a
+                       block takes the OTHER paper tone from the band it stands
+                       in. Measured on the panel: 1.103 light, 1.111 dark. */
+                    className="rounded-[var(--radius)] bg-card"
+                    items={pending.map((i) => ({
+                      id: i.id,
+                      initials: i.email.slice(0, 1).toUpperCase(),
+                      title: i.email,
+                      subtitle: i.roleTitle,
+                      // REVOKE, ON THE ROW ITSELF. Icon-only with the sentence as
+                      // its accessible name and tooltip — the app's own narrow-row
+                      // convention (CLAUDE.md's action-icon mapping: revoke =
+                      // `Prohibit`), and the same treatment `RolePanel`'s two acts
+                      // take. Drawn only for `team_members:delete`; the door
+                      // refuses anybody else anyway, and a control that always
+                      // fails is worse than no control.
+                      trailing: canRemoveMembers ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`${t("Revoke invite")} — ${i.email}`}
+                              onClick={() =>
+                                setConfirm({ kind: "invites.revoke", inviteId: i.id })
+                              }
+                            >
+                              <Prohibit className="text-destructive size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t("Revoke invite")}</TooltipContent>
+                        </Tooltip>
+                      ) : undefined,
+                    }))}
+                  />
+                )}
+              </div>
+            )}
 
-          {/* WHAT THIS WALL LEAVES OUT, SAID OUT LOUD — "we should not see cliets
-              in team, no? thats for staff" (client, 2026-09-10). A collection
-              that silently drops rows is worse than one that explains itself,
-              so the subtraction is a sentence rather than an absence: how many
-              client logins are not here, and the screen that owns them. Drawn
-              only when there ARE some, because a line about zero people is
-              noise on every team that has never granted portal access.
+            {/* WHAT THIS WALL LEAVES OUT, SAID OUT LOUD — "we should not see cliets
+                in team, no? thats for staff" (client, 2026-09-10). A collection
+                that silently drops rows is worse than one that explains itself,
+                so the subtraction is a sentence rather than an absence: how many
+                client logins are not here, and the screen that owns them. Drawn
+                only when there ARE some, because a line about zero people is
+                noise on every team that has never granted portal access.
 
-              THE WHOLE SENTENCE WITH A HOLE IN IT (R28), in both grammatical
-              numbers — never a count glued to a translated noun, which is the
-              one shape a translator cannot reorder. */}
-          {clientCount > 0 && (
-            <p className="text-muted-foreground text-xs">
-              {clientCount === 1
-                ? t(
-                    "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.",
-                    { count: String(clientCount) }
-                  )
-                : t(
-                    "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.",
-                    { count: String(clientCount) }
-                  )}
-            </p>
-          )}
+                THE WHOLE SENTENCE WITH A HOLE IN IT (R28), in both grammatical
+                numbers — never a count glued to a translated noun, which is the
+                one shape a translator cannot reorder. */}
+            {clientCount > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {clientCount === 1
+                  ? t(
+                      "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.",
+                      { count: String(clientCount) }
+                    )
+                  : t(
+                      "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.",
+                      { count: String(clientCount) }
+                    )}
+              </p>
+            )}
 
-          {membersLoading && members.length === 0 ? (
-            <Skeleton variant="list" lines={4} />
-          ) : (
-            <CardGrid
-              // FLUID, NOT THE THREE-COLUMN LADDER — "more members in each row"
-              // (client, 2026-09-09). `fluid` is the kit's own
-              // `repeat(auto-fit, minmax(…, 1fr))`, and its doc names this
-              // exact case: "Use this where the cell has a natural minimum — a
-              // figure, a mark and a line — and the fixed ladder would leave
-              // one card stranded on its own row." A member card has one; see
-              // MIN_CARD above for how it was measured.
-              fluid
-              minItemWidth={MIN_CARD}
-              label={t("Members")}
-              empty={matching.length === 0}
-              emptyLabel={
-                staff.length === 0
-                  ? t("No members yet.")
-                  : t("No members match what you're looking for.")
-              }
-            >
-              {matching.map((m) => (
-                <Card key={m.userId} variant="raised">
-                  {/* THE WHOLE CELL IS THE DOOR, AND IT IS A REAL ANCHOR (R37)
-                      — "when clickingon card in team, open full screen the
-                      profile" (client, 2026-09-10). It was a bare `<button>`
-                      opening a slide-in; a destination with an address is a
-                      link, so middle-click, copy-address and a screen reader's
-                      link list all work, and only the plain left click is
-                      intercepted into the one shell. `block` because an anchor
-                      is inline and the card's own inset is what should decide
-                      the width. */}
-                  <InAppLink
-                    href={`/t/${teamId}/members/${m.userId}`}
-                    className="block"
+            {membersLoading && members.length === 0 ? (
+              <Skeleton variant="list" lines={4} />
+            ) : (
+              <CardGrid
+                // FLUID, NOT THE THREE-COLUMN LADDER — "more members in each row"
+                // (client, 2026-09-09). `fluid` is the kit's own
+                // `repeat(auto-fit, minmax(…, 1fr))`, and its doc names this
+                // exact case: "Use this where the cell has a natural minimum — a
+                // figure, a mark and a line — and the fixed ladder would leave
+                // one card stranded on its own row." A member card has one; see
+                // MIN_CARD above for how it was measured.
+                fluid
+                minItemWidth={MIN_CARD}
+                label={t("Members")}
+                empty={matching.length === 0}
+                emptyLabel={
+                  staff.length === 0
+                    ? t("No members yet.")
+                    : t("No members match what you're looking for.")
+                }
+              >
+                {matching.map((m) => (
+                  <Card
+                    key={m.userId}
+                    variant="raised"
+                    // A CARD THAT IS A LINK ACKNOWLEDGES THE POINTER — client,
+                    // 2026-09-14: "we are missing a hover state for the cards.
+                    // For example, in settings modules, I would need to see a
+                    // hover when I hover over a card." This wall is the same
+                    // shape (a real anchor filling the whole cell, R37 above).
+                    //
+                    // NOT `interactive` — that prop also grants
+                    // `motion-hover-lift` (motion.css §13), and this is a WALL:
+                    // many cards, one glance. `app-tiles.tsx` already argued the
+                    // same shape down to a fill-only wash for the identical
+                    // reason ("a grid of them lifting is the page of reacting
+                    // boxes UI-RULEBOOK C2 exists to prevent"), and it is the
+                    // kit's own token either way — `--accent`, the same wash
+                    // `interactive` would have reached for (card.tsx: "Hover,
+                    // where a card is a target, is `--accent`"), just without
+                    // the shadow. `motion-hover` is motion.css's own transition
+                    // class for a fill swap; nothing here is hand-rolled.
+                    className="hover:bg-accent motion-hover"
                   >
-                  <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
-                    {/* TWO LETTERS, THROUGH THE TWO SEAMS THAT ALREADY EXIST.
-                        `RecordMark` is the app's one person mark (R35's third
-                        rung: a picture, else a type glyph, else an initial) and
-                        `personInitials` is the app's one two-letter avatar mark
-                        — R54's own note keeps it explicitly out of the
-                        first-name rule, "an initial is a MARK, not a name".
-                        `RecordMark`'s bare `name` fallback is ONE letter, which
-                        is right on a dense list row and wrong on the biggest
-                        thing on the card, so the pair is handed over rather
-                        than a third helper invented. The picture still wins
-                        where a member has one, so the day this data grows a
-                        photograph the same slot carries it.
+                    {/* THE WHOLE CELL IS THE DOOR, AND IT IS A REAL ANCHOR (R37)
+                        — "when clickingon card in team, open full screen the
+                        profile" (client, 2026-09-10). It was a bare `<button>`
+                        opening a slide-in; a destination with an address is a
+                        link, so middle-click, copy-address and a screen reader's
+                        link list all work, and only the plain left click is
+                        intercepted into the one shell. `block` because an anchor
+                        is inline and the card's own inset is what should decide
+                        the width. */}
+                    <InAppLink
+                      href={`/t/${teamId}/members/${m.userId}`}
+                      className="block"
+                    >
+                    <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                      {/* TWO LETTERS, THROUGH THE TWO SEAMS THAT ALREADY EXIST.
+                          `RecordMark` is the app's one person mark (R35's third
+                          rung: a picture, else a type glyph, else an initial) and
+                          `personInitials` is the app's one two-letter avatar mark
+                          — R54's own note keeps it explicitly out of the
+                          first-name rule, "an initial is a MARK, not a name".
+                          `RecordMark`'s bare `name` fallback is ONE letter, which
+                          is right on a dense list row and wrong on the biggest
+                          thing on the card, so the pair is handed over rather
+                          than a third helper invented. The picture still wins
+                          where a member has one, so the day this data grows a
+                          photograph the same slot carries it.
 
-                        `band`, NOT `tile` — "bigger images" (client,
-                        2026-09-10). It is the fourth of `RecordMark`'s four
-                        NAMED sizes (56, and 72 from `sm:` up) rather than a
-                        `size-*` class written here: that file's own header is
-                        explicit that a size handed in as a class name puts two
-                        Tailwind size rules on one box and is how a fifth and
-                        sixth size arrive without anybody deciding on one. The
-                        card's floor is 12rem and its inset is 32, so 72 sits
-                        inside 160 with room to spare. */}
-                    <RecordMark
-                      picture={m.imageUrl}
-                      mark={personInitials(m.firstName, m.lastName)}
-                      name={staffFullName(m)}
-                      shape="round"
-                      size="band"
-                    />
-                    {/* NAME AND SURNAME — her 2026-09-09 correction to the
-                        first-name rule of 2026-09-07. Through the one naming
-                        seam (R54), never `first + " " + last` here; the two
-                        rulings and why they do not conflict are written up in
-                        shared/staff-name.ts on `staffFullName` itself.
+                          `band`, NOT `tile` — "bigger images" (client,
+                          2026-09-10). It is the fourth of `RecordMark`'s four
+                          NAMED sizes (56, and 72 from `sm:` up) rather than a
+                          `size-*` class written here: that file's own header is
+                          explicit that a size handed in as a class name puts two
+                          Tailwind size rules on one box and is how a fifth and
+                          sixth size arrive without anybody deciding on one. The
+                          card's floor is 12rem and its inset is 32, so 72 sits
+                          inside 160 with room to spare. */}
+                      <RecordMark
+                        picture={m.imageUrl}
+                        mark={personInitials(m.firstName, m.lastName)}
+                        name={staffFullName(m)}
+                        shape="round"
+                        size="band"
+                      />
+                      {/* NAME AND SURNAME — her 2026-09-09 correction to the
+                          first-name rule of 2026-09-07. Through the one naming
+                          seam (R54), never `first + " " + last` here; the two
+                          rulings and why they do not conflict are written up in
+                          shared/staff-name.ts on `staffFullName` itself.
 
-                        THE KIT'S OWN TITLE PART, not a `<span>` (R65). "Above"
-                        is a claim about position, and a title hand-rolled into
-                        a span has none a census can read — this card was the
-                        proof: a chip-position check over the old markup would
-                        have reported a perfectly ordered card while looking at
-                        nothing at all. `text-sm` carries the wall's own step,
-                        exactly as the span did; the kit's 18/500 is chapter
-                        13's figure for a full card, not for a cell. */}
-                    {/* THE CHIP AND THE NAME ARE ONE BLOCK, AND THE CHIP IS ON
-                        TOP OF IT (R65) — "chip on top of title" (client,
-                        2026-09-10, and the second time she has said it: the
-                        Kanban card got the same instruction on 2026-09-07). The
-                        role is what SORTS a wall of people, so it is read
-                        BEFORE the name it qualifies; under the name it is
-                        qualifying something already read.
+                          THE KIT'S OWN TITLE PART, not a `<span>` (R65). "Above"
+                          is a claim about position, and a title hand-rolled into
+                          a span has none a census can read — this card was the
+                          proof: a chip-position check over the old markup would
+                          have reported a perfectly ordered card while looking at
+                          nothing at all. `text-sm` carries the wall's own step,
+                          exactly as the span did; the kit's 18/500 is chapter
+                          13's figure for a full card, not for a cell. */}
+                      {/* THE CHIP AND THE NAME ARE ONE BLOCK, AND THE CHIP IS ON
+                          TOP OF IT (R65) — "chip on top of title" (client,
+                          2026-09-10, and the second time she has said it: the
+                          Kanban card got the same instruction on 2026-09-07). The
+                          role is what SORTS a wall of people, so it is read
+                          BEFORE the name it qualifies; under the name it is
+                          qualifying something already read.
 
-                        IMMEDIATELY above it, not at the top of the card. The
-                        kit's own kanban card carries the argument for why, in
-                        the words of the same ruling: above the title a chip is
-                        the title's OVERLINE, and an overline separated from
-                        its title by everything else in the stack stops
-                        introducing it. So the two share one box at `gap-1`
-                        while the card's own stack stays at `gap-2`, and the
-                        FACE still leads the card — which is what "bigger
-                        images" asked for in the same sentence. */}
-                    <span className="flex flex-col items-center gap-1">
-                      <Badge>{m.roleTitle}</Badge>
-                      <CardTitle className="text-sm">{staffFullName(m)}</CardTitle>
-                    </span>
-                    <span className="text-muted-foreground w-full truncate text-xs">
-                      {m.email}
-                    </span>
-                  </CardContent>
-                  </InAppLink>
-                </Card>
-              ))}
-            </CardGrid>
-          )}
-        </>
+                          IMMEDIATELY above it, not at the top of the card. The
+                          kit's own kanban card carries the argument for why, in
+                          the words of the same ruling: above the title a chip is
+                          the title's OVERLINE, and an overline separated from
+                          its title by everything else in the stack stops
+                          introducing it. So the two share one box at `gap-1`
+                          while the card's own stack stays at `gap-2`, and the
+                          FACE still leads the card — which is what "bigger
+                          images" asked for in the same sentence. */}
+                      <span className="flex flex-col items-center gap-1">
+                        <Badge>{m.roleTitle}</Badge>
+                        <CardTitle className="text-sm">{staffFullName(m)}</CardTitle>
+                      </span>
+                      <span className="text-muted-foreground w-full truncate text-xs">
+                        {m.email}
+                      </span>
+                    </CardContent>
+                    </InAppLink>
+                  </Card>
+                ))}
+              </CardGrid>
+            )}
+          </div>
+        </div>
       )}
 
       <InviteDialog

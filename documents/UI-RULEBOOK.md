@@ -45,7 +45,7 @@ the concrete implementation, and its evidence.
 - [7. Typography](#7-typography) (T1 to T8)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S6)
 - [9. Mobile](#9-mobile) (M1 to M6)
-- [10. Copy](#10-copy) (W1 to W12)
+- [10. Copy](#10-copy) (W1 to W13)
 - [11. Record type glyphs](#11-record-type-glyphs) (G1 to G6)
 - [12. Density: the glance budget](#12-density-the-glance-budget-n1-to-n12) (N1 to N12)
 - [13. The kit, and what counts as using it](#13-the-kit-and-what-counts-as-using-it-u1-to-u3) (U1 to U3)
@@ -930,6 +930,27 @@ rows can do nothing. That is precisely how a lone create button kept escaping �
 censuses ask whether `search` is PRESENT, never whether `actions` agrees with it. See
 [K11](#k11-an-empty-collection-draws-no-toolbar-at-all-not-even-the-add-button), which now
 answers that question for the whole row.
+
+**And the half that does not stand on a toolbar at all (11 Sep 2026).** Every clause above
+keys on a **tag the fix itself puts there** — a recipe, a `<ToolbarRow>`, a
+`<CollectionHeading>` — so a wall of records built by hand is invisible to this rule by
+construction. Settings › Modules shipped twelve cards and no search box under a green
+build, and became visible to the rule the next day only because the client asked for the
+toolbar and the screen gained a `<ToolbarRow>`. **A law you enter by being fixed is a law
+that could never have caught you.** So the fourth subject is the **wall**: a component that
+renders the kit's `CardGrid` or the kit's `List` over a `.map()` has declared itself a wall
+or a register of records, and must draw a search somewhere in itself — a `<ToolbarRow>`, a
+`<PagedFind>`, a `<SearchInput>`, or (on the portal) `useDoorSearch`. A wall that **pages**
+cannot be excused at all; a bounded one is excused by a `path#Component` line in
+`TOOLBAR_EXEMPT`, keyed per component so the next wall in that file cannot inherit a reason
+written about a different collection.
+
+**What it deliberately cannot see, and why that is the right trade.** A hand-rolled `<ul>`
+is not a wall to this rule, and two real growing registers in the app are drawn that way.
+No non-fuzzy predicate reaches them — the fuzzy one files a conversation thread and an
+activity feed as data views, and **a false offender in a build gate is worse than a wall
+the rule stays quiet about.** If you are building a list of records, reach for the kit part
+and you will be told about the search box on the day you ship.
 
 **Law.** [R48](../RULES.md) (`toolbar-shows-search`).
 
@@ -1918,6 +1939,39 @@ around.
 
 **Law.** [R44](../RULES.md) (`translation-ceiling`).
 
+### W13: no subtitle under a heading, unless she asked
+
+**The rule.** *"In settings, modules: delete this. Generally, I don't like subtitles, so
+stop putting them unless I ask."* (2026-09-14, over Settings › Modules' own intro
+sentence). She had already said the narrower version twice the same week — *"in ticket
+settings (or any other module) no subtilte"* (10 Sep) and *"ticket types should be …
+without subtitle, make this. always"* (11 Sep) — and both landed as one-screen fixes. This
+is the wider version: a sentence explaining what a heading means, drawn directly beneath
+it, is off by default everywhere in the app.
+
+**What counts.** A prose element (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>`) standing
+as the very next thing after a heading (`<h1>`–`<h4>`, the kit's `Headline`) — the shape
+[C12](#c12-nothing-stands-on-the-bare-page-ground) already names as the "title block", read
+here for a different question: not where it stands, but whether it should be there at all.
+
+**What is not a subtitle.** A form field's own helper text ([F](#6-forms-and-dialogs) —
+rendered through the kit's `Field`, which has no heading beside it, a label rather than a
+title). An empty state's explanation (`CollectionEmptyState`, `PortalEmpty`). The reason a
+switched-off automation cannot be turned on, which a settings page is required to show —
+see BUILD-A-MODULE.md's automations step. All three answer a different question than "what
+is this section for", and all three are real components rather than a bare tag, which is
+also how the check tells them apart.
+
+**The way out.** "Unless I ask" is part of the ruling. A reasoned, rot-checked exemption —
+`SUBTITLE_OK` in `shared/rules/registry.ts` — names the file and why, the same discipline
+[C12](#c12-nothing-stands-on-the-bare-page-ground)'s own `UNCONTAINED_SECTION_OK` uses.
+
+**Not the same law as C12.** C12 asks where a titled section's content stands; a sentence
+inside its own title block is exempt from C12 either way. This asks whether the sentence
+should exist at all — a boxed subtitle passes C12 and fails this one.
+
+**Law.** [R71](../RULES.md) (`no-default-subtitles`).
+
 ---
 
 ## 11. Record type glyphs
@@ -2744,7 +2798,7 @@ library, not a synthesised weight in the host.
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
-| 10. Copy | W1 to W12 (12) |
+| 10. Copy | W1 to W13 (13) |
 | 11. Record type glyphs | G1 to G6 (6) |
 | 12. Density: the glance budget | N1 to N12 (12) |
 | 13. The kit, and what counts as using it | U1 to U3 (3) |
@@ -2776,7 +2830,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R39 | [G1](#g1-a-record-type-carries-a-glyph), [U1](#u1-every-part-of-the-kit-is-either-reached-or-has-a-written-reason) | R62 | [K15](#k15-the-two-zeros-look-the-same-the-add-button-is-the-only-difference) |
 | R63 | [K14](#k14-the-toolbar-stays-on-top-while-the-rows-scroll-under-it-and-the-pin-is-the-rows) | R64 | [L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place) |
 | R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
-| R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | | |
+| R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R71 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
 
 ### The seven files that carry most of it
 
