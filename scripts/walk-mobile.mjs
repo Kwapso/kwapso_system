@@ -20,7 +20,9 @@
  *       `overflow: hidden` ancestor) is not a defect and is skipped — an avatar's
  *       initials inside a clipped circle used to report here.
  *   3 · IS ANYTHING FIXED SITTING ON THE BOTTOM NAV, and does the bar have a
- *       gutter at both ends.
+ *       gutter at both ends. Nav labels are measured the same way as text
+ *       elements: deliberate ellipsis truncation is skipped, so a one-line label
+ *       with `text-overflow: ellipsis` is not a defect.
  *   4 · DO THE NAV LABELS FIT IN EVERY LANGUAGE THE APP SPEAKS. Measured with a
  *       canvas in the bar's own computed font, because the labels are `flex-1`
  *       and a fifth of 375 is 75px: "Mein Unternehmen" needs 112.
@@ -213,12 +215,28 @@ const PROBE = (labelsByLang) => {
     }
     return false
   }
+  /** Is this element deliberately truncated with ellipsis? If text-overflow is
+   * set to ellipsis, or the element clips itself, or an ancestor clips it, then
+   * overflow is intentional — not a defect. This applies to both text elements
+   * in the page. */
+  const isDeliberateTruncation = (el) => {
+    const cs = getComputedStyle(el)
+    if (cs.textOverflow === "ellipsis" || cs.overflow !== "visible" || cs.overflowX !== "visible") return true
+    return clippedByAncestor(el)
+  }
+  /** Is this nav label deliberately truncated with ellipsis? Unlike general text
+   * elements, nav labels should only be exempted if text-overflow is explicitly
+   * set to ellipsis, not just for any clipping. */
+  const hasEllipsisTruncation = (el) => {
+    const cs = getComputedStyle(el)
+    return cs.textOverflow === "ellipsis"
+  }
   const cut = []
   for (const el of document.querySelectorAll("a,button,span,p,h1,h2,h3,td,th,label,li")) {
     const cs = getComputedStyle(el)
     if (cs.display === "none" || cs.visibility === "hidden") continue
-    if (cs.textOverflow === "ellipsis" || cs.overflow !== "visible" || cs.overflowX !== "visible") continue
-    if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && !clippedByAncestor(el)) {
+    if (isDeliberateTruncation(el)) continue
+    if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
       cut.push(`${el.tagName.toLowerCase()}["${(el.textContent || "").trim().slice(0, 22)}"] ${el.scrollWidth}>${el.clientWidth}`)
     }
   }
@@ -303,7 +321,13 @@ const PROBE = (labelsByLang) => {
     }
     // Is anything ACTUALLY cut in the bar right now?
     const barCut = [...nav.querySelectorAll("a,button")]
-      .map((el) => { const sp = el.querySelector("span") ?? el; return sp.scrollWidth > sp.clientWidth + 1 ? `"${sp.textContent.trim()}"` : null })
+      .map((el) => {
+        const sp = el.querySelector("span") ?? el
+        if (sp.scrollWidth > sp.clientWidth + 1 && !hasEllipsisTruncation(sp)) {
+          return `"${sp.textContent.trim()}"`
+        }
+        return null
+      })
       .filter(Boolean)
 
     bar = {
