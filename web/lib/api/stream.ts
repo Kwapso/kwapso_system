@@ -20,6 +20,7 @@ import type {
  * settles the turn. Keys are terse + stable — the wire contract data-ops emits. */
 export type AgentStreamEvent =
   | { t: "text"; d: string }
+  | { t: "thought"; d: string }
   | { t: "step_start"; tool: string; summary: string; ids?: Record<string, string> }
   | { t: "step_end"; tool: string; ok: boolean; summary: string; error?: string }
   /** WHAT THE ASSISTANT JUST READ — the answer seam's own citations and passages

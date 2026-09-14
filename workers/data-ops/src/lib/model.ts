@@ -104,7 +104,16 @@ export interface Model {
   /** Stream the turn: fire onText for each text delta as it arrives, and return the
    *  FULL reply (accumulated text + any tool calls) when the turn ends — same shape as
    *  complete(), so the loop treats a streamed turn identically once it finishes. */
-  stream?(messages: ChatMessage[], tools: ToolSpec[], onText: (delta: string) => void): Promise<ModelReply>
+  stream?(
+    messages: ChatMessage[],
+    tools: ToolSpec[],
+    onText: (delta: string) => void,
+    /** The model's hidden reasoning, as it arrives — the same words `reasoning`
+     *  on the reply accumulates, handed over live so a person can watch a long
+     *  step think instead of watching nothing. Optional: a caller with no strip
+     *  to fill passes nothing and the words still land on the reply. */
+    onThought?: (delta: string) => void
+  ): Promise<ModelReply>
 }
 
 /* --------------------------------- Claude --------------------------------- */
@@ -497,7 +506,8 @@ class WorkersAiModel implements Model {
   async stream(
     messages: ChatMessage[],
     tools: ToolSpec[],
-    onText: (delta: string) => void
+    onText: (delta: string) => void,
+    onThought?: (delta: string) => void
   ): Promise<ModelReply> {
     const res = (await this.env.AI.run(
       this.name as never,
@@ -506,7 +516,7 @@ class WorkersAiModel implements Model {
     )) as unknown as Response
     if (!(res instanceof Response)) throw modelHttpError(502, "the AI binding streamed no response")
     if (!res.ok) throw modelHttpError(res.status, await res.text().catch(() => ""))
-    return parseOpenAiStream(res.body, onText)
+    return parseOpenAiStream(res.body, onText, onThought)
   }
 }
 
@@ -515,7 +525,8 @@ type ToolBuild = { id: string; name: string; json: string }
 
 export async function parseOpenAiStream(
   body: ReadableStream<Uint8Array> | null,
-  onText: (delta: string) => void
+  onText: (delta: string) => void,
+  onThought?: (delta: string) => void
 ): Promise<ModelReply> {
   const reader = body?.getReader()
   if (!reader) throw modelHttpError(502, "the model streamed no body")
@@ -569,7 +580,10 @@ export async function parseOpenAiStream(
       // not an answer. gpt-oss puts the same slice under both names, so one is
       // read, never both.
       const thought = delta.reasoning_content ?? delta.reasoning
-      if (thought) reasoning += thought
+      if (thought) {
+        reasoning += thought
+        onThought?.(thought)
+      }
       for (const [i, tc] of (delta.tool_calls ?? []).entries()) {
         const at = tc.index ?? i
         const build = calls.get(at) ?? { id: "", name: "", json: "" }

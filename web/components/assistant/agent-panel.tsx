@@ -21,7 +21,8 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { Check, ClockCounterClockwise, Plus, X } from "@shared/ui/foundations/icons"
+import { CaretDown, Check, ClockCounterClockwise, Plus, X } from "@shared/ui/foundations/icons"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@shared/ui/components/collapsible/collapsible"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -980,23 +981,53 @@ export function AgentPanel({
               messages={chat.items
                 .filter((it) => !(it.role === "assistant" && it.content === ""))
                 .map((it: AgentChatItem) => {
-                  if (it.role === "tool")
+                  if (it.role === "tool") {
+                    const mark =
+                      it.status === "pending" ? (
+                        <Spinner size="sm" />
+                      ) : it.status === "failed" ? (
+                        <X className="text-destructive size-3.5" aria-hidden />
+                      ) : (
+                        <Check className="text-success size-3.5" aria-hidden />
+                      )
                     return {
                       id: it.id,
                       role: "assistant" as const,
-                      content: (
-                        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-                          {it.status === "pending" ? (
-                            <Spinner size="sm" />
-                          ) : it.status === "failed" ? (
-                            <X className="text-destructive size-3.5" aria-hidden />
-                          ) : (
-                            <Check className="text-success size-3.5" aria-hidden />
-                          )}
-                          {it.actionLabel}
-                        </span>
-                      ),
+                      content:
+                        it.thought === undefined ? (
+                          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                            {mark}
+                            {it.actionLabel}
+                          </span>
+                        ) : (
+                          // THE MODEL'S THINKING, ONE PRESS AWAY — the same
+                          // disclosure the turn's sources use (agent-sources.tsx),
+                          // closed by default because it is scratch work: rough,
+                          // unedited, and not the answer. It streams while the
+                          // step runs, which is the point — a long step used to
+                          // look dead for a minute at a time.
+                          // No `[contain:inline-size]` here, unlike the sources
+                          // strip: that one sits inside an answer with prose to
+                          // give the bubble a width, this one IS the bubble's
+                          // whole content. Closed, the row is as wide as its
+                          // label; open, the notes widen it up to the kit's own
+                          // cap and wrap there. Measured on staging, 14 Sep
+                          // 2026: with containment the open notes were squeezed
+                          // into a column as wide as the words "Working it out".
+                          <Collapsible>
+                            <CollapsibleTrigger className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs whitespace-nowrap">
+                              {mark}
+                              {it.actionLabel}
+                              <CaretDown className="motion-disclosure-marker size-3.5" aria-hidden />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <p className="text-muted-foreground mt-1 text-xs">{t("Rough notes, not the answer.")}</p>
+                              <p className="text-muted-foreground mt-1 text-xs whitespace-pre-wrap [overflow-wrap:anywhere]">{it.thought}</p>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ),
                     }
+                  }
                   // WHAT THIS TURN READ (Law R23), in the kit's ruled shape.
                   // `evidence` is app data — a knowledge citation with a kind, a
                   // record path and the passage's own words — and the kit's

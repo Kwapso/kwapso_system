@@ -1451,9 +1451,13 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // source in the base whole) and past it the cut speaks WHERE IT HAPPENS.
   // Accepted debt in the same change that added them, per this law's own
   // sanctioned move.
-  de: 39,
-  es: 39,
-  ca: 39,
+  // RAISED 39 -> 41 in all three on 14 Sep 2026: the assistant's thinking strip
+  // ("Working it out" / "Rough notes, not the answer."), which streams the
+  // model's own reasoning into a disclosure a person may open. Two sentences,
+  // English-only until the next translation pass.
+  de: 41,
+  es: 41,
+  ca: 41,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
