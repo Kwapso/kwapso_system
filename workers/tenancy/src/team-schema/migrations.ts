@@ -371,7 +371,8 @@ CREATE INDEX idx_help_stakeholders_help ON help_stakeholders (help_id);
     // files, the agent-built PLAN (targets, mappings, normalization, references,
     // dependency order), and the per-row REPORT — all as JSON here. Per-file parsing
     // reuses the single-target session engine; this table is the batch shell.
-    // Creator-scoped like data_import_sessions (a batch belongs to who started it).
+    // Creator-scoped the same way 0004's now-retired single-target session table
+    // was (a batch belongs to who started it) — see 0087, which drops that table.
     version: "0006_import_batches",
     sql: `
 CREATE TABLE data_import_batches (
@@ -5944,6 +5945,71 @@ ALTER TABLE accounts ADD COLUMN name_narrows_alone INTEGER NOT NULL DEFAULT 0;
     version: "0086_the_fourth_verb_is_update_not_edit",
     sql: `
 ALTER TABLE role_permissions RENAME COLUMN can_edit TO can_update;
+`,
+  },
+  {
+    // THE FIRST IMPORT SESSION TABLE GOES — found by a read-only audit,
+    // 14 Sep 2026, while this repo was being checked over for use as a
+    // template. Nobody ruled on this one; the table simply stopped being the
+    // thing the code meant two and a half months before anyone noticed.
+    //
+    // ── WHAT THIS TABLE WAS ─────────────────────────────────────────────────
+    //
+    // `data_import_sessions` (0004_modules, 2026-06-23) was the ORIGINAL
+    // single-target CSV import: one uploaded file, one target table, three
+    // stages held as columns on one row (validate → extract/preview →
+    // confirm). `data_import_batches` (0006_import_batches, 2026-07-04, eleven
+    // days later) replaced it with the AGENTIC multi-file import
+    // (AGENTIC-IMPORT.md) — several files, an agent-built plan across several
+    // targets, a per-row report — and every door, lib and screen moved onto
+    // the new shape at the same time. The old table was never dropped when
+    // the new one landed; it was simply the thing nothing pointed at any
+    // more.
+    //
+    // ── THIS IS A DROP, FOR 0077/0078's REASONS, AND THEY HOLD ─────────────
+    //
+    //   1. DEACTIVATE-NEVER-DELETE IS ABOUT A ROW IN A LIVING FEATURE. By
+    //      today there is no reader left: no type, no lib, no door, no tool,
+    //      no screen, no cache key — and unlike 0077/0078, no code ever
+    //      referred to this table by any of its own identifiers either
+    //      (`ImportSession` / `import_session` / `importSession` appear
+    //      nowhere in the repo).
+    //   2. THE AUDIT SURVIVES ANYWAY. What ran through this table between
+    //      23 Jun and 4 Jul lives in `activity`, untouched here. What is
+    //      dropped is the current-state table, not the record of what
+    //      happened.
+    //   3. PRECEDENT, NOW A THIRD TIME. 0025 dropped four retired-module
+    //      tables; 0077 and 0078 dropped the two rate cards. This is the
+    //      same shape, for the same reason, over a table nobody had to rule
+    //      on retiring because nothing was ever built to read it back.
+    //
+    // ── PROVED DEAD TWO WAYS, NOT ONE (grep absence alone is not proof) ────
+    //
+    //   · A whole-repo grep for the table's name returns exactly three hits:
+    //     the `CREATE TABLE` below, the comment beside 0006's own table
+    //     (fixed in this same migration's file, see below) naming it only by
+    //     analogy, and one more analogy comment in
+    //     `workers/data-ops/src/lib/import-batch.ts` (flagged for a follow-up
+    //     there — this file does not own it).
+    //   · Reading `import-batch.ts`'s SQL literals directly (not trusting the
+    //     grep alone): every SELECT/INSERT/UPDATE in the import pipeline
+    //     names `data_import_batches`. Not one names `data_import_sessions`.
+    //
+    // ── UNLIKE 0077/0078, THIS ONE NEEDS NO DEPLOY ORDERING ────────────────
+    //
+    // 0077 and 0078 dropped tables a worker was serving THAT MORNING, so the
+    // order (worker first, then this) was load-bearing. Nothing here has
+    // named `data_import_sessions` since 4 Jul 2026 — no currently-deployed
+    // worker reads or writes it, at any point in the rolling deploy. This
+    // migration is safe to apply whenever the estate reaches it.
+    //
+    // `IF EXISTS`, matching every DROP in this ledger: a team database
+    // rebuilt from this file today never had the table under this name at
+    // all only if some future edit removes the CREATE above — until then
+    // every existing team has it, and this simply retires it.
+    version: "0087_the_first_import_shape_is_the_one_nothing_reads",
+    sql: `
+DROP TABLE IF EXISTS data_import_sessions;
 `,
   },
 ]

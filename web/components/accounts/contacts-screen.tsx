@@ -91,10 +91,12 @@
 // The BY COMPANY tab. It was the 31 Aug arrangement of this screen and she has
 // replaced it with a table; two of one collection's arrangements plus her two
 // tabs would be a strip of three she did not ask for. `contacts-by-company.tsx`
-// is NOT deleted — it is a working component with its own suite, and the
-// grouping is the obvious second view if she wants one back — but nothing on a
-// screen renders it today, and saying so here is what stops the next reader
-// assuming it is live.
+// WAS kept unmounted for a time — "a working component, the obvious second
+// view if she wants one back" — but nothing ever wired it to a screen, and an
+// unreached component defended only by a comment is exactly what
+// web/test/orphan-components.test.ts exists to catch once the component's own
+// dedicated test stopped counting as a mount (14 Sep 2026). Deleted, with
+// UI-GAPS.md #24 closed as abandoned rather than reopened as a live TODO.
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"

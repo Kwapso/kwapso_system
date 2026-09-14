@@ -731,12 +731,18 @@ const FOOTER_TO_BOTTOM =
  * `secondary` variant, since that is the one variant that reads
  * `--badge-quiet-fill` at all (every coloured, destructive, status-dot or
  * outline badge draws its fill from its own token, untouched). It wins over
- * `web/app/layout.tsx`'s `<body>` repoint (also aimed at the same now-dead
- * literal class, so currently inert too — flagged separately, out of this
- * row's scope) by ordinary CSS custom-property inheritance once that rule is
- * fixed the same way: this row's rebind sits on a descendant closer to the
- * badge than `<body>`, and the nearer declaration wins with no importance
- * war needed. The dot pill's own rule below is unrelated — `[data-dot]` is
+ * `web/app/layout.tsx`'s `<body>` repoint by ordinary CSS custom-property
+ * inheritance: this row's rebind sits on a descendant closer to the badge
+ * than `<body>`, and the nearer declaration wins with no importance war
+ * needed. **FIXED 2026-09-14** — `<body>`'s own repoint was aimed at the
+ * same now-dead literal class this paragraph already names (the kit resync
+ * that turned `secondary` into a custom property with a fallback, rather
+ * than the `bg-surface-quiet` class this repoint's old selector matched),
+ * so it painted nothing for two weeks; caught fixing Settings › Team's
+ * chips against the client's identical colour ruling on that screen, and
+ * repointed the same way this paragraph already prescribed — rebind the
+ * property on `<body>`, not a class match. The dot pill's own rule below is
+ * unrelated — `[data-dot]` is
  * an attribute this file's own JSX sets, not a kit-generated class, so it
  * never goes stale the way the class match did.
  *

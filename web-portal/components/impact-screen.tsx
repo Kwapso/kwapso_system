@@ -339,8 +339,24 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
             the axis are on for exactly that: a bar going the wrong way has to be
             readable as such. */}
         {appChart.length > 1 && (
-          // A chart is one picture, not a collection of rows — bare (N6).
-          <AppSavingsChart rows={appChart} label={t("Hours a month")} />
+          // R67 (2026-09-14) — CONTAINED, the same ruling this file already
+          // took above for "What you bought": N6 ("a block earns a container
+          // only when it holds a collection of two or more rows or a form of
+          // two or more fields") would call a single chart bare on purpose,
+          // but this file's own history is the reason that argument does not
+          // win here a second time — its OWN comment made an identical
+          // "this one doesn't need a container" case for the heading above,
+          // in writing, and the client overruled it: "a screen that argues
+          // itself out of a law in its own comment is the pattern five
+          // rulings in three days have each overturned somewhere else …
+          // ONE rule with no local exceptions is what she has been buying
+          // all week" (`UNCONTAINED_SECTION_OK`'s own account of this file).
+          // The corrected R67 census (narrower `isOverlay`, so
+          // `AppSavingsChart` is no longer mistaken for a modal) reaches
+          // this body for the first time and finds exactly that shape again.
+          <div className="rounded-[var(--radius)] bg-surface-panel p-4">
+            <AppSavingsChart rows={appChart} label={t("Hours a month")} />
+          </div>
         )}
 
         <Accordion type="multiple" className="rounded-[var(--radius)] bg-surface-panel px-4">

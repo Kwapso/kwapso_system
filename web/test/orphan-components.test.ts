@@ -14,26 +14,37 @@ import { join, relative } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { PARKED } from "@shared/rules/registry"
 
 const WEB = join(__dirname, "..")
 const PORTAL = join(WEB, "..", "web-portal")
 // BOTH front doors' import universes — round two asked why the census stopped
 // at one door when the orphan it was built for could just as well have been a
 // portal file.
-const ROOTS = ["components", "app", "lib", "test"].map((d) => join(WEB, d))
+//
+// "test" IS NOT ONE OF THESE ROOTS, and that omission is load-bearing rather
+// than an oversight (fixed 14 Sep 2026). A component's OWN dedicated spec file
+// importing it is not evidence the APP mounts it — it is evidence the
+// component has a unit test — and counting it as a "mount" is exactly how
+// `web/components/accounts/contacts-by-company.tsx` passed this census while
+// genuinely unreached: nothing in web/app, web/components, web/lib or
+// shared/web renders `<ContactsByCompany>` (`contacts-screen.tsx`'s own
+// `module === "contacts"` dispatch renders the flat `<ContactsScreen>`
+// instead), but `web/test/contacts-by-company.test.tsx` imports and renders it
+// directly, and with "test" in ROOTS that import alone satisfied `mounted()`.
+// Dropping "test" here closes the gap: a component reachable ONLY from its own
+// test is now exactly as unmounted as one reachable from nothing at all, which
+// is what this census exists to catch. (dead-exports.test.ts's separate
+// census, one level down at the EXPORT rather than the FILE, deliberately
+// keeps tests as users — a private helper's own unit test is a real reader of
+// the binding; it is this file's question, "does the app mount the file", that
+// a test file cannot answer for.)
+const ROOTS = ["components", "app", "lib"].map((d) => join(WEB, d))
 ROOTS.push(join(WEB, "..", "shared", "web"))
-ROOTS.push(join(PORTAL, "components"), join(PORTAL, "app"), join(PORTAL, "lib"), join(PORTAL, "test"))
+ROOTS.push(join(PORTAL, "components"), join(PORTAL, "app"), join(PORTAL, "lib"))
 
-/** Components that are unmounted ON PURPOSE, each with the decision that parks
- * it. Rot-checked below: a line whose file has gained an importer (or lost its
- * file) turns the build red, so the list records real decisions only. */
-const PARKED: Record<string, string> = {
-  "tickets/mail-reply-dialog":
-    "the only place either front end ever holds a Gmail draft id. Parked, not dead: " +
-    "the reachable-screens exemption for POST /google/gmail/trash names this file as " +
-    "where a person's own 'bin it' belongs the day a screen opens it — delete this " +
-    "line and the dialog together with that one.",
-}
+// PARKED moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line 13's
+// promise made true). Imported above.
 
 describe("every component file is mounted, or parked with a reason", () => {
   const files = ROOTS.flatMap((r) => sourceFiles(r, { extensions: [".ts", ".tsx"] }))

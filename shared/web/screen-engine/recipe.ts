@@ -207,8 +207,13 @@ export interface ScreenRecipe {
   /** detail: the header + the tab set. */
   header?: ScreenHeader
   tabs?: RecipeTab[]
-  /** list: how the rows render + the collection (search/filter/sort/pages). */
-  display?: "table" | "list" | "cards" | "gallery"
+  /** list: how the rows render + the collection (search/filter/sort/pages).
+   * "cards" was removed 14 Sep 2026: `screen-renderer.tsx`'s branch for it was
+   * dead code (`knowledgeListRecipe`, web/lib/screens.ts, was the only recipe
+   * that ever declared it, and `collection-content.tsx` routes the knowledge
+   * module to a bespoke component before `ScreenRenderer` is reached), so it
+   * was deleted rather than left as a value nothing renders. */
+  display?: "table" | "list" | "gallery"
   collection?: CollectionConfig
   /** list (display: "list"): the List surface. Omit (or "card") for the default
    * bordered surface; "none" = flat, for when the host wraps the collection in

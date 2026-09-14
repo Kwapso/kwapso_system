@@ -699,10 +699,13 @@ anybody could reach.
 
 **Two gaps, both deliberate and both the owner's to close.**
 
-1. **Staging enforces no AI ceiling at all.** `AGENT_NO_DAILY_CAP: "true"` in the staging
-   block of content, tenancy and data-ops. The flag exists on purpose so testing is never
-   refused, and `credits-invariant.test.ts` keeps it off production. The in-rule fix is an
-   **account-level neuron alarm** in Cloudflare, not removing the flag.
+1. **Staging enforces a higher AI ceiling than production.** The old escape hatch,
+   `AGENT_NO_DAILY_CAP`, is gone from every spender's config — removed from staging
+   2026-09-06, and the `content` worker's copy carries the date it left. Staging now ships a
+   real `AGENT_FREE_DAILY` ceiling in each spender's own `wrangler.jsonc` (`tenancy`,
+   `content`, `data-ops`): high enough that ordinary testing never meets it, nowhere near an
+   unattended loop. Never set `AGENT_NO_DAILY_CAP` on any environment; `credits-invariant.test.ts`
+   fails the build if any vars block, production or staging, carries it.
 2. **Spend is visible in the app only in UNITS**, never in neurons or money. Changing that
    is a UI change.
 

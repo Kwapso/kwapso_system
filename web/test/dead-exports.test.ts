@@ -38,20 +38,13 @@ import { join, relative } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { DEAD_EXPORT_OK } from "@shared/rules/registry"
 
 const WEB = join(__dirname, "..")
 const ROOT = join(WEB, "..")
 
-/** Exported values that nothing names, each with the decision that keeps it.
- * Rot-checked both ways below: an entry whose export has gained a user, or whose
- * export no longer exists, turns the build red — so the list can only shrink. */
-const DEAD_EXPORT_OK: Record<string, string> = {
-  "web/components/tickets/mail-reply-dialog.tsx::MailReplyDialog":
-    "the file is PARKED in web/test/orphan-components.test.ts with the decision that parks " +
-    "it — it is the only place either front end holds a Gmail draft id, kept for the day a " +
-    "screen opens it. An unmounted file has an unimported export by construction; this line " +
-    "is that same decision seen from one level down, and both go together or neither does.",
-}
+// DEAD_EXPORT_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 /** Every app-owned source file: both front doors minus their app-router folders,
  * shared/ minus the pinned kit, and each worker's src/. */
@@ -91,8 +84,31 @@ function exportedValues(source: string): string[] {
 describe("every exported value is named by something", () => {
   const declared = appSources().flatMap((f) => exportedValues(f.source).map((name) => ({ rel: f.rel, name })))
   // The whole corpus as one string per file, minus THIS file — a register that
-  // vouched for its own entries would report a clean sweep for ever.
-  const others = allSources().filter((f) => f.rel !== relative(ROOT, __filename))
+  // vouched for its own entries would report a clean sweep for ever. (Tried
+  // removing this exclusion instead, 14 Sep 2026, reasoning that `declared`
+  // already structurally excludes every test file so no export could ever be
+  // DECLARED here — true, but irrelevant: this file's own placeholder
+  // no-such-export string, a few lines below, would then match itself in
+  // `others` and silently break the positive control that proves the matcher
+  // can see a dead export at all. Reverted.)
+  //
+  // ALSO MINUS shared/rules/registry.ts, added the same day the deny-lists
+  // this repo's tests used to declare locally moved INTO it. Every exemption
+  // list keyed by an export's own name — `DEAD_EXPORT_OK` itself is the
+  // clearest case — spells the excused identifier out loud as its OBJECT KEY
+  // ("web/components/tickets/mail-reply-dialog.tsx::MailReplyDialog"), so once
+  // registry.ts is a candidate "elsewhere" file, the exemption entry that
+  // EXCUSES an orphan starts reading as the reason it is not one — a name is
+  // "used" because the law book quotes it while explaining why nothing else
+  // uses it. Circular, and it would have made every future DEAD_EXPORT_OK line
+  // silently self-defeating the moment it was written. Registry data is
+  // already exempt from THIS census by its own header ("a registry read only
+  // by the law that enforces it… calling those dead would make this census
+  // argue with the repo rather than check it"); this closes the matching
+  // false-negative on the READING side of the same file.
+  const others = allSources().filter(
+    (f) => f.rel !== relative(ROOT, __filename) && f.rel !== "shared/rules/registry.ts"
+  )
 
   it("finds a real corpus on both sides (a blind census reads exactly like a clean one)", () => {
     expect(declared.length, "no exported values found — the declaration scan has gone blind").toBeGreaterThan(500)

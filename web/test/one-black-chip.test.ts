@@ -46,6 +46,7 @@ import { describe, expect, it } from "vitest"
 import { join } from "node:path"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { INVERSE_BADGE_OK, REF_AS_STRING_OK, type RefAsString } from "@shared/rules/registry"
 
 const REPO_ROOT = join(__dirname, "..", "..")
 
@@ -79,17 +80,8 @@ const INVERSE_BADGE = /<Badge\b[^>]*?variant="inverse"/g
 const REF_INTERPOLATED = /\$\{[^}]*\.ref\b[^}]*\}/
 const REF_JOINED = /\.ref\b[\s\S]*?" · "|" · "[\s\S]*?\.ref\b/
 
-/** EVERY SURFACE THAT LEGITIMATELY BUILDS A BLACK CHIP OF ITS OWN, with the
- * reason it is not a record's reference. One line, and it should stay that
- * way. */
-const INVERSE_BADGE_OK: Record<string, string> = {
-  "web/components/process/process-map.tsx":
-    "NOT A REFERENCE. The two badges there are a LEGEND KEY — the short code " +
-    "(`A`, `B`) standing in front of each side's label on a comparison bar, " +
-    "paired with a `secondary` badge for the other side so the two sides read " +
-    "as opposites. It is charcoal because it is the loud half of a pair, not " +
-    "because it names a record; nothing on that map has a `ref` at all.",
-}
+// INVERSE_BADGE_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 /** EVERY SLOT THAT IS A STRING BY CONSTRUCTION, so a chip cannot go in it and
  * the reference stays a prefix. Named "path:line", so a line that shifts is
@@ -122,71 +114,10 @@ const INVERSE_BADGE_OK: Record<string, string> = {
  * moves with the code and dies with it. Ambiguity is the thing a substring can
  * newly get wrong, so it is asserted away below: a fragment matching two sites
  * in its file fails, because otherwise one reviewed exemption could silently
- * cover a second site nobody ever looked at. */
-type RefAsString = { file: string; contains: string; why: string }
-
-const REF_AS_STRING_OK: RefAsString[] = [
-  {
-    file: "web/lib/picker-sources.ts",
-    contains: "label: t.ref ?",
-    why:
-      "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
-      "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
-      "its name from this one field. A ticket option leads with its number " +
-      "because that is what somebody types to find it. (feat/ui-ux grew the " +
-      "line above this one so an account option routes through the one " +
-      "`accountOption` seam — the kind of edit that used to re-pin this entry " +
-      "and now does nothing to it.)",
-  },
-  {
-    file: "web/lib/picker-sources.ts",
-    contains: "label: s.ref ?",
-    why: "same slot, a story option — see the ticket one above.",
-  },
-  {
-    file: "web/components/work/stories-screen.tsx",
-    contains: "label: t.ref ?",
-    why:
-      "the ticket picker on the story form, building the same `PickerOption.label` " +
-      "the two lines in picker-sources.ts build.",
-  },
-  {
-    file: "web/components/tickets/help-detail.tsx",
-    contains: "recordLabel={[ticket.ref",
-    why:
-      "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
-      "entry is being logged against, inside sentences and a dialog title, not on " +
-      "a row of its own.",
-  },
-  {
-    file: "web/components/tickets/help-detail.tsx",
-    contains: "label: [ticket.ref",
-    why:
-      "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
-      "string slot as picker-sources.ts, for the ticket the form is pinned to.",
-  },
-  {
-    file: "web/components/work/story-detail.tsx",
-    contains: "recordLabel={story.ref ?",
-    why: "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx above.",
-  },
-  {
-    file: "web/components/work/sprints-screen.tsx",
-    contains: "title: s.ref ?",
-    why:
-      "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
-      "the chip would be wrong even if the slot allowed it: a day cell is a few " +
-      "characters wide and a lozenge in it is furniture, not information.",
-  },
-  {
-    file: "web-portal/components/delivery-block.tsx",
-    contains: "s.ref ?? s.name",
-    why:
-      "A REACT LIST KEY (`id:`), never rendered — the client reads `s.name` and " +
-      "the dates on that row. Kept as the key because a sprint's reference is the " +
-      "stablest thing about it.",
-  },
-]
+ * cover a second site nobody ever looked at.
+ *
+ * REF_AS_STRING_OK (and the RefAsString type) moved to shared/rules/registry.ts,
+ * 14 Sep 2026 (RULES.md line 13's promise made true). Imported above. */
 
 
 /** THE FILE'S LINES WITH EVERY COMMENT REMOVED AND NOT ONE LINE LOST, so a

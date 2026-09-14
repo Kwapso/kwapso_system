@@ -1,21 +1,24 @@
 "use client"
 
-// Member roles now live at /t/<teamId>/roles (the team area's Member roles
-// section). Keep this path as a redirect so old links still land in the right
-// place.
+// Member roles no longer has a page of its own. The standalone collection this
+// path used to redirect to (/t/<teamId>/roles, with its own Members · Member
+// roles · Invites tab strip) is retired — client ruling, 2026-09-14, over a
+// screenshot of exactly that page: "what is this? told you to kill it. Now
+// this only lives on settings / team." Every role's own grid has lived on
+// Settings › Team since 2026-09-09 (web/components/team/roles-matrix.tsx);
+// this shim just stops handing out an address for a screen the app no longer
+// draws. No teamId to wait for any more — Settings resolves the active team
+// itself.
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
 
 import { ShellLoading } from "@/components/shell/app-shell"
-import { useActiveTeam } from "@/lib/use-active-team"
 
 export default function RolesRedirect() {
-  const active = useActiveTeam()
   const router = useRouter()
-  const teamId = active.ctx?.team?.id ?? null
   React.useEffect(() => {
-    if (teamId) router.replace(`/t/${teamId}/roles`)
-  }, [teamId, router])
+    router.replace("/settings?tab=team")
+  }, [router])
   return <ShellLoading />
 }

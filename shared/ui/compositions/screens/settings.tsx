@@ -316,6 +316,36 @@ export const ThemePicture = ({ tone }: { tone: "light" | "dark" | "system" }) =>
   );
 };
 
+/** THE THEME SWATCH — a small colour mark, not a picture: 13px, radius
+    `--radius-sm`, `ThemePicture`'s own `light`/`dark`/`system` fills at a
+    dot's scale rather than a thumbnail's. Built for the consuming app's
+    Settings › Appearance pill row (`shared/web/appearance-pill-group.tsx`,
+    kwapso_system): its own Background pills already carry a swatch, resolved
+    through `SpinePicture`'s `[data-spine]` cascade (a ROLE token, `--spine-
+    fill`, reachable from app code); Appearance's three pills have no
+    equivalent role token to reach for, because a light/dark swatch is
+    PALETTE-FIXED by definition — the same reason `ThemePicture` pins hex
+    rather than riding the cascade two paragraphs up. So the fixed hex stays
+    here, in the one file the app's own R32 already exempts for exactly this
+    shape ("a swatch of what dark mode looks like must not flip when you are
+    in dark mode"), and the app reaches it as a part rather than reinventing
+    the pin. Same three hex sets as `ThemePicture`, transcribed rather than
+    re-derived. */
+export const ThemeSwatch = ({ tone }: { tone: "light" | "dark" | "system" }) => {
+  const drawn = {
+    light: "#FFFEF9",
+    dark: "#141310",
+    system: "linear-gradient(90deg,#FFFEF9 50%,#141310 50%)",
+  }[tone];
+  return (
+    <span
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 rounded-[var(--radius-sm)] shadow-[var(--hairline)]"
+      style={{ background: drawn }}
+    />
+  );
+};
+
 /** The spine pictures: the rail column in each of its fills, rows beside it.
     Token-drawn, as the kit's own markup draws them.
 
@@ -424,7 +454,8 @@ export const ScalePicture = ({
        ├─ RAIL              lies on it, paints nothing
        └─ floating CARD     the one raised thing, off-beige in both palettes
           └─ soft PANEL     the collection/record body, one rung quieter
-             └─ off-beige ROW  one title, one meta line, at the chosen scale
+             └─ off-beige ROWS  a short populated list, the first at the
+                                 chosen scale — see v1.2.78 below
 
    Same four rungs `screen-shell.tsx`'s own diagram draws for the real
    screen. Ink is the strong edge (light ground/card contrast 17.386, the
@@ -434,6 +465,154 @@ export const ScalePicture = ({
    dropped as a simplification, because a preview that fakes the strong edges
    and skips the thin ones would misrepresent exactly the two spines a
    reviewer most needs to trust it on.
+
+   V1.2.78 — SHE SAW IT LIVE AND SAID IT LOOKS SHIT, AND POINTED AT A
+   REFERENCE SHE LIKED. Verbatim: "Fix the preview because it looks shit. It
+   was already good in your artifact, so fix that." The artifact was a
+   design-lane review page with four candidate layouts; the fourth, "preview-
+   led", carried a small live app mock (`.app-mock` in that file) that read as
+   a picture of a product where v1.2.77's shipped preview read as a placeholder
+   — the client's own description of the shipped one: "a flat mango rectangle
+   containing one rounded white card with 'Record title / Status · 4 open'
+   and a grey bar."
+
+   WHAT THE ARTIFACT'S MOCK DID RIGHT, DIAGNOSED RATHER THAN COPIED (its own
+   markup is a standalone page with its own throwaway tokens — `--mock-*` —
+   and none of that crosses over):
+
+     1. IT WAS POPULATED. One title-plus-meta pair floating alone in a panel
+        with `justify-content: center` around it is mostly empty padding —
+        which is what reads as "placeholder" rather than "screen with data on
+        it". The mock's card held a title, a meta line AND two more content
+        bars beneath. A product has more than one row; a picture of one row
+        adrift in whitespace does not look like a product.
+     2. THE TOP CHROME WAS VISIBLE. The shipped breadcrumb slot was a single
+        2px bar at 32% opacity — which is exactly the "grey bar" she named,
+        because at that height and that opacity it barely resolves as a mark
+        at all, let alone as navigation. The mock's topbar was a real,
+        legible bar.
+     3. THE NESTING READ AS LAYERS, NOT AS ONE BOX. Card-on-page and panel-
+        on-card both measure a THIN contrast in light (1.103, 1.103 — this
+        file's own header states the figures) by construction, because paper
+        and mango are the thin case `--shadow-lifted` exists to carry. With
+        no edge of its own the panel is invisible whenever the colour alone
+        cannot carry it, and three boxes read as one.
+
+   WHAT CHANGED HERE, IN THE KIT'S OWN TOKENS — the fix is the diagnosis
+   applied to THIS component's real parts, not the mock's div soup:
+
+     1. THE PANEL HOLDS THREE ROWS NOW, not one, top-aligned rather than
+        centred, so the panel's own space is spent on content rather than on
+        margin around a lone specimen. Only the FIRST row is the specimen —
+        it alone carries `Record title` / `Status · 4 open` and alone moves
+        with `scale`, exactly as before. The two beneath are texture: plain
+        bars, fixed size, fading at `--opacity-70`-ish per row (Tailwind
+        `opacity-*`, not a new colour — R32 in the app repo governs `web/` and
+        `shared/web/`, not this component's own file, and every hex or
+        rgba() here was already pinned for the same reason `ThemePicture`'s
+        is: "a picture OF a palette cannot re-theme with the palette without
+        lying about the choice it depicts").
+     2. THE BREADCRUMB IS TWO SEGMENTS, THICKER AND MORE OPAQUE — a short
+        mark and a longer one, the shape "module › record" reads as even at
+        preview scale, replacing the single 2px/32% hairline that measured as
+        a stray line rather than as chrome.
+     3. THE PANEL WEARS THE ROW'S OWN HAIRLINE (`shadow-[var(--hairline)]`,
+        already drawn on the innermost row below) SO ITS EDGE SURVIVES WHERE
+        COLOUR ALONE DOES NOT — the identical move `sections-stand-on-paper`
+        (the app repo's R67) had to make for real panels-on-cards for the
+        same measured reason, applied here to a picture of one.
+
+   WHAT DID NOT CHANGE: the ground/rail/card hierarchy, the resolved-theme
+   contract (`theme` takes `"light" | "dark"` only), and the scale mechanic
+   (only the specimen row's two sizes move; nothing about how much a row
+   shows changes with scale). None of those were what she was pointing at.
+
+   V1.2.79 — THE SPECIMEN BECOMES A CHIP, A TITLE AND A BODY, IN LOREM. Her
+   words: "on the settings appearance display, do it with chip, title and
+   body — use lorem ipsums." Three decisions in that one sentence:
+
+     1. CHIP ABOVE THE TITLE, NOT BESIDE IT. That is R65 in the consuming
+        app ("on a card that stands for a record, the chip sits above the
+        title" — source order is visual order in a column), so this preview
+        now demonstrates the app's own law rather than inventing a card
+        layout of its own. The chip is a fixed-size MARK, like the two
+        texture rows below it — it does not move with `scale`, because a
+        chip is not type; only the title and the body do.
+     2. LOREM IS CORRECT HERE, ON PURPOSE, NOT A LAPSE THAT NEEDS FIXING
+        LATER. A preview is a picture of the SHAPE a record takes, not of
+        anyone's DATA — real words ("Record title", "Status · 4 open")
+        imply this is showing an actual record, which it never was. Lorem
+        also keeps the specimen LANGUAGE-NEUTRAL, which matters specifically
+        because of where this preview now sits: `AppearancePanel`
+        (the consuming app's `shared/web/appearance-panel.tsx`) puts the
+        Language control immediately beside it, and an English specimen
+        next to a German selection would read as a bug rather than as a
+        deliberately abstract picture. CONFIRMED, NOT ASSUMED: lorem placed
+        here sits outside the app's translation walk — `resolveImport` in
+        `scripts/lib/i18n-source.mjs` refuses every specifier that resolves
+        under `shared/ui/` (`VENDORED_UI`), so `appFiles()` never parses this
+        file at all, and R28's extractor cannot catalogue a string it never
+        reads. Nobody should "fix" this back to real English copy: doing so
+        would silently ship an uncatalogued, untranslated sentence sitting
+        one screen away from the language switcher itself.
+     3. THE SCALE MECHANIC SURVIVES, AND IS WHERE IT SHOULD BE CLEAREST NOW.
+        Title and body are the two things that move with `scale` — the same
+        contract the old title/meta pair kept, extended to the new shape.
+        The body is the SAME lorem sentence at every step (per
+        `ScalePicture`'s own ruling: the mechanism this depicts sets one
+        root font size and adds no content), long enough that it visibly
+        wraps onto more lines as the size grows rather than reading as a
+        one-word shrug — a truer demonstration of "the type gets bigger,
+        nothing is added or removed" than a short line ever was, because the
+        reader can see the SAME words taking more room.
+
+   V1.2.81 — THE BREADCRUMB IS GONE. READ THIS BEFORE YOU REDRAW ONE. This is
+   the SECOND time the top chrome above the card has been replaced rather than
+   kept, and the second time is why removal, not another redesign, is the
+   right fix.
+
+     ROUND ONE (shipped v1.2.77). The top chrome was a single 2px bar at 32%
+     opacity. The client's own words for it: "a flat mango rectangle
+     containing one rounded white card with 'Record title / Status · 4 open'
+     and a grey bar" — she read it as a placeholder, not as navigation.
+
+     ROUND TWO (v1.2.78, THIS FILE'S OWN PREVIOUS FIX). Diagnosed as "the
+     shipped breadcrumb slot was a single 2px bar at 32% opacity … which is
+     exactly the 'grey bar' she named" and replaced with TWO segments —
+     "module › record", thicker and more opaque — on the reasoning that a
+     real trail with two parts would read as chrome rather than as a stray
+     line. See the diagnosis above, still kept verbatim as the historical
+     record of what round two tried and why.
+
+     ROUND TWO WAS ALSO REJECTED. She looked at the shipped two-segment
+     version live and asked for the bars on top of the preview to be removed,
+     full stop — not redrawn a third way. The lesson is not "the second
+     design was wrong in some fixable detail"; it is that a fake trail — any
+     number of opaque bars standing in for words nobody can read — reads as
+     placeholder furniture to her REGARDLESS of segment count or opacity, and
+     a third attempt at the same idea would be the second mistake shipped
+     twice. So this round is a DELETION: the rail now leads straight into the
+     floating card, with nothing standing in for a breadcrumb above it.
+     `APPEARANCE_PREVIEW_GROUND_INK` (the ink the two bars were drawn in) is
+     deleted with it rather than kept dormant — a fact this file's own
+     `spine.ts` sibling in the consuming app argues for elsewhere: a mapping
+     kept "to be safe" outlives the problem it solved and confuses the next
+     reader into thinking it is still needed.
+
+     WHAT THIS COSTS. The preview's top edge is now the rail meeting the
+     card directly — one fewer visual layer than a real screen has (a real
+     screen's card sits under a real breadcrumb). That is an honest
+     simplification, not a regression pretending otherwise: this preview's
+     job is the ground/rail/card/panel HIERARCHY (see this file's own header
+     above, "AppearancePreview"), and two rulings in a row say a fake trail
+     does not help that argument and reads as unfinished chrome instead.
+
+     THE CARD STAYS `flex-1` IN A `gap-3` COLUMN. With the breadcrumb gone the
+     column holds one child instead of two, so `gap-3` does nothing (nothing
+     to space) and the card's own `flex-1` fills the frame exactly as before
+     — if anything with slightly more room, never less. Nothing here needed
+     to change for the card to keep filling `AppearancePreview`'s own
+     `min-h-[17rem]` frame.
 
    PINNED HEX, NOT LIVE TOKENS — `ThemePicture`'s own fork, for the same
    reason. Dark-mode tokens bind at `:root[data-theme="dark"]` (tokens.css
@@ -479,17 +658,6 @@ const APPEARANCE_PREVIEW_GROUND: Record<
   mango: { light: "#FED069", dark: "#FED069" },
 };
 
-/** `--spine-ink` per spine, tokens.css §7b — the ink a topbar mark reads on
-    the ground itself, before the floating card is reached. */
-const APPEARANCE_PREVIEW_GROUND_INK: Record<
-  "ink" | "paper" | "mango",
-  { light: string; dark: string }
-> = {
-  ink: { light: "#FFFEF9", dark: "#FFFEF9" },
-  paper: { light: "#1A1918", dark: "#FFFEF9" },
-  mango: { light: "#1A1918", dark: "#1A1918" },
-};
-
 /** `--card`, spine-independent — the one floating thing on any ground. */
 const APPEARANCE_PREVIEW_CARD = { light: "#FFFEF9", dark: "#26241F" };
 
@@ -497,23 +665,27 @@ const APPEARANCE_PREVIEW_CARD = { light: "#FFFEF9", dark: "#26241F" };
     rung quieter than the card it sits in. */
 const APPEARANCE_PREVIEW_PANEL = { light: "#F7F2EB", dark: "#1C1B18" };
 
-/** `--foreground` / `--muted-foreground`, read on the card and the panel
-    (never on the ground — see APPEARANCE_PREVIEW_GROUND_INK for that). */
+/** `--foreground` / `--muted-foreground`, read on the card and the panel —
+    never on the ground, which since v1.2.81 paints nothing of its own (see
+    "THE BREADCRUMB IS GONE" in this file's own header). */
 const APPEARANCE_PREVIEW_ROW_INK = { light: "#1A1918", dark: "#FFFEF9" };
 const APPEARANCE_PREVIEW_ROW_META = {
   light: "rgba(26, 25, 24, .55)",
   dark: "rgba(255, 254, 249, .55)",
 };
 
-/** The row's two sizes, in px — the same pair `ScalePicture` draws, read one
-    step larger because this frame has the room to hold it legibly. */
+/** The specimen's two sizes, in px — title and body, read one step larger
+    than `ScalePicture`'s own pair because this frame has the room to hold
+    them legibly. v1.2.79: renamed from `meta` to `body` when the specimen's
+    second line changed from a short status line to a lorem paragraph — see
+    `AppearancePreview`'s own header. */
 const APPEARANCE_PREVIEW_SCALE: Record<
   "compact" | "default" | "large",
-  { title: number; meta: number }
+  { title: number; body: number }
 > = {
-  compact: { title: 15, meta: 13 },
-  default: { title: 18, meta: 16 },
-  large: { title: 21, meta: 19 },
+  compact: { title: 15, body: 13 },
+  default: { title: 18, body: 16 },
+  large: { title: 21, body: 19 },
 };
 
 export interface AppearancePreviewProps extends React.ComponentPropsWithoutRef<"div"> {
@@ -541,7 +713,6 @@ export function AppearancePreview({
   ...props
 }: AppearancePreviewProps) {
   const ground = APPEARANCE_PREVIEW_GROUND[spine][theme];
-  const groundInk = APPEARANCE_PREVIEW_GROUND_INK[spine][theme];
   const card = APPEARANCE_PREVIEW_CARD[theme];
   const panel = APPEARANCE_PREVIEW_PANEL[theme];
   const rowInk = APPEARANCE_PREVIEW_ROW_INK[theme];
@@ -553,7 +724,12 @@ export function AppearancePreview({
       role="img"
       aria-label={`Preview: ${spine} background, ${theme} appearance`}
       className={cn(
-        "flex min-h-[14rem] w-full overflow-hidden rounded-[var(--radius)] transition-colors duration-200",
+        /* v1.2.78: 14 → 15.5rem, three rows needing more room than one
+           centred row did. v1.2.79: → 17rem — the specimen grew a chip and
+           a wrapping lorem body; this is a FLOOR, not a cap (the column
+           below has no fixed height), so a longer wrap at Large only grows
+           the box further rather than clipping. */
+        "flex min-h-[17rem] w-full overflow-hidden rounded-[var(--radius)] transition-colors duration-200",
         className,
       )}
       style={{ background: ground }}
@@ -567,42 +743,102 @@ export function AppearancePreview({
         aria-hidden="true"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
-        {/* A BREADCRUMB SLOT, on the ground, above the card — the fourth
-            thing `screen-shell.tsx`'s diagram draws at this level. */}
-        <span
-          className="h-2 w-[42%] rounded-pill"
-          style={{ background: groundInk, opacity: 0.32 }}
-          aria-hidden="true"
-        />
         {/* THE FLOATING CARD — the one raised, shadowed thing on this
-            ground; `--shadow-lifted`, load-bearing on paper and mango. */}
+            ground; `--shadow-lifted`, load-bearing on paper and mango. NO
+            BREADCRUMB ABOVE IT — see "THE BREADCRUMB IS GONE" in this file's
+            own header for why. */}
         <div
           className="flex flex-1 flex-col rounded-[var(--radius)] p-3 shadow-[var(--shadow-lifted)]"
           style={{ background: card }}
         >
-          {/* THE PANEL — one rung quieter, the record body. */}
+          {/* THE PANEL — one rung quieter, the record body. v1.2.78: wears
+              the row's own hairline now, so its edge survives where the
+              colour alone measures too thin to read (panel-on-card is
+              contrast 1.103 in light, 1.111 in dark — this file's own header
+              states the figures) — the exact move `sections-stand-on-paper`
+              makes for a real panel on a real card, applied here to a
+              picture of one. Top-aligned, not centred: the space is spent on
+              rows now, not on margin around a single one. */}
           <div
-            className="flex flex-1 flex-col justify-center rounded-[var(--radius)] p-3"
+            className="flex flex-1 flex-col gap-1.5 rounded-[var(--radius)] p-2.5 shadow-[var(--hairline)]"
             style={{ background: panel }}
           >
-            {/* THE ROW — back to the card's own tone, a hairline standing
-                in for the thin edge measured against the panel. */}
+            {/* ROW 1 — the specimen: a chip, a title, a body. v1.2.79 — see
+                this file's own header for the full account. */}
             <div
               className="flex flex-col gap-1.5 rounded-[var(--radius)] px-3 py-2.5 shadow-[var(--hairline)]"
               style={{ background: card }}
             >
+              {/* THE CHIP — ABOVE the title, never beside it: R65 in the
+                  consuming app states the order, and this draws that law
+                  rather than a layout of its own. Lorem, one word, the same
+                  reason the title and body are: a picture of the shape, not
+                  of a record's real status. Fixed size — a chip is a MARK,
+                  not type, so unlike the title and body below it, it does
+                  not move with `scale` (the same fixed-size treatment the
+                  texture rows 2–3 get, and for the identical reason). */}
+              <span
+                className="inline-flex w-fit items-center rounded-pill px-2 py-0.5 text-[0.625rem] font-[var(--font-weight-medium)]"
+                style={{ background: panel, color: rowMeta }}
+              >
+                Lorem
+              </span>
+              {/* THE TITLE — moves with `scale`, exactly as the old
+                  "Record title" line did; only the word changed, to lorem,
+                  for the reason the header states. */}
               <span
                 className="truncate font-[var(--font-weight-medium)] transition-[font-size] duration-200"
                 style={{ color: rowInk, fontSize: `${sizes.title}px`, lineHeight: 1.3 }}
               >
-                Record title
+                Lorem ipsum dolor
               </span>
+              {/* THE BODY — moves with `scale` too, and is the clearest
+                  place the mechanic reads now: the SAME sentence at every
+                  step, long enough that it visibly wraps onto more lines as
+                  the size grows rather than staying one line throughout. No
+                  `truncate` — clipping it to one line would hide the exact
+                  thing this row exists to show. */}
               <span
-                className="truncate transition-[font-size] duration-200"
-                style={{ color: rowMeta, fontSize: `${sizes.meta}px`, lineHeight: 1.35 }}
+                className="transition-[font-size] duration-200"
+                style={{ color: rowMeta, fontSize: `${sizes.body}px`, lineHeight: 1.4 }}
               >
-                Status · 4 open
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+                incididunt ut labore.
               </span>
+            </div>
+            {/* ROWS 2–3 — texture, not specimens: a short populated list
+                reads as a product; one row alone in a padded panel is what
+                read as a placeholder. Fixed size, never scaling with `scale`
+                — the mechanism the scale picture and this preview both state
+                moves type only, and these two rows are not the type being
+                depicted. Fading per row (Tailwind `opacity-*`, not a new
+                colour) so the eye reads them as "list continues" rather than
+                as three equal specimens. */}
+            <div
+              className="flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2 opacity-70"
+              style={{ background: card }}
+            >
+              <span
+                className="h-[0.3125rem] w-[58%] rounded-pill"
+                style={{ background: rowInk, opacity: 0.3 }}
+              />
+              <span
+                className="h-[0.25rem] w-[34%] rounded-pill"
+                style={{ background: rowMeta, opacity: 0.6 }}
+              />
+            </div>
+            <div
+              className="flex flex-col gap-1 rounded-[var(--radius)] px-3 py-2 opacity-40"
+              style={{ background: card }}
+            >
+              <span
+                className="h-[0.3125rem] w-[46%] rounded-pill"
+                style={{ background: rowInk, opacity: 0.3 }}
+              />
+              <span
+                className="h-[0.25rem] w-[30%] rounded-pill"
+                style={{ background: rowMeta, opacity: 0.6 }}
+              />
             </div>
           </div>
         </div>

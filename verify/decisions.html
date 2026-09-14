@@ -226,6 +226,27 @@
   }
   footer.settle ul { margin: 0; padding-left: 20px; }
   footer.settle li { margin-bottom: 8px; }
+
+  .log-entry { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .log-entry .rig-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .log-entry .date {
+    font-size: 11.5px;
+    color: var(--ink-tertiary);
+    font-variant-numeric: tabular-nums;
+  }
+  .log-entry p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-secondary); max-width: 86ch; }
+  .log-entry .ruling { color: var(--foreground); }
 </style>
 </head>
 <body>
@@ -416,6 +437,111 @@
       <tr><td>vs. system app's own title</td><td class="diff">smaller than the system app it mirrors &mdash; likely part of the client's complaint</td><td class="same">matches the system app's current (also-too-small) title</td><td class="diff">bigger than the system app's title unless the system app also moves to h1</td></tr>
       <tr><td>60rem centered column</td><td class="same">baseline</td><td class="diff">comfortable, no wrap risk on typical titles</td><td class="diff">comfortable on desktop; check the narrowest calm breakpoint for 2-3 word titles</td></tr>
     </table>
+  </section>
+
+  <!-- ===================== THE LOG — short entries, rig deleted on shipping ===================== -->
+  <section class="block">
+    <h2 class="block-title">Other rig decisions, shipped</h2>
+    <p class="block-note">
+      Short entries for rigs whose ruling did not need a full side-by-side page of
+      its own. Per <code>verify/README.md</code>: a rig is scaffolding, deleted the
+      moment its decision is recorded here — every rig named below has already been
+      removed, along with its <code>.claude/launch.json</code> entry where it had one.
+    </p>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">automations-chip-top</span><span class="date">14 Sep 2026</span></div>
+      <p>Client: &ldquo;In Settings Module Automation, put the chip on top of the title, the
+      protected chip.&rdquo; <span class="ruling">Ruling: the Protected chip moved ABOVE the
+      title on an automation row, its reason last (R70).</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">automations-toolbar</span><span class="date">14 Sep 2026</span></div>
+      <p>Client: &ldquo;add toolbar in automations: searchbar sort by name and filter by
+      status,&rdquo; plus the same-day follow-up asking Protected to be a filterable status too.
+      <span class="ruling">Ruling: shipped — search, sort by name, and a status filter that
+      includes Protected, on the module automations screen.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">choices-panel</span><span class="date">14 Sep 2026</span></div>
+      <p>Question: what does Settings &rsaquo; Choices show per dropdown value, and is
+      Protected a status or something else? <span class="ruling">Ruling: value / module+icon /
+      status columns, and Protected is its OWN facet — independent of active/inactive, not a
+      third state replacing them, so a row can be both deactivated and protected at once.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">google-merged-container</span><span class="date">14 Sep 2026</span></div>
+      <p>Client: &ldquo;In Settings, Integrations, put the whole things of Google in the same
+      container. Right now, it's two. Merge them.&rdquo; <span class="ruling">Ruling: the two
+      Google containers in Integrations merged into one.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">integrations-cards</span><span class="date">14 Sep 2026</span></div>
+      <p>Question: the Integrations cards' treatment after the client's fourth &ldquo;nothing on
+      white&rdquo; ruling (R67 amendment 4, 11 Sep 2026). <span class="ruling">Ruling: shipped as
+      measured — every container carries a visible ground against the page (a real contrast
+      ratio in both palettes, not 1.000 in either), the Google card drawing the real, shipped
+      <code>CollectionEmptyState</code> rather than a copy of it.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">modules-toolbar</span><span class="date">14 Sep 2026</span></div>
+      <p>Question: Settings &rsaquo; Modules' own toolbar. <span class="ruling">Ruling: search +
+      sort toolbar, shipped; the module cards themselves stay name-only.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">section-title</span><span class="date">11 Sep 2026 ruling, shipped 14 Sep 2026</span></div>
+      <p>Client: &ldquo;ticket types should be on top of the searchbar inside the container
+      without subtitle, make this. always.&rdquo; <span class="ruling">Ruling: a section's title
+      moved inside its container, and its subtitle was deleted (R67 amendment 5 / R63 part 3,
+      R72).</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">settings-automations-tab</span><span class="date">14 Sep 2026</span></div>
+      <p>Client: &ldquo;On Settings, add a tab for Automations and show all the automations in
+      the system, filtered by module and by status,&rdquo; plus the same-day &ldquo;add filter to
+      protected&rdquo; follow-up. <span class="ruling">Ruling: shipped as the UNSCOPED mounting of
+      the real <code>&lt;ModuleAutomations&gt;</code>, <code>scope: { kind: "all" }</code>, beside
+      the pre-existing per-module scoped mounting.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">team-chips</span><span class="date">14 Sep 2026</span></div>
+      <p>Client: &ldquo;the chips in team this color #F7F2EB.&rdquo; <span class="ruling">Ruling:
+      shipped via <code>--badge-quiet-fill</code> at the token seam in <code>badge.tsx</code>
+      (#F7F2EB is <code>--kw-soft-paper</code>, surfaced as <code>--surface-panel</code>) —
+      never a hex literal and never a class selector. The old
+      <code>[&amp;_[data-slot=badge].bg-surface-quiet]</code> rule in
+      <code>web/app/layout.tsx</code> was already dead against the current kit (badge.tsx has not
+      emitted that class since v1.2.15) and is not what makes this ship.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">team-tab-titles</span><span class="date">14 Sep 2026</span></div>
+      <p>Follow-up to the &ldquo;title only at the top&rdquo; ruling, asked directly of Settings
+      &rsaquo; Team's Members/Roles heading. Client, verbatim: &ldquo;yes remove members and roles
+      titles too.&rdquo; <span class="ruling">Ruling: both headings (<code>members-gallery.tsx</code>,
+      <code>roles-matrix.tsx</code>) became <code>sr-only</code> — a real heading a screen reader
+      still finds, nothing shown on screen.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">pinned-corners</span><span class="date">10 Sep 2026</span></div>
+      <p>R63 part 4. Client, verbatim: &ldquo;when pin, i still want it round.&rdquo;
+      <span class="ruling">Ruling: shipped.</span></p>
+    </div>
+
+    <div class="log-entry">
+      <div class="head"><span class="rig-name">toolbar-floor</span><span class="date">11 Sep 2026</span></div>
+      <p>Question: how narrow can a toolbar's search field get before it stops being usable?
+      <span class="ruling">Ruling: shipped — the search field's 128px floor.</span></p>
+    </div>
   </section>
 
   <footer class="settle">

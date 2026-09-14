@@ -86,6 +86,65 @@
 // line: a screen either has a reason to keep explaining itself under a heading
 // or it does not, and a per-line key would let the next sentence added to an
 // already-exempted file borrow an argument written about a different one.
+//
+// ── AMENDMENT 1 (2026-09-14) — `CARDTITLE` IS A HEADING ─────────────────────
+//
+// THE THIRD MISS. This law's own founding case — the Modules wall's card, name
+// over a joined line of section titles — passed this census on the day it was
+// written, and stayed on screen four days into R72's own life before the
+// client named it by hand a third time: *"In settings, modules: delete this."*
+// The card drew its name through the kit's `CardTitle`, not `<h1>`-`<h4>` or
+// `<Headline>`, so the pair (`CardTitle`, `<span>`) never formed — `a` failed
+// `HEADING.test(a)` before `b` was ever asked about. **This was not the
+// Capitalised-prose blind spot amendment 0 already named** (a subtitle
+// rendered through a Capitalised, real-content component): the prose here was
+// a bare `<span>`, which the ORIGINAL `PROSE` set already matched fine. The
+// miss was entirely on the HEADING side — a kit component that draws a real
+// heading, documented as one in the kit's own source
+// (`shared/ui/components/card/card.tsx`: "TEN STATES — none apply; it is a
+// heading"), was invisible to a census that only recognised bare tags and one
+// named kit part.
+//
+// So `HEADING` gains exactly the one name the kit itself already calls a
+// heading — `CardTitle` — and `PROSE` gains, for the same reason and on the
+// same authority, the one name the kit calls prose beside it —
+// `CardDescription` (its own header: "TEN STATES — none apply; it is prose").
+// Nothing else in `shared/ui/components/card/card.tsx` claims either word.
+//
+// WHAT THIS DOES AND DOES NOT REACH — checked by hand against every call site
+// in the app, because there are few enough to read rather than guess about
+// (four files import `CardTitle`, one imports `CardDescription`, in the whole
+// of `web/`, `web-portal/` and `shared/web/`):
+//
+//   · The Modules card (fixed by this same change — the offending `<span>` is
+//     deleted, not exempted) and any future card built the same way.
+//   · `web/components/team/members-gallery.tsx` draws a member's email under
+//     their name in the identical wall shape — but `CardTitle` there sits
+//     INSIDE its own wrapping `<span>` (paired with the role `Badge` above it,
+//     for R65's "chip on top of title"), so the email line is a sibling of
+//     that wrapper, never of `CardTitle` itself. Structurally outside the
+//     pair, not exempted into it — confirmed by running this census over the
+//     file, not by reading the JSX and guessing.
+//   · `shared/web/screen-engine/screen-renderer.tsx`'s generic `display:
+//     "cards"` branch pairs `CardTitle` with `CardDescription` directly and
+//     would be the one real catch — except the ONE recipe in the whole app
+//     that declares `display: "cards"` (`knowledgeListRecipe`,
+//     `web/lib/screens.ts`) is special-cased to a bespoke component
+//     (`KnowledgeSourceCard`) before `screen-renderer.tsx` ever sees it
+//     (`web/components/deep-link/collection-content.tsx`, `if (module ===
+//     "knowledge")`). No live recipe reaches this branch today, so widening
+//     `PROSE` catches a card shape that is currently unreachable — recorded
+//     here rather than left for the next reader to rediscover, and flagged
+//     separately as dead code, which is a different law's job (lean, not R72).
+//
+// So this amendment's live effect, as of 2026-09-14, is exactly the Modules
+// card and nothing else — the two other `CardTitle`/`CardDescription` sites in
+// the app are outside the pair for reasons specific to each, not because
+// anybody wrote them an exemption.
+//
+// `CardDescription` is NOT widened into the three deliberately-not-a-subtitle
+// shapes (helper text, empty state, R70's required reason): none of those
+// three draws through `Card` at all, so the question does not arise for them.
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -103,11 +162,18 @@ const ROOT = join(HERE, "..", "..") // repo root
  * for the same reason: a settings section can live in `shared/web/`. */
 const APP_DIRS = [join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
 
-const HEADING = /^(h[1-4]|Headline)$/
-/** R67's own `READABLE_PROSE` set. A raw HTML tag, never a component — which is
- * what makes `<Text>`, `<CollectionEmptyState>` and every other real-content
- * component fall outside this census by construction, not by exemption. */
-const PROSE = /^(p|span|small|em|strong)$/
+/** `CardTitle` joins the bare heading tags by amendment 1 (2026-09-14) — the
+ * kit's own source calls it one ("TEN STATES — none apply; it is a heading",
+ * `shared/ui/components/card/card.tsx`), and the Modules panel's card proved a
+ * heading the census could not see is a heading it cannot protect either. */
+const HEADING = /^(h[1-4]|Headline|CardTitle)$/
+/** R67's own `READABLE_PROSE` set, PLUS `CardDescription` (amendment 1,
+ * 2026-09-14, the kit's own words again: "TEN STATES — none apply; it is
+ * prose") — the one kit component that stands opposite `CardTitle` the same
+ * way a bare `<p>` stands opposite `<h2>`. Every other real-content component
+ * (`<Text>`, `<CollectionEmptyState>`, …) stays outside by construction: this
+ * is a second NAMED exception, not a reopened door. */
+const PROSE = /^(p|span|small|em|strong|CardDescription)$/
 
 type Parsed = { rel: string; path: string; tree: ts.SourceFile }
 

@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { HAND_ROLLED_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const ROOT = join(HERE, "..", "..") // repo root
@@ -43,27 +44,10 @@ const ROOT = join(HERE, "..", "..") // repo root
 const HAND_ROLLED =
   /\btransition-(colors|opacity|shadow|transform|all|\[[^\]]+\])/
 
-/** Pinned, with the reason each. Rot-checked below.
- *
- * EMPTY, and that is the point. It has now emptied TWICE, both times because
- * the hand-rolled thing was replaced by a kit part rather than because anybody
- * came looking for the pin.
- *
- * The first was `record-chrome.tsx`'s `transition-[height]` on the collapsing
- * sticky record header, whose own reason ended "Delete this pin the day the kit
- * draws one" — 2026-08-27, when the header became the kit's `RecordChrome`.
- *
- * The second was `agent-markdown.tsx`'s link transition. It described a
- * `text-decoration-color` swap on the assistant's rendered links, hand-rolled
- * because `motion-hover` covers background-color/border-color/color/fill and
- * not that property — and the whole rule it belonged to was a VERBATIM COPY of
- * `ArticleBody`'s own link treatment, kept (in that file's words) "so the two
- * renderers say the same thing about a link once the kit ever unifies them".
- * They were unified on 2026-09-13: the assistant's prose is drawn by
- * `ArticleBody` now, the copy was deleted, and the transition went with it — to
- * the kit's own identical one. So the pin described nothing, and this check
- * said so before anybody read the diff. The list can only shrink. */
-const HAND_ROLLED_OK: Record<string, string> = {}
+// HAND_ROLLED_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md line
+// 13's promise made true — CLAUDE.md's own planning ritual already names
+// `HAND_ROLLED_OK` beside `UNCONTAINED_SECTION_OK` as if it were registry
+// data; moving it here makes that sentence true). Imported above.
 
 describe("motion is the kit's, everywhere", () => {
   /** Both front doors and the host seams they share. `shared/ui/` is NOT walked:

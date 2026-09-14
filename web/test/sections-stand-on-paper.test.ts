@@ -103,7 +103,7 @@ import { describe, expect, it } from "vitest"
 
 import ts from "typescript"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { UNCONTAINED_SECTION_OK } from "@shared/rules/registry"
+import { UNCONTAINED_SECTION_OK, OVERLAY_FAMILY_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -417,67 +417,162 @@ describe("R67 — a titled section stands on paper", () => {
       if (/^[A-Z]/.test(name) && !declText.has(name)) declText.set(name, { text, rel: f.rel })
   }
 
-  const paintCache = new Map<string, boolean>()
-  function componentPaints(name: string): boolean {
-    const cached = paintCache.get(name)
-    if (cached !== undefined) return cached
-    paintCache.set(name, false) // recursion guard
-    const d = declText.get(name)
-    if (!d) return false
-    const tops = fileTop.get(d.rel) ?? new Map<string, string>()
-    let text = d.text
-    const seen = new Set([name])
-    for (let hop = 0; hop < 8; hop++) {
-      let grew = false
-      for (const [k, v] of tops) {
-        if (seen.has(k)) continue
-        if (new RegExp(`\\b${k}\\b`).test(text)) {
-          seen.add(k)
-          text += `\n${v}`
-          grew = true
-        }
-      }
-      if (!grew) break
-    }
-    // …AND ONLY THROUGH ITS OWN CLASSES. The walk deliberately does NOT follow
-    // the components this one RENDERS. That version was written and thrown
-    // away: `CollectionEmptyState` renders a headline, a sentence and a button,
-    // one of which resolves to a fill two files away, so every uncontained zero
-    // register in the app came back green — and an uncontained zero register is
-    // precisely what the client reported. A rule that cannot catch the bug it
-    // was written for is not a weaker rule, it is a different one.
-    const hit = FILL.test(text)
-    paintCache.set(name, hit)
-    return hit
-  }
+  // `componentPaints` used to be built right here, closed over this outer
+  // `declText`/`fileTop` (the whole app + kit). IT NOW LIVES INSIDE
+  // `createPaintWalk` BELOW, unchanged in substance but PARAMETERISED BY A
+  // FILE LIST rather than closed over `all` — see that function's own header
+  // for why: R67's amendment-5 tripwire needed a corpus it owns, not the
+  // app's, and a closure over `all` cannot be pointed at anything else.
+  // `declText`/`fileTop` stay here, unmoved, because `isOverlay` and `isAct`
+  // just below still read them and have nothing to do with painting.
 
-  /** An overlay does not stand on the page — it stands on the scrim. Derived
-   * in two steps, because almost nothing names a portal itself: a component
-   * whose DECLARING FILE renders through one is an overlay, and so is a
-   * component that renders an overlay. `<AddLinkDialog>` is a
-   * `<FormShellDialog>` is a kit `<Sheet>` is a Radix portal — three files, and
-   * stopping at the first would have reported a slide-in form as content lying
-   * on the page. */
-  const portalFile = new Map<string, boolean>()
+  // ── AMENDMENT 6 (2026-09-14) — AN OVERLAY IS ONE OF THE KIT'S OWN
+  //    SCRIM-STANDING SURFACES, NOT "RENDERS ANY PORTAL", AND IT IS ASKED OF
+  //    EVERY ROOT A COMPONENT CAN RETURN, NOT OF ANY TAG ITS TEXT MENTIONS ──
+  //
+  // THE OLD TEST WAS "DOES THE DECLARING FILE MENTION A PORTAL ANYWHERE",
+  // TRANSITIVELY, AND THAT CAUGHT SOMETHING THAT IS NOT AN OVERLAY AT ALL.
+  // `shared/ui/components/tooltip/tooltip.tsx` wraps its pill in
+  // `TooltipPrimitive.Portal` too — every floating Radix primitive does, it is
+  // how any of them escapes an `overflow: hidden` ancestor — but the kit's own
+  // header says why this one is not the rest of chapter 12: "THE TOOLTIP IS
+  // THE EXCEPTION TO THE OVERLAY SURFACE. Every other floating thing in
+  // chapter 12 is `--popover` at 24 under `--shadow-overlay`. This one is
+  // `--surface-inverse` … and it carries NO shadow." A tooltip portals so an
+  // icon-only button's label can clear a scroll container; it is never asked
+  // "what stands behind you", because nothing does — it describes the
+  // trigger, it does not present a surface a section's content could have
+  // been drawn into instead. `ToolbarRow`'s own row builds a `<SortControl>`
+  // (R53), the kit's own `SortControl` falls back to a `<Select>` below its
+  // narrowest breakpoint, and `Select`'s Radix primitive portals its listbox
+  // for the same reason a tooltip does — clearing whatever it is standing in
+  // — so the old, file-wide test could not tell "this is a modal" from "this
+  // floats one popup list", and `isOverlay("ToolbarRow")` came back `true`
+  // and cascaded to every component that draws a toolbar.
+  //
+  // SO THE TEST IS NARROWED FROM "PORTALS" TO A NAMED FAMILY: does the
+  // component RETURN one of the kit's actual modal-surface TAGS.
+  // `Sheet`/`SheetContent` and `AlertDialog`/`AlertDialogContent` are R59's
+  // own two shapes, verbatim: "A surface that COLLECTS — a form, an editor, a
+  // picker — presents as the kit's `Sheet` … A surface that ASKS a yes/no
+  // question about something that already exists is an `AlertDialog`,
+  // centred." Bare `Dialog`/`DialogContent` is R59's third, narrower shape —
+  // not a form's home any more, but still a live, if discouraged, centred
+  // surface (`CENTRED_DIALOG_OK`, R59's own reasoned way out) that still
+  // stands on the scrim and never on the page, so it belongs in the family
+  // for the same reason `AlertDialog` does.
+  //
+  // POPOVER WAS TRIED AND MEASURED OUT. R59's own tooltip sentence reads, from
+  // the other side, as the kit drawing one line between the tooltip and
+  // everything else that floats, Popover included — and a first pass put it
+  // in the family on that reading. IT REGRESSED THE LAW'S OWN EXEMPLAR: this
+  // very file names `CollectionFrame` as ONE OF THE TWO SHAPES A SECTION MAY
+  // STAND IN ("heading outside, content on paper … which is what
+  // `CollectionFrame` draws on every collection screen in the base"), and
+  // `CollectionFrame`'s own filter bar reaches for a `<Popover>` — a "more
+  // filters" trigger, one control among many real, paper-standing bodies.
+  // With Popover in the family, `isOverlay("CollectionFrame")` came back
+  // `true`: the law's own reference shape for "correctly contained" was
+  // reading as "stands on the scrim, skip it", and that false verdict
+  // cascaded into `RecordTable` (which draws one) and from there into
+  // `SettingsChoicesPanel` (Settings › Modules and Settings › Ticket types'
+  // own vocabulary tables) — a WORSE regression than the one this amendment
+  // exists to fix, because it hid the law's own worked example rather than
+  // one Tooltip cascade. A `<Popover>` in this codebase is exactly the same
+  // shape as `Select`/`DropdownMenu`/`ContextMenu`: a floating LIST or MENU
+  // hung off an ordinary in-flow trigger, not a surface a component's whole
+  // job is to present — none of its four call sites
+  // (`agent-host.tsx`, `agent-panel.tsx`, `record-picker.tsx`,
+  // `collection-frame.tsx`) puts a popover's content in place of a
+  // component's own body. So it is deliberately OUT, on the same reasoning
+  // that already keeps `Select`/`Combobox`/`DropdownMenu`/`ContextMenu` out:
+  // each is a CONTROL, its trigger is what stands in the section's flow, and
+  // R67's own ACT exclusion already covers a lone control.
+  //
+  // AND THE WALK ITSELF NARROWED FROM "ANY TAG THE TEXT MENTIONS" TO "EVERY
+  // ROOT THE COMPONENT CAN RETURN" — R67's OWN "PER BRANCH" CLAUSE, ASKED OF
+  // THIS QUESTION TOO. Even inside the four-name family, `isOverlay` still
+  // over-excused: `ScreenRenderer` (`shared/web/screen-engine/
+  // screen-renderer.tsx`) is the engine behind `contacts-by-company.tsx:164`
+  // and a hundred other call sites, and ONE of its several early-return
+  // branches — `recipe.type === "confirm"` — renders `<ScreenConfirm>`,
+  // which is genuinely nothing but an `<AlertDialog>`. The old "any tag the
+  // text mentions, transitively" scan found that one true branch and called
+  // the WHOLE component an overlay, so every call site that renders an
+  // ordinary list or detail screen (the overwhelming majority of them) was
+  // excused too — the identical failure shape this law's own foundational
+  // finding names for painting ("she was looking at the branch with nothing
+  // in it"), moved from the paint question to this one. So `isOverlay` now
+  // reuses `rootElements` (amendment 5's own helper, unchanged) to collect
+  // every element a component can RETURN — a ternary's two arms as two roots,
+  // exactly as `rootPaints` already does for painting — and requires EVERY
+  // root to resolve, transitively, to the family. `ScreenConfirm` has one
+  // root, `<AlertDialog>`, and passes. `ScreenRenderer` has several,
+  // including a bare `<div>` and a `<ScreenLayer>`, and fails — correctly,
+  // because most of what it renders is ordinary page content. A single-root
+  // wrapper like `AddLinkDialog` → `FormShellDialog` → `Sheet` still resolves
+  // in the same two hops it always did; a component with no returns TypeScript
+  // can find (rootless, e.g. one only reachable through `React.forwardRef`)
+  // resolves to `false` rather than `true`, the same under-reaching direction
+  // every other clause here takes.
+  const OVERLAY_SURFACE = /^(Sheet|SheetContent|Dialog|DialogContent|AlertDialog|AlertDialogContent)$/
+  const overlayRootDecl = new Map<string, ts.Node>()
   for (const f of all)
-    portalFile.set(f.rel, /\.Portal\b|<[A-Za-z]*Portal\b|createPortal\(/.test(readFileSync(f.path, "utf8")))
+    for (const st of f.tree.statements) {
+      if (ts.isVariableStatement(st))
+        for (const d of st.declarationList.declarations)
+          if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !overlayRootDecl.has(d.name.text))
+            overlayRootDecl.set(d.name.text, d)
+      if (
+        ts.isFunctionDeclaration(st) &&
+        st.name &&
+        /^[A-Z]/.test(st.name.text) &&
+        !overlayRootDecl.has(st.name.text)
+      )
+        overlayRootDecl.set(st.name.text, st)
+    }
   const overlayCache = new Map<string, boolean>()
   function isOverlay(name: string): boolean {
     const cached = overlayCache.get(name)
     if (cached !== undefined) return cached
+    if (OVERLAY_SURFACE.test(name)) {
+      overlayCache.set(name, true)
+      return true
+    }
     overlayCache.set(name, false) // recursion guard
-    const d = declText.get(name)
-    if (!d) return false
-    let hit = portalFile.get(d.rel) === true
-    if (!hit)
-      for (const m of d.text.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g))
-        if (m[1] !== name && isOverlay(m[1])) {
-          hit = true
-          break
-        }
+    const decl = overlayRootDecl.get(name)
+    if (!decl) return false
+    const roots = rootElements(decl)
+    const hit =
+      roots.length > 0 &&
+      roots.every((r) => {
+        const t = tagName(r)
+        return !!t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])
+      })
     overlayCache.set(name, hit)
     return hit
   }
+
+  // THE OVERLAY FAMILY'S OWN SKIP SET, PINNED — so a WIDENING is REVIEWED,
+  // never trusted. `isOverlay` decides which components excuse a body from
+  // R67 by standing on the scrim rather than the page, and a skip decision is
+  // exactly the kind of thing that used to be silent: the census below runs
+  // `isOverlay` on whatever tag names it meets and moves on. This is the
+  // house pattern `KIT_CONTAIN_CEILING` set for a NUMBER that may only fall —
+  // here the reviewed unit is the set of NAMES, not a count, because a name
+  // carries a reason and a count does not. Computed once, at census time (the
+  // two loops below populate `overlayCache` as they run), and asserted BOTH
+  // ways in the tripwire: a name `isOverlay` newly returns `true` for and
+  // this table does not know about turns the build red until it is named
+  // here with a real reason (a new component starting to portal a `Sheet`,
+  // say); a name below that `isOverlay` no longer agrees with is stale and
+  // must be deleted, the same rot-check `UNCONTAINED_SECTION_OK` already
+  // uses.
+  //
+  // OVERLAY_FAMILY_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+  // line 13's promise made true — this table's own note the day it was
+  // written said a later lane would move it here "rather than
+  // half-migrating"; this is that lane). Imported above.
 
   /** …AND AN ACT IS NOT CONTENT EITHER. A lone `<Button>` under a heading is
    * "Show older" or "Ask us something" — the same class of thing as the create
@@ -517,71 +612,10 @@ describe("R67 — a titled section stands on paper", () => {
   // do, so the walk keeps under-reaching rather than inventing offenders: this
   // law's stated direction, and the reason a `cva` a component does not actually
   // call is never read at all.
+  // `Cva`/`cvaOf` used to be built right here, closed over this outer `all`.
+  // Both now live inside `createPaintWalk` below, parameterised the same way
+  // `componentPaints` is — see that function's header.
   type Cva = { base: string; variants: Map<string, Map<string, string>>; defaults: Map<string, string> }
-  const cvaCache = new Map<string, Cva | null>()
-  function cvaOf(name: string): Cva | null {
-    if (cvaCache.has(name)) return cvaCache.get(name)!
-    cvaCache.set(name, null)
-    const d = declText.get(name)
-    if (!d) return null
-    const file = all.find((f) => f.rel === d.rel)
-    if (!file) return null
-    let found: Cva | null = null
-    const strings = (n: ts.Node): string => {
-      let s = ""
-      const collect = (x: ts.Node) => {
-        if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) s += ` ${x.text}`
-        ts.forEachChild(x, collect)
-      }
-      collect(n)
-      return s
-    }
-    const visit = (n: ts.Node) => {
-      if (found) return
-      if (
-        ts.isVariableDeclaration(n) &&
-        ts.isIdentifier(n.name) &&
-        n.initializer &&
-        ts.isCallExpression(n.initializer) &&
-        n.initializer.expression.getText() === "cva" &&
-        // ONLY THE `cva` THIS COMPONENT ACTUALLY CALLS. A file may declare
-        // several (card.tsx has one per part); reading a sibling's would answer
-        // about a box this element is not.
-        new RegExp(`\\b${n.name.text}\\s*\\(`).test(d.text)
-      ) {
-        const args = n.initializer.arguments
-        const variants = new Map<string, Map<string, string>>()
-        const defaults = new Map<string, string>()
-        if (args[1] && ts.isObjectLiteralExpression(args[1]))
-          for (const p of args[1].properties) {
-            if (!ts.isPropertyAssignment(p)) continue
-            const key = p.name.getText().replace(/['"]/g, "")
-            if (key === "variants" && ts.isObjectLiteralExpression(p.initializer))
-              for (const vp of p.initializer.properties) {
-                if (!ts.isPropertyAssignment(vp) || !ts.isObjectLiteralExpression(vp.initializer)) continue
-                const opts = new Map<string, string>()
-                for (const op of vp.initializer.properties)
-                  if (ts.isPropertyAssignment(op))
-                    opts.set(op.name.getText().replace(/['"]/g, ""), strings(op.initializer))
-                variants.set(vp.name.getText().replace(/['"]/g, ""), opts)
-              }
-            if (key === "defaultVariants" && ts.isObjectLiteralExpression(p.initializer))
-              for (const dp of p.initializer.properties)
-                if (ts.isPropertyAssignment(dp))
-                  defaults.set(
-                    dp.name.getText().replace(/['"]/g, ""),
-                    dp.initializer.getText().replace(/['"]/g, "")
-                  )
-          }
-        found = { base: args[0] ? strings(args[0]) : "", variants, defaults }
-        return
-      }
-      ts.forEachChild(n, visit)
-    }
-    visit(file.tree)
-    cvaCache.set(name, found)
-    return found
-  }
 
   /** A string prop's literal value at this call site; `ABSENT` when the prop is
    * not written at all (so `defaultVariants` decides) and `null` when it is
@@ -656,20 +690,12 @@ describe("R67 — a titled section stands on paper", () => {
   // nothing in it"). So ALL of a component's returned elements must paint, or
   // it does not — the per-branch clause read one level down, and the same
   // under-reaching direction the rest of this file keeps.
-  const rootDecl = new Map<string, ts.Node>()
-  for (const f of all)
-    for (const st of f.tree.statements) {
-      if (ts.isVariableStatement(st))
-        for (const d of st.declarationList.declarations)
-          if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
-            rootDecl.set(d.name.text, d)
-      if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
-        rootDecl.set(st.name.text, st)
-    }
   /** The JSX elements a component can RETURN — one per `return`, unwrapped
    * through parentheses and through a ternary's two arms, which is `bodies()`'s
    * own shape asked about roots instead of children. A fragment is not a root
-   * (there is no one box to stand in) and neither is `null`. */
+   * (there is no one box to stand in) and neither is `null`. Pure — it takes a
+   * declaration node and nothing else — so `createPaintWalk` below can run it
+   * against any corpus, the real app or a fixture. */
   function rootElements(decl: ts.Node): ts.Node[] {
     const out: ts.Node[] = []
     let fragment = false
@@ -702,42 +728,284 @@ describe("R67 — a titled section stands on paper", () => {
     } else ts.forEachChild(decl, walk)
     return fragment ? [] : out
   }
-  let rootsFollowed = 0
-  const rootCache = new Map<string, boolean>()
-  function rootPaints(name: string): boolean {
-    const cached = rootCache.get(name)
-    if (cached !== undefined) return cached
-    rootCache.set(name, false) // recursion guard
-    const decl = rootDecl.get(name)
-    if (!decl) return false
-    const roots = rootElements(decl)
-    if (roots.length === 0) return false
-    const hit = roots.every((r) => paints(r))
-    if (hit) rootsFollowed++
-    rootCache.set(name, hit)
-    return hit
+
+  // ── FIXED 2026-09-14 — THE TRIPWIRE NOW OWNS ITS SPECIMEN, NOT THE APP'S ───
+  //
+  // `componentPaints`, `cvaOf`, `rootDecl`, `rootPaints` and `paints` used to
+  // be five closures built ONCE, directly over `all` (the whole app + kit).
+  // That was fine for the real census below, but it meant amendment 5's own
+  // blindness tripwire — "at least one component must be found to paint
+  // through its own ROOT" — could only be proved by pointing at a component
+  // ALREADY IN THE APP that has that shape (`ThemeSection` etc., rooted in
+  // `SettingsSection`). On 2026-09-14 a lane doing exactly what the client
+  // ordered — "one container, four sections" — folded `LanguageSection`'s own
+  // wrapper into `SettingsSection` too, and in doing so removed the LAST such
+  // component from the product. The census is unchanged and still correct;
+  // the tripwire went red because its only specimen retired.
+  //
+  // A TRIPWIRE PROVING "the walk still resolves a root-painted component"
+  // SHOULD NOT DEPEND ON THE APP HAPPENING TO CONTAIN ONE — that is true for
+  // the same reason the rest of this file gives for deriving its subject
+  // instead of hand-picking it: it fails when the product legitimately
+  // changes, and worse, it can pass for the wrong reason if some unrelated
+  // screen happens to grow the shape back. So the five closures above are now
+  // ONE function, `createPaintWalk`, parameterised by a file list rather than
+  // closed over `all`. The real census still calls it exactly once, on `all`,
+  // below. The tripwire calls it a SECOND time, on three tiny fixture
+  // "files" this test builds and owns — never read off disk, never merged
+  // into `all`, so they cannot affect, and cannot be affected by, anything
+  // the app actually contains.
+  function createPaintWalk(files: Parsed[]) {
+    const declText = new Map<string, { text: string; rel: string }>()
+    const fileTop = new Map<string, Map<string, string>>()
+    for (const f of files) {
+      const tops = new Map<string, string>()
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations)
+            if (ts.isIdentifier(d.name)) tops.set(d.name.text, d.getText())
+        if (ts.isFunctionDeclaration(st) && st.name) tops.set(st.name.text, st.getText())
+      }
+      fileTop.set(f.rel, tops)
+      for (const [name, text] of tops)
+        if (/^[A-Z]/.test(name) && !declText.has(name)) declText.set(name, { text, rel: f.rel })
+    }
+
+    // WHAT EACH COMPONENT PAINTS, resolved through the module-scope constants
+    // its own FILE declares (never a component it renders — see `paints`
+    // below for why that version was thrown away).
+    const paintCache = new Map<string, boolean>()
+    function componentPaints(name: string): boolean {
+      const cached = paintCache.get(name)
+      if (cached !== undefined) return cached
+      paintCache.set(name, false) // recursion guard
+      const d = declText.get(name)
+      if (!d) return false
+      const tops = fileTop.get(d.rel) ?? new Map<string, string>()
+      let text = d.text
+      const seen = new Set([name])
+      for (let hop = 0; hop < 8; hop++) {
+        let grew = false
+        for (const [k, v] of tops) {
+          if (seen.has(k)) continue
+          if (new RegExp(`\\b${k}\\b`).test(text)) {
+            seen.add(k)
+            text += `\n${v}`
+            grew = true
+          }
+        }
+        if (!grew) break
+      }
+      const hit = FILL.test(text)
+      paintCache.set(name, hit)
+      return hit
+    }
+
+    // A COMPONENT PAINTS WHAT THE CALL SITE PICKED (amendment 2): where the
+    // fill comes from a `cva`, the variant the call site selects decides.
+    const cvaCache = new Map<string, Cva | null>()
+    function cvaOf(name: string): Cva | null {
+      if (cvaCache.has(name)) return cvaCache.get(name)!
+      cvaCache.set(name, null)
+      const d = declText.get(name)
+      if (!d) return null
+      const file = files.find((f) => f.rel === d.rel)
+      if (!file) return null
+      let found: Cva | null = null
+      const strings = (n: ts.Node): string => {
+        let s = ""
+        const collect = (x: ts.Node) => {
+          if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) s += ` ${x.text}`
+          ts.forEachChild(x, collect)
+        }
+        collect(n)
+        return s
+      }
+      const visit = (n: ts.Node) => {
+        if (found) return
+        if (
+          ts.isVariableDeclaration(n) &&
+          ts.isIdentifier(n.name) &&
+          n.initializer &&
+          ts.isCallExpression(n.initializer) &&
+          n.initializer.expression.getText() === "cva" &&
+          // ONLY THE `cva` THIS COMPONENT ACTUALLY CALLS. A file may declare
+          // several (card.tsx has one per part); reading a sibling's would
+          // answer about a box this element is not.
+          new RegExp(`\\b${n.name.text}\\s*\\(`).test(d.text)
+        ) {
+          const args = n.initializer.arguments
+          const variants = new Map<string, Map<string, string>>()
+          const defaults = new Map<string, string>()
+          if (args[1] && ts.isObjectLiteralExpression(args[1]))
+            for (const p of args[1].properties) {
+              if (!ts.isPropertyAssignment(p)) continue
+              const key = p.name.getText().replace(/['"]/g, "")
+              if (key === "variants" && ts.isObjectLiteralExpression(p.initializer))
+                for (const vp of p.initializer.properties) {
+                  if (!ts.isPropertyAssignment(vp) || !ts.isObjectLiteralExpression(vp.initializer)) continue
+                  const opts = new Map<string, string>()
+                  for (const op of vp.initializer.properties)
+                    if (ts.isPropertyAssignment(op))
+                      opts.set(op.name.getText().replace(/['"]/g, ""), strings(op.initializer))
+                  variants.set(vp.name.getText().replace(/['"]/g, ""), opts)
+                }
+              if (key === "defaultVariants" && ts.isObjectLiteralExpression(p.initializer))
+                for (const dp of p.initializer.properties)
+                  if (ts.isPropertyAssignment(dp))
+                    defaults.set(
+                      dp.name.getText().replace(/['"]/g, ""),
+                      dp.initializer.getText().replace(/['"]/g, "")
+                    )
+            }
+          found = { base: args[0] ? strings(args[0]) : "", variants, defaults }
+          return
+        }
+        ts.forEachChild(n, visit)
+      }
+      visit(file.tree)
+      cvaCache.set(name, found)
+      return found
+    }
+
+    const rootDecl = new Map<string, ts.Node>()
+    for (const f of files)
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations)
+            if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
+              rootDecl.set(d.name.text, d)
+        if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
+          rootDecl.set(st.name.text, st)
+      }
+
+    // AMENDMENT 5 ITSELF: a component paints if its own classes do, if its
+    // own `cva` does, or if the single element it RETURNS paints, resolved
+    // the same way, transitively — ONE edge, the component's own root.
+    let rootsFollowed = 0
+    const rootCache = new Map<string, boolean>()
+    function rootPaints(name: string): boolean {
+      const cached = rootCache.get(name)
+      if (cached !== undefined) return cached
+      rootCache.set(name, false) // recursion guard
+      const decl = rootDecl.get(name)
+      if (!decl) return false
+      const roots = rootElements(decl)
+      if (roots.length === 0) return false
+      const hit = roots.every((r) => paints(r))
+      if (hit) rootsFollowed++
+      rootCache.set(name, hit)
+      return hit
+    }
+
+    const paints = (n: ts.Node): boolean => {
+      if (FILL.test(classNameOf(n))) return true
+      const t = tagName(n)
+      if (!t || !/^[A-Z]/.test(t)) return false
+      const name = t.split(".")[0]
+      const cva = cvaOf(name)
+      // No `cva` to read — the component's own classes, and then its own ROOT
+      // (amendment 5), are the whole answer.
+      if (!cva) return componentPaints(name) || rootPaints(name)
+      if (FILL.test(cva.base)) return true
+      for (const [key, opts] of cva.variants) {
+        const passed = literalProp(n, key)
+        if (passed === null) {
+          if ([...opts.values()].some((v) => FILL.test(v))) return true
+          continue
+        }
+        const chosen = passed === ABSENT ? cva.defaults.get(key) : passed
+        if (chosen !== undefined && opts.has(chosen) && FILL.test(opts.get(chosen)!)) return true
+      }
+      return false
+    }
+
+    return { paints, rootPaints, rootsFollowed: () => rootsFollowed }
   }
 
-  const paints = (n: ts.Node): boolean => {
-    if (FILL.test(classNameOf(n))) return true
-    const t = tagName(n)
-    if (!t || !/^[A-Z]/.test(t)) return false
-    const name = t.split(".")[0]
-    const cva = cvaOf(name)
-    // No `cva` to read — the component's own classes, and then its own ROOT
-    // (amendment 5), are the whole answer.
-    if (!cva) return componentPaints(name) || rootPaints(name)
-    if (FILL.test(cva.base)) return true
-    for (const [key, opts] of cva.variants) {
-      const passed = literalProp(n, key)
-      if (passed === null) {
-        if ([...opts.values()].some((v) => FILL.test(v))) return true
-        continue
-      }
-      const chosen = passed === ABSENT ? cva.defaults.get(key) : passed
-      if (chosen !== undefined && opts.has(chosen) && FILL.test(opts.get(chosen)!)) return true
+  const mainWalk = createPaintWalk(all)
+  const { paints, rootPaints } = mainWalk
+
+  // ── THE TRIPWIRE'S OWN FIXTURE — three tiny synthetic "files", parsed the
+  // same way `parse()` parses a real one but never touched to disk and never
+  // added to `all`. They mirror the real, three-file chain the comment above
+  // names (`ThemeSection` → `SettingsSection` → a `<section>` with an inline
+  // fill), with the same shape and the same reason each level exists:
+  //
+  //   · `FixturePaintedLeaf` paints DIRECTLY — its own JSX carries a fill
+  //     class — so it is found by `componentPaints` alone, the base case,
+  //     never touching `rootPaints`. Stands in for `SettingsSection`.
+  //   · `FixtureRootedMiddle`'s own text has no fill anywhere in it — it only
+  //     names `FixturePaintedLeaf` — so `componentPaints` alone reports it as
+  //     NOT painting, and only the root walk (amendment 5) can find that its
+  //     one RETURN is the leaf. Stands in for `ThemeSection`.
+  //   · `FixtureBareHost` is the call site: it returns `<FixtureRootedMiddle
+  //     />`, the same shape the real census meets when it walks a section's
+  //     body and finds `<ThemeSection />` sitting in it. Asserting through
+  //     `rootPaints` on THIS name is what actually exercises the fallback
+  //     inside `paints` (`componentPaints(name) || rootPaints(name)`) for
+  //     the middle component too, not just the standalone `rootPaints`
+  //     function — the exact wiring a regression here would break.
+  //
+  // Two files matter for keeping this honest: `FixturePaintedLeaf` and
+  // `FixtureRootedMiddle` are declared in SEPARATE fixture files on purpose.
+  // `componentPaints`'s hop-expansion only reads a component's OWN FILE's
+  // top-level constants — if both lived in one file, `FixtureRootedMiddle`'s
+  // text would hop-expand into `FixturePaintedLeaf`'s and report as painting
+  // WITHOUT any root-walk at all, which would prove nothing (and is exactly
+  // why the real `ThemeSection`/`SettingsSection` pair being in different
+  // files is load-bearing, not incidental).
+  function parseFixture(rel: string, source: string): Parsed {
+    const path = join(HERE, "__fixtures__", rel)
+    return { rel, path, tree: ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX) }
+  }
+  const rootWalkFixture = [
+    parseFixture(
+      "root-walk-fixture-leaf.tsx",
+      `export function FixturePaintedLeaf() {
+         return <div className="p-4 bg-surface-panel">leaf</div>
+       }`
+    ),
+    parseFixture(
+      "root-walk-fixture-middle.tsx",
+      `export function FixtureRootedMiddle() {
+         return <FixturePaintedLeaf />
+       }`
+    ),
+    parseFixture(
+      "root-walk-fixture-host.tsx",
+      `export function FixtureBareHost() {
+         return <FixtureRootedMiddle />
+       }`
+    ),
+  ]
+
+  // ── AMENDMENT 7's OWN FIXTURE — SAME REASON AS THE ONE ABOVE: A TRIPWIRE
+  //    PROVING `bodies()` STILL SEES A BARE IDENTIFIER SHOULD NOT DEPEND ON
+  //    THE APP HAPPENING TO CONTAIN ONE. `settings-section.tsx`'s own
+  //    `<section>{children}</section>` never reaches `bodies()` at all — its
+  //    `<section>` paints itself directly, so shape (a) resolves it before
+  //    `bodies()` is called — which is correct today and would say nothing
+  //    about whether the counter still fires the day a NEW chokepoint forwards
+  //    `{children}` without painting itself. Mirrors the real shape closely
+  //    enough to mean something (a `<section>` with no fill, whose only child
+  //    is a bare identifier) while owning its own file, so nothing the app
+  //    does can empty it out or fill it in by accident. */
+  const bareIdentifierFixture = parseFixture(
+    "bare-identifier-fixture.tsx",
+    `function FixtureChildrenPassthrough({ children }) {
+       return <section className="flex flex-col gap-2">{children}</section>
+     }`
+  )
+  function firstSection(f: Parsed): ts.JsxElement {
+    let found: ts.JsxElement | undefined
+    const walk = (n: ts.Node) => {
+      if (!found && ts.isJsxElement(n) && tagName(n) === "section") found = n
+      ts.forEachChild(n, walk)
     }
-    return false
+    walk(f.tree)
+    if (!found) throw new Error(`fixture ${f.rel} has no <section> — the fixture itself is broken`)
+    return found
   }
   const subtreePaints = (n: ts.Node): boolean => {
     let hit = false
@@ -763,10 +1031,51 @@ describe("R67 — a titled section stands on paper", () => {
     return hit
   }
 
+  // ── AMENDMENT 7 (2026-09-14) — A BARE IDENTIFIER IS AN UNRESOLVED BODY, NOT
+  //    A ZERO ONE ────────────────────────────────────────────────────────────
+  //
+  // `bodies()` RESOLVES A TERNARY, A `&&`, A `.map()` AND A JSX LITERAL — every
+  // shape a section's content actually takes IN THE FILE THAT WRITES IT. A
+  // CHOKEPOINT COMPONENT writes a different shape: `shared/web/
+  // settings-section.tsx` draws `<section …>{children}</section>`, and
+  // `{children}` is a bare `Identifier` expression, which `fromExpr` above
+  // does not match at all — not a ternary, not a JSX literal, not a call. The
+  // old behaviour was silence: the expression matched no branch, nothing was
+  // pushed, and `bodies()` returned however many OTHER bodies the section
+  // wrote (zero, for a chokepoint whose whole job is to forward its caller's
+  // content) — a section that hands its census-eligible content to its CALLER
+  // reported as a section with NOTHING to judge, which is not the same claim
+  // as "everything it draws is on paper." Nothing about that empty array said
+  // it was empty because the walk gave up rather than because the section is
+  // simple.
+  //
+  // TWO WAYS OUT, and this file takes the CHEAPER one on purpose. Resolving
+  // `{children}` for real means following it one hop to every CALL SITE of the
+  // component that declares it — `SettingsSection`'s own children are written
+  // at `ThemeSection`, `ScaleSection`, `SpineSection` and every module
+  // settings page, each a different file — and then asking whether every one
+  // of THOSE bodies stands on paper, which is a second census nested inside
+  // this one. It is not built here, and the reason is measured rather than
+  // assumed: `SettingsSection`'s own `<section>` carries `bg-surface-panel` on
+  // itself (this file's own `settings-section.tsx`), so shape (a) — "the
+  // section IS the box" — already resolves it correctly, TODAY, without ever
+  // calling `bodies()` on it: the ancestor walk in the two census loops below
+  // checks `paints(node)` before `bodies()` is reached at all, and a painted
+  // node short-circuits there. So the live risk is not this exact file, it is
+  // the NEXT chokepoint that forwards `{children}`/`{body}`/`{content}`
+  // without painting itself — the day one exists, its bodies must not read as
+  // zero. So a bare identifier expression is not dropped, it is COUNTED, the
+  // same move amendment 4 makes for `headless`/`proseBare`: a number this
+  // file owns and the tripwire below pins, so a widening of this blind spot
+  // (a new component reading `{children}` on a `<section>` that is NOT
+  // already boxed) is a reviewed change to the pin rather than a silent
+  // return to "zero bodies means clean."
+  //
   /** THE BODIES A SECTION ACTUALLY DRAWS — one per BRANCH, which is the clause
    * with the teeth. A ternary's two arms, a `&&`'s right-hand side and a
    * `.map()`'s row are each their own body, so a section cannot pass on the
    * strength of the one branch that happens to have a panel in it. */
+  const amendment7 = { unresolvedIdentifiers: 0 }
   function bodies(node: ts.JsxElement | ts.ArrowFunction | ts.FunctionExpression): ts.Node[] {
     const out: ts.Node[] = []
     const fromChild = (n: ts.Node) => {
@@ -788,13 +1097,26 @@ describe("R67 — a titled section stands on paper", () => {
         fromExpr(e.whenFalse)
         return
       }
+      // `&&`'s LEFT is a GUARD, never content — `scoping && <GoogleScopeDialog/>`
+      // asks "is scoping truthy", it does not offer `scoping` itself as
+      // something that could stand on the page. AMENDMENT 7 is what surfaced
+      // this: before it, a bare identifier on either side was silently
+      // dropped either way, so walking into `&&`'s left cost nothing and hid
+      // a category error in this walk. Once a bare identifier is COUNTED
+      // rather than dropped, that same walk turned two ordinary guards
+      // (`scoping && <GoogleScopeDialog/>`, `sharing && <GoogleSourceDialog/>`
+      // in `google-connections.tsx`) into false "unresolved body" counts —
+      // `scoping`/`sharing` are booleans standing in a CONDITION position, not
+      // a body this walk failed to see into. `||` and `??` keep both sides:
+      // `data.icon || <DefaultIcon/>` really does offer two candidate bodies,
+      // either of which could be what renders.
+      if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+        fromExpr(e.right)
+        return
+      }
       if (
         ts.isBinaryExpression(e) &&
-        [
-          ts.SyntaxKind.AmpersandAmpersandToken,
-          ts.SyntaxKind.BarBarToken,
-          ts.SyntaxKind.QuestionQuestionToken,
-        ].includes(e.operatorToken.kind)
+        [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(e.operatorToken.kind)
       ) {
         fromExpr(e.left)
         fromExpr(e.right)
@@ -820,6 +1142,17 @@ describe("R67 — a titled section stands on paper", () => {
             walk(b)
           } else fromExpr(b)
         }
+        return
+      }
+      // AMENDMENT 7 — a bare identifier (`{children}`, `{body}`, `{content}`)
+      // is a body this walk cannot see into, not an absent one. Counted
+      // rather than pushed: an untagged node would report as a literal
+      // `<null>` finding, which is not what it is — it is unmeasured, and the
+      // tripwire below is where that gets a reviewed number instead of a
+      // silent zero.
+      if (ts.isIdentifier(e)) {
+        amendment7.unresolvedIdentifiers++
+        return
       }
     }
     // A RENDER PROP's bodies are every expression it can RETURN — the same
@@ -1052,13 +1385,34 @@ describe("R67 — a titled section stands on paper", () => {
     // ON PURPOSE. The root walk is a WIDENING of what counts as painted, so its
     // failure modes are a no-op in one direction and the thrown-away version in
     // the other, and each is invisible on its own.
+    //
+    // FIXED 2026-09-14 — OWNED SPECIMEN, NOT THE APP'S. This used to read
+    // `rootsFollowed` off `mainWalk`, i.e. off whatever the real app happens to
+    // contain, on the reasoning that `ThemeSection` and its three neighbours
+    // always would. They stopped: the client's ruling ("one container, four
+    // sections") reached its last holdout, `LanguageSection`, the same day
+    // this was found red, and the product legitimately has zero components of
+    // that shape now. A tripwire that goes red because the PRODUCT changed,
+    // with nothing wrong, sends the next person hunting a bug that is not
+    // there — and the same proxy could just as easily pass for the wrong
+    // reason, green because some unrelated screen happens to grow the shape
+    // back, whether or not the walk still works. So the proof is now run
+    // against `rootWalkFixture` above, a corpus this test owns and nothing
+    // else can add to or empty out.
+    const fixtureWalk = createPaintWalk(rootWalkFixture)
     expect(
-      rootsFollowed,
-      "no component was found to paint through its own ROOT, so amendment 5 admitted nothing. It exists " +
-        "because `ThemeSection` and its three neighbours stand in `SettingsSection`'s box rather than " +
-        "spelling a fill themselves — if this is zero, either that chokepoint has been unpicked or the " +
-        "root walk has stopped resolving, and the second one looks exactly like a law that works"
-    ).toBeGreaterThan(0)
+      fixtureWalk.rootPaints("FixtureBareHost"),
+      "the owned fixture — FixtureBareHost returns <FixtureRootedMiddle/>, which returns " +
+        "<FixturePaintedLeaf/>, which is the only one of the three whose own JSX carries a fill class — " +
+        "no longer resolves as painting. Either `rootElements` stopped finding a component's own RETURN, " +
+        "or `paints`'s `componentPaints(name) || rootPaints(name)` fallback (the line amendment 5 added) " +
+        "was dropped, and the second one looks exactly like a law that works"
+    ).toBe(true)
+    expect(
+      fixtureWalk.rootsFollowed(),
+      "the owned fixture resolved zero components through their own root — FixtureRootedMiddle and " +
+        "FixtureBareHost both should, since neither one's own text carries a fill class"
+    ).toBeGreaterThanOrEqual(2)
     expect(
       rootPaints("CollectionEmptyState"),
       "`CollectionEmptyState` now counts as PAINTING, which is the version of this walk that was written " +
@@ -1075,6 +1429,59 @@ describe("R67 — a titled section stands on paper", () => {
         "(the fourth overruled this file's own exemption); a zero here means the law has reverted to the " +
         "version she rejected while still passing"
     ).toBeGreaterThan(0)
+
+    // AMENDMENT 6's TRIPWIRE — THE OVERLAY FAMILY'S SKIP SET, BOTH WAYS. By
+    // the time this runs, the two census loops above have already called
+    // `isOverlay` on everything they met, so `overlayCache` holds today's real
+    // verdicts. A name it now says `true` for that `OVERLAY_FAMILY_OK` does
+    // not know about is a WIDENING that must be reviewed and named, not
+    // waved through; a pinned name it no longer agrees with is stale and the
+    // list can only shrink, the same rot-check `UNCONTAINED_SECTION_OK` uses.
+    const overlayTrueNow = [...overlayCache.entries()].filter(([, v]) => v).map(([k]) => k)
+    const newOverlay = overlayTrueNow.filter((n) => !(n in OVERLAY_FAMILY_OK))
+    expect(
+      newOverlay,
+      "isOverlay now returns true for a component OVERLAY_FAMILY_OK does not name — either it is a real " +
+        "scrim-standing surface (add it here with the chain that proves it) or the family has widened again " +
+        "the way Popover once did (narrow it back):"
+    ).toEqual([])
+    const staleOverlay = Object.keys(OVERLAY_FAMILY_OK).filter((n) => !overlayTrueNow.includes(n))
+    expect(
+      staleOverlay,
+      "these OVERLAY_FAMILY_OK entries match nothing isOverlay returns true for any more — delete them:"
+    ).toEqual([])
+
+    // AMENDMENT 7's TRIPWIRE, IN TWO HALVES LIKE AMENDMENT 4's. First the
+    // REVIEWED PIN against the real app: today it is zero, because the one
+    // live chokepoint that forwards `{children}` on a `<section>`
+    // (`settings-section.tsx`) paints itself directly and is resolved by
+    // shape (a) before `bodies()` is ever called on it — see that table's own
+    // comment. A rise here means a section's real content just went dark to
+    // this walk; resolve it one hop through the caller or explain the new
+    // count at this line.
+    expect(
+      amendment7.unresolvedIdentifiers,
+      "the real census now finds a bare identifier standing where a section's content should be — a " +
+        "component is forwarding `{children}`/`{body}`/`{content}` on an unpainted `<section>` the way " +
+        "`settings-section.tsx` almost does. Resolve it one hop through the caller, or explain the new " +
+        "count here (it must only ever rise together with a reason)"
+    ).toBe(0)
+    // …then the OWNED FIXTURE, so the counter's own wiring is proved without
+    // waiting for the app to grow a second chokepoint (this file's own most
+    // recent lesson, at amendment 5's `rootsFollowed` tripwire above).
+    const beforeFixture = amendment7.unresolvedIdentifiers
+    const fixtureBodies = bodies(firstSection(bareIdentifierFixture))
+    expect(
+      fixtureBodies,
+      "the owned fixture's `<section>{children}</section>` produced a real body — `bodies()` started " +
+        "resolving a bare identifier to JSX, which it cannot do; something upstream of this walk changed"
+    ).toEqual([])
+    expect(
+      amendment7.unresolvedIdentifiers - beforeFixture,
+      "the owned fixture's bare `{children}` was not counted — the AMENDMENT 7 branch in `fromExpr` stopped " +
+        "matching `ts.isIdentifier`, and a section that forwards its content invisibly is back to reading " +
+        "as a clean zero"
+    ).toBe(1)
   })
 
   it("sections-stand-on-paper: every titled section and every tab panel is contained, or says why not (R67)", () => {

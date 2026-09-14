@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { NOT_A_WORK_PICKER } from "@shared/rules/registry"
 import type { TeamMember } from "@shared/types"
 import { assignableMembers } from "@/lib/members"
 
@@ -124,17 +125,8 @@ describe("assignableMembers — our people, and only ours", () => {
 
 /* ------------------------------------------------------------------------- */
 
-/**
- * The screens that read the members list and are NOT asking "who can do this
- * work". A client login is a member: the screens that MANAGE members have to
- * show them, or nobody could see a grant, change a role, or take one away.
- * Every one is a visible line with a reason; anything else must go through the
- * one seam.
- */
-const NOT_A_WORK_PICKER: Record<string, string> = {
-  "screens/kwapso-screen.tsx":
-    "the team roster on the agency's own record — a list of who is here, not a list of who can be given something",
-}
+// NOT_A_WORK_PICKER moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above.
 
 describe("one seam decides it, and every picker uses that seam", () => {
   it("no screen builds its own members list", () => {

@@ -45,7 +45,6 @@ import type { TaskView } from "@/lib/live-resources"
 import {
   shapeActivity,
   shapeBrandDetail,
-  shapeInviteDetail,
   shapeMemberDetail,
   shapePurposeDetail,
 } from "@/components/deep-link/shape"
@@ -217,17 +216,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     overridesQ,
 
     membersQ,
-    invitesQ,
     activityQ,
     activityTotal,
     activityKey,
     activityFetchPage,
-    inviteAuditQ,
     // THE TEAM'S ROLES — the member profile's role picker. Read across the
     // whole team area anyway, so this costs nothing.
     roles,
     rights,
-    onAction,
     onIntent,
     sectionPath,
     myUserId,
@@ -365,6 +361,33 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // stays mounted, and the reader lands on the tab that now holds the team.
     if (module === "team") return <MovedToTeamTab />
 
+    // MEMBERS' COLLECTION, ROLES (either shape) AND INVITES (either shape) ALL
+    // MOVE HERE TOO — CLIENT RULING, 2026-09-14, over a screenshot of exactly
+    // this: a standalone Members page still carrying its own tab strip
+    // (Members · Member roles · Invites). "what is this? told you to kill it.
+    // Now this only lives on settings / team." The 2026-09-09 pass (the
+    // paragraph on `roles` below) killed the per-role detail redirect but left
+    // `members`/`roles`/`invites` as `placement: "tab"` rows in TEAM_SECTIONS,
+    // so their COLLECTION screens kept drawing that strip — reachable by
+    // anyone who still had the address, which is exactly what a bookmark or
+    // the two legacy shims (web/app/members/page.tsx, web/app/roles/page.tsx)
+    // hand out. web/lib/pages.ts moved all three to `placement: "contextual"`
+    // the same day; this is the other half of that decision.
+    //
+    // `roles` and `invites` move regardless of whether the URL names a record
+    // — neither one has EVER had a real detail address anything links to
+    // (a role's own page went 2026-09-09; nothing has linked to
+    // /t/<teamId>/invites/<id> since revoke moved onto the members gallery's
+    // toolbar). `members` only redirects when the URL names NO record: the
+    // member's own record page is the one survivor, because it is the screen
+    // Settings › Team's gallery actually links to
+    // (`/t/${teamId}/members/${userId}`) and where change-role/remove really
+    // happen — SECTION_HOSTED_ELSEWHERE (shared/rules/registry.ts) says so and
+    // R64's own check proves it by reading the door calls off this file.
+    if (module === "roles") return <MovedToTeamTab />
+    if (module === "invites") return <MovedToTeamTab />
+    if (module === "members" && !recordId) return <MovedToTeamTab />
+
     // Lists — the collection half, next door. Same ctx bundle, so the seam
     // costs nothing to cross; what it buys is two files you can hold in your
     // head instead of one switch with fifteen branches in it.
@@ -419,33 +442,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         />
       )
     }
-    if (module === "invites") {
-      if (invitesQ.error) return <LoadError what="invites" />
-      if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-      const invite = invitesQ.data.find((i) => i.id === recordId) ?? null
-      if (!invite) return <p className="text-muted-foreground text-sm">{t("That invite no longer exists.")}</p>
-      const base = resolveRecipe("invites.detail", overridesQ.data, t)
-      if (!base) return <NotFound />
-      // R8/R16's seam, over whatever collection tab this recipe declares — the
-      // same shape as the member branch above, and with no Activity tab left to
-      // badge either.
-      let recipe = withTabCounts(base, { activity: activityTotal })
-      // Revoke only makes sense while the invite is still pending.
-      if (invite.status !== "pending") recipe = withoutActions(recipe, ["invites.revoke"])
-      const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [], lang)
-      return (
-        <div className="flex flex-col gap-4">
-          <ScreenRenderer
-            recipe={recipe}
-            data={data}
-            rights={rights}
-            onAction={onAction}
-            onIntent={onIntent}
-            activityAction={scopeRail}
-          />
-        </div>
-      )
-    }
+    // INVITES HAD A DETAIL SCREEN HERE (invites.detail — who/what/when, plus
+    // Revoke), deleted 2026-09-14 with the rest of the team-area strip: it was
+    // already reachable from nothing, anywhere, before this change — revoke
+    // moved onto the members gallery's toolbar on 2026-09-09 and called
+    // `tenancy.revokeInvite` from there instead (SECTION_HOSTED_ELSEWHERE,
+    // shared/rules/registry.ts). `module === "invites"` is caught above this
+    // switch now, list or detail alike, so this branch never ran either way —
+    // it is deleted rather than left as an unreachable twin.
     if (module === "accounts") {
       return (
         <AccountDetailScreen
@@ -462,11 +466,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // permission grid on a record screen with two tabs) is deleted; every role's
     // sheet is one grid on Settings › Team now
     // (web/components/team/roles-matrix.tsx), and a cell there is where a right
-    // is changed. The ADDRESS still resolves and lands on that grid, for the
-    // same reason `/t/<teamId>` does — see `MovedToTeamTab` at the foot of this
-    // file. The roles LIST is untouched: its rows open the matrix instead of a
-    // page, which is the same destination the client asked for.
-    if (module === "roles") return <MovedToTeamTab />
+    // is changed. `module === "roles"` is caught above this switch now (see the
+    // 2026-09-14 comment beside `MovedToTeamTab` there) — list or detail land
+    // on that grid alike, for the same reason `/t/<teamId>` does.
     if (module === "knowledge") {
       return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }

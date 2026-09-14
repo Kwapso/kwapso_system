@@ -20,6 +20,7 @@ import {
   ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  AUTH_PUBLISH_EXEMPT,
   CARD_CHIP_BELOW_OK,
   CENTRED_DIALOG_OK,
   CLIENT_REACHABLE_EXEMPT,
@@ -41,6 +42,7 @@ import {
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TWO_READS_ONE_DOOR,
+  TWO_STRIPS_OK,
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
   EMPTY_TOOLBAR_EXEMPT,
@@ -527,6 +529,73 @@ describe("RULES — the laws of the base", () => {
       `our newest law is ${highest} and the base has minted up to ${BASE_LAW_CEILING} — ` +
         `mint above the ceiling, or raise it after re-reading ${BASE_REPOSITORY}`
     ).toBeGreaterThan(BASE_LAW_CEILING)
+  })
+
+  // R73 — RULES.md line 13's promise, kept: a deny-list is DATA in the
+  // registry, never a `const` in the test file that reads it. A census off
+  // web/test/** and web-portal/test/** on 14 Sep 2026 found twenty exemption
+  // lists declared locally instead — moved to shared/rules/registry.ts, each
+  // test now importing its list. This is the check that keeps it moved: no
+  // test file may declare (rather than import) a `const` shaped like one of
+  // these lists, ever again.
+  it("registry-backed-exemptions: a deny-list in a test file is an import, never a declaration", () => {
+    // THE SHAPE, DERIVED OFF WHAT THE CENSUS ACTUALLY FOUND rather than
+    // guessed at: every one of the twenty ended `_OK` or `_EXEMPT`, or was one
+    // of seven irregular names this base already uses for the identical
+    // job — a deny-list that names what it excuses rather than restating "is
+    // this OK". Both are real spellings already live in the registry, so the
+    // pattern is read off `RULES_REGISTRY`'s own subject rather than typed
+    // twice: the suffix rule, plus the irregular names, which is exactly the
+    // set `web/test/named-paths.test.ts`, `web/test/picked-files-are-sent.test.ts`,
+    // `web/test/orphan-components.test.ts`, `web/test/stored-html.test.tsx`,
+    // `web/test/forms-forward-everything.test.ts`, `web/test/assignable-members.test.ts`
+    // and `web/test/ancestors-have-names.test.ts` used to declare locally.
+    const IRREGULAR_NAMES = [
+      "GONE_ON_PURPOSE",
+      "DEFERRED_UPLOAD_FORMS",
+      "PARKED",
+      "MAY_INJECT",
+      "BY_HAND",
+      "NOT_A_WORK_PICKER",
+      "NO_RECORD_BEHIND_IT",
+    ]
+    const EXEMPTION_SHAPED = new RegExp(
+      `^(?:[A-Z][A-Z0-9]*_(?:OK|EXEMPT)|${IRREGULAR_NAMES.join("|")})$`
+    )
+    // A `const` (or `let`) DECLARATION — never matches an `import { NAME }`
+    // line, which is the whole discriminator: a real import statement
+    // declares no `const` at all, so the two shapes cannot be confused. Any
+    // indentation, because the fault has shipped both at module scope
+    // (`GONE_ON_PURPOSE`) and nested inside a `describe`/`it` block
+    // (`BY_HAND`, `OVERLAY_FAMILY_OK`, the rules.test.ts-local `EXEMPT` this
+    // very file used to carry) — a walk that only read column zero would have
+    // missed three of the twenty the census found.
+    const DECLARES_EXEMPTION = /\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::|=)/g
+
+    const files = [
+      ...sourceFiles(join(ROOT, "web", "test"), { extensions: [".ts", ".tsx"], relativeTo: ROOT }),
+      ...sourceFiles(join(ROOT, "web-portal", "test"), { extensions: [".ts", ".tsx"], relativeTo: ROOT }),
+    ]
+    // Tripwire: a walk that found no test files would pass this by finding
+    // nothing to offend, indistinguishable from a clean sweep.
+    expect(files.length, "the test-file walk found nothing — it has gone blind").toBeGreaterThan(80)
+
+    const offenders: string[] = []
+    for (const file of files) {
+      const src = stripComments(file.source)
+      for (const m of src.matchAll(DECLARES_EXEMPTION)) {
+        const name = m[1]
+        if (!EXEMPTION_SHAPED.test(name)) continue
+        offenders.push(`${file.rel} declares \`const ${name}\` locally`)
+      }
+    }
+    expect(
+      offenders,
+      "a deny-list is DATA in the registry (RULES.md line 13), never a local const in the " +
+        "test that reads it — move this list's entries, reasons and header comment into " +
+        "shared/rules/registry.ts as an `export const`, and import it here instead:\n  " +
+        offenders.join("\n  ")
+    ).toEqual([])
   })
 
   // R2 — every record-detail screen exposes Overview + Activity tabs. The
@@ -1563,13 +1632,13 @@ describe("RULES — the laws of the base", () => {
     // The scan must not go blind: three workers are the known floor.
     expect(publishers.length, "the publisher scan found almost nothing").toBeGreaterThanOrEqual(3)
 
-    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name:
-    // it publishes on the USER channel (identity events + a forced sign-out), not a
-    // team resource, so there is no ROUTES-table mutation set for a seam to walk.
-    const EXEMPT: Record<string, string> = {
-      auth: "publishes on the per-user identity channel, not a team resource — no ROUTES mutation set to walk (CACHING.md rule 5)",
-    }
-    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !EXEMPT[w])
+    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name
+    // (AUTH_PUBLISH_EXEMPT, shared/rules/registry.ts — renamed here from the
+    // anonymous local `EXEMPT` it used to be, 14 Sep 2026, RULES.md line 13's
+    // promise made true): it publishes on the USER channel (identity events + a
+    // forced sign-out), not a team resource, so there is no ROUTES-table
+    // mutation set for a seam to walk.
+    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !AUTH_PUBLISH_EXEMPT[w])
     expect(
       unguarded,
       `these workers publish and have no publish-seam suite — add one and list them in ` +
@@ -1585,7 +1654,7 @@ describe("RULES — the laws of the base", () => {
         `MUTATING_WORKERS lists ${w}, which has no publish-seam.test.ts`
       ).toBe(true)
     }
-    for (const w of Object.keys(EXEMPT))
+    for (const w of Object.keys(AUTH_PUBLISH_EXEMPT))
       expect(publishers, `${w} is exempted from R1's roster but publishes nothing`).toContain(w)
   })
 
@@ -5171,6 +5240,7 @@ describe("RULES — the laws of the base", () => {
       "automations-are-visible", // R70: web/test/automations.test.ts — the automation registry against four derivations: R30's own branded-send census (shared/rules/email-sites.ts), every wrangler cron, every export of the files that exist only to act, and every automationOff("…") read in worker source
       "agent-label-vocabulary", // R71: workers/data-ops/test/agent-label-vocabulary.test.ts — every summarize() poisoned with the `help` alias on its module/table/targetTable field, derived off the schema field name
       "no-default-subtitles", // R72: web/test/no-default-subtitles.test.ts — the heading-adjacent prose sibling census over both front doors, plus the three heading-drawing chokepoints read directly for a re-grown subtitle/description prop
+      "registry-backed-exemptions", // R73: the exemption-shaped-const census, above, right after law-id-origin
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -5649,7 +5719,9 @@ describe("a tab strip is not nested inside another one", () => {
   // entry here again means somebody has re-accepted the stacked-strip cost
   // with their eyes open — which, after this ruling, means asking the client
   // first.
-  const TWO_STRIPS_OK: Record<string, string> = {}
+  //
+  // TWO_STRIPS_OK moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+  // line 13's promise made true). Imported above.
 
   it("tab-shape: any screen with two strips is a reasoned exception, never a default", () => {
     // THE SANITY CHECK IS ON FILE ENUMERATION, not on finding an offender.
@@ -6362,54 +6434,56 @@ describe("R64 — a team-area section has a door, or names the screen that took 
       .filter((m) => /placement:\s*"tab"/.test(m[0]))
       .map((m) => m[1])
 
-    // TRIPWIRE 1 — THE PARSE. Every clause below is a set relation against this
-    // set, and a set relation against an empty set is empty: a regex that
-    // stopped matching would report a perfectly doored app.
+    // TRIPWIRE 1 — THE PARSE, RETARGETED 2026-09-14. This used to require AT
+    // LEAST ONE `placement: "tab"` row, because a set relation against an
+    // empty set is empty and an empty set here used to mean only one thing: a
+    // broken regex. It no longer can mean only that. The client's ruling that
+    // day — "Team management is reachable only from Settings › Team. The team
+    // area's own standalone pages must go." — retired the team-area strip
+    // outright, and `members`/`roles`/`invites` (the only rows that had EVER
+    // carried `placement: "tab"`) moved to `placement: "contextual"` the same
+    // day (web/lib/pages.ts carries the whole decision). Zero is now the
+    // CORRECT reading, so the proof the regex still works is POSITIVE instead:
+    // it must find these three keys, by name, each `placement: "contextual"`.
+    for (const key of ["members", "roles", "invites"]) {
+      expect(
+        new RegExp(`key:\\s*"${key}"[^}]*placement:\\s*"contextual"`).test(table),
+        `R64 — TEAM_SECTIONS' \`${key}\` row is not \`placement: "contextual"\`. It moved off "tab" on 2026-09-14 when the team-area strip was retired; if it moved again, teach this law the new shape`
+      ).toBe(true)
+    }
     expect(
       tabSections.length,
-      `R64 — read no \`placement: "tab"\` section out of TEAM_SECTIONS. Either the team area has no strip left (which is a decision to take with the client, not a green build) or the slice above stopped matching ${PAGES_REL}`
-    ).toBeGreaterThan(0)
+      `R64 — TEAM_SECTIONS carries a \`placement: "tab"\` row again: ${tabSections.join(", ")}. That is a real decision (the team area gets its strip back), not a silent regression — if it is deliberate, restore clauses (ii) and the "subtracted" half of clause (vi) below rather than leaving them permanently dead (git history has the pre-2026-09-14 version of this file)`
+    ).toBe(0)
 
-    // ── ii · THE DOOR THAT IS LEFT, AND THAT IT REALLY IS ONE ───────────────
-    // The "This team" list is the app's one entrance to the team area. Checked
-    // FIRST and on its own, because everything after this is measured against
-    // what it subtracts — a check that read the subtraction off a panel that no
-    // longer navigates would be measuring a door that is not there.
-    const panelAt = tab.indexOf("const adminSections = TEAM_SECTIONS.filter(")
+    // ── ii · THE OLD DOOR IS GONE FOR GOOD, NOT JUST LEFT EMPTY ─────────────
+    // Until 2026-09-14 this clause read `adminSections` off ${TAB_REL} — the
+    // "This team" list, the app's one-time entrance to the team area — and
+    // checked what it subtracted. That computation had already gone quietly
+    // vacuous days earlier: `members`/`roles`/`invites` were the only rows
+    // that had EVER carried `placement: "tab"` and all three were ALREADY
+    // subtracted (Internal rates, the one row the list ever rendered, left
+    // with the account rate card on 10 Sep 2026), so `adminSections` was
+    // `[]` and the list drew nothing — while the COLLECTION SCREENS those
+    // three would have opened were still fully reachable by address, strip
+    // and all, which is the exact client screenshot that closed this out.
+    // Left in place as "harmless" is how the 2026-09-09 regression's own
+    // comment read at the time too, so this checks the removal HELD rather
+    // than assuming it: the mechanism is gone, not merely unused.
     expect(
-      panelAt,
-      `R64 — ${TAB_REL} no longer derives \`adminSections\` from TEAM_SECTIONS. That list is the whole of the app's entrance to the team area; if it was renamed, teach this law the new name — if it was DELETED, every tab section below needs a SECTION_HOSTED_ELSEWHERE line, which this check will then say out loud`
-    ).toBeGreaterThan(-1)
-    expect(
-      /softNavigate\(`\/t\/\$\{teamId\}\/\$\{item\.id\}`\)/.test(tab),
-      `R64 — ${TAB_REL} draws the "This team" list but nothing in it soft-navigates into /t/<teamId>/<segment>. The offered half of this law has to be real: a section is only 'doored' by that list if pressing its row actually opens it`
-    ).toBe(true)
+      tab.includes("adminSections"),
+      `R64 — ${TAB_REL} mentions \`adminSections\` again. That derivation was deleted 2026-09-14 because TEAM_SECTIONS can no longer carry a \`placement: "tab"\` row for it to filter (see tripwire 1 above) — if a tab section is back, restore the real clause rather than half-reviving a computation with nothing left to filter`
+    ).toBe(false)
+    // No tab section is ever subtracted any more — see tripwire 1 — so this is
+    // the empty set clause (vi) below unions with `orphanedContextual`, not a
+    // parse of a now-deleted filter literal.
+    const subtracted: string[] = []
 
-    // THE SUBTRACTION, off the filter's own array literal. Narrow on purpose —
-    // `!["…"].includes(s.key)` is the one shape that removes a section from the
-    // list, and reading every string in the filter instead would also collect
-    // `"tab"` and `"read"`, which are not sections.
-    const subtractAt = tab.slice(panelAt).match(/!\[([^\]]*)\]\.includes\(s\.key\)/)
-    expect(
-      subtractAt,
-      `R64 — could not read the \`!["…"].includes(s.key)\` subtraction out of ${TAB_REL}'s adminSections filter. That literal is the record of which sections lost their door; if the filter changed shape, teach this law the new one`
-    ).not.toBeNull()
-    const subtracted = [...(subtractAt?.[1] ?? "").matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1])
-
-    // TRIPWIRE 2 — the subtraction is a real subset of the sections. A key that
-    // is not a tab section means the two files have drifted apart, and it is
-    // also proof this parsed words rather than noise.
-    const notSections = subtracted.filter((k) => !tabSections.includes(k))
-    expect(
-      notSections,
-      `R64 — ${TAB_REL} subtracts a key that is not a \`placement: "tab"\` section in TEAM_SECTIONS: ${notSections.join(", ")}. Either the section moved or was deleted, in which case the subtraction is dead code, or this law is reading the wrong literal`
-    ).toEqual([])
-
-    // ── iii · EVERY SUBTRACTED SECTION NAMES ITS HOST, AND ONLY THOSE ───────
-    // Both directions, because each failure is invisible alone. A subtracted
+    // ── iii · EVERY DOORLESS SECTION NAMES ITS HOST, AND ONLY THOSE ────────
+    // Both directions, because each failure is invisible alone. A doorless
     // section with no line is a capability nobody can reach — the 2026-09-09
-    // regression, exactly. A line for a section that is NOT subtracted is a
-    // stale claim that will one day be read as cover for a real gap.
+    // regression, exactly. A line for a section that HAS a door is a stale
+    // claim that will one day be read as cover for a real gap.
     // ── v · THE CONTEXTUAL SECTIONS, AND THE BLINDNESS THAT EARNED THEM ────
     //
     // WHAT THIS LAW COULD NOT SEE UNTIL 11 SEP 2026. Everything above walks
@@ -6559,13 +6633,17 @@ describe("R64 — a team-area section has a door, or names the screen that took 
       const ids = [...m[2].matchAll(/action:\s*"([a-z]+\.[A-Za-z]+)"/g)].map((x) => x[1])
       if (ids.length) actsOf.set(m[1], [...(actsOf.get(m[1]) ?? []), ...ids])
     }
-    // TRIPWIRE 4 — the recipes parsed, and at least one subtracted section
-    // actually owes something. A green run over an app where no section owes an
-    // act would be the "check that measures nothing" this repo keeps earning.
-    const owed = subtracted.filter((k) => (actsOf.get(k) ?? []).length > 0)
+    // TRIPWIRE 4 — the recipes parsed, and at least one doorless section
+    // actually owes something. Reads `doorless` (clause vi, above this one in
+    // file order) rather than `subtracted`, which is always `[]` since
+    // 2026-09-14 (tripwire 1) — `members` is the doorless key that owes
+    // `members.changeRole`/`members.remove` now. A green run over an app
+    // where no section owes an act would be the "check that measures nothing"
+    // this repo keeps earning.
+    const owed = doorless.filter((k) => (actsOf.get(k) ?? []).length > 0)
     expect(
       owed.length,
-      `R64 — no subtracted section owes a single act, which means either ${SCREENS_REL}'s recipes stopped declaring \`actions:\` (teach this law the new shape) or the three administrative acts on a team's people have been deleted. Both are a decision, not a green build`
+      `R64 — no doorless section owes a single act, which means either ${SCREENS_REL}'s recipes stopped declaring \`actions:\` (teach this law the new shape) or the three administrative acts on a team's people have been deleted. Both are a decision, not a green build`
     ).toBeGreaterThan(0)
 
     const missing: string[] = []

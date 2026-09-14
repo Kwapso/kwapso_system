@@ -38,6 +38,7 @@ import { describe, expect, it } from "vitest"
 import { buildCrumbs, type CrumbRecords, RECORD_FACE } from "@/components/deep-link/crumbs"
 import { TEAM_SECTIONS } from "@/lib/pages"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { NO_RECORD_BEHIND_IT } from "@shared/rules/registry"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
@@ -58,19 +59,11 @@ function segments(): string[] {
   return [...new Set(TEAM_SECTIONS.map((s) => s.segment).filter(Boolean))]
 }
 
-/** Segments that never carry a record id, with the reason each. Data, and
- * rot-checked below, so the list can only shrink. */
-const NO_RECORD_BEHIND_IT: Record<string, string> = {
-  // `dropdowns` STOOD HERE and went on 11 Sep 2026 with its section: the
-  // whole-vocabulary screen and a value's own record were retired together at
-  // the client's ruling ("end goal kill the big tab 'choice options'"), so there
-  // is no segment left for a line to excuse. The rot-check below is what
-  // required this deletion rather than allowing the line to sit on.
-  time: "the work-log collection. A log is read on the record it was booked against, never at /time/<id>.",
-  import: "the CSV importer — a workflow, not a collection. Nothing under it has an id.",
-  brand: "brand assets open in a panel on the section itself rather than at an address of their own.",
-  purposes: "meeting purposes are edited in place on their section, like dropdown values.",
-}
+// NO_RECORD_BEHIND_IT moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
+// line 13's promise made true). Imported above. (Its own comment recorded
+// that `dropdowns` stood here and went on 11 Sep 2026 with its section — the
+// whole-vocabulary screen and a value's own record were retired together at
+// the client's ruling, "end goal kill the big tab 'choice options'".)
 
 /** Lists loaded across the WHOLE TEAM AREA rather than on their own section, and
  * the cache key each is loaded under. They back a tab's count badge, so they are

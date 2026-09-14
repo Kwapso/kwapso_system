@@ -155,13 +155,42 @@
 // Recorded at this length because her FIRST message asked for the opposite, and
 // a later reader finding only that message would restore the second mango
 // believing they were following her.
+//
+// ── IMPORT + EXPORT CSV MOVED IN, 2026-09-14 ─────────────────────────────────
+//
+// This grid used to be reachable ONLY through the roles LIST screen at
+// /t/<teamId>/roles — the one this component itself says it replaces, in the
+// header above — and that list screen drew two acts nothing else in the app
+// offered: a secondary "Import CSV" (`go`'d to /t/<teamId>/import/member_roles`,
+// checked by F2's own census in web/test/cold-account.test.tsx — a member_roles
+// import target needs a screen that names that exact address) and a download
+// "Export CSV" (`/api/tenancy/roles/export`), both beside its own now-deleted
+// "New role" button. The client's 2026-09-14 ruling ("Team management is
+// reachable only from Settings › Team. The team area's own standalone pages
+// must go.") retires that whole screen — web/lib/pages.ts and
+// web/components/deep-link/module-content.tsx carry the rest of that change —
+// and R64 (`sections-have-a-door`) is explicit that a capability may not be
+// deleted along with the page that used to host it: it needs a real home
+// first. "New role" and the create/revoke acts already had one; these two did
+// not, so they are rebuilt here, beside "New role", through `ToolbarAction`
+// (web/components/deep-link/screen-bits.tsx) — NOT the black `+` (they create
+// nothing) and NOT a hand-built `buttonVariants` anchor, which
+// web/test/toolbar-search-floor.test.tsx polices for exactly this reason: a
+// toolbar action built any other way does not fold to its glyph when the row
+// runs out of room. Export is shown whenever there is at least one role to
+// export, the same gate the list screen used ("export needs only READ —
+// implied by seeing this list" applies here too, since the whole tab is
+// already gated on `member_roles:read`); Import is shown only for
+// `member_roles:create`, the same right the list screen's own button gated on.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
-import { Plus, Power } from "@shared/ui/foundations/icons"
+import { Download, Plus, Power, UploadSimple } from "@shared/ui/foundations/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
+import { ToolbarAction } from "@/components/deep-link/screen-bits"
+import { softNavigate } from "@/lib/nav"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -538,29 +567,61 @@ export function RolesMatrix({
        argument, the measured contrast in both palettes, and the upstream ask
        that would delete this prop. */
     <TeamPanel narrowGround={false}>
-      {/* THE CONTAINER'S OWN HEAD — the collection's name, and the one action
-          beside it: a BLACK `+`, icon only. Not mango, not labelled, and not
-          `AddButton`; this file's header has all three reasons and the client's
-          two messages that settle them. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Headline as="h2" size="h4">
+      {/* THE CONTAINER'S OWN HEAD — the collection's name, and its actions
+          beside it: "Import CSV" / "Export CSV" (moved in from the retired
+          roles list screen, 2026-09-14 — see this file's header, both through
+          `ToolbarAction` so they fold to their glyph like every other toolbar
+          action) and the one BLACK `+`, icon only. Not mango, not labelled,
+          and not `AddButton`; this file's header has all three reasons and
+          the client's two messages that settle them.
+
+          THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
+          "remove members and roles titles too", the same call that took the
+          visible "Members" heading next door. Both sections stand inside
+          ONE tab panel already named "Team", so that shared name cannot
+          tell a reader which stacked collection they are in — see
+          `members-gallery.tsx`'s identical note for the fuller argument
+          (Automations and Integrations, by contrast, are the only
+          collection on their own tab and go fully headless). Keeping a real
+          `<Headline as="h2">`, only visually hidden, is the kit's `sr-only`
+          route: a screen reader's heading list still reads "Members" then
+          "Roles", nothing extra shows on screen, and R67 (containment only,
+          no heading required since its 2026-09-11 amendment) is untouched. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Headline as="h2" size="h4" className="sr-only">
           {t("Roles")}
         </Headline>
-        {canCreate && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="inverse"
-                size="icon"
-                aria-label={t("New role")}
-                onClick={() => setAddOpen(true)}
-              >
-                <Plus className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("New role")}</TooltipContent>
-          </Tooltip>
-        )}
+        <div className="flex items-center gap-2">
+          {canCreate && (
+            <ToolbarAction
+              label={t("Import CSV")}
+              icon={<UploadSimple className="size-4" />}
+              onClick={() => softNavigate(`/t/${teamId}/import/member_roles`)}
+            />
+          )}
+          {sheets && sheets.length > 0 && (
+            <ToolbarAction
+              label={t("Export CSV")}
+              icon={<Download className="size-4" />}
+              href="/api/tenancy/roles/export"
+            />
+          )}
+          {canCreate && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="inverse"
+                  size="icon"
+                  aria-label={t("New role")}
+                  onClick={() => setAddOpen(true)}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("New role")}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       {sheetsQ.error ? (
