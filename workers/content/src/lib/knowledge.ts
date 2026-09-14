@@ -2620,6 +2620,33 @@ export function isVectorizeRateLimited(e: unknown): boolean {
   return message.includes("code = 40041") || /too many requests/i.test(message)
 }
 
+/** THE SAME SENTENCE `isVectorizeRateLimited` SAYS, IN SQL — because the
+ * counter was written under an older rule and the rows it parked are still
+ * parked.
+ *
+ * `indexOneSource` stopped advancing `embed_attempts` on a Vectorize 429 the
+ * day that was understood: a burst of 429s is a fact about the INFRASTRUCTURE
+ * at that instant, never about any one document. But rows that reached
+ * `EMBED_ATTEMPT_CAP` BEFORE that change are sitting at the cap with a rate
+ * limit recorded as the reason — and the revisit pass selects
+ * `embed_attempts < EMBED_ATTEMPT_CAP`, so it skips them. For ever. Their text
+ * will not change (they are mirrors of a story and a task nobody is editing),
+ * which is the only other thing that clears the counter.
+ *
+ * MEASURED ON STAGING, 14 Sep 2026: exactly two, a 342-character story and a
+ * 97-character task, both `VECTOR_DELETE_ERROR (code = 40041): Too Many
+ * Requests`, both at `embed_attempts = 5`. I told the owner they were "queued,
+ * not abandoned". They were abandoned, and nothing in the app would ever have
+ * said so — a permanently-skipped row looks exactly like a row whose turn has
+ * not come.
+ *
+ * So the cap is lifted for exactly the failure that was never supposed to
+ * count toward it. The two spellings are kept beside each other deliberately:
+ * `isVectorizeRateLimited` reads a thrown Error, this reads the string that
+ * error was SAVED as, and a test asserts the same message satisfies both. */
+export const RATE_LIMITED_ERROR_SQL =
+  "(index_error LIKE '%code = 40041%' OR LOWER(index_error) LIKE '%too many requests%')"
+
 /** THE ONE EXPRESSION THAT DECIDES "IS THIS SOURCE ACTUALLY BROKEN" —
  * measured against the raw `index_error IS NOT NULL` count and found to
  * overstate it roughly twelve to one (38 raw vs. 3 real, staging, 11 Sep
@@ -2695,8 +2722,13 @@ export async function revisitUnhealthySources(
     cfg,
     guard.databaseId,
     // R14: bounded by INDEX_REVISIT_LIMIT.
+    // THE CAP, EXCEPT FOR THE FAILURE THAT WAS NEVER A REASON — see
+    // `RATE_LIMITED_ERROR_SQL`. A row at the cap whose recorded error is a
+    // Vectorize 429 got there under the old rule, and no amount of waiting
+    // un-parks it.
     `SELECT id FROM knowledge_sources
-      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL}) AND embed_attempts < ${EMBED_ATTEMPT_CAP}
+      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL})
+        AND (embed_attempts < ${EMBED_ATTEMPT_CAP} OR ${RATE_LIMITED_ERROR_SQL})
       ORDER BY updated_at ASC LIMIT ${limit}`
   )
   let recovered = 0
