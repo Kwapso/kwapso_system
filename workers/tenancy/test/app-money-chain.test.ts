@@ -36,7 +36,7 @@ const asStaff = () => makeEnv(() => holder.db as DatabaseSync, IDS.staffUser)
  * role only, because this suite is about the arithmetic rather than the fence. */
 function letStaffSeeTheMoney() {
   holder.db?.exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('${IDS.adminRole}_commercials', '${IDS.adminRole}', 'commercials', 1, 1, 1, 1);`
   )
 }

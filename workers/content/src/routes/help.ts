@@ -310,9 +310,9 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null, undefined, id)
 }
 
-/** POST /api/content/help/update — edit a ticket (help:edit). */
+/** POST /api/content/help/update — edit a ticket (help:update). */
 export async function postUpdateHelp(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<TicketInput & { id?: string }>(request, env, "help", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<TicketInput & { id?: string }>(request, env, "help", "update")
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   requireText(body.description, "Description", TEXT_LIMITS.long)
   optionalText(body.appId, "App", TEXT_LIMITS.short)
@@ -325,11 +325,11 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
- * Gated PURELY by help:edit (every status move, including reopen — no raiser exception). */
+ * Gated PURELY by help:update (every status move, including reopen — no raiser exception). */
 export async function postHelpStatus(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; status?: unknown }>(request, env, "help", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; status?: unknown }>(request, env, "help", "update")
   // R21 AT THE DOOR, and it became necessary the day a client login was granted
-  // `help:edit` so they could re-rank their own company's tickets (SCOPE ch.07).
+  // `help:update` so they could re-rank their own company's tickets (SCOPE ch.07).
   // That grant is safe for the ORDER and for the WORDING, both of which the lock
   // governs — and it would have been a disaster here: the same right would have
   // let a contact set their own request to `resolved`, or drag it back out of it,
@@ -361,14 +361,14 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
  * Counts first (dryRun returns just the count), refuses past the bulk ceiling,
  * idempotent by construction, ONE activity row, and publishes ONE coarse ping
  * only when something moved (R17: a no-op publishes nothing). Facets only —
- * free text is deliberately NOT a filter for a write. Gated by help:edit. */
+ * free text is deliberately NOT a filter for a write. Gated by help:update. */
 export async function postBulkHelpStatusByFilter(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{
     toStatus?: unknown
     status?: unknown
     helpType?: unknown
     dryRun?: unknown
-  }>(request, env, "help", "edit")
+  }>(request, env, "help", "update")
   // R21: the set-shaped sibling of the status door, refused for the same reason
   // — and more so, because one call moves many.
   await refusePortalCaller(cfg, guard)
@@ -404,13 +404,13 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
 
 /** POST /api/content/help/bulk-status — move MANY tickets to the same status in one
  * call (the bulk sibling of the single status endpoint). Gated ONCE by the SAME
- * right (help:edit), validates ids at the boundary (non-empty array of non-empty
+ * right (help:update), validates ids at the boundary (non-empty array of non-empty
  * strings, cap 500 → clean 400) and the status against the same allowed set the
  * single endpoint uses, applies the same per-row change to every matching ticket,
  * and — the live-sync law — publishes ONE row-level ping per CHANGED row (patch
  * that row, never refetch the list). Returns { updated, skipped }. */
 export async function postBulkHelpStatus(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ ids?: unknown; status?: unknown }>(request, env, "help", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ ids?: unknown; status?: unknown }>(request, env, "help", "update")
   // R21: the many-ids sibling of the status door, refused for the same reason.
   await refusePortalCaller(cfg, guard)
   const ids = requireIdList(body.ids)
@@ -521,7 +521,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   return json({ replies, total })
 }
 
-/** POST /api/content/help/resolve — COME BACK TO THE CLIENT (help:edit).
+/** POST /api/content/help/resolve — COME BACK TO THE CLIENT (help:update).
  *
  * The second and last thing in the product that emails a client (BUILD-1 §7),
  * and the reason it is its own door rather than a side effect of the status
@@ -545,7 +545,7 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
     request,
     env,
     "help",
-    "edit"
+    "update"
   )
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
@@ -575,7 +575,7 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
  *
  * Gated by help:EDIT — reordering is editing the ticket, and a client's own right
  * to do it is decided a layer down by the lock, not by a second permission. That
- * matters: `help:edit` is a right the seeded Client role does NOT hold, so this
+ * matters: `help:update` is a right the seeded Client role does NOT hold, so this
  * door is closed to a client login today and opens the moment an owner grants it.
  * The lock is what keeps that grant safe.
  *
@@ -586,7 +586,7 @@ export async function postHelpRank(request: Request, env: Env): Promise<Response
     id?: unknown
     afterId?: unknown
     beforeId?: unknown
-  }>(request, env, "help", "edit")
+  }>(request, env, "help", "update")
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   const afterId = optionalText(body.afterId, "Ticket above", TEXT_LIMITS.short) ?? null
   const beforeId = optionalText(body.beforeId, "Ticket below", TEXT_LIMITS.short) ?? null
@@ -601,13 +601,13 @@ export async function postHelpRank(request: Request, env: Env): Promise<Response
  * (SCOPE ch.07: archive is available from any state). Nothing is deleted; the
  * conversation and the history survive exactly as they were.
  *
- * Gated by help:edit, like every other move along the row. */
+ * Gated by help:update, like every other move along the row. */
 export async function postHelpArchive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; archived?: unknown }>(
     request,
     env,
     "help",
-    "edit"
+    "update"
   )
   // R21: putting a request away is our filing, not theirs. A client who thinks a
   // ticket is finished says so in the conversation, and a staff member decides.
@@ -636,7 +636,7 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
  * WHY THE DOOR WAS REMOVED AND NOT KEPT AS A HARMLESS NO-OP. R17's predicate
  * was the whole of its safety: it could only ever move a row that was
  * `awaiting_validation`. With no such row possible, the door could only ever
- * move zero rows — and it was gated on `help:read` rather than `help:edit`
+ * move zero rows — and it was gated on `help:read` rather than `help:update`
  * precisely so a CLIENT login could reach it. A portal-reachable write door
  * that can no longer do the one useful thing it existed for is surface with no
  * function, which is the definition of what should not survive a retirement.
@@ -656,7 +656,7 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
  * Refused to a client login (R21): triage is our queue, and a request that has
  * been read is a fact about us rather than about them. */
 export async function postHelpTriageRead(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   // R17: already read, already scheduled, already started → zero rows moved.
@@ -877,14 +877,14 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
 /** POST /api/content/help/attachments/remove — take a file or a link off
  * (help:EDIT — taking something off a ticket is a write, and gating a write on
  * the read right let any reader strip attachments staff had added; the story
- * sibling has always demanded work:edit). Deactivate, never delete: the row
+ * sibling has always demanded work:update). Deactivate, never delete: the row
  * keeps its audit block and the object stays in the bucket. */
 export async function postRemoveHelpAttachment(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; attachmentId?: unknown }>(
     request,
     env,
     "help",
-    "edit"
+    "update"
   )
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
@@ -973,8 +973,8 @@ export async function getHelpRating(request: Request, env: Env): Promise<Respons
  * owner's ruling of 6 Sep 2026, "let's store sentiment (1-3) on the portal for
  * how did we do it to see if client is happy").
  *
- * GATED ON `help:read`, NOT `help:edit`, and that is the same reading the
- * `validate` door already makes: `help:edit` is a right the seeded Client role
+ * GATED ON `help:read`, NOT `help:update`, and that is the same reading the
+ * `validate` door already makes: `help:update` is a right the seeded Client role
  * deliberately does not hold, so gating on it would close this door to the only
  * people it exists for. A rating changes no lifecycle, moves no status and edits
  * nothing — it appends a sentence about work that is already finished.

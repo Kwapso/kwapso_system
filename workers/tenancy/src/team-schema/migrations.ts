@@ -5920,6 +5920,32 @@ CREATE TABLE automations (
 ALTER TABLE accounts ADD COLUMN name_narrows_alone INTEGER NOT NULL DEFAULT 0;
 `,
   },
+  {
+    // THE FOURTH VERB, RENAMED — the owner's ruling: the permission matrix is
+    // exactly CRUD, so "edit" becomes "update" everywhere the concept appears,
+    // not just on screen. Every OTHER law this base enforces treats a right's
+    // NAME as code (`Right`, `MODULE_OFFERED_RIGHTS`, `TOOL_GATES`, every
+    // `requireRight` call) — the one place that name was also a stored SCHEMA
+    // fact was this column, so the rename is not done until this column says
+    // it too.
+    //
+    // THE FIRST `RENAME COLUMN` THIS LEDGER HAS EVER RUN. Every migration
+    // before this one is additive (`CREATE TABLE` / `ADD COLUMN`) — nothing
+    // here has ever un-said a column's name once a team held it. SQLite has
+    // supported `ALTER TABLE ... RENAME COLUMN` since 3.25 and D1 runs a
+    // modern build, so it is legal; it is still a first, so it is named as
+    // one rather than folded quietly into the additive pattern around it.
+    //
+    // NO DATA MOVES. The four rights were never stored as a string — the row
+    // is four booleans, `can_read`/`can_create`/`can_edit`/`can_delete` — so
+    // this is a pure rename of the THIRD column's name, not a data migration:
+    // every team's existing grants (which roles hold what) survive exactly as
+    // they are, under the new name.
+    version: "0086_the_fourth_verb_is_update_not_edit",
+    sql: `
+ALTER TABLE role_permissions RENAME COLUMN can_edit TO can_update;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

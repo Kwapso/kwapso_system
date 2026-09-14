@@ -15,7 +15,7 @@
 //    exemption nobody checks is just a skip with better manners.
 //
 // 2. NO STATUS CONTROL, AND SINCE 7 SEP 2026 THE SENTENCE HAS NO EXCEPTION
-//    CLAUSE. Moving a ticket along its lifecycle is gated on help:edit, which is
+//    CLAUSE. Moving a ticket along its lifecycle is gated on help:update, which is
 //    the agency's job: the client sees where it stands (CHECKLIST 5.2 — the
 //    status is a label, never a button).
 //

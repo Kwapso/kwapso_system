@@ -24,7 +24,7 @@ export const TEAM_MODULES = [
   "selectable_data",
   // `screens` WAS HERE, and it was the only module on the sheet whose four
   // switches decided nothing at all (21 Aug 2026). Its two doors — read the
-  // screen recipes, save one — gate on `teams:edit`, which is the correct
+  // screen recipes, save one — gate on `teams:update`, which is the correct
   // answer: a screen layout is a team setting. So the row offered four grants
   // that no door has ever asked for, and an owner ticking one believed they had
   // granted something. Removed here, and migration 0038 deletes its rows.
@@ -66,7 +66,7 @@ export const TEAM_MODULES = [
   // the `agent` right, so that giving somebody the assistant does not silently
   // give the assistant their outbox. The tall sheet's unit of "a switch per
   // role" is a module row. (`agent` is the precedent for a module whose four
-  // rights are not all meaningful: nothing reads agent:edit either.)
+  // rights are not all meaningful: nothing reads agent:update either.)
   //
   // THE THIRD WAS `google_events`, "Calendar on your behalf", and it went with
   // the doors it guarded when the calendar became READ-ONLY (18 Aug 2026). A
@@ -161,7 +161,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // is exactly why it is its own module and not four more rights on `work`. A
   // contact completes theirs and uploads a file against it from the portal
   // (SCOPE ch.06, one of the six things a contact can do), so an owner grants
-  // `todos: read + edit` to their Client role and grants nothing else.
+  // `todos: read + update` to their Client role and grants nothing else.
   todos: "Inputs",
   // MEETINGS. A record of a conversation — when it was, why we met, what was on
   // the agenda and what was decided. AGENCY material: the notes are ours, taken
@@ -208,7 +208,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   //            them (files in the folders you named, mail with a known contact,
   //            your calendar, the spaces you named);
   //   create — CONNECT a Google account, and name a folder or a space for it;
-  //   edit   — write back through a connection: put a file in a folder you
+  //   update — write back through a connection: put a file in a folder you
   //            named, leave a draft in your own Gmail, post in a space you named;
   //   delete — disconnect an account, or take a folder or space away again.
   //
@@ -217,7 +217,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // switches and live in their own modules below. Only `create` is read on
   // either: the module IS the switch. A space post is not a third switch because
   // the owner named two, and a space is one you named yourself; it sits under
-  // `edit` with the other writes.
+  // `update` with the other writes.
   google: "Google connections",
   // Read as a sentence with the role's name in front: "Ana may send mail on her
   // behalf" is the wrong reading — it is "kwapso may send mail on Ana's behalf".
@@ -233,7 +233,7 @@ export const TEAM_MODULE_CATALOG: { key: string; label: string }[] =
   TEAM_MODULES.map((key) => ({ key, label: MODULE_LABELS[key] }))
 
 /** The four rights each module row carries, in matrix order. */
-export const MODULE_RIGHTS = ["read", "create", "edit", "delete"] as const
+export const MODULE_RIGHTS = ["read", "create", "update", "delete"] as const
 
 /** WHICH OF THE FOUR A MODULE ACTUALLY OFFERS (R36).
  *
@@ -281,21 +281,21 @@ export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHT
   // The team's own settings, and the screen recipes that came with `screens`.
   // Reading a team is `whoAmI`, not a right; a team is created at signup and is
   // never deleted (SCOPE: one team per product).
-  teams: ["edit"],
-  // A contact is a person ACCOUNT, so editing one is `accounts:edit` — this
+  teams: ["update"],
+  // A contact is a person ACCOUNT, so editing one is `accounts:update` — this
   // right is about being able to LIST them, link one, and take a link away.
   contacts: ["read", "create", "delete"],
   // Same shape: granting and revoking a login are the two acts. A login has
   // nothing on it to edit that is not the person's own account row.
   portal_users: ["read", "create", "delete"],
-  // Deactivate, never delete — a ticket is archived, which is `edit`.
-  help: ["read", "create", "edit"],
+  // Deactivate, never delete — a ticket is archived, which is `update`.
+  help: ["read", "create", "update"],
   // THE MODULE IS THE SWITCH. `read` is "see your threads", `create` is "say
   // something to it". There is no third act: the assistant acts through the
   // caller's OTHER rights, which is the whole security model.
   agent: ["read", "create"],
   // A story, sprint or work log is deactivated, not deleted.
-  work: ["read", "create", "edit"],
+  work: ["read", "create", "update"],
   // A switch over a SIGHT, not over a record: "may this role see everyone's
   // tasks, or only their own". Creating and editing a task is `work`'s call.
   all_tasks: ["read"],
@@ -305,7 +305,7 @@ export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHT
   // thing … for now i iwanna wipe it clean") and the account rate card went an
   // hour later ("the whole account rates also killed it"). The ONE door left on
   // this right is `GET /api/tenancy/app-money` — what one app gives back, priced
-  // — which reads and never writes. Leaving `create`, `edit` and `delete` on the
+  // — which reads and never writes. Leaving `create`, `update` and `delete` on the
   // sheet would be three boxes an owner ticks and believes they granted by, which
   // is the whole of R36.
   commercials: ["read"],

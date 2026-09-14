@@ -164,13 +164,13 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null, undefined, id)
 }
 
-/** POST /api/content/stories/update — edit a story (work:edit). */
+/** POST /api/content/stories/update — edit a story (work:update). */
 export async function postUpdateStory(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<StoryInput & { id?: unknown }>(
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
@@ -204,7 +204,7 @@ async function announceScheduled(
 }
 
 /** POST /api/content/stories/status — move a story along its fixed lifecycle
- * (work:edit), and — when the move CLOSES it — settle the ticket half in the
+ * (work:update), and — when the move CLOSES it — settle the ticket half in the
  * same call: the closing note lands in the ticket's draft resolution, and the
  * ticket flips to READY if that was the last piece of work outstanding.
  *
@@ -228,7 +228,7 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     reviewNote?: unknown
     reviewFileUrl?: unknown
     reviewFileName?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   if (typeof body.status !== "string" || !(STORY_STATUSES as readonly string[]).includes(body.status))
@@ -319,7 +319,7 @@ export async function postCreateSprint(request: Request, env: Env): Promise<Resp
   })
 }
 
-/** POST /api/content/sprints/update — edit a sprint (work:edit).
+/** POST /api/content/sprints/update — edit a sprint (work:update).
  *
  * The door a sprint's PRICE was missing: `sold_price_cents` could be set only at
  * the moment the sprint was started, so a block of work agreed before its price
@@ -331,7 +331,7 @@ export async function postUpdateSprint(request: Request, env: Env): Promise<Resp
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Sprint", TEXT_LIMITS.short)
@@ -348,7 +348,7 @@ export async function postUpdateSprint(request: Request, env: Env): Promise<Resp
 }
 
 /** POST /api/content/sprints/complete — mark a sprint finished, or reopen it
- * (work:edit). R17: the current-state predicate rides the UPDATE — a repeat
+ * (work:update). R17: the current-state predicate rides the UPDATE — a repeat
  * moves zero rows and says nothing twice. (Completing used to ALSO cut a
  * version of every map beneath it; 0051 moved the cut to the map itself, so
  * this door changes no map any more.) */
@@ -357,7 +357,7 @@ export async function postSprintComplete(request: Request, env: Env): Promise<Re
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Sprint", TEXT_LIMITS.short)
@@ -389,7 +389,7 @@ export async function getStoryAttachments(request: Request, env: Env): Promise<R
 
 /** POST /api/content/stories/attachments — attach a file or a link to a story.
  *
- * `work:edit`, because unlike a ticket (where the person who raised it may add
+ * `work:update`, because unlike a ticket (where the person who raised it may add
  * their own screenshot) a story is ours and showing what it did is part of doing
  * it. The two branches are the ticket door's, for the ticket door's reasons: a
  * LINK has its scheme checked here rather than filtered at each front end, since
@@ -402,7 +402,7 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
     label?: unknown
     url?: unknown
     fileDataUrl?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   if (body.kind !== "file" && body.kind !== "link")
@@ -486,7 +486,7 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
  * lib/story-attachments.ts carries that argument, because it is a decision about
  * what deactivate-never-delete is FOR rather than about this handler.
  *
- * `work:edit`, the same right the other two writes ask for and for the same
+ * `work:update`, the same right the other two writes ask for and for the same
  * reason: a story is ours. And the same `refusePortalCaller` (R21).
  */
 export async function postStoryAttachmentUpdate(request: Request, env: Env): Promise<Response> {
@@ -496,7 +496,7 @@ export async function postStoryAttachmentUpdate(request: Request, env: Env): Pro
     label?: unknown
     url?: unknown
     fileDataUrl?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
@@ -575,7 +575,7 @@ export async function postStoryAttachmentRemove(request: Request, env: Env): Pro
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)

@@ -176,7 +176,7 @@ export function AccountDetailScreen({
   // the door would refuse.
   const appsQ = useCached<AppRow[]>(have ? appsKey(teamId) : null, () => listFetch.apps(teamId))
   const canReadKnowledge = can("knowledge", "read")
-  const canEdit = can("accounts", "edit")
+  const canEdit = can("accounts", "update")
   const canArchive = can("accounts", "delete")
   // THE ADDRESS BOOK IS ITS OWN GRANT. `contacts` rather than `accounts`: a
   // developer opening a client sees the company and its apps, not the list of

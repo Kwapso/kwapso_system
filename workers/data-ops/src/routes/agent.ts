@@ -306,7 +306,7 @@ export async function getAgentThread(request: Request, env: Env): Promise<Respon
  * rule the chat turn follows.
  *
  * IT WRITES ACT-AS-USER, through the SAME gated door a person's edit goes
- * through. There is no second path into a ticket: the caller needs `help:edit`
+ * through. There is no second path into a ticket: the caller needs `help:update`
  * on the other side, and if they do not have it the translation is refused there
  * rather than half-applied here. */
 export async function postTranslateTicket(request: Request, env: Env): Promise<Response> {

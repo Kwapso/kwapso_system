@@ -60,7 +60,7 @@ function draw(rows: Account[]) {
       recipe={RECIPE}
       // The recipe gates on `accounts: read` — with no rights the engine draws
       // nothing at all, which would make every claim below pass on an empty page.
-      rights={{ accounts: { read: true, create: false, edit: false, delete: false } }}
+      rights={{ accounts: { read: true, create: false, update: false, delete: false } }}
       listKey={LIST_KEY}
       onAction={() => {}}
       onIntent={() => {}}

@@ -219,7 +219,7 @@ export async function createTeam(
 /** Edit a team's name + optional logo (the global teams row). A new logo (data
  * URL) lands in R2 and is served by the gateway at /media/<team>/logo/<random> —
  * a capability URL (no session on that door), so the key carries a random tail.
- * Caller checks teams:edit. */
+ * Caller checks teams:update. */
 export async function updateTeamDetails(
   env: Env,
   teamId: string,

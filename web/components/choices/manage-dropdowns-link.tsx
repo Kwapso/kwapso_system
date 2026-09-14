@@ -68,7 +68,7 @@ export function ManageDropdownsLink({
     !!teamId &&
     !!page &&
     can("selectable_data", "read") &&
-    (can("selectable_data", "create") || can("selectable_data", "edit"))
+    (can("selectable_data", "create") || can("selectable_data", "update"))
   if (!allowed) return null
   return (
     <InAppLink

@@ -44,7 +44,7 @@ beforeEach(() => {
   // are agency material, so grant their modules here rather than widening a
   // harness every other suite depends on.
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES
        ('P_ADMIN_SEL', '${IDS.adminRole}', 'selectable_data', 1, 1, 1, 1),
        ('P_ADMIN_LRN', '${IDS.adminRole}', 'learning', 1, 1, 1, 1);`
   )
@@ -63,7 +63,7 @@ function seedRoles(n: number, withPermissions: boolean) {
     if (withPermissions)
       for (const m of TEAM_MODULE_CATALOG)
         rows.push(
-          `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+          `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
            VALUES ('P_${id}_${m.key}', '${id}', '${m.key}', 1, 1, 1, 1);`
         )
   }
@@ -86,7 +86,7 @@ function fillPermissions(target: number) {
     )
     for (let m = 0; m < 100 && made < target - have; m++, made++)
       rows.push(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('PW_${r}_${m}', '${id}', 'mod_${m}', 1, 0, 0, 0);`
       )
   }
@@ -131,7 +131,7 @@ describe("the roles export refuses rather than revoking", () => {
     fillPermissions(EXPORT_HARD_CAP)
     expect((await listAllRolePermissions(cfg, guard)).complete).toBe(true)
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('PW_OVER', 'R_WIDE_00000', 'over_the_cap', 1, 0, 0, 0);`
     )
     expect((await listAllRolePermissions(cfg, guard)).complete).toBe(false)

@@ -68,7 +68,7 @@ vi.mock("@shared/web/realtime", async (importOriginal) => ({
 
 /* -------------------------------- fixtures -------------------------------- */
 
-const ALL = { read: true, create: true, edit: true, delete: true }
+const ALL = { read: true, create: true, update: true, delete: true }
 const user: SessionUser = {
   id: "u1",
   email: "aurora@kwapso.com",

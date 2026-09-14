@@ -25,7 +25,7 @@
 //     exactly what stops a map set to March reading March's price.
 //
 // THE DOORS GATE; THIS ONLY DECIDES WHAT TO DRAW. Everything here sits behind
-// `processes:create` / `:edit` / `:delete` — the same rights that let somebody
+// `processes:create` / `:update` / `:delete` — the same rights that let somebody
 // map the process, because a role exists to carry the cost that turns that map's
 // minutes into money.
 
@@ -182,7 +182,7 @@ export function ClientOrgPanel({
   const t = useT()
   const { can } = usePermissions(teamId)
   const canCreate = can("processes", "create")
-  const canEdit = can("processes", "edit")
+  const canEdit = can("processes", "update")
   const canSwitchOff = can("processes", "delete")
 
   const deptQ = useCached<ClientDepartment[]>(clientDepartmentsKey(teamId), () =>

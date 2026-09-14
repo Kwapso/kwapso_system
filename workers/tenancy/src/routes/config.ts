@@ -31,7 +31,7 @@ export async function getScreens(request: Request, env: Env): Promise<Response> 
 
 export async function postScreen(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ module?: string; recipe?: unknown }>(
-    request, env, "teams", "edit"
+    request, env, "teams", "update"
   )
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
@@ -59,7 +59,7 @@ export async function postScreen(request: Request, env: Env): Promise<Response> 
  * carry only this team's overrides of it — which is to say, only the ones it has
  * deliberately switched OFF.
  *
- * THE READ IS OPEN TO ANY MEMBER and the write is `teams:edit`, exactly as the
+ * THE READ IS OPEN TO ANY MEMBER and the write is `teams:update`, exactly as the
  * recipe store above it. Her ruling is VISIBILITY, so the answer to "what does
  * this software do without me asking" cannot itself be behind the right to
  * change it — and the page already refuses a reader the module's own gate
@@ -75,7 +75,7 @@ export async function getAutomations(request: Request, env: Env): Promise<Respon
 
 export async function postAutomation(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ key?: string; on?: unknown }>(
-    request, env, "teams", "edit"
+    request, env, "teams", "update"
   )
   await refusePortalCaller(cfg, guard)
   const key = requireText(body.key, "Automation", TEXT_LIMITS.short)

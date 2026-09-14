@@ -219,7 +219,7 @@ export function WritePanels({
       open:
         !!kind &&
         (query.panel === "add" || editing) &&
-        can(INTERNAL_MODULE[kind], editing ? "edit" : "create"),
+        can(INTERNAL_MODULE[kind], editing ? "update" : "create"),
       fields: spec?.fields ?? [],
       title: spec?.title ?? "",
       subtitle: spec?.subtitle ?? "",
@@ -256,7 +256,7 @@ export function WritePanels({
           query.panel === "edit" &&
           query.module === "members" &&
           !!query.id &&
-          can("team_members", "edit")
+          can("team_members", "update")
         }
         onOpenChange={(o) => !o && closePanel()}
         roles={activeRoles}
@@ -330,7 +330,7 @@ export function WritePanels({
           on the DETAIL read (see `knowledgeOneQ` above) before it draws, so a
           fast click-and-submit can never send an emptied body. */}
       <KnowledgeFormDialog
-        open={knowledgeEditing && !!knowledgeEditRow && can("knowledge", "edit")}
+        open={knowledgeEditing && !!knowledgeEditRow && can("knowledge", "update")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={query.id ? `knowledge:edit:${query.id}` : undefined}
         teamId={teamId}
@@ -384,9 +384,9 @@ export function WritePanels({
         onSubmit={uploadKnowledgeFile}
       />
 
-      {/* Edit the team (?panel=edit&module=team) — gated by teams:edit. */}
+      {/* Edit the team (?panel=edit&module=team) — gated by teams:update. */}
       <TeamEditDialog
-        open={query.panel === "edit" && query.module === "team" && can("teams", "edit")}
+        open={query.panel === "edit" && query.module === "team" && can("teams", "update")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `team:edit:${teamId}` : undefined}
         team={active.ctx?.team ?? null}

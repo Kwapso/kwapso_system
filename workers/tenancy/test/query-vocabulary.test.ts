@@ -61,7 +61,7 @@ beforeEach(() => {
   // look clean. The harness's own role already holds the spine; this widens it
   // to the rest so the vocabulary of EVERY module is exercised.
   db().exec(`
-    INSERT OR IGNORE INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    INSERT OR IGNORE INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
     SELECT '${IDS.adminRole}_' || m.module, '${IDS.adminRole}', m.module, 1, 1, 1, 1
       FROM (SELECT 'commercials' AS module UNION ALL SELECT 'work'
             UNION ALL SELECT 'knowledge' UNION ALL SELECT 'meetings'

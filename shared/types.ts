@@ -106,7 +106,7 @@ export type TeamMember = {
 export type RightSet = {
   read: boolean
   create: boolean
-  edit: boolean
+  update: boolean
   delete: boolean
 }
 
@@ -163,9 +163,9 @@ export type RolePermissions = {
   value: PermissionValue
   isDefault: boolean
   title: string
-  /** whether the signed-in viewer may edit roles (member_roles:edit) — drives
+  /** whether the signed-in viewer may edit roles (member_roles:update) — drives
    * the screen's edit-vs-view mode and whether Save shows. */
-  canEdit: boolean
+  canUpdate: boolean
 }
 
 /** One invite to a team. `status` is the display status — "pending" past its
@@ -1126,6 +1126,16 @@ export type ModelFailure =
 export type StreamEvent =
   /** append this delta to the current assistant reply bubble (word-by-word). */
   | { t: "text"; d: string }
+  /** WHAT THE MODEL IS THINKING, as it thinks it — the provider's hidden
+   * reasoning, streamed word by word into a strip the person may open. Never
+   * part of the answer, never saved: it is scratch work, and it is shown
+   * because a long step otherwise looks dead for a minute at a time, and
+   * because when an answer is wrong the reasoning usually says why (14 Sep
+   * 2026: the "average per app" that moved between runs was the model picking
+   * a different denominator each time, visible only here). One run of these
+   * deltas belongs to one model call; the next step or the answer's first word
+   * closes it. */
+  | { t: "thought"; d: string }
   /** a tool is about to run (human, id→name-resolved summary). */
   | { t: "step_start"; tool: string; summary: string; ids?: Record<string, string> }
   /** that tool finished — ok true, or false on failure (`error` = the door's short,

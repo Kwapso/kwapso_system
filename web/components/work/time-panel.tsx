@@ -210,7 +210,7 @@ export function TimePanel({
 }: {
   teamId: string
   canCreate: boolean
-  /** `work:edit` — a step above logging your own, because correcting a row of
+  /** `work:update` — a step above logging your own, because correcting a row of
    * time changes a number somebody else may already have read. */
   canEdit: boolean
 }) {

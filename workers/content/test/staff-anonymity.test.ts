@@ -191,7 +191,7 @@ describe("the stakeholder list does not hand out the staff roster", () => {
   function helpOnlyMember() {
     db().exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('R_HELPONLY', 'Support desk', 0, '2026-01-01');
-      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
         VALUES ('P_HELPONLY', 'R_HELPONLY', 'help', 1, 1, 0, 0);
       INSERT INTO users (id, email, first_name, current_team_id) VALUES ('U_DESK', 'desk@kwapso.app', 'Desk', '${IDS.team}');
       INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m8', '${IDS.team}', 'U_DESK', 'R_HELPONLY', '2026-01-01');
@@ -216,7 +216,7 @@ describe("the stakeholder list does not hand out the staff roster", () => {
   it("team_members:read gets it back — the right that owns the directory pays for it", async () => {
     helpOnlyMember()
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('P_HELPONLY_TM', 'R_HELPONLY', 'team_members', 1, 0, 0, 0);`
     )
     const res = await call("U_DESK", "GET /api/content/help/stakeholders", undefined, `?id=${STAFF_TICKET}`)

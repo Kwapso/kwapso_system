@@ -248,7 +248,7 @@ function idList(value: unknown[], label: string): string[] {
 }
 
 export async function postUpdateApp(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "App", TEXT_LIMITS.short)
   const { supersededUrls } = await updateApp(cfg, guard, scope, actor, id, {
@@ -366,7 +366,7 @@ export async function postCreateAppModule(request: Request, env: Env): Promise<R
 /** POST /api/tenancy/app-modules/update — rename or re-describe a section.
  * Every ticket holding it follows, because a ticket stores the id. */
 export async function postUpdateAppModule(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Module", TEXT_LIMITS.short)
   await updateAppModule(cfg, guard, scope, actor, id, {
@@ -484,7 +484,7 @@ function isoDayOrThrow(value: string | undefined): string | undefined {
  * the numbers"); the door's job is to make the move honest, which it does by
  * writing a line in the history saying what it became. */
 export async function postAuditDate(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
   const auditDate = requireText(body.auditDate, "Date", TEXT_LIMITS.short)
@@ -507,7 +507,7 @@ export async function postAuditDate(request: Request, env: Env): Promise<Respons
  * the same sentence, so the second call answers `alreadyLinked` rather than an
  * error (R17, through the unique index). */
 export async function postLinkProcesses(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const fromProcessId = requireText(body.fromProcessId, "Process", TEXT_LIMITS.short)
   const toProcessId = requireText(body.toProcessId, "Process", TEXT_LIMITS.short)
@@ -527,7 +527,7 @@ export async function postLinkProcesses(request: Request, env: Env): Promise<Res
  * work, so there is no history to keep and a "removed connection" row on a
  * screen would be noise. */
 export async function postUnlinkProcesses(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Link", TEXT_LIMITS.short)
   const processId = requireText(body.processId, "Process", TEXT_LIMITS.short)
@@ -559,7 +559,7 @@ export async function postCreateProcess(request: Request, env: Env): Promise<Res
 }
 
 export async function postUpdateProcess(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Process", TEXT_LIMITS.short)
   const updated = await updateProcess(cfg, guard, scope, actor, id, {
@@ -628,7 +628,7 @@ export async function postAddStep(request: Request, env: Env): Promise<Response>
 }
 
 export async function postUpdateStep(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Step", TEXT_LIMITS.short)
   const step = await updateStep(cfg, guard, scope, actor, id, {

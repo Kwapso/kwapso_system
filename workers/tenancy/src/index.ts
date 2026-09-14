@@ -85,11 +85,11 @@
 //   GET  /api/tenancy/invitations          -> invites I've RECEIVED (any signed-in user)
 //   POST /api/tenancy/invitations/accept   -> accept a received invite (join + switch)
 //   GET  /api/tenancy/config/screens       -> a team's screen-recipe overrides (any member)
-//   POST /api/tenancy/config/screens       -> set a screen override (teams:edit; people only —
+//   POST /api/tenancy/config/screens       -> set a screen override (teams:update; people only —
 //                                             it is on neither machine catalogue, and the R19
 //                                             census says why)
 //   GET  /api/tenancy/config/automations   -> which automations this team switched OFF (any member)
-//   POST /api/tenancy/config/automations   -> switch one automation on/off (teams:edit; people
+//   POST /api/tenancy/config/automations   -> switch one automation on/off (teams:update; people
 //                                             only, for the same reason as the recipe store above
 //                                             and one more: a model that could silence the emails
 //                                             could make its own next mistake quiet)

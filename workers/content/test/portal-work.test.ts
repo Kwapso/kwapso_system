@@ -175,7 +175,7 @@ describe("a client sees the block they bought, and nothing inside it", () => {
 })
 
 // SCOPE ch.07 gives the account two powers over its own requests, and both are
-// `help:edit` — which is why granting it made the four doors on the same right
+// `help:update` — which is why granting it made the four doors on the same right
 // refuse a portal caller. These cases are the two halves of that decision.
 describe("what a client may do to their own ticket, and what they may not", () => {
   /** A ticket the CLIENT raised, which is the only kind they may edit. */
@@ -198,7 +198,7 @@ describe("what a client may do to their own ticket, and what they may not", () =
     ).toBe("The dispatch board stopped refreshing")
 
     // …and stops the moment a staff member reads it. The lock is what makes the
-    // `help:edit` grant safe, not the permission.
+    // `help:update` grant safe, not the permission.
     await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "triaged" })
     const after = await call(IDS.contactUser, "POST /api/content/help/update", {
       id,

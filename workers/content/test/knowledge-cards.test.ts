@@ -117,7 +117,7 @@ beforeEach(() => {
   holder.db = buildSpineDb()
   vectorIndex = fakeVectorize()
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('${IDS.adminRole}_knowledge', '${IDS.adminRole}', 'knowledge', 1, 1, 1, 1);
      INSERT INTO todos (id, ref, account_id, title, detail, created_at, creator_id)
        VALUES ('TD_C', 'BERG-T9', '${IDS.victimAccount}', 'Send us the supplier list',

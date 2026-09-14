@@ -60,11 +60,11 @@ export async function getStaffProfiles(request: Request, env: Env): Promise<Resp
 }
 
 /** Write a person's profile — one door for "there wasn't one" and "there was".
- * Gated `staff_profiles:edit`: writing down what a colleague is like is the same
+ * Gated `staff_profiles:update`: writing down what a colleague is like is the same
  * act either way, and a permission that depends on invisible state is one nobody
  * can reason about. */
 export async function postSaveStaffProfile(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<StaffProfileInput>(request, env, "staff_profiles", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<StaffProfileInput>(request, env, "staff_profiles", "update")
   await refusePortalCaller(cfg, guard)
   requireText(body.userId, "Member", TEXT_LIMITS.short)
   const { id, created, supersededUrls } = await saveStaffProfile(cfg, guard, actor, body)
@@ -116,11 +116,11 @@ export async function postSetStaffProfileActive(request: Request, env: Env): Pro
 }
 
 /** Upload a profile photo or a certificate PDF as a base64 data URL. Gated
- * staff_profiles:edit — the same right that writes the row the URL lands on.
+ * staff_profiles:update — the same right that writes the row the URL lands on.
  * HOUSEKEEPING: it writes a file, not a record, so there is nothing to broadcast. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 export async function postUploadStaffFile(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "staff_profiles", "edit")
+  const { cfg, guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "staff_profiles", "update")
   await refusePortalCaller(cfg, guard)
   const parsed = parseUploadDataUrl(body.dataUrl, MAX_UPLOAD_BYTES)
   if (!parsed) return fail(400, "invalid_input", "That file isn't a supported upload (max 25 MB).")
@@ -190,7 +190,7 @@ export async function postStreamStaffFile(request: Request, env: Env): Promise<R
       `That upload is too big, the most we can take in one file is ${Math.round(STREAM_UPLOAD_MAX_BYTES / 1_000_000)} MB. Nothing was saved.`
     )
 
-  const { cfg, guard } = await gated(request, env, "staff_profiles", "edit")
+  const { cfg, guard } = await gated(request, env, "staff_profiles", "update")
   await refusePortalCaller(cfg, guard)
 
   // The DECLARED type, held to the same allow-list the buffered door applies —
@@ -271,7 +271,7 @@ export async function postCreateStaffCertificate(request: Request, env: Env): Pr
 
 export async function postUpdateStaffCertificate(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<StaffCertificateInput & { id?: string }>(
-    request, env, "staff_profiles", "edit"
+    request, env, "staff_profiles", "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Certificate", TEXT_LIMITS.short)

@@ -334,8 +334,8 @@ export function buildTeamSeed(
     const [vr, vc, ve, vd] =
       module === "agent" ? [1, 1, 0, 0] : module === "all_tasks" ? [0, 0, 0, 0] : [1, 0, 0, 0]
     statements.push(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(adminRoleId)}, ${sqlString(module)}, 1, 1, 1, 1);`,
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(viewerRoleId)}, ${sqlString(module)}, ${vr}, ${vc}, ${ve}, ${vd});`
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(adminRoleId)}, ${sqlString(module)}, 1, 1, 1, 1);`,
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(viewerRoleId)}, ${sqlString(module)}, ${vr}, ${vc}, ${ve}, ${vd});`
     )
   }
 

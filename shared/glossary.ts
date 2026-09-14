@@ -38,15 +38,21 @@ export const GLOSSARY = {
   // "See" became "Read" and this very sentence was the glossary's side of the
   // argument for it ("the glossary was already on her side").
   //
-  // THE IDENTIFIER STAYS `edit`. `RightSet.edit` (shared/types.ts), every
-  // `requireRight`/`gated` pair, every `TOOL_GATES` string and the four
-  // permission columns in the database are unchanged — a rename there is a
-  // migration and a door change for zero benefit, the same ruling this file
-  // already records for `help`/Tickets (CLAUDE.md) and for
-  // `is_default`/Protected two entries down. Only the word a person reads
-  // moves, here and on the roles matrix (`web/components/team/roles-matrix.tsx`,
-  // which carries the fuller account of the column, the kit's own still-"Edit"
-  // default owed upstream, and why "edit" does not join R34's deny-list).
+  // THE IDENTIFIER MOVED TOO, on the owner's own follow-up decision: not just
+  // the word a person reads, but `RightSet.edit` (shared/types.ts), every
+  // `requireRight`/`gated` pair, every `TOOL_GATES` string and the `can_edit`
+  // column in every team's own database, all renamed to `update` in the same
+  // change (`can_edit` → `can_update`, migration 0086 — the first
+  // `RENAME COLUMN` this ledger has ever run). A DIFFERENT session answered
+  // the same ruling with a display-only rename first, reasoning that a wire
+  // rename was "a migration and a door change for zero benefit", the same
+  // argument this file already records for `help`/Tickets and for
+  // `is_default`/Protected — but the owner asked for the full rename when
+  // asked directly, and that is what shipped. "Edit" still does not join
+  // R34's deny-list: it remains ordinary, correctly-used English everywhere
+  // else in the app (the pencil-icon action on a record, "Edit this role"),
+  // none of which means this permission — see
+  // `web/components/team/roles-matrix.tsx` for the fuller account.
   permission: { term: "Access right", def: "A single thing a role can do: read, create, update, or delete." },
   invite: { term: "Invite", def: "An email asking someone to join your team in a role you choose." },
   revoke: { term: "Revoke", def: "Cancel an invite before it's accepted." },

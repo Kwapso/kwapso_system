@@ -224,7 +224,7 @@ describe("member_roles buildBody: the matrix rides along only when the file carr
       "help.create": "TRUE",
       "knowledge.read": "1",
     }) as { permissions?: Record<string, Record<string, boolean>> }
-    expect(body.permissions?.help).toEqual({ read: true, create: true, edit: false, delete: false })
+    expect(body.permissions?.help).toEqual({ read: true, create: true, update: false, delete: false })
     expect(body.permissions?.knowledge.read).toBe(true)
     expect(body.permissions?.teams.read).toBe(false)
   })

@@ -57,7 +57,7 @@ afterEach(cleanup)
 const RIGHT_TO_KIT: Record<string, string> = {
   read: "see",
   create: "create",
-  edit: "edit",
+  update: "edit",
   delete: "delete",
 }
 
@@ -211,7 +211,7 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
 
     it("pins the name column, and names the paper it paints", () => {
       // Twenty-two columns overflow; without this a role's band is bands of
-      // `S C E D` with nothing saying whose they are. The ground is not
+      // `R C U D` with nothing saying whose they are. The ground is not
       // cosmetic — the wrong one is a pale band down every grid at rest.
       const src = source()
       expect(src).toContain("stickyNames")

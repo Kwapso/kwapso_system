@@ -64,7 +64,7 @@ function roleLookup(role: { id: string; title: string; is_default: number } | nu
         module: m.key,
         can_read: 1,
         can_create: 1,
-        can_edit: 1,
+        can_update: 1,
         can_delete: 1,
       }))
     return []
@@ -82,20 +82,20 @@ beforeEach(() => {
 describe("normalizeRights (auto-flip-read)", () => {
   it("turning on any write forces read on", () => {
     expect(normalizeRights({ create: true }).read).toBe(true)
-    expect(normalizeRights({ edit: true }).read).toBe(true)
+    expect(normalizeRights({ update: true }).read).toBe(true)
     expect(normalizeRights({ delete: true }).read).toBe(true)
   })
   it("read alone stays, all-off stays off", () => {
     expect(normalizeRights({ read: true })).toEqual({
       read: true,
       create: false,
-      edit: false,
+      update: false,
       delete: false,
     })
     expect(normalizeRights({})).toEqual({
       read: false,
       create: false,
-      edit: false,
+      update: false,
       delete: false,
     })
   })
@@ -121,7 +121,7 @@ describe("setRolePermissions", () => {
     roleLookup({ id: "R", title: "Editor", is_default: 0 })
     // create on but read off in the incoming value — server must flip read on.
     await setRolePermissions(cfg, guard, actor, "R", {
-      team_members: { read: false, create: true, edit: false, delete: false },
+      team_members: { read: false, create: true, update: false, delete: false },
     })
     expect(d1ExecScript).toHaveBeenCalledTimes(1)
     const script = d1ExecScript.mock.calls[0][2] as string
@@ -133,12 +133,12 @@ describe("setRolePermissions", () => {
 
   it("never stores a right the module does not offer (R36) — the box the grid draws anyway is written off", async () => {
     roleLookup({ id: "R", title: "Editor", is_default: 0 })
-    const all = { read: true, create: true, edit: true, delete: true }
+    const all = { read: true, create: true, update: true, delete: true }
     await setRolePermissions(cfg, guard, actor, "R", { help: all, teams: all, all_tasks: all })
     const script = d1ExecScript.mock.calls[0][2] as string
-    // help offers read/create/edit and no delete — a ticket is archived, never deleted
+    // help offers read/create/update and no delete — a ticket is archived, never deleted
     expect(script).toContain("'help', 1, 1, 1, 0")
-    // teams offers edit alone: reading a team is whoAmI, and auto-flip-read
+    // teams offers update alone: reading a team is whoAmI, and auto-flip-read
     // must not smuggle an unoffered read back in
     expect(script).toContain("'teams', 0, 0, 1, 0")
     // all_tasks is one switch over a sight
@@ -219,55 +219,55 @@ describe("setRoleActive (deactivate / reactivate)", () => {
 })
 
 describe("getRolePermissions", () => {
-  it("builds the value from saved rows, all-off for untouched modules; reports the caller's edit right", async () => {
+  it("builds the value from saved rows, all-off for untouched modules; reports the caller's update right", async () => {
     d1Query.mockImplementation(async (_c, _db, sql: string, params?: string[]) => {
       if (sql.includes("FROM member_roles"))
         return [{ id: "R", title: "Editor", is_default: 0 }]
-      // the caller's own member_roles:edit check (role_id + module filter)
+      // the caller's own member_roles:update check (role_id + module filter)
       if (params && params[1] === "member_roles")
-        return [{ can_read: 1, can_create: 0, can_edit: 1, can_delete: 0 }]
+        return [{ can_read: 1, can_create: 0, can_update: 1, can_delete: 0 }]
       // the role's saved sheet: only team_members has a row (full rights)
       return [
         {
           module: "team_members",
           can_read: 1,
           can_create: 1,
-          can_edit: 1,
+          can_update: 1,
           can_delete: 1,
         },
       ]
     })
     const res = await getRolePermissions(cfg, guard, "R")
     expect(res.isDefault).toBe(false)
-    expect(res.canEdit).toBe(true)
+    expect(res.canUpdate).toBe(true)
     expect(res.modules).toHaveLength(TEAM_MODULE_CATALOG.length)
     // …and every row says which of the four it offers (R36's data, through
     // the door, so the screen draws only the boxes that decide something)
-    expect(res.modules.find((m) => m.key === "help")?.rights).toEqual(["read", "create", "edit"])
-    expect(res.modules.find((m) => m.key === "team_members")?.rights).toEqual(["read", "create", "edit", "delete"])
+    expect(res.modules.find((m) => m.key === "help")?.rights).toEqual(["read", "create", "update"])
+    expect(res.modules.find((m) => m.key === "team_members")?.rights).toEqual(["read", "create", "update", "delete"])
     expect(res.value.team_members).toEqual({
       read: true,
       create: true,
-      edit: true,
+      update: true,
       delete: true,
     })
     expect(res.value.knowledge).toEqual({
       read: false,
       create: false,
-      edit: false,
+      update: false,
       delete: false,
     })
   })
 
-  it("reports canEdit=false when the caller lacks member_roles:edit", async () => {
+  it("reports canUpdate=false when the caller lacks member_roles:update", async () => {
     d1Query.mockImplementation(async (_c, _db, sql: string, params?: string[]) => {
       if (sql.includes("FROM member_roles"))
         return [{ id: "R", title: "Editor", is_default: 0 }]
       if (params && params[1] === "member_roles")
-        return [{ can_read: 1, can_create: 0, can_edit: 0, can_delete: 0 }]
+        return [{ can_read: 1, can_create: 0, can_update: 0, can_delete: 0 }]
       return []
     })
     const res = await getRolePermissions(cfg, guard, "R")
-    expect(res.canEdit).toBe(false)
+    expect(res.canUpdate).toBe(false)
   })
 })

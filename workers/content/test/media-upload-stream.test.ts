@@ -87,7 +87,7 @@ const DOORS = [
     call: postStreamStaffFile,
     shelf: "internal" as const,
     prefix: "/media/internal/",
-    gate: "staff_profiles:edit",
+    gate: "staff_profiles:update",
     /** The module segment this door's keys carry — see the key test below. */
     segment: "staff",
   },

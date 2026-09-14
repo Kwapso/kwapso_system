@@ -193,7 +193,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "get_role_permissions",
     description:
-      "Read a role's access rights (its permission matrix, by role id): for each module. Read, create, edit, delete.",
+      "Read a role's access rights (its permission matrix, by role id): for each module. Read, create, update, delete.",
     schema: obj({ roleId: S }, ["roleId"]),
     binding: "TENANCY",
     method: "GET",

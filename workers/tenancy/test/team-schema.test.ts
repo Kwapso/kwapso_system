@@ -178,7 +178,7 @@ describe("team schema", () => {
       "selectable_data",
       // `screens` was here until 21 Aug 2026. It drew four boxes on the Roles
       // screen and no door ever asked for one: both of the recipe store's doors
-      // gate on `teams:edit`, which is right — a screen layout is a team setting.
+      // gate on `teams:update`, which is right — a screen layout is a team setting.
       // R36 now fails the build on any switch nothing consults. Migration 0050
       // deletes the rows; the `screens` TABLE stays, and 0047 says why.
       "agent",
@@ -231,7 +231,7 @@ describe("team schema", () => {
       // deliberately separate from the `agent` right, so granting somebody the
       // assistant does not silently grant the assistant their outbox. A module
       // whose four rights are not all meaningful is not new here: nothing reads
-      // `agent:edit` either.
+      // `agent:update` either.
       //
       // `google_events` ("Calendar on your behalf") was the third, and it went
       // with the doors it guarded when the calendar became READ-ONLY on
@@ -592,11 +592,40 @@ describe("every module reaches the teams that already exist", () => {
        VALUES ('R_ADMIN', 'Admin', 'Default role, full access.', 1, '2026-01-01'),
               ('R_BUILT', 'Delivery lead', 'Built by hand.', 0, '2026-01-01')`
     )
-    for (const m of TEAM_MIGRATIONS.slice(1)) db.exec(m.sql)
+    // 0039 IS RUN IN PLACE, its own idempotency proved RIGHT THERE, rather than
+    // after the whole set — 0086 (further down the ledger) renames the very
+    // column 0039 writes (`can_edit` → `can_update`), so replaying 0039's own
+    // immutable SQL text (which correctly still says `can_edit`, as it must —
+    // migrations are never edited once shipped) against a database that has
+    // already run 0086 would fail on a column that no longer exists. Splitting
+    // the loop here proves the same thing production never does differently:
+    // 0039 only ever meets a schema that still has its own column name.
+    const backfillIdx = TEAM_MIGRATIONS.findIndex((m) => m.version === "0039_deliverables_permission")
+    expect(backfillIdx, "0039 is the back-fill this test is about — did it move?").toBeGreaterThan(0)
+    for (const m of TEAM_MIGRATIONS.slice(1, backfillIdx + 1)) db.exec(m.sql)
+
+    // IDEMPOTENT, against the team that was patched BY HAND on 18 Aug 2026 to
+    // unblock testing. That team already HAS the row, so the back-fill must meet
+    // it and do nothing — not fail on the insert, not write a second one. Only
+    // this migration is replayed: the rest are stamped and run once by
+    // construction (an ADD COLUMN cannot be re-run and is not asked to be), so
+    // replaying the whole set would be testing something the runner never does.
+    const backfill = TEAM_MIGRATIONS[backfillIdx]
+    db.exec(backfill.sql)
+    const rows = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM role_permissions WHERE role_id = 'R_ADMIN' AND module = 'deliverables'`
+      )
+      .get() as { n: number }
+    expect(rows.n, "the back-fill must be safe to meet a team that already has the row").toBe(1)
+
+    // …THEN THE REST OF THE LEDGER, including 0086's rename, to reach today's
+    // actual schema before the final assertions below read it.
+    for (const m of TEAM_MIGRATIONS.slice(backfillIdx + 1)) db.exec(m.sql)
 
     const admin = db
       .prepare(
-        `SELECT can_read AS r, can_create AS c, can_edit AS e, can_delete AS d
+        `SELECT can_read AS r, can_create AS c, can_update AS e, can_delete AS d
            FROM role_permissions WHERE role_id = 'R_ADMIN' AND module = 'deliverables'`
       )
       .get() as { r: number; c: number; e: number; d: number } | undefined
@@ -611,23 +640,6 @@ describe("every module reaches the teams that already exist", () => {
       )
       .get() as { r: number } | undefined
     expect(built?.r, "a role somebody built by hand gains nothing").toBe(0)
-
-    // IDEMPOTENT, against the team that was patched BY HAND on 18 Aug 2026 to
-    // unblock testing. That team already HAS the row, so the back-fill must meet
-    // it and do nothing — not fail on the insert, not write a second one. Only
-    // this migration is replayed: the rest are stamped and run once by
-    // construction (an ADD COLUMN cannot be re-run and is not asked to be), so
-    // replaying the whole set would be testing something the runner never does.
-    const backfill = TEAM_MIGRATIONS.find((m) => m.version === "0039_deliverables_permission")
-    expect(backfill, "0039 is the back-fill this test is about — did it move?").toBeTruthy()
-    db.exec((backfill as { sql: string }).sql)
-    db.exec((backfill as { sql: string }).sql)
-    const rows = db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM role_permissions WHERE role_id = 'R_ADMIN' AND module = 'deliverables'`
-      )
-      .get() as { n: number }
-    expect(rows.n, "the back-fill must be safe to meet a team that already has the row").toBe(1)
   })
 
   it("a FRESH team still gets it from the seed, untouched by the back-fill", () => {

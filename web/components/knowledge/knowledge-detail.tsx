@@ -14,7 +14,7 @@
 // different thing from the material. Somebody who reads an answer they disagree
 // with comes here to see the words behind it, and then takes them away.
 //
-// Edit is gated by knowledge:edit; taking a source away by knowledge:delete —
+// Edit is gated by knowledge:update; taking a source away by knowledge:delete —
 // the same rights the assistant is held to when it is asked to do either.
 
 import * as React from "react"
@@ -155,7 +155,7 @@ export function KnowledgeDetailScreen({
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("knowledge", "edit")
+  const canEdit = can("knowledge", "update")
   const canRemove = can("knowledge", "delete")
 
   // The open tab is remembered per record for as long as this document

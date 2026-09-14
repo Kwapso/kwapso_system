@@ -340,7 +340,7 @@ beforeEach(() => {
   for (const role of [IDS.adminRole, IDS.clientRole])
     for (const module of ["knowledge", "google"])
       db().exec(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('${role}_${module}', '${role}', '${module}', 1, 1, 1, 1);`
       )
   connect(IDS.staffUser)

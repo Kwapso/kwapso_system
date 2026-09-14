@@ -253,7 +253,7 @@ export function WaveCollection({
   // right that lets somebody start a sprint. The doors gate; this only decides
   // what to draw, so a control we hide is never the defence.
   const canCreate = can("work", "create")
-  const canEdit = can("work", "edit")
+  const canEdit = can("work", "update")
 
   const wavesQ = useCached<Wave[]>(wavesKey(teamId), () => fetchWaves(teamId))
   // The exact server total (R16) — never the loaded page's length.

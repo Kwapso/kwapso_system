@@ -94,7 +94,7 @@ export function StoryDetailScreen({
   const attachmentsTotal = useCachedValue<number | null>(`total:${storyAttachmentsKey(storyId)}`)
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("work", "edit")
+  const canEdit = can("work", "update")
   // The timer asks for the right its own door asks for (`work:create`), not the
   // one that governs editing the story — a person who may log time but not
   // rewrite the work was being offered neither.
@@ -448,7 +448,7 @@ export function StoryDetailScreen({
                 onActivityChanged={() => invalidate(`activity:record:stories:${storyId}`)}
               />
             )
-          // `work:edit`, which is what BOTH attachment doors gate on — not the
+          // `work:update`, which is what BOTH attachment doors gate on — not the
           // read right the ticket's panel takes, and not `canLogTime`. A button
           // drawn on a wider right is a button whose every press is a 403.
           if (t.value === "files")

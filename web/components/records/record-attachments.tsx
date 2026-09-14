@@ -20,7 +20,7 @@
 // THE `fix` PROP IS A PERMISSION DECISION, NOT A FEATURE FLAG. Owner's ruling,
 // 27 Aug 2026, asked as "may a client login rename or replace a file agency
 // staff attached?" and answered in one word: "never." A ticket's panel writes on
-// `help:read`, which a CLIENT LOGIN HOLDS; a story's writes on `work:edit`,
+// `help:read`, which a CLIENT LOGIN HOLDS; a story's writes on `work:update`,
 // which no client can reach. So the ticket panel passes no `fix` and the pencil
 // is never drawn — and drawing it would have been the obvious next commit while
 // the two files were twins, which is exactly why folding them puts the

@@ -35,7 +35,11 @@ export type AgentChatItem =
    * "eyebrow", and corrected to the server's own value the next time this
    * thread is loaded from storage. */
   | (AgentChatMessage & { evidence?: TurnEvidence; createdAt?: string })
-  | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed" }
+  /** A tool step's row — or, when `thought` is set, the model's own thinking
+   * for one step, streamed into a strip the person may open. Same row shape on
+   * purpose: it sits in the transcript exactly where the step it precedes
+   * does, and every reader that narrows on `role === "tool"` keeps working. */
+  | { id: string; role: "tool"; actionLabel: string; status: "pending" | "done" | "failed"; thought?: string }
 import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
 
 import type { AgentMessage, AgentQuota, ModelFailure, PendingCall } from "@shared/types"
@@ -367,6 +371,17 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     // rapid delta; step rows are keyed by tool so step_end can flip the right one.
     let replyText = ""
     const stepIdByTool = new Map<string, string>()
+    // ONE THINKING ROW PER MODEL CALL. Opened by the first `thought` delta after
+    // anything else, appended to by the rest, and settled (spinner → tick) by
+    // whatever the model did with that thinking: a step, the answer's first
+    // word, a confirm, or the end of the turn.
+    let thoughtId: string | null = null
+    const settleThought = () => {
+      if (!thoughtId) return
+      const id = thoughtId
+      thoughtId = null
+      setItems((prev) => prev.map((it) => (it.id === id && it.role === "tool" ? { ...it, status: "done" as const } : it)))
+    }
 
     /** WRITE THE ASSISTANT'S WORDS, wherever its bubble has got to.
      *
@@ -394,12 +409,32 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
 
     await run((ev) => {
       switch (ev.t) {
+        case "thought": {
+          if (thoughtId) {
+            const id = thoughtId
+            setItems((prev) =>
+              prev.map((it) => (it.id === id && it.role === "tool" ? { ...it, thought: (it.thought ?? "") + ev.d } : it))
+            )
+            break
+          }
+          const id = newId()
+          thoughtId = id
+          setItems((prev) => {
+            const idx = prev.findIndex((it) => it.id === assistantId)
+            const row: AgentChatItem = { id, role: "tool", actionLabel: t("Working it out"), status: "pending", thought: ev.d }
+            if (idx < 0) return [...prev, row]
+            return [...prev.slice(0, idx), row, ...prev.slice(idx)]
+          })
+          break
+        }
         case "text": {
+          settleThought()
           replyText += ev.d
           writeAssistant(<AgentMarkdown text={replyText} />)
           break
         }
         case "step_start": {
+          settleThought()
           const stepId = newId()
           stepIdByTool.set(ev.tool, stepId)
           // Insert the pending tool row BEFORE the assistant bubble (steps run, then
@@ -459,6 +494,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "confirm": {
+          settleThought()
           // Terminal: a destructive act needs a yes/no. Adopt the thread id the event
           // carries — on a FIRST-turn confirm this is the ONLY place the client learns
           // it (a paused turn never reaches `final`), and resolve() needs it or the
@@ -478,6 +514,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "final": {
+          settleThought()
           const out = ev.outcome
           // The loop turns a model failure into a settled turn rather than a
           // 500, so `done` is true and this is the ONLY thing that says the
@@ -498,6 +535,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "error": {
+          settleThought()
           // A model failure that never reached the loop's own catch — a worker
           // with no key is the ordinary one, because `selectModel` throws before
           // the loop exists to catch it.

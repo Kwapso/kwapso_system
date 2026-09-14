@@ -345,18 +345,18 @@ beforeEach(() => {
   // role's. Asserted rather than assumed, exactly as meetings.test.ts does it.
   for (const module of ["meetings", "google", "work", "knowledge"])
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('${IDS.adminRole}_${module}', '${IDS.adminRole}', '${module}', 1, 1, 1, 1)
        ON CONFLICT (role_id, module) DO UPDATE SET
-         can_read = 1, can_create = 1, can_edit = 1, can_delete = 1;`
+         can_read = 1, can_create = 1, can_update = 1, can_delete = 1;`
     )
   const granted = db()
     .prepare(
       `SELECT COUNT(*) n FROM role_permissions WHERE role_id = ? AND module IN ('meetings','google')
-        AND can_read = 1 AND can_edit = 1`
+        AND can_read = 1 AND can_update = 1`
     )
     .get(IDS.adminRole) as { n: number }
-  expect(granted.n, "the transcript door needs meetings:edit AND google:read").toBe(2)
+  expect(granted.n, "the transcript door needs meetings:update AND google:read").toBe(2)
   for (const service of ["calendar", "drive", "gmail"]) connect(service)
   world.events = [pastEntry()]
 })
@@ -866,10 +866,10 @@ describe("18.4 · what was said is answerable, with a citation back to the call"
     vectorIndex = fakeVectorize()
     for (const module of ["meetings", "google", "work", "knowledge"])
       db().exec(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('${IDS.adminRole}_${module}', '${IDS.adminRole}', '${module}', 1, 1, 1, 1)
          ON CONFLICT (role_id, module) DO UPDATE SET
-           can_read = 1, can_create = 1, can_edit = 1, can_delete = 1;`
+           can_read = 1, can_create = 1, can_update = 1, can_delete = 1;`
       )
     for (const service of ["calendar", "drive", "gmail"]) connect(service)
     world.notices = []

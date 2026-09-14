@@ -1087,7 +1087,7 @@ describe("THE QUESTION THIS LANE WAS OPENED BY, in two calls", () => {
 describe("notYet: the everyday meetings list stops at today", () => {
   beforeEach(() => {
     db().exec(`
-      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
         VALUES ('${IDS.adminRole}_meetings_nq', '${IDS.adminRole}', 'meetings', 1, 1, 1, 1);
       -- THE REAL ONE, last week.
       INSERT INTO meetings (id, title, starts_at, created_at)
@@ -1171,7 +1171,7 @@ describe("staleCheck: a client-scoped read says when more may exist, unlinked", 
       -- spine-harness's grantAll() does not include "meetings" (no test here
       -- had needed it before); this suite is the first meetings read, so it
       -- grants its own.
-      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
         VALUES ('${IDS.adminRole}_meetings', '${IDS.adminRole}', 'meetings', 1, 1, 1, 1);
       INSERT INTO accounts (id, account_type, name, created_at) VALUES ('A_FC', 'entity', 'FluClinic', '2026-01-01');
       -- LINKED: the only row an accountId=A_FC read can find on its own.

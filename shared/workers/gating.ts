@@ -32,7 +32,7 @@ export type GatingEnv = {
    * to add after the code that reads it. */
 } & RateLimitEnv
 
-export type Right = "read" | "create" | "edit" | "delete"
+export type Right = "read" | "create" | "update" | "delete"
 export type Actor = { id: string; email: string; name: string }
 export type MemberGuard = {
   userId: string
@@ -362,7 +362,7 @@ export function noteIdentity(request: Request, who: { teamId?: string; userId?: 
 type RightsRow = {
   can_read: number
   can_create: number
-  can_edit: number
+  can_update: number
   can_delete: number
 }
 
@@ -404,7 +404,7 @@ function moduleRights(cfg: D1Rest, guard: MemberGuard, module: string): Promise<
   const fresh = d1Query<RightsRow>(
     cfg,
     guard.databaseId,
-    "SELECT can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
+    "SELECT can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ? AND module = ?",
     [guard.roleId, module]
   )
     .then((rows) => rows[0] ?? null)
@@ -443,13 +443,13 @@ export function rightsSheet(cfg: D1Rest, guard: MemberGuard): Promise<Set<string
     guard.databaseId,
     // Bounded by the number of MODULES, which is a property of the code and not
     // of any request (R14's reasoning, on a read too small to page).
-    `SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ? LIMIT ${LIST_HARD_CAP}`,
+    `SELECT module, can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ? LIMIT ${LIST_HARD_CAP}`,
     [guard.roleId]
   )
     .then((rows) => {
       const held = new Set<string>()
       for (const r of rows)
-        for (const right of ["read", "create", "edit", "delete"] as const)
+        for (const right of ["read", "create", "update", "delete"] as const)
           if (r[`can_${right}`] === 1) held.add(`${r.module}:${right}`)
       return held
     })

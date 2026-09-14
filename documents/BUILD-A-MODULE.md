@@ -175,7 +175,7 @@ both the worker gate and the Roles UI.
 `buildTeamSeed` (`team-schema/seed.ts`) writes the starter permission sheet every new
 team gets: **Admin** (full) and **Viewer** (read-only). The loop already iterates
 `TEAM_MODULES`, so your module is seeded automatically. Admin gets
-`read/create/edit/delete = 1,1,1,1`, Viewer gets `1,0,0,0`. You only touch this if
+`read/create/update/delete = 1,1,1,1`, Viewer gets `1,0,0,0`. You only touch this if
 your module needs a *different* Viewer default (the brand library left it as
 read-only; `agent` is the one special case, everyone may use it, so Viewer gets
 `1,1,0,0`). For a normal module, do nothing here.

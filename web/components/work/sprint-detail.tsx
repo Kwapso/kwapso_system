@@ -108,7 +108,7 @@ export function SprintDetailScreen({
   const sprintTypes = useSprintTypes(teamId)
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("work", "edit")
+  const canEdit = can("work", "update")
   const canCreate = can("work", "create")
 
   // The open tab is remembered per record for as long as this document

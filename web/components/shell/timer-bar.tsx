@@ -235,7 +235,7 @@ export function RecordTimerButton({
   teamId,
   targetTable,
   targetId,
-  /** `work:edit` at the call site — the same right the door gates on. */
+  /** `work:update` at the call site — the same right the door gates on. */
   canLog,
   /** A finished piece of work has nothing left to time. */
   disabled,

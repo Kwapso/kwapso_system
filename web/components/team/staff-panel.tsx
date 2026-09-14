@@ -55,7 +55,7 @@ export function StaffPanel({
   const { t, lang } = useLanguage()
   const { can } = usePermissions(teamId)
   const mayRead = can("staff_profiles", "read")
-  const mayWrite = can("staff_profiles", "edit")
+  const mayWrite = can("staff_profiles", "update")
   const mayAdd = can("staff_profiles", "create")
   const mayArchive = can("staff_profiles", "delete")
 

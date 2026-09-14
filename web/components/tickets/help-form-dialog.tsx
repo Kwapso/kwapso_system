@@ -324,7 +324,7 @@ export function HelpFormDialog({
   /** THE TICKET BEING EDITED, when one is. Attachments hang off it; on a create
    * the id arrives from `onSubmit`'s answer instead. */
   helpId?: string
-  /** Whether this person may attach at all. The door gates on `help:edit`, so a
+  /** Whether this person may attach at all. The door gates on `help:update`, so a
    * control that always refused would be worse than none. */
   canAttach?: boolean
 }) {
@@ -1397,7 +1397,7 @@ export function HelpFormDialog({
           of this dialog, which is the whole of the owner's ask: "while adding or
           editing them, just like we have at the story level." One field, one
           code path; the upload simply knows a different id on an edit.
-          Behind `help:edit`, because that is what the attachments door gates on
+          Behind `help:update`, because that is what the attachments door gates on
           and a control that always refused would be worse than none. */}
       {canAttach && (
         <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>

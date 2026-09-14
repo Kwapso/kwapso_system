@@ -39,9 +39,9 @@ export async function getTriage(request: Request, env: Env): Promise<Response> {
   // widening is the week nobody has been named for: with no name, the exception
   // would make the queue invisible to every single person on the team, which is
   // the failure this feature exists to prevent. So an unclaimed week falls back
-  // to "anyone who could triage it" (`help:edit`, the right the triage ACT itself
+  // to "anyone who could triage it" (`help:update`, the right the triage ACT itself
   // gates on), and a claimed one is one person's.
-  const yours = onDuty ? onDuty.userId === guard.userId : await hasRight(cfg, guard, "help", "edit")
+  const yours = onDuty ? onDuty.userId === guard.userId : await hasRight(cfg, guard, "help", "update")
   return json({
     onDuty,
     yours,
@@ -50,7 +50,7 @@ export async function getTriage(request: Request, env: Env): Promise<Response> {
   })
 }
 
-/** POST /api/content/triage — put somebody on duty for a week (help:edit).
+/** POST /api/content/triage — put somebody on duty for a week (help:update).
  *
  * The person is named by user id and PROVED against the team's own membership
  * before it is written: a rota naming somebody who left is a rota nobody reads
@@ -60,7 +60,7 @@ export async function postSetTriageDuty(request: Request, env: Env): Promise<Res
     request,
     env,
     "help",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const userId = requireText(body.userId, "Person", TEXT_LIMITS.short)

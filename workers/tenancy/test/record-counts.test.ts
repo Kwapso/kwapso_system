@@ -123,7 +123,7 @@ describe("the record-counts door (tenancy)", () => {
     // number is a permission nobody can tell from a broken counter.
     db()
       .prepare(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('R_WORK', ?, 'work', 1, 1, 1, 1)`
       )
       .run(IDS.adminRole)

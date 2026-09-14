@@ -5,7 +5,7 @@
 // WHY THIS SUITE EXISTS, precisely. The confirm set used to be derived from a
 // list of three MODULE names (member_roles, team_members, portal_users). That
 // derivation is honest about permissions and blind to the fence: `link_contact`
-// is gated accounts:create and `set_account_parent` is gated accounts:edit, so
+// is gated accounts:create and `set_account_parent` is gated accounts:update, so
 // neither looked like a privilege write — while both change an input the fence
 // reads, and either one silently widens what an outside company's login can
 // read. A green test that asserts the wrong intent is how the first confirm gap

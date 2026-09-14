@@ -231,7 +231,7 @@ export async function postApplyProcessDraft(request: Request, env: Env): Promise
 
   const detail = await getDraft(cfg, guard, scope, id)
   const revises = detail.payload.steps.some((s) => s.revisesStepId && keepSteps.includes(s.key))
-  if (revises) await requireRight(cfg, guard, "processes", "edit")
+  if (revises) await requireRight(cfg, guard, "processes", "update")
 
   const result = await applyDraft(cfg, guard, scope, actor, id, { keepSteps, keepRoles, keepTools })
   // R17: a second press moved zero rows and wrote nothing, so it pings nobody.

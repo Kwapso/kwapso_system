@@ -431,7 +431,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
       // everything that keeps the two in step happens without either asking.
       // GATED ON `help:read` AND NOT ON `selectable_data:read`: a person who
       // may see tickets may see what tickets does by itself. Changing one is a
-      // second and different question (`teams:edit`, asked at the door and in
+      // second and different question (`teams:update`, asked at the door and in
       // `module-automations.tsx`), which is why the two are not one gate.
       {
         key: "automations",
@@ -654,7 +654,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      *
      * `team` IS THE SEGMENT because `teams` is the permission this base already
      * treats as "this team's own settings" — the recipe store gates on
-     * `teams:edit` for the same reason, and R36 records that `screens` was
+     * `teams:update` for the same reason, and R36 records that `screens` was
      * given four rights of its own and needed none. It is also the ONLY right
      * `teams` offers (`MODULE_OFFERED_RIGHTS`), so gating the section on `read`
      * would be a door refusing everybody, Admin included.
@@ -691,7 +691,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
     sections: [
       {
         key: "automations",
-        gate: { module: "teams", right: "edit" },
+        gate: { module: "teams", right: "update" },
         kind: "automations",
         title: "Automations",
       },

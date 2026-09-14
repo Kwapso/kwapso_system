@@ -123,7 +123,7 @@ export async function postCreateDeliverable(request: Request, env: Env): Promise
  * deliberately not editable; lib/deliverables.ts says why. */
 export async function postUpdateDeliverable(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<DeliverableInput & { id?: string }>(
-    request, env, "deliverables", "edit"
+    request, env, "deliverables", "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Deliverable", TEXT_LIMITS.short)
@@ -185,7 +185,7 @@ export async function postSetDeliverableActive(request: Request, env: Env): Prom
  * set that field on. `postUpdateDeliverable` reads five fields off the body and
  * `visible` is deliberately not one of them.
  *
- * GATED ON `deliverables:edit`, the same right that corrects one — sharing is not
+ * GATED ON `deliverables:update`, the same right that corrects one — sharing is not
  * a harder act than editing, it is a different one, and inventing a fifth verb
  * for the permission matrix would be a right an owner has to understand before
  * they can grant anything. R21: it is the agency's decision about the agency's
@@ -199,7 +199,7 @@ export async function postSetDeliverableVisibility(request: Request, env: Env): 
     id?: unknown
     appId?: unknown
     visible?: unknown
-  }>(request, env, "deliverables", "edit")
+  }>(request, env, "deliverables", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Deliverable", TEXT_LIMITS.short)
   const appId = requireText(body.appId, "App", TEXT_LIMITS.short)

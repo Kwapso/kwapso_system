@@ -387,12 +387,12 @@ const CLIENT_RIGHTS = {
   accounts: ["read"],
   contacts: ["read"],
   portal_users: ["read"],
-  help: ["read", "create", "edit"],
-  todos: ["read", "edit"],
+  help: ["read", "create", "update"],
+  todos: ["read", "update"],
   deliverables: ["read"],
   processes: ["read", "create"],
   // The worst case, on purpose. See above.
-  commercials: ["read", "create", "edit", "delete"],
+  commercials: ["read", "create", "update", "delete"],
 }
 {
   const roles = await agency("/api/tenancy/roles", {}, staffCookie)
@@ -411,7 +411,7 @@ const CLIENT_RIGHTS = {
   const value = Object.fromEntries(
     Object.entries(CLIENT_RIGHTS).map(([m, rights]) => [
       m,
-      { read: false, create: false, edit: false, delete: false, ...Object.fromEntries(rights.map((r) => [r, true])) },
+      { read: false, create: false, update: false, delete: false, ...Object.fromEntries(rights.map((r) => [r, true])) },
     ])
   )
   const wrote = await agencyPost("/api/tenancy/roles/permissions", { roleId: role.id, value }, staffCookie)

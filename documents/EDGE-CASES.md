@@ -316,7 +316,7 @@ beside the four that confirmed.
 **And the second half, added 2026-08-11: the ACCOUNT FENCE.** Deriving from
 module names is honest about permissions and blind to *who can see whose*.
 `link_contact` is gated `accounts:create` and `set_account_parent` is gated
-`accounts:edit`, so neither looked like a privilege write, while
+`accounts:update`, so neither looked like a privilege write, while
 `accountScope()` resolves a client login's whole world from exactly the rows they
 write (the parent pointer, `account_links`, `portal_users`). Linking a contact to
 a company, or re-parenting an account, hands an outside company sight of data it

@@ -389,7 +389,7 @@ Today it covers:
     the generic one is for an integration that would rather send one shape for
     every record kind than remember twenty-one names. Same map, same doors, same
     confirm rule, either way.
-  - the team, `update_team` (rename the team this token is pinned to; needs `teams:edit`)
+  - the team, `update_team` (rename the team this token is pinned to; needs `teams:update`)
   - roles, `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members, `set_member_role`, `remove_member` (people join via **invite**)
   - invites, `create_invite`, `revoke_invite`
@@ -476,7 +476,7 @@ Today it covers:
     because there is nothing left to confirm — a ticket is in the queue from the
     moment it is raised.
   - the work engine, stories and sprints, `create_story`, `update_story`,
-    `set_story_status` (`work:create` / `work:edit`), `create_sprint`,
+    `set_story_status` (`work:create` / `work:update`), `create_sprint`,
     `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
     PRICE is set or corrected — it was the revenue half of every margin until the
     margin was retired on 10 Sep 2026, and until that door existed it could be typed
@@ -494,22 +494,22 @@ Today it covers:
     portal caller outright, so unlike the ticket doors the question "what if a
     contact reaches this?" has a one-word answer.
   - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
-    (`todos:create` / `:edit` / `:delete` — what we need FROM a client), and
-    `create_task`, `update_task`, `set_task_done` (`work:create` / `work:edit` —
+    (`todos:create` / `:update` / `:delete` — what we need FROM a client), and
+    `create_task`, `update_task`, `set_task_done` (`work:create` / `work:update` —
     what we owe ourselves; `update_task` is also how a task is RE-PRIORITISED, since
     the 1-to-4 score is derived from its `important` and `urgent` ticks).
   - time, `start_timer`, `stop_timer`, `log_time`, `resolve_runaway_timer`,
     `set_timer_auto_stop`, all on `work:create`. Logging your OWN hours is a create,
     not an edit: a person who may do the work may say how long it took them.
-    CORRECTING a row that already exists is `work:edit` and has deliberately no tool
+    CORRECTING a row that already exists is `work:update` and has deliberately no tool
     at all — see the exclusions below.
-  - the triage rota, `set_triage_duty` (`help:edit`), beside the `get_triage` read.
+  - the triage rota, `set_triage_duty` (`help:update`), beside the `get_triage` read.
   - meetings, `create_meeting`, `update_meeting`, `set_meeting_active`
-    (`meetings:create` / `:edit` / `:delete`; cancelling IS this module's delete
+    (`meetings:create` / `:update` / `:delete`; cancelling IS this module's delete
     and the row survives it). There is no `set_meeting_held` and no
     `add_meeting_to_calendar`: a meeting's own start time says whether it has
     happened, and nothing in this product writes to a calendar.
-    `read_meeting_transcript` opens on `meetings:edit`, demands `google:read` at
+    `read_meeting_transcript` opens on `meetings:update`, demands `google:read` at
     the door, and one call writes a row of time for each
     of OUR OWN people who was in the room — never the client's, because a client's
     hour is not our cost. It is idempotent, so a second read does nothing: the
@@ -556,7 +556,7 @@ Today it covers:
   - the knowledge base, `add_knowledge_source`, `update_knowledge_source`,
     `set_knowledge_source_active`, `sync_knowledge`, `sync_google_knowledge`. The
     same acts a person has on the Knowledge base screen, gated by the same
-    `knowledge:create` / `:edit` / `:delete` rights — so a token whose role cannot
+    `knowledge:create` / `:update` / `:delete` rights — so a token whose role cannot
     take a source away cannot ask the assistant to take one away either.
     `sync_knowledge` brings the base into step with the app's own rows one bounded
     slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
@@ -602,7 +602,7 @@ Today it covers:
 
    RENAMING the pinned team is not that, and `update_team` is on this surface. It was
    agent-only on a reading of this exclusion that its own reason never supported: a
-   rename moves nothing and reaches nowhere new. The same door, the same `teams:edit`
+   rename moves nothing and reaches nowhere new. The same door, the same `teams:update`
    gate, the same audit row.
 3. **The client-portal standing doors**. `GET /api/tenancy/portal/context` and
    `POST /api/tenancy/portal/switch-account`, are off it too, and the reason is
@@ -684,7 +684,7 @@ Today it covers:
 
    Two other narrowings **were** here and are now closed, because neither had a reason
    that survived being written down: `create_role` takes its `permissions` matrix (the
-   door demands `member_roles:edit` on top of `member_roles:create` when one arrives,
+   door demands `member_roles:update` on top of `member_roles:create` when one arrives,
    its own double gate is the control, and the two-call path via `set_role_permissions`
    reached the same end state anyway), and `reply_help_ticket` takes `taggedUserIds` (a
    client login is refused mentions at the door and cannot hold a token at all, so every
@@ -753,7 +753,7 @@ belong in front of you rather than in a catalogue you skim:
 - **`read_meeting_transcript`** hunts a meeting's transcript through the caller's
   own Google, in order of proof: the file attached to the calendar entry, then a
   document in a shared Drive folder, then Google's own notice in the caller's
-  mail. Same shape at the door: `google:read` beside `meetings:edit`.
+  mail. Same shape at the door: `google:read` beside `meetings:update`.
 
 What a leaked token reaches, then, is its owner's calendar, the transcript
 documents their own Google can see, and whatever the knowledge sweep already
@@ -958,7 +958,7 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
    still reversible (deactivate-not-delete), audited, and one-team. If you hand a
    token to a *less*-trusted integration, prefer a tightly-scoped role and watch
    `last_used_at`.
-2. **`member_roles:edit` is a powerful right.** Anyone who can edit roles can grant
+2. **`member_roles:update` is a powerful right.** Anyone who can edit roles can grant
    permissions, including to their own role, exactly as in the UI (there's no separate
    admin tier). So give a machine token that right only when the integration genuinely
    manages roles; a read/import/export integration never needs it.

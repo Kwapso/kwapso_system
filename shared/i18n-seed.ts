@@ -4190,8 +4190,9 @@ export const SEED: Catalogue = {
    * and Catalan can put the count where their own grammar wants it. */
   "No description yet.": { de: "Noch keine Beschreibung.", es: "Todavía no hay descripción.", ca: "Encara no hi ha descripció." },
   "Can read {count} of {total} modules": { de: "Kann {count} von {total} Modulen lesen", es: "Puede leer {count} de {total} módulos", ca: "Pot llegir {count} de {total} mòduls" },
-  // RENAMED FROM "Can edit …" 14 Sep 2026, the same day the grid's Edit column
-  // became Update (client: "rename edit to update"). See role-panel.tsx.
+  // RENAMED FROM "Can edit …" 14 Sep 2026, the day the grid's Edit column and
+  // the underlying right both became Update (client: "rename edit to
+  // update"). See role-panel.tsx.
   "Can update {count} of {total} modules": { de: "Kann {count} von {total} Modulen aktualisieren", es: "Puede actualizar {count} de {total} módulos", ca: "Pot actualitzar {count} de {total} mòduls" },
 
   /* ── SETTINGS › ONE MODULE'S OWN PAGE, 2026-09-09 ─────────────────────────

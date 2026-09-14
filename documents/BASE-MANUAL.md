@@ -155,7 +155,7 @@ where you are standing when you need it, and one mechanism described in two
 documents is a mechanism the two can disagree about. This section is the half
 CONVENTIONS does not carry: *why the spine is shaped this way at all.*
 
-**Why a tall sheet.** Permissions are `role | module | read/create/edit/delete`
+**Why a tall sheet.** Permissions are `role | module | read/create/update/delete`
 rows, not columns. A new module is *new rows*, never a schema change
 (DATA-MODEL.md. Glide's 24-boolean WIDE table became this TALL one). Members
 point at one role; editing a role applies instantly to every holder.
@@ -512,7 +512,7 @@ bigger.
   the 10 GB cap (OPERATIONS.md), so you see the ceiling coming.
 
 - **Member roles + permissions.** The permission model is a **tall sheet**
-  (`role_permissions`: `role_id · module · read/create/edit/delete`). Adding a module
+  (`role_permissions`: `role_id · module · read/create/update/delete`). Adding a module
   or a role is **new rows, never a schema change**, so permissions scale to any number
   of modules and roles with zero migrations. Editing a role applies instantly to every
   holder (members point at a role id, not a copy of the rights). The one invariant to

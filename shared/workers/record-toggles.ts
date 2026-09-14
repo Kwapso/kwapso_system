@@ -179,13 +179,13 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     summary:
       "Archive a process map (`active: false`) or restore it (`active: true`). Never deleted: every version, every step and the whole conversation survive, and an archived map simply stops counting toward the value figures.",
   },
-  // `work:edit`, not `work:delete` — the work module offers no delete right, and
+  // `work:update`, not `work:delete` — the work module offers no delete right, and
   // the door says so itself.
   wave: {
     binding: "TENANCY",
     path: "/api/tenancy/waves/active",
     idField: "id",
-    gate: "work:edit",
+    gate: "work:update",
     noun: "wave",
     on: "Bring back",
     off: "Switch off",

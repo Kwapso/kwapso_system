@@ -61,7 +61,7 @@ export async function postCreateMeetingPurpose(request: Request, env: Env): Prom
 
 export async function postUpdateMeetingPurpose(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<MeetingPurposeInput & { id?: string }>(
-    request, env, "delivery", "edit"
+    request, env, "delivery", "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Meeting purpose", TEXT_LIMITS.short)

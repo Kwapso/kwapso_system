@@ -28,7 +28,7 @@
 // THE ONE THING THAT WOULD BREAK IT is the panel becoming a second place to
 // read the grid. The matrix IS the overview — "All the roles together, I want
 // to have an overview" — so this panel deliberately holds NO per-area rights
-// grid, no run of S · C · E · D, nothing you could compare two roles with. It
+// grid, no run of R · C · U · D, nothing you could compare two roles with. It
 // holds what the matrix cannot say: the description, how many people hold it,
 // whether it is switched on, and TWO DERIVED NUMBERS that summarise the band
 // rather than restate it. A reader who wants the detail is one press from the
@@ -69,7 +69,7 @@
 // with the words carried as the accessible name and the tooltip — the same
 // shape `AddButton` uses. And NEITHER is drawn for the locked Admin role, which
 // cannot be renamed or switched off at all, nor for a viewer without
-// `member_roles:edit`.
+// `member_roles:update`.
 
 import * as React from "react"
 
@@ -99,7 +99,7 @@ import { useT } from "@shared/web/language"
  * SEES is any right at all: a role holding `create` on an area necessarily
  * holds `read` there (the door grants read alongside any write, and so does the
  * draft in roles-matrix.tsx), so "sees" is the honest word for the outer set.
- * CHANGES is create, edit or delete — the areas where this role can move
+ * CHANGES is create, update or delete — the areas where this role can move
  * something rather than only look at it.
  *
  * Both are filtered to the rights the area OFFERS (R36 · `m.rights`), for the
@@ -107,7 +107,7 @@ import { useT } from "@shared/web/language"
  * on an area that has no delete is a value the door strips on save, and
  * counting it here would put a number on screen that no switch can explain. */
 function summarise(perms: RolePermissions): { total: number; sees: number; changes: number } {
-  const WRITES: (keyof RightSet)[] = ["create", "edit", "delete"]
+  const WRITES: (keyof RightSet)[] = ["create", "update", "delete"]
   let sees = 0
   let changes = 0
   for (const m of perms.modules) {
@@ -123,7 +123,7 @@ function summarise(perms: RolePermissions): { total: number; sees: number; chang
 export function RolePanel({
   role,
   perms,
-  canEdit,
+  canUpdate,
   onEdit,
   onToggleActive,
   open,
@@ -135,9 +135,9 @@ export function RolePanel({
    * of its own (R56: one read per unit). `null` while the grid is still cold,
    * or for a deactivated role, whose sheet the door 404s on purpose. */
   perms: RolePermissions | null
-  /** `member_roles:edit`, and never the locked Admin role — whether the two
+  /** `member_roles:update`, and never the locked Admin role — whether the two
    * controls in the head are drawn at all. */
-  canEdit: boolean
+  canUpdate: boolean
   onEdit: (role: TeamRole) => void
   onToggleActive: (role: TeamRole) => void
   open: boolean
@@ -146,7 +146,7 @@ export function RolePanel({
   const t = useT()
   if (!role) return null
 
-  const acts = canEdit && !role.isDefault
+  const acts = canUpdate && !role.isDefault
   const summary = perms ? summarise(perms) : null
 
   return (
@@ -230,7 +230,7 @@ export function RolePanel({
               <p className="text-muted-foreground text-sm">
                 {/* THREE SYNONYMS LIVED IN THESE TWO SENTENCES, and the matrix
                     beside them used the right word for all three. "Sees" against
-                    the glossary's `read`; "change" against its `edit`, which is
+                    the glossary's `read`; "change" against its `update`, which is
                     also the label on the column this number counts; and "areas",
                     which appeared in exactly these two strings in the whole app
                     and nowhere else, against `module` — the word every other
@@ -244,14 +244,6 @@ export function RolePanel({
                 })}
               </p>
               <p className="text-muted-foreground text-sm">
-                {/* FOLLOWED THE COLUMN A SECOND TIME, 14 Sep 2026. The grid's
-                    Edit column renamed to Update (client: "rename edit to
-                    update"), and this sentence's whole argument, above, is that
-                    its word MIRRORS that column's label rather than inventing a
-                    fourth name for the same idea — so the word here moves with
-                    it. `summary.changes` still sums the identifier `edit`
-                    alongside `create`/`delete` (RightSet.edit, unrenamed, see
-                    roles-matrix.tsx); only the sentence a person reads changed. */}
                 {t("Can update {count} of {total} modules", {
                   count: String(summary.changes),
                   total: String(summary.total),

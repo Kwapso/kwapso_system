@@ -43,7 +43,7 @@ function grantMapModules() {
   ]
   for (const m of modules)
     db().exec(
-      `INSERT OR IGNORE INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT OR IGNORE INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('${IDS.adminRole}_map_${m}', '${IDS.adminRole}', '${m}', 1, 1, 1, 1)`
     )
 }

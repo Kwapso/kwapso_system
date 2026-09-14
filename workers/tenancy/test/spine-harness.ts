@@ -223,7 +223,7 @@ export function buildSpineDb(): DatabaseSync {
   const grantAll = (roleId: string, title: string = roleId) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${title}', 0, '2026-01-01');
-      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'contacts'
               UNION ALL SELECT 'portal_users'

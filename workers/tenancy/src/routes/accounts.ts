@@ -433,7 +433,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     request,
     env,
     "accounts",
-    "edit"
+    "update"
   )
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
@@ -509,7 +509,7 @@ export async function postAccountParent(request: Request, env: Env): Promise<Res
     request,
     env,
     "accounts",
-    "edit"
+    "update"
   )
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
