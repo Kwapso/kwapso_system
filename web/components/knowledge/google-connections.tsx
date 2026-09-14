@@ -211,6 +211,26 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
 
   return (
     <section className="motion-panel-in flex flex-col gap-4">
+      {/* ONE CONTAINER, NOT TWO — client ruling, 2026-09-14: "in Settings,
+        * Integrations, put the whole things of Google in the same container.
+        * Right now, it's two. Merge them." Until this pass the invitation
+        * (below) and the per-service rows (further down) were each their own
+        * `rounded-[var(--radius)] bg-surface-panel` box, stacked with a gap —
+        * legal under R67 (both stand on paper, neither on the page ground) but
+        * two decisions where the section is one thing: "your Google
+        * connections". They now share a single outer panel, the invitation on
+        * top and the rows underneath it, split by the same inset hairline a
+        * service row uses against its neighbour (kit §2.7 — a rule between
+        * rows is a hairline, not a second card).
+        *
+        * ONE BOX, WHATEVER THIS SECTION IS SAYING (R67) — the same change its
+        * neighbour on this tab took on 2026-09-11 (web/components/team/
+        * access-tokens.tsx has the client's ruling and the measured tones).
+        * The connected services stood on soft paper and the error, the
+        * skeleton and the "not set up here" line stood on the page, so the
+        * section changed SHAPE as well as content between states; that is
+        * unchanged here, it is just one panel now instead of a matching pair. */}
+      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
       {/* THE EYEBROW AND THE SENTENCE ARE GONE, AND THE INVITATION IS A CARD —
         * client ruling, 2026-09-11, over a screenshot of this tab: "i said
         * nothing on white backgorund. … for google replicate the no tokens yet,
@@ -220,12 +240,13 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         * "REPLICATE THE NO TOKENS YET" IS AN INSTRUCTION ABOUT A COMPONENT, not
         * about a look, so this draws the neighbour's own register rather than a
         * second thing shaped like it: `CollectionEmptyState`, the one body the
-        * app's zeros are drawn with (R62), on the same soft paper, with the same
-        * `px-4` inset the tokens panel gives it. Two cards that mean the same
-        * thing must not be two components. The only thing this call site asks
-        * for that a collection does not is the WORD on the button — you do not
-        * "add the first" Google connection, you approve one — which is a prop on
-        * that component now (`createLabel`), defaulted so no other caller moves.
+        * app's zeros are drawn with (R62), on the same soft paper as the rows
+        * beneath it now that the two are one panel. Two cards that mean the
+        * same thing must not be two components. The only thing this call site
+        * asks for that a collection does not is the WORD on the button — you
+        * do not "add the first" Google connection, you approve one — which is
+        * a prop on that component now (`createLabel`), defaulted so no other
+        * caller moves.
         *
         * WHAT THE SENTENCE UNDERNEATH HAD TO KEEP, because both halves are
         * load-bearing and neither survives on the page ground:
@@ -242,14 +263,15 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         *     whole mechanism of scoping also should be optional, with one button
         *     to just sync everything instead of selecting one thing".
         *
-        * IT STANDS DOWN WHEN THERE IS NOTHING LEFT TO CONNECT. "Connect to
-        * Google" over four live connections is a false title, and the old
-        * always-drawn row could get away with saying it because it was a
-        * toolbar rather than a claim. Somebody reconnecting one service has the
-        * button on that service's own row; somebody who has disconnected one
-        * gets this card back. */}
+        * IT STANDS DOWN WHEN THERE IS NOTHING LEFT TO CONNECT, UNCHANGED BY THE
+        * MERGE. "Connect to Google" over four live connections is a false
+        * title, and the old always-drawn row could get away with saying it
+        * because it was a toolbar rather than a claim. Somebody reconnecting
+        * one service has the button on that service's own row; somebody who
+        * has disconnected one gets this card back — now as the panel's own top
+        * section rather than a second panel above it. */}
       {q.data?.ready && GOOGLE_SERVICES.some((service) => !liveFor(service)) && (
-        <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+        <div className="px-4 pt-4 shadow-[var(--hairline-under)]">
           <CollectionEmptyState
             title={t("Connect to Google")}
             description={t(
@@ -268,14 +290,6 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           />
         </div>
       )}
-
-      {/* ONE BOX, WHATEVER THIS SECTION IS SAYING (R67) — the same change its
-       * neighbour on this tab took the same day (web/components/team/
-       * access-tokens.tsx has the client's ruling and the measured tones). The
-       * connected services stood on soft paper and the error, the skeleton and
-       * the "not set up here" line stood on the page, so the section changed
-       * SHAPE as well as content between states. */}
-      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
       {q.error ? (
         <div className="p-4">
           <ShapeStateBody

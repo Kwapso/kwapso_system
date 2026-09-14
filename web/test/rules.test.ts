@@ -8,6 +8,12 @@ import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+// R48 §iv reads a real syntax tree rather than a window of characters — "which
+// component draws this wall, and does that component search" is a question about
+// the JSX, and the compiler is already a dependency here (the same move
+// `sections-stand-on-paper.test.ts` makes for R67).
+import ts from "typescript"
+
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { GLOSSARY } from "@shared/glossary"
 import {
@@ -248,6 +254,217 @@ function findBars(): string[] {
   return componentFiles().flatMap((f) =>
     [...stripComments(read(f)).matchAll(/<PagedFind[\s\S]{0,1800}/g)].map((m) => m[0])
   )
+}
+
+
+/* ── R48 §iv — THE WALLS. ────────────────────────────────────────────────────
+ *
+ * Census (i) reads RECIPES and census (ii) reads `<ToolbarRow>` CALL SITES, so
+ * both stand on a TAG: a screen is visible to this law only because it reached
+ * for a named piece of the app's own furniture. A wall of records built by hand
+ * — a `.map()` straight into a kit part, with no toolbar to find — is invisible
+ * to both BY CONSTRUCTION, and that is how Settings › Modules shipped on
+ * 2026-09-10 with twelve cards and no search box under a green build. The
+ * client asked for the toolbar herself the next day, at which point the screen
+ * gained a `<ToolbarRow>` and became visible to census (ii) — which is the
+ * wrong way round: a law you enter by being fixed is a law that could never
+ * have caught you.
+ *
+ * SO THE SUBJECT IS THE WALL, NOT THE TOOLBAR. A component that renders the
+ * kit's `CardGrid`, or the kit's `List`, over a `.map()` has DECLARED ITSELF a
+ * wall or a register of records — those two parts exist for nothing else, the
+ * kit's own header calls `CardGrid` "a wall of record cards", and no comment
+ * can satisfy the predicate.
+ *
+ * IDENTIFIED BY IMPORT BINDING, NEVER BY TAG NAME. The local name is read off
+ * the file's own import of `@shared/ui/components/card-grid/card-grid`,
+ * `@shared/ui/components/list/list` or `@shared/web/list-compat` — the app's
+ * own compat seam, which IS the kit's `List` one hop away and is how seven of
+ * the call sites reach it. Two things in this repo are called `List` and are
+ * not a wall: Phosphor's LIST ICON, drawn as a view-mode glyph on
+ * `web/components/work/wave-finder.tsx` and `web/components/apps/apps-screen.tsx`,
+ * and `const List = block.tag` in `web/components/assistant/agent-markdown.tsx`,
+ * which is a raw `<ul>`. A tag-name census files both as collections; this one
+ * cannot see them, and it still sees an import somebody renames.
+ *
+ * IT UNDER-REACHES ON PURPOSE, the direction R67 argues for at length: a false
+ * offender in a build gate is worse than a wall the law stays quiet about. It
+ * does NOT catch a hand-rolled `<ul>` — `web-portal/components/waiting-on-you.tsx`
+ * and the local `TeamPanel` on `web/components/screens/kwapso-screen.tsx` are
+ * both real, growing registers of records this census cannot see — and no
+ * non-fuzzy predicate can: the fuzzy version that catches them also files a
+ * conversation thread and an activity feed as data views.
+ *
+ * ── THE ROOM ────────────────────────────────────────────────────────────────
+ *
+ * The question is asked of the COMPONENT that draws the wall: the nearest
+ * enclosing function with a Capitalised name, which is React's own statement of
+ * what a component is. A lowercase local helper is part of its parent's body
+ * and climbs — `sprints-screen.tsx` groups its rows under one `<section>` per
+ * sprint state, and a `<section>` is emphatically NOT the room: those five
+ * sections are five slices of ONE collection that ONE toolbar above them all
+ * narrows, so rooming by section would report the screen with the toolbar as
+ * the screen without one. A wall drawn by a module-level helper with no
+ * component above it at all is asked of the FILE, because the module is then
+ * the only scope its caller shares.
+ *
+ * WHAT THAT COSTS, measured rather than assumed: `settings-screen.tsx` draws
+ * three walls in ONE component, and the Modules wall's own `<ToolbarRow>`
+ * answers for the two navigation lists on the Team tab as well. Both are menus
+ * of the app's own screens rather than registers of records, so nothing is lost
+ * today — but a fourth wall added to that component would inherit the same
+ * silence, and it is written down here rather than discovered later.
+ *
+ * ── WHAT COUNTS AS SEARCHING ────────────────────────────────────────────────
+ *
+ * Four signals, each grounded in something this repo already holds shut:
+ * `<ToolbarRow>`, which census (ii) above already requires to carry a `search`
+ * prop; `<PagedFind>`, which draws an unconditional `<SearchInput>` with no
+ * per-caller way to switch it off (`web/components/records/paged-find.tsx`);
+ * `<SearchInput>`, the kit's own search control; and `useDoorSearch`
+ * (`web-portal/lib/search.ts`), the portal's way of asking the DOOR, which
+ * draws no `<ToolbarRow>` on purpose (§ii-b) and which R63 already derives its
+ * portal toolbar owners from. The fourth matches no wall today and is here so
+ * that a portal wall which door-searches is not reported as a wall with no
+ * search at all — a false offender, which is the one outcome this census is
+ * built to avoid.
+ *
+ * COMMENTS ARE BLANKED BEFORE THE PARSE, length-preserved so the line numbers
+ * still name the real file. Not housekeeping: `web/components/team/access-tokens.tsx`
+ * and `shared/web/screen-engine/screen-renderer.tsx` each discuss `<ToolbarRow>`
+ * and `<PagedFind>` in prose, and a census that read the raw text would accept
+ * an explanation of a search box as a search box.
+ *
+ * ── OUT BY SCOPE, NOT BY EXEMPTION ──────────────────────────────────────────
+ *
+ * `shared/web/list-compat.tsx` DECLARES the app's `List` — the same reason
+ * census (ii) skips `web/components/deep-link/screen-bits.tsx`, which declares
+ * `<ToolbarRow>`. A declaration is not a call site, and the seam has no
+ * collection of its own.
+ *
+ * `shared/web/screen-engine/` is the RECIPE ENGINE, and its walls are every
+ * recipe's body at once. Whether one of those collections searches is decided
+ * by its own `CollectionConfig.searchable`, which census (i) above holds entry
+ * by entry; judging the engine here would ask one component to answer for every
+ * collection in the app, and would be satisfied or broken by all of them
+ * together. */
+type RecordWall = {
+  /** repo-relative path of the file that draws it. */
+  rel: string
+  /** `path#Component` — the exemption key, one per component rather than one
+   * per file, so a wall can never inherit a neighbour's reason. */
+  key: string
+  /** The kit part, for the failure message. */
+  part: string
+  line: number
+  /** Does the room draw one of the four search signals? */
+  searches: boolean
+  /** Does the room PAGE (R14)? A growing wall may not be exempted at all. */
+  grows: boolean
+}
+
+/** The three specifiers a wall arrives through. `@shared/web/list-compat` is
+ * the kit's own `List` one hop away — `list-compat.tsx` imports it and reshapes
+ * `items`/`surface` into the kit's `rows`/`variant` — so a file importing it is
+ * rendering the kit part, and leaving it out would take seven of the app's call
+ * sites out of the law. */
+const WALL_MODULES = new Set([
+  "@shared/ui/components/card-grid/card-grid",
+  "@shared/ui/components/list/list",
+  "@shared/web/list-compat",
+])
+
+/** See the header above for what each of these four is grounded in. */
+const WALL_SEARCHES = /<(?:ToolbarRow|PagedFind|SearchInput)\b|\buseDoorSearch\b/
+/** R14's own vocabulary for a collection that grows with use. */
+const WALL_GROWS = /\b(?:hasMore|loadMore)\b|<LoadMore\b/
+/** Out by SCOPE — see the header. A path prefix, so the whole engine folder
+ * goes with it. */
+const WALL_SCOPE_OUT = ["shared/web/list-compat.tsx", "shared/web/screen-engine/"]
+
+/** The nearest enclosing Capitalised function — React's own statement of what a
+ * component is — or `null` where a module-level helper draws the wall. */
+function enclosingComponent(node: ts.Node, sf: ts.SourceFile): ts.Node | null {
+  for (let cur: ts.Node | undefined = node; cur; cur = cur.parent) {
+    let name: string | undefined
+    if (ts.isFunctionDeclaration(cur)) name = cur.name?.getText(sf)
+    else if (
+      (ts.isArrowFunction(cur) || ts.isFunctionExpression(cur)) &&
+      ts.isVariableDeclaration(cur.parent)
+    )
+      name = cur.parent.name.getText(sf)
+    if (name && /^[A-Z]/.test(name)) return cur
+  }
+  return null
+}
+
+/** The name to key an exemption on: the enclosing component, else the nearest
+ * named function at module scope (whose room is the whole file). */
+function enclosingName(node: ts.Node, sf: ts.SourceFile): string {
+  for (let cur: ts.Node | undefined = node; cur; cur = cur.parent) {
+    if (ts.isFunctionDeclaration(cur) && cur.name) return cur.name.getText(sf)
+    if (
+      (ts.isArrowFunction(cur) || ts.isFunctionExpression(cur)) &&
+      ts.isVariableDeclaration(cur.parent)
+    )
+      return cur.parent.name.getText(sf)
+  }
+  return "module"
+}
+
+/** EVERY WALL OR REGISTER OF RECORDS EITHER FRONT DOOR DRAWS WITH A KIT PART. */
+function recordWalls(): RecordWall[] {
+  const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
+  const walls: RecordWall[] = []
+  for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+    if (WALL_SCOPE_OUT.some((out) => f.rel === out || f.rel.startsWith(out))) continue
+    // Blanked, not deleted: `keepLength` keeps every offset — and therefore
+    // every line number — identical to the file on disk.
+    const src = stripComments(f.source, { keepLength: true })
+    const sf = ts.createSourceFile(f.path, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+
+    const local = new Map<string, string>()
+    for (const st of sf.statements) {
+      if (!ts.isImportDeclaration(st)) continue
+      if (!ts.isStringLiteral(st.moduleSpecifier)) continue
+      if (!WALL_MODULES.has(st.moduleSpecifier.text)) continue
+      const bindings = st.importClause?.namedBindings
+      if (!bindings || !ts.isNamedImports(bindings)) continue
+      for (const el of bindings.elements) {
+        const exported = (el.propertyName ?? el.name).text
+        if (exported === "CardGrid" || exported === "List") local.set(el.name.text, exported)
+      }
+    }
+    if (local.size === 0) continue
+
+    const visit = (node: ts.Node): void => {
+      const opening =
+        ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : null
+      const part = opening ? local.get(opening.tagName.getText(sf)) : undefined
+      if (opening && part) {
+        // The WHOLE element — opening tag through closing tag — so a `.map()`
+        // in a prop and a `.map()` between the tags both count, which is the
+        // difference between `<List items={rows.map(…)} />` and
+        // `<CardGrid>{rows.map(…)}</CardGrid>`. Both shapes are in this repo.
+        const element = ts.isJsxOpeningElement(opening) ? opening.parent : opening
+        if (/\.map\s*\(/.test(element.getText(sf))) {
+          const component = enclosingComponent(opening, sf)
+          const room = (component ?? sf).getText(sf)
+          walls.push({
+            rel: f.rel,
+            key: `${f.rel}#${enclosingName(opening, sf)}`,
+            part,
+            line: sf.getLineAndCharacterOfPosition(opening.getStart(sf)).line + 1,
+            searches: WALL_SEARCHES.test(room),
+            grows: WALL_GROWS.test(room),
+          })
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sf)
+  }
+  return walls
 }
 
 describe("RULES — the laws of the base", () => {
@@ -2938,17 +3155,29 @@ describe("RULES — the laws of the base", () => {
   // including the search, should be absolutely everywhere we have a data view
   // or a collection view. Stop hardcoding this. Just write it as a rule."
   //
-  // Two censuses, off the disk, never a hand-list — the same shape R29's page
+  // Four censuses, off the disk, never a hand-list — the same shape R29's page
   // width and R31's radius vocabulary already use:
   //
-  //   i.  Every `BASE_RECIPES` (web/lib/screens.ts) entry whose recipe carries
-  //       a `CollectionConfig` must have `searchable: true`, the ENGINE'S own
-  //       default (`defaultCollectionConfig`, config.ts) — or be named in
-  //       `TOOLBAR_EXEMPT` with the real reason search lives elsewhere.
-  //   ii. Every `<ToolbarRow>` call site (screen-bits.tsx's own bespoke
-  //       toolbar, reached by a BOUNDED collection with no recipe search to
-  //       inherit — apps, sprints, tasks' Calendar tab, Triage, every nested
-  //       panel) must pass a `search` prop, or be named in the same registry.
+  //   i.   Every `BASE_RECIPES` (web/lib/screens.ts) entry whose recipe carries
+  //        a `CollectionConfig` must have `searchable: true`, the ENGINE'S own
+  //        default (`defaultCollectionConfig`, config.ts) — or be named in
+  //        `TOOLBAR_EXEMPT` with the real reason search lives elsewhere.
+  //   ii.  Every `<ToolbarRow>` call site (screen-bits.tsx's own bespoke
+  //        toolbar, reached by a BOUNDED collection with no recipe search to
+  //        inherit — apps, sprints, tasks' Calendar tab, Triage, every nested
+  //        panel) must pass a `search` prop, or be named in the same registry.
+  //   ii-b Every portal collection ROOM, because the portal draws no
+  //        `<ToolbarRow>` at all and (ii) therefore reported green on that
+  //        whole front door by finding nothing to inspect.
+  //   iv.  Every WALL OR REGISTER OF RECORDS — a component drawing the kit's
+  //        `CardGrid` or its `List` over a `.map()` — because all three
+  //        censuses above key on a TAG THE FIX ITSELF PUTS THERE, so a
+  //        hand-built wall was invisible to this law by construction. That is
+  //        how Settings › Modules shipped twelve cards with no search box under
+  //        a green build on 2026-09-10, and only became visible to (ii) the
+  //        next day, when the client asked for the toolbar and the screen
+  //        gained a `<ToolbarRow>`. A law you enter by being fixed is a law
+  //        that could never have caught you.
   //
   // (ii) is a brace-depth-aware scan rather than a plain regex, because a
   // `search={<SearchInput .../>}` prop is not the only thing between
@@ -3089,10 +3318,71 @@ describe("RULES — the laws of the base", () => {
       `R48 — every portal collection screen searches, or is a bounded room named in TOOLBAR_EXEMPT:\n  ${roomOffenders.join("\n  ")}`
     ).toEqual([])
 
+    // iv · THE WALL CENSUS — the clause that does not stand on a toolbar.
+    //
+    // Censuses (i) and (ii) both key on a TAG the fix itself puts there, so a
+    // hand-built wall of records is invisible to this law by construction. See
+    // `recordWalls()` above this file's `describe` for the whole argument: the
+    // subject, why it is read off the IMPORT rather than the tag name, what the
+    // room is, what the four search signals are grounded in, and what this
+    // deliberately cannot see.
+    const walls = recordWalls()
+
+    // THE TRIPWIRE, both halves. A census that matches nothing passes an
+    // "everything searches" assertion perfectly, and so does one whose search
+    // predicate has gone blind and reported every wall in the app as an
+    // offender to be exempted. Both numbers are floors, not pins: they may rise
+    // freely and a fall means the derivation stopped seeing what it sees today.
+    expect(
+      walls.length,
+      "R48 §iv found almost no walls — the import specifiers, the `.map()` test or the file walk " +
+        "have changed shape. Fix the derivation, never this number: a scan over nothing reports all clear"
+    ).toBeGreaterThan(7)
+    expect(
+      walls.filter((w) => w.searches).length,
+      "R48 §iv found no wall that searches — the four search signals have stopped matching, and " +
+        "every wall in the app is about to be reported as one with no search box"
+    ).toBeGreaterThan(2)
+
+    const wallOffenders: string[] = []
+    const wallExemptUsed = new Set<string>()
+    for (const w of walls) {
+      if (w.searches) continue
+      // A GROWING WALL MAY NOT BE EXEMPTED AT ALL, the same refusal census ii-b
+      // already makes for a paging portal room: `hasMore`/`loadMore`/`<LoadMore>`
+      // means the collection grows with use (R14), and a growing list is
+      // precisely the one a reader cannot get to the end of by scrolling. The
+      // exemption this law allows is "a search box over a handful of rows is a
+      // control that cannot do anything", and that sentence is false the moment
+      // the handful is a page of something larger.
+      if (w.grows) {
+        wallOffenders.push(
+          `${w.key} (line ${w.line}, <${w.part}>): a wall of records that PAGES (hasMore/loadMore) ` +
+            `and whose component draws no search — a growing list is the one a reader cannot reach ` +
+            `the end of, so this may not be exempted`
+        )
+        continue
+      }
+      if (w.key in TOOLBAR_EXEMPT) {
+        wallExemptUsed.add(w.key)
+        continue
+      }
+      wallOffenders.push(
+        `${w.key} (line ${w.line}, <${w.part}>): a component that draws the kit's <${w.part}> over a ` +
+          `.map() — a wall or register of records — and draws no search of its own. Give it one ` +
+          `(a <ToolbarRow search={…}>, a <PagedFind>, a <SearchInput>), or name this component in ` +
+          `TOOLBAR_EXEMPT with the real reason its rows are bounded`
+      )
+    }
+    expect(
+      wallOffenders,
+      `R48 — every wall or register of records searches, or is a bounded room named in TOOLBAR_EXEMPT:\n  ${wallOffenders.join("\n  ")}`
+    ).toEqual([])
+
     // iii · THE RATCHET, BOTH DIRECTIONS — the same shape R29/R31/R32 already
     // run: an entry nothing uses is a pin left behind by a screen that got
     // fixed, and it has to go, or the list stops being able to only shrink.
-    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed, ...roomExemptUsed])
+    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed, ...roomExemptUsed, ...wallExemptUsed])
     const stale = Object.keys(TOOLBAR_EXEMPT).filter((k) => !usedKeys.has(k))
     expect(
       stale,
@@ -3114,11 +3404,53 @@ describe("RULES — the laws of the base", () => {
   //   i.  A `<ToolbarRow>` tag's OWN `className` prop hard-codes a `mb-*` —
   //       the same brace-depth scan R48 uses, so a `search={<X onClear={…}/>}`
   //       prop nested inside the tag can't be mistaken for its own close.
-  //   ii. The nearest OPEN `<div>`/`<section>` wrapper immediately before the
-  //       row (or before a `{someToolbar}` variable a screen renders in its
-  //       place — sprints-screen.tsx's own shape) still carries its own
-  //       `gap-*`/`space-y-*` on a `flex-col` — the same double-spend the row
-  //       used to leave to callers.
+  //   ii. The BOX THE ROW IS A CHILD OF spaces its children apart itself —
+  //       a `gap-*` on a flex column, or a `space-y-*` stack, which needs no
+  //       flex at all — and something renders after the row inside it. Then
+  //       that number and `--toolbar-content-gap` are both being spent on the
+  //       same edge, which is the double-spend the row was centralised to end.
+  //
+  // ── CLAUSE (ii) WAS DEAD FOR ITS WHOLE LIFE, AND THIS IS THE REPAIR ─────────
+  //
+  // It used to read backward over a 400-character window for a `<div>`/
+  // `<section>` opening tag ANCHORED TO THE END of that window, then test what
+  // the anchor did NOT consume — i.e. the 360 characters BEFORE the wrapper —
+  // against a pattern that admits only whitespace, an emptied `{/* … */}` and a
+  // `{cond && (` guard. That prefix is ordinary code at every call site in this
+  // repo, so the function returned `null` before it ever read a class. Measured
+  // 11 Sep 2026 over the real stripper: 24 call sites, 24 `null`s, ZERO of them
+  // for a reason about spacing. A lane that deliberately added `gap-4` to a
+  // toolbar's own wrapper could not make this go red, which is the only test
+  // that ever mattered — and "a comment sits between the wrapper and the row",
+  // the shape the window was written to tolerate, was never even reached.
+  //
+  // So the window is gone and the row's PARENT is resolved properly:
+  //
+  //   · a JSX tag census with `stripComments`'s own `afterValue` bit, because
+  //     `useState<string>(…)` and `a < b` are spelled like opening tags and a
+  //     scanner that counts them loses the stack within two lines;
+  //   · a FRAGMENT is walked THROUGH — it paints no box, so a row inside
+  //     `{err ? <State/> : <>…</>}` is spaced by whatever holds the ternary;
+  //   · a COMPONENT wrapper is followed to the element it puts its children
+  //     in — `{children}` where it writes one, else the element wearing the
+  //     props SPREAD, which is how every kit primitive passes them on. Without
+  //     this, `<TeamPanel>` (`flex flex-col gap-4`, the members wall's own
+  //     container) was double-spending R49's number invisibly, because the
+  //     old scan matched `<div>` and `<section>` and nothing else;
+  //   · and a row that is the LAST thing in its box is NOT an offence, because
+  //     a column gap it has no following sibling for cannot reach the content.
+  //     That is not a softening: it is the difference between the law and a
+  //     registry of apologies. `client-org-panel.tsx` nests its heading and its
+  //     row in a `gap-2` pair ON PURPOSE, with the content a sibling of the
+  //     PAIR — the file says so in a comment written before this check could
+  //     read it — and pinning that file as "allowed to double-spend" would have
+  //     blinded the law to the real one somebody adds to it next year.
+  //
+  // WHAT IT STILL CANNOT SEE, said out loud rather than left to look like
+  // compliance: a row drawn at a COMPONENT'S OWN ROOT (`tickets-collection.tsx`
+  // returns `<>…<ToolbarRow/>…</>`) is spaced by whoever renders that component,
+  // which is a render graph and not a file. Three call sites are in that shape
+  // today; none of them is inside a gapped box, checked by hand on 11 Sep 2026.
   it("toolbar-content-gap: <ToolbarRow> pays its own trailing gap, never a call site (R49)", () => {
     const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
     expect(
@@ -3126,29 +3458,271 @@ describe("RULES — the laws of the base", () => {
       "R49 — <ToolbarRow>'s own root must carry `mb-[var(--toolbar-content-gap)]` (screen-bits.tsx) — every call site inherits it from there, so a call site never has to ask for it"
     ).toContain("mb-[var(--toolbar-content-gap)]")
 
-    // A wrapper's className, read backward from a `<ToolbarRow` (or a toolbar
-    // variable) occurrence: the nearest preceding `<div`/`<section` opening
-    // tag that is still OPEN at that point (nothing else opened after it —
-    // stripComments turns a JSX `{/* … */}` into a bare `{ }`, and a
-    // `{cond && (` guard, so both are tolerated in the gap between).
-    const WRAPPER_OPEN = /<(?:div|section)\s+className="([^"]*)"\s*>\s*$/
-    const BETWEEN_OK = /^(?:\{\s*\}|\{\s*[\w.]+(?:\s*&&\s*\(?)?|\s|\/\/[^\n]*\n)*$/
+    /** Words after which a `<` OPENS something instead of continuing a value.
+     * `stripComments`'s own `afterValue` bit, and the only way to tell a JSX
+     * element from `useState<string>(…)`, `useRef<Row | null>(…)` or `a < b`. */
+    const OPENS_AN_EXPRESSION = new Set([
+      "return",
+      "typeof",
+      "instanceof",
+      "in",
+      "of",
+      "new",
+      "delete",
+      "void",
+      "throw",
+      "case",
+      "do",
+      "else",
+      "yield",
+      "await",
+      "default",
+    ])
 
-    function wrapperGapOffence(before: string): string | null {
-      // Walk backward over "nothing but whitespace / an emptied comment / an
-      // opened `{cond && (`" until a JSX opening tag is reached — if it is a
-      // gapped flex-col div/section, that gap is a second hand on this row's
-      // own number.
-      const tail = before.slice(-400)
-      if (!BETWEEN_OK.test(tail.replace(WRAPPER_OPEN, ""))) return null
-      const m = WRAPPER_OPEN.exec(tail)
-      if (!m) return null
-      const cls = m[1]
-      if (!/flex-col/.test(cls)) return null
-      const gapMatch = cls.match(/\b(?:gap|space-y)-(\[[^\]]+\]|[0-9]+(?:\.5)?)\b/)
-      if (!gapMatch) return null
-      if (gapMatch[0].includes("--toolbar-content-gap")) return null
-      return gapMatch[0]
+    type JsxTag = { start: number; end: number; kind: "open" | "close" | "selfClose"; name: string; text: string }
+
+    const opensJsx = (src: string, at: number): boolean => {
+      let j = at - 1
+      while (j >= 0 && /\s/.test(src[j])) j--
+      if (j < 0) return true
+      if (src[j] === ")" || src[j] === "]") return false
+      if (!/[\w$]/.test(src[j])) return true
+      return OPENS_AN_EXPRESSION.has(/[\w$]+$/.exec(src.slice(0, j + 1))?.[0] ?? "")
+    }
+
+    /** Every JSX tag that opens or closes before `upto`. A tag's own `>` is
+     * found past quoted attribute values and `{…}` holes, so `search={<X/>}`
+     * does not end it early — R48's shape, applied to every tag rather than to
+     * `<ToolbarRow` alone. */
+    const jsxTags = (src: string, upto: number): JsxTag[] => {
+      const TAG = /<(\/?)([A-Za-z_$][\w$.:-]*)?(?=[\s/>])/g
+      let out: JsxTag[] = []
+      let i = 0
+      for (;;) {
+        TAG.lastIndex = i
+        const m = TAG.exec(src)
+        if (!m || m.index >= upto) break
+        const closing = m[1] === "/"
+        if (!closing && !opensJsx(src, m.index)) {
+          i = TAG.lastIndex
+          continue
+        }
+        let j = TAG.lastIndex
+        let depth = 0
+        let quote = ""
+        let closed = false
+        for (; j < src.length; j++) {
+          const c = src[j]
+          if (quote !== "") {
+            if (c === "\\") j++
+            else if (c === quote) quote = ""
+            continue
+          }
+          if (c === '"' || c === "'" || c === "`") quote = c
+          else if (c === "{") depth++
+          else if (c === "}") depth--
+          else if (c === ">" && depth === 0) {
+            closed = true
+            break
+          }
+        }
+        if (!closed) break
+        if (j + 1 > upto) {
+          // `upto` sits INSIDE this tag's attributes — a render prop carrying
+          // JSX (`renderPanel={(p) => <div>…<ToolbarRow/>…</div>}`, wave-detail).
+          // Nothing outside is an ancestor BY CHILDREN, so the scope starts here.
+          out = []
+          i = TAG.lastIndex
+          continue
+        }
+        out.push({
+          start: m.index,
+          end: j + 1,
+          kind: closing ? "close" : src[j - 1] === "/" ? "selfClose" : "open",
+          name: m[2] ?? "",
+          text: src.slice(m.index, j + 1),
+        })
+        i = j + 1
+      }
+      return out
+    }
+
+    /** The element the code at `at` is a CHILD of, and how many FRAGMENTS sit
+     * in between — a fragment paints no box, so the gap a row is spaced by
+     * belongs to the first real element above it. `null` when the row is at a
+     * component's own root, or is an expression assigned to a variable. */
+    const enclosingBox = (src: string, at: number): { tag: JsxTag; fragments: number } | null => {
+      const tags = jsxTags(src, at)
+      let depth = 0
+      let fragments = 0
+      for (let k = tags.length - 1; k >= 0; k--) {
+        const t = tags[k]
+        if (t.kind === "selfClose") continue
+        if (t.kind === "close") {
+          depth++
+          continue
+        }
+        if (depth > 0) {
+          depth--
+          continue
+        }
+        if (t.name === "") {
+          fragments++
+          continue
+        }
+        return { tag: t, fragments }
+      }
+      return null
+    }
+
+    /** Does anything RENDER after the row inside that box? A column `gap` (or a
+     * `space-y`) only spends the toolbar→content number when it has a following
+     * sibling to spend it on; a row that is its box's LAST child is separated
+     * from the content by its own trailing margin and nothing else. */
+    const rendersAfter = (src: string, from: number, fragments: number): boolean => {
+      let i = from
+      let closed = 0
+      while (i < src.length) {
+        const c = src[i]
+        if (/\s/.test(c)) {
+          i++
+          continue
+        }
+        const close = /^<\/[\w$.:-]*\s*>/.exec(src.slice(i, i + 64))
+        if (close) {
+          if (++closed > fragments) return false // that one was the box's own close
+          i += close[0].length
+          continue
+        }
+        if (c === "<" || c === "{") return true // a sibling element, or a hole that draws one
+        if ("()}]?:,;&|".includes(c)) {
+          i++ // the guard or ternary the row itself sits in, closing
+          continue
+        }
+        return true // text, or anything else that reaches the page
+      }
+      return false
+    }
+
+    /** The class STRINGS a tag declares: a literal `className="…"`, or every
+     * string inside a `className={cn(…)}` — which is where a component keeps
+     * its own base classes next to the one its caller hands in. */
+    const classLiterals = (tag: string): string[] => {
+      const literal = /\bclassName\s*=\s*"([^"]*)"/.exec(tag)
+      if (literal) return [literal[1]]
+      const hole = /\bclassName\s*=\s*\{/.exec(tag)
+      if (!hole) return []
+      const open = hole.index + hole[0].length - 1
+      let depth = 0
+      let j = open
+      for (; j < tag.length; j++) {
+        if (tag[j] === "{") depth++
+        else if (tag[j] === "}" && --depth === 0) break
+      }
+      return [...tag.slice(open, j + 1).matchAll(/"([^"]*)"/g)].map((m) => m[1])
+    }
+
+    /** The spacing this class string puts BETWEEN its children: a `space-y-*`
+     * stack (margins, no flex needed) or a `gap-*` on a flex COLUMN. */
+    const columnGap = (cls: string): string | null => {
+      const stack = /\bspace-y-(?:\[[^\]]+\]|[0-9]+(?:\.5)?)\b/.exec(cls)
+      if (stack) return stack[0]
+      if (!/\bflex-col\b/.test(cls)) return null
+      const gap = /\bgap-(?:\[[^\]]+\]|[0-9]+(?:\.5)?)\b/.exec(cls)
+      if (!gap || gap[0].includes("--toolbar-content-gap")) return null
+      return gap[0]
+    }
+
+    const sourceCache = new Map<string, string | null>()
+    const readSource = (rel: string): string | null => {
+      if (!sourceCache.has(rel)) {
+        const path = join(ROOT, rel)
+        sourceCache.set(rel, existsSync(path) ? stripComments(readFileSync(path, "utf8")) : null)
+      }
+      return sourceCache.get(rel) ?? null
+    }
+
+    /** `@/…` is the front door the importing file lives in, `@shared/…` is
+     * shared/, a relative path is a relative path — the three shapes
+     * web/tsconfig.json declares, and the kit is vendored in-repo so its own
+     * primitives resolve the same way an app component does. */
+    const resolveImport = (fromRel: string, spec: string): string | null => {
+      const base = spec.startsWith("@/")
+        ? `${fromRel.split("/")[0]}/${spec.slice(2)}`
+        : spec.startsWith("@shared/")
+          ? `shared/${spec.slice("@shared/".length)}`
+          : spec.startsWith(".")
+            ? join(dirname(fromRel), spec)
+            : null
+      if (base === null) return null
+      for (const ext of [".tsx", ".ts", "/index.tsx", "/index.ts"]) {
+        if (existsSync(join(ROOT, base + ext))) return base + ext
+      }
+      return null
+    }
+
+    /** Where a COMPONENT wrapper puts the children handed to it — the element
+     * whose spacing a row inside it is really subject to. `{children}` where
+     * the component writes one; otherwise the element wearing the props SPREAD
+     * (`({ className, ...props }) => <div className={cn(…)} {...props} />`),
+     * which is how the kit's own primitives pass them on. `null` means this
+     * census cannot see, and a census that cannot see says so. */
+    const childrenHosts = (rel: string, name: string): { rel: string; tag: JsxTag }[] | null => {
+      const src = readSource(rel)
+      if (src === null) return null
+      const defRel = new RegExp(`\\b(?:function|const|let|class)\\s+${name}\\b`).test(src)
+        ? rel
+        : (() => {
+            const named = new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*"([^"]+)"`).exec(src)
+            return named ? resolveImport(rel, named[1]) : null
+          })()
+      if (defRel === null) return null
+      const defSrc = readSource(defRel)
+      if (defSrc === null) return null
+      const def = new RegExp(`(?:function\\s+${name}\\b|(?:const|let)\\s+${name}\\s*[=:])`).exec(defSrc)
+      if (!def) return null
+      const after = defSrc.slice(def.index)
+      const next = /\nexport\s/.exec(after.slice(1))
+      const body = next ? after.slice(0, next.index + 1) : after
+      const hosts: { rel: string; tag: JsxTag }[] = []
+      for (const m of body.matchAll(/\{\s*children\s*\}/g)) {
+        const box = enclosingBox(defSrc, def.index + (m.index ?? 0))
+        if (box) hosts.push({ rel: defRel, tag: box.tag })
+      }
+      if (hosts.length > 0) return hosts
+      for (const t of jsxTags(body, body.length)) {
+        if (t.kind !== "close" && /\{\s*\.\.\.\s*[\w$]+\s*\}/.test(t.text)) return [{ rel: defRel, tag: t }]
+      }
+      return null
+    }
+
+    /** Every way the box at `tag` spaces the row inside it — its own classes,
+     * and, when it is a component, the classes of whatever it puts its children
+     * in, as far down as the chain goes. */
+    const spacingFaults = (rel: string, tag: JsxTag, trail: string, depth = 0): string[] => {
+      const faults: string[] = []
+      for (const cls of classLiterals(tag.text)) {
+        const gap = columnGap(cls)
+        if (gap) faults.push(`${trail}<${tag.name}> spaces its children by \`${gap}\``)
+      }
+      if (!/^[A-Z]/.test(tag.name) || depth >= 4) return faults
+      const hosts = childrenHosts(rel, tag.name)
+      if (hosts === null) {
+        faults.push(
+          `${trail}<${tag.name}> is a component this census cannot read the children's box out of — give that box a literal className, or name this file in TOOLBAR_CONTENT_GAP_EXEMPT with the reason`
+        )
+        return faults
+      }
+      for (const host of hosts) {
+        for (const cls of classLiterals(host.tag.text)) {
+          const gap = columnGap(cls)
+          if (gap)
+            faults.push(`${trail}<${tag.name}> puts its children in <${host.tag.name}>, which spaces them by \`${gap}\` (${host.rel})`)
+        }
+        if (/^[A-Z]/.test(host.tag.name))
+          faults.push(...spacingFaults(host.rel, host.tag, `${trail}<${tag.name}> → `, depth + 1))
+      }
+      return faults
     }
 
     const roots = [WEB, join(ROOT, "web-portal")]
@@ -3160,11 +3734,10 @@ describe("RULES — the laws of the base", () => {
 
       // i · every real `<ToolbarRow` TAG (brace-depth scan, R48's shape).
       let from = 0
-      const tagStarts: number[] = []
+      const rows: { at: number; end: number }[] = []
       for (;;) {
         const at = src.indexOf("<ToolbarRow", from)
         if (at === -1) break
-        tagStarts.push(at)
         let i = at + "<ToolbarRow".length
         let braceDepth = 0
         while (i < src.length) {
@@ -3175,6 +3748,11 @@ describe("RULES — the laws of the base", () => {
           i++
         }
         const tag = src.slice(at, i + 1)
+        // The row's own end: a self-closing tag ends at its `/>`, an open one
+        // at its `</ToolbarRow>` — which is what "the thing after the row"
+        // is measured from below.
+        const closed = src[i - 1] === "/" ? i + 1 : src.indexOf("</ToolbarRow>", i) + "</ToolbarRow>".length
+        rows.push({ at, end: closed })
         const classNameMatch = tag.match(/\bclassName\s*=\s*"([^"]*)"/)
         if (classNameMatch && /\bmb-(?!\[var\(--toolbar-content-gap\)\])/.test(classNameMatch[1])) {
           if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) exemptUsed.add(f.rel)
@@ -3186,25 +3764,30 @@ describe("RULES — the laws of the base", () => {
         from = i + 1
       }
 
-      // ii · the nearest OPEN flex-col wrapper before each tag, and before a
-      // `{xToolbar}`-shaped variable this file also defines from a real
-      // `<ToolbarRow` (sprints-screen.tsx's own indirection).
-      const checkpoints = [...tagStarts]
+      // ii · the BOX each row is a child of — and the box a `{xToolbar}`-shaped
+      // variable is rendered in, which is where sprints-screen.tsx and
+      // tickets-dashboard.tsx really put theirs.
+      const checkpoints = [...rows]
       for (const m of src.matchAll(/\{(\w*[Tt]oolbar\w*)\}/g)) {
         if (new RegExp(`\\b(?:const|let)\\s+${m[1]}\\s*=[\\s\\S]{0,600}?<ToolbarRow\\b`).test(src)) {
-          checkpoints.push(m.index ?? 0)
+          const at = m.index ?? 0
+          checkpoints.push({ at, end: at + m[0].length })
         }
       }
-      for (const at of checkpoints) {
-        const offence = wrapperGapOffence(src.slice(0, at))
-        if (!offence) continue
+      for (const point of checkpoints) {
+        const box = enclosingBox(src, point.at)
+        if (!box) continue // a component's own root: its box is the caller's, and out of a file scan's reach
+        if (!rendersAfter(src, point.end, box.fragments)) continue // last child — the gap never reaches the content
+        const faults = spacingFaults(f.rel, box.tag, "")
+        if (faults.length === 0) continue
         if (f.rel in TOOLBAR_CONTENT_GAP_EXEMPT) {
           exemptUsed.add(f.rel)
           continue
         }
-        offenders.push(
-          `${f.rel}: a flex-col wrapper immediately around a <ToolbarRow> (or the toolbar it renders) still carries its own \`${offence}\` — the row already pays --toolbar-content-gap itself, so this doubles it`
-        )
+        for (const fault of faults)
+          offenders.push(
+            `${f.rel}: the box a <ToolbarRow> sits in still spaces it from the content below — ${fault}; the row already pays --toolbar-content-gap itself, so this doubles it`
+          )
       }
     }
     expect(
@@ -4498,6 +5081,7 @@ describe("RULES — the laws of the base", () => {
       "one-identity-per-source", // R68: workers/content/test/one-identity-per-source.test.ts — 0073's migration SQL for the partial unique index, plus a source census over workers/content/src for any identity_key write missing the identityKey() import
       "automations-are-visible", // R70: web/test/automations.test.ts — the automation registry against four derivations: R30's own branded-send census (shared/rules/email-sites.ts), every wrangler cron, every export of the files that exist only to act, and every automationOff("…") read in worker source
       "agent-label-vocabulary", // R71: workers/data-ops/test/agent-label-vocabulary.test.ts — every summarize() poisoned with the `help` alias on its module/table/targetTable field, derived off the schema field name
+      "no-default-subtitles", // R72: web/test/no-default-subtitles.test.ts — the heading-adjacent prose sibling census over both front doors, plus the three heading-drawing chokepoints read directly for a re-grown subtitle/description prop
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

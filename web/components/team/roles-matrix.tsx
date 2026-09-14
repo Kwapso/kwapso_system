@@ -214,11 +214,15 @@ const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
  * The kit derives a slot's letter from the first character of its label unless a
  * capability names its own `initial`, and its doc says exactly why the prop
  * exists: "a language whose four words share an initial needs to choose its own
- * four marks". Spanish is Ver · Crear · Editar · Eliminar and Catalan is Veure ·
- * Crear · Editar · Eliminar — Editar and Eliminar collided on E in both before
- * the 10 Sep 2026 ruling that renamed the app's fourth verb to `update`
- * (Actualizar/Actualitzar), which would have put two identical letters in the
- * same run and destroyed the one reading this drawing exists for.
+ * four marks". THE PAIR THAT COLLIDES MOVED, IT DID NOT DISAPPEAR. Spanish is
+ * Ver · Crear · Editar · Eliminar and Catalan is Veure · Crear · Editar ·
+ * Eliminar — Editar and Eliminar collided on E in both, before the 14 Sep 2026
+ * ruling that renamed the app's fourth verb, identifier and all, to `update`
+ * (Actualizar/Actualitzar). That closed the Spanish/Catalan collision and
+ * opened a German one: Lesen · Erstellen · Aktualisieren · Löschen puts Lesen
+ * and Löschen on the same L. Whichever language it is this build, a fixed mark
+ * still means the four letters are never derived from whatever word a reader's
+ * own language happens to put there.
  *
  * So the marks are fixed rather than derived, and they do not move between
  * languages; the LEGEND under the grid is what carries the translated word for
@@ -237,9 +241,29 @@ function capabilities(t: (s: string) => string): PermissionCapability[] {
     // "See" too.
     { id: "see", label: t("Read"), initial: "R" },
     { id: "create", label: t("Create"), initial: "C" },
-    // `id` STAYS THE KIT'S OWN `edit` (vendored, R39) — only the WORD changes,
-    // to a string distinct from the app's generic `t("Edit")` record-edit
-    // button, since the two mean different things and must not share a key.
+    // UPDATE, NOT "EDIT" — the client's ruling, 14 Sep 2026: "for permissions,
+    // rename edit to update (this way we have the full CRUD concept)". Asked
+    // directly whether the rename should reach the identifier or stop at the
+    // label, the owner chose the full rename: `RightSet.edit` became
+    // `RightSet.update` (shared/types.ts), every `requireRight`/`TOOL_GATES`
+    // pair that named it, and the `can_edit` column in every team's own
+    // database (migration 0086). Only `id` here STAYS THE KIT'S OWN `edit`
+    // (vendored, hash-pinned, R39 — `RIGHT_TO_KIT` maps it either way); every
+    // other spelling in this app now says `update`. Owed upstream: the kit's
+    // default label for this capability still says "Edit" too (same debt as
+    // "See" above, same fix — a kit release, not a local patch).
+    //
+    // "EDIT" DOES NOT JOIN THE R34 DENY-LIST. It competes with nothing here:
+    // the word is ordinary, correctly-used English on dozens of unrelated
+    // sentences — the pencil-icon action on every record screen ("Edit"),
+    // "Edit name and logo", "Edit this role" two files over in
+    // `role-panel.tsx` — none of which mean this permission column, all of
+    // which mean "open this one record and change it". R34 is deliberately
+    // narrow: a word earns a line only when, in this app, it can mean nothing
+    // else — the way "teammate" could only ever mean Member. "Edit" fails that
+    // test on its face, and banning it would need a GLOSSARY_SYNONYM_OK line
+    // for nearly every one of those sentences, which is the shape the
+    // deny-list exists to avoid, not the shape it exists to hold.
     { id: "edit", label: t("Update"), initial: "U" },
     { id: "delete", label: t("Delete"), initial: "D" },
   ]

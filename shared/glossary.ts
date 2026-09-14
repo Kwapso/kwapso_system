@@ -31,6 +31,28 @@ export const GLOSSARY = {
   // are not members — the contact who raised a ticket, the name on an account.
   member: { term: "Member", def: "A person on your team." },
   role: { term: "Role", def: "What a member is allowed to see and do." },
+  // THE FOURTH WORD MOVED (client's ruling, 14 Sep 2026): "for permissions,
+  // rename edit to update (this way we have the full CRUD concept)". Read ·
+  // Create · Update · Delete is the standard four, named the standard way —
+  // the same rename the roles matrix already carries once, 11 Sep 2026, when
+  // "See" became "Read" and this very sentence was the glossary's side of the
+  // argument for it ("the glossary was already on her side").
+  //
+  // THE IDENTIFIER MOVED TOO, on the owner's own follow-up decision: not just
+  // the word a person reads, but `RightSet.edit` (shared/types.ts), every
+  // `requireRight`/`gated` pair, every `TOOL_GATES` string and the `can_edit`
+  // column in every team's own database, all renamed to `update` in the same
+  // change (`can_edit` → `can_update`, migration 0086 — the first
+  // `RENAME COLUMN` this ledger has ever run). A DIFFERENT session answered
+  // the same ruling with a display-only rename first, reasoning that a wire
+  // rename was "a migration and a door change for zero benefit", the same
+  // argument this file already records for `help`/Tickets and for
+  // `is_default`/Protected — but the owner asked for the full rename when
+  // asked directly, and that is what shipped. "Edit" still does not join
+  // R34's deny-list: it remains ordinary, correctly-used English everywhere
+  // else in the app (the pencil-icon action on a record, "Edit this role"),
+  // none of which means this permission — see
+  // `web/components/team/roles-matrix.tsx` for the fuller account.
   permission: { term: "Access right", def: "A single thing a role can do: read, create, update, or delete." },
   invite: { term: "Invite", def: "An email asking someone to join your team in a role you choose." },
   revoke: { term: "Revoke", def: "Cancel an invite before it's accepted." },

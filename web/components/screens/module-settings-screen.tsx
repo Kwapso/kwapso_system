@@ -125,6 +125,7 @@ import { buttonVariants } from "@shared/ui/components/button/button"
 import { Gear } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
+import { TabsView, defaultTabsConfig, type TabItem } from "@shared/web/screen-engine/tabs-view"
 
 import { InAppLink } from "@/components/shell/in-app-link"
 import { softNavigate } from "@/lib/nav"
@@ -136,6 +137,10 @@ import { ticketTypeColour } from "@/lib/type-colours"
 import { usePermissions } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
+import { useRemembered } from "@shared/web/remembered"
+import { formatCount } from "@shared/web/format-count"
+import { AUTOMATIONS } from "@shared/automations"
+import { TEAM_SECTIONS } from "@/lib/pages"
 
 /** What every block on a module's settings page has, whatever it draws. */
 type ModuleSettingsSectionBase = {
@@ -316,10 +321,43 @@ export type ModuleSettingsPage = {
  * "Country" as two named blocks — they share a search, a filter and one
  * "New value" that asks which group, which is what the whole-vocabulary screen
  * has always done and is the narrowing this prop exists for. */
+
+/** THE PAGE'S OWN TITLE, TAKEN FROM THE NAV RATHER THAN RETYPED — client
+ * ruling, 2026-09-14: *"on the page settings accounts, put only the name of
+ * the module. You don't need to put settings. For example, instead of
+ * account settings, just accounts. Make sure you use the name exactly as in
+ * the navigation bar. Most of the time, it's a plural."*
+ *
+ * `TEAM_SECTIONS` (`web/lib/pages.ts`) is the one place a destination's nav
+ * word is already decided — the sidebar, the team area's own tab strip and
+ * the breadcrumb all read it. A `MODULE_SETTINGS` entry names the SAME
+ * segment `TEAM_SECTIONS` does (R61's own `module-settings-two-doors` census
+ * proves every segment resolves to a real `MODULE_PERMISSION` key, which is
+ * how a section reaches the nav in the first place), so its title is a
+ * LOOKUP rather than a second spelling — "Ticket settings" and "Account
+ * settings" are gone with this change, and what is left is "Tickets" and
+ * "Accounts", her own worked example, word for word.
+ *
+ * THROWS RATHER THAN GUESSING on a segment `TEAM_SECTIONS` does not carry —
+ * a title typed by hand here is exactly the drift this function exists to
+ * refuse, so a genuinely nav-less page (there is exactly one, `"team"`
+ * below) states its title as a literal with a comment saying why, rather
+ * than teaching this lookup a silent fallback nothing would ever notice
+ * going stale. */
+function navPageTitle(segment: string): string {
+  const section = TEAM_SECTIONS.find((s) => s.segment === segment)
+  if (!section)
+    throw new Error(
+      `MODULE_SETTINGS: "${segment}" names no TEAM_SECTIONS destination — give it a nav entry, or spell its ` +
+        `title by hand with a comment saying why (the way the "team" segment below does)`
+    )
+  return section.title
+}
+
 const MODULE_SETTINGS: ModuleSettingsPage[] = [
   {
     segment: "tickets",
-    title: "Ticket settings",
+    title: navPageTitle("tickets"),
     sections: [
       {
         key: "ticket-type",
@@ -408,7 +446,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   // table — `tasks.department`, `stories.story_type`, `sprints.sprint_type`.
   {
     segment: "tasks",
-    title: "Task settings",
+    title: navPageTitle("tasks"),
     sections: [
       {
         key: "department",
@@ -440,7 +478,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   },
   {
     segment: "stories",
-    title: "Story settings",
+    title: navPageTitle("stories"),
     sections: [
       {
         key: "story-type",
@@ -454,7 +492,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   },
   {
     segment: "sprints",
-    title: "Sprint settings",
+    title: navPageTitle("sprints"),
     sections: [
       {
         key: "sprint-type",
@@ -472,7 +510,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   // the one card, so the page still reads as stages and kinds.
   {
     segment: "apps",
-    title: "App settings",
+    title: navPageTitle("apps"),
     sections: [
       {
         key: "app-vocabulary",
@@ -491,7 +529,10 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   },
   {
     segment: "accounts",
-    title: "Account settings",
+    // CLIENT'S OWN EXAMPLE, VERBATIM, 2026-09-14: "instead of account
+    // settings, just accounts." `navPageTitle` resolves this exactly there —
+    // `TEAM_SECTIONS`'s "accounts" entry reads "Accounts".
+    title: navPageTitle("accounts"),
     sections: [
       {
         key: "account-vocabulary",
@@ -540,7 +581,10 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      * (`work_prefs.auto_stop`) and it is PER PERSON, so it is not the team's to
      * set — and the other two are a warning and a nag rather than acts. */
     segment: "time",
-    title: "Time settings",
+    // THE NAV CALLS THIS SEGMENT "WORK LOGS", NOT "TIME" — `navPageTitle`
+    // resolves what the sidebar already says rather than the URL segment,
+    // which is why this page reads "Work logs" and not "Time".
+    title: navPageTitle("time"),
     sections: [
       {
         key: "automations",
@@ -555,7 +599,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      * meet lives under `delivery` and has its own screen; this page is only
      * about the capture. */
     segment: "meetings",
-    title: "Meeting settings",
+    title: navPageTitle("meetings"),
     sections: [
       {
         key: "automations",
@@ -572,7 +616,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      * colleague's connected Google account, and a retirement pass that takes
      * material away again. Three of the five are switchable. */
     segment: "knowledge",
-    title: "Knowledge base settings",
+    title: navPageTitle("knowledge"),
     sections: [
       {
         key: "automations",
@@ -594,7 +638,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      * list, which is how somebody looking for "why did they get an email"
      * actually searches. None of the three is switchable and each says why. */
     segment: "members",
-    title: "Member settings",
+    title: navPageTitle("members"),
     sections: [
       {
         key: "automations",
@@ -631,7 +675,17 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
      * THE OWNER MAY WANT IT ELSEWHERE. The honest alternatives are the Kwapso
      * screen (the app's own record, which is where this page's GEAR is mounted)
      * and a home nobody has built. Written up in the report rather than decided
-     * inside a table. */
+     * inside a table.
+     *
+     * THE ONE LITERAL TITLE LEFT IN THIS TABLE, 2026-09-14. Every other page's
+     * title is `navPageTitle(segment)` — the client's own ruling that a
+     * settings page reads exactly the nav's word for it — and this is the one
+     * segment with no nav word to read: "team" names no `TEAM_SECTIONS` row
+     * (it never navigated anywhere; the paragraph above is the whole account
+     * of why it exists at all), so `navPageTitle("team")` would throw rather
+     * than silently drift. "Housekeeping" stays hand-spelled, on purpose, for
+     * the same reason the paragraph above already gives it a name that is
+     * NOT "Team settings". */
     segment: "team",
     title: "Housekeeping",
     sections: [
@@ -645,7 +699,7 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   },
   {
     segment: "brand",
-    title: "Brand library settings",
+    title: navPageTitle("brand"),
     sections: [
       {
         key: "brand-category",
@@ -756,6 +810,75 @@ export function ModuleSettingsScreen({
   const page = moduleSettingsPage(segment)
   const sections = visibleModuleSettings(segment, can)
 
+  // ── TWO TABS, NEVER A HAND-LISTED SHAPE — client ruling, 2026-09-11/14:
+  // "on every module settings page, add two tabs: 1. Automations 2. Choice
+  // components". `kind` is still the two-member union the header above
+  // argues for, and each tab is drawn only where THIS reader's own
+  // `visibleModuleSettings` result actually holds that kind — the same
+  // refusal `sections.length === 0` already answers for the page as a whole,
+  // asked once more per tab rather than a second `can(` call (R61 holds this
+  // file to exactly one). A page whose sections are ALL one kind (nine of
+  // the eleven today: five vocabulary-only, four automations-only) draws a
+  // single tab rather than a second, empty one with nothing behind it — this
+  // repo's standing rule against a control that decides nothing (R36, R70),
+  // read onto a tab instead of a switch. Tickets and Accounts, where a
+  // module genuinely owns both, are where two tabs show side by side.
+  const automationsSection = sections.find(
+    (s): s is Extract<ModuleSettingsSection, { kind: "automations" }> => s.kind === "automations"
+  )
+  const vocabularySections = sections.filter(
+    (s): s is Extract<ModuleSettingsSection, { kind: "vocabulary" }> => s.kind === "vocabulary"
+  )
+
+  // R16 — THE NUMBER ON EACH TAB, exactly once, through the one `formatCount`
+  // seam. Client, 2026-09-14: "show the total count for Automations and for
+  // Choice Components categories, not for the amount of choices."
+  //
+  //   · AUTOMATIONS — how many automations this module has: `AUTOMATIONS`
+  //     (shared/automations.ts) is the one registry every automation ships
+  //     in, filtered to this page's own segment, the same list
+  //     `ModuleAutomations` itself reads. A code constant rather than a
+  //     server total (there is no table of automations to COUNT(*) over —
+  //     see that file's own header), so the exactness R16 asks for is free:
+  //     the number IS the registry.
+  //   · CHOICES — how many GROUPS (categories), never how many values sit
+  //     inside them: `section.types` is the declared group list for each
+  //     visible vocabulary section, summed. Also a fact about `MODULE_SETTINGS`
+  //     itself rather than a query — a team can rename a value but cannot add
+  //     or remove a GROUP from a page, that is a code change to this table.
+  const automationsCount = AUTOMATIONS.filter((a) => a.segment === segment).length
+  const choiceGroupCount = vocabularySections.reduce((n, s) => n + s.types.length, 0)
+
+  const tabs: TabItem[] = []
+  if (automationsSection)
+    tabs.push({
+      value: "automations",
+      label: t("Automations"),
+      icon: "",
+      badge: formatCount(automationsCount),
+      badgeVariant: "" as const,
+    })
+  if (vocabularySections.length > 0)
+    tabs.push({
+      // THE GLOSSARY'S OWN WORD (`shared/glossary.ts`, `dropdownValues.term`),
+      // never "Choice components" — the client asked for "whatever the
+      // standard term in the industry is", and CLAUDE.md's voice rule
+      // (warm, plain, no jargon, the glossary's own words) already answers
+      // that question in the other direction: "picklist" / "option set" /
+      // "reference data" are exactly the jargon that rule refuses, and this
+      // app already has a plain word for the same concept, used nowhere else.
+      value: "choices",
+      label: t("Choices"),
+      icon: "",
+      badge: formatCount(choiceGroupCount),
+      badgeVariant: "" as const,
+    })
+
+  // Remembered per address (`/settings/<segment>`), like every other tab
+  // strip in the app — a visit to Ticket settings and a visit to Account
+  // settings do not share one memory slot.
+  const [tab, setTab] = useRemembered<string>("tab", automationsSection ? "automations" : "choices")
+
   // AN ADDRESS NOBODY HAS A PAGE FOR, and one a reader may not see, land in the
   // same place — and it is `NoAccess` rather than `NotFound` for both, because
   // its own sentence ("You don't have access to this, or it doesn't exist") is
@@ -776,77 +899,90 @@ export function ModuleSettingsScreen({
           unread. A bare `<h1>` is what Settings itself draws one screen up. */}
       <Headline as="h1" size="display-m">{t(page.title)}</Headline>
 
-      {/* THE SECTIONS, STACKED — the same arrangement Settings' own Appearance
-          and Team panels use (`gap-8`), because this is the same kind of page
-          and a second rhythm for one idea is how spacing drifts. The host does
-          the arranging and nothing else; each section owns its own reads, its
-          own toolbar and its own dialogs. */}
-      <div className="flex flex-col gap-8">
-        {sections.map((section) =>
-          /* THE HOST'S TWO BRANCHES, AND THE SECOND ONE ARRIVED THE WAY THE
-             FIRST ONE'S COMMENT SAID IT WOULD — *"one member and one branch, in
-             the open"*, on 2026-09-11, when the client ruled that every
-             automation in the base is visible on its module's settings page.
-             Still no abstraction over what a section might one day be: two
-             kinds, two arms, and the day there is a third it is written here
-             rather than guessed at now. */
-          section.kind === "automations" ? (
-            <ModuleAutomations
-              key={section.key}
-              teamId={teamId}
-              segment={segment}
-              title={t(section.title)}
-            />
-          ) : (
-          <SelectableScreen
-            key={section.key}
-            teamId={teamId}
-            // ── THE IMPORT DOOR, THIS PAGE'S OWN — 11 SEP 2026 ──────────────
-            // This line used to read "NO `onImport`", because the CSV doors
-            // acted on the team's whole vocabulary and a button on a page
-            // titled "Ticket settings" would have done more than the page said.
-            // The client ruled otherwise when she retired the Choices tab:
-            // *"each module's settings page gets its own import and export for
-            // its own groups… nothing sits outside Settings."*
-            //
-            // SO THE DOOR NARROWED, not the button. The wizard is the app's one
-            // import screen and the scope travels in its address — the confirm
-            // door reads the same list off the body and skips every row in
-            // another group with a reason, so this page cannot write a Country
-            // even if the file holds one. `section.types` is the same list the
-            // section's Export CSV sends to `?groups=`, so the two halves of
-            // her sentence are one fact.
-            onImport={() =>
-              softNavigate(
-                `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(section.types.join(","))}`
-              )
-            }
-            // STILL NO RECORD TO OPEN, and that is a decision rather than an
-            // omission — `onOpen` is what draws the row's link to a value's own
-            // detail screen, and that screen was retired on 11 Sep 2026 with the
-            // whole-vocabulary screen that was its only door. A settings page
-            // navigating OUT of Settings is the move the client stopped on
-            // Settings › Team ("Everything should be in different containers…
-            // not taken anywhere else", 2026-09-09), and the report on this
-            // change records what the removed screen carried and where it is
-            // read now. Renaming, the mark, the default mark and deactivating
-            // are all on the row (or, on a coloured group, on the chip).
-            //
-            // NO `standalone` EITHER: the prop is gone. It chose between a
-            // page-sized heading with the registry's own count (R16 ii) and a
-            // section heading, and there is only one mounting left.
-            scope={{
-              types: section.types,
-              title: t(section.title),
-              create: section.create,
-              // ABSENT ON A GROUP WITH NO PALETTE, which is what turns the
-              // section back into a list — see `ModuleSettingsSection.colour`.
-              colour: section.colour,
-            }}
-          />
-          )
-        )}
-      </div>
+      {/* THE TWO TABS — drawn through the library `TabsView` (R2/R3/R8: no
+          hand-rolled tab strip), the same config-driven engine every record
+          detail and the Settings/Kwapso screens already use. Each panel keeps
+          its own reads, its own toolbar and its own dialogs exactly as the
+          stacked layout did; only the arrangement (tabbed, not `gap-8`
+          stacked) and the section's own name (now on the tab, not inside the
+          Choices panel's toolbar — see selectable-screen.tsx) changed. */}
+      <TabsView
+        config={{ ...defaultTabsConfig, tabs }}
+        value={tab}
+        onValueChange={setTab}
+        renderPanel={(panel) => {
+          if (panel.value === "automations")
+            return automationsSection ? (
+              <ModuleAutomations
+                key={automationsSection.key}
+                teamId={teamId}
+                segment={segment}
+                title={t(automationsSection.title)}
+              />
+            ) : null
+          if (panel.value === "choices")
+            return (
+              <div className="flex flex-col gap-8">
+                {vocabularySections.map((section) => (
+                  <SelectableScreen
+                    key={section.key}
+                    teamId={teamId}
+                    // ── THE IMPORT DOOR, THIS PAGE'S OWN — 11 SEP 2026 ──────
+                    // This line used to read "NO `onImport`", because the CSV
+                    // doors acted on the team's whole vocabulary and a button
+                    // on a page titled "Ticket settings" would have done more
+                    // than the page said. The client ruled otherwise when she
+                    // retired the Choices tab: *"each module's settings page
+                    // gets its own import and export for its own groups…
+                    // nothing sits outside Settings."*
+                    //
+                    // SO THE DOOR NARROWED, not the button. The wizard is the
+                    // app's one import screen and the scope travels in its
+                    // address — the confirm door reads the same list off the
+                    // body and skips every row in another group with a
+                    // reason, so this page cannot write a Country even if the
+                    // file holds one. `section.types` is the same list the
+                    // section's Export CSV sends to `?groups=`, so the two
+                    // halves of her sentence are one fact.
+                    onImport={() =>
+                      softNavigate(
+                        `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(section.types.join(","))}`
+                      )
+                    }
+                    // STILL NO RECORD TO OPEN, and that is a decision rather
+                    // than an omission — `onOpen` is what draws the row's
+                    // link to a value's own detail screen, and that screen
+                    // was retired on 11 Sep 2026 with the whole-vocabulary
+                    // screen that was its only door. A settings page
+                    // navigating OUT of Settings is the move the client
+                    // stopped on Settings › Team ("Everything should be in
+                    // different containers… not taken anywhere else",
+                    // 2026-09-09), and the report on this change records
+                    // what the removed screen carried and where it is read
+                    // now. Renaming, the mark, the default mark and
+                    // deactivating are all on the row (or, on a coloured
+                    // group, on the chip).
+                    //
+                    // NO `standalone` EITHER: the prop is gone. It chose
+                    // between a page-sized heading with the registry's own
+                    // count (R16 ii) and a section heading, and there is only
+                    // one mounting left.
+                    scope={{
+                      types: section.types,
+                      title: t(section.title),
+                      create: section.create,
+                      // ABSENT ON A GROUP WITH NO PALETTE, which is what
+                      // turns the section back into a list — see
+                      // `ModuleSettingsSection.colour`.
+                      colour: section.colour,
+                    }}
+                  />
+                ))}
+              </div>
+            )
+          return null
+        }}
+      />
     </div>
   )
 }

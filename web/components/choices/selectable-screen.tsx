@@ -752,17 +752,24 @@ export function SelectableScreen({
     <div className="flex flex-col gap-6">
       {/* THE TITLE USED TO STAND HERE, on the bare page ground, with its
           description under it and the card below that — the exact three lines
-          the client drew on. It is now `<ToolbarRow title>`'s, one element
-          down: inside the container, on top of the search box, pinned with the
-          toolbar it titles. The words are unchanged and still `scope.title`'s;
-          what moved is who PLACES them, and that is the whole point — a
-          heading a call site positions is a heading a call site can position on
-          the white, which is what happened here through four rulings.
+          the client drew on. It moved to `<ToolbarRow title>` on 2026-09-11
+          (inside the container, on top of the search box, pinned with the
+          toolbar it titles) and left again on 2026-09-14: the client ruled
+          that every module settings page carries this section under a TAB
+          named "Choices" (`shared/glossary.ts`'s `dropdownValues.term`), and
+          "you can also remove the title … because we will already have the
+          name on the tab" — module-settings-screen.tsx draws the strip that
+          names it now. `scope.title` still arrives (the words are true of
+          the whole vocabulary and false of any slice of it, same as ever, and
+          the Modules tab on Settings still reads `section.title` for its own
+          subtitle), it is just not drawn a second time here.
 
           NO `CollectionHeading` AND NO COUNT (R16 ii). This used to branch on
           `standalone`, because the whole-vocabulary SCREEN named and counted
           itself through the registry; a section inside a page is never the
-          page, and the page above already carries the title. */}
+          page, and the tab above it now carries both the name and the count
+          (module-settings-screen.tsx, "how many groups", never how many
+          values). */}
 
       {canCreate && (
         <SelectableFormDialog
@@ -786,17 +793,11 @@ export function SelectableScreen({
           search — so the button cannot drift back onto its own row. */}
       <CollectionCard>
           <ToolbarRow
-            // THE SECTION'S OWN NAME, INSIDE THE CONTAINER, ON TOP OF THE
-            // SEARCH BOX — client, 2026-09-11, this screen, verbatim: "ticket
-            // types should be on top of the searchbar inside the container
-            // without subtitle, make this. always". A STRING, so there is no
-            // position here for this call site to get wrong; the row draws it
-            // inside the pinned band (screen-bits.tsx's `title`).
-            //
-            // AND IT OUTLIVES `empty` BELOW. R50 takes the row away on an empty
-            // collection and the title stays — `CollectionEmptyState`'s "No
-            // values yet." is the register, not the section's name.
-            title={scope.title}
+            // NO `title` HERE ANY MORE — client, 2026-09-14: the module
+            // settings page now names this section on the TAB strip above
+            // (module-settings-screen.tsx), so a second name inside the
+            // container would be the same word said twice. See this file's
+            // header comment, just above, for the full account.
             // R50 — never toolbar on an empty collection. This row USED TO
             // draw regardless of `values.length` whenever `canCreate` was
             // true — a lone "New value" (plus Import CSV, for an import-

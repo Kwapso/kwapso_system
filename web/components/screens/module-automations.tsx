@@ -165,9 +165,22 @@ export function ModuleAutomations({
               className="flex items-start justify-between gap-4 rounded-[var(--radius)] bg-card p-4"
             >
               <div className="flex min-w-0 flex-col gap-1">
-                <Text className="font-medium">{t(a.title)}</Text>
-                <Text className="text-muted-foreground">{t(a.description)}</Text>
-                {/* THE MARK AND THE REASON, AND THEY ARE ONE BRANCH ON PURPOSE.
+                {/* THE MARK AND THE REASON, ABOVE THE TITLE, AND ONE BRANCH ON
+                    PURPOSE. Her ruling, 2026-09-14: "put the chip on top of the
+                    title, the protected chip." R65 is the law that already says
+                    a chip sits above a record's title, but R65's own census is
+                    anchored to the kit `<Card key=>` — a card drawn one per row
+                    of a collection — and this row is a hand-rolled `<li>`, not
+                    a kit Card, so it never entered R65's walk. The SENTENCE
+                    reaches this row; the CHECK's chosen oracle does not, on
+                    purpose — R65 tried and rejected a "Card wrapping a Badge"
+                    oracle and a hand-list before settling on `key=`, precisely
+                    because those wider oracles catch panels that are not
+                    records. An automation row is a config line, not a record
+                    with its own screen, so it is left out here rather than
+                    widened into blind guesswork; this move is the ruling
+                    answered directly, by hand, on the one file it names.
+
                     R70 requires the reason on every row that cannot be switched
                     and forbids it on every row that can, so this branch can
                     never be a row that quietly says nothing.
@@ -186,7 +199,9 @@ export function ModuleAutomations({
                     THE MARK MAY NEVER APPEAR WITHOUT THE REASON BESIDE IT, and
                     that is structural rather than a convention: the two render
                     from ONE guard, so there is no edit that leaves the badge
-                    behind on its own. It matters because the word carries a
+                    behind on its own — which is why moving the chip above the
+                    title moved the reason with it rather than splitting the
+                    guard in two. It matters because the word carries a
                     DIFFERENT promise on each half — take the protection off a
                     choice and it can be switched off; an automation's never
                     comes off, at this door as well as on this screen — and the
@@ -200,6 +215,8 @@ export function ModuleAutomations({
                     <Text className="text-muted-foreground">{t(a.helpText)}</Text>
                   </div>
                 ) : null}
+                <Text className="font-medium">{t(a.title)}</Text>
+                <Text className="text-muted-foreground">{t(a.description)}</Text>
               </div>
               {a.switchable ? (
                 <Switch

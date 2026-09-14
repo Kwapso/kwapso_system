@@ -1658,7 +1658,6 @@ export const SEED: Catalogue = {
   "Transcript read.": { de: "Mitschrift gelesen.", es: "Transcripción leída.", ca: "Transcripció llegida."},
   "Try fewer words, or clear the filters.": { de: "Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Prueba con menos palabras o borra los filtros.", ca: "Prova amb menys paraules o esborra els filtres."},
   "Try “invite a member as a Viewer”": { de: "Versuchen Sie „ein Mitglied als Betrachter einladen“", es: "Prueba «invita a un miembro como Lector»", ca: "Prova «convida un membre com a Lector»"},
-  "Update": { de: "Aktualisieren", es: "Actualizar", ca: "Actualitzar"},
   "Update the details you hold for them.": { de: "Aktualisieren Sie die Angaben, die Sie zu dieser Person haben.", es: "Actualiza los datos que tienes de esta persona.", ca: "Actualitza les dades que en tens."},
   "Update what you're asking for. Everyone on the ticket will see the change.": { de: "Aktualisieren Sie, worum Sie bitten. Alle beim Ticket sehen die Änderung.", es: "Actualiza lo que estás pidiendo. Todos los que están en el ticket verán el cambio.", ca: "Actualitza el que demanes. Tothom qui és al ticket veurà el canvi."},
   "Uploaded file": { de: "Hochgeladene Datei", es: "Archivo subido", ca: "Fitxer pujat"},
@@ -4250,18 +4249,24 @@ export const SEED: Catalogue = {
   "Filing it under an account is how a question about them finds it first.": { de: "Wenn Sie es unter einem Kunden ablegen, wird eine Frage über sie dort zuerst gefunden.", es: "Archivarlo bajo una cuenta es como se encuentra primero una pregunta sobre ellos.", ca: "Arxivar-ho sota un compte és com es troba primer una pregunta sobre ells." },
   "Questions about that account are answered from what is in here. Leave it as ours if the": { de: "Fragen zu diesem Kunden werden aus dem beantwortet, was hier steht. Lassen Sie es als unseres, wenn", es: "Las preguntas sobre esa cuenta se responden con lo que hay aquí. Déjalo como nuestro si el", ca: "Les preguntes sobre aquest compte es responen amb el que hi ha aquí. Deixa-ho com a nostre si el" },
 
-  /* ── SETTINGS › TEAM, 2026-09-09 ────────────────────────────────────────
+  /* ── SETTINGS › TEAM, 2026-09-09, UPDATED 14 Sep 2026 ─────────────────────
    * The members gallery and the roles matrix, and the words the permission
-   * legend needs. `See` · `Create` · `Edit` · `Delete` are the four rights as a
-   * READER meets them; the four MARKS on the grid stay S · C · E · D in every
-   * language, because Editar and Eliminar collide on E in both Spanish and
-   * Catalan (web/components/team/roles-matrix.tsx says so at the capability
-   * list). So these are the words the legend maps those four marks onto.
+   * legend needs. `Read` · `Create` · `Update` · `Delete` are the four rights
+   * as a READER meets them (the standard CRUD four, and the standard word for
+   * each — client, 14 Sep 2026: "rename edit to update, this way we have the
+   * full CRUD concept"; `Edit` was the word here until that ruling). The four
+   * MARKS on the grid stay R · C · U · D in every language regardless of which
+   * pair of these four words happens to collide on a first letter in any one
+   * translation — see web/components/team/roles-matrix.tsx's capability list
+   * for which pair that is this build (it has already moved once, from
+   * Spanish/Catalan Editar·Eliminar to German Lesen·Löschen). So these are the
+   * words the legend maps those four fixed marks onto.
    * `Granted` / `Not granted` are capitalised on purpose: this app already says
    * a lowercase `granted` about a staff CERTIFICATE, seeded as "ausgestellt" /
    * "expedido" — issued, not permitted. */
   "Read": { de: "Lesen", es: "Leer", ca: "Llegir" },
   "Create": { de: "Erstellen", es: "Crear", ca: "Crear" },
+  "Update": { de: "Aktualisieren", es: "Actualizar", ca: "Actualitzar" },
   "Granted": { de: "Erteilt", es: "Concedido", ca: "Concedit" },
   "Not granted": { de: "Nicht erteilt", es: "No concedido", ca: "No concedit" },
   "Roles and what each one may do": { de: "Rollen und was jede darf", es: "Roles y lo que puede hacer cada uno", ca: "Rols i què pot fer cadascun" },
@@ -4311,6 +4316,9 @@ export const SEED: Catalogue = {
    * and Catalan can put the count where their own grammar wants it. */
   "No description yet.": { de: "Noch keine Beschreibung.", es: "Todavía no hay descripción.", ca: "Encara no hi ha descripció." },
   "Can read {count} of {total} modules": { de: "Kann {count} von {total} Modulen lesen", es: "Puede leer {count} de {total} módulos", ca: "Pot llegir {count} de {total} mòduls" },
+  // RENAMED FROM "Can edit …" 14 Sep 2026, the day the grid's Edit column and
+  // the underlying right both became Update (client: "rename edit to
+  // update"). See role-panel.tsx.
   "Can update {count} of {total} modules": { de: "Kann {count} von {total} Modulen aktualisieren", es: "Puede actualizar {count} de {total} módulos", ca: "Pot actualitzar {count} de {total} mòduls" },
 
   /* ── SETTINGS › ONE MODULE'S OWN PAGE, 2026-09-09 ─────────────────────────

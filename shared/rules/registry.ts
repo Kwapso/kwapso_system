@@ -457,7 +457,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R48",
     dimension: "ui",
-    law: "THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT — NEVER A PER-SCREEN CHOICE. Every collection/data-view screen draws its toolbar's search box UNLESS a named, reasoned entry says otherwise. Two censuses, off the disk, never a hand-list: every `BASE_RECIPES` entry (`web/lib/screens.ts`) whose recipe carries a `CollectionConfig` must have `searchable: true`, or be named in `TOOLBAR_EXEMPT`; and every `<ToolbarRow>` call site across `web/` and `web-portal/` (`web/components/deep-link/screen-bits.tsx`'s own bespoke toolbar, reached by a bounded collection with no recipe search to inherit) must pass a `search` prop, or be named in the same registry. Both directions are rot-checked: an exemption whose file no longer matches the condition it was pinned for fails the build, so the list can only shrink.",
+    law: "THE TOOLBAR, SEARCH INCLUDED, IS A DEFAULT — NEVER A PER-SCREEN CHOICE. Every collection/data-view screen draws its toolbar's search box UNLESS a named, reasoned entry says otherwise. Two censuses, off the disk, never a hand-list: every `BASE_RECIPES` entry (`web/lib/screens.ts`) whose recipe carries a `CollectionConfig` must have `searchable: true`, or be named in `TOOLBAR_EXEMPT`; and every `<ToolbarRow>` call site across `web/` and `web-portal/` (`web/components/deep-link/screen-bits.tsx`'s own bespoke toolbar, reached by a bounded collection with no recipe search to inherit) must pass a `search` prop, or be named in the same registry. Both directions are rot-checked: an exemption whose file no longer matches the condition it was pinned for fails the build, so the list can only shrink. THE THIRD CENSUS (ii-b, 4 Sep 2026) is the portal by ROOM rather than by toolbar — that front door draws no `<ToolbarRow>` at all, so for as long as (ii) was the whole law it reported green on the client's entire app by finding nothing to inspect. THE FOURTH CENSUS (iv, 11 Sep 2026) IS THE ONE THAT DOES NOT STAND ON A TOOLBAR, and it is here because all three above key on a TAG THE FIX ITSELF PUTS THERE: a recipe, a `<ToolbarRow>` call site, a `<CollectionHeading>`. A wall of records built by hand is invisible to every one of them BY CONSTRUCTION, which is how Settings \u203a Modules shipped twelve cards and no search box under a green build on 10 Sep 2026 \u2014 and how it became visible to census (ii) the NEXT day, when the client asked for the toolbar herself and the screen gained a `<ToolbarRow>`. A law you enter by being fixed is a law that could never have caught you. SO THE SUBJECT IS THE WALL: every component under `web/`, `web-portal/` or `shared/web/` that renders the kit's `CardGrid` or the kit's `List` over a `.map()` has DECLARED itself a wall or a register of records \u2014 those two parts exist for nothing else, the kit's own header calls `CardGrid` \"a wall of record cards\", and no comment can satisfy the predicate. IDENTIFIED BY IMPORT BINDING AND NEVER BY TAG NAME, read off the file's own import of `@shared/ui/components/card-grid/card-grid`, `@shared/ui/components/list/list` or `@shared/web/list-compat` (the app's own compat seam, which IS the kit's `List` one hop away and is how seven call sites reach it) \u2014 so Phosphor's `List` ICON and `agent-markdown.tsx`'s `const List = block.tag` are not walls, and a renamed import still is. THE ROOM IS THE COMPONENT: the nearest enclosing function with a Capitalised name, React's own statement of what a component is. A lowercase local helper climbs, and a `<section>` is emphatically NOT the boundary \u2014 `sprints-screen.tsx` groups one collection into five state sections that ONE toolbar narrows, so rooming by section would report the screen WITH the toolbar as the screen without one. SEARCHING IS FOUR SIGNALS, each grounded in something already held shut: `<ToolbarRow>` (census ii requires its `search` prop), `<PagedFind>` (draws an unconditional `<SearchInput>`, no per-caller way off), `<SearchInput>` (the kit's own control) and `useDoorSearch` (the portal's way of asking the DOOR, which R63 already derives its portal toolbar owners from). A GROWING WALL MAY NOT BE EXEMPTED AT ALL \u2014 `hasMore`/`loadMore`/`<LoadMore>` means the collection grows with use (R14), and the exemption this law allows is \"a search box over a handful of rows is a control that cannot do anything\", which is false the moment the handful is a page of something larger. The same refusal ii-b already makes for a paging portal room. EXEMPTIONS ARE KEYED `path#Component`, not per file: a file-keyed reason lets the NEXT wall added to that file inherit an argument written about a different collection, which is how a bounded room's exemption comes to cover a growing one. TWO THINGS ARE OUT BY SCOPE RATHER THAN BY EXEMPTION: `shared/web/list-compat.tsx`, which DECLARES the app's `List` (the same reason (ii) skips `web/components/deep-link/screen-bits.tsx`, which declares `<ToolbarRow>`), and `shared/web/screen-engine/`, the recipe engine, whose walls are every recipe's body at once \u2014 whether one of those collections searches is its own `CollectionConfig.searchable`, which census (i) holds entry by entry, and judging the engine here would ask one component to answer for every collection in the app. IT UNDER-REACHES ON PURPOSE, R67's direction: a hand-rolled `<ul>` is not caught \u2014 `web-portal/components/waiting-on-you.tsx` and the local `TeamPanel` on `web/components/screens/kwapso-screen.tsx` are real, growing registers this census cannot see \u2014 and no non-fuzzy predicate can, because the fuzzy one files a conversation thread and an activity feed as data views. It also asks the question of the COMPONENT, so `settings-screen.tsx` draws three walls in one and the Modules toolbar answers for the Team tab's two navigation lists as well; both are menus rather than records, so nothing is lost today, and it is written down rather than discovered later. A TRIPWIRE PULLS BOTH WAYS: the census must find walls at all, and at least one must PASS on its own search \u2014 a scan over nothing and a search predicate gone blind both report an app that needs six exemptions.",
     why: "The client's own words, correcting a narrower answer already given once: \"I don't care here. You're giving me specifics, and I told you that the toolbar, including the search, should be absolutely everywhere we have a data view or a collection view. Stop hardcoding this. Just write it as a rule.\" A recipe's `searchable` flag and a bespoke `<ToolbarRow search={…}>` prop were both ORDINARY optional fields before this law — nothing stopped a screen from omitting either, and two did, silently: Tasks' Calendar tab and Triage both drew a toolbar with a button and no search box at all, reasoned only in a code comment nothing read at build time (\"the calendar has no search of its own\"). Flipping the default is the only fix that cannot regress the same way twice — an opt-IN can always be forgotten by omission, which is exactly what happened; an opt-OUT has to be written down, named, and given a reason a reviewer can read, in the same shape R31/R32/R29 already use for their own reasoned exceptions. A collection genuinely and permanently empty of rows (`WaveFinder`'s and Sprints' own \"nothing to search yet\" fallback) is the one legitimate reason left, because a search box over zero rows is a control that cannot do anything — and that reason is now written down rather than assumed. SUPERSEDED IN PART, R50 (2026-09-03): that fallback shape — a bare `<ToolbarRow actions={…}>` reached only once the collection was empty — is exactly how a create button kept escaping this law's own two censuses, because both only ever asked whether `search` was present, never whether `actions` agreed with it. Both call sites now carry one `<ToolbarRow>` gated by R50's own required `empty` prop instead, and `TOOLBAR_EXEMPT` no longer names either.",
     checkId: "toolbar-shows-search",
     status: "enforced",
@@ -465,7 +465,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R49",
     dimension: "ui",
-    law: "THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER, PAID BY THE ROW ITSELF, NEVER A PER-SCREEN MARGIN. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) pays `--toolbar-content-gap` (`web/app/globals.css`) as its own trailing margin, on its own root, so every call site gets it for free. No call site may ALSO wrap the row in a gapped flex column or space-y stack, and no call site may pass a competing `mb-*` in its own `className` — either is the same number being spent twice, which is how it grows past what it was meant to be. Checked as a census off the disk: `ToolbarRow`'s own definition must carry the token, and no `<ToolbarRow>` call site (or the variable a screen names `*[Tt]oolbar*` and renders in its place) may sit inside a `flex-col` wrapper that ALSO declares its own `gap-*`/`space-y-*`, or pass a hardcoded `mb-*` of its own, unless named in `TOOLBAR_CONTENT_GAP_EXEMPT` with the real reason.",
+    law: "THE GAP BETWEEN A TOOLBAR ROW AND WHAT IT SITS ABOVE IS ONE NUMBER, PAID BY THE ROW ITSELF, NEVER A PER-SCREEN MARGIN. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) pays `--toolbar-content-gap` (`web/app/globals.css`) as its own trailing margin, on its own root, so every call site gets it for free. No call site may ALSO wrap the row in a gapped flex column or space-y stack, and no call site may pass a competing `mb-*` in its own `className` — either is the same number being spent twice, which is how it grows past what it was meant to be. Checked as a census off the disk: `ToolbarRow`'s own definition must carry the token, and no `<ToolbarRow>` call site (or the variable a screen names `*[Tt]oolbar*` and renders in its place) may pass a hardcoded `mb-*` of its own, or sit in a BOX that spaces its own children apart — a `gap-*` on a flex column, or a `space-y-*` stack, which needs no flex at all — with something rendering after the row inside that box, unless named in `TOOLBAR_CONTENT_GAP_EXEMPT` with the real reason. THE SECOND CLAUSE WAS DEAD FOR ITS WHOLE LIFE AND WAS REBUILT ON 11 SEP 2026: it anchored its wrapper pattern to the END of a 400-character window and then tested the code BEFORE that wrapper against a whitespace-only pattern, so it returned null at all twenty-four call sites and a deliberate `gap-4` on a toolbar's own wrapper could not turn it red. The box is resolved properly now — a JSX tag census carrying `stripComments`'s own afterValue bit so a generic type argument is not counted as an opening tag, fragments walked THROUGH because they paint no box, and a COMPONENT wrapper followed to the element it puts its children in (`{children}`, else the element wearing the props spread). That last hop found the only real offender, `<TeamPanel>`'s `flex flex-col gap-4` under the members wall. A row that is the LAST child of its box is not an offence, because a column gap with no following sibling never reaches the content — which keeps `client-org-panel.tsx`'s deliberate heading-and-row pairs green instead of exempted. A row drawn at a component's OWN root is spaced by whoever renders that component and is out of a file census's reach; three call sites are in that shape and none sits in a gapped box.",
     why: "The client's own words, item 5 of the 2026-09-03 spacing round: \"tehre's wahy too much space between the toolbar and the contenta\" — confirmed on every screen she checked, not a detail-screen-only thing. It had drifted into five different numbers doing the identical job: a wrapping `flex flex-col gap-N` div (`gap-2`/`gap-3`/`gap-4`/`gap-6`, 7.5–22.5px), a `space-y-3`, and a `className=\"mb-4\"` passed straight to the row — fourteen call sites, four mechanisms, no shared owner. The exact shape `--tab-content-gap` already fixed for a tab strip and its panel (R48's neighbour law in spirit, same client session), read the other way round: the STRIP pays its own trailing space so a caller cannot forget it or invent a new number, and a margin on a sibling is the thing that drifts — this law spends the same `--space-5` `--tab-content-gap` already uses, because both are 'the gap between a control strip and the content under it' and a system with one rhythm does not mint a second number for the same sentence.",
     checkId: "toolbar-content-gap",
     status: "enforced",
@@ -644,6 +644,14 @@ export const RULES_REGISTRY: Rule[] = [
     law: "A HUMAN-FACING LABEL SPEAKS THE APP'S WORD, NEVER THE ALIAS A TOOL DESCRIPTION OFFERED THE MODEL. `describe_module` and `query_records` accept a module by any of its aliases — their own description says so, in words: \"`help` reaches tickets\" — because CLAUDE.md's own \"don't finish the rename\" keeps `help` as the permission module, the table, the API path and the MCP tool names on purpose. Nothing stops the model reaching for exactly the word its tool description just offered it, and the agent's step chip / confirm panel built its label straight from that raw argument, so the alias printed VERBATIM on a screen the product has no section named after. Any `summarize()` in `shared/workers/tool-catalog.ts` that builds a label from a schema field spelled `module`, `table` or `targetTable` must route the value through `queryLabel` (which wraps query-grammar's own `canonicalModule`) before it reaches a sentence — never the raw argument.",
     why: "The owner's own report, 13 Sep 2026, reading the assistant's step chips on staging verbatim: \"See what help can be asked\", \"Look up help\", \"Count help by account\", \"Count help by app\". A person reads those, and the product has no help section — it has Tickets, and CLAUDE.md is explicit that the rename stops at the door: the module, the table, the API path and the tool names stay `help`, but nothing SPOKEN to a person may. The bug was not a typo — the tool's own description tells the model \"`help` reaches tickets\", so the model was following an instruction the catalogue itself gave it, and the label-building code echoed that instruction's own word back onto the screen. The fix reuses `canonicalModule`, the query engine's own answer to \"what did they actually mean\", rather than re-deriving a second map that could drift from the door's — the same reuse-a-seam discipline CLAUDE.md's planning ritual asks for. Checked by RUNNING every tool's `summarize()` with a poisoned alias, derived off the schema field NAME rather than a hand-list of the two tools that leaked, so a future module's `module`/`table`/`targetTable` argument is covered without anyone updating this law — the same shape R22's body-parity proof stands on (prove it by calling the function, not by reading it).",
     checkId: "agent-label-vocabulary",
+    status: "enforced",
+  },
+  {
+    id: "R72",
+    dimension: "ui",
+    law: "NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED. The client's ruling, 2026-09-14, over Settings › Modules' own intro sentence: \"In settings, modules: delete this. Generally, I don't like subtitles, so stop putting them unless I ask.\" The second sentence is the wider one and the one this law enforces — she had already said the narrower version twice the same week about two other screens (\"in ticket settings (or any other module) no subtilte\", 10 Sep; \"ticket types should be … without subtitle, make this. always\", 11 Sep), and both landed as one-screen fixes: `shared/web/settings-section.tsx` deleted the field outright, and `MODULE_SETTINGS` lost its `description` column with it. This is the third saying, about a fourth screen neither fix touched, and it is not about one screen any more — it is a DEFAULT for the whole app. A SUBTITLE IS, PRECISELY: a prose element (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>` — R67's own `READABLE_PROSE` set, reused for the same reason R67 reused it: a real kit component is always Capitalised, so `<Text>`, `<CollectionEmptyState>`, `<NothingYet>` and every other genuine-content component are invisible to a lowercase-tag census by construction) standing as the immediate next SIGNIFICANT sibling of a heading (`<h1>`-`<h4>`, the kit's `<Headline>`) inside the same JSX children array — blank text and a `{/* comment */}` are transparent to the pair, the same move R67's own walk makes. THREE SHAPES ARE DELIBERATELY NOT A SUBTITLE: a form field's helper text (rendered through the kit's `Field`, which has no heading sibling to stand beside — a label, not a title); an empty state's explanation (`CollectionEmptyState`/`PortalEmpty`/`NothingYet`/`ShapeStateBody`, Capitalised, so already outside the census); and the reason a switched-off automation cannot be turned on, which R70 *requires* as `helpText` and which answers \"why can I not change this\" rather than \"what is this section for\". A REAL BLIND SPOT, WRITTEN DOWN: a heading a CHOKEPOINT COMPONENT draws for its caller (`SettingsSection`, `ToolbarRow`'s `title`, `CollectionHeading`) is invisible to the sibling census if a caller passes prose as that component's `children` — heading and prose then sit in two different JSX children arrays. Those three are held shut the narrower way instead: none may re-grow a prop shaped like a subtitle (`subtitle`/`description`/`subheading`/`caption`, matched as a declared TYPE member so a comment merely discussing the word does not trip it), which is the only door wide enough to let the blind spot matter — `shared/web/settings-section.tsx`'s own header states the argument this check imports: \"a section cannot declare a subtitle it has nowhere to put.\" `SUBTITLE_OK` (this file) is the way out `SUBTITLE_OK`'s own way out for the rest of the app — a reasoned, file-keyed line, rot-checked both ways so the list can only shrink, the same discipline `UNCONTAINED_SECTION_OK` (R67) and `HAND_ROLLED_OK` (the kit-motion check) already use.",
+    why: "R67 already polices a titled section, and the two laws share a census file and a house term (\"title block\") without being the same law. R67's subject is WHERE content stands: a sentence inside the title block is explicitly exempt from R67 (amendment 4's `carriesHeading` skip) because R67 has nothing to say about whether the sentence should exist, only about the ground it stands on if it does — a boxed subtitle passes R67 outright. This law's subject is whether the sentence exists at all, independent of containment; an unboxed subtitle fails both laws, and a BOXED one now fails only this one, which is the proof they are answering different questions rather than one question twice. R67's own header makes the same point from the other side, about the seven module settings pages it cannot reach: \"reaching them means judging a component by the PROPS it is handed rather than the JSX it writes, which is a different check with a different oracle.\" That is what this file does, and it is why the fix is a new law rather than a sixth amendment to R67. Getting the boundary right mattered more than catching every case: a census that flagged a field's helper text, an empty-state sentence or R70's required automation reason would be turned off within a day, so each of the three is excluded STRUCTURALLY — by tag name (a real component is Capitalised, a bare `<p>` is not) or by having no heading sibling at all — rather than by a growing list of exceptions somebody has to keep arguing for.",
+    checkId: "no-default-subtitles",
     status: "enforced",
   },
 ]
@@ -1867,7 +1875,16 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
  *   · A `BASE_RECIPES` key (`web/lib/screens.ts`, e.g. `"tickets.list"`) —
  *     the recipe's own `CollectionConfig.searchable` is `false`.
  *   · A FILE PATH (`web/components/....tsx`) — a `<ToolbarRow>` call site in
- *     that file has no `search` prop.
+ *     that file has no `search` prop, or (census ii-b) a portal collection
+ *     screen draws no search field of its own.
+ *   · A `path#Component` KEY (census iv, added 2026-09-11) — that COMPONENT
+ *     draws the kit's `CardGrid` or the kit's `List` over a `.map()`, which is
+ *     a wall or a register of records, and draws no search anywhere in itself.
+ *     Keyed per component rather than per file ON PURPOSE: a file-keyed reason
+ *     would let the next wall added to that file inherit an argument written
+ *     about a different collection, which is how a bounded room's exemption
+ *     comes to cover a growing one. A component that PAGES cannot be exempted
+ *     here at all — see census iv in `web/test/rules.test.ts`.
  *
  * Rot-checked in both directions, the same shape `SCREEN_WIDTH_EXEMPT` above
  * uses: an entry whose condition is no longer true (the recipe turned its
@@ -1878,6 +1895,26 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
  * `<ToolbarRow>` a screen writes is expected to carry search unless it is
  * named here. */
 export const TOOLBAR_EXEMPT: Record<string, string> = {
+  // ── THE WALLS AND REGISTERS (R48 census iv, added 11 Sep 2026). Six
+  // components draw the kit's `CardGrid` or its `List` over a `.map()` and
+  // search nothing. None of them pages — a wall that does may not be exempted
+  // at all — and none of them is a collection of records a person would go
+  // looking through: two are menus, one is a day in a dialog, and three are
+  // bounded by something outside the screen (a person's own invites, one
+  // company's contacts, one client's contracts).
+  "web/components/screens/home-screen.tsx#FirstSteps":
+    "NOT RECORDS — three onboarding ACTS, declared in this component and filtered by what the reader may create: add the first account, bring a spreadsheet in, raise the first ticket. They are drawn as a list because each is a link with a sentence under it. The block renders nothing at all the moment the team has anything on the go (`pulseIsQuiet`), so at most three rows, and only ever while there is nothing here to search.",
+  "web/components/screens/home-screen.tsx#HomeScreen":
+    "A NAVIGATION MENU. Eight fixed destinations — the six module screens this reader may read, plus Team and Settings — declared as two arrays in this component. Searching it would search the app's own furniture; every one of the eight leads to a collection that searches its own rows, which is where somebody looking for a record is going.",
+  "web/components/records/record-calendar.tsx#DayRows":
+    "BOUNDED BY ONE DAY, AND DRAWN IN A DIALOG. This is what \"+N more\" on a calendar square opens into — everything falling on that one day, over the month grid. It cannot grow past a day's entries, the reader reached it by pointing at the day, and the collection it is a slice of is narrowed by the calendar host's own toolbar one level up.",
+  "web/components/team/invitations.tsx#InvitationsPanel":
+    "BOUNDED BY THE INVITES WAITING FOR ONE PERSON — the teams that have asked THIS reader to join, read whole and accepted one button at a time. It is not a collection anybody browses: a row leaves the moment it is accepted, and the panel is also mounted on the teamless onboarding screen, where the whole point is that there is nothing else on the page yet.",
+  "web-portal/components/company-screen.tsx#CompanyScreen":
+    "THE SAME ROOM AND THE SAME REASON this file's own path-keyed line below already carries for census ii-b: bounded by the account itself — the company's own record and the handful of people at it, unpaged, and it cannot grow past the people at one client. TWO KEYS RATHER THAN ONE because the two censuses ask different questions of it (ii-b: a portal collection screen drawing no search FIELD; iv: a component drawing the kit's `List` over a `.map()`), and one key answering for both is a reason a reviewer could not tell had gone stale on one of them.",
+  "web-portal/components/delivery-block.tsx#DeliveryBlock":
+    "BOUNDED BY CONTRACT — \"What you bought\", the blocks of work sold to the accounts this client may see. `clientSprints` (`workers/content/src/lib/todos.ts`) reads them whole under the R14 hard cap and states the ground in writing: \"a sprint is a contract, so a client has a handful.\" The block renders nothing until there is at least one. THIS ENTRY DIES THE DAY IT PAGES: census iv refuses an exemption to any wall carrying `hasMore`/`loadMore`, so putting this list behind a cursor fails the build until it also gets a search box — the same ratchet `deliverables-screen.tsx` carries below.",
+
   // ── THE PORTAL'S BOUNDED ROOMS (R48 census ii-b, added 4 Sep 2026). The
   // client portal draws no <ToolbarRow> at all, so until this census existed the
   // law passed on that whole front door by matching nothing. Its two GROWING
@@ -1984,6 +2021,92 @@ export const TWO_READS_ONE_DOOR: Record<string, string> = {
     "the sub-tab that is OPEN and the WAITING column on the Open board are two questions, and only one of them is ever live at a time. `facetQ` reads whichever stage tab a person has picked; `waitingQ` is null-keyed unless `facet === OPEN && openView === \"board\"`, and its `help-facet:all:waiting` key is the same one the Waiting TAB rests on, so the board column and that tab are one read between them rather than two. Collapsing them would mean the board's Waiting column counted page one of the open list instead of the door's own total (R14/R16), which is the arithmetic the column exists to show. Named on 8 Sep 2026, when main's R56 met feat/ui-ux's ticket board — neither branch could see this, because the law and the screen landed on opposite sides of the merge.",
   "web/lib/use-screen-data.ts::useScreenData::listFetch.tasks":
     "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
+}
+
+/** R72 — THE FILES THAT STILL DRAW A SUBTITLE UNDER A HEADING, and the reason
+ * each does. Sits beside R67's own exemption table on purpose — same house
+ * pattern (file-keyed, rot-checked both ways) — and is a DIFFERENT law: R67
+ * asks where a titled section's content stands, this asks whether a sentence
+ * under its heading should exist at all. See web/test/no-default-subtitles.test.ts
+ * for the full argument and the reused `READABLE_PROSE`/`HEADING` sets.
+ *
+ * COORDINATION NOTE for whoever lands an R67 amendment for tabbed sections
+ * around the same time as this table: this block and R71's test file are new
+ * additions right above R67's own `UNCONTAINED_SECTION_OK` table below — if
+ * both land together, keep both tables and both `export const` blocks; there
+ * is nothing here for an R67 tab-panel change to actually conflict with,
+ * since R71's own census walks JSX siblings directly and does not read
+ * R67's tab dispatch at all. Flagged so a merge treats this as an addition
+ * beside R67, never as a competing edit to it. */
+export const SUBTITLE_OK: Record<string, string> = {
+  "web/components/screens/kwapso-screen.tsx":
+    "the agency's own team-area header, `<Headline as=\"h1\">{team.name}</Headline>` followed by " +
+    "\"Who we are: our material, our team, and the details that go on a contract.\" R67's own " +
+    "UNCONTAINED_SECTION_OK carries two live entries for this exact file (`#team`, `#default`), both " +
+    "reasoned \"this screen is the agency's own housekeeping and is mid-change in another lane\" — the " +
+    "same reason applies here rather than restyling a screen another lane is actively editing.",
+  "web/components/apps/app-detail.tsx":
+    "a REFUSAL screen, not a titled section: `<Headline as=\"h1\">{app.name}</Headline>` followed by " +
+    "\"You're not on this app, so its page is closed. Ask an admin to add you to the team on it.\" The " +
+    "sentence answers \"why can I not see this\", the same job R70 requires `helpText` to do for a " +
+    "switched-off automation — it is excluded there by being a Capitalised component and cannot be here, " +
+    "because the whole screen IS the refusal and has no heading that isn't also the refusal's own subject.",
+  "web/app/onboarding/page.tsx":
+    "a pre-team auth flow, not a titled section on paper: the \"wrong door\" screen names the worker's own " +
+    "refusal reason under its heading (\"the worker's own sentence, not a second copy written here\", this " +
+    "file's own comment), and the profile-setup screen's sentence is the instruction for the form directly " +
+    "below it — the inline equivalent of a dialog's FormShell `subtitle` (R4's own locked title/subtitle · " +
+    "separator · fields · separator · action shape), which this law does not reach for the same reason R4 " +
+    "is untouched: a dialog's subtitle explains what the ACTION does and is a different job from a section " +
+    "explaining what it contains. Onboarding is a full-page form wearing the identical shape inline.",
+  "web/components/screens/home-screen.tsx":
+    "\"Start here\", the pulse block's own heading, followed by \"Nothing's on the go right now. Any one of " +
+    "these is a good place to start.\" — gated on `pulseIsQuiet` (the whole block `return`s null otherwise), " +
+    "so this is R62's empty-state register in spirit: the sentence explains why the three acts below it " +
+    "exist, not what a permanent section is for, and it is only ever on screen when there is nothing else " +
+    "to show. Written as an exemption rather than routed through `CollectionEmptyState` because this is not " +
+    "a collection's zero row count, it is a team's whole pulse reading quiet.",
+
+  // ── THE CLIENT PORTAL, FIVE FILES, ONE RULING SHORT ─────────────────────
+  //
+  // She ruled on Settings › Modules, on the AGENCY app. `web-portal/` is the
+  // second front door and, unlike R67's own agency screens, none of these
+  // five is mid-change, refused, or gated on an empty state — each is a
+  // permanent page-title-plus-sentence, the exact shape she is describing.
+  // But R67's own portal block already made this call once, about the SAME
+  // shape ("the portal is consistent with itself, so panelling it is a
+  // REDESIGN, not a repair"), and this law is not the place to make a
+  // five-screen portal-wide call on her behalf a second time. Filed as a
+  // census AWAITING HER RULING, the way R67's own portal block was filed
+  // before it was answered — not hidden in a report, because a report does
+  // not fail a build the day one of these is quietly "fixed" the wrong way.
+  "web-portal/components/home-screen.tsx":
+    "the greeting `<h1>` followed by \"This is everything we're doing for {company}\" / \"This is your " +
+    "work with us.\" — a genuine descriptive subtitle, the shape this law exists to remove, filed as a " +
+    "portal debt rather than deleted unilaterally: see the block comment above this line.",
+  "web-portal/components/company-screen.tsx":
+    "the account-name `<h1>` followed by \"What we hold for you. If any of it is wrong, tell us and we'll " +
+    "fix it.\" — same shape, same reason: a portal debt awaiting her ruling, not an agency screen she has " +
+    "actually seen this sentence on.",
+  "web-portal/components/impact-screen.tsx":
+    "\"What this has been worth\" followed by \"Time your team gets back, every month, and where every " +
+    "hour of it comes from.\" R67's OWN account of this file is the sharpest argument for why R67 and R71 " +
+    "are different laws: this heading+sentence pair is now CONTAINED (R67's portal block: \"impact-screen." +
+    "tsx is the one file the portal block has ever lost\" — its own comment argued \"one fewer drawn line " +
+    "is worth having\" on the screen a client shows other people, and was overruled on paper-standing " +
+    "grounds, not on whether the sentence should exist). Passing R67 and failing R71 is not a contradiction " +
+    "between them, it is the proof they ask different questions. Filed as a portal debt for the same reason " +
+    "as its two neighbours above.",
+  "web-portal/components/no-access.tsx":
+    "\"You're signed in\" followed by why nothing shows for this email and what to do about it — a REFUSAL " +
+    "screen (the same shape as `app-detail.tsx` above), not a titled section explaining itself. Filed here " +
+    "rather than argued away because the heading IS the refusal's own headline, and a census that has to " +
+    "read intent to skip a file is a census nobody can trust; the reason is written instead.",
+  "web-portal/components/sign-in.tsx":
+    "\"Sign in\" followed by which of two live instructions the current auth `step` needs (\"We'll email " +
+    "you a six-digit code…\" / \"Enter the code we sent to {email}.\") — a pre-auth flow's own instruction " +
+    "for the form directly below it, the same inline-FormShell-subtitle shape `onboarding/page.tsx` above " +
+    "already covers, on the portal's own sign-in screen rather than the agency's.",
 }
 
 /** R67 — THE FILES THAT STILL DRAW A TITLED SECTION ON THE BARE PAGE GROUND,
@@ -2261,8 +2384,15 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
  * list is worse than dead — it is wrong. Rot-checked in both directions: an
  * entry whose component now passes `sort` fails the build. */
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
-  "web/components/team/members-gallery.tsx#MembersGallery":
-    "A GALLERY OF THE PEOPLE ON THE TEAM, and the client named its toolbar slot by slot on 2026-09-09: search, a Role filter, Invites, and the plus. There is no order to offer that anybody would ask for. The wall carries four facts — a round mark, the full name, the role chip and the email — and three of them order the same way (a person's name IS the row, an email sorts by the same name in a worse spelling, and a role is the FILTER one slot along, not a second control asking the same question). The one field that would genuinely sequence a team, the date somebody joined, is deliberately not on the card: the row this replaced spent a whole line on \"<role> · joined <date>\" and \"this takes too much space\" is the correction that produced the gallery. A sort picker offering a single option over a bounded, alphabetical wall of nine cards is a control that answers nothing.",
+  // DELETED 2026-09-11 — `members-gallery.tsx#MembersGallery`. It argued that
+  // "a sort picker offering a single option over a bounded, alphabetical wall
+  // is a control that answers nothing", and the client ruled the opposite for
+  // the identical shape one tab over on 2026-09-10: *"sort by - name"* on
+  // Settings › Modules, a bounded alphabetical wall of twelve cards. The
+  // entry's own argument is answered by the control — `SortControl` draws a
+  // DIRECTION button beside the field unless a caller passes
+  // `showDirection: false`, and `ToolbarRow` never does — so one field is a
+  // real choice between A→Z and Z→A. The gallery now passes `sort`.
   "web/components/work/tasks-screen.tsx#TasksScreen":
     "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
   "web/components/apps/stakeholders-panel.tsx#StakeholdersPanel":
