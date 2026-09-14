@@ -452,10 +452,10 @@ export function shapeAccountsList(
         // a free-text column that drifted into four spellings of two ideas, and
         // every one of 106 contacts read "Active".
         detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "—",
-        // 0091 — the account manager's face (R35), or "—" for nobody
+        // 0091 — the account manager's face (R35), or null for nobody
         // assigned yet. `a.accountManagerId` is `null` for a client login
         // (`toAccount`'s own withholding) as well as for "nobody assigned",
-        // so this column reads the same honest dash either way.
+        // so this column reads the same honest null either way.
         manager: (() => {
           const m = a.accountManagerId ? managerById.get(a.accountManagerId) : undefined
           return m ? (
@@ -464,7 +464,7 @@ export function shapeAccountsList(
               {m.name}
             </span>
           ) : (
-            "—"
+            null
           )
         })(),
         // THE POSTAL ADDRESS' OWN FIELD (shared/types.ts's `Account.country`),

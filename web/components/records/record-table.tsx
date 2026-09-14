@@ -132,6 +132,10 @@ export type TableColumn = {
    * which stays correct for every column that was already plain text before
    * this existed (Tasks, Contacts, Meetings all leave it unset). */
   searchKey?: string
+  /** CUSTOM RENDER for the cell. Called with the raw row value; return
+   * `undefined` to render the value as-is. Useful for showing a placeholder
+   * when the value is empty (null/"—"). */
+  render?: (value: unknown) => React.ReactNode | undefined
 }
 
 /** ── WHY A COLUMN HAS TO SAY WHAT IT IS ───────────────────────────────────────
@@ -460,18 +464,21 @@ export function RecordTable<T extends TableRowData>({
                       : "")
                   }
                 >
-                  {columns.map((c) => (
-                    <TableCell key={c.key}>
-                      {refColumn && c === columns[0] ? (
-                        <span className={REF_LEADS_NAME}>
-                          <RecordRef value={row[refColumn] as string | null | undefined} />
-                          <span className="min-w-0 truncate">{row[c.key] as React.ReactNode}</span>
-                        </span>
-                      ) : (
-                        (row[c.key] as React.ReactNode)
-                      )}
-                    </TableCell>
-                  ))}
+                  {columns.map((c) => {
+                    const cellValue = c.render ? c.render(row[c.key]) : (row[c.key] as React.ReactNode)
+                    return (
+                      <TableCell key={c.key}>
+                        {refColumn && c === columns[0] ? (
+                          <span className={REF_LEADS_NAME}>
+                            <RecordRef value={row[refColumn] as string | null | undefined} />
+                            <span className="min-w-0 truncate">{cellValue}</span>
+                          </span>
+                        ) : (
+                          cellValue
+                        )}
+                      </TableCell>
+                    )
+                  })}
                   {actions.length > 0 && (
                     // Reaching the menu must not also open the record.
                     <TableCell

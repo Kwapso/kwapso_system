@@ -206,7 +206,7 @@ function accountGalleryBody({
                   <RecordMark picture={row.logoUrl} name={row.name} size="band" />
                   <CardTitle className="text-sm">{row.name}</CardTitle>
                   {/* W2: a card hides an empty field; a table cell keeps its column */}
-                  {row.manager !== "—" && row.manager}
+                  {row.manager}
                 </CardContent>
               </InAppLink>
             </Card>
@@ -228,7 +228,11 @@ function accountTableColumns(t: Translate): TableColumn[] {
   return [
     { key: "name", label: t("Name"), sort: nameSort?.value, defaultDir: nameSort?.defaultDir },
     { key: "status", label: t("Status") },
-    { key: "manager", label: t("Account manager") },
+    {
+      key: "manager",
+      label: t("Account manager"),
+      render: (v) => v == null ? "—" : undefined
+    },
     { key: "country", label: t("Country") },
   ]
 }

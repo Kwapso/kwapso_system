@@ -409,7 +409,7 @@ describe("shapeAccountsList", () => {
       "status",
     ])
     expect(rows?.[0].mark, "the leading column must hold a node, not a string").toBeTypeOf("object")
-    expect(rows?.[0].manager, "nobody assigned yet is a real, honest answer").toBe("—")
+    expect(rows?.[0].manager, "nobody assigned yet is a real, honest answer").toBeNull()
     expect(rows?.[0].country, "no country typed yet is a real, honest answer").toBe("—")
     expect(rows?.[0].status, "the archive flag, worded, is a node — a coloured badge").toBeTypeOf("object")
   })
