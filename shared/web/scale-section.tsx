@@ -1,42 +1,39 @@
 "use client"
 
-// HOW BIG THE APP IS — three cards, shown not described, and one number
-// behind them.
+// HOW BIG THE APP IS — a compact card row, beside the shared Appearance
+// preview rather than carrying its own picture.
 //
-// PICTURE CARDS, NOT BUTTONS. This section drew a plain row of buttons for a
-// while, on the reasoning that a root font size has no picture worth
-// drawing — but the client asked for the same visual treatment `SpineSection`
-// already gives Sidebar, which overrides that reasoning outright. The cards
-// below are `SpineSection`'s own shape: `AppearanceOptionGroup` +
-// `compositions/screens/settings.tsx`'s own `ScalePicture`, a sibling of
-// `SpinePicture` drawn for exactly this and never wired up outside the kit's
-// own demo until now. This is a RENDER-ONLY change — see below, every piece
-// of `chosen`/`saving`/`choose()` is untouched.
+// PREVIEW-LED, CLIENT RULING 2026-09-14. She chose the preview-led layout of
+// four Settings · Appearance options a lane put in front of her: one live
+// `AppearancePreview` (`shared/ui/compositions/screens/settings.tsx`, kit
+// v1.2.77) beside compact controls, replacing twelve small option pictures
+// with one shared preview that is always current. This section used to draw
+// its own `SettingsSection` box and a `ScalePicture` on every card; both are
+// gone — the box is now the shared panel's (`shared/web/appearance-panel.tsx`)
+// and the picture's job is the live preview's, which shows the SAME
+// mechanism (one root font size, nothing added or removed) at a size worth
+// looking at instead of three 58px thumbnails.
 //
-// OPTIMISTIC, THEN PERSISTED, exactly as the language switcher is. A card
-// presses, the size resizes instantly and the save follows; if the save
-// fails the size snaps back and says so. The preference lives on the
-// person's own row, so it follows them between devices rather than living
-// in one browser (UI-RULEBOOK S4), and it is the ONLY way to make this app
-// bigger, because the viewport is locked against pinch-zoom (S5).
+// `onChosenChange` IS NEW AND IS THE WHOLE POINT: the preview beside this
+// group has to know what is chosen the instant a card is pressed, before the
+// save round-trip settles — the same "instant, then persisted" contract this
+// file already keeps for the person pressing the card, extended one level up
+// so the picture is never a frame behind the control that drives it.
 //
-// It sets one CSS variable and nothing else. Every size token in the theme is in
-// `rem` and every spacing class is a Tailwind `rem` step, so text and spacing
-// move together from one number — which is what the owner asked for, and what
-// the iPhone's own setting does.
+// OPTIMISTIC, THEN PERSISTED, exactly as before. A card presses, the size
+// resizes instantly and the save follows; if the save fails the size snaps
+// back and says so. The preference lives on the person's own row, so it
+// follows them between devices rather than living in one browser
+// (UI-RULEBOOK S4), and it is the ONLY way to make this app bigger, because
+// the viewport is locked against pinch-zoom (S5).
 
 import * as React from "react"
 
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  AppearanceOptionGroup,
-  ScalePicture,
-  type AppearanceOption,
-} from "@shared/ui/compositions/screens/settings"
+import { AppearanceOptionGroup, type AppearanceOption } from "@shared/ui/compositions/screens/settings"
 
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"
-import { SettingsSection } from "./settings-section"
 
 /** Put the size on the document. One place, called by the provider on load and
  * by a click before the save, so the screen and the stored preference can never
@@ -46,6 +43,18 @@ export function applyScale(value: string | null | undefined, door: "agency" | "p
   document.documentElement.style.fontSize = `${scaleFontSize(value, door)}px`
 }
 
+/** `SCALE_STEPS`' own order maps positionally onto the preview's three steps
+ * — `AppearancePreview`'s own header states the same convention `ScalePicture`
+ * already used: only the WORD and the picture move, `value` stays
+ * `SCALE_STEPS[*].value`, which this app has stored since before the card row
+ * existed (`"compact" | "comfortable" | "large"`, not the kit's own
+ * `"default"` middle key). A value this build does not recognise reads as the
+ * middle step, matching `shared/scale.ts`'s own `toScale` fallback. */
+export function previewScaleStep(value: string | null | undefined): "compact" | "default" | "large" {
+  const index = SCALE_STEPS.findIndex((s) => s.value === value)
+  return index === 0 ? "compact" : index === 2 ? "large" : "default"
+}
+
 export function ScaleSection({
   /** what the person currently reads at, from their own session row */
   value,
@@ -53,10 +62,14 @@ export function ScaleSection({
   save,
   /** which front door's baseline the steps mean */
   door = "agency",
+  /** Told the resting value on mount and again on every press, so the
+   * shared preview beside this group is never a frame behind it. */
+  onChosenChange,
 }: {
   value: string | null
   save: (scale: string) => Promise<unknown>
   door?: "agency" | "portal"
+  onChosenChange?: (value: string) => void
 }) {
   const { t } = useLanguage()
   // The chosen step is local so the buttons answer instantly; the session row
@@ -65,6 +78,9 @@ export function ScaleSection({
   const [chosen, setChosen] = React.useState(value)
   const [saving, setSaving] = React.useState<string | null>(null)
   React.useEffect(() => setChosen(value), [value])
+
+  const resting = chosen ?? SCALE_STEPS[1].value
+  React.useEffect(() => onChosenChange?.(resting), [resting, onChosenChange])
 
   async function choose(next: string) {
     if (next === chosen || saving) return
@@ -84,60 +100,25 @@ export function ScaleSection({
     }
   }
 
-  /* 26.05's own Appearance cards, verbatim — transcribed from settings.tsx's
-     SCALES, the words this app has not adopted the route to draw itself.
-     The kit's own array keys its middle step "default" and calls it
-     "Regular"; this app's own middle step has always been stored as
-     `"comfortable"` (`shared/scale.ts`, `db/core/0026_user_scale.sql`) — the
-     SAME step, a different key, because the column shipped long before this
-     card row did. Only the WORD and the picture move: `value` below is
-     still `SCALE_STEPS[*].value`, which is what `choose()`, `applyScale` and
-     the session row all key off. */
+  // COMPACT: no picture, no per-option description — the live preview beside
+  // this group carries that argument now. Only the label and the "In use"
+  // ring survive on the card.
   const options: readonly AppearanceOption[] = [
-    {
-      value: SCALE_STEPS[0].value,
-      label: t("Compact"),
-      description: t("13px root, tight rows."),
-      picture: <ScalePicture step="compact" />,
-    },
-    {
-      value: SCALE_STEPS[1].value,
-      label: t("Regular"),
-      description: t("15px root, the default in both doors."),
-      picture: <ScalePicture step="default" />,
-    },
-    {
-      value: SCALE_STEPS[2].value,
-      label: t("Large"),
-      description: t("17px root, roomy rows."),
-      picture: <ScalePicture step="large" />,
-    },
+    { value: SCALE_STEPS[0].value, label: t("Compact") },
+    { value: SCALE_STEPS[1].value, label: t("Regular") },
+    { value: SCALE_STEPS[2].value, label: t("Large") },
   ]
 
   return (
-    <SettingsSection title={t("Size")}>
-      {/* R67, AND NOW THE TITLE WITH IT — client, 2026-09-11: "ticket types
-       * should be on top of the searchbar inside the container without
-       * subtitle, make this. always". Said of a module settings page and
-       * applied here because it is the same shape: a heading and a sentence on
-       * the white above a box that could have held them.
-       *
-       * THIS SECTION WAS HALF-FIXED ON 2026-09-10 and this is the other half.
-       * That pass moved the option cards off `bg-card` — in LIGHT `--card`,
-       * `--background` and `--surface-raised` are all #FFFEF9, so they measured
-       * CONTRAST 1.000 against the page and were held up by their hairline
-       * alone — and left the title block standing on the white, because R67
-       * said prose was not content. The box is now `SettingsSection`'s, the
-       * heading is drawn INSIDE it, and the sentence is DELETED (it said what
-       * the title says). Soft paper on page measures 1.103 light / 1.079 dark;
-       * the raised option cards on it, 1.103 light / 1.111 dark. */}
+    <div className="flex flex-col gap-2">
+      <h3 className="text-muted-foreground text-micro uppercase">{t("Size")}</h3>
       <AppearanceOptionGroup
         options={options}
-        value={chosen ?? SCALE_STEPS[1].value}
+        value={resting}
         disabled={saving !== null}
         onValueChange={(next) => void choose(next)}
         badgeLabel={t("In use")}
       />
-    </SettingsSection>
+    </div>
   )
 }

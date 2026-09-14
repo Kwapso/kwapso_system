@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.76",
-  "sha": "8c1d6f07fdeca7a49730e20aa4e387ba43b13430",
-  "syncedAt": "2026-09-12"
+  "tag": "v1.2.77",
+  "sha": "2eb321780ec3c7f7e4f54f5cfd4d85a7fdcee010",
+  "syncedAt": "2026-09-14"
  },
- "generatedAt": "2026-09-12T07:48:07.457Z",
+ "generatedAt": "2026-09-14T08:24:23.437Z",
  "counts": {
   "components": 119,
   "hooks": 2,
@@ -9058,6 +9058,7 @@
     "ThemePicture",
     "SpinePicture",
     "ScalePicture",
+    "AppearancePreview",
     "AppearanceOptionGroup",
     "SettingsRoute",
     "SettingsSecurity"

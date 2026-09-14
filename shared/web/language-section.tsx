@@ -1,7 +1,26 @@
 "use client"
 
-// THE SWITCHER — one control, shown in Settings, in the Appearance tab under
-// Size, Appearance and Background.
+// THE SWITCHER — one control, shown in Settings, FIRST in the Appearance tab
+// now, above Size, Appearance and Background.
+//
+// PUT FIRST, CLIENT RULING 2026-09-14, choosing the preview-led layout of the
+// four Settings · Appearance options a lane put in front of her: "put
+// language first". She did not argue the order and neither does this file.
+//
+// NO SUBTITLE, THE SAME RULING. She quoted this section's own two sentences
+// back verbatim and asked for them gone: "remove subtitle 'What people type
+// stays in the language they typed it. 88% translated.'" Both are deleted —
+// the fact about typed text, and the coverage sentence below the control —
+// and so is the one she did not quote but that stands in the identical
+// position, "Choose the language you want {brand} in.": R72's own default
+// ("no subtitle under a heading, unless she asks") is the reading that
+// explains why she saw ONE subtitle to name where this file drew three
+// sentences: they are the same shape, stacked. THE COVERAGE NUMBER IS NOT
+// LOST, only its own sentence — the option list below already carries it
+// per-language (`{pct}%` beside every row still learning the words), which
+// is where somebody CHOOSING a language needs it; the sentence existed to
+// tell somebody who had ALREADY chosen, which the badge on the trigger's own
+// resting row no longer needs to spell out in prose.
 //
 // IT SPENT THREE WEEKS ON THE PROFILE PAGE (17 Aug – 10 Sep 2026), on the
 // reading that a reading language is about a PERSON and Settings is about the
@@ -31,11 +50,9 @@
 // who knows their language only as "Punjabi" and a person who scans for ਪੰਜਾਬੀ
 // both find the row.
 //
-// HOW COMPLETE EACH LANGUAGE IS, still said out loud. A machine fills the
-// catalogue in and a language can be part-written; somebody choosing one is told
-// so before they discover it a screen later. In the list it is a bare number, so
-// twenty-nine rows stay scannable; under the control it is the whole sentence
-// for the language actually in force, which is the one that matters.
+// HOW COMPLETE EACH LANGUAGE IS, still said, but only in the list now (see the
+// no-subtitle note above) — a bare `{pct}%` beside every row still learning
+// the words, where somebody choosing needs it.
 //
 // OPTIMISTIC, THEN PERSISTED. The choice re-renders the app instantly and the
 // save follows. If the save fails the language snaps back and says so, in the
@@ -54,19 +71,8 @@ import {
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
-import { brand } from "../brand"
 import { useLanguage } from "./language"
 import { SettingsSection } from "./settings-section"
-
-/** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
- * itself "THE one place to brand this app" and twenty-three files read it; the
- * sentences below used to spell the name out instead, which meant a rebrand — or
- * a fork of this base for the next product — would have left them saying the old
- * one, in four languages, on a screen that looked finished. Written as a `{brand}`
- * hole rather than concatenated, because a hole is the only shape a translator
- * can reorder (shared/i18n.ts, `fill`). */
-const BRAND = { brand: brand.name }
-
 
 export function LanguageSection({
   /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
@@ -86,7 +92,9 @@ export function LanguageSection({
 
   /** How much of the app this language can say, as a whole number — or null for
    * English, which IS the key and is therefore complete by definition. Saying
-   * "100% translated" under English would be noise. */
+   * "100% translated" under English would be noise. Read by the list below,
+   * per row — the one place this number is still said now that the sentence
+   * under the control is gone (see the header). */
   const percent = (code: string): number | null =>
     code === "en" ? null : Math.round((done[code as keyof typeof done] ?? 0) * 100)
 
@@ -113,84 +121,48 @@ export function LanguageSection({
     }
   }
 
-  const currentPercent = percent(current.code)
-
   return (
-    /* THE FOURTH SECTION ON THE SAME TAB, and it gets the same shape for the
-       same reason: client, 2026-09-11, "ticket types should be on top of the
-       searchbar inside the container without subtitle, make this. always".
-       Its heading was the one thing on this tab still standing on the white
-       after its three neighbours came inside — three sections one way and one
-       the other, on one tab, is precisely the inconsistency the ruling is
-       about.
-
-       THE SENTENCE BELOW STAYS, and it is not a subtitle surviving under
-       another name. It is INSIDE the container, directly above the control it
-       is about, and it carries a fact the title cannot: what people type stays
-       in the language they typed it. That is R67 amendment 4's own line — prose
-       is exempt where it is in the thing it describes — read as a design rule
-       rather than as a loophole.
-
-       `motion-panel-in` WENT WITH THE WRAPPER. Three of this section's four
-       neighbours never had it, so one tab was animating in quarters; one
-       behaviour for one tab is the trade, and it is recorded here rather than
-       discovered later. */
+    /* R72 (no subtitle under a heading, unless she asked): the two sentences
+       that used to stand here — one above the control, one below it — are
+       both gone; see the header for the ruling and for where the coverage
+       number moved instead. Just the heading `SettingsSection` draws and the
+       control itself. */
     <SettingsSection title={t("Language")}>
-      <div className="flex flex-col gap-4">
-        <p className="text-muted-foreground text-sm">
-          {t("Choose the language you want {brand} in.", BRAND)}{" "}
-          {t("What people type stays in the language they typed it.")}
-        </p>
-        <Select
-          value={lang}
-          onValueChange={(next) => void choose(next as Language)}
-          disabled={saving}
-        >
-          <SelectTrigger className="sm:max-w-xs" aria-label={t("Language")}>
-            {/* Given children, the trigger shows THESE rather than the selected
-             * row's own text — so the percentage stays in the list, where it
-             * helps somebody choose, and out of the resting control, where the
-             * sentence below already says it. */}
-            <SelectValue>
-              <span className="flex items-center gap-2 truncate">
-                <span aria-hidden>{current.flag}</span>
-                <span>{current.native}</span>
-                {current.english !== current.native && (
-                  <span className="text-muted-foreground text-xs">{current.english}</span>
-                )}
-              </span>
-            </SelectValue>
-          </SelectTrigger>
-          {/* LANGUAGES' own order: the agency's own four first, then the world's
-           * by how many people speak them. The order is the engine's decision,
-           * not this screen's — see shared/i18n.ts. */}
-          <SelectContent>
-            {LANGUAGES.map((l) => {
-              const pct = percent(l.code)
-              return (
-                <SelectItem key={l.code} value={l.code}>
-                  <span className="flex items-center gap-2">
-                    <span aria-hidden>{l.flag}</span>
-                    <span>{l.native}</span>
-                    {l.english !== l.native && (
-                      <span className="text-muted-foreground text-xs">{l.english}</span>
-                    )}
-                    {pct !== null && pct < 100 && (
-                      <span className="text-muted-foreground text-xs tabular-nums">{pct}%</span>
-                    )}
-                  </span>
-                </SelectItem>
-              )
-            })}
-          </SelectContent>
-        </Select>
-        {currentPercent !== null && currentPercent < 100 && (
-          <p className="text-muted-foreground text-xs">
-            {t("{percent}% translated", { percent: currentPercent })}{" "}
-            {t("The rest is shown in English.")}
-          </p>
-        )}
-      </div>
+      <Select value={lang} onValueChange={(next) => void choose(next as Language)} disabled={saving}>
+        <SelectTrigger className="sm:max-w-xs" aria-label={t("Language")}>
+          <SelectValue>
+            <span className="flex items-center gap-2 truncate">
+              <span aria-hidden>{current.flag}</span>
+              <span>{current.native}</span>
+              {current.english !== current.native && (
+                <span className="text-muted-foreground text-xs">{current.english}</span>
+              )}
+            </span>
+          </SelectValue>
+        </SelectTrigger>
+        {/* LANGUAGES' own order: the agency's own four first, then the world's
+         * by how many people speak them. The order is the engine's decision,
+         * not this screen's — see shared/i18n.ts. */}
+        <SelectContent>
+          {LANGUAGES.map((l) => {
+            const pct = percent(l.code)
+            return (
+              <SelectItem key={l.code} value={l.code}>
+                <span className="flex items-center gap-2">
+                  <span aria-hidden>{l.flag}</span>
+                  <span>{l.native}</span>
+                  {l.english !== l.native && (
+                    <span className="text-muted-foreground text-xs">{l.english}</span>
+                  )}
+                  {pct !== null && pct < 100 && (
+                    <span className="text-muted-foreground text-xs tabular-nums">{pct}%</span>
+                  )}
+                </span>
+              </SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select>
     </SettingsSection>
   )
 }

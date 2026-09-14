@@ -62,6 +62,19 @@
                 "--strictPort"
             ],
             "port": 5301
+        },
+        {
+            "_": "Settings \u203a Appearance (preview-led) verify rig \u2014 a static build of verify/appearance-panel/, the same recipe as verify/pinned-corners/build.mjs. Run `node verify/appearance-panel/build.mjs` first; this just serves the output. Not app auth \u2014 mounts the real components directly.",
+            "name": "verify-appearance-panel",
+            "runtimeExecutable": "python3",
+            "runtimeArgs": [
+                "-m",
+                "http.server",
+                "4173",
+                "--directory",
+                "verify/appearance-panel"
+            ],
+            "port": 4173
         }
     ]
 }

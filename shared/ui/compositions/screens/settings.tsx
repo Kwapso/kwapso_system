@@ -406,6 +406,212 @@ export const ScalePicture = ({
 };
 
 /* ============================================================================
+   AppearancePreview — one live picture of the app itself, not a swatch.
+
+   WHY THIS EXISTS. The client, 2026-09-14, choosing between four Settings ·
+   Appearance layouts a lane put in front of her, picked the preview-led one —
+   a single live preview beside compact controls, replacing twelve small
+   option pictures — and ruled on what was wrong with the picture Background
+   had: "Represent in the preview better the background (currently it's the
+   old coloured navbar only)." The picture available for that job was
+   `SpinePicture`, a 44px `THUMB_RAIL` swatch — never meant to carry the
+   argument `screen-shell.tsx`'s own reshape makes: "THE GROUND IS THE SPINE,
+   AND ONLY THE CONTENT FLOATS" — three looks for the whole app, not just the
+   rail. This draws that hierarchy, small, so the three read as different at
+   a glance for the reason they are different in the real app:
+
+       spine GROUND        the whole frame           (`AppearancePreview`'s root)
+       ├─ RAIL              lies on it, paints nothing
+       └─ floating CARD     the one raised thing, off-beige in both palettes
+          └─ soft PANEL     the collection/record body, one rung quieter
+             └─ off-beige ROW  one title, one meta line, at the chosen scale
+
+   Same four rungs `screen-shell.tsx`'s own diagram draws for the real
+   screen. Ink is the strong edge (light ground/card contrast 17.386, the
+   client's own reason for keeping three spines: "in light i can choose to
+   have a 'dark' background"); paper and mango are the thin case
+   `--shadow-lifted` exists to carry — so the shadow is drawn here too, not
+   dropped as a simplification, because a preview that fakes the strong edges
+   and skips the thin ones would misrepresent exactly the two spines a
+   reviewer most needs to trust it on.
+
+   PINNED HEX, NOT LIVE TOKENS — `ThemePicture`'s own fork, for the same
+   reason. Dark-mode tokens bind at `:root[data-theme="dark"]` (tokens.css
+   §6): a scoped descendant has no selector that says "be dark" while the
+   document stays light, so a live preview of a THEME cannot ride the
+   cascade the way `SpinePicture` rides spine tokens (bound on
+   `[data-spine="…"]`, any element — no document-level attribute needed).
+   Every hex below is transcribed, not re-derived: `tokens.css`'s own
+   `--kw-*` values, and `screen-shell.tsx`'s own measured ground/card table
+   from its reshape note.
+
+       ground   ink   light #1A1918  dark #1C1B18
+                paper light #F7F2EB  dark #2F2D28
+                mango light #FED069  dark #FED069   (mango does not move)
+       card           light #FFFEF9  dark #26241F   (spine-independent)
+       panel          light #F7F2EB  dark #1C1B18   (spine-independent)
+       ink-on-ground  ink   #FFFEF9  both palettes  (`--spine-ink` for ink is
+                                     unconditionally off-beige, tokens.css §7b)
+                      paper light #1A1918  dark #FFFEF9  (`var(--foreground)`)
+                      mango #1A1918  both  (`--ink-on-accent`; D3's "always
+                                     black text" on mango)
+
+   `theme` TAKES `"light" | "dark"` ONLY, ALREADY RESOLVED — never `"system"`.
+   A picture has no clock and no `matchMedia` of its own; the caller (wherever
+   the person's stored preference is read, the same place `ModeToggle` itself
+   resolves it) answers "what does system mean right now" once, before this
+   renders. `AppearanceOption`'s own "system" tone stays `ThemePicture`'s job,
+   on the small option card beside this preview.
+
+   SCALE MOVES THE ROW'S TYPE ONLY — the same two sizes `ScalePicture` draws
+   (title, meta), read larger here because this frame has the room. Nothing
+   about how MUCH the row shows changes with scale, for the identical reason
+   `ScalePicture`'s own header states: the mechanism this depicts sets one
+   root font size and adds no row.
+   ========================================================================= */
+
+const APPEARANCE_PREVIEW_GROUND: Record<
+  "ink" | "paper" | "mango",
+  { light: string; dark: string }
+> = {
+  ink: { light: "#1A1918", dark: "#1C1B18" },
+  paper: { light: "#F7F2EB", dark: "#2F2D28" },
+  mango: { light: "#FED069", dark: "#FED069" },
+};
+
+/** `--spine-ink` per spine, tokens.css §7b — the ink a topbar mark reads on
+    the ground itself, before the floating card is reached. */
+const APPEARANCE_PREVIEW_GROUND_INK: Record<
+  "ink" | "paper" | "mango",
+  { light: string; dark: string }
+> = {
+  ink: { light: "#FFFEF9", dark: "#FFFEF9" },
+  paper: { light: "#1A1918", dark: "#FFFEF9" },
+  mango: { light: "#1A1918", dark: "#1A1918" },
+};
+
+/** `--card`, spine-independent — the one floating thing on any ground. */
+const APPEARANCE_PREVIEW_CARD = { light: "#FFFEF9", dark: "#26241F" };
+
+/** `--surface-panel`, spine-independent — the collection/record body, one
+    rung quieter than the card it sits in. */
+const APPEARANCE_PREVIEW_PANEL = { light: "#F7F2EB", dark: "#1C1B18" };
+
+/** `--foreground` / `--muted-foreground`, read on the card and the panel
+    (never on the ground — see APPEARANCE_PREVIEW_GROUND_INK for that). */
+const APPEARANCE_PREVIEW_ROW_INK = { light: "#1A1918", dark: "#FFFEF9" };
+const APPEARANCE_PREVIEW_ROW_META = {
+  light: "rgba(26, 25, 24, .55)",
+  dark: "rgba(255, 254, 249, .55)",
+};
+
+/** The row's two sizes, in px — the same pair `ScalePicture` draws, read one
+    step larger because this frame has the room to hold it legibly. */
+const APPEARANCE_PREVIEW_SCALE: Record<
+  "compact" | "default" | "large",
+  { title: number; meta: number }
+> = {
+  compact: { title: 15, meta: 13 },
+  default: { title: 18, meta: 16 },
+  large: { title: 21, meta: 19 },
+};
+
+export interface AppearancePreviewProps extends React.ComponentPropsWithoutRef<"div"> {
+  /** Already resolved — never "system". See the header above. */
+  theme: "light" | "dark";
+  /** The ground the whole frame stands on. */
+  spine: "ink" | "paper" | "mango";
+  /** Moves the row's type only, never what the row shows. */
+  scale?: "compact" | "default" | "large";
+}
+
+/**
+ * A small, live picture of the app itself: the spine ground, the rail lying
+ * on it painting nothing, and one floating record — card, panel, row — at
+ * the chosen scale. Pure and prop-driven, exactly as `ThemePicture` /
+ * `SpinePicture` / `ScalePicture` are: no internal state, so a caller can
+ * re-render it on every control press and the picture is never stale by a
+ * frame.
+ */
+export function AppearancePreview({
+  theme,
+  spine,
+  scale = "default",
+  className,
+  ...props
+}: AppearancePreviewProps) {
+  const ground = APPEARANCE_PREVIEW_GROUND[spine][theme];
+  const groundInk = APPEARANCE_PREVIEW_GROUND_INK[spine][theme];
+  const card = APPEARANCE_PREVIEW_CARD[theme];
+  const panel = APPEARANCE_PREVIEW_PANEL[theme];
+  const rowInk = APPEARANCE_PREVIEW_ROW_INK[theme];
+  const rowMeta = APPEARANCE_PREVIEW_ROW_META[theme];
+  const sizes = APPEARANCE_PREVIEW_SCALE[scale];
+
+  return (
+    <div
+      role="img"
+      aria-label={`Preview: ${spine} background, ${theme} appearance`}
+      className={cn(
+        "flex min-h-[14rem] w-full overflow-hidden rounded-[var(--radius)] transition-colors duration-200",
+        className,
+      )}
+      style={{ background: ground }}
+      {...props}
+    >
+      {/* THE RAIL — lies on the ground and paints nothing of its own,
+          exactly as `rail.tsx`'s own state 1 and `screen-shell.tsx`'s
+          reshape both state it. */}
+      <span
+        className="w-[2.875rem] shrink-0 min-[45rem]:w-[3.375rem]"
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
+        {/* A BREADCRUMB SLOT, on the ground, above the card — the fourth
+            thing `screen-shell.tsx`'s diagram draws at this level. */}
+        <span
+          className="h-2 w-[42%] rounded-pill"
+          style={{ background: groundInk, opacity: 0.32 }}
+          aria-hidden="true"
+        />
+        {/* THE FLOATING CARD — the one raised, shadowed thing on this
+            ground; `--shadow-lifted`, load-bearing on paper and mango. */}
+        <div
+          className="flex flex-1 flex-col rounded-[var(--radius)] p-3 shadow-[var(--shadow-lifted)]"
+          style={{ background: card }}
+        >
+          {/* THE PANEL — one rung quieter, the record body. */}
+          <div
+            className="flex flex-1 flex-col justify-center rounded-[var(--radius)] p-3"
+            style={{ background: panel }}
+          >
+            {/* THE ROW — back to the card's own tone, a hairline standing
+                in for the thin edge measured against the panel. */}
+            <div
+              className="flex flex-col gap-1.5 rounded-[var(--radius)] px-3 py-2.5 shadow-[var(--hairline)]"
+              style={{ background: card }}
+            >
+              <span
+                className="truncate font-[var(--font-weight-medium)] transition-[font-size] duration-200"
+                style={{ color: rowInk, fontSize: `${sizes.title}px`, lineHeight: 1.3 }}
+              >
+                Record title
+              </span>
+              <span
+                className="truncate transition-[font-size] duration-200"
+                style={{ color: rowMeta, fontSize: `${sizes.meta}px`, lineHeight: 1.35 }}
+              >
+                Status · 4 open
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
    THE VISUAL OPTION CARD — 26.05's "How an option panel is built", verbatim:
    "A choice that changes how the app looks is never a row of pills and never
    a dropdown. It is one card per option: a small picture of the thing

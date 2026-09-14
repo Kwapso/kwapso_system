@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Added — `AppearancePreview`, so Background stops being a swatch on a rail
+
+The client, 2026-09-14, choosing between four Settings · Appearance layouts a
+consuming app put in front of her, picked the preview-led one and ruled on
+what was wrong with the picture Background had: *"Represent in the preview
+better the background (currently it's the old coloured navbar only)."* The
+only picture on offer was `SpinePicture` — a 44px `THUMB_RAIL` swatch — and it
+was never built to carry the argument `screen-shell.tsx`'s own 2026-09-02
+reshape makes: the spine is the ground the WHOLE window stands on, not a
+stripe down one edge.
+
+`AppearancePreview` draws that hierarchy at preview size — ground, the rail
+lying on it painting nothing, a floating card, the soft panel inside it, a row
+at the chosen scale — the same four rungs `screen-shell.tsx`'s own diagram
+draws for the real screen, so ink/paper/mango read as different at a glance
+for the reason they are different in the real app, and `--shadow-lifted`
+carries the thin edges (paper, mango) rather than the preview faking only the
+strong one (ink).
+
+It takes `theme` already resolved (`"light" | "dark"`, never `"system"` — a
+picture has no clock; see `ThemePicture`'s own precedent for why), `spine`,
+and an optional `scale`, and is pure and prop-driven like its three siblings:
+no internal state, safe to re-render on every control press.
+
 ### Changed — the grid turns rather than being handed its axes backwards, and the column that names a row stops scrolling away
 
 Two things came back from the consuming application on the day it shipped a

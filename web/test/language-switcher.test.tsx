@@ -51,15 +51,22 @@ describe("the switcher is a dropdown, from the library (R3)", () => {
     expect(read(MENU)).toContain("components/dropdown-menu/dropdown-menu")
   })
 
-  it("Settings still says how complete a part-written language is", () => {
-    // The honest half of shipping a machine-filled catalogue. A dropdown makes
-    // it easy to lose — there is less room than a button had — so the sentence
-    // and the per-row figure are both named here. `coverage()` is the engine's
-    // one seam for the number; a component computing its own would be a second
-    // answer to "how much of this can I read".
+  it("Settings still says how complete a part-written language is, in the list", () => {
+    // The honest half of shipping a machine-filled catalogue, still true after
+    // the 2026-09-14 ruling deleted the sentence UNDER the control (the client
+    // quoted it back verbatim and asked for it gone, alongside the preview-led
+    // Settings · Appearance redesign — see language-section.tsx's own header).
+    // What survives is the per-row figure in the OPEN list, which is where
+    // somebody CHOOSING a language needs the number; `coverage()` is still the
+    // engine's one seam for it, so a component computing its own would still
+    // be a second answer to "how much of this can I read".
     const src = read(SECTION)
-    expect(src, "the sentence under the control").toContain("{percent}% translated")
+    expect(src, "the per-row percentage in the open list").toContain("{pct}%")
     expect(src, "the number comes from the engine's own seam").toContain("coverage()")
+    expect(
+      src.includes("{percent}% translated"),
+      "the sentence under the control was deleted by the 2026-09-14 ruling and must not grow back"
+    ).toBe(false)
   })
 
   for (const [name, path] of [

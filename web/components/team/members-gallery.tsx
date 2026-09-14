@@ -150,12 +150,22 @@
 // all. A name-based filter would go on returning a plausible list on the day
 // somebody renamed "Client" to "Kunde", and nobody would see it happen.
 //
-// AND THE COUNT SAYS WHAT IT DROPPED. A wall that silently omits people is worse
-// than one that explains itself, so the line under the toolbar names how many
-// client logins are not here and where they are instead: portal access is
-// granted and revoked on the CONTACT's own record
-// (web/components/accounts/contact-detail.tsx), gated on `portal_users`, which
-// is the screen that owns the question. Nothing is hidden, only re-homed.
+// THE SENTENCE THAT USED TO SAY WHAT IT DROPPED IS GONE, 2026-09-14 — R72:
+//
+//   "in settings, team remove '{count} client logins are not shown here.
+//    Team is your own staff; a client's portal access is on their contact
+//    record.'"
+//
+// It named how many client logins were not on the wall and pointed at the
+// screen that owns them, under the "Members" heading — exactly the shape R72
+// forbids by default now, and this file was never on `SUBTITLE_OK`'s
+// exemption list to begin with. The FACT it stated is still true and the
+// subtraction above still happens; only the sentence explaining it is gone.
+// It has nowhere else in THIS screen to live without becoming the same
+// subtitle under another name — the honest homes are the contact record
+// itself (web/components/accounts/contact-detail.tsx, where portal access is
+// actually granted and revoked) or a zero-state a person only sees by
+// reaching for it, and nobody has re-added it there. See RULES.md's R72 row.
 
 import * as React from "react"
 
@@ -316,15 +326,13 @@ export function MembersGallery({
     },
   ]
 
-  // OUR OWN STAFF, AND THE NUMBER THIS SUBTRACTS — "we should not see cliets in
-  // team, no? thats for staff" (client, 2026-09-10). `isClient` is the members
-  // door's own resolution of a `portal_users` row in the team's database; this
-  // file's header carries why that fact and never a role TITLE is what a filter
-  // may stand on. Both halves are computed here because both are shown: the
-  // wall is `staff`, and `clientCount` is the sentence under the toolbar that
-  // stops the subtraction from being silent.
+  // OUR OWN STAFF, AND NOTHING ELSE — "we should not see cliets in team, no?
+  // thats for staff" (client, 2026-09-10). `isClient` is the members door's
+  // own resolution of a `portal_users` row in the team's database; this
+  // file's header carries why that fact and never a role TITLE is what a
+  // filter may stand on, and why the subtraction now happens silently —
+  // see the header's R72 note above for the sentence that used to explain it.
   const staff = members.filter((m) => !m.isClient)
-  const clientCount = members.length - staff.length
 
   // SEARCHED FIRST, THEN NARROWED — the same order every collection screen in
   // the app applies, so the facet's own count describes what the search left.
@@ -612,31 +620,6 @@ export function MembersGallery({
                   />
                 )}
               </div>
-            )}
-
-            {/* WHAT THIS WALL LEAVES OUT, SAID OUT LOUD — "we should not see cliets
-                in team, no? thats for staff" (client, 2026-09-10). A collection
-                that silently drops rows is worse than one that explains itself,
-                so the subtraction is a sentence rather than an absence: how many
-                client logins are not here, and the screen that owns them. Drawn
-                only when there ARE some, because a line about zero people is
-                noise on every team that has never granted portal access.
-
-                THE WHOLE SENTENCE WITH A HOLE IN IT (R28), in both grammatical
-                numbers — never a count glued to a translated noun, which is the
-                one shape a translator cannot reorder. */}
-            {clientCount > 0 && (
-              <p className="text-muted-foreground text-xs">
-                {clientCount === 1
-                  ? t(
-                      "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.",
-                      { count: String(clientCount) }
-                    )
-                  : t(
-                      "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.",
-                      { count: String(clientCount) }
-                    )}
-              </p>
             )}
 
             {membersLoading && members.length === 0 ? (
