@@ -8,7 +8,7 @@
 // a canned "something went wrong"; a step cap prevents runaways; every turn is saved
 // with each step's outcome (the audit trail the panel rehydrates from).
 
-import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "@shared/types"
+import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent, AgentMessage } from "@shared/types"
 import { pendingCall } from "@shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
 import { blockBrief } from "@shared/agent-blocks"
@@ -862,6 +862,74 @@ function replayable(history: { role: string; content: string | null }[]): ChatMe
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }))
 }
 
+/** A TURN CAN OUTLIVE ITS REQUEST (14 Sep 2026). `replayable` is the memory of
+ *  PAST turns — prose only, the way the model is shown last week. This is the
+ *  CURRENT turn, rebuilt exactly: each assistant row's saved calls (id + input)
+ *  and, paired to them by order, the tool rows that answered — so a turn whose
+ *  request ran out of time is resumed from its last result rather than from
+ *  nothing. Returns null when a row predates the ids (an older thread), and the
+ *  caller falls back to prose, which is the old behaviour and never worse.
+ *
+ *  Measured before this existed: the owner asked one five-part question five
+ *  times in a day; three attempts died at the time limit with every figure
+ *  already fetched and saved, and each retry started again from the question. */
+export function resumable(turn: AgentMessage[]): ChatMessage[] | null {
+  const out: ChatMessage[] = []
+  let i = 0
+  while (i < turn.length) {
+    const m = turn[i]!
+    if (m.role === "user") {
+      if (m.content) out.push({ role: "user", content: m.content })
+      i++
+      continue
+    }
+    if (m.role === "assistant") {
+      const calls = m.toolCalls ?? []
+      if (!calls.length) {
+        if (m.content) out.push({ role: "assistant", content: m.content })
+        i++
+        continue
+      }
+      if (calls.some((c) => typeof c.id !== "string")) return null
+      const toolCalls: ToolCall[] = calls.map((c) => ({ id: c.id as string, name: c.tool, input: c.input ?? {} }))
+      out.push({ role: "assistant", content: m.content ?? "", toolCalls })
+      i++
+      // The answers, in the order the calls were made. A call with no row yet
+      // (the request died between the two) is given an honest placeholder so
+      // the provider never sees a call without its result.
+      for (const tc of toolCalls) {
+        const row = turn[i]
+        if (row && row.role === "tool") {
+          out.push({ role: "tool", content: row.content ?? "", toolCallId: tc.id, toolName: tc.name })
+          i++
+        } else {
+          out.push({ role: "tool", content: "FAILED: the turn was cut off before this call ran. Call it again if you still need it.", toolCallId: tc.id, toolName: tc.name })
+        }
+      }
+      continue
+    }
+    i++ // a stray tool row with no call above it — nothing to pair it to
+  }
+  return out
+}
+
+/** How many requests one turn may span — the cost dial for a long question.
+ *  Each segment is at most TURN_DEADLINE_MS and MAX_STEPS credits, so the worst
+ *  case per turn is MAX_SEGMENTS times both. Four is fourteen minutes and, on
+ *  the engine measured on 14 Sep 2026 at one lookup per step, roughly forty
+ *  lookups — no question the owner has asked has needed half of that. */
+export const MAX_SEGMENTS = 4
+
+/** What the person reads while the next segment is being asked for. Saved,
+ *  because a reopened thread must show the turn was still going, not that it
+ *  had stopped. Model-facing side of the same handover: CARRY_ON_NUDGE. */
+export const CARRYING_ON_NOTE = "Still working on that one — carrying on from where I got to."
+
+/** The one user-role line a continuation opens with. It follows the exact
+ *  replay of the turn so far, results included, so "carry on" means carry on. */
+export const CARRY_ON_NUDGE =
+  "That request ran out of time partway. Everything above is what you already did and found — carry on from there and finish the answer. Do not repeat a lookup whose result is already above."
+
 /** The body fields that carry an ACCOUNT id — a company, or a person on the books.
  * Resolved for the confirm panel, because a grant names its person with one of
  * these and a raw ULID tells the approver nothing about who they are letting in. */
@@ -1471,6 +1539,10 @@ export async function runChat(
   opts: {
     threadId?: string
     message: string
+    /** PICK THE LAST TURN UP WHERE ITS REQUEST DIED. No new user row; the turn's
+     * saved rows are replayed exactly (`resumable`) and the loop runs on. The
+     * door sets it from `body.continue === true`; `message` is ignored then. */
+    continue?: boolean
     source: string
     files?: { name: string; csv: string }[]
     /** THE SOURCE CHIPS this conversation is using — chip keys, already checked
@@ -1487,25 +1559,42 @@ export async function runChat(
   // into someone else's conversation cannot be taken back, and the next turn
   // would read their history as context.
   if (opts.threadId) await requireOwnThread(cfg, guard, actor.id, opts.threadId)
+  if (opts.continue && !opts.threadId) throw new GuardError(400, "invalid_input", "Carrying on needs the thread to carry on.")
   const threadId = opts.threadId ?? (await createThread(cfg, guard, actor, deriveTitle(opts.message)))
   // The saved message names the attachments (honest history); the machine plan block
-  // below is model-facing only.
+  // below is model-facing only. A continuation adds no row: the question is
+  // already there, and so is everything the turn did before its request died.
   const attachNote = opts.files?.length ? `\n(Attached: ${opts.files.map((f) => f.name).join(", ")})` : ""
-  await appendMessage(cfg, guard, actor, threadId, { role: "user", content: opts.message + attachNote, source: opts.source })
-  const planBlock = opts.files?.length ? await planAttachedFiles(env, cfg, guard, actor, opts.files) : null
+  if (!opts.continue)
+    await appendMessage(cfg, guard, actor, threadId, { role: "user", content: opts.message + attachNote, source: opts.source })
+  const planBlock = !opts.continue && opts.files?.length ? await planAttachedFiles(env, cfg, guard, actor, opts.files) : null
 
   const history = await listMessages(cfg, guard, threadId)
+  // THE CURRENT TURN starts at the last user row. A fresh turn's is one row (just
+  // appended); a continuation's is the question plus everything saved since.
+  const turnAt = history.map((m) => m.role).lastIndexOf("user")
+  const before = turnAt < 0 ? history : history.slice(0, turnAt)
+  const turn = turnAt < 0 ? [] : history.slice(turnAt)
   // Window to the last MAX_HISTORY messages before seeding — the model only sees recent
-  // context; the full thread stays in the DB.
+  // context; the full thread stays in the DB. Past turns replay as prose; the
+  // current one replays exactly when it can (`resumable`), prose otherwise.
   const convo: ChatMessage[] = [
     { role: "system", content: systemFor(opts.language) },
-    ...replayable(history.slice(-MAX_HISTORY)),
+    ...replayable(before.slice(-MAX_HISTORY)),
+    ...(resumable(turn) ?? replayable(turn)),
   ]
   // The attached-files plan rides as one more user-turn block (the wire format
   // coalesces it with the message) — never persisted, rebuilt fresh per attach.
   if (planBlock) convo.push({ role: "user", content: planBlock })
+  // A continuation's one instruction, after the exact replay. Also never saved.
+  if (opts.continue) convo.push({ role: "user", content: CARRY_ON_NUDGE })
+  // Which segment of the turn this is — how many times it has carried on
+  // already — read off the saved notes, so the cap holds however the
+  // continuation was asked for.
+  const segment = turn.filter((m) => m.role === "assistant" && m.content === CARRYING_ON_NOTE).length
   const quota = await getQuota(env, guard.teamId)
   const tally: UsageTally = { credits: 0, free: 0, credit: 0, actions: [], tokens: NO_TOKENS }
+  const asked = opts.continue ? (turn[0]?.content ?? opts.message) : opts.message
   return runPlanLoop(
     env,
     request,
@@ -1515,8 +1604,8 @@ export async function runChat(
     threadId,
     convo,
     quota,
-    { source: opts.source, summary: usageSummary(opts.message), tally, sources: opts.sources },
-    {},
+    { source: opts.source, summary: usageSummary(asked), tally, sources: opts.sources },
+    { segment },
     emit
   )
 }
@@ -1537,7 +1626,7 @@ async function runPlanLoop(
   convo: ChatMessage[],
   quota: AgentQuota,
   opts: { source: string; summary: string; tally: UsageTally; sources?: string[] },
-  loopOpts: { prepaid?: boolean; fold?: boolean } = {},
+  loopOpts: { prepaid?: boolean; fold?: boolean; segment?: number } = {},
   emit?: Emit
 ): Promise<ChatOutcome> {
   // The thread id is the affinity key: every step of this turn re-sends the same
@@ -1710,13 +1799,19 @@ async function runPlanLoop(
    *  the between-steps check and nowhere else, which is precisely why the second
    *  place had no sentence at all. */
   const stoppedPartway = async (): Promise<ChatOutcome> => {
-    const note =
-      "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
-      "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
+    // OUT OF REQUEST, NOT OUT OF WORK. Under the segment cap the turn hands
+    // itself on: the note is saved, the outcome says `continues`, and the client
+    // asks the same door for the next segment at once. Only the last permitted
+    // segment says the honest sentence and stops.
+    const continues = (loopOpts.segment ?? 0) < MAX_SEGMENTS - 1
+    const note = continues
+      ? CARRYING_ON_NOTE
+      : "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
+        "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
     say(note)
     await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
     await log()
-    return { done: true as const, threadId, reply: note, quota }
+    return { done: true as const, threadId, reply: note, quota, ...(continues ? { continues: true } : {}) }
   }
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -1951,7 +2046,10 @@ async function runPlanLoop(
     await appendMessage(cfg, guard, actor, threadId, {
       role: "assistant",
       content: reply.text,
-      toolCallsJson: JSON.stringify(reply.toolCalls.map((tc) => ({ tool: tc.name, status: "pending" }))),
+      // `id` and `input` ride the row so a turn can be RESUMED from it (see
+      // `resumable`): the tool rows that follow are paired back to these calls
+      // by order, which is the order the loop below appends them in.
+      toolCallsJson: JSON.stringify(reply.toolCalls.map((tc) => ({ tool: tc.name, status: "pending", id: tc.id, input: tc.input }))),
       source: opts.source,
     })
     convo.push({ role: "assistant", content: reply.text, toolCalls: reply.toolCalls })
@@ -2063,11 +2161,17 @@ async function runPlanLoop(
     }
   }
 
-  const note = "I took several steps and paused here. Tell me to keep going if you'd like."
+  // OUT OF STEPS, NOT OUT OF WORK — the same handover the time limit makes.
+  // On the engine measured 14 Sep 2026 (one lookup a step, ~15 s each) this
+  // exit arrives BEFORE the time limit on any hard question, so without it a
+  // continuation would never have happened. The segment cap bounds the whole
+  // turn; the last permitted segment says the old sentence and stops.
+  const continues = (loopOpts.segment ?? 0) < MAX_SEGMENTS - 1
+  const note = continues ? CARRYING_ON_NOTE : "I took several steps and paused here. Tell me to keep going if you'd like."
   say(note)
   await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
   await log()
-  return { done: true, threadId, reply: note, quota }
+  return { done: true, threadId, reply: note, quota, ...(continues ? { continues: true } : {}) }
 }
 
 /** Resume after the client approves (or declines). The calls executed come from the
