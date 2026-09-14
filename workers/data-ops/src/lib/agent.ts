@@ -1779,11 +1779,14 @@ async function runPlanLoop(
         // First delta of a NEW model turn gets the blank-line separator when earlier
         // text already streamed (e.g. a lead-in before steps, then the wrap-up after).
         let first = true
+        // The thinking goes to the panel's own strip and nowhere near `spoke`:
+        // scratch work is not the assistant having said something.
+        const onThought = (d: string) => emit!({ t: "thought", d })
         reply = await inTime(model.stream!(convo, toolsNow(), (d) => {
           emit!({ t: "text", d: (first && spoke ? "\n\n" : "") + d })
           first = false
           spoke = true
-        }))
+        }, onThought))
       } else {
         reply = await inTime(model.complete(convo, toolsNow()))
       }
