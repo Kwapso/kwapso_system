@@ -3186,26 +3186,28 @@ export const GROWING_COLLECTIONS: Record<
     pagerKey: "accountsKey(",
     why: "every company AND every person an agency works with is a row here — a contact list that only grows, so a ceiling would eventually become a refusal to answer",
   },
-  activity: {
-    lib: "workers/tenancy/src/lib/activity-read.ts",
-    fn: "getActivity",
-    routes: "workers/tenancy/src/routes/team.ts",
-    rowsKey: "activity",
-    webKey: "activity:team:",
-    pagerFile: "components/deep-link/module-content.tsx",
-    /* THE PAGER IS INSIDE THE RAIL NOW, so this names the value handed to it
-       rather than the literal key, and `keyBuiltIn` below names where that
-       literal still lives. The client retired the Activity tab on 7 Sep 2026
-       ("kill all old activity tabs") and the feed moved into the slide-in the
-       footer's Latest activity door opens — `<ActivityRail>`, which mounts the
-       same `<ActivityPanel>` and therefore the same `<LoadMore>`. The substance
-       of this line never changed: page two of the team's history is reachable.
-       What changed is which file writes the key, which is why the pin grew a
-       third link instead of simply moving. */
-    pagerKey: "activityKey",
-    keyBuiltIn: "web/lib/use-screen-data.ts",
-    why: "the fastest-growing table in the base — EVERY mutation writes a row",
-  },
+  // THE TEAM-WIDE `scope=team` ENTRY USED TO LIVE HERE, and it was already a
+  // ghost by the time `member-screen.tsx` moved onto the generic (table, id)
+  // path (14 Sep 2026, this file's `RECORD_TABS_SINGLE_PANEL` note). The
+  // client retired `team.detail` — the one screen that ever showed the
+  // team-wide feed — on 2026-09-09 ("This overview about the team should not
+  // even exist"), which left this entry's `webKey: "activity:team:"` pinned
+  // to a literal `web/lib/use-screen-data.ts` had not composed since that
+  // date, and its `pagerFile`/`pagerKey` satisfied only by coincidence: the
+  // SAME `activityKey` variable also carried the MEMBER'S OWN `scope=user`
+  // key, the one call site that was actually still reachable, so the pin
+  // stayed green for the wrong reason for six days. Deleting the last live
+  // reader of that variable (member-screen.tsx's own move, and the dead
+  // `activityScope`/`activityKey`/`activityQ`/`activityTotal`/
+  // `activityFetchPage` block it left behind in use-screen-data.ts) is what
+  // surfaced it: nothing in `web/` has been able to reach page two of the
+  // team's own feed since 2026-09-09, because nothing has been able to reach
+  // page ONE of it either. `getActivity`'s `scope=team` branch (activity-
+  // read.ts) still exists server-side — R14's first clause (a LIMIT on every
+  // list/search read) is unconditional and does not need a GROWING_COLLECTIONS
+  // row to pass — this only removes the now-false claim that a WEB screen can
+  // still page it.
+  //
   // The SAME door and the SAME rows, read through the generic (table, id) scope —
   // listed separately because "the server pages" and "the client can reach page
   // two" are different facts, and this half was the one missing: every record

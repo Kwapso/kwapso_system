@@ -155,7 +155,10 @@ export function useScreenActions(teamId: string | null) {
           const { members } = await tenancy.setMemberRole(payload.userId, payload.roleId)
           primeCache(`members:${teamId}`, members)
           invalidate(`member_roles:${teamId}`) // member counts per role changed
-          invalidate(`activity:user:${payload.userId}`) // their activity feed gained a row
+          // Their activity feed gained a row — the generic (table, id) key
+          // `member-screen.tsx` now reads through (R5), not the retired
+          // `activity:user:<id>` scope key.
+          invalidate(recordActivityKey("users", payload.userId))
           toast.success(t("Role updated."))
           break
         }
@@ -163,7 +166,7 @@ export function useScreenActions(teamId: string | null) {
           const { members } = await tenancy.removeMember(payload.userId)
           primeCache(`members:${teamId}`, members)
           invalidate(`member_roles:${teamId}`)
-          invalidate(`activity:user:${payload.userId}`)
+          invalidate(recordActivityKey("users", payload.userId))
           toast.success(t("Member removed."))
           break
         }

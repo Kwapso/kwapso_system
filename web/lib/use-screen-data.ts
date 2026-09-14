@@ -18,7 +18,6 @@ import {
   appsKey,
   brandAssetsKey,
   companiesKey,
-  cursorKey,
   helpKey,
   knowledgeKey,
   knowledgeShapeKey,
@@ -34,7 +33,7 @@ import {
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { ticketTypeKeptForMigration } from "@shared/types"
 import { useRecordActivity } from "@/lib/use-record-activity"
-import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useCached, useCachedValue } from "@shared/web/store"
 import { useAfterPaint } from "@shared/web/after-paint"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
@@ -357,63 +356,16 @@ export function useScreenData({
     .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
     .map((v) => v.value)
 
-  // Activity is one read path over three scopes (team / a member / an invite) — the
-  // scope is derived from what's in view, and its cache key mirrors the scope so a
-  // live ping refreshes the right feed.
-  // (An account's own history is read by its record screen through the generic
-  // record path — it isn't one of the three scopes this feed covers.)
-  const activityScope: "team" | "user" | "invite" | null =
-    module === "team"
-      ? "team"
-      : module === "members" && recordId
-        ? "user"
-        : module === "invites" && recordId
-          ? "invite"
-          : null
-  const activityKey =
-    !enabled || !activityScope
-      ? null
-      : activityScope === "team"
-        ? `activity:team:${teamId}`
-        : `activity:${activityScope}:${recordId}`
-  // R14: the feed is PAGED — page one lands here and parks its next cursor in the
-  // sidecar <LoadMore> reads; R16: its exact (permission-filtered) total rides along.
-  const activityQ = useCached(activityKey, () =>
-    tenancy
-      .activity(activityScope ?? "team", activityScope === "team" ? undefined : (recordId ?? undefined))
-      .then((r) => {
-        primeCache(cursorKey(activityKey as string), r.nextCursor)
-        primeCache(`total:${activityKey}`, r.total)
-        return r.activity
-      })
-  )
-  // R16: the number the DETAIL's activity door prints — the same exact, already-
-  // permission-filtered total the fetch above primed, read as a sidecar so the
-  // door and the feed can never disagree. Undefined until page one lands, which
-  // formatCount renders as nothing. It badged an Activity TAB until the client
-  // killed those (2026-09-06); the number and its argument are unchanged by the
-  // move, only the place it is printed.
-  const activityTotal = useCachedValue<number>(activityKey ? `total:${activityKey}` : null)
-  // R14 — PAGE TWO OF WHICHEVER SCOPE FEED IS IN VIEW, spending the cursor the
-  // fetch above parked. It lives here rather than at the host because the door
-  // it is asked through (`<ActivityRail>`, off the record footer's Latest
-  // activity column) must page THE SAME feed under THE SAME key: a fetcher
-  // built beside the control could quietly ask a different scope, and the
-  // reader would get somebody else's history appended to their own. Same three
-  // arguments as page one, plus the cursor, from the one call.
-  const activityFetchPage = (cursor: string) =>
-    tenancy
-      .activity(
-        activityScope ?? "team",
-        activityScope === "team" ? undefined : (recordId ?? undefined),
-        cursor
-      )
-      .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
-  // THE GENERIC (table, id) RECORD FEED — Law R5, for the four agency-internal
-  // details. The three scopes above (team / user / invite) are the base's older
-  // fixed ones, named at the door; a module written today reads its history the
-  // generic way, and this map is the only thing that has to know which table a
-  // URL segment's records live in.
+  // THE `team` / `user` / `invite` FIXED-SCOPE ACTIVITY FEED USED TO LIVE HERE,
+  // and its last reader is gone. `team.detail` and the standalone `invites`
+  // detail were both retired (module-content.tsx: `MovedToTeamTab`, and the
+  // "INVITES HAD A DETAIL SCREEN HERE" note), and `member-screen.tsx` moved
+  // onto the generic (table, id) path (`useRecordActivity("users", userId)`,
+  // R5) so it could offer `onAddNote` the same way every other bespoke record
+  // detail does — `scope=user` was always THAT SAME read under the hood
+  // (`FIXED_SCOPE_TABLES`, workers/tenancy/src/lib/activity-read.ts: "user /
+  // role / invite ARE the generic (table, id) read with the table supplied by
+  // the scope name"), so nothing was left for this block to cover.
   const internalTable = recordId ? (INTERNAL_ACTIVITY_TABLE[module ?? ""] ?? null) : null
   const internalActivity = useRecordActivity(enabled ? internalTable : null, recordId)
   // The invite-detail audit (inviter snapshot + acceptance) — only when viewing
@@ -449,11 +401,6 @@ export function useScreenData({
     purposesQ,
     brandCategoryOptions,
     departmentOptions,
-    activityScope,
-    activityKey,
-    activityQ,
-    activityTotal,
-    activityFetchPage,
     internalActivity,
     inviteAuditQ,
   }

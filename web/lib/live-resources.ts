@@ -1414,7 +1414,14 @@ export const TEAM_RESOURCES: Record<
     idField: "userId",
     fetchOne: (id) => tenancy.member(id),
     fetchList: () => tenancy.members().then((r) => r.members),
-    deps: (t, id) => [`member_roles:${t}`, `activity:user:${id}`],
+    // The member's own history — `activity:record:users:<id>` (R5's generic
+    // (table, id) key: `members.ts` writes every membership event against
+    // `relatedTable: "users"`, and `member-screen.tsx` reads it through
+    // `useRecordActivity("users", userId)`, matching every other bespoke
+    // record detail's own footer feed). Was `activity:user:<id>` — the fixed
+    // `scope=user` read's own key — until the screen moved onto the generic
+    // path so it could offer `onAddNote` the same way Contact/Account do.
+    deps: (t, id) => [`member_roles:${t}`, `activity:record:users:${id}`],
     refreshCtx: true,
   },
   member_roles: {

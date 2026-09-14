@@ -392,6 +392,16 @@ export function KnowledgeDetailScreen({
       // history would have had nowhere left to be read at all. Same hook, same
       // rows, the place every other record already puts them.
       activity={activity}
+      // `onAddNote` — the missing half of the pairing above. A source's own
+      // door (`activityAction`, record-chrome.tsx) only draws when its exact
+      // total is nonzero (`hasActivityDoor`), so a source with no logged
+      // history yet — nothing indexed, nothing corrected — drew a footer with
+      // NEITHER an audit column (a source has no creator/editor either) nor an
+      // activity one: the same empty-footer shape `member-screen.tsx` shipped
+      // with, one screen over. Every other bespoke detail already pairs
+      // `activity` with `onAddNote` for exactly this reason.
+      onAddNote={can("knowledge", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
     >
       <TabsView
         className={STICKY_TABS}

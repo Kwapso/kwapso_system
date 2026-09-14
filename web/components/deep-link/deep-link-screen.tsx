@@ -200,11 +200,6 @@ export function DeepLinkScreen() {
     internalActivity,
     totals,
     helpTypeOptions,
-    activityScope,
-    activityKey,
-    activityQ,
-    activityTotal,
-    activityFetchPage,
     inviteAuditQ,
   } = useScreenData({
     teamId,
@@ -933,7 +928,7 @@ export function DeepLinkScreen() {
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, knowledgeShapeQ, companiesQ, totals,
             brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
-            activityQ, activityTotal, activityKey, activityScope, activityFetchPage, inviteAuditQ, teamName, active,
+            inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, myUserId, query,
             // The tickets screen's sub-tab strip is built from the team's own
