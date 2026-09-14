@@ -33,7 +33,7 @@ export type ScreenPresentation =
   | "sheet"
   | "fullscreen"
 
-export type ScreenRight = "read" | "create" | "edit" | "delete"
+export type ScreenRight = "read" | "create" | "update" | "delete"
 
 export type RecipeFieldType =
   | "text"
@@ -264,7 +264,7 @@ export interface ScreenRecipe {
 export interface ModuleRights {
   read: boolean
   create: boolean
-  edit: boolean
+  update: boolean
   delete: boolean
 }
 

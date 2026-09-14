@@ -38,7 +38,7 @@
 //
 // Whether this section is DRAWN AT ALL is `visibleModuleSettings`'s answer, one
 // file over, and R61 holds that to exactly one `can(` in the host. Whether the
-// switches can be MOVED is a second and different question — `teams:edit`, the
+// switches can be MOVED is a second and different question — `teams:update`, the
 // same right the door gates on — and it is asked here, in this file, for the
 // same reason `SelectableScreen` asks its own three: a section owns its writes.
 // Reading is open to any member the module's own gate lets through, because her
@@ -99,7 +99,7 @@ export function ModuleAutomations({
   // The same right the door gates the write on. A reader without it sees every
   // row and every state, and cannot move anything — which is the honest shape
   // of "visibility" for somebody who may not change the team's settings.
-  const mayChange = can("teams", "edit")
+  const mayChange = can("teams", "update")
 
   const settingsQ = useCached<Record<string, string>>(`automations:${teamId}`, () =>
     tenancy.automationSettings().then((r) => r.automations)

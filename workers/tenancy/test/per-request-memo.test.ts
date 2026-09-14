@@ -41,11 +41,11 @@ beforeEach(() => q.mockReset())
 
 describe("hasRight — one read per module per request", () => {
   it("answers four rights on one module from a single read", async () => {
-    q.mockResolvedValue([{ can_read: 1, can_create: 1, can_edit: 0, can_delete: 0 }])
+    q.mockResolvedValue([{ can_read: 1, can_create: 1, can_update: 0, can_delete: 0 }])
     const guard = newGuard()
     expect(await hasRight(cfg, guard, "help", "read")).toBe(true)
     expect(await hasRight(cfg, guard, "help", "create")).toBe(true)
-    expect(await hasRight(cfg, guard, "help", "edit")).toBe(false)
+    expect(await hasRight(cfg, guard, "help", "update")).toBe(false)
     expect(await hasRight(cfg, guard, "help", "delete")).toBe(false)
     // The row always carried all four; it used to be re-read for each one.
     expect(q).toHaveBeenCalledTimes(1)
@@ -53,7 +53,7 @@ describe("hasRight — one read per module per request", () => {
 
   it("still reads once per MODULE — a memo is not a blanket yes", async () => {
     q.mockImplementation(async (_c: unknown, _db: unknown, _sql: string, params?: string[]) =>
-      params?.[1] === "help" ? [{ can_read: 1, can_create: 0, can_edit: 0, can_delete: 0 }] : []
+      params?.[1] === "help" ? [{ can_read: 1, can_create: 0, can_update: 0, can_delete: 0 }] : []
     )
     const guard = newGuard()
     expect(await hasRight(cfg, guard, "help", "read")).toBe(true)
@@ -66,10 +66,10 @@ describe("hasRight — one read per module per request", () => {
     // The isolate-reuse case, stated plainly: caller one is allowed, the role's
     // sheet then changes, caller two must see the change. A cache keyed on
     // roleId would answer the second request out of the first one's read.
-    q.mockResolvedValueOnce([{ can_read: 1, can_create: 1, can_edit: 1, can_delete: 1 }])
-    expect(await hasRight(cfg, newGuard(), "help", "edit")).toBe(true)
-    q.mockResolvedValueOnce([{ can_read: 1, can_create: 0, can_edit: 0, can_delete: 0 }])
-    expect(await hasRight(cfg, newGuard(), "help", "edit")).toBe(false)
+    q.mockResolvedValueOnce([{ can_read: 1, can_create: 1, can_update: 1, can_delete: 1 }])
+    expect(await hasRight(cfg, newGuard(), "help", "update")).toBe(true)
+    q.mockResolvedValueOnce([{ can_read: 1, can_create: 0, can_update: 0, can_delete: 0 }])
+    expect(await hasRight(cfg, newGuard(), "help", "update")).toBe(false)
     expect(q).toHaveBeenCalledTimes(2)
   })
 
@@ -77,12 +77,12 @@ describe("hasRight — one read per module per request", () => {
     const guard = newGuard()
     q.mockRejectedValueOnce(new Error("D1 is having a moment"))
     await expect(hasRight(cfg, guard, "help", "read")).rejects.toThrow()
-    q.mockResolvedValueOnce([{ can_read: 1, can_create: 0, can_edit: 0, can_delete: 0 }])
+    q.mockResolvedValueOnce([{ can_read: 1, can_create: 0, can_update: 0, can_delete: 0 }])
     expect(await hasRight(cfg, guard, "help", "read")).toBe(true)
   })
 
   it("shares ONE in-flight read between racing callers in the same request", async () => {
-    q.mockResolvedValue([{ can_read: 1, can_create: 0, can_edit: 0, can_delete: 0 }])
+    q.mockResolvedValue([{ can_read: 1, can_create: 0, can_update: 0, can_delete: 0 }])
     const guard = newGuard()
     const [a, b] = await Promise.all([
       hasRight(cfg, guard, "help", "read"),

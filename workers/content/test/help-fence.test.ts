@@ -140,7 +140,7 @@ beforeEach(() => {
     const granted = db()
       .prepare(
         `SELECT COUNT(*) n FROM role_permissions
-          WHERE role_id = ? AND module = 'help' AND can_read = 1 AND can_create = 1 AND can_edit = 1`
+          WHERE role_id = ? AND module = 'help' AND can_read = 1 AND can_create = 1 AND can_update = 1`
       )
       .get(role) as { n: number }
     expect(granted.n, `${role} must hold every help right for this suite to mean anything`).toBe(1)
@@ -229,7 +229,7 @@ describe("the help WRITES carry the fence, not just the reads", () => {
   // THIS CASE GOT STRONGER, and the number it asserts changed with it. It used to
   // expect 404 — the fence answering "no such ticket" about somebody else's. The
   // status door now refuses a CLIENT LOGIN outright (403) before the fence is
-  // consulted at all, because a client was granted `help:edit` so they could
+  // consulted at all, because a client was granted `help:update` so they could
   // re-rank their own company's tickets (SCOPE ch.07) and the same right would
   // otherwise have let a contact resolve their own request — the client-side
   // reopen button SCOPE says does not exist.

@@ -124,8 +124,8 @@ describe("the owner's switch is demanded where the act happens", () => {
         if (!demanded) missing.push(`${name} ${act.what} without demanding ${act.switch}:create`)
         // And never on its own: a role that may send but may not otherwise use
         // the connection is not a state anybody should be able to reach.
-        if (!/\bgated(?:Body)?(?:<[^>]*>)?\s*\(\s*request,\s*env,\s*"google",\s*"edit"|requireRight\s*\(\s*\w+,\s*\w+,\s*"google",\s*"edit"/.test(body))
-          missing.push(`${name} demands ${act.switch} but not google:edit underneath it`)
+        if (!/\bgated(?:Body)?(?:<[^>]*>)?\s*\(\s*request,\s*env,\s*"google",\s*"update"|requireRight\s*\(\s*\w+,\s*\w+,\s*"google",\s*"update"/.test(body))
+          missing.push(`${name} demands ${act.switch} but not google:update underneath it`)
       }
     expect(
       missing,

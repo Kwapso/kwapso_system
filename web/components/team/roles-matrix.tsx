@@ -58,7 +58,7 @@
 //
 //     kit `modules`      ← the 22 team modules (shared/team-modules.ts)
 //     kit `roles`        ← this team's roles
-//     kit `capabilities` ← the four rights, S · C · E · D
+//     kit `capabilities` ← the four rights, R · C · U · D
 //
 // and that is exactly why the 2026-09-10 flip is a one-line deletion rather
 // than a rewrite. Nothing about the data moves with the drawing: `held`,
@@ -192,47 +192,55 @@ import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
 /** SERVER ⇄ KIT rights vocabulary — lifted unchanged from the per-role screen
- * this replaces. The app's sheet says read/create/edit/delete; the kit says
- * see/create/edit/delete. Three of the four agree (the kit took `create` at
- * v1.2.24, the word every enforcing surface here already uses); `see`/`read` is
- * the one that still differs and deliberately so — the kit's id is the word in
- * front of a reader, `read` is the word the gate is written in. One mapping,
- * both directions, so neither side ever learns the other's words. */
-const RIGHT_TO_KIT = { read: "see", create: "create", edit: "edit", delete: "delete" } as const
+ * this replaces. The app's sheet says read/create/update/delete; the kit says
+ * see/create/edit/delete (its own id is vendored and unchanged — R39). Three of
+ * the four agree (the kit took `create` at v1.2.24, the word every enforcing
+ * surface here already uses); `see`/`read` is the one that still differs and
+ * deliberately so — the kit's id is the word in front of a reader, `read` is
+ * the word the gate is written in. `update`/`edit` differs for the same reason,
+ * since the client's 10 Sep 2026 ruling standardized the app's own fourth verb
+ * to `update`. One mapping, both directions, so neither side ever learns the
+ * other's words. */
+const RIGHT_TO_KIT = { read: "see", create: "create", update: "edit", delete: "delete" } as const
 const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
   see: "read",
   create: "create",
-  edit: "edit",
+  edit: "update",
   delete: "delete",
 }
 
-/** THE FOUR MARKS ARE FIXED — S · C · E · D — AND THE WORDS ARE TRANSLATED.
+/** THE FOUR MARKS ARE FIXED — R · C · U · D — AND THE WORDS ARE TRANSLATED.
  *
  * The kit derives a slot's letter from the first character of its label unless a
  * capability names its own `initial`, and its doc says exactly why the prop
  * exists: "a language whose four words share an initial needs to choose its own
- * four marks". Two of ours do. Spanish is Ver · Crear · Editar · Eliminar and
- * Catalan is Veure · Crear · Editar · Eliminar — Editar and Eliminar collide on
- * E in both, which would put two identical letters in the same run and destroy
- * the one reading this drawing exists for.
+ * four marks". Spanish is Ver · Crear · Editar · Eliminar and Catalan is Veure ·
+ * Crear · Editar · Eliminar — Editar and Eliminar collided on E in both before
+ * the 10 Sep 2026 ruling that renamed the app's fourth verb to `update`
+ * (Actualizar/Actualitzar), which would have put two identical letters in the
+ * same run and destroyed the one reading this drawing exists for.
  *
- * So the marks are the four the client named ("I really need to see the create
- * letters", 2026-09-09) and they do not move between languages; the LEGEND under
- * the grid is what carries the translated word for each. A fixed mark plus a
- * translated key is the shape the kit's own `initial` prop is there to allow. */
+ * So the marks are fixed rather than derived, and they do not move between
+ * languages; the LEGEND under the grid is what carries the translated word for
+ * each. A fixed mark plus a translated key is the shape the kit's own `initial`
+ * prop is there to allow. */
 function capabilities(t: (s: string) => string): PermissionCapability[] {
   return [
     // READ, NOT "SEE" — the client's ruling, 11 Sep 2026, and the glossary was
     // already on her side: `permission` is defined as "A single thing a role can
-    // do: READ, create, edit, or delete." Three of the four columns already said
-    // the glossary's word and this one did not, so the screen that TEACHES people
-    // what a right is was the one screen using a synonym for it. The kit's own
-    // capability id stays `see` (it is vendored and hash-pinned, and the app maps
-    // `RIGHT_TO_KIT` either way); only the WORD a person reads moves. Owed
-    // upstream: the kit's default label for this capability says "See" too.
+    // do: READ, create, update, or delete." Three of the four columns already
+    // said the glossary's word and this one did not, so the screen that TEACHES
+    // people what a right is was the one screen using a synonym for it. The
+    // kit's own capability id stays `see` (it is vendored and hash-pinned, and
+    // the app maps `RIGHT_TO_KIT` either way); only the WORD a person reads
+    // moves. Owed upstream: the kit's default label for this capability says
+    // "See" too.
     { id: "see", label: t("Read"), initial: "R" },
     { id: "create", label: t("Create"), initial: "C" },
-    { id: "edit", label: t("Edit"), initial: "E" },
+    // `id` STAYS THE KIT'S OWN `edit` (vendored, R39) — only the WORD changes,
+    // to a string distinct from the app's generic `t("Edit")` record-edit
+    // button, since the two mean different things and must not share a key.
+    { id: "edit", label: t("Update"), initial: "U" },
     { id: "delete", label: t("Delete"), initial: "D" },
   ]
 }
@@ -333,10 +341,10 @@ export function RolesMatrix({
   // itself. One list, computed once, handed to every module row.
   const lockedRoleIds = (sheets ?? []).filter((s) => s.perms.isDefault).map((s) => s.role.id)
 
-  // ONE VIEWER, ONE ANSWER. Every sheet carries the same `canEdit` (it is a fact
-  // about the viewer, not about the role), so the grid is editable when the
+  // ONE VIEWER, ONE ANSWER. Every sheet carries the same `canUpdate` (it is a
+  // fact about the viewer, not about the role), so the grid is editable when the
   // viewer may edit roles at all; the Admin row is locked row-by-row above.
-  const canSave = sheets != null && sheets.length > 0 && sheets[0].perms.canEdit
+  const canSave = sheets != null && sheets.length > 0 && sheets[0].perms.canUpdate
 
   // THE MODULES, WHICH ARE THE KIT'S `modules` AND ARE THE ROWS since
   // 2026-09-10. They come off the first sheet: every role's sheet carries the same
@@ -653,7 +661,7 @@ export function RolesMatrix({
                 const cur = prev[roleId]?.[moduleKey] ?? {
                   read: false,
                   create: false,
-                  edit: false,
+                  update: false,
                   delete: false,
                 }
                 const val = { ...cur, [right]: next }
@@ -669,12 +677,12 @@ export function RolesMatrix({
           {/* THE LEGEND SHE ASKED FOR IS THE KIT'S OWN — "for the rule
               metrics, I really need to see the create letters… add a legend at
               the bottom" (client, 2026-09-09). `legend` is on by default and
-              draws exactly that: the four marks S · C · E · D against See ·
-              Create · Edit · Delete, then a filled run labelled Granted and a
+              draws exactly that: the four marks R · C · U · D against Read ·
+              Create · Update · Delete, then a filled run labelled Granted and a
               hollow one labelled Not granted.
 
               A SECOND LINE STOOD HERE FOR ONE PASS and was deleted after looking
-              at it: "S See · C Create · E Edit · D Delete" in plain text, three
+              at it: "R Read · C Create · U Update · D Delete" in plain text, three
               millimetres under the kit's own legend saying the same four things
               with the real marks beside them. Two legends for one grid is one
               more than the grid has meanings. */}
@@ -791,7 +799,7 @@ export function RolesMatrix({
       <RolePanel
         role={openRole}
         perms={openRole ? (sheets?.find((s) => s.role.id === openRole.id)?.perms ?? null) : null}
-        canEdit={canSave}
+        canUpdate={canSave}
         open={openRole !== null}
         onOpenChange={(open) => !open && setOpenRole(null)}
         onEdit={(role) => {

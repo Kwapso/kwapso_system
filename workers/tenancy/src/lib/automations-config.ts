@@ -3,7 +3,7 @@
 //
 // A COPY OF `screens-config.ts` BESIDE IT, deliberately and nearly line for
 // line: keyed by module, one JSON column, two audit blocks, a byte cap AND a row
-// cap enforced insert-only, a bounded ordered read, `teams:edit` on the write,
+// cap enforced insert-only, a bounded ordered read, `teams:update` on the write,
 // `refusePortalCaller` on both halves, `publishChange`, `logActivity`. The
 // recipe store is the shape this base already trusts for per-team configuration
 // that no worker has an opinion about, and inventing a second shape for the

@@ -521,7 +521,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   // Renaming the team the caller is standing in. It was agent-only, on the
   // reading that teams are off the machine surface — but that exclusion is about
   // the PIN (list / create / switch would move a token to a team it wasn't made
-  // in), and renaming the pinned team moves nothing. Same door, same teams:edit
+  // in), and renaming the pinned team moves nothing. Same door, same teams:update
   // gate, same audit row.
   {
     name: "update_team",
@@ -724,9 +724,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_role",
     summary:
-      "Create a team role. It has no rights unless you pass `permissions` (as set_role_permissions takes) — which also needs member_roles:edit.",
+      "Create a team role. It has no rights unless you pass `permissions` (as set_role_permissions takes) — which also needs member_roles:update.",
     detail:
-      "Create a new team role. It starts with no access rights unless you pass `permissions`, the same object set_role_permissions takes (keyed by module → { read, create, edit, delete }). Creating WITH a matrix is create + edit in one move, so the door demands member_roles:edit on top of member_roles:create; leave it out for a plain create and grant rights afterwards.",
+      "Create a new team role. It starts with no access rights unless you pass `permissions`, the same object set_role_permissions takes (keyed by module → { read, create, update, delete }). Creating WITH a matrix is create + update in one move, so the door demands member_roles:update on top of member_roles:create; leave it out for a plain create and grant rights afterwards.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles",
     schema: obj({ title: S, description: S, permissions: { type: "object" } }, ["title"]),
     buildBody: (i) => ({
@@ -754,9 +754,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_role_permissions",
     summary:
-      "Set a role's rights by `roleId`. `value` maps each module to { read, create, edit, delete }; a write auto-enables read. The Admin role is locked.",
+      "Set a role's rights by `roleId`. `value` maps each module to { read, create, update, delete }; a write auto-enables read. The Admin role is locked.",
     detail:
-      "Set a role's access rights (by role id). `value` is an object keyed by module, one of teams, team_members, member_roles, help, selectable_data, screens, agent, each mapping to { read, create, edit, delete } booleans. Turning on create/edit/delete auto-enables read. The Admin role is locked (the server enforces this).",
+      "Set a role's access rights (by role id). `value` is an object keyed by module, one of teams, team_members, member_roles, help, selectable_data, screens, agent, each mapping to { read, create, update, delete } booleans. Turning on create/update/delete auto-enables read. The Admin role is locked (the server enforces this).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/permissions",
     schema: obj({ roleId: S, value: { type: "object" } }, ["roleId", "value"]),
     buildBody: (i) => ({ roleId: str(i, "roleId"), value: i.value }),

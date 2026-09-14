@@ -391,7 +391,7 @@ physics: a handler literally cannot address another team's rows.
 
 **`requireRight(cfg, guard, module, right)`** is the permission one-liner. It reads the
 role's tall permission sheet (`role_permissions`) and throws `403 forbidden` if the
-role lacks the right. Rights are the fixed set `"read" | "create" | "edit" | "delete"`.
+role lacks the right. Rights are the fixed set `"read" | "create" | "update" | "delete"`.
 
 ```ts
 export async function requireRight(cfg, guard, module, right): Promise<void> {

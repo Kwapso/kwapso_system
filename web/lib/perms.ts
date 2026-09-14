@@ -11,7 +11,7 @@ import type { PermissionValue } from "@shared/types"
 import { tenancy } from "@/lib/api"
 import { clearCache, primeCache, readCache, useCached } from "@shared/web/store"
 
-export type Right = "read" | "create" | "edit" | "delete"
+export type Right = "read" | "create" | "update" | "delete"
 export type Can = (module: string, right: Right) => boolean
 
 /** Your effective rights for a team + a `can(module, right)` check. While rights

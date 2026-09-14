@@ -116,7 +116,7 @@ beforeEach(() => {
   // is what makes the refusals below mean something — without them they would be
   // ordinary 403s proving nothing.
   db().exec(`
-    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
       VALUES ('${IDS.adminRole}_commercials', '${IDS.adminRole}', 'commercials', 1, 1, 1, 1),
              ('${IDS.adminRole}_google', '${IDS.adminRole}', 'google', 1, 1, 1, 1);
   `)

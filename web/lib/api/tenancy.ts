@@ -81,7 +81,7 @@ export const tenancy = {
     }),
 
   /** Edit the active team's name + optional logo (data URL) + the agency's own
-   * legal details. Needs teams:edit.
+   * legal details. Needs teams:update.
    *
    * `legal` is PATCHED, never replaced: a field this call leaves out keeps what
    * it had, so the team-edit dialog can save a rename without erasing an address
@@ -288,7 +288,7 @@ export const tenancy = {
     }),
 
   /** Edit a dropdown value — its word and its emoji; its type stays. Needs
-   * selectable_data:edit.
+   * selectable_data:update.
    *
    * `mark` UNDEFINED leaves the emoji alone, an empty string clears it — the
    * lib's own contract. The screen sends it either way, because it now has a
@@ -302,7 +302,7 @@ export const tenancy = {
     }),
 
   /** Mark a dropdown value as one of the team's defaults, or take the mark off.
-   * Needs selectable_data:edit. A default value refuses to be switched off while
+   * Needs selectable_data:update. A default value refuses to be switched off while
    * the mark is on — this is how a team takes the protection off. */
   setSelectableDefault: (id: string, isDefault: boolean) =>
     api<{ values: SelectableValue[] }>("/api/tenancy/selectable/default", {
@@ -426,7 +426,7 @@ export const tenancy = {
     api<{ screens: Record<string, string> }>("/api/tenancy/config/screens"),
 
   /** Set (author) a team's override for one screen — runtime-editable, no deploy.
-   * Needs teams:edit. */
+   * Needs teams:update. */
   setScreenOverride: (module: string, recipe: unknown) =>
     api<{ screens: Record<string, string> }>("/api/tenancy/config/screens", {
       method: "POST",
@@ -440,7 +440,7 @@ export const tenancy = {
   automationSettings: () =>
     api<{ automations: Record<string, string> }>("/api/tenancy/config/automations"),
 
-  /** Switch one automation off, or back on. Needs teams:edit, and the door
+  /** Switch one automation off, or back on. Needs teams:update, and the door
    * refuses a key the registry says cannot be switched — the sign-in code is
    * unswitchable AT THE DOOR and not only on the screen. */
   setAutomation: (key: string, on: boolean) =>

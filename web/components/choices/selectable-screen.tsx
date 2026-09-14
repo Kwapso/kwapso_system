@@ -580,7 +580,7 @@ export function SelectableScreen({
   // with nothing to add, are two different reasons for the same absent button
   // and neither one may be inferred from the other.
   const canCreate = can("selectable_data", "create") && scope.create
-  const canEdit = can("selectable_data", "edit")
+  const canEdit = can("selectable_data", "update")
   const canDelete = can("selectable_data", "delete")
 
   // Add via the shared form dialog (Law R4); the screen just toggles it open.

@@ -1,8 +1,8 @@
 // Roles & permissions module — read and edit a role's permission "tall sheet"
-// (role × module × read/create/edit/delete) inside the team's OWN database, and
+// (role × module × read/create/update/delete) inside the team's OWN database, and
 // create new roles. Locked rules enforced HERE on the server (never just the UI):
 //   • the default Admin role can't be edited;
-//   • auto-flip-read — turning on any write right (create/edit/delete) forces
+//   • auto-flip-read — turning on any write right (create/update/delete) forces
 //     Read on (you can't have write without read).
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
@@ -22,7 +22,7 @@ import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 export type RightSet = {
   read: boolean
   create: boolean
-  edit: boolean
+  update: boolean
   delete: boolean
 }
 /** A whole role's sheet: one RightSet per module key. */
@@ -32,7 +32,7 @@ type PermRow = {
   module: string
   can_read: number
   can_create: number
-  can_edit: number
+  can_update: number
   can_delete: number
 }
 type RoleRow = { id: string; title: string; description: string | null; is_default: number }
@@ -48,7 +48,7 @@ export function buildPermissionValue(rows: PermRow[]): PermissionValue {
     value[m.key] = {
       read: r?.can_read === 1,
       create: r?.can_create === 1,
-      edit: r?.can_edit === 1,
+      update: r?.can_update === 1,
       delete: r?.can_delete === 1,
     }
   }
@@ -100,7 +100,7 @@ export async function listAllRolePermissions(
     guard.databaseId,
     // R14 hard cap (roles × modules). +1 is how "there was more" is known without
     // a second query — the same trick listAccountsForExport uses.
-    `SELECT role_id, module, can_read, can_create, can_edit, can_delete FROM role_permissions ORDER BY role_id, module LIMIT ${EXPORT_HARD_CAP + 1}`
+    `SELECT role_id, module, can_read, can_create, can_update, can_delete FROM role_permissions ORDER BY role_id, module LIMIT ${EXPORT_HARD_CAP + 1}`
   )
   const byRole = new Map<string, PermRow[]>()
   for (const row of rows.slice(0, EXPORT_HARD_CAP)) {
@@ -143,24 +143,24 @@ export async function getRolePermissions(
   value: PermissionValue
   isDefault: boolean
   title: string
-  /** does the CALLER hold member_roles:edit? drives the screen's edit/view mode */
-  canEdit: boolean
+  /** does the CALLER hold member_roles:update? drives the screen's edit/view mode */
+  canUpdate: boolean
 }> {
   // Three INDEPENDENT team-DB reads — the role row, its permission sheet, and the
-  // caller's own member_roles:edit right (none consumes another's result) — so run
+  // caller's own member_roles:update right (none consumes another's result) — so run
   // them as one round-trip instead of three serial ones. Promise.all rejects on
   // the first error, so a missing role still surfaces roleOrThrow's 404, same as
-  // before. (This is called AFTER the route's requireRight gate; canEdit only
+  // before. (This is called AFTER the route's requireRight gate; canUpdate only
   // drives the screen's edit/view mode — the gate itself is untouched.)
-  const [role, rows, canEdit] = await Promise.all([
+  const [role, rows, canUpdate] = await Promise.all([
     roleOrThrow(cfg, guard, roleId),
     d1Query<PermRow>(
       cfg,
       guard.databaseId,
-      "SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ?",
+      "SELECT module, can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ?",
       [roleId]
     ),
-    hasRight(cfg, guard, "member_roles", "edit"),
+    hasRight(cfg, guard, "member_roles", "update"),
   ])
 
   return {
@@ -168,7 +168,7 @@ export async function getRolePermissions(
     value: buildPermissionValue(rows),
     isDefault: role.is_default === 1,
     title: role.title,
-    canEdit,
+    canUpdate,
   }
 }
 
@@ -182,7 +182,7 @@ export async function getMyPermissions(
   const rows = await d1Query<PermRow>(
     cfg,
     guard.databaseId,
-    "SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ?",
+    "SELECT module, can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ?",
     [guard.roleId]
   )
   return buildPermissionValue(rows)
@@ -192,7 +192,7 @@ export async function getMyPermissions(
  * rule below, applied to whoever is on the receiving end.
  *
  * `setRolePermissions` already refuses to widen the caller's OWN role, with the
- * sentence "member_roles:edit must not be a ladder to every right you weren't
+ * sentence "member_roles:update must not be a ladder to every right you weren't
  * given". That guard names the caller's role id, so it only ever caught the most
  * direct spelling. Two doors walked around it:
  *
@@ -223,7 +223,7 @@ export async function requireGrantableRights(
     // sheet would refuse a grant nobody asked for.
     const want = normalizeRights(wanted?.[m.key])
     const have = normalizeRights(mine[m.key])
-    for (const right of ["read", "create", "edit", "delete"] as const)
+    for (const right of ["read", "create", "update", "delete"] as const)
       if (want[right] && !have[right]) over.push(`${m.label}, ${right}`)
   }
   if (over.length)
@@ -244,19 +244,19 @@ export async function requireGrantableRole(
   const rows = await d1Query<PermRow>(
     cfg,
     guard.databaseId,
-    "SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ?",
+    "SELECT module, can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ?",
     [roleId]
   )
   await requireGrantableRights(cfg, guard, buildPermissionValue(rows))
 }
 
 /** Normalize one module's rights with the locked "any write needs read" rule:
- * if any of create/edit/delete is on, read is forced on. */
+ * if any of create/update/delete is on, read is forced on. */
 export function normalizeRights(r: Partial<RightSet> | undefined): RightSet {
   const create = !!r?.create
-  const edit = !!r?.edit
+  const update = !!r?.update
   const del = !!r?.delete
-  return { read: !!r?.read || create || edit || del, create, edit, delete: del }
+  return { read: !!r?.read || create || update || del, create, update, delete: del }
 }
 
 /** Save a role's permission sheet (upsert one row per module). Refuses the
@@ -275,9 +275,9 @@ export async function setRolePermissions(
       "locked_role",
       "The Admin role is locked, its permissions can't be changed."
     )
-  // NO SELF-GRANT. member_roles:edit lets you shape OTHER people's access; it
+  // NO SELF-GRANT. member_roles:update lets you shape OTHER people's access; it
   // must not be a ladder to every right you weren't given. Without this, a
-  // custom role holding member_roles:edit could POST its OWN role id with every
+  // custom role holding member_roles:update could POST its OWN role id with every
   // module true and become an admin in one call. Same invariant as "you can't
   // change your own role" on the members path.
   if (roleId === guard.roleId)
@@ -304,11 +304,11 @@ export async function setRolePermissions(
     // is about the rights a module HAS, and this is about the ones it does not.
     const offered = offeredRights(m.key)
     const bit = (right: keyof RightSet) => (n[right] && offered.includes(right) ? 1 : 0)
-    return `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
-VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, ${bit("read")}, ${bit("create")}, ${bit("edit")}, ${bit("delete")})
+    return `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
+VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, ${bit("read")}, ${bit("create")}, ${bit("update")}, ${bit("delete")})
 ON CONFLICT(role_id, module) DO UPDATE SET
   can_read = excluded.can_read, can_create = excluded.can_create,
-  can_edit = excluded.can_edit, can_delete = excluded.can_delete;`
+  can_update = excluded.can_update, can_delete = excluded.can_delete;`
   })
 
   await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
@@ -427,7 +427,7 @@ export async function createRole(
 VALUES (${sqlString(roleId)}, ${sqlString(cleanTitle)}, ${sqlString(desc)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`,
     ...TEAM_MODULE_CATALOG.map(
       (m) =>
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, 0, 0, 0, 0);`
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, 0, 0, 0, 0);`
     ),
   ]
 

@@ -253,7 +253,7 @@ export async function postUpdateWorkLog(request: Request, env: Env): Promise<Res
     note?: unknown
     kind?: unknown
     billable?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Work log", TEXT_LIMITS.short)
   const { accountId } = await editWorkLog(cfg, guard, actor, id, {

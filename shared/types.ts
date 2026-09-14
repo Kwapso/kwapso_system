@@ -106,7 +106,7 @@ export type TeamMember = {
 export type RightSet = {
   read: boolean
   create: boolean
-  edit: boolean
+  update: boolean
   delete: boolean
 }
 
@@ -163,9 +163,9 @@ export type RolePermissions = {
   value: PermissionValue
   isDefault: boolean
   title: string
-  /** whether the signed-in viewer may edit roles (member_roles:edit) — drives
+  /** whether the signed-in viewer may edit roles (member_roles:update) — drives
    * the screen's edit-vs-view mode and whether Save shows. */
-  canEdit: boolean
+  canUpdate: boolean
 }
 
 /** One invite to a team. `status` is the display status — "pending" past its

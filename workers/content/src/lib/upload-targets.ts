@@ -94,7 +94,7 @@ export const UPLOAD_TARGETS: Record<string, UploadTarget> = {
     maxBytes: STREAM_UPLOAD_MAX_BYTES,
   },
   staff: {
-    right: ["staff_profiles", "edit"],
+    right: ["staff_profiles", "update"],
     module: "staff",
     binding: "INTERNAL_MEDIA",
     bucketVar: "INTERNAL_MEDIA_BUCKET",

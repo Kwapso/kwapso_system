@@ -2,7 +2,7 @@
 // stated in words since it was written, now enforced on every door that hands
 // rights to somebody.
 //
-// The hole this suite was written for: `member_roles:edit` was guarded against
+// The hole this suite was written for: `member_roles:update` was guarded against
 // the caller widening their OWN role (`roleId === guard.roleId`), and that guard
 // names ONE role id, so two doors walked straight around it.
 //
@@ -60,10 +60,10 @@ function makeRole(id: string, title: string, rights: Record<string, string[]>) {
   )
   for (const [module, list] of Object.entries(rights))
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('P_${id}_${module}', '${id}', '${module}',
          ${list.includes("read") ? 1 : 0}, ${list.includes("create") ? 1 : 0},
-         ${list.includes("edit") ? 1 : 0}, ${list.includes("delete") ? 1 : 0});`
+         ${list.includes("update") ? 1 : 0}, ${list.includes("delete") ? 1 : 0});`
     )
 }
 
@@ -77,7 +77,7 @@ beforeEach(() => {
   // A second victim role for the create-a-role half.
   makeRole("R_ROLEMAKER", "Role maker", {
     team_members: ["read", "create"],
-    member_roles: ["read", "create", "edit"],
+    member_roles: ["read", "create", "update"],
   })
 })
 
@@ -121,7 +121,7 @@ describe("a NEW role cannot be minted stronger than its maker", () => {
     makeRole("R_NEW", "Minted", {})
     await expect(
       setRolePermissions(cfg, guardFor("R_ROLEMAKER"), actor, "R_NEW", {
-        accounts: { read: true, create: true, edit: true, delete: true },
+        accounts: { read: true, create: true, update: true, delete: true },
       })
     ).rejects.toMatchObject({ status: 403, code: "grant_exceeds_own" })
   })
@@ -130,7 +130,7 @@ describe("a NEW role cannot be minted stronger than its maker", () => {
     makeRole("R_NEW2", "Minted too", {})
     await expect(
       setRolePermissions(cfg, guardFor("R_ROLEMAKER"), actor, "R_NEW2", {
-        team_members: { read: true, create: true, edit: false, delete: false },
+        team_members: { read: true, create: true, update: false, delete: false },
       })
     ).resolves.toBeUndefined()
   })
@@ -143,7 +143,7 @@ describe("a NEW role cannot be minted stronger than its maker", () => {
     makeRole("R_NEW3", "Minted three", {})
     await expect(
       setRolePermissions(cfg, guardFor("R_CREATE_ONLY"), actor, "R_NEW3", {
-        help: { read: false, create: true, edit: false, delete: false },
+        help: { read: false, create: true, update: false, delete: false },
       })
     ).resolves.toBeUndefined()
   })
@@ -154,7 +154,7 @@ describe("the ceiling fails closed", () => {
     makeRole("R_NOTHING", "Nothing", {})
     await expect(
       requireGrantableRights(cfg, guardFor("R_NOTHING"), {
-        help: { read: true, create: false, edit: false, delete: false },
+        help: { read: true, create: false, update: false, delete: false },
       })
     ).rejects.toMatchObject({ code: "grant_exceeds_own" })
   })

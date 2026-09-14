@@ -31,7 +31,7 @@ export const GLOSSARY = {
   // are not members — the contact who raised a ticket, the name on an account.
   member: { term: "Member", def: "A person on your team." },
   role: { term: "Role", def: "What a member is allowed to see and do." },
-  permission: { term: "Access right", def: "A single thing a role can do: read, create, edit, or delete." },
+  permission: { term: "Access right", def: "A single thing a role can do: read, create, update, or delete." },
   invite: { term: "Invite", def: "An email asking someone to join your team in a role you choose." },
   revoke: { term: "Revoke", def: "Cancel an invite before it's accepted." },
   // ONE VERB FOR SWITCHING A RECORD OFF (R6, decided 2026-08-19). The word

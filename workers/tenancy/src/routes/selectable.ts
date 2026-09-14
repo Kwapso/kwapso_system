@@ -1,6 +1,6 @@
 // Dropdown-values routes ("Selectable data"): list the team's values, add one,
 // rename one, deactivate/reactivate one. Gated by the `selectable_data` module
-// (read to view, create/edit/delete to manage). Each mutation broadcasts a live
+// (read to view, create/update/delete to manage). Each mutation broadcasts a live
 // change ping (the publish-seam test enforces this).
 
 import { refusePortalCaller } from "@shared/workers/account-scope"
@@ -104,7 +104,7 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
 }
 
 export async function postUpdateSelectable(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string; mark?: string }>(request, env, "selectable_data", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string; mark?: string }>(request, env, "selectable_data", "update")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
   // module and was missing on exactly the half that changes things. It held only
@@ -161,7 +161,7 @@ async function listAndCount(cfg: Parameters<typeof listSelectable>[0], guard: Pa
  * read by a person, and moving them would break every caller for no reader's
  * benefit (CLAUDE.md's `help`/Tickets ruling, applied again). */
 export async function postSetSelectableDefault(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; isDefault?: boolean }>(request, env, "selectable_data", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; isDefault?: boolean }>(request, env, "selectable_data", "update")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO — the same refusal the other three
   // write doors on this module carry, for the same reason: the decision belongs
   // at the door, not to how carefully a role happened to be built.

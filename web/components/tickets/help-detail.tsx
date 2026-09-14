@@ -6,7 +6,7 @@
 // (the GENERIC record-activity feed) is not a tab any more — it is reached from
 // the ink footer's Latest activity column, on the client's 2026-09-06 ruling, and
 // web/components/records/activity-panel.tsx carries that ruling and the argument. Edit +
-// every status move are gated PURELY by help:edit. Replies echo instantly
+// every status move are gated PURELY by help:update. Replies echo instantly
 // (optimistic) and reconcile with the server reply. Host-composed, like
 // role-detail.
 
@@ -179,7 +179,7 @@ export function HelpDetailScreen({
 
   const stakeholderBadge = formatCount(stakeholdersQ.data?.length)
   const { can } = usePermissions(teamId)
-  const canEdit = can("help", "edit") // single source — gates Edit, the stepper, and the thread's resolve
+  const canEdit = can("help", "update") // single source — gates Edit, the stepper, and the thread's resolve
   // Logging time is `work:create` — the right the start/stop door itself gates
   // on, so the button offers exactly what the server would accept. It is WORK's
   // right and not the ticket's: answering a request and putting hours on the
@@ -193,12 +193,12 @@ export function HelpDetailScreen({
   // (R10); this only decides whether we draw a button that would come back 403.
   const canWriteWork = can("work", "create")
   // THE TIME AGAINST THIS REQUEST. Reading it is `work:read` and correcting a row
-  // is `work:edit` — the two rights those doors gate on, and neither of them is a
+  // is `work:update` — the two rights those doors gate on, and neither of them is a
   // ticket right: answering a request and reading the team's timesheet are
   // different things a role may grant separately. A role without `work:read` sees
   // no tab at all rather than a tab that refuses.
   const canSeeTime = can("work", "read")
-  const canEditTime = can("work", "edit")
+  const canEditTime = can("work", "update")
   // R16: the door's exact COUNT(*) over this record's time, fetched by the panel
   // and read back here for the badge.
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("help", helpId))
@@ -1003,7 +1003,7 @@ export function HelpDetailScreen({
           if (panel.value === "files")
             // help:EDIT since the door tightened (e36b254) — read kept the
             // button visible and every press a 403.
-            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "edit")} />
+            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "update")} />
           if (panel.value === "stakeholders")
             return (
               <HelpStakeholders
@@ -1168,7 +1168,7 @@ export function HelpDetailScreen({
               />
               <ReplyComposer
                 send={reply}
-                /* CLOSING IS `help:edit` — the right `/help/resolve` itself
+                /* CLOSING IS `help:update` — the right `/help/resolve` itself
                    gates on — and there is nothing to close on a ticket that is
                    already answered, so the control is not drawn rather than
                    drawn and refused. Every OTHER status draws it, which is the

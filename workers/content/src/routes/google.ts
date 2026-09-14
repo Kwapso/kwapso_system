@@ -20,7 +20,7 @@
 // THE TWO SWITCHES, and which door each one guards:
 //   • google:create      — may connect a Google account (and name a folder/space);
 //   • google_mail:create — kwapso may SEND mail as you.
-// The second is demanded ON TOP of `google:edit`, so a role that can send but
+// The second is demanded ON TOP of `google:update`, so a role that can send but
 // cannot otherwise use the connection is not a state anybody can reach. And it
 // is demanded of the PERSON pressing "send it from kwapso" exactly as it is of
 // the assistant: it is the same act, by the same product, out of the same
@@ -727,7 +727,7 @@ export async function postGoogleDriveUpload(request: Request, env: Env): Promise
     name?: unknown
     text?: unknown
     mimeType?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Folder", TEXT_LIMITS.short))
   if (source.service !== "drive") return fail(400, "invalid_input", "That isn't a Drive folder.")
@@ -770,7 +770,7 @@ export async function postGoogleDriveUpdate(request: Request, env: Env): Promise
     name?: unknown
     text?: unknown
     mimeType?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   const fileId = requireText(body.fileId, "File", TEXT_LIMITS.short)
   const { token, connectionId } = await accessTokenFor(env, cfg, guard, "drive")
@@ -800,7 +800,7 @@ export async function postGoogleDriveFolder(request: Request, env: Env): Promise
     request,
     env,
     "google",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Folder", TEXT_LIMITS.short))
@@ -842,7 +842,7 @@ export async function postGoogleDriveSaveMail(request: Request, env: Env): Promi
     messageId?: unknown
     threadId?: unknown
     name?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Folder", TEXT_LIMITS.short))
   if (source.service !== "drive") return fail(400, "invalid_input", "That isn't a Drive folder.")
@@ -960,14 +960,14 @@ export async function getGoogleMailMessage(request: Request, env: Env): Promise<
  * lives, and the id so "send it from kwapso" can send exactly that draft rather
  * than a second copy of it.
  *
- * Gated on `google:edit` only — nothing has left the building. */
+ * Gated on `google:update` only — nothing has left the building. */
 export async function postGoogleMailDraft(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{
     to?: unknown
     subject?: unknown
     body?: unknown
     threadId?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   const to = requireText(body.to, "To", TEXT_LIMITS.short)
   const subject = requireText(body.subject, "Subject", TEXT_LIMITS.short)
@@ -990,7 +990,7 @@ export async function postGoogleMailDraft(request: Request, env: Env): Promise<R
 /**
  * POST /api/content/google/gmail/send — actually send it.
  *
- * TWO GATES, and the second one is the owner's switch: `google:edit` says you
+ * TWO GATES, and the second one is the owner's switch: `google:update` says you
  * may use your connection, `google_mail:create` says kwapso may send mail as
  * you. It is demanded here whoever pressed the button — the assistant, or the
  * person clicking "send it from kwapso" beside the draft link — because it is
@@ -1009,7 +1009,7 @@ export async function postGoogleMailSend(request: Request, env: Env): Promise<Re
     subject?: unknown
     body?: unknown
     threadId?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google_mail", "create")
   const draftId = optionalText(body.draftId, "Draft", TEXT_LIMITS.short)
@@ -1056,7 +1056,7 @@ export async function postGoogleMailReply(request: Request, env: Env): Promise<R
     request,
     env,
     "google",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google_mail", "create")
@@ -1089,10 +1089,10 @@ export async function postGoogleMailReply(request: Request, env: Env): Promise<R
  * Contracts" means to a person), and removing one never does — making a label in
  * order to take it off a message is a write nobody asked for.
  *
- * Gated on `google:edit` and NOT on the mail switch, which is a considered line
+ * Gated on `google:update` and NOT on the mail switch, which is a considered line
  * rather than an oversight: the owner's switch is about mail LEAVING the
  * building, and a label leaves nothing. Nobody else can see it. It is the same
- * reading that puts a Drive upload under `google:edit` — writing inside the
+ * reading that puts a Drive upload under `google:update` — writing inside the
  * world this person connected.
  *
  * R17: a message that already carries the label (or already does not) moves
@@ -1103,7 +1103,7 @@ export async function postGoogleMailLabel(request: Request, env: Env): Promise<R
     messageId?: unknown
     label?: unknown
     on?: unknown
-  }>(request, env, "google", "edit")
+  }>(request, env, "google", "update")
   await refusePortalCaller(cfg, guard)
   const messageId = requireText(body.messageId, "Message", TEXT_LIMITS.short)
   const label = requireText(body.label, "Label", TEXT_LIMITS.short)
@@ -1441,7 +1441,7 @@ export async function getGoogleChat(request: Request, env: Env): Promise<Respons
 
 /** POST /api/content/google/chat/messages — post in a space I named.
  *
- * Under `google:edit` rather than a switch of its own: the owner named TWO extra
+ * Under `google:update` rather than a switch of its own: the owner named TWO extra
  * switches (mail and events) and a third would be re-deciding something already
  * settled. The reasoning that makes it fit: a space is one this person chose and
  * named themselves, so posting in it is writing inside the world they connected
@@ -1451,7 +1451,7 @@ export async function postGoogleChat(request: Request, env: Env): Promise<Respon
     request,
     env,
     "google",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Space", TEXT_LIMITS.short))

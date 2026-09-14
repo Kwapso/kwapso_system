@@ -23,7 +23,7 @@
 // the ordinary row-level live path (R15).
 //
 // THE DOOR GATES; THIS ONLY DECIDES WHAT TO DRAW. Add and edit sit behind
-// `processes:create` / `:edit` and switching one off behind `:delete` — the same
+// `processes:create` / `:update` and switching one off behind `:delete` — the same
 // rights that let somebody record the app itself, because a section of a system
 // is part of the record of that system.
 
@@ -65,7 +65,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
 
   const { can } = usePermissions(teamId)
   const canCreate = can("processes", "create")
-  const canEdit = can("processes", "edit")
+  const canEdit = can("processes", "update")
   const canSwitchOff = can("processes", "delete")
 
   const [addOpen, setAddOpen] = React.useState(false)

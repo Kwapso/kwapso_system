@@ -278,7 +278,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
 }
 
 export async function postUpdateTeam(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "teams", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "teams", "update")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
   // module and was missing on exactly the half that changes things. It held only

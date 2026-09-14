@@ -76,7 +76,7 @@ export function TaskDetailScreen({
 }) {
   const { t, lang } = useLanguage()
   const { can } = usePermissions(teamId)
-  const canEdit = can("work", "edit")
+  const canEdit = can("work", "update")
   // The clock asks for the right its own door asks for (`work:create`).
   const canLogTime = can("work", "create")
   const canSeeTime = can("work", "read")

@@ -113,7 +113,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         teamId={teamId as string}
         total={totals.workLogs}
         canCreate={can("work", "create")}
-        canEdit={can("work", "edit")}
+        canEdit={can("work", "update")}
       />
     )
   }
@@ -770,7 +770,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                           key={source.id}
                           source={source}
                           accountNames={names}
-                          canEdit={can("knowledge", "edit")}
+                          canEdit={can("knowledge", "update")}
                           onOpen={() => onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
                           onEditFiling={() =>
                             go(sectionPath, { panel: "edit", module: "knowledge", id: source.id })

@@ -1658,6 +1658,7 @@ export const SEED: Catalogue = {
   "Transcript read.": { de: "Mitschrift gelesen.", es: "Transcripción leída.", ca: "Transcripció llegida."},
   "Try fewer words, or clear the filters.": { de: "Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Prueba con menos palabras o borra los filtros.", ca: "Prova amb menys paraules o esborra els filtres."},
   "Try “invite a member as a Viewer”": { de: "Versuchen Sie „ein Mitglied als Betrachter einladen“", es: "Prueba «invita a un miembro como Lector»", ca: "Prova «convida un membre com a Lector»"},
+  "Update": { de: "Aktualisieren", es: "Actualizar", ca: "Actualitzar"},
   "Update the details you hold for them.": { de: "Aktualisieren Sie die Angaben, die Sie zu dieser Person haben.", es: "Actualiza los datos que tienes de esta persona.", ca: "Actualitza les dades que en tens."},
   "Update what you're asking for. Everyone on the ticket will see the change.": { de: "Aktualisieren Sie, worum Sie bitten. Alle beim Ticket sehen die Änderung.", es: "Actualiza lo que estás pidiendo. Todos los que están en el ticket verán el cambio.", ca: "Actualitza el que demanes. Tothom qui és al ticket veurà el canvi."},
   "Uploaded file": { de: "Hochgeladene Datei", es: "Archivo subido", ca: "Fitxer pujat"},
@@ -4310,7 +4311,7 @@ export const SEED: Catalogue = {
    * and Catalan can put the count where their own grammar wants it. */
   "No description yet.": { de: "Noch keine Beschreibung.", es: "Todavía no hay descripción.", ca: "Encara no hi ha descripció." },
   "Can read {count} of {total} modules": { de: "Kann {count} von {total} Modulen lesen", es: "Puede leer {count} de {total} módulos", ca: "Pot llegir {count} de {total} mòduls" },
-  "Can edit {count} of {total} modules": { de: "Kann {count} von {total} Modulen bearbeiten", es: "Puede editar {count} de {total} módulos", ca: "Pot editar {count} de {total} mòduls" },
+  "Can update {count} of {total} modules": { de: "Kann {count} von {total} Modulen aktualisieren", es: "Puede actualizar {count} de {total} módulos", ca: "Pot actualitzar {count} de {total} mòduls" },
 
   /* ── SETTINGS › ONE MODULE'S OWN PAGE, 2026-09-09 ─────────────────────────
    * The Tickets pilot of the client's ruling that settings be grouped by

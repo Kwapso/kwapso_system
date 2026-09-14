@@ -33,7 +33,7 @@ beforeEach(() => {
   // spine-harness.ts's `grantAll`) that does not include `selectable_data` —
   // grant it here rather than widen a shared fixture every other suite reads.
   db().exec(`
-    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
     VALUES ('R_ADMIN_selectable_data', '${IDS.adminRole}', 'selectable_data', 1, 1, 1, 1);
   `)
 })

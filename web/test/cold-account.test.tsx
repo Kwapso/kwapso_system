@@ -60,7 +60,7 @@ const WEB = join(__dirname, "..")
 
 /* ------------------------------- the fixtures ------------------------------ */
 
-const ALL_RIGHTS = { read: true, create: true, edit: true, delete: true }
+const ALL_RIGHTS = { read: true, create: true, update: true, delete: true }
 const admin: PermissionValue = {
   accounts: ALL_RIGHTS,
   help: ALL_RIGHTS,
@@ -70,8 +70,8 @@ const admin: PermissionValue = {
 /** A role that may look at everything and change nothing — the shape that must
  * see no first-run block at all, because every step in it would refuse them. */
 const viewer: PermissionValue = {
-  accounts: { read: true, create: false, edit: false, delete: false },
-  help: { read: true, create: false, edit: false, delete: false },
+  accounts: { read: true, create: false, update: false, delete: false },
+  help: { read: true, create: false, update: false, delete: false },
 }
 
 const ctx: ActiveContext = {
@@ -303,7 +303,7 @@ const COLLECTIONS: [key: string, title: string, hasCreateAction: boolean][] = [
   ["members.list", "No members yet.", false],
 ]
 
-const ALL_FOUR = { read: true, create: true, edit: true, delete: true }
+const ALL_FOUR = { read: true, create: true, update: true, delete: true }
 /** Every module any recipe below gates on. A recipe whose gate is missing draws
  * NOTHING, which would pass every absence assertion in this section. */
 const EVERY_RIGHT = {

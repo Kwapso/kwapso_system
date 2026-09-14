@@ -155,7 +155,7 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // the derivation working, not a gap: it gates no read door at all (nothing
     // asks for `google_mail:read`), so there is no read half for this test to
     // compare a write half against. What guards it is that every door demanding
-    // it ALSO demands `google:edit`, and this set already holds `google`. (There
+    // it ALSO demands `google:update`, and this set already holds `google`. (There
     // was a second switch, `google_events`; it went with the calendar's write
     // half on 18 August 2026.)
     //

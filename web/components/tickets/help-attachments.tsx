@@ -13,7 +13,7 @@
 // login rename or replace a file agency staff attached?" and answered in one
 // word: "never." Not on `help:read`, not on any role a client login can hold.
 // The story panel one record along DOES pass one, because its right is
-// `work:edit`, which no client can reach. Same panel, and the right underneath
+// `work:update`, which no client can reach. Same panel, and the right underneath
 // it is the whole difference.
 //
 // AND IF IT IS EVER EXTENDED: the fence goes on the DOOR, not here. R21 was

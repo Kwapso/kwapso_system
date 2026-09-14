@@ -16,7 +16,7 @@ const MAX_RECIPE_BYTES = 64 * 1024
  * against a list — it treats a recipe as opaque on purpose, because the web app
  * owns the `ScreenRecipe` shape. So the key space here is ANY string, every
  * distinct one mints a row through the upsert, and each row carries up to 64 KB.
- * That made the table's size a choice belonging to whoever holds `teams:edit`,
+ * That made the table's size a choice belonging to whoever holds `teams:update`,
  * and the read below runs on EVERY page load. A ceiling on the rows is the
  * bounded thing this worker can honestly assert without borrowing the web app's
  * vocabulary. Ten screens ship today; this is room for a fork to grow. */

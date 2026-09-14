@@ -903,7 +903,7 @@ export async function postUpdateKnowledge(request: Request, env: Env): Promise<R
     request,
     env,
     "knowledge",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Source", TEXT_LIMITS.short)

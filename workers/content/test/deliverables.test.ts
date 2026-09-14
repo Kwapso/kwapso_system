@@ -83,7 +83,7 @@ const post = (userId: string, path: string, body: unknown) =>
 function revokeDeliverables(roleId: string) {
   db()
     .prepare(
-      `UPDATE role_permissions SET can_read = 0, can_create = 0, can_edit = 0, can_delete = 0
+      `UPDATE role_permissions SET can_read = 0, can_create = 0, can_update = 0, can_delete = 0
         WHERE role_id = ? AND module = 'deliverables'`
     )
     .run(roleId)

@@ -50,7 +50,7 @@ beforeEach(() => {
   // agency material and is granted here rather than widening a fixture every
   // other suite depends on.
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('P_ADMIN_BRD', '${IDS.adminRole}', 'brand_assets', 1, 1, 1, 1);`
   )
 })

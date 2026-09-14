@@ -141,13 +141,13 @@ export function MeetingDetailScreen({
   )
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("meetings", "edit")
+  const canEdit = can("meetings", "update")
   const canCancel = can("meetings", "delete")
   // Reading the transcript reaches the caller's own Drive and calendar with the
   // caller's own token, so the door asks for `google:read` on top of this
   // module's `edit`. This only decides whether the action is worth offering.
   //
-  // It used to ask for `google:edit` plus a "Calendar on your behalf" switch,
+  // It used to ask for `google:update` plus a "Calendar on your behalf" switch,
   // because the same menu also pushed a meeting INTO a calendar. Nothing pushes
   // any more, so demanding a write right to READ a transcript would be gating a
   // read behind a capability the app no longer has.
@@ -161,7 +161,7 @@ export function MeetingDetailScreen({
   // narrows by (9.3) — right in the total and quietly wrong in the split.
   // Correcting a row is still offered, because a wrong figure is worse.
   const canSeeTime = can("work", "read")
-  const canEditTime = can("work", "edit")
+  const canEditTime = can("work", "update")
   // Counted when the MEETING opens rather than when the tab is clicked, for the
   // reason shared/record-counts.ts gives: a badge that only arrives with the
   // panel is blank exactly when somebody is deciding whether to open it.

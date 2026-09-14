@@ -85,7 +85,7 @@ export async function getRolesExport(request: Request, env: Env): Promise<Respon
     )
   const permsByRole = perms.byRole
   const auditBy = new Map(audit.map((a) => [a.id, a]))
-  const RIGHTS = ["read", "create", "edit", "delete"] as const
+  const RIGHTS = ["read", "create", "update", "delete"] as const
   const header = [
     "title",
     "description",
@@ -130,7 +130,7 @@ export async function getRolePerms(request: Request, env: Env): Promise<Response
 
 export async function postRolePerms(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
-  await requireRight(cfg, guard, "member_roles", "edit")
+  await requireRight(cfg, guard, "member_roles", "update")
   await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     roleId?: string
@@ -147,7 +147,7 @@ export async function postRolePerms(request: Request, env: Env): Promise<Respons
   //
   // This door used to answer `{ ok: true }`, so the screen could not trust what
   // it had in hand — `setRolePermissions` auto-enables `read` wherever
-  // create/edit/delete was switched on, so what was saved is not always what was
+  // create/update/delete was switched on, so what was saved is not always what was
   // sent. The screen's only recourse was to ask again, and role-detail.tsx did
   // exactly that: a POST and then a GET, two sequential round trips to learn the
   // answer the first one already knew (~1.5-3s at the door timings recorded in
@@ -185,10 +185,10 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
       `This team already has ${MAX_ROLES_PER_TEAM} roles, which is the limit. Deactivate one you no longer use and try again.`
     )
   // Creating WITH a permission matrix (the import round-trip / a matrix-carrying
-  // CSV) is create + edit in one move, so it demands BOTH rights — the same gate
+  // CSV) is create + update in one move, so it demands BOTH rights — the same gate
   // setting a matrix on the Roles screen goes through. A plain create is unchanged.
   const withMatrix = typeof body.permissions === "object" && body.permissions !== null
-  if (withMatrix) await requireRight(cfg, guard, "member_roles", "edit")
+  if (withMatrix) await requireRight(cfg, guard, "member_roles", "update")
   const roleId = await createRole(cfg, guard, actor, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
   if (withMatrix) await setRolePermissions(cfg, guard, actor, roleId, body.permissions as PermissionValue)
   // Row-level: carry the new role's id so open role lists patch just that row.
@@ -198,7 +198,7 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
 
 export async function postUpdateRole(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
-  await requireRight(cfg, guard, "member_roles", "edit")
+  await requireRight(cfg, guard, "member_roles", "update")
   await refusePortalCaller(cfg, guard) // R21: agency machinery
   const body = (await request.json().catch(() => ({}))) as {
     roleId?: string

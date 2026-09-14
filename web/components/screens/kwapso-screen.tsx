@@ -16,7 +16,7 @@
 // page answers "where is our logo?" without a detour.
 //
 // Every panel gates itself: the brand list on `brand_assets:read`, the people on
-// `team_members:read`, and editing the details on `teams:edit`. The page itself
+// `team_members:read`, and editing the details on `teams:update`. The page itself
 // is gated by nothing, because everybody in the team may look up the company's
 // phone number.
 
@@ -82,7 +82,7 @@ export function KwapsoScreen({
   // on the team overview at `/t/<teamId>`, and she deleted that screen ("This
   // overview about the team should not even exist"). This page is where they
   // belong now and arguably always did: it is titled with the team's name, it
-  // is gated on the same `teams:edit`, and its whole subject is "who we are".
+  // is gated on the same `teams:update`, and its whole subject is "who we are".
   // A SECOND quiet control rather than a second pencil beside the first — one
   // control per thing it edits, each next to what it edits, which is also what
   // keeps this header at UI-RULEBOOK B1's two-actions maximum.
@@ -112,7 +112,7 @@ export function KwapsoScreen({
           </p>
         </div>
         {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-        {can("teams", "edit") && (
+        {can("teams", "update") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <PencilSimple className="size-3.5" />
@@ -151,7 +151,7 @@ export function KwapsoScreen({
                   { label: t("Phone"), value: team.phone || "—" },
                 ]}
               />
-              {can("teams", "edit") && (
+              {can("teams", "update") && (
                 <Button
                   variant="secondary"
                   size="sm"

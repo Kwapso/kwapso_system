@@ -35,7 +35,7 @@
 // glide-visuals.mjs: read the file off disk, POST it to the ordinary gated
 // upload door (`/api/content/brand-assets/upload-stream`, gated
 // `brand_assets:create`), and patch the row through the ordinary edit door
-// (gated `brand_assets:edit`, which publishes and writes activity). Nothing here
+// (gated `brand_assets:update`, which publishes and writes activity). Nothing here
 // touches D1 and nothing here touches a bucket.
 //
 // THE TWO VIDEOS HAVE NO RECORD TO LAND ON, and that is a decision rather than a

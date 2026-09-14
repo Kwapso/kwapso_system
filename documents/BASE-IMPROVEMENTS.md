@@ -77,7 +77,7 @@ findings survived; all nine are fixed below. 371 tests.
 |---|---|---|
 | HIGH | **Stored prompt injection reached UNCONFIRMED privilege grants.** Any member with `help:create` writes instructions into a 20,000-character ticket description; an admin later asks the assistant anything that lists tickets; `set_role_permissions` / `set_member_role` / `create_role` / `invite_member` then run AS the admin with no panel. | Those four now confirm. See EDGE-CASES §5 (this REVERSES the 2026-07-10 destructive-only decision, narrowly: every other constructive write still runs free). |
 | MED | **`?scope=user` with no `id` returned the WHOLE team feed, unfiltered**, it matched no branch, leaving an empty WHERE. Exactly the leak R18 exists to stop, arrived at by omission; the source-scan stayed green because the clause still *existed*. | Fails closed at both layers (the route validates the scope and refuses an id-scope with no id; the reader returns nothing rather than widening), locked by `activity-scope.test.ts`, which RUNS the reader over every scope shape. |
-| MED | **A role could grant ITSELF every right**, `member_roles:edit` + your own role id = admin in one call. | `setRolePermissions` refuses a self-grant, matching the sibling "you can't change your own role" invariant. |
+| MED | **A role could grant ITSELF every right**, `member_roles:update` + your own role id = admin in one call. | `setRolePermissions` refuses a self-grant, matching the sibling "you can't change your own role" invariant. |
 | MED | **An unauthenticated request could write into the GLOBAL core DB**, the client-error beacon's gate was `Cookie.includes("session")`, a substring test on an attacker-controlled header, next to a comment claiming a drive-by couldn't fill the table. | The gateway resolves the session with auth before forwarding; a forged cookie now writes nothing (verified live on staging). |
 | MED | **The daily AI allowance was advisory**, read-then-check, so N simultaneous chats all passed. | The cap rides the UPDATE, like the paid-credit path beside it. |
 | MED | **The impersonation door shared a name with the maintenance key.** `ADMIN_KEY` is set on tenancy + data-ops in BOTH environments, so one mistyped `wrangler secret put` directory would have armed sign-in-as-anyone on production. | Its own `TEST_LOGIN_KEY` secret **and** a hard refusal when `ENVIRONMENT` is production, two independent locks, neither a runbook sentence. `ADMIN_KEY` deleted from staging auth. |
@@ -135,7 +135,7 @@ non-team scope arrives without an `id`, and validate `scope` against the literal
 set in the route instead of casting it.
 
 ## A3 · HIGH, a role can grant itself every right
-**The attack:** a member holding `member_roles:edit` posts their OWN role id to
+**The attack:** a member holding `member_roles:update` posts their OWN role id to
 `/api/tenancy/roles/permissions` with every module true, and is an admin.
 
 ```bash

@@ -1255,7 +1255,7 @@ export const content = {
       post({ id, appId, active })
     ),
   /** Client visibility: show one deliverable to the client, or take it back
-   * (gated `deliverables:edit`). Its own door rather than a field on `/update`,
+   * (gated `deliverables:update`). Its own door rather than a field on `/update`,
    * because publishing something to a client is a decision and correcting a
    * title is a correction. */
   setDeliverableVisibility: (id: string, appId: string, visible: boolean) =>

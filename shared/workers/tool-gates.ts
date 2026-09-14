@@ -27,10 +27,10 @@ import type { RecordToggle } from "./record-toggles"
  * `workers/mcp/test/catalog.test.ts` asserts every write tool resolves HERE or names a
  * reason in GATELESS_WRITES below, so the fallback can never be what decides. */
 export const TOOL_GATES: Record<string, string> = {
-  update_team: "teams:edit",
+  update_team: "teams:update",
   create_account: "accounts:create",
-  update_account: "accounts:edit",
-  set_account_parent: "accounts:edit",
+  update_account: "accounts:update",
+  set_account_parent: "accounts:update",
   set_account_active: "accounts:delete",
   // `contacts`, not `accounts` — both doors say so in their own comments
   // (`postLinkPerson`, `postLinkActive`: "GATED ON `contacts`, not `accounts`").
@@ -45,16 +45,16 @@ export const TOOL_GATES: Record<string, string> = {
   set_portal_access_active: "portal_users:delete",
   add_help_stakeholder: "help:read",
   create_role: "member_roles:create",
-  update_role: "member_roles:edit",
+  update_role: "member_roles:update",
   set_role_active: "member_roles:delete",
-  set_role_permissions: "member_roles:edit",
-  set_member_role: "team_members:edit",
+  set_role_permissions: "member_roles:update",
+  set_member_role: "team_members:update",
   remove_member: "team_members:delete",
   invite_member: "team_members:create",
   revoke_invite: "team_members:delete",
   create_dropdown_value: "selectable_data:create",
-  update_dropdown_value: "selectable_data:edit",
-  set_dropdown_default: "selectable_data:edit",
+  update_dropdown_value: "selectable_data:update",
+  set_dropdown_default: "selectable_data:update",
   // KEYED BY THE MCP NAME since the collapse (29 Aug 2026). The agent's
   // canonical name for this act is now `set_record_active` with record
   // `dropdown_value`, and the only surface that still publishes a tool of its
@@ -64,90 +64,90 @@ export const TOOL_GATES: Record<string, string> = {
   // WHAT WE HANDED OVER. Its own module, never `processes` — filing a handover
   // doc against a system is a different grant from editing the system itself.
   create_deliverable: "deliverables:create",
-  update_deliverable: "deliverables:edit",
+  update_deliverable: "deliverables:update",
   set_deliverable_active: "deliverables:delete",
-  // Sharing is `edit`, the same right that corrects one — the door says why.
+  // Sharing is `update`, the same right that corrects one — the door says why.
   // Deliberately NOT its own verb: a fifth right on this module would be one
   // more box an owner has to understand before they can grant anything.
-  set_deliverable_visibility: "deliverables:edit",
+  set_deliverable_visibility: "deliverables:update",
   create_brand_asset: "brand_assets:create",
-  update_brand_asset: "brand_assets:edit",
+  update_brand_asset: "brand_assets:update",
   set_brand_asset_active: "brand_assets:delete",
   create_meeting_purpose: "delivery:create",
-  update_meeting_purpose: "delivery:edit",
+  update_meeting_purpose: "delivery:update",
   set_meeting_purpose_active: "delivery:delete",
   // The profile door is ONE door for "there wasn't one" and "there was", so it
-  // is gated once on `edit`: writing down what a colleague is like is the same
+  // is gated once on `update`: writing down what a colleague is like is the same
   // act either way, and a permission that depends on invisible state is one
   // nobody can reason about. `create` gates the certificate door instead.
-  save_staff_profile: "staff_profiles:edit",
+  save_staff_profile: "staff_profiles:update",
   set_staff_profile_active: "staff_profiles:delete",
   create_staff_certificate: "staff_profiles:create",
-  update_staff_certificate: "staff_profiles:edit",
+  update_staff_certificate: "staff_profiles:update",
   set_staff_certificate_active: "staff_profiles:delete",
   add_knowledge_source: "knowledge:create",
-  update_knowledge_source: "knowledge:edit",
+  update_knowledge_source: "knowledge:update",
   set_knowledge_source_active: "knowledge:delete",
   // It CREATES sources (mirrors of rows the caller can already read), so it is
   // gated as a create — the same right a person needs to fill the base by hand.
   sync_knowledge: "knowledge:create",
   raise_help_ticket: "help:create",
-  update_help_ticket: "help:edit",
-  set_help_status: "help:edit",
+  update_help_ticket: "help:update",
+  set_help_status: "help:update",
   // Reordering and archiving are both moves along the row, so both sit on the
   // same right the status move does. Note what that means for a client login:
-  // the seeded Client role holds help:read + help:create and NOT help:edit, so
+  // the seeded Client role holds help:read + help:create and NOT help:update, so
   // neither door is open to them today. SCOPE ch.07 does say a contact may
   // re-rank their own company's tickets — when an owner grants that, the LOCK
   // (workers/content/src/lib/help.ts refuseIfLocked) is what keeps it safe, not
   // this line.
-  rank_help_ticket: "help:edit",
-  archive_help_ticket: "help:edit",
+  rank_help_ticket: "help:update",
+  archive_help_ticket: "help:update",
   // THE ONE ACT ON THE LADDER A PERSON STILL PERFORMS (CHECKLIST 5.11). Reading
   // a request is OUR queue, so it needs the right every other move needs.
   //
   // IT WAS TWO, AND THE SECOND IS WORTH ITS EPITAPH because its gate was the
   // odd one out here: `validate_help_ticket` (CHECKLIST 5.13) sat on
-  // `help:read` rather than `help:edit`, deliberately — confirming a request is
-  // the CLIENT's answer, and `help:edit` is a right the seeded Client role does
+  // `help:read` rather than `help:update`, deliberately — confirming a request is
+  // the CLIENT's answer, and `help:update` is a right the seeded Client role does
   // not hold, so gating it the ordinary way would have made the door
   // unreachable by the only people it existed for. The client retired the
   // `awaiting_validation` stage on 7 Sep 2026 and the tool and its door went
   // with it. The same gate choice, for the same reason, still stands one line
   // up on `reply_help_ticket` and on the rating door.
-  triage_help_ticket: "help:edit",
+  triage_help_ticket: "help:update",
   // Showing somebody what you mean is the same bar as saying it — a person who
   // can see a ticket can attach to it, exactly as they can reply to it.
   add_help_link: "help:read",
   list_story_attachments: "work:read",
-  add_story_link: "work:edit",
-  update_story_attachment: "work:edit",
-  remove_story_attachment: "work:edit",
-  remove_help_attachment: "help:edit",
+  add_story_link: "work:update",
+  update_story_attachment: "work:update",
+  remove_story_attachment: "work:update",
+  remove_help_attachment: "help:update",
   reply_help_ticket: "help:read",
   // Answering is a status move, so it sits on the same right every other move
   // does — and the door refuses a portal caller, because "resolved" is our word.
-  resolve_help_ticket: "help:edit",
+  resolve_help_ticket: "help:update",
   // THE WORK ENGINE. One module for stories and the sprints they sit in, and no
   // client login holds it — so unlike the ticket doors above, the question "what
   // happens when a contact reaches this?" has a shorter answer here: the door
   // refuses them (refusePortalCaller), whatever an owner ticks.
   create_story: "work:create",
-  update_story: "work:edit",
-  set_story_status: "work:edit",
+  update_story: "work:update",
+  set_story_status: "work:update",
   create_sprint: "work:create",
-  update_sprint: "work:edit",
-  complete_sprint: "work:edit",
+  update_sprint: "work:update",
+  complete_sprint: "work:update",
   raise_todo: "todos:create",
-  complete_todo: "todos:edit",
+  complete_todo: "todos:update",
   cancel_todo: "todos:delete",
   create_task: "work:create",
-  update_task: "work:edit",
-  set_task_done: "work:edit",
+  update_task: "work:update",
+  set_task_done: "work:update",
   // MEETINGS gate on their own module. `set_meeting_active` is a `delete`
   // because cancelling IS this module's delete; the row survives it.
   create_meeting: "meetings:create",
-  update_meeting: "meetings:edit",
+  update_meeting: "meetings:update",
   set_meeting_active: "meetings:delete",
   // The door that reaches OUTSIDE this app, listed at the gate it opens with —
   // the FIRST one, which is the one a role has to hold before any of the others
@@ -158,13 +158,13 @@ export const TOOL_GATES: Record<string, string> = {
   // read-only, so there is nothing to push. `set_meeting_held` is gone too, with
   // the status it moved.
   sync_google_knowledge: "knowledge:create",
-  // The rota is about TICKETS, so it gates with them. `help:edit` is a right the
+  // The rota is about TICKETS, so it gates with them. `help:update` is a right the
   // seeded Client role does not hold — and the door refuses a portal caller
   // anyway, because an unread backlog is our failure and not an SLA.
-  set_triage_duty: "help:edit",
-  // TIME. Logging your OWN is a create, not an edit — a person who may do the
+  set_triage_duty: "help:update",
+  // TIME. Logging your OWN is a create, not an update — a person who may do the
   // work may say how long it took them. Correcting a row that already exists is
-  // `work:edit`, and there is deliberately no tool on that door (see MCP.md).
+  // `work:update`, and there is deliberately no tool on that door (see MCP.md).
   start_timer: "work:create",
   stop_timer: "work:create",
   log_time: "work:create",
@@ -174,65 +174,65 @@ export const TOOL_GATES: Record<string, string> = {
   // headless client hasn't got). Listed for the same reason as the rest: the gate
   // is what isPrivilegeWrite reads, and a write with no line is a write the PATH
   // REGEX decides for.
-  bulk_set_help_status: "help:edit",
-  set_help_status_by_filter: "help:edit",
+  bulk_set_help_status: "help:update",
+  set_help_status_by_filter: "help:update",
   // The map: one module, four rights, and the same three-way split every other
-  // module has — create maps and steps, edit them, and `delete` for the two acts
+  // module has — create maps and steps, update them, and `delete` for the two acts
   // that take something out of the picture (archiving, and recording that a step
   // stopped happening).
   // THE CLIENT'S OWN ORGANISATION — the same module as the map, because a role
   // exists to carry an hourly cost so a step's minutes can become money. Whoever
   // may change a client's process map may change its cast list.
   create_client_department: "processes:create",
-  update_client_department: "processes:edit",
+  update_client_department: "processes:update",
   set_client_department_active: "processes:delete",
   create_client_role: "processes:create",
-  update_client_role: "processes:edit",
-  set_client_role_person: "processes:edit",
+  update_client_role: "processes:update",
+  set_client_role_person: "processes:update",
   set_client_role_active: "processes:delete",
   create_client_tool: "processes:create",
-  update_client_tool: "processes:edit",
-  set_client_tool_price: "processes:edit",
+  update_client_tool: "processes:update",
+  set_client_tool_price: "processes:update",
   set_client_tool_active: "processes:delete",
   create_app: "processes:create",
-  update_app: "processes:edit",
+  update_app: "processes:update",
   set_app_active: "processes:delete",
   // A MODULE IS PART OF THE APP RECORD, so it gates on `processes` like the app
   // itself does — the same right that lets somebody record a system lets them
   // say what sections it has. Switching one off takes `delete`, because it
   // removes a choice every future ticket could have made.
   create_app_module: "processes:create",
-  update_app_module: "processes:edit",
+  update_app_module: "processes:update",
   set_app_module_active: "processes:delete",
   create_process: "processes:create",
-  update_process: "processes:edit",
+  update_process: "processes:update",
   set_process_active: "processes:delete",
   add_process_step: "processes:create",
-  update_process_step: "processes:edit",
+  update_process_step: "processes:update",
   remove_process_step: "processes:delete",
   delete_process_step: "processes:delete",
   cut_process_version: "processes:create",
-  // MOVING THE AUDIT DATE IS AN EDIT ON THE MAP, not a new record — it changes
+  // MOVING THE AUDIT DATE IS AN UPDATE ON THE MAP, not a new record — it changes
   // which agreed version counts as the "before" and therefore every figure the
-  // map reports. Same right as editing a step, because it moves the same number.
+  // map reports. Same right as updating a step, because it moves the same number.
   // WAVES — what a client bought. The module is `work`, the same one the sprints
   // inside a wave gate on, because they are one record from a reader's point of
   // view: "what did they buy" and "what are we doing this fortnight" are the same
   // shelf at two depths.
   //
-  // `set_wave_active` gates on EDIT and not DELETE, deliberately: `work` offers
-  // read/create/edit only, so a door on `work:delete` would refuse everybody
+  // `set_wave_active` gates on UPDATE and not DELETE, deliberately: `work` offers
+  // read/create/update only, so a door on `work:delete` would refuse everybody
   // including the locked Admin role (R36).
   create_wave: "work:create",
-  update_wave: "work:edit",
-  set_wave_active: "work:edit",
-  set_sprint_wave: "work:edit",
-  set_audit_date: "processes:edit",
-  // A CONNECTION IS A SIGNPOST, and an edit to the map that carries it. Not
+  update_wave: "work:update",
+  set_wave_active: "work:update",
+  set_sprint_wave: "work:update",
+  set_audit_date: "processes:update",
+  // A CONNECTION IS A SIGNPOST, and an update to the map that carries it. Not
   // `create`: nothing is authored, and gating it behind create would mean a
   // person who may correct a map's times may not say where its work goes next.
-  connect_processes: "processes:edit",
-  disconnect_processes: "processes:edit",
+  connect_processes: "processes:update",
+  disconnect_processes: "processes:update",
   comment_on_process: "processes:create",
   // THE MONEY, AND THERE IS NO WRITE LEFT ON IT. Three rate cards sat under this
   // one module because they were one decision-maker's job, in three tables and
@@ -245,13 +245,13 @@ export const TOOL_GATES: Record<string, string> = {
   // exactly one door and it is a read, which is why `MODULE_OFFERED_RIGHTS`
   // offers only `read` on it — see shared/team-modules.ts.
   // Reading a transcript writes the words onto the meeting and time against it,
-  // so it is an edit of the meeting — and `google:read` besides, which the door
+  // so it is an update of the meeting — and `google:read` besides, which the door
   // asks for itself because it reaches the caller's own Drive.
-  read_meeting_transcript: "meetings:edit",
+  read_meeting_transcript: "meetings:update",
   // It MAKES meetings, so it is a create — and `google:read` besides, which the
   // door asks for itself.
   sync_calendar_series: "meetings:create",
-  // GOOGLE. Every write through somebody's own connection is `google:edit` —
+  // GOOGLE. Every write through somebody's own connection is `google:update` —
   // "change something in the world you connected" — because `create` on this
   // module means CONNECT AN ACCOUNT, which is the switch an owner grants
   // separately and which no tool here holds.
@@ -276,22 +276,22 @@ export const TOOL_GATES: Record<string, string> = {
   // binned file keeps its history for thirty days), what ends is kwapso's own
   // handiwork. It is a separate right so an owner can grant an assistant that
   // writes without granting one that un-writes.
-  google_drive_upload: "google:edit",
-  google_drive_update: "google:edit",
-  google_drive_folder: "google:edit",
-  google_mail_to_drive: "google:edit",
+  google_drive_upload: "google:update",
+  google_drive_update: "google:update",
+  google_drive_folder: "google:update",
+  google_mail_to_drive: "google:update",
   google_drive_trash: "google:delete",
-  google_draft_reply: "google:edit",
-  google_send_mail: "google:edit",
-  google_reply_mail: "google:edit",
-  google_label_mail: "google:edit",
+  google_draft_reply: "google:update",
+  google_send_mail: "google:update",
+  google_reply_mail: "google:update",
+  google_label_mail: "google:update",
   // The mail half of "taking something back", and the same right the Drive bin
   // takes: Gmail's Trash keeps a binned letter for thirty days, so what ends is
   // kwapso's own handiwork rather than the person's material. There is no
   // permanent delete to gate, on any surface — the app does not hold the scope
   // that could perform one.
   google_mail_trash: "google:delete",
-  google_chat_post: "google:edit",
+  google_chat_post: "google:update",
   google_chat_delete: "google:delete",
 }
 

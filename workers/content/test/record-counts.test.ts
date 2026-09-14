@@ -243,7 +243,7 @@ describe("the record-counts door (content)", () => {
     // reason other than a missing counter.
     db()
       .prepare(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('R_MEET', ?, 'meetings', 1, 1, 1, 1)`
       )
       .run(IDS.adminRole)

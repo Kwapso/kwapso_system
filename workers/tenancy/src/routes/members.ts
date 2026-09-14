@@ -26,7 +26,7 @@ export async function getMembers(request: Request, env: Env): Promise<Response> 
 
 export async function postMemberRole(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ userId?: string; roleId?: string }>(
-    request, env, "team_members", "edit"
+    request, env, "team_members", "update"
   )
   const scope = await refusePortalCaller(cfg, guard) // R21: agency machinery
   if (typeof body.userId !== "string" || typeof body.roleId !== "string")

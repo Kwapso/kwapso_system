@@ -25,7 +25,7 @@
 // the three the door does is decided by what the body carries, so one call
 // covers all three. A ticket gets none of it: its door gates on `help:read`,
 // which a client login holds, and the owner ruled "never" on a client fixing
-// somebody else's file. A story is OURS, and its doors gate on `work:edit`.
+// somebody else's file. A story is OURS, and its doors gate on `work:update`.
 
 import type { StoryAttachment } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
@@ -39,7 +39,7 @@ export function StoryAttachmentsPanel({
   canEdit,
 }: {
   storyId: string
-  /** `work:edit` — the right BOTH write doors ask for. See the header: the ticket
+  /** `work:update` — the right BOTH write doors ask for. See the header: the ticket
    * panel's wider `read` would be wrong here, and drawing a button the door
    * refuses is the failure this parameter is named after. */
   canEdit: boolean

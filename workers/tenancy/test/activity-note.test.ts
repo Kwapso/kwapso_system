@@ -76,7 +76,7 @@ beforeEach(() => {
   // admin/burglar fixtures do.
   db().exec(`
     INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('R_READER', 'Reader', 0, '2026-01-01');
-    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
       VALUES ('R_READER_accounts', 'R_READER', 'accounts', 1, 0, 0, 0);
     INSERT INTO users (id, email, first_name, current_team_id) VALUES ('U_READER', 'reader@kwapso.app', 'Reader', '${IDS.team}');
     INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m_reader', '${IDS.team}', 'U_READER', 'R_READER', '2026-01-01');

@@ -101,7 +101,7 @@ export function WaveDetailScreen({
 
   const { can } = usePermissions(teamId)
   const canCreate = can("work", "create")
-  const canEdit = can("work", "edit")
+  const canEdit = can("work", "update")
 
   // The open tab is remembered per record for as long as this document
   // lives (web/lib/nav-memory.ts) — leaving to another section and coming

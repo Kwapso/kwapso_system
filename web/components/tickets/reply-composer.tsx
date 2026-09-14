@@ -295,7 +295,7 @@ export function useReplySend({
 export function ReplyComposer({
   /** The hold, owned by the screen above the tab strip. */
   send,
-  /** Draw "Send and close" at all. The caller decides: it needs `help:edit`
+  /** Draw "Send and close" at all. The caller decides: it needs `help:update`
    * (which is what `/help/resolve` gates on), and it is not drawn on a ticket
    * that is already answered — there is nothing left for it to do, and a control
    * that can only be refused should not be a control. */

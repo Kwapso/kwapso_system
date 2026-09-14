@@ -120,7 +120,7 @@ export const NAV: NavItem[] = [
   // its own, since every person in the team may look up the company's phone
   // number, with everything INSIDE it gated panel by panel instead (the brand
   // library on `brand_assets:read`, the people on `team_members:read`, editing
-  // the legal details on `teams:edit`) — and it briefly grew into its own
+  // the legal details on `teams:update`) — and it briefly grew into its own
   // three-row rail SECTION (Details · Team · Branding, one per tab on
   // `KwapsoScreen`) before the client reversed that in the same breath as
   // Settings: "remove the whole kwapso section from the sidebar and move with
@@ -264,7 +264,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //
   // The team RECORD did not stop existing, only its screen: its name and logo
   // are edited on /kwapso (the agency's own Details tab, which is the team
-  // record by another name and already carries `teams:edit`), and its audit
+  // record by another name and already carries `teams:update`), and its audit
   // block was three rows nothing linked to.
   { key: "members", title: "Members", module: "team_members", segment: "members", placement: "tab", countCacheKey: "members" },
   { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "tab", countCacheKey: "member_roles" },

@@ -193,7 +193,7 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
   beforeAll(async () => {
     holder.db = buildSpineDb()
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('admin_knowledge', '${IDS.adminRole}', 'knowledge', 1, 1, 1, 1);`
     )
     // The fixture ships one ticket of its own; drop it so the counts below are

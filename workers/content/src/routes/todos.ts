@@ -190,7 +190,7 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
     id?: unknown
     fileDataUrl?: unknown
     fileName?: unknown
-  }>(request, env, "todos", "edit")
+  }>(request, env, "todos", "update")
   // The fence decides whose to-do this is BEFORE anything is written — 404, never
   // 403, so "not yours" never confirms the to-do exists.
   const scope = await callerScope(cfg, guard)
@@ -475,7 +475,7 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
   return taskPage(cfg, guard, { view: "open" })
 }
 
-/** POST /api/content/tasks/update — correct a task (work:edit).
+/** POST /api/content/tasks/update — correct a task (work:update).
  *
  * The door that did not exist. Tasks could be written and ticked and nothing
  * else, so a typo was permanent, a task written for the wrong person stayed
@@ -499,7 +499,7 @@ export async function postUpdateTask(request: Request, env: Env): Promise<Respon
     department?: unknown
     important?: unknown
     urgent?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   await refusePortalCaller(cfg, guard)
 
   const id = requireText(body.id, "Task", TEXT_LIMITS.short)
@@ -528,14 +528,14 @@ export async function postUpdateTask(request: Request, env: Env): Promise<Respon
   return taskPage(cfg, guard, { view: "open" })
 }
 
-/** POST /api/content/tasks/done — tick it, or put it back (work:edit).
+/** POST /api/content/tasks/done — tick it, or put it back (work:update).
  * R17: ticking a done task moves zero rows and writes no second history line. */
 export async function postTaskDone(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; done?: unknown }>(
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Task", TEXT_LIMITS.short)

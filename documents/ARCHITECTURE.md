@@ -285,7 +285,7 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/auth/logout | auth | end session |
 | POST /api/tenancy/bootstrap | tenancy | accept invites OR create the personal team (+ its database) |
 | GET /api/tenancy/teams | tenancy | my teams (switcher/home) |
-| POST /api/tenancy/teams/update | tenancy | edit the active team's name + logo (teams:edit) |
+| POST /api/tenancy/teams/update | tenancy | edit the active team's name + logo (teams:update) |
 | GET /api/tenancy/members | tenancy | the active team's members (+ identity + role) |
 | POST /api/tenancy/members/role | tenancy | change a member's role (guards: not self, ≥1 admin); also emails the member a branded role-change notification via auth `/internal/send-email` (best-effort. See below) |
 | POST /api/tenancy/members/remove | tenancy | remove (deactivate) a member; also emails the member a branded "removed from team" notification via auth `/internal/send-email` (best-effort. See below) |
@@ -310,8 +310,8 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/content/help | content | list the team's tickets (`?scope=mine\|all`; `?id=` → one) |
 | GET /api/content/help/thread | content | one ticket's reply thread, oldest-first (`?id=`) |
 | POST /api/content/help | content | raise a ticket (`help:create`; always opens `open`) |
-| POST /api/content/help/update | content | edit a ticket (`help:edit`) |
-| POST /api/content/help/status | content | move along the fixed lifecycle (`help:edit`; raiser may reopen without it) |
+| POST /api/content/help/update | content | edit a ticket (`help:update`) |
+| POST /api/content/help/status | content | move along the fixed lifecycle (`help:update`; raiser may reopen without it) |
 | POST /api/content/help/reply | content | add a reply (`help:read`); @mention + raiser get a best-effort email |
 | GET /api/data-ops/import/targets | data-ops | list active, code-supported import targets from the global catalog |
 | POST /api/data-ops/import | data-ops | start a 3-stage import session (gated on the target's `create` right) |
@@ -338,14 +338,14 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/content/google/pick | content | the Drive folders / Chat spaces I could name |
 | POST /api/content/google/sources · /sources/active | content | name a folder or space + say who may read it (private/team) · stop sharing one |
 | GET /api/content/google/drive/files · /drive/file | content | files in the folders I named · one file's text |
-| POST /api/content/google/drive/upload | content | write a file INTO a folder I named (`google:edit`) |
+| POST /api/content/google/drive/upload | content | write a file INTO a folder I named (`google:update`) |
 | GET /api/content/google/gmail/messages · /gmail/message | content | mail to/from a KNOWN CONTACT only · one message |
-| POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:edit`) |
-| POST /api/content/google/gmail/send | content | actually send it, `google:edit` **plus** the `google_mail` switch |
+| POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:update`) |
+| POST /api/content/google/gmail/send | content | actually send it, `google:update` **plus** the `google_mail` switch |
 | GET /api/content/google/calendar/events | content | my own calendar, in a window. The ONLY calendar door besides the transcript read — the sync is one-way and nothing here writes to a calendar |
 | GET /api/content/google/calendar/event/transcript | content | what was SAID in a meeting, reached from its calendar event |
 | POST /api/content/meetings/sync-calendar | content | read Google's calendar INTO Meetings: the live window every call, plus one resumable slice of the whole calendar |
-| GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:edit`) |
+| GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:update`) |
 | GET /media/* | gateway | serve uploaded files from R2 |
 | (WebSocket) /api/realtime?team= | realtime | join a team's live channel; receive row-level `{resource,id,op}` pings (gated by active membership of THAT team) |
 | (WebSocket) /api/realtime?user= | realtime | join your OWN identity channel (account/membership events + forced sign-out); gated to your own id, open even when teamless |
@@ -394,10 +394,10 @@ on top follows [CACHING.md](CACHING.md).
 - **Block at every step (LOCKED 2026-06-21).** `?panel` / `?confirm` overlays are
   permission-gated on open (client) AND each action re-checks `requireRight` on the
   SERVER, so the guarantee is never UI-only.
-- **Permissions: tall sheet** per team, `role | module | read/create/edit/delete`.
+- **Permissions: tall sheet** per team, `role | module | read/create/update/delete`.
   New module = new rows, never a schema change. Members point at one role;
   editing a role applies instantly to every holder.
-- Any write right (create/edit/delete) **auto-flips READ on**, visibly.
+- Any write right (create/update/delete) **auto-flips READ on**, visibly.
 - The enforcement seam is BUILT, it lives in **`shared/workers/gating.ts`**
   (requireMember + requireRight reading the tall sheet; the ONE seam every
   worker uses, `workers/tenancy/src/lib/permissions.ts` is a thin re-export

@@ -913,7 +913,7 @@ export function TicketsCollection({
   /** the team's live `Ticket type` values — the tab strip is built from these */
   helpTypeOptions: string[]
   totals: { help?: number }
-  can: (module: string, right: "read" | "create" | "edit" | "delete") => boolean
+  can: (module: string, right: "read" | "create" | "update" | "delete") => boolean
   onCreate: () => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -1395,8 +1395,8 @@ export function TicketsCollection({
                   can answer "is it empty" honestly — see its own header. */}
               <TriageQueue
                 teamId={teamId}
-                canTriage={can("help", "edit")}
-                canEdit={can("help", "edit")}
+                canTriage={can("help", "update")}
+                canEdit={can("help", "update")}
                 helpTypeOptions={helpTypeOptions}
                 canCreateTicket={canCreateTicket}
                 onCreate={onCreate}
@@ -1697,7 +1697,7 @@ export function TicketsCollection({
             not repeat its own reason for being one) and on Triage's, same as
             before. */}
         {facet !== TRIAGE && facet !== DASHBOARD && (
-          <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
+          <TriageStrip teamId={teamId} canSetDuty={can("help", "update")} />
         )}
       </div>
     </CountedAbove>

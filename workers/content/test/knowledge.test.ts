@@ -190,14 +190,14 @@ beforeEach(() => {
   // true would answer "refused" for the wrong reason.
   for (const role of [IDS.adminRole, IDS.clientRole])
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
        VALUES ('${role}_knowledge', '${role}', 'knowledge', 1, 1, 1, 1);`
     )
   for (const role of [IDS.adminRole, IDS.clientRole]) {
     const granted = db()
       .prepare(
         `SELECT COUNT(*) n FROM role_permissions WHERE role_id = ? AND module = 'knowledge'
-          AND can_read = 1 AND can_create = 1 AND can_edit = 1 AND can_delete = 1`
+          AND can_read = 1 AND can_create = 1 AND can_update = 1 AND can_delete = 1`
       )
       .get(role) as { n: number }
     expect(granted.n, `${role} must hold every knowledge right for this suite to mean anything`).toBe(1)
@@ -1746,7 +1746,7 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
           VALUES ('${DEFAULT_ROLE_USER}', 'default-role@kwapso.app', 'Dana', '${IDS.team}');
         INSERT INTO member_roles (id, title, is_default, created_at)
           VALUES ('R_DEFAULT_TEST', 'Owner', 1, '2026-01-01');
-        INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
           VALUES ('RP_DEFAULT_TEST_knowledge', 'R_DEFAULT_TEST', 'knowledge', 1, 1, 1, 1);
         INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
           VALUES ('m_default_role', '${IDS.team}', '${DEFAULT_ROLE_USER}', 'R_DEFAULT_TEST', '2026-01-01');

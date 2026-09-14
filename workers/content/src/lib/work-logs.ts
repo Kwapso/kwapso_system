@@ -684,7 +684,7 @@ VALUES (${sqlString(id)}, ${sqlString(accountId)}, ${sqlString(input.targetTable
 
 /** EDIT a log: its note, its kind of work, whether it is billable, and its two
  * moments. "Log edits are permission-based and ALWAYS leave a trail" (BUILD-1
- * §5) — the permission is the door's (work:edit), and this is the trail. It is an
+ * §5) — the permission is the door's (work:update), and this is the trail. It is an
  * activity row rather than a version history because the question anybody ever
  * asks of a corrected timesheet is "who changed it and to what", once. */
 export async function editWorkLog(

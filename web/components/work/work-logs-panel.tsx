@@ -256,7 +256,7 @@ export function WorkLogsPanel({
    * form — the record is the answer to that question, so it is shown rather than
    * picked. */
   recordLabel: string
-  /** `work:edit` at the call site — a step above logging your own, and the right
+  /** `work:update` at the call site — a step above logging your own, and the right
    * the correction door itself gates on. */
   canEdit: boolean
   /** `work:create` — the right the write door gates on. Absent = no Log time

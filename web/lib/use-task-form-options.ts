@@ -7,7 +7,7 @@
 // department the other had.
 //
 // `teamId` may be null, for a caller who cannot open the form at all: a person
-// without `work:edit` should not pay four reads for pickers they will never see.
+// without `work:update` should not pay four reads for pickers they will never see.
 
 import { assignableMembers } from "@/lib/members"
 import { appsKey, listFetch } from "@/lib/live-resources"

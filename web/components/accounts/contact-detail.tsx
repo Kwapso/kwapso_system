@@ -120,7 +120,7 @@ export function ContactDetailScreen({
   // list, so this record now opens without it.
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("accounts", "edit")
+  const canEdit = can("accounts", "update")
   const canArchive = can("accounts", "delete")
   const canSeeContacts = can("contacts", "read")
   const canSeeLogins = can("portal_users", "read")

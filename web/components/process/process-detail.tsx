@@ -219,7 +219,7 @@ export function ProcessDetailScreen({
   const activity = useRecordActivity("processes", ready ? processId : null)
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("processes", "edit")
+  const canEdit = can("processes", "update")
   const canCreate = can("processes", "create")
   const canArchive = can("processes", "delete")
 

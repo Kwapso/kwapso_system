@@ -163,7 +163,7 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
   stories: [
     timeOn("stories"),
     // WHAT IT SHOWS FOR ITSELF — the files and links on the work. `work` because
-    // that is the right the attachment doors themselves ask for (`work:edit` to
+    // that is the right the attachment doors themselves ask for (`work:update` to
     // write, `work:read` to list), and `stories` because an attachment write
     // publishes the STORY: the row is part of the story rather than a collection
     // beside it, so there is no second resource for a ping to carry.

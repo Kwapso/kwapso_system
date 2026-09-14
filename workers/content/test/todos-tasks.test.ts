@@ -250,7 +250,7 @@ describe("who sees everyone else's tasks is a permission (4.9)", () => {
         VALUES ('m_narrow', '${IDS.team}', '${NARROW_USER}', '${NARROW_ROLE}', '2026-01-01');
       INSERT INTO member_roles (id, title, is_default, created_at)
         VALUES ('${NARROW_ROLE}', 'Developer', 0, '2026-01-01');
-      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
         VALUES ('rp_narrow_work', '${NARROW_ROLE}', 'work', 1, 1, 1, 1);
     `)
   })
@@ -304,7 +304,7 @@ describe("who sees everyone else's tasks is a permission (4.9)", () => {
       assigneeId: NARROW_USER,
     })
     db().exec(
-      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
          VALUES ('rp_narrow_all', '${NARROW_ROLE}', 'all_tasks', 1, 0, 0, 0);`
     )
     expect((await titles(NARROW_USER)).sort()).toEqual(["Mine to do", "Somebody else's job"])

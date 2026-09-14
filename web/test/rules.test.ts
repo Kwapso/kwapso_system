@@ -2316,7 +2316,7 @@ describe("RULES — the laws of the base", () => {
     const storable = (r: string) => {
       if (grantable.has(r)) return true
       const [mod, right] = r.split(":")
-      return right === "read" && ["create", "edit", "delete"].some((w) => grantable.has(`${mod}:${w}`))
+      return right === "read" && ["create", "update", "delete"].some((w) => grantable.has(`${mod}:${w}`))
     }
     expect(
       [...clientRights].filter((r) => !storable(r)),
@@ -4513,7 +4513,7 @@ describe("RULES — the laws of the base", () => {
  * ticks it, saves, and gets a green toast has been told they granted something.
  * On 21 Aug 2026 fifteen of eighty-eight decided nothing, seven of them with no
  * note anywhere saying so, and one module (`screens`) had four boxes and no
- * door at all: its two doors gate on `teams:edit`.
+ * door at all: its two doors gate on `teams:update`.
  *
  * OFFERED IS DATA, CONSULTED IS DERIVED, and the check fails both ways.
  * Offered-but-unasked is theatre. Asked-but-unoffered is the dangerous half: a
@@ -4533,7 +4533,7 @@ describe("RULES — the laws of the base", () => {
  *       than folding into (1).
  */
 describe("offered-rights: no permission switch decides nothing", () => {
-  const RIGHTS = ["read", "create", "edit", "delete"] as const
+  const RIGHTS = ["read", "create", "update", "delete"] as const
 
   /** Everything the running code actually asks for, off the source. */
   function consulted(): Map<string, Set<string>> {
@@ -4551,8 +4551,8 @@ describe("offered-rights: no permission switch decides nothing", () => {
     for (const f of files) {
       const flat = read(f.path).replace(/\s+/g, " ")
       // 1 · the literal pair, and 2 · the MCP gate string
-      for (const m of flat.matchAll(/"([a-z_]+)"\s*,\s*"(read|create|edit|delete)"/g)) add(m[1], m[2])
-      for (const m of flat.matchAll(/"([a-z_]+):(read|create|edit|delete)"/g)) add(m[1], m[2])
+      for (const m of flat.matchAll(/"([a-z_]+)"\s*,\s*"(read|create|update|delete)"/g)) add(m[1], m[2])
+      for (const m of flat.matchAll(/"([a-z_]+):(read|create|update|delete)"/g)) add(m[1], m[2])
     }
     // 3 · the record feed asks every mapped module for read
     for (const mod of Object.values(ACTIVITY_GATE_MAP)) add(mod, "read")

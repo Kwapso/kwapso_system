@@ -40,7 +40,7 @@ function show(recipe: ScreenRecipe) {
       // sprints and to-dos are four segments over two permission modules
       // (screens.ts's MODULE_PERMISSION). A denied screen renders NOTHING at
       // all, so getting this wrong is a suite that passes on an empty body.
-      rights={{ work: { read: true, create: false, edit: false, delete: false } }}
+      rights={{ work: { read: true, create: false, update: false, delete: false } }}
       onAction={() => {}}
     />
   )

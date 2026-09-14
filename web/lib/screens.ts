@@ -216,7 +216,7 @@ const membersListRecipe: ScreenRecipe = {
 }
 
 /** Member detail (Overview). Actions change-role + remove are gated by
- * team_members edit/delete; the host hides them on your own row. Its Activity
+ * team_members update/delete; the host hides them on your own row. Its Activity
  * tab went with every other one on 2026-09-06 — see the team recipe above. */
 const memberDetailRecipe: ScreenRecipe = {
   type: "detail",
@@ -229,7 +229,7 @@ const memberDetailRecipe: ScreenRecipe = {
       label: "Change role",
       action: "members.changeRole",
       variant: "secondary",
-      gate: { module: "team_members", right: "edit" },
+      gate: { module: "team_members", right: "update" },
     },
     {
       id: "members.remove",
@@ -780,7 +780,7 @@ function internalDetailTabs(rows: { label: string; column: string }[]): RecipeTa
  * records somebody works through, so there is no status to move along. */
 function internalDetailActions(module: string, prefix: string, archiveLabel: string): RecipeAction[] {
   return [
-    { id: `${prefix}.edit`, label: "Edit", action: `${prefix}.edit`, variant: "secondary", gate: { module, right: "edit" } },
+    { id: `${prefix}.edit`, label: "Edit", action: `${prefix}.edit`, variant: "secondary", gate: { module, right: "update" } },
     {
       id: `${prefix}.archive`,
       label: archiveLabel,

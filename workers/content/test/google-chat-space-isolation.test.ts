@@ -94,9 +94,9 @@ beforeEach(() => {
   holder.db = buildSpineDb()
   chat.fails = new Set()
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('r_knowledge', '${IDS.adminRole}', 'knowledge', 1, 1, 1, 1);
-     INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+     INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('r_google', '${IDS.adminRole}', 'google', 1, 1, 1, 1);`
   )
   const future = new Date(Date.now() + 3_600_000).toISOString()

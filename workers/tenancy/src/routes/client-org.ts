@@ -139,7 +139,7 @@ export async function postUpdateDepartment(request: Request, env: Env): Promise<
     request,
     env,
     "processes",
-    "edit"
+    "update"
   )
   const scope = await callerScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
@@ -212,7 +212,7 @@ export async function postUpdateClientRole(request: Request, env: Env): Promise<
     name?: unknown
     centsPerHour?: unknown
     departmentIds?: unknown
-  }>(request, env, "processes", "edit")
+  }>(request, env, "processes", "update")
   const scope = await callerScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
@@ -237,7 +237,7 @@ export async function postClientRolePerson(request: Request, env: Env): Promise<
     id?: unknown
     personAccountId?: unknown
     attached?: unknown
-  }>(request, env, "processes", "edit")
+  }>(request, env, "processes", "update")
   const scope = await callerScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const personAccountId = requireText(body.personAccountId, "Person", TEXT_LIMITS.short)
@@ -321,7 +321,7 @@ export async function postUpdateTool(request: Request, env: Env): Promise<Respon
     id?: unknown
     name?: unknown
     mark?: unknown
-  }>(request, env, "processes", "edit")
+  }>(request, env, "processes", "update")
   const scope = await callerScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
@@ -341,7 +341,7 @@ export async function postToolPrice(request: Request, env: Env): Promise<Respons
     cents?: unknown
     billingPeriod?: unknown
     effectiveOn?: unknown
-  }>(request, env, "processes", "edit")
+  }>(request, env, "processes", "update")
   const scope = await callerScope(cfg, guard)
   const toolId = requireText(body.toolId, "Tool", TEXT_LIMITS.short)
   const amount = cents(Number(body.cents), "Cost")

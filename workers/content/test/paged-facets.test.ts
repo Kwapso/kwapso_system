@@ -121,7 +121,7 @@ beforeEach(() => {
   // assumed, because a suite whose premise quietly stopped being true would fail
   // (or pass) for a reason that has nothing to do with filtering.
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('${IDS.adminRole}_knowledge', '${IDS.adminRole}', 'knowledge', 1, 1, 1, 1);`
   )
   const values = Array.from({ length: ROWS }, (_, i) => {

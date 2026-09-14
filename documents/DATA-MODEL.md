@@ -526,7 +526,7 @@ it pointing at nothing. Restored; the anchor
 
 ### member_roles + role_permissions. KEEP (built; we split Glide's WIDE → TALL)
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,
-then **24 boolean columns** = 6 modules × {read,create,edit,delete}. Modules:
+then **24 boolean columns** = 6 modules × {read,create,update,delete}. Modules:
 **Teams, Team members, Member roles, Learning, Help, Selectable data**, the six
 our `TEAM_MODULES` (`shared/team-modules.ts`) STARTED as. Five of them are still
 there unchanged (the module a person now reads as **Tickets** is still keyed
@@ -607,7 +607,7 @@ contract already published, so renaming it can only take something away:
 
 | Still `help` | Why it stays |
 |---|---|
-| the permission module key (`help:read/create/edit/delete`) | it is the string sitting in `role_permissions` in every team database, renaming it takes somebody's access away |
+| the permission module key (`help:read/create/update/delete`) | it is the string sitting in `role_permissions` in every team database, renaming it takes somebody's access away |
 | the tables `help` + `help_threads`, and `activity.related_table = 'help'` | renaming orphans every history row already written about a ticket |
 | the API paths `/api/content/help*` | they are `PORTAL_DOORS` entries, `PORTAL_VISIBLE_READS/WRITES` keys and R21's derivation input |
 | the MCP tool names (`list_help_tickets`, `create_help_ticket`, …) | a published external contract, outside developers call these by name |
@@ -2178,12 +2178,12 @@ predates scope and is written down here rather than quietly reconciled.)
 
 **Permissions: two modules. It was three.** `google` (read what you shared ·
 **create = connect an account**, name a folder or space, and say how much of a
-mailbox or a calendar may be read · edit = write back
+mailbox or a calendar may be read · update = write back
 through it · delete = disconnect or stop sharing), plus `google_mail`, which
 exists to carry ONE right: may kwapso send mail as you. Separate from `agent`, so
 granting somebody the assistant does not grant the assistant their outbox. A
 module whose four rights are not all meaningful is not new here: nothing reads
-`agent:edit` either.
+`agent:update` either.
 
 **`google_events` was the third and is gone** (migration
 `0038_calendar_one_way`). It carried "kwapso may put an EVENT in your calendar",

@@ -66,7 +66,7 @@ export async function postCreateBrandAsset(request: Request, env: Env): Promise<
 
 export async function postUpdateBrandAsset(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<BrandAssetInput & { id?: string }>(
-    request, env, "brand_assets", "edit"
+    request, env, "brand_assets", "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Asset", TEXT_LIMITS.short)

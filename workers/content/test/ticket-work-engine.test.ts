@@ -409,7 +409,7 @@ describe("drag-rank is the order the list is read in", () => {
       await call(IDS.victimUser, "POST /api/content/help", { description: "Mine" })
     ))[0]
     // The burglar's ticket is another company's; naming it must not even confirm
-    // it exists. (The Client role holds no help:edit, so the door refuses first —
+    // it exists. (The Client role holds no help:update, so the door refuses first —
     // which is the outer of the two answers, and the one that ships today.)
     const res = await call(IDS.victimUser, "POST /api/content/help/rank", {
       id: mine,

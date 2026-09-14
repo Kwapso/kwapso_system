@@ -15,7 +15,7 @@
 // never be two answers (R16).
 //
 // THE DOOR GATES; THIS ONLY DECIDES WHAT TO DRAW. Every button below is behind
-// the right its own door demands — `deliverables:create` to add, `:edit` to
+// the right its own door demands — `deliverables:create` to add, `:update` to
 // correct, `:delete` to archive — and none of them is `processes`, which is what
 // lets somebody open the app. A role without the right sees no button instead of
 // a button that comes back a 403.
@@ -113,7 +113,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
 
   const { can } = usePermissions(teamId)
   const canCreate = can("deliverables", "create")
-  const canEdit = can("deliverables", "edit")
+  const canEdit = can("deliverables", "update")
   const canArchive = can("deliverables", "delete")
 
   // The team's own vocabulary for the KIND field, read only by somebody who can
@@ -384,7 +384,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           <PencilSimple className="size-3.5" />
                         </Button>
                       )}
-                      {/* SHOW IT TO THE CLIENT, OR TAKE IT BACK. `deliverables:edit`,
+                      {/* SHOW IT TO THE CLIENT, OR TAKE IT BACK. `deliverables:update`,
                           the same right that corrects one — sharing is a different
                           act, not a harder one. Eye / EyeSlash join the house action
                           mapping (UI-CONVENTIONS) as show-to-client /

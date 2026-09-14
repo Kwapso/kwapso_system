@@ -307,7 +307,7 @@ export function StoryFormDialog({
     primeCache(`total:${storyAttachmentsKey(target)}`, r.total)
   }
 
-  /** Take one off from in here. `work:edit` gates the door, and this dialog is
+  /** Take one off from in here. `work:update` gates the door, and this dialog is
    * only ever opened by somebody who holds it. */
   async function detach(attachmentId: string) {
     if (!storyId) return

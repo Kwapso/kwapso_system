@@ -149,9 +149,9 @@ beforeEach(() => {
        VALUES ('${CONTACT}', 'individual', '${IDS.victimAccount}', 'Luis Vera', 'luis@bergman.example', '2026-01-01', '${IDS.staffUser}');`
   )
   db().exec(
-    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+    `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('${IDS.adminRole}_knowledge', '${IDS.adminRole}', 'knowledge', 1, 1, 1, 1);
-     INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+     INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
      VALUES ('${IDS.adminRole}_google', '${IDS.adminRole}', 'google', 1, 1, 1, 1);`
   )
 })

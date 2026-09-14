@@ -121,7 +121,7 @@ export async function postUpdateWave(request: Request, env: Env): Promise<Respon
     id?: unknown
     name?: unknown
     goal?: unknown
-  }>(request, env, "work", "edit")
+  }>(request, env, "work", "update")
   const scope = await agencyScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
@@ -142,7 +142,7 @@ export async function postWaveActive(request: Request, env: Env): Promise<Respon
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   const scope = await agencyScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
@@ -171,7 +171,7 @@ export async function postWaveSprint(request: Request, env: Env): Promise<Respon
     request,
     env,
     "work",
-    "edit"
+    "update"
   )
   const scope = await agencyScope(cfg, guard)
   const sprintId = requireText(body.sprintId, "Sprint", TEXT_LIMITS.short)

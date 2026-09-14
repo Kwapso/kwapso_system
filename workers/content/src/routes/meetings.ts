@@ -164,7 +164,7 @@ export async function postUpdateMeeting(request: Request, env: Env): Promise<Res
     request,
     env,
     "meetings",
-    "edit"
+    "update"
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Meeting", TEXT_LIMITS.short)
@@ -222,7 +222,7 @@ export async function postSetMeetingActive(request: Request, env: Env): Promise<
  * did not touch that — the claim was never on the status, which is why the
  * hours cannot be doubled by a second import. */
 export async function postMeetingTranscript(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "meetings", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "meetings", "update")
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google", "read")
   const id = requireText(body.id, "Meeting", TEXT_LIMITS.short)

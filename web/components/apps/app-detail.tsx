@@ -128,7 +128,7 @@ export function AppDetailScreen({
   const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
 
   const { can } = usePermissions(teamId)
-  const canEdit = can("processes", "edit")
+  const canEdit = can("processes", "update")
   const canArchive = can("processes", "delete")
   const canWriteWork = can("work", "create")
   const canReadKnowledge = can("knowledge", "read")
@@ -143,7 +143,7 @@ export function AppDetailScreen({
   const canReadDeliverables = can("deliverables", "read")
   // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
   // system is `help:create` and putting a meeting on the meetings list is
-  // `meetings:create` — the rights those two doors gate on. `processes:edit`,
+  // `meetings:create` — the rights those two doors gate on. `processes:update`,
   // which is what lets somebody edit the app record itself, says nothing about
   // either. The door decides (R10); these only decide whether we draw a button
   // that would come back a 403.
