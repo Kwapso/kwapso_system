@@ -4907,6 +4907,95 @@ describe("RULES — the laws of the base", () => {
       corner,
       `R63 — "when pin, i still want it round": the pinned band reaches the container's border box and rounds its top corners against what is BEHIND the container:\n  ${corner.join("\n  ")}`
     ).toEqual([])
+
+    // ── (viii) A STOOD-DOWN ROW UN-PINS COMPLETELY ─────────────────────────
+    // Measured on staging, 2026-09-14, from the client's "stories is broken":
+    // every story was in the DOM, laid out, `opacity: 1`, white on transparent
+    // — and the screen drew an empty panel. The rows were under an opaque
+    // rectangle the exact colour of the panel, and nothing could see it: it is
+    // a PSEUDO-ELEMENT, so it is absent from the DOM, invisible to
+    // `elementFromPoint` (it is `pointer-events: none`), and off the row's own
+    // ancestor chain, which is where a walk upward from a missing row looks.
+    // A forced `background: red !important` on a row did not show. Giving that
+    // row `z-index: 10` did — and that is the whole diagnosis: the band was
+    // painting ABOVE the rows.
+    //
+    // THE CAUSE IS THE INTERACTION OF TWO CORRECT LINES. Clause (v)'s rule
+    // stands the inner toolbar down with `position: static`; the pin's band is
+    // `::before { position: absolute; inset: 0 }`, which is the ROW's own box
+    // only while the row is positioned. Made static, `inset: 0` resolves
+    // against the nearest positioned ancestor instead — the panel — so a
+    // 1200x68 band became 1272x4593, and the `z-index: 9` the stand-down left
+    // behind lifted it over every row painting in flow beneath it.
+    //
+    // SO THE CHECK IS DERIVED FROM THE PIN, NOT FROM THIS LIST: whatever
+    // `PINNED_TOOLBAR_IN_KIT_PANEL` applies to the slot, the rule that stands
+    // that slot down must neutralise. Both front doors carry the rule (it is
+    // hand-written in each `globals.css`, beside the token it spends), and a
+    // door that stops carrying it is red rather than silently skipped.
+    const pinnedInKitPanel =
+      /export const PINNED_TOOLBAR_IN_KIT_PANEL\s*=([\s\S]*?)(?:\n\n|$)/.exec(
+        stripComments(readFileSync(join(ROOT, "shared/web/pinned-chrome.ts"), "utf8"))
+      )?.[1] ?? ""
+    const SLOT = "[&_[data-slot=collection-frame-toolbar]]:"
+    /** What the pin gives the slot that a STOOD-DOWN row must not keep, and the
+     * declaration that takes each one back. Read off the pin's own class string
+     * — an `applied` the seam stops spelling makes this clause red here, rather
+     * than quietly asserting nothing about a band that still paints. */
+    const standDown: [applied: string, undone: string, why: string][] = [
+      [
+        `${SLOT}sticky`,
+        "position: static",
+        "the row that is not the outermost pin does not pin",
+      ],
+      [
+        `${SLOT}z-[9]`,
+        "z-index: auto",
+        "a stood-down row must not keep a stacking context of its own — it is what lifted the band over the rows on 2026-09-14",
+      ],
+      [
+        `${SLOT}before:absolute`,
+        "content: none",
+        "and it draws no band at all: `inset: 0` on an absolutely-positioned ::before is the row's box only while the row is positioned, so on a static row it becomes the whole panel",
+      ],
+    ]
+    const stoodDown: string[] = []
+    const STAND_DOWN_RULE =
+      /\*:has\(> \[data-slot="toolbar-row-pin"\]\) \[data-slot="collection-frame-toolbar"\]([\s\S]*?)\n\}\n/g
+    for (const door of ["web/app/globals.css", "web-portal/app/globals.css"]) {
+      // EVERY rule on the selector, base and ::before together: the band is
+      // undone in a companion rule, so reading only the first block would
+      // report a missing `content: none` that is right there.
+      // COMMENTS STRIPPED FIRST — through the repo's one stripper, which is
+      // itself a law (web/test/source-scan.test.ts). This clause earned the line the hard
+      // way: the fix's own note inside the rule explains why `z-index: auto`
+      // is there, so a raw read found the needle in the PROSE and the clause
+      // passed against a door that had lost the declaration. A rule test that
+      // reads its own explanation is a rule test that cannot fail.
+      const css = stripComments(readFileSync(join(ROOT, door), "utf8"))
+      const blocks = [...css.matchAll(STAND_DOWN_RULE)].map((m) => m[0])
+      if (blocks.length === 0) {
+        stoodDown.push(
+          `${door}: has no stand-down rule for [data-slot=collection-frame-toolbar] — two pinned toolbars then land in one band and the outer paints over the inner's create button`
+        )
+        continue
+      }
+      const body = blocks.join("\n")
+      for (const [applied, undone, why] of standDown) {
+        if (!pinnedInKitPanel.includes(applied)) {
+          stoodDown.push(
+            `shared/web/pinned-chrome.ts: PINNED_TOOLBAR_IN_KIT_PANEL no longer applies \`${applied}\` — this clause is derived from it, so re-point it rather than deleting the sentence it proves`
+          )
+          continue
+        }
+        if (!body.includes(undone))
+          stoodDown.push(`${door}: the stand-down rule must take \`${applied}\` back with \`${undone}\` — ${why}`)
+      }
+    }
+    expect(
+      stoodDown,
+      `R63 — a stood-down collection toolbar un-pins COMPLETELY, or its band paints over the rows (measured on Stories, staging, 2026-09-14):\n  ${stoodDown.join("\n  ")}`
+    ).toEqual([])
   })
 
   /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.

@@ -260,6 +260,35 @@
      this row drew before part 4. */
   --pinned-inset-x: 0px;
   --pinned-behind: var(--pinned-ground);
+
+  /* AND THE PIN'S OWN STACKING CONTEXT AND BAND GO WITH IT. Measured on
+     staging, 2026-09-14, after the client reported Stories as broken: the row
+     stood down here kept `z-index: 9` and kept the `::before` that paints the
+     band. `::before` is `position: absolute; inset: 0`, which is the pinned
+     row's own box only while that row is POSITIONED — and the first
+     declaration in this rule makes it static, so `inset: 0` resolves against
+     the nearest positioned ancestor instead: the panel (`relative z-[2]`).
+     The band therefore grew from 1200x68 to the panel's full 1272x4593, and
+     `z-index: 9` lifted the whole pseudo-element above the rows painting in
+     flow beneath it. Every story was in the DOM, laid out, `opacity: 1`, white
+     on transparent — under an opaque rectangle the colour of the panel. A
+     forced `background: red !important` on a row did not show; giving that row
+     `z-index: 10` did.
+
+     So a stood-down row un-pins COMPLETELY: no stacking context of its own,
+     and no band. `z-index: auto` alone would be enough to uncover the rows (a
+     `z-index: -1` child paints below in-flow content once its parent stops
+     being a stacking context), but a 4,593px pseudo-element nobody can see is
+     the trap that cost this screen — so the band is removed outright, which is
+     also what "a stood-down row is not pinned" already says twice above. */
+  z-index: auto;
+}
+
+/* The stood-down row's band, removed rather than merely hidden — see the
+   z-index note in the rule above. A row that is not pinned paints no band and
+   carries no container corner, so the pseudo-element has nothing left to draw. */
+*:has(> [data-slot="toolbar-row-pin"]) [data-slot="collection-frame-toolbar"]::before {
+  content: none;
 }
 
 /* ============================================================================
