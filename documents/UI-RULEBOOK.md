@@ -1548,14 +1548,44 @@ second sheet sliding over the first, and the two answers are "Keep editing" (foc
 default, the safe answer) or a destructive "Discard your unsaved changes?" that runs the
 tab's own Discard path before switching.
 
-**What is still open.** The guard above catches a tab SWITCH inside Settings. It does not
-catch leaving the screen altogether — closing the tab, following a link elsewhere in the
-app, or closing the browser with a dirty Appearance or Roles draft still staged. No
-`beforeunload` handler and no hook into the app shell's own navigation dispatch exists yet:
-an app-wide navigate-away guard is a named gap, not a shipped behaviour.
+**The navigate-away half, closed 2026-09-15.** Staging a draft behind this bar answers "what
+happens if I press Save or Discard" — it does not by itself answer "what happens if I leave
+without answering either." Switching the Settings TAB while dirty already asked first
+(`settings-screen.tsx`'s own `handleTabChange`); LEAVING Settings altogether — a nav-rail
+press, an `<InAppLink>` to a record, closing the Settings tab in the workspace strip, or the
+browser's own Back — used to unmount a dirty panel in silence, because none of those seams
+had ever heard of the tab guard's private `dirtyTabs` map. `web/lib/unsaved-changes.ts` is
+the one registry both now read and feed (`markDirty`/`isDirty`/`anyDirty`), and
+`web/lib/nav.ts`'s `guardNavigate` is what asks before ANY navigation is allowed to unmount
+whatever is showing — called from `softNavigate` itself and from `go()`
+(`deep-link-screen.tsx`, registered as `hostGo`), which is what actually reaches a nav-rail
+press or a workspace-tab close, since both call `go` directly rather than through
+`softNavigate`. The one dialog (`<UnsavedChangesDialog>`,
+`web/components/shell/unsaved-changes-dialog.tsx`) is raised locally by the tab guard and,
+for a real navigation, by `<UnsavedChangesDialogHost>` — mounted once in `web/app/layout.tsx`
+beside `<Toaster />`, because `guardNavigate` is a plain function with no dialog in hand, the
+same shape `toast()` already uses. The browser's own Back is guarded too
+(`use-host-nav.ts`'s `useUrlRoute`, which cannot `preventDefault()` a `popstate` and instead
+puts the address bar back and asks). Opening a new workspace tab (`openInNewTab`, R74) never
+asks — it does not leave the tab you were on — and a `beforeunload` listener covers closing
+the browser tab or reloading outright, registered only while something is actually dirty.
 
-**Code.** `shared/web/appearance-panel.tsx`, `web/components/team/roles-matrix.tsx`,
-`web/components/screens/settings-screen.tsx`.
+**Not a LAW yet, on purpose.** A census could ask "every consumer of the kit's
+`<UnsavedChangesBar>` calls `markDirty`" — the shape every other derived rule in this base
+takes — but the real wiring is one file removed from the bar itself: `AppearancePanel` and
+`RolesMatrix` each render the bar and expose `onDirtyChange`, and it is their CALLER
+(`settings-screen.tsx`) that turns a press into a `markDirty` call, through a plain prop with
+no marker a source scan can follow back to its origin. With exactly two callers, both wired
+by the same hand in the same change, a check built to "derive" that link would really only be
+restating two facts this file already asserts in prose — the dishonest shape the brief that
+closed this gap warned against, not a rule that could catch a THIRD panel wiring the prop to
+a `console.log` instead. Revisit this the day a third staged panel exists: two real call sites
+sharing one traceable pattern is what a positional census (R20's own shape) needs to be worth
+writing.
+
+**Code.** `shared/web/appearance-panel.tsx` (the staging), `web/lib/unsaved-changes.ts` (the
+registry), `web/lib/nav.ts` (the guard), `web/components/shell/unsaved-changes-dialog.tsx`
+(the one dialog and its host).
 
 ### B13: a protected value is always active — there is no such state as "active, protected"
 
