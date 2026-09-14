@@ -53,7 +53,7 @@
     // call — it reads the tokens agent_usage_log recorded and turns them
     // into money, which needs the rate card's name. Held to data-ops' pin by
     // no-quiet-downgrade.test.ts, which reads every wrangler config off disk.
-    "AGENT_MODEL": "@cf/moonshotai/kimi-k2.6",
+    "AGENT_MODEL": "@cf/openai/gpt-oss-120b",
     "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     // THE CORE DATABASE'S OWN UUID — the same id as the `DB` binding above, said
@@ -138,7 +138,7 @@
         // call — it reads the tokens agent_usage_log recorded and turns them
         // into money, which needs the rate card's name. Held to data-ops' pin by
         // no-quiet-downgrade.test.ts, which reads every wrangler config off disk.
-        "AGENT_MODEL": "@cf/moonshotai/kimi-k2.6",
+        "AGENT_MODEL": "@cf/openai/gpt-oss-120b",
         // "true" like content + data-ops: ONE allowance, ONE height — staging
         // never refuses for running out (the counters still record).
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",

@@ -59,17 +59,19 @@ export const MODEL_PRICES: Record<
   string,
   { inPerM: number; outPerM: number; neuronsPerMIn: number; neuronsPerMOut: number }
 > = {
-  // The assistant's engine, pinned in workers/data-ops/wrangler.jsonc in BOTH
-  // environments and matched by DEFAULT_AGENT_MODEL.
+  // The engine from 1 to 14 Sep 2026, kept because every usage row in that window
+  // was metered on it — pricing an old row at today's engine would silently
+  // rewrite what those turns cost. (Why it went: model.ts, above DEFAULT_AGENT_MODEL.)
   "@cf/moonshotai/kimi-k2.6": {
     inPerM: 0.95,
     outPerM: 4.0,
     neuronsPerMIn: 86_364,
     neuronsPerMOut: 363_636,
   },
-  // The previous engine, kept because staging history and every bench run before
-  // 1 Sep 2026 was measured on it — pricing an old row at today's engine would
-  // silently rewrite what those runs cost.
+  // The assistant's engine, pinned in workers/data-ops/wrangler.jsonc in BOTH
+  // environments and matched by DEFAULT_AGENT_MODEL. It was also the engine
+  // before 1 Sep 2026, so the staging history and the early bench runs price
+  // on this row too.
   "@cf/openai/gpt-oss-120b": {
     inPerM: 0.35,
     outPerM: 0.75,
