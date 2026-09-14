@@ -8,6 +8,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 
 import type { CoreDb } from "./error-log"
+import { isD1Transient } from "./d1-transient"
 import type { ActivityOrigin } from "./origin"
 
 export type D1Rest = {
@@ -215,7 +216,10 @@ async function cfRaw<T>(
       // one thing that separates them. Retrying it is the SAME policy the 5xx
       // branch already applies to the same statements — not a new stance on
       // retrying writes.
-      if (data.errors?.some((e) => /^internal error/i.test(e.message))) {
+      // The wording is ONE signature shared with the native binding
+      // (d1-transient.ts) — it used to be anchored here, and the `D1_ERROR: `
+      // prefix walked past it.
+      if (data.errors?.some((e) => isD1Transient(e.message))) {
         lastError = new Error(
           `Cloudflare D1 API failed: ${data.errors.map((e) => e.message).join("; ")}`
         )
