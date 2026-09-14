@@ -22,6 +22,7 @@
 import type { D1Database } from "@cloudflare/workers-types"
 
 import type { AgentQuota, UsageLogRow } from "../types"
+import { retryTransient } from "./d1-transient"
 import { logError } from "./error-log"
 import type { Actor } from "./gating"
 import { ulid } from "./id"
@@ -71,14 +72,18 @@ function today(): string {
 
 /** A team's current quota snapshot (free used today + purchasable balance). */
 export async function getQuota(env: Env, teamId: string): Promise<AgentQuota> {
-  const usage = await env.DB.prepare(
-    "SELECT used FROM agent_usage WHERE team_id = ? AND period = ?"
+  // Two reads, retried when the core database says it will be fine in a
+  // moment (d1-transient.ts) — a quota read is always safe to ask again.
+  const usage = await retryTransient(() =>
+    env.DB.prepare("SELECT used FROM agent_usage WHERE team_id = ? AND period = ?")
+      .bind(teamId, today())
+      .first<{ used: number }>()
   )
-    .bind(teamId, today())
-    .first<{ used: number }>()
-  const credit = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
-    .bind(teamId)
-    .first<{ balance: number }>()
+  const credit = await retryTransient(() =>
+    env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
+      .bind(teamId)
+      .first<{ balance: number }>()
+  )
   const unlimited = noDailyCap(env)
   // The number a person READS is always the configured allowance, never the
   // unreachable sentinel capFor hands the SQL — so an uncapped environment shows
@@ -121,28 +126,37 @@ export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeRe
   // ONE statement checks the cap AND consumes the slot: the row is created at
   // used = 1, or incremented only while it is still under the cap. Zero rows
   // changed = the free allowance is spent, and we fall through to paid credits.
-  const claimed = await env.DB.prepare(
-    // The `SELECT ... WHERE ? > 0` is load-bearing: a bare VALUES row is inserted
-    // unconditionally, so the ON CONFLICT guard below only ever protected the
-    // SECOND request of the day. With AGENT_FREE_DAILY=0 the first one still went
-    // through free — a cap of zero that granted one.
-    `INSERT INTO agent_usage (team_id, period, used, updated_at)
-     SELECT ?, ?, 1, ? WHERE ? > 0
-     ON CONFLICT(team_id, period) DO UPDATE SET used = used + 1, updated_at = ?
-     WHERE agent_usage.used < ?`
+  //
+  // RETRIED ON A TRANSIENT (d1-transient.ts), and this is the one write where
+  // that is a judgement rather than a free choice — the file says which way it
+  // went and why: one free unit charged twice in the rare worst case, against
+  // a whole turn dying at step twenty-eight in the measured one.
+  const claimed = await retryTransient(() =>
+    env.DB.prepare(
+      // The `SELECT ... WHERE ? > 0` is load-bearing: a bare VALUES row is inserted
+      // unconditionally, so the ON CONFLICT guard below only ever protected the
+      // SECOND request of the day. With AGENT_FREE_DAILY=0 the first one still went
+      // through free — a cap of zero that granted one.
+      `INSERT INTO agent_usage (team_id, period, used, updated_at)
+       SELECT ?, ?, 1, ? WHERE ? > 0
+       ON CONFLICT(team_id, period) DO UPDATE SET used = used + 1, updated_at = ?
+       WHERE agent_usage.used < ?`
+    )
+      .bind(teamId, period, now, cap, now, cap)
+      .run()
   )
-    .bind(teamId, period, now, cap, now, cap)
-    .run()
   if ((claimed.meta.changes ?? 0) > 0) {
     const quota = await getQuota(env, teamId)
     return { ok: true, source: "free", quota }
   }
 
-  const res = await env.DB.prepare(
-    "UPDATE agent_credits SET balance = balance - 1, updated_at = ? WHERE team_id = ? AND balance > 0"
+  const res = await retryTransient(() =>
+    env.DB.prepare(
+      "UPDATE agent_credits SET balance = balance - 1, updated_at = ? WHERE team_id = ? AND balance > 0"
+    )
+      .bind(now, teamId)
+      .run()
   )
-    .bind(now, teamId)
-    .run()
   if ((res.meta.changes ?? 0) === 0) {
     return { ok: false, source: "none", quota: await getQuota(env, teamId) }
   }

@@ -48,6 +48,24 @@ describe("the D1 REST door's failure classification", () => {
     expect(s.calls(), "one blip, one retry — two calls").toBe(2)
   })
 
+  it("the native binding's wording — `D1_ERROR: ` prefixed, capital I, 'storage caused object to be reset' — retries too", async () => {
+    // 14 Sep 2026: the third wording D1 has used for the same transient, and
+    // the anchored `^internal error` match walked straight past its prefix.
+    // The signature is now the one shared with the native path
+    // (d1-transient.ts); this pins that the REST door reads it.
+    const reset = {
+      status: 200,
+      body: {
+        success: false,
+        errors: [{ code: 7500, message: "D1_ERROR: Internal error in D1 DB storage caused object to be reset; reference = h8l1" }],
+        result: null,
+      },
+    }
+    const f = fetchScript([reset, ok])
+    expect(await d1Query(CFG, "db1", "SELECT 1")).toEqual([{ n: 7 }])
+    expect(f.calls()).toBe(2)
+  })
+
   it("gives up after the attempts are spent, with the real message", async () => {
     const s = fetchScript([transient7500])
     await expect(d1Query(CFG, "db1", "SELECT 1")).rejects.toThrow(/internal error; reference/)
