@@ -56,7 +56,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
 import type { TaskView } from "@/lib/live-resources"
-import { registerHostGo } from "@/lib/nav"
+import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
   closeTab,
@@ -339,12 +339,36 @@ export function DeepLinkScreen() {
   // is still on the page, so both movers capture first and then move. Every
   // deliberate move in the app is one of these two (R37 sees to that), so there
   // is no third place to remember.
+  // THE ONE PLACE A NAVIGATION ACTUALLY HAPPENS — and so the one place that
+  // must ask first. `go` is registered as `hostGo` (below), which is what
+  // `softNavigate` resolves to, but it is ALSO called directly by several
+  // callers inside this file and `AppShell` (`onNavigate={go}` — the nav
+  // rail, a breadcrumb, `closeWorkspaceTab`), which never pass through
+  // `softNavigate` at all. Guarding here, rather than only in `nav.ts`, is
+  // what actually covers "pressing a nav item while a draft sits behind you"
+  // — see `guardNavigate`'s own header in `nav.ts` for why the check exists
+  // in both places without ever showing two dialogs.
   const go = React.useCallback(
     (path: string, q?: ScreenQuery) => {
-      captureScroll()
-      routeTo(path, q)
+      const perform = () => {
+        captureScroll()
+        routeTo(path, q)
+      }
+      // READ AND CLEARED UNCONDITIONALLY, EVERY CALL — a flag left set by a
+      // `leaving` call that returned early above would still be sitting
+      // there for the NEXT, unrelated `go()`. `openInNewTab` (nav.ts, R74)
+      // sets this immediately before the one call into `hostGo` that reaches
+      // here — opening a new workspace tab does not leave the one you were
+      // on, so it is the one navigation this app has ruled must never ask.
+      const skipGuard = consumeGoGuardSkip()
+      const leaving = path.split("?")[0] !== currentPath.split("?")[0]
+      if (!leaving || skipGuard) {
+        perform()
+        return
+      }
+      guardNavigate(perform)
     },
-    [captureScroll, routeTo]
+    [currentPath, captureScroll, routeTo]
   )
   const replace = React.useCallback(
     (path: string) => {
@@ -555,11 +579,26 @@ export function DeepLinkScreen() {
   // MOVES when the tab that closed was the one being looked at — closing a
   // background tab must not navigate, which is the entire point of a background
   // tab.
+  //
+  // CLOSING THE ACTIVE TAB IS A NAVIGATION TOO (see `unsaved-changes.ts`), so
+  // it is held behind the SAME guard as every other one — but held as ONE
+  // unit with the `closeTab` call, not just the `go` after it. `closeTab`
+  // mutates the workspace-tab store immediately, so gating only `go` would
+  // still remove the tab from the strip on Keep editing while the panel it
+  // pointed at stayed mounted and dirty — a half-closed tab agreeing with
+  // nothing on screen. Deferring the whole close-and-land step means Keep
+  // editing truly moves nothing: the tab is still there, still active, still
+  // showing the same draft.
   const closeWorkspaceTab = React.useCallback(
     (path: string) => {
-      const landing = closeTab(path)
-      if (path !== currentPath) return
-      go(landing ?? sectionPath)
+      if (path !== currentPath) {
+        closeTab(path) // a background tab never navigates — nothing mounted is at risk
+        return
+      }
+      guardNavigate(() => {
+        const landing = closeTab(path)
+        go(landing ?? sectionPath)
+      })
     },
     [currentPath, go, sectionPath]
   )

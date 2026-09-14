@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/shell/error-boundary"
 import { ErrorReporter } from "@shared/web/error-reporter"
 import { InstallPrompt } from "@/components/shell/install-prompt"
 import { VersionWatch } from "@/components/shell/version-watch"
+import { UnsavedChangesDialogHost } from "@/components/shell/unsaved-changes-dialog"
 import "./globals.css"
 
 // Name, description, icons and the viewport lock come from the ONE place both
@@ -183,6 +184,13 @@ export default function RootLayout({
           </ErrorBoundary>
           <InstallPrompt />
           <Toaster />
+          {/* THE UNSAVED-CHANGES CONFIRM'S HOST — beside `<Toaster />` for the
+           * same reason: `web/lib/nav.ts`'s `guardNavigate` and
+           * `use-host-nav.ts`'s Back handling are plain functions, not
+           * components, and this is the one place their imperative confirm
+           * request is actually drawn. See `unsaved-changes-dialog.tsx`'s
+           * own header. */}
+          <UnsavedChangesDialogHost />
         </ThemeProvider>
       </body>
     </html>

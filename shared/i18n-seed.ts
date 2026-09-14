@@ -181,23 +181,28 @@ export const SEED: Catalogue = {
     ca: "L'idioma canvia de seguida. Mida, aparença i fons esperen a desar.",
   },
 
-  /* ── The Settings tab strip's own unsaved-changes guard, added 2026-09-14
-   * beside `settings-screen.tsx`'s `handleTabChange` — the kit's `AlertDialog`
-   * (R59) that stops a dirty Appearance or Team › Roles draft from being
-   * thrown away in silence by a tab switch. The question follows the same
-   * "infinitive/¿…?/Vols…?" shape "Switch off this module?" and "Deactivate
-   * this profile?" already use a few hundred lines below, and "Discard" here
-   * shares its German/Spanish/Catalan root with the bar's own `Discard`
-   * entry above rather than inventing a second word for the same act. */
+  /* ── The one unsaved-changes confirm, added 2026-09-14 beside
+   * `settings-screen.tsx`'s `handleTabChange` (a dirty Appearance or Team ›
+   * Roles draft, thrown away in silence by a tab switch) and widened
+   * 2026-09-15 to `web/lib/nav.ts`'s `guardNavigate` and
+   * `use-host-nav.ts`'s Back handling — the SAME kit `AlertDialog` (R59) now
+   * raised by leaving Settings altogether (a nav-rail press, a record link,
+   * closing the Settings tab, the browser's own Back), not only by switching
+   * tabs inside it — see `unsaved-changes-dialog.tsx`. The question follows
+   * the same "infinitive/¿…?/Vols…?" shape "Switch off this module?" and
+   * "Deactivate this profile?" already use a few hundred lines below, and
+   * "Discard" here shares its German/Spanish/Catalan root with the bar's own
+   * `Discard` entry above rather than inventing a second word for the same
+   * act. */
   "Discard your unsaved changes?": {
     de: "Ungespeicherte Änderungen verwerfen?",
     es: "¿Descartar los cambios sin guardar?",
     ca: "Vols descartar els canvis sense desar?",
   },
-  "Switching tabs throws away what you changed here.": {
-    de: "Beim Wechsel der Registerkarte gehen deine Änderungen hier verloren.",
-    es: "Si cambias de pestaña, perderás los cambios que hiciste aquí.",
-    ca: "Si canvies de pestanya, perdràs els canvis que has fet aquí.",
+  "Leaving throws away what you changed here.": {
+    de: "Beim Verlassen gehen deine Änderungen hier verloren.",
+    es: "Si sales, perderás los cambios que hiciste aquí.",
+    ca: "Si surts, perdràs els canvis que has fet aquí.",
   },
   "Keep editing": {
     de: "Weiter bearbeiten",

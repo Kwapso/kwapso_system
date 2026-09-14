@@ -213,16 +213,6 @@
 
 import * as React from "react"
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
@@ -245,6 +235,8 @@ import type { ActiveTeam } from "@/lib/use-active-team"
 import { AppearancePanel } from "@shared/web/appearance-panel"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
+import { UnsavedChangesDialog } from "@/components/shell/unsaved-changes-dialog"
+import { isDirty, markDirty } from "@/lib/unsaved-changes"
 
 import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
@@ -270,6 +262,13 @@ import { formatCount } from "@shared/web/format-count"
  * measuring different cells and a shared number would tie them together by
  * accident. */
 const MIN_MODULE_CARD = "16rem"
+
+/** THE TWO STAGED PANELS' OWN REGISTRY KEYS — see "THE UNSAVED-TAB GUARD"
+ * below. `"settings:<tab>"`, never a path: Settings has one URL for every
+ * tab, and `web/lib/unsaved-changes.ts`'s own header asks every caller for a
+ * stable name for the SCREEN holding the draft. */
+const APPEARANCE_DIRTY_KEY = "settings:appearance"
+const TEAM_DIRTY_KEY = "settings:team"
 
 export function SettingsScreen({
   active,
@@ -338,12 +337,18 @@ export function SettingsScreen({
   // nobody is looking at. A guard on the one seam that already knows when a
   // switch is about to happen is the smaller change.
   //
-  // `dirtyTabs` is fed by the two staged panels' own `onDirtyChange` — the
-  // narrowest prop each file grew for this (see each panel's own doc), called
-  // from an effect off their existing `dirty` state and with `false` on
-  // unmount. Any tab this screen never stages stays permanently `false` here
-  // and is never asked to guard anything.
-  const [dirtyTabs, setDirtyTabs] = React.useState<Record<string, boolean>>({})
+  // `dirtyTabs` USED TO BE A PRIVATE STATE MAP HERE, FED BY THE TWO STAGED
+  // PANELS' OWN `onDirtyChange`. It is now `web/lib/unsaved-changes.ts` — the
+  // ONE registry, so this screen's own tab switch and the app's nav bus (a
+  // nav-rail press, a record link, closing this Settings tab in the
+  // workspace strip, the browser's own Back) ask the SAME question about the
+  // SAME draft instead of two guards that could disagree. See that file's
+  // own header for the full account of the gap it closes; this screen still
+  // does exactly what it always did — feed the registry on every `dirty`
+  // change, `false` again on unmount — it just no longer keeps its own copy
+  // of the answer. `APPEARANCE_DIRTY_KEY` / `TEAM_DIRTY_KEY` are declared
+  // above, module-level, with the registry's own naming rule.
+
   // The tab a press was ASKING to switch to, held only while the discard
   // dialog is open — `null` means the dialog is closed. Set by the guard
   // below, cleared by either of the dialog's two answers.
@@ -355,9 +360,11 @@ export function SettingsScreen({
   // never calls `setTab` from anywhere but here and the dialog's own Discard
   // answer) passes through it. When the CURRENT tab is dirty, the switch does
   // not happen yet: R59 (a yes/no warning is the one centred overlay) says
-  // this is the kit's `AlertDialog`, opened below instead.
+  // this is the kit's `AlertDialog`, opened below instead. Reads `isDirty`
+  // straight off the registry rather than a local map — every tab but
+  // `appearance`/`team` is never marked, so this is always `false` for them.
   function handleTabChange(next: string) {
-    if (dirtyTabs[tab]) {
+    if (isDirty(`settings:${tab}`)) {
       setPendingTabSwitch(next)
       return
     }
@@ -370,23 +377,20 @@ export function SettingsScreen({
   // it a fresh arrow function on every render of THIS screen would change
   // that second dependency every time this screen re-renders for any reason
   // at all (the Modules wall's search box, a tab switch, a live members
-  // ping…), which reruns the panel's effect, which calls `setDirtyTabs`,
-  // which re-renders this screen, which hands the panel a new function
-  // again — an infinite loop, caught live in `verify/appearance-panel`'s own
-  // rig before it ever reached the real screen. `useCallback` with an empty
-  // dependency array is correct because both closures only ever reach a
-  // `useState` setter (React guarantees its own identity never changes) and
-  // a literal tab key — there is nothing about either closure that a later
-  // render could make stale.
+  // ping…), which reruns the panel's effect — harmless on its own now that
+  // the target is the registry rather than a `setState` that re-rendered
+  // THIS screen (the loop `verify/appearance-panel`'s own rig caught before
+  // it ever reached the real screen), but still kept `useCallback`'d so a
+  // panel's effect is not asked to re-run for no reason on every unrelated
+  // render. `useCallback` with an empty dependency array is correct because
+  // both closures only ever reach `markDirty` (a stable module export) and a
+  // literal registry key — there is nothing about either closure that a
+  // later render could make stale.
   const setAppearanceDirty = React.useCallback(
-    (dirty: boolean) =>
-      setDirtyTabs((prev) => (prev.appearance === dirty ? prev : { ...prev, appearance: dirty })),
+    (dirty: boolean) => markDirty(APPEARANCE_DIRTY_KEY, dirty),
     []
   )
-  const setTeamDirty = React.useCallback(
-    (dirty: boolean) => setDirtyTabs((prev) => (prev.team === dirty ? prev : { ...prev, team: dirty })),
-    []
-  )
+  const setTeamDirty = React.useCallback((dirty: boolean) => markDirty(TEAM_DIRTY_KEY, dirty), [])
 
   // MEMBERS + ROLES — ONE READ, TWO CONTAINERS. `useScreenData` loads members
   // only "on its own module" (its own doc), which `module: "members"` turns on;
@@ -1201,55 +1205,28 @@ export function SettingsScreen({
       />
 
       {/* THE UNSAVED-TAB GUARD'S OWN DIALOG — R59: a yes/no warning is the one
-          centred overlay, the kit's `AlertDialog`, never a `Sheet`. Shape and
-          copy voice copied from the app's other confirms over a reversible
-          choice (`roles-matrix.tsx`'s own deactivate-role warning is one: a
-          question for a title, one plain sentence for the body, the safe
-          answer as `AlertDialogCancel` — focused by Radix by default — and
-          the losing answer as a destructive `AlertDialogAction`). "Losing"
-          is the operative word here too: nothing is deleted on a server, but
-          a discarded draft is gone the same way an unsaved page reload would
-          lose it, which is exactly the shape this law is for. */}
-      <AlertDialog
+          centred overlay, the kit's `AlertDialog`, never a `Sheet`. The
+          component itself, its copy and its shape now live in
+          `unsaved-changes-dialog.tsx`, shared with the app's nav bus (a
+          nav-rail press, a record link, closing this Settings tab, the
+          browser's own Back — see `web/lib/nav.ts`'s `guardNavigate`) so
+          there is exactly one unsaved-changes confirm in the app, not two
+          that read almost, but not quite, the same. */}
+      <UnsavedChangesDialog
         open={pendingTabSwitch !== null}
         onOpenChange={(open) => !open && setPendingTabSwitch(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("Discard your unsaved changes?")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("Switching tabs throws away what you changed here.")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            {/* KEEP EDITING — the default answer, and Radix's own initial
-                focus (the safe answer, same as every other `AlertDialog` in
-                this app). Closing the dialog without switching is the whole
-                of it: `tab` never moved, so the panel that was dirty is
-                still mounted, still dirty, still showing exactly what was
-                there before the press. */}
-            <AlertDialogCancel>{t("Keep editing")}</AlertDialogCancel>
-            {/* DISCARD CHANGES — performs the switch that was on hold. The
-                leaving panel unmounts on the next render the same way it
-                always would have; its draft dies exactly as it did before
-                this guard existed, and that is now a CHOSEN outcome rather
-                than a silent one. Nothing to await: discarding a draft that
-                was never sent anywhere has no door to call, the same
-                argument `roles-matrix.tsx`'s own `discardDraft` makes about
-                itself. */}
-            <AlertDialogAction
-              variant="destructive"
-              onClick={(e) => {
-                e.preventDefault()
-                if (pendingTabSwitch) setTab(pendingTabSwitch)
-                setPendingTabSwitch(null)
-              }}
-            >
-              {t("Discard changes")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onDiscard={() => {
+          // Performs the switch that was on hold. The leaving panel unmounts
+          // on the next render the same way it always would have; its draft
+          // dies exactly as it did before this guard existed, and that is
+          // now a CHOSEN outcome rather than a silent one. Nothing to await:
+          // discarding a draft that was never sent anywhere has no door to
+          // call, the same argument `roles-matrix.tsx`'s own `discardDraft`
+          // makes about itself.
+          if (pendingTabSwitch) setTab(pendingTabSwitch)
+          setPendingTabSwitch(null)
+        }}
+      />
     </div>
   )
 }

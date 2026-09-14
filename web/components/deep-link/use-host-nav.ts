@@ -11,6 +11,8 @@ import { usePathname, type useRouter } from "next/navigation"
 import { buildScreenQuery, type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { parseRoute, TOP_LEVEL_MODULES, type Route } from "@/components/deep-link/route"
+import { guardNavigate } from "@/lib/nav"
+import { anyDirty } from "@/lib/unsaved-changes"
 
 /** The framework router, as the host hands it over. */
 type HostRouter = ReturnType<typeof useRouter>
@@ -24,17 +26,49 @@ export function isInAppPath(p: string): boolean {
 /** Read the path + query on the CLIENT — a static export can't prerender ids.
  * Re-reads on path changes and on Back/Forward (popstate); query-only changes are
  * reflected synchronously by go() (a push that doesn't change the pathname won't
- * re-fire the effect). This avoids useSearchParams, which complicates static export. */
+ * re-fire the effect). This avoids useSearchParams, which complicates static export.
+ *
+ * BACK IS GUARDED TOO — the one navigation in this app that does NOT go
+ * through `go()`/`softNavigate` at all: the browser moves the address bar
+ * and fires `popstate` before any of our code runs, so there is nothing here
+ * to `preventDefault()` the way a click can be stopped. The browser cannot be
+ * asked to hold the move the way `guardNavigate` holds an in-app one, so a
+ * dirty Back is instead PUT BACK — the address bar is pushed straight back to
+ * where it was, undoing the visual move — and the SAME confirm every other
+ * leave raises is asked; Discard replays the move the person actually made,
+ * Keep editing leaves it undone. `lastGoodPath` is what "back to where it
+ * was" means: the last address this hook actually settled on, by any means
+ * (mount, a real Back this ran the same check on, or `go()`/`replace()`
+ * writing through `setRoute` below) — read fresh out of `window.location`
+ * rather than kept as a second copy of `route`, so it can never drift from
+ * what the address bar itself last agreed to. */
 export function useUrlRoute(): { route: Route | null; setRoute: (route: Route) => void } {
   const pathname = usePathname()
   const [route, setRoute] = React.useState<Route | null>(null)
+  const lastGoodPath = React.useRef("")
+  const commit = React.useCallback((next: Route | null) => {
+    setRoute(next)
+    lastGoodPath.current = window.location.pathname + window.location.search
+  }, [])
   React.useEffect(() => {
-    const read = () => setRoute(parseRoute(window.location.pathname, window.location.search))
+    const read = () => {
+      const target = window.location.pathname + window.location.search
+      if (anyDirty().length === 0) {
+        commit(parseRoute(window.location.pathname, window.location.search))
+        return
+      }
+      // THE MOVE ALREADY HAPPENED — put the bar back, then ask.
+      window.history.pushState(null, "", lastGoodPath.current || target)
+      guardNavigate(() => {
+        window.history.pushState(null, "", target)
+        commit(parseRoute(window.location.pathname, window.location.search))
+      })
+    }
     read()
     window.addEventListener("popstate", read)
     return () => window.removeEventListener("popstate", read)
-  }, [pathname])
-  return { route, setRoute }
+  }, [pathname, commit])
+  return { route, setRoute: commit }
 }
 
 /** Moving around the app: go (push), replace, and close an open panel.
