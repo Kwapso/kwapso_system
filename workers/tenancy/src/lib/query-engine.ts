@@ -681,6 +681,31 @@ function sortMenu(mod: QueryModule): SortMenu<Row> {
 
 export type QueryGroup = { key: Record<string, unknown>; label?: string | null; count: number }
 
+/** THE ARITHMETIC THE MODEL WAS DOING IN ITS HEAD, done here once. Asked "average
+ *  open tickets per account" on 14 Sep 2026, three runs on the same 433 tickets
+ *  answered 22.8, 21.7 and 18 per app — the same groups every time, and a
+ *  different denominator each time: whether the bucket with no app counted,
+ *  whether it divided the whole total or only the labelled rows. So a grouped
+ *  answer now says it: `groups` with a value, the `rows` they add up to, the
+ *  `average` of rows per group (one decimal), and the `unassigned` rows whose
+ *  key was empty and so belong to no group. Null when the groups were cut at
+ *  GROUP_CAP — a summary over a truncated tally would be exactly the wrong
+ *  number wearing an honest label. */
+export type QueryGroupSummary = { groups: number; rows: number; average: number | null; unassigned: number }
+
+export function summariseGroups(groups: QueryGroup[]): QueryGroupSummary {
+  const hasValue = (g: QueryGroup) => Object.values(g.key).every((v) => v !== null && v !== undefined && v !== "")
+  const valued = groups.filter(hasValue)
+  const rows = valued.reduce((n, g) => n + g.count, 0)
+  const unassigned = groups.filter((g) => !hasValue(g)).reduce((n, g) => n + g.count, 0)
+  return {
+    groups: valued.length,
+    rows,
+    average: valued.length ? Math.round((rows / valued.length) * 10) / 10 : null,
+    unassigned,
+  }
+}
+
 /** A value the caller filtered by that names NOTHING here.
  *
  * WHY THIS RIDES THE ANSWER. Asked "how many open tickets from flu clinic,
@@ -710,6 +735,8 @@ export type QueryAnswer = {
   happened: boolean
   groups: QueryGroup[] | null
   groupsTruncated: boolean
+  /** beside `groups`, and only when they were not cut — see QueryGroupSummary */
+  groupSummary: QueryGroupSummary | null
   /** the filter values that named nothing — empty when everything resolved */
   unmatched: Unmatched[]
   /** R1's staleCheck: rows that TEXT-match the client this query is scoped to
@@ -790,6 +817,7 @@ export async function runQuery(
       total: await totalPromise,
       groups,
       groupsTruncated: truncated,
+      groupSummary: truncated ? null : summariseGroups(groups),
       everyday: q.everyday,
       happened: q.happened,
       unmatched: await unmatchedPromise,
@@ -808,6 +836,7 @@ export async function runQuery(
       total: await totalPromise,
       groups: null,
       groupsTruncated: false,
+      groupSummary: null,
       everyday: q.everyday,
       happened: q.happened,
       unmatched: await unmatchedPromise,
@@ -850,6 +879,7 @@ export async function runQuery(
     total: await totalPromise,
     groups: null,
     groupsTruncated: false,
+    groupSummary: null,
     everyday: q.everyday,
     happened: q.happened,
     unmatched: await unmatchedPromise,
