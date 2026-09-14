@@ -417,39 +417,14 @@ describe("R67 — a titled section stands on paper", () => {
       if (/^[A-Z]/.test(name) && !declText.has(name)) declText.set(name, { text, rel: f.rel })
   }
 
-  const paintCache = new Map<string, boolean>()
-  function componentPaints(name: string): boolean {
-    const cached = paintCache.get(name)
-    if (cached !== undefined) return cached
-    paintCache.set(name, false) // recursion guard
-    const d = declText.get(name)
-    if (!d) return false
-    const tops = fileTop.get(d.rel) ?? new Map<string, string>()
-    let text = d.text
-    const seen = new Set([name])
-    for (let hop = 0; hop < 8; hop++) {
-      let grew = false
-      for (const [k, v] of tops) {
-        if (seen.has(k)) continue
-        if (new RegExp(`\\b${k}\\b`).test(text)) {
-          seen.add(k)
-          text += `\n${v}`
-          grew = true
-        }
-      }
-      if (!grew) break
-    }
-    // …AND ONLY THROUGH ITS OWN CLASSES. The walk deliberately does NOT follow
-    // the components this one RENDERS. That version was written and thrown
-    // away: `CollectionEmptyState` renders a headline, a sentence and a button,
-    // one of which resolves to a fill two files away, so every uncontained zero
-    // register in the app came back green — and an uncontained zero register is
-    // precisely what the client reported. A rule that cannot catch the bug it
-    // was written for is not a weaker rule, it is a different one.
-    const hit = FILL.test(text)
-    paintCache.set(name, hit)
-    return hit
-  }
+  // `componentPaints` used to be built right here, closed over this outer
+  // `declText`/`fileTop` (the whole app + kit). IT NOW LIVES INSIDE
+  // `createPaintWalk` BELOW, unchanged in substance but PARAMETERISED BY A
+  // FILE LIST rather than closed over `all` — see that function's own header
+  // for why: R67's amendment-5 tripwire needed a corpus it owns, not the
+  // app's, and a closure over `all` cannot be pointed at anything else.
+  // `declText`/`fileTop` stay here, unmoved, because `isOverlay` and `isAct`
+  // just below still read them and have nothing to do with painting.
 
   /** An overlay does not stand on the page — it stands on the scrim. Derived
    * in two steps, because almost nothing names a portal itself: a component
@@ -517,71 +492,10 @@ describe("R67 — a titled section stands on paper", () => {
   // do, so the walk keeps under-reaching rather than inventing offenders: this
   // law's stated direction, and the reason a `cva` a component does not actually
   // call is never read at all.
+  // `Cva`/`cvaOf` used to be built right here, closed over this outer `all`.
+  // Both now live inside `createPaintWalk` below, parameterised the same way
+  // `componentPaints` is — see that function's header.
   type Cva = { base: string; variants: Map<string, Map<string, string>>; defaults: Map<string, string> }
-  const cvaCache = new Map<string, Cva | null>()
-  function cvaOf(name: string): Cva | null {
-    if (cvaCache.has(name)) return cvaCache.get(name)!
-    cvaCache.set(name, null)
-    const d = declText.get(name)
-    if (!d) return null
-    const file = all.find((f) => f.rel === d.rel)
-    if (!file) return null
-    let found: Cva | null = null
-    const strings = (n: ts.Node): string => {
-      let s = ""
-      const collect = (x: ts.Node) => {
-        if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) s += ` ${x.text}`
-        ts.forEachChild(x, collect)
-      }
-      collect(n)
-      return s
-    }
-    const visit = (n: ts.Node) => {
-      if (found) return
-      if (
-        ts.isVariableDeclaration(n) &&
-        ts.isIdentifier(n.name) &&
-        n.initializer &&
-        ts.isCallExpression(n.initializer) &&
-        n.initializer.expression.getText() === "cva" &&
-        // ONLY THE `cva` THIS COMPONENT ACTUALLY CALLS. A file may declare
-        // several (card.tsx has one per part); reading a sibling's would answer
-        // about a box this element is not.
-        new RegExp(`\\b${n.name.text}\\s*\\(`).test(d.text)
-      ) {
-        const args = n.initializer.arguments
-        const variants = new Map<string, Map<string, string>>()
-        const defaults = new Map<string, string>()
-        if (args[1] && ts.isObjectLiteralExpression(args[1]))
-          for (const p of args[1].properties) {
-            if (!ts.isPropertyAssignment(p)) continue
-            const key = p.name.getText().replace(/['"]/g, "")
-            if (key === "variants" && ts.isObjectLiteralExpression(p.initializer))
-              for (const vp of p.initializer.properties) {
-                if (!ts.isPropertyAssignment(vp) || !ts.isObjectLiteralExpression(vp.initializer)) continue
-                const opts = new Map<string, string>()
-                for (const op of vp.initializer.properties)
-                  if (ts.isPropertyAssignment(op))
-                    opts.set(op.name.getText().replace(/['"]/g, ""), strings(op.initializer))
-                variants.set(vp.name.getText().replace(/['"]/g, ""), opts)
-              }
-            if (key === "defaultVariants" && ts.isObjectLiteralExpression(p.initializer))
-              for (const dp of p.initializer.properties)
-                if (ts.isPropertyAssignment(dp))
-                  defaults.set(
-                    dp.name.getText().replace(/['"]/g, ""),
-                    dp.initializer.getText().replace(/['"]/g, "")
-                  )
-          }
-        found = { base: args[0] ? strings(args[0]) : "", variants, defaults }
-        return
-      }
-      ts.forEachChild(n, visit)
-    }
-    visit(file.tree)
-    cvaCache.set(name, found)
-    return found
-  }
 
   /** A string prop's literal value at this call site; `ABSENT` when the prop is
    * not written at all (so `defaultVariants` decides) and `null` when it is
@@ -656,20 +570,12 @@ describe("R67 — a titled section stands on paper", () => {
   // nothing in it"). So ALL of a component's returned elements must paint, or
   // it does not — the per-branch clause read one level down, and the same
   // under-reaching direction the rest of this file keeps.
-  const rootDecl = new Map<string, ts.Node>()
-  for (const f of all)
-    for (const st of f.tree.statements) {
-      if (ts.isVariableStatement(st))
-        for (const d of st.declarationList.declarations)
-          if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
-            rootDecl.set(d.name.text, d)
-      if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
-        rootDecl.set(st.name.text, st)
-    }
   /** The JSX elements a component can RETURN — one per `return`, unwrapped
    * through parentheses and through a ternary's two arms, which is `bodies()`'s
    * own shape asked about roots instead of children. A fragment is not a root
-   * (there is no one box to stand in) and neither is `null`. */
+   * (there is no one box to stand in) and neither is `null`. Pure — it takes a
+   * declaration node and nothing else — so `createPaintWalk` below can run it
+   * against any corpus, the real app or a fixture. */
   function rootElements(decl: ts.Node): ts.Node[] {
     const out: ts.Node[] = []
     let fragment = false
@@ -702,43 +608,257 @@ describe("R67 — a titled section stands on paper", () => {
     } else ts.forEachChild(decl, walk)
     return fragment ? [] : out
   }
-  let rootsFollowed = 0
-  const rootCache = new Map<string, boolean>()
-  function rootPaints(name: string): boolean {
-    const cached = rootCache.get(name)
-    if (cached !== undefined) return cached
-    rootCache.set(name, false) // recursion guard
-    const decl = rootDecl.get(name)
-    if (!decl) return false
-    const roots = rootElements(decl)
-    if (roots.length === 0) return false
-    const hit = roots.every((r) => paints(r))
-    if (hit) rootsFollowed++
-    rootCache.set(name, hit)
-    return hit
+
+  // ── FIXED 2026-09-14 — THE TRIPWIRE NOW OWNS ITS SPECIMEN, NOT THE APP'S ───
+  //
+  // `componentPaints`, `cvaOf`, `rootDecl`, `rootPaints` and `paints` used to
+  // be five closures built ONCE, directly over `all` (the whole app + kit).
+  // That was fine for the real census below, but it meant amendment 5's own
+  // blindness tripwire — "at least one component must be found to paint
+  // through its own ROOT" — could only be proved by pointing at a component
+  // ALREADY IN THE APP that has that shape (`ThemeSection` etc., rooted in
+  // `SettingsSection`). On 2026-09-14 a lane doing exactly what the client
+  // ordered — "one container, four sections" — folded `LanguageSection`'s own
+  // wrapper into `SettingsSection` too, and in doing so removed the LAST such
+  // component from the product. The census is unchanged and still correct;
+  // the tripwire went red because its only specimen retired.
+  //
+  // A TRIPWIRE PROVING "the walk still resolves a root-painted component"
+  // SHOULD NOT DEPEND ON THE APP HAPPENING TO CONTAIN ONE — that is true for
+  // the same reason the rest of this file gives for deriving its subject
+  // instead of hand-picking it: it fails when the product legitimately
+  // changes, and worse, it can pass for the wrong reason if some unrelated
+  // screen happens to grow the shape back. So the five closures above are now
+  // ONE function, `createPaintWalk`, parameterised by a file list rather than
+  // closed over `all`. The real census still calls it exactly once, on `all`,
+  // below. The tripwire calls it a SECOND time, on three tiny fixture
+  // "files" this test builds and owns — never read off disk, never merged
+  // into `all`, so they cannot affect, and cannot be affected by, anything
+  // the app actually contains.
+  function createPaintWalk(files: Parsed[]) {
+    const declText = new Map<string, { text: string; rel: string }>()
+    const fileTop = new Map<string, Map<string, string>>()
+    for (const f of files) {
+      const tops = new Map<string, string>()
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations)
+            if (ts.isIdentifier(d.name)) tops.set(d.name.text, d.getText())
+        if (ts.isFunctionDeclaration(st) && st.name) tops.set(st.name.text, st.getText())
+      }
+      fileTop.set(f.rel, tops)
+      for (const [name, text] of tops)
+        if (/^[A-Z]/.test(name) && !declText.has(name)) declText.set(name, { text, rel: f.rel })
+    }
+
+    // WHAT EACH COMPONENT PAINTS, resolved through the module-scope constants
+    // its own FILE declares (never a component it renders — see `paints`
+    // below for why that version was thrown away).
+    const paintCache = new Map<string, boolean>()
+    function componentPaints(name: string): boolean {
+      const cached = paintCache.get(name)
+      if (cached !== undefined) return cached
+      paintCache.set(name, false) // recursion guard
+      const d = declText.get(name)
+      if (!d) return false
+      const tops = fileTop.get(d.rel) ?? new Map<string, string>()
+      let text = d.text
+      const seen = new Set([name])
+      for (let hop = 0; hop < 8; hop++) {
+        let grew = false
+        for (const [k, v] of tops) {
+          if (seen.has(k)) continue
+          if (new RegExp(`\\b${k}\\b`).test(text)) {
+            seen.add(k)
+            text += `\n${v}`
+            grew = true
+          }
+        }
+        if (!grew) break
+      }
+      const hit = FILL.test(text)
+      paintCache.set(name, hit)
+      return hit
+    }
+
+    // A COMPONENT PAINTS WHAT THE CALL SITE PICKED (amendment 2): where the
+    // fill comes from a `cva`, the variant the call site selects decides.
+    const cvaCache = new Map<string, Cva | null>()
+    function cvaOf(name: string): Cva | null {
+      if (cvaCache.has(name)) return cvaCache.get(name)!
+      cvaCache.set(name, null)
+      const d = declText.get(name)
+      if (!d) return null
+      const file = files.find((f) => f.rel === d.rel)
+      if (!file) return null
+      let found: Cva | null = null
+      const strings = (n: ts.Node): string => {
+        let s = ""
+        const collect = (x: ts.Node) => {
+          if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) s += ` ${x.text}`
+          ts.forEachChild(x, collect)
+        }
+        collect(n)
+        return s
+      }
+      const visit = (n: ts.Node) => {
+        if (found) return
+        if (
+          ts.isVariableDeclaration(n) &&
+          ts.isIdentifier(n.name) &&
+          n.initializer &&
+          ts.isCallExpression(n.initializer) &&
+          n.initializer.expression.getText() === "cva" &&
+          // ONLY THE `cva` THIS COMPONENT ACTUALLY CALLS. A file may declare
+          // several (card.tsx has one per part); reading a sibling's would
+          // answer about a box this element is not.
+          new RegExp(`\\b${n.name.text}\\s*\\(`).test(d.text)
+        ) {
+          const args = n.initializer.arguments
+          const variants = new Map<string, Map<string, string>>()
+          const defaults = new Map<string, string>()
+          if (args[1] && ts.isObjectLiteralExpression(args[1]))
+            for (const p of args[1].properties) {
+              if (!ts.isPropertyAssignment(p)) continue
+              const key = p.name.getText().replace(/['"]/g, "")
+              if (key === "variants" && ts.isObjectLiteralExpression(p.initializer))
+                for (const vp of p.initializer.properties) {
+                  if (!ts.isPropertyAssignment(vp) || !ts.isObjectLiteralExpression(vp.initializer)) continue
+                  const opts = new Map<string, string>()
+                  for (const op of vp.initializer.properties)
+                    if (ts.isPropertyAssignment(op))
+                      opts.set(op.name.getText().replace(/['"]/g, ""), strings(op.initializer))
+                  variants.set(vp.name.getText().replace(/['"]/g, ""), opts)
+                }
+              if (key === "defaultVariants" && ts.isObjectLiteralExpression(p.initializer))
+                for (const dp of p.initializer.properties)
+                  if (ts.isPropertyAssignment(dp))
+                    defaults.set(
+                      dp.name.getText().replace(/['"]/g, ""),
+                      dp.initializer.getText().replace(/['"]/g, "")
+                    )
+            }
+          found = { base: args[0] ? strings(args[0]) : "", variants, defaults }
+          return
+        }
+        ts.forEachChild(n, visit)
+      }
+      visit(file.tree)
+      cvaCache.set(name, found)
+      return found
+    }
+
+    const rootDecl = new Map<string, ts.Node>()
+    for (const f of files)
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations)
+            if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
+              rootDecl.set(d.name.text, d)
+        if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
+          rootDecl.set(st.name.text, st)
+      }
+
+    // AMENDMENT 5 ITSELF: a component paints if its own classes do, if its
+    // own `cva` does, or if the single element it RETURNS paints, resolved
+    // the same way, transitively — ONE edge, the component's own root.
+    let rootsFollowed = 0
+    const rootCache = new Map<string, boolean>()
+    function rootPaints(name: string): boolean {
+      const cached = rootCache.get(name)
+      if (cached !== undefined) return cached
+      rootCache.set(name, false) // recursion guard
+      const decl = rootDecl.get(name)
+      if (!decl) return false
+      const roots = rootElements(decl)
+      if (roots.length === 0) return false
+      const hit = roots.every((r) => paints(r))
+      if (hit) rootsFollowed++
+      rootCache.set(name, hit)
+      return hit
+    }
+
+    const paints = (n: ts.Node): boolean => {
+      if (FILL.test(classNameOf(n))) return true
+      const t = tagName(n)
+      if (!t || !/^[A-Z]/.test(t)) return false
+      const name = t.split(".")[0]
+      const cva = cvaOf(name)
+      // No `cva` to read — the component's own classes, and then its own ROOT
+      // (amendment 5), are the whole answer.
+      if (!cva) return componentPaints(name) || rootPaints(name)
+      if (FILL.test(cva.base)) return true
+      for (const [key, opts] of cva.variants) {
+        const passed = literalProp(n, key)
+        if (passed === null) {
+          if ([...opts.values()].some((v) => FILL.test(v))) return true
+          continue
+        }
+        const chosen = passed === ABSENT ? cva.defaults.get(key) : passed
+        if (chosen !== undefined && opts.has(chosen) && FILL.test(opts.get(chosen)!)) return true
+      }
+      return false
+    }
+
+    return { paints, rootPaints, rootsFollowed: () => rootsFollowed }
   }
 
-  const paints = (n: ts.Node): boolean => {
-    if (FILL.test(classNameOf(n))) return true
-    const t = tagName(n)
-    if (!t || !/^[A-Z]/.test(t)) return false
-    const name = t.split(".")[0]
-    const cva = cvaOf(name)
-    // No `cva` to read — the component's own classes, and then its own ROOT
-    // (amendment 5), are the whole answer.
-    if (!cva) return componentPaints(name) || rootPaints(name)
-    if (FILL.test(cva.base)) return true
-    for (const [key, opts] of cva.variants) {
-      const passed = literalProp(n, key)
-      if (passed === null) {
-        if ([...opts.values()].some((v) => FILL.test(v))) return true
-        continue
-      }
-      const chosen = passed === ABSENT ? cva.defaults.get(key) : passed
-      if (chosen !== undefined && opts.has(chosen) && FILL.test(opts.get(chosen)!)) return true
-    }
-    return false
+  const mainWalk = createPaintWalk(all)
+  const { paints, rootPaints } = mainWalk
+
+  // ── THE TRIPWIRE'S OWN FIXTURE — three tiny synthetic "files", parsed the
+  // same way `parse()` parses a real one but never touched to disk and never
+  // added to `all`. They mirror the real, three-file chain the comment above
+  // names (`ThemeSection` → `SettingsSection` → a `<section>` with an inline
+  // fill), with the same shape and the same reason each level exists:
+  //
+  //   · `FixturePaintedLeaf` paints DIRECTLY — its own JSX carries a fill
+  //     class — so it is found by `componentPaints` alone, the base case,
+  //     never touching `rootPaints`. Stands in for `SettingsSection`.
+  //   · `FixtureRootedMiddle`'s own text has no fill anywhere in it — it only
+  //     names `FixturePaintedLeaf` — so `componentPaints` alone reports it as
+  //     NOT painting, and only the root walk (amendment 5) can find that its
+  //     one RETURN is the leaf. Stands in for `ThemeSection`.
+  //   · `FixtureBareHost` is the call site: it returns `<FixtureRootedMiddle
+  //     />`, the same shape the real census meets when it walks a section's
+  //     body and finds `<ThemeSection />` sitting in it. Asserting through
+  //     `rootPaints` on THIS name is what actually exercises the fallback
+  //     inside `paints` (`componentPaints(name) || rootPaints(name)`) for
+  //     the middle component too, not just the standalone `rootPaints`
+  //     function — the exact wiring a regression here would break.
+  //
+  // Two files matter for keeping this honest: `FixturePaintedLeaf` and
+  // `FixtureRootedMiddle` are declared in SEPARATE fixture files on purpose.
+  // `componentPaints`'s hop-expansion only reads a component's OWN FILE's
+  // top-level constants — if both lived in one file, `FixtureRootedMiddle`'s
+  // text would hop-expand into `FixturePaintedLeaf`'s and report as painting
+  // WITHOUT any root-walk at all, which would prove nothing (and is exactly
+  // why the real `ThemeSection`/`SettingsSection` pair being in different
+  // files is load-bearing, not incidental).
+  function parseFixture(rel: string, source: string): Parsed {
+    const path = join(HERE, "__fixtures__", rel)
+    return { rel, path, tree: ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX) }
   }
+  const rootWalkFixture = [
+    parseFixture(
+      "root-walk-fixture-leaf.tsx",
+      `export function FixturePaintedLeaf() {
+         return <div className="p-4 bg-surface-panel">leaf</div>
+       }`
+    ),
+    parseFixture(
+      "root-walk-fixture-middle.tsx",
+      `export function FixtureRootedMiddle() {
+         return <FixturePaintedLeaf />
+       }`
+    ),
+    parseFixture(
+      "root-walk-fixture-host.tsx",
+      `export function FixtureBareHost() {
+         return <FixtureRootedMiddle />
+       }`
+    ),
+  ]
   const subtreePaints = (n: ts.Node): boolean => {
     let hit = false
     const walk = (x: ts.Node) => {
@@ -1052,13 +1172,34 @@ describe("R67 — a titled section stands on paper", () => {
     // ON PURPOSE. The root walk is a WIDENING of what counts as painted, so its
     // failure modes are a no-op in one direction and the thrown-away version in
     // the other, and each is invisible on its own.
+    //
+    // FIXED 2026-09-14 — OWNED SPECIMEN, NOT THE APP'S. This used to read
+    // `rootsFollowed` off `mainWalk`, i.e. off whatever the real app happens to
+    // contain, on the reasoning that `ThemeSection` and its three neighbours
+    // always would. They stopped: the client's ruling ("one container, four
+    // sections") reached its last holdout, `LanguageSection`, the same day
+    // this was found red, and the product legitimately has zero components of
+    // that shape now. A tripwire that goes red because the PRODUCT changed,
+    // with nothing wrong, sends the next person hunting a bug that is not
+    // there — and the same proxy could just as easily pass for the wrong
+    // reason, green because some unrelated screen happens to grow the shape
+    // back, whether or not the walk still works. So the proof is now run
+    // against `rootWalkFixture` above, a corpus this test owns and nothing
+    // else can add to or empty out.
+    const fixtureWalk = createPaintWalk(rootWalkFixture)
     expect(
-      rootsFollowed,
-      "no component was found to paint through its own ROOT, so amendment 5 admitted nothing. It exists " +
-        "because `ThemeSection` and its three neighbours stand in `SettingsSection`'s box rather than " +
-        "spelling a fill themselves — if this is zero, either that chokepoint has been unpicked or the " +
-        "root walk has stopped resolving, and the second one looks exactly like a law that works"
-    ).toBeGreaterThan(0)
+      fixtureWalk.rootPaints("FixtureBareHost"),
+      "the owned fixture — FixtureBareHost returns <FixtureRootedMiddle/>, which returns " +
+        "<FixturePaintedLeaf/>, which is the only one of the three whose own JSX carries a fill class — " +
+        "no longer resolves as painting. Either `rootElements` stopped finding a component's own RETURN, " +
+        "or `paints`'s `componentPaints(name) || rootPaints(name)` fallback (the line amendment 5 added) " +
+        "was dropped, and the second one looks exactly like a law that works"
+    ).toBe(true)
+    expect(
+      fixtureWalk.rootsFollowed(),
+      "the owned fixture resolved zero components through their own root — FixtureRootedMiddle and " +
+        "FixtureBareHost both should, since neither one's own text carries a fill class"
+    ).toBeGreaterThanOrEqual(2)
     expect(
       rootPaints("CollectionEmptyState"),
       "`CollectionEmptyState` now counts as PAINTING, which is the version of this walk that was written " +

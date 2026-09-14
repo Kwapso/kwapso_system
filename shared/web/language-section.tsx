@@ -1,20 +1,43 @@
 "use client"
 
-// THE SWITCHER — one control, shown in Settings, FIRST in the Appearance tab
-// now, above Size, Appearance and Background.
+// THE SWITCHER — one control, shown in Settings, FIRST inside the single
+// Appearance container now, above Size, Appearance and Background.
 //
-// PUT FIRST, CLIENT RULING 2026-09-14, choosing the preview-led layout of the
-// four Settings · Appearance options a lane put in front of her: "put
-// language first". She did not argue the order and neither does this file.
+// CORRECTION, 2026-09-14 (the same day, after she saw the shipped panel).
+// "Put language first" landed as its OWN container above a second one holding
+// the preview and the other three — two boxes. Her actual words, once she saw
+// it live: "What I meant by language first was inside the container, just to
+// make it the top section: Language · Size · Appearance · Background." One
+// container, four sections, in that order. So this file no longer draws a
+// `SettingsSection` of its own — that was the bug — and is now the same shape
+// as `ScaleSection` / `ThemeSection` / `SpineSection`: a bare micro-label plus
+// its control, meant to stand as the first group inside `AppearancePanel`'s
+// one box (`shared/web/appearance-panel.tsx`), which is where it is mounted
+// now. `settings-screen.tsx` no longer renders this component directly.
 //
-// NO SUBTITLE, THE SAME RULING. She quoted this section's own two sentences
-// back verbatim and asked for them gone: "remove subtitle 'What people type
-// stays in the language they typed it. 88% translated.'" Both are deleted —
-// the fact about typed text, and the coverage sentence below the control —
-// and so is the one she did not quote but that stands in the identical
-// position, "Choose the language you want {brand} in.": R72's own default
-// ("no subtitle under a heading, unless she asks") is the reading that
-// explains why she saw ONE subtitle to name where this file drew three
+// WHY THE CONTROL COLUMN, NOT ABOVE THE PREVIEW ROW. `AppearancePreview`
+// pictures Size, Appearance and Background only — a language has no visual
+// analogue to preview (see the kit component's own header) — so there are two
+// places "top" could mean: a full-width row above the preview+controls grid,
+// or the first entry in the compact control column beside the preview. This
+// file (and `AppearancePanel`) takes the second reading. Her own list —
+// "Language · Size · Appearance · Background" — is a flat run of four
+// sections, the same shape Size/Appearance/Background already are in that
+// column; a full-width band above the grid would draw Language as a
+// DIFFERENT kind of thing from its three neighbours, which is a layout
+// decision she did not ask for. The sticky preview does not care which
+// control sits first above it — it already renders unmoved while any of the
+// three below it are picked — so nothing about the preview's own behaviour
+// changes by Language sitting over them instead of beside the box.
+//
+// NO SUBTITLE, THE 2026-09-14 preview-led RULING. She quoted this section's
+// own two sentences back verbatim and asked for them gone: "remove subtitle
+// 'What people type stays in the language they typed it. 88% translated.'"
+// Both are deleted — the fact about typed text, and the coverage sentence
+// below the control — and so is the one she did not quote but that stands in
+// the identical position, "Choose the language you want {brand} in.": R72's
+// own default ("no subtitle under a heading, unless she asks") is the reading
+// that explains why she saw ONE subtitle to name where this file drew three
 // sentences: they are the same shape, stacked. THE COVERAGE NUMBER IS NOT
 // LOST, only its own sentence — the option list below already carries it
 // per-language (`{pct}%` beside every row still learning the words), which
@@ -72,16 +95,16 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
 import { useLanguage } from "./language"
-import { SettingsSection } from "./settings-section"
 
 export function LanguageSection({
   /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
   save,
-  /* NO `className` OVERRIDE ANY MORE. It had one call site and that call site
-   * passed nothing, so the "default" was what shipped — and the default was
-   * this section's own wrapper, which is now `SettingsSection`'s. A prop whose
-   * only purpose was to let a host restyle the box is the door R67 has been
-   * shut through five rulings. */
+  /* NO `className` OVERRIDE. It had one call site and that call site passed
+   * nothing, so the "default" was what shipped — and the box is
+   * `AppearancePanel`'s single `SettingsSection` now, same as its three
+   * neighbours. A prop whose only purpose was to let a host restyle a box
+   * this file no longer owns is the door R67 has been shut through five
+   * rulings. */
 }: {
   save: (lang: Language) => Promise<unknown>
 }) {
@@ -125,9 +148,12 @@ export function LanguageSection({
     /* R72 (no subtitle under a heading, unless she asked): the two sentences
        that used to stand here — one above the control, one below it — are
        both gone; see the header for the ruling and for where the coverage
-       number moved instead. Just the heading `SettingsSection` draws and the
+       number moved instead. No `SettingsSection` any more — the box is
+       `AppearancePanel`'s, one level up — just the same compact micro-label
+       `ScaleSection` / `ThemeSection` / `SpineSection` each draw, and the
        control itself. */
-    <SettingsSection title={t("Language")}>
+    <div className="flex flex-col gap-2">
+      <h3 className="text-muted-foreground text-micro uppercase">{t("Language")}</h3>
       <Select value={lang} onValueChange={(next) => void choose(next as Language)} disabled={saving}>
         <SelectTrigger className="sm:max-w-xs" aria-label={t("Language")}>
           <SelectValue>
@@ -163,6 +189,6 @@ export function LanguageSection({
           })}
         </SelectContent>
       </Select>
-    </SettingsSection>
+    </div>
   )
 }

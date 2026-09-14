@@ -775,12 +775,15 @@ export function moduleSettingsPage(segment: string): ModuleSettingsPage | undefi
  *     rule about not offering a door that refuses applies to a ROW as much as to
  *     an icon — arguably more, because a row is labelled and looks like content.
  *
- *   • THE ROW CAN SAY WHAT IS ON THE PAGE. It carries the visible SECTIONS, not
- *     just the page, so the tab can print "Ticket types"
- *     underneath the name instead of a bare noun. An index whose rows are only
- *     nouns is a menu; one that says what is inside is scannable. And because
- *     the sections are the FILTERED ones, the subtitle never promises a block
- *     this particular reader will not be shown.
+ *   • THE ROW CARRIES THE VISIBLE SECTIONS, not just the page — which is what
+ *     lets bullet two filter an empty module out by length rather than by a
+ *     second gate call. It used to be read for display too, a joined line of
+ *     section titles under the module's name; the client killed that outright,
+ *     2026-09-14, over this exact wall ("In settings, modules: delete this.
+ *     Generally, I don't like subtitles, so stop putting them unless I ask"),
+ *     R72's own founding ruling. `settings-screen.tsx` no longer destructures
+ *     `sections` out of this row for that reason — the shape stays because the
+ *     filter still needs it, not because anything still prints it.
  *
  * SORTED BY NOTHING — `MODULE_SETTINGS`'s own order is the order, the same way
  * `TEAM_SECTIONS` is on the Team tab. When it holds one entry that is not a
@@ -916,7 +919,7 @@ export function ModuleSettingsScreen({
               <ModuleAutomations
                 key={automationsSection.key}
                 teamId={teamId}
-                segment={segment}
+                scope={{ kind: "module", segment }}
                 title={t(automationsSection.title)}
               />
             ) : null

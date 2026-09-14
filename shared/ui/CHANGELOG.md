@@ -2,6 +2,67 @@
 
 ## Unreleased
 
+### Changed — `AppearancePreview`'s specimen is a chip, a title and a body, in lorem
+
+The client, 2026-09-14, the same day as the two entries below: *"on the
+settings appearance display, do it with chip, title and body — use lorem
+ipsums."* Three decisions in that sentence, all applied to the specimen row
+(the one row of the three that carries copy and moves with `scale`):
+
+1. **The chip sits above the title, not beside it** — the consuming app's own
+   R65 ("on a card that stands for a record, the chip sits above the
+   title"), so the preview now demonstrates that law rather than inventing a
+   card layout of its own. The chip is a fixed-size mark, like the two
+   texture rows beneath it; it does not move with `scale` — only the title
+   and the body do.
+2. **Lorem is deliberate, not a placeholder for real copy.** A preview is a
+   picture of the shape a record takes, not of anyone's data, and it is now
+   language-neutral specifically because the consuming app's Language control
+   sits immediately beside it (`AppearancePanel`) — an English specimen next
+   to a chosen non-English language would read as a bug. Confirmed against
+   the consuming app's own `scripts/lib/i18n-source.mjs`: `resolveImport`
+   refuses every specifier under `shared/ui/`, so this file is outside the
+   translation walk entirely and lorem here can never be catalogued,
+   uncatalogued, or flagged stale by it either way.
+3. **The body is long enough to make the scale mechanic visible** — the same
+   lorem sentence at every step, wrapping onto more lines as the size grows,
+   which is a truer demonstration of "the type gets bigger, nothing is added
+   or removed" (`ScalePicture`'s own ruling) than a short one-line status
+   ever was.
+
+`APPEARANCE_PREVIEW_SCALE`'s second field renamed `meta` → `body` to match.
+See `AppearancePreview`'s own header for the full account.
+
+### Changed — `AppearancePreview` reads as a product, not a placeholder
+
+Shipped in v1.2.77 (see the entry directly below), seen live by the client the
+same day, and corrected the same day: *"Fix the preview because it looks
+shit. It was already good in your artifact, so fix that."* Her own words for
+the shipped preview: *"a flat mango rectangle containing one rounded white
+card with 'Record title / Status · 4 open' and a grey bar."* The artifact was
+a design-lane review page with four candidate layouts for the panel; the
+reference she meant was the small live app mock its fourth ("preview-led")
+layout carried — a standalone page with its own throwaway tokens, not
+something to copy into the kit, but diagnosable: it was POPULATED (a title,
+a meta line and two more content rows, not one row adrift in a padded panel),
+its top chrome was legible (a real bar, not a 2px hairline at 32% opacity —
+which is the exact "grey bar" she named), and its layers read as layers
+rather than collapsing into one box.
+
+Applied to this component's own real parts, in its own real tokens: the panel
+now holds three rows, top-aligned — the first is still the one specimen that
+carries copy and moves with `scale`, the two beneath are fixed-size texture,
+fading per row so the eye reads "list continues"; the breadcrumb is two
+segments, thicker and more opaque, so it reads as a trail rather than a
+stray line; and the panel now wears the same `shadow-[var(--hairline)]` the
+row already wore, so its edge survives where panel-on-card's own colour
+contrast (1.103 light, 1.111 dark) is too thin to carry it alone — the
+identical move the consuming app's `sections-stand-on-paper` law had to make
+for a real panel on a real card, applied here to a picture of one. Nothing
+about the resolved-theme contract, the ground/rail/card hierarchy, or the
+scale mechanic changed; none of those were what she was pointing at. See this
+file's own `AppearancePreview` header comment for the full diagnosis.
+
 ### Added — `AppearancePreview`, so Background stops being a swatch on a rail
 
 The client, 2026-09-14, choosing between four Settings · Appearance layouts a

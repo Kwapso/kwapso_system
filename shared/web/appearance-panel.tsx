@@ -1,16 +1,22 @@
 "use client"
 
-// THE PREVIEW-LED APPEARANCE PANEL — one live picture of the app, compact
-// controls beside it, for Size, Appearance and Background.
+// THE PREVIEW-LED APPEARANCE PANEL — ONE container, four sections: Language,
+// Size, Appearance, Background. A live picture beside the last three; the
+// first has nothing for the picture to show, so it sits above the other
+// three in the same compact control column.
 //
-// THE RULING, 2026-09-14. A lane put four Settings · Appearance layouts in
-// front of the client — the shape the tab has drawn since 11 Sep, two
-// denser alternatives, and this one — and she picked this one, in her own
-// words: "for the settings design use preview led — put language first
-// (remove subtitle …) Represent in the preview better the background
-// (currently it's the old coloured navbar only). Create a new component in
-// ui-ux if needed for this." Four instructions, four things this file (and
-// the two it composes with) is:
+// THE RULING, 2026-09-14, IN TWO PARTS THE SAME DAY. First: a lane put four
+// Settings · Appearance layouts in front of the client and she picked
+// preview-led, in her own words: "for the settings design use preview led —
+// put language first (remove subtitle …) Represent in the preview better the
+// background (currently it's the old coloured navbar only). Create a new
+// component in ui-ux if needed for this." That shipped as TWO containers —
+// Language in its own box above a second box holding the preview and the
+// other three — and she corrected it once she saw it live: "What I meant by
+// language first was inside the container, just to make it the top section:
+// Language · Size · Appearance · Background." One container, four sections,
+// in that order. This file now owns all four; `settings-screen.tsx` mounts
+// only `<AppearancePanel>` on this tab.
 //
 //   1. PREVIEW-LED. Twelve small option pictures — three each on Size,
 //      Appearance and Background — become one shared `AppearancePreview`
@@ -18,10 +24,18 @@
 //      compact controls (`ScaleSection`, `ThemeSection`, `SpineSection`, each
 //      trimmed of its own picture and its own box — see those three files'
 //      own headers).
-//   2. LANGUAGE FIRST — done one level up, in `settings-screen.tsx`, which
-//      renders `<LanguageSection>` before this panel. Nothing here decides
-//      that order; this file is Size/Appearance/Background only, same three
-//      settings it always was.
+//   2. LANGUAGE FIRST, INSIDE THE ONE CONTAINER. `LanguageSection`
+//      (`shared/web/language-section.tsx`) lost its own `SettingsSection` the
+//      same way `ScaleSection` et al. already had — a bare micro-label plus
+//      its control — and is the first thing in the control column below,
+//      above `ScaleSection`. NOT above the preview row: the preview only
+//      pictures Size/Appearance/Background, so putting Language above the
+//      whole grid would draw it as a different KIND of thing from its three
+//      neighbours (a full-width band versus a card-column entry), which is a
+//      layout choice she did not ask for — her own list is a flat run of
+//      four, the shape the column already had for three. The sticky preview
+//      is unaffected either way; it does not react to Language and did not
+//      react to Size/Appearance/Background moving beneath it before either.
 //   3. NO SUBTITLE — `language-section.tsx`'s own change; unrelated to this
 //      file except that it is the same ruling.
 //   4. A NEW KIT COMPONENT — `AppearancePreview`. `SpinePicture` (the kit's
@@ -32,9 +46,10 @@
 //      was the kit's to build, not this app's: `AppearanceOptionGroup`,
 //      `ThemePicture`, `ScalePicture` and `SpinePicture` already lived in the
 //      kit for exactly this screen, and a richer preview is the same kind of
-//      part. Built in `Kwapso/kwapso-ui-ux`, tagged v1.2.77, pulled with
-//      `scripts/sync-design.mjs` — see that repo's CHANGELOG.md entry (and
-//      this repo's own lane report) for the round trip.
+//      part. Built in `Kwapso/kwapso-ui-ux`, tagged v1.2.77, then reworked in
+//      v1.2.78 after the client saw it live and called it "shit" beside a
+//      reference she liked better — see that repo's CHANGELOG.md and this
+//      repo's own lane report for both round trips.
 //
 // WHY THE PREVIEW NEEDS THREE RESOLVED VALUES, LIVE. `AppearancePreview`
 // takes `theme` ("light"/"dark", already resolved — never "system": a
@@ -45,14 +60,8 @@
 // reports its resting value up through an `onChosenChange` / `onResolvedChange`
 // callback, fired on mount and on every press, and this panel mirrors that
 // into the props the preview reads. Nothing here owns a save; every save is
-// still the control's own.
-//
-// LANGUAGE IS NOT IN THIS PANEL, on purpose — `AppearancePreview`'s own
-// header states why: it draws Size, Appearance and Background because those
-// three are visual states a picture can show; a language has no visual
-// analogue to preview (the picture would have to draw prose in a script the
-// reader may not read), so it keeps its own plain control, first on the tab,
-// in its own box.
+// still the control's own — Language's included, now that it saves through
+// this panel too.
 
 import * as React from "react"
 
@@ -61,11 +70,15 @@ import { AppearancePreview } from "@shared/ui/compositions/screens/settings"
 import { ScaleSection, previewScaleStep } from "./scale-section"
 import { ThemeSection } from "./theme-section"
 import { SpineSection } from "./spine-section"
+import { LanguageSection } from "./language-section"
 import { toSpine, type Spine } from "../spine"
 import { useLanguage } from "./language"
+import { type Language } from "../i18n"
 import { SettingsSection } from "./settings-section"
 
 export function AppearancePanel({
+  /** Persist the language choice. Both apps pass their own `auth.setLanguage`. */
+  saveLanguage,
   /** what the person currently reads at, from their own session row */
   scaleValue,
   /** Persist the scale choice. The agency app passes its own `auth.setScale`. */
@@ -75,6 +88,7 @@ export function AppearancePanel({
   /** Persist the spine choice. */
   saveSpine,
 }: {
+  saveLanguage: (lang: Language) => Promise<unknown>
   scaleValue: string | null
   saveScale: (scale: string) => Promise<unknown>
   spineValue: string | null
@@ -98,6 +112,10 @@ export function AppearancePanel({
           className="lg:sticky lg:top-4"
         />
         <div className="flex flex-col gap-5">
+          {/* LANGUAGE, FIRST — her correction, verbatim in the header above:
+              "Language · Size · Appearance · Background", inside this one
+              column, not a full-width band over the grid. */}
+          <LanguageSection save={saveLanguage} />
           <ScaleSection value={scaleValue} save={saveScale} onChosenChange={setPreviewScale} />
           <ThemeSection onResolvedChange={setPreviewTheme} />
           <SpineSection value={spineValue} save={saveSpine} onChosenChange={setPreviewSpine} />

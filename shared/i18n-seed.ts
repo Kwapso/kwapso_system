@@ -4406,4 +4406,20 @@ export const SEED: Catalogue = {
   "Watch the schedules": { de: "Die Zeitpläne überwachen", es: "Vigilar las tareas programadas", ca: "Vigilar les tasques programades" },
   "Each unattended job checks that the others are still running.": { de: "Jeder unbeaufsichtigte Auftrag prüft, ob die anderen noch laufen.", es: "Cada tarea desatendida comprueba que las demás siguen funcionando.", ca: "Cada tasca desatesa comprova que les altres continuen funcionant." },
   "It is the thing that notices when everything above has stopped. Switching it off would make a silent failure look exactly like a quiet night.": { de: "Es ist das, was bemerkt, wenn alles darüber stehen geblieben ist. Abgeschaltet sähe ein stiller Ausfall genauso aus wie eine ruhige Nacht.", es: "Es lo que se da cuenta cuando todo lo anterior se ha parado. Al desactivarlo, un fallo silencioso se vería igual que una noche tranquila.", ca: "És el que s'adona quan tot el que hi ha a sobre s'ha aturat. En desactivar-ho, una fallada silenciosa es veuria igual que una nit tranquil·la." },
+
+  /* ── The Automations toolbar, 14 Sep 2026 (search, sort by name, filter by
+     status) — and the Settings › Automations tab's own module filter beside
+     it, same round. */
+  "Search automations…": { de: "Automatisierungen durchsuchen…", es: "Buscar automatizaciones…", ca: "Cercar automatitzacions…" },
+  "Search automations": { de: "Automatisierungen durchsuchen", es: "Buscar automatizaciones", ca: "Cercar automatitzacions" },
+  "Off": { de: "Aus", es: "Desactivado", ca: "Desactivat" },
+  "No automations.": { de: "Keine Automatisierungen.", es: "No hay automatizaciones.", ca: "No hi ha automatitzacions." },
+  "Filter by module": { de: "Nach Modul filtern", es: "Filtrar por módulo", ca: "Filtrar per mòdul" },
+  "All modules": { de: "Alle Module", es: "Todos los módulos", ca: "Tots els mòduls" },
+
+  /* ── The system-wide Choices tab (Settings), 14 Sep 2026 — a table over
+     every choice value this reader's own visible modules own. */
+  "Search choices…": { de: "Optionen suchen…", es: "Buscar opciones…", ca: "Cerca opcions…" },
+  "No choices match what you're looking for.": { de: "Keine Optionen passen zu Ihrer Suche.", es: "Ninguna opción coincide con lo que buscas.", ca: "Cap opció coincideix amb el que busques." },
+  "Couldn't load the choices.": { de: "Optionen konnten nicht geladen werden.", es: "No se pudieron cargar las opciones.", ca: "No s'han pogut carregar les opcions." },
 }

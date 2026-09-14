@@ -266,9 +266,47 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // are edited on /kwapso (the agency's own Details tab, which is the team
   // record by another name and already carries `teams:update`), and its audit
   // block was three rows nothing linked to.
-  { key: "members", title: "Members", module: "team_members", segment: "members", placement: "tab", countCacheKey: "members" },
-  { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "tab", countCacheKey: "member_roles" },
-  { key: "invites", title: "Invites", module: "team_members", segment: "invites", placement: "tab", countCacheKey: "invites" },
+  // MEMBERS / ROLES / INVITES LEFT THE STRIP ENTIRELY — CLIENT RULING,
+  // 2026-09-14, over a screenshot of a standalone Members page still carrying
+  // its own tab strip (Members · Member roles · Invites): "what is this? told
+  // you to kill it. Now this only lives on settings / team." She had already
+  // ruled this once, 2026-09-09, in roles-matrix.tsx's own header ("I don't
+  // know why this redirects to another page… not taken anywhere else") — that
+  // pass killed the per-role detail redirect but left these three rows
+  // `placement: "tab"`, so the collection screens at /t/<teamId>/members,
+  // /roles and /invites kept drawing the strip this ruling is about, reachable
+  // by anyone who still had the address (a bookmark, the two legacy shims at
+  // web/app/members/page.tsx and web/app/roles/page.tsx). The "This team" list
+  // had already stopped linking to any of the three by 2026-09-10; what
+  // survived was the ROUTES themselves, independent of that list.
+  //
+  // `placement: "contextual"` because that is the shape these three now have:
+  // reached (if at all) from a button on Settings › Team, never a tab of their
+  // own. None of the three is reached by a LITERAL navigation ending at its
+  // segment — the one link left, on a member's card, is
+  // `/t/${teamId}/members/${userId}`, which does not end at `/members` any
+  // more than `/dropdowns/${v.id}` counted as a door to `/dropdowns` (R64
+  // clause v) — so all three are doorless and SECTION_HOSTED_ELSEWHERE
+  // (shared/rules/registry.ts) says where each one's material actually lives.
+  // web/components/deep-link/module-content.tsx sends every one of these
+  // routes to Settings › Team now (`MovedToTeamTab`) rather than drawing a
+  // page; the member's own record at /t/<teamId>/members/<userId> is the one
+  // survivor, because that is the screen Settings › Team's members gallery
+  // actually links to and where change-role/remove really happen.
+  // `countCacheKey` DROPPED FROM ALL THREE, 2026-09-14, alongside the
+  // placement change above: it existed to badge a tab on the (now-deleted)
+  // team-area strip and to arbitrate against a `<CollectionHeading>` on the
+  // (now-deleted) collection screen — R16 ii's own census
+  // (web/test/rules.test.ts) reads every `countCacheKey` row not placed
+  // "tab" and requires exactly that heading to exist somewhere. Members'
+  // count is still shown, by hand, on Settings › Team
+  // (web/components/team/members-gallery.tsx's own `formatCount` call) —
+  // that screen was never built on the generic collection engine this field
+  // feeds, so keeping the key here would be a second, unconsulted opinion
+  // about a number the gallery already owns outright.
+  { key: "members", title: "Members", module: "team_members", segment: "members", placement: "contextual" },
+  { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "contextual" },
+  { key: "invites", title: "Invites", module: "team_members", segment: "invites", placement: "contextual" },
   // ── THE "CHOICES" ROW STOOD HERE, AND IT IS THE CASE R64 COULD NOT SEE ─────
   //
   // It was `placement: "contextual"` from 2026-09-01, which took it off the team

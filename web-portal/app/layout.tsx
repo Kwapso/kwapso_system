@@ -39,8 +39,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        * comment for the full back-and-forth). The portal has no record
        * header identity row of the agency door's shape, so this rule needs
        * no further special-casing the way `web/components/records/record-chrome.tsx`
-       * does. */}
-      <body className="bg-background min-h-[100svh] antialiased [&_[data-slot=badge].bg-surface-quiet]:bg-surface-panel">
+       * does.
+       *
+       * THE SELECTOR WENT DEAD, SILENTLY — the identical regression as the
+       * agency door's `web/app/layout.tsx` (see its own comment for the full
+       * account): a kit resync (v1.2.13 → v1.2.15) turned Badge's
+       * `secondary` variant from the literal class `bg-surface-quiet` into
+       * `bg-[var(--badge-quiet-fill,var(--surface-quiet))]`, a custom
+       * property this selector's class match can no longer find. Caught
+       * 2026-09-14 while fixing the agency door's Settings › Team chips
+       * against the client's identical ruling on that screen; the portal's
+       * own plain pills ("Main contact", `impact-screen.tsx`) were drawing
+       * the same wrong quiet grey the whole time. Fixed the same way: rebind
+       * the custom property on `<body>` rather than match a class string
+       * that drifts with the kit's build output. */}
+      <body className="bg-background min-h-[100svh] antialiased [--badge-quiet-fill:var(--surface-panel)]">
         {/* The client's front door opens on the same frame the agency's does —
          * one product, one ident, one animation. FIRST in the body so the
          * animator is published before the parser reaches the loader further

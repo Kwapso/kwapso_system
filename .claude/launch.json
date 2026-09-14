@@ -75,6 +75,32 @@
                 "verify/appearance-panel"
             ],
             "port": 4173
+        },
+        {
+            "_": "The Automations toolbar (search / sort by name / filter by status) verify rig \u2014 a static build of verify/automations-toolbar/, the same recipe as verify/toolbar-floor/build.mjs. Run `node verify/automations-toolbar/build.mjs` first; this just serves the output. Not app auth \u2014 mounts the real <ToolbarRow> directly, fed by shared/automations.ts's own automationStatus().",
+            "name": "verify-automations-toolbar",
+            "runtimeExecutable": "python3",
+            "runtimeArgs": [
+                "-m",
+                "http.server",
+                "4174",
+                "--directory",
+                "verify/automations-toolbar"
+            ],
+            "port": 4174
+        },
+        {
+            "_": "Settings › Automations (the unscoped mounting) verify rig — a static build of verify/settings-automations-tab/. Run `node verify/settings-automations-tab/build.mjs` first; this just serves the output. Not app auth — mounts the real <ModuleAutomations> directly, scope: { kind: \"all\" }, side by side with the pre-existing scoped mounting.",
+            "name": "verify-settings-automations-tab",
+            "runtimeExecutable": "python3",
+            "runtimeArgs": [
+                "-m",
+                "http.server",
+                "4175",
+                "--directory",
+                "verify/settings-automations-tab"
+            ],
+            "port": 4175
         }
     ]
 }

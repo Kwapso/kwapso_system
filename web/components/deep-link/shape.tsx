@@ -17,6 +17,11 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
 import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { Swatch } from "@/components/records/record-picker"
+import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
+import { CONCEPT_ICON } from "@/lib/pages"
 // THE CLASS, NOT THE CHIP. `REF_LEADS_NAME` is the one spelling of "a shrink-0
 // thing in front of a name that truncates", written for the reference lozenge
 // and exactly as true of the contacts table's mark — the alternative was a
@@ -34,6 +39,7 @@ import type {
   InviteAudit,
   Meeting,
   MeetingPurpose,
+  SelectableValue,
   TeamMember,
   TeamRole,
 } from "@shared/types"
@@ -622,5 +628,140 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity, lang) },
+  }
+}
+
+/** WHERE ONE GROUP OF CHOICE VALUES LIVES — the module its words are stored
+ * on (`shared/selectable-homes.ts`, read through `MODULE_SETTINGS` and
+ * `moduleSettingsIndex`), never a second map typed here. The Choices tab
+ * builds this once, off the one gate (`settings-choices-panel.tsx`), and
+ * hands it to the shaper below so a pure function never has to ask
+ * `usePermissions` a question of its own. */
+export type ChoiceGroupHome = { segment: string; title: string; colour?: (value: string) => string }
+
+/** The system-wide Choices tab (Settings), a table over every choice value
+ * this reader's own visible modules own — see `settings-choices-panel.tsx`
+ * for how the rows are gathered and gated. Three columns, the client's own
+ * words: *"the value itself · module with the icon · status: active,
+ * inactive, and are protected."*
+ *
+ * ── THE VALUE, WITH ITS MARK (R35) ──────────────────────────────────────────
+ *
+ * The same face `selectable-screen.tsx` already draws for the identical row —
+ * a colour swatch on a palette group (Ticket type), the value's own mark on
+ * one that has it, nothing on one that has neither (that third case is this
+ * screen's own gap, inherited rather than introduced: `ValueRow` has never
+ * drawn a fallback initial for a mark-less value, and closing it is a change
+ * to that shared row, not to this one).
+ *
+ * A PLAIN STRING WHEN THERE IS NOTHING TO DRAW BESIDE THE WORD, and that is
+ * a search/sort decision as much as a visual one: `record-table.tsx`'s
+ * `searchKeys`/its own `ordered()` both read `String(row[key])` when a column
+ * declares no `searchKey`/`sortKey` of its own, and a React element strings to
+ * `"[object Object]"`. Every one of the nine vocabularies but Ticket type
+ * carries no colour, and most values in any of them carry no mark either, so
+ * leaving the cell as the bare word for those rows is what keeps them
+ * searchable and sortable through the plain path — `valueText` still rides
+ * beside the cell for the rows that DO wear a swatch or a mark, which is what
+ * the column's own `searchKey`/`sortKey` read instead.
+ *
+ * ── THE MODULE, WITH THE MODULE'S ICON ──────────────────────────────────────
+ *
+ * `CONCEPT_ICON` keyed by the segment `groupHome` already carries — the exact
+ * table the Modules wall (`settings-screen.tsx`) reads for its own cards, so
+ * a module wears the same glyph whether it is a card there or a cell here.
+ *
+ * ── STATUS: ACTIVE, INACTIVE, AND PROTECTED IS NOT A THIRD STATE ────────────
+ *
+ * `active`/`inactive` is one switch; `isDefault` ("Protected", the client's
+ * own renaming — `selectable-screen.tsx`'s header carries that ruling) is a
+ * SEPARATE flag that can be true on either side of it. The door proves the
+ * two are independent rather than assumed: `setSelectableDefault`
+ * (workers/tenancy/src/lib/selectable.ts) asks no question about
+ * `deactivated_at` before writing `is_default`, and the only refusal in
+ * `setSelectableActive` runs the other direction (a PROTECTED value refuses
+ * to be switched off — it does not refuse to be protected while off). So a
+ * row reached by deactivating first and protecting second is Inactive AND
+ * Protected at once, which the existing row/chip already draw as two
+ * independent badges rather than one three-way word. This column does the
+ * same: the active word is never absent (unlike the row it is drawn from,
+ * which shows nothing at all for the active case), because a table column
+ * with no filled cell on most rows reads as broken; Protected rides beside it
+ * only when it applies. `statusText` — the search/sort text — folds both
+ * into one string for the same reason `valueText`/`moduleText` exist: the
+ * cell is a node, the comparison needs a word. `protectedState` rides beside
+ * `activeState` as the same kind of field for the same reason: the toolbar's
+ * Protected facet (settings-choices-panel.tsx) needs a plain "yes"/"no" to
+ * match against, read off the identical `v.isDefault` the badge above already
+ * reads — one flag asked twice, not a second one invented. */
+export function shapeChoicesTable(
+  values: SelectableValue[],
+  groupHome: Map<string, ChoiceGroupHome>,
+  lang: Language
+): ScreenData {
+  const t = translator(lang)
+  return {
+    rows: values.map((v) => {
+      const home = groupHome.get(v.type)
+      const segment = home?.segment ?? ""
+      const moduleTitle = home ? t(home.title) : v.type
+      const colour = home?.colour?.(v.value)
+      const valueCell =
+        colour || v.mark ? (
+          <span className={REF_LEADS_NAME}>
+            {colour ? (
+              <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
+            ) : (
+              <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
+                {v.mark}
+              </span>
+            )}
+            <span className="min-w-0 truncate">{v.value}</span>
+          </span>
+        ) : (
+          v.value
+        )
+      const statusWord = v.active ? t("Active") : t("Inactive")
+      return {
+        id: v.id,
+        value: valueCell,
+        valueText: v.value,
+        module: (
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+            <Icon
+              name={CONCEPT_ICON[segment as keyof typeof CONCEPT_ICON] ?? CONCEPT_ICON.settings}
+              className="text-muted-foreground size-4 shrink-0"
+            />
+            <span className="min-w-0 truncate">{moduleTitle}</span>
+          </span>
+        ),
+        moduleText: moduleTitle,
+        // THE FACET'S OWN PLAIN FIELD — a filter reads `row[field]` for an
+        // exact match (`evaluateRules`, shared/web/screen-engine/config.ts),
+        // so it cannot share a key with a node column any more than search
+        // or sort can.
+        moduleSegment: segment,
+        status: (
+          <span className="inline-flex items-center gap-2">
+            <Badge variant="secondary" className={v.active ? undefined : "opacity-60"}>
+              {statusWord}
+            </Badge>
+            {v.isDefault && <Badge variant="secondary">{t("Protected")}</Badge>}
+          </span>
+        ),
+        statusText: v.isDefault ? `${statusWord} ${t("Protected")}` : statusWord,
+        activeState: v.active ? "active" : "inactive",
+        // THE FACET'S OWN PLAIN FIELD, SAME `v.isDefault` AS THE BADGE ABOVE —
+        // not a second source of truth, the one flag read twice: once to
+        // decide whether the Protected badge renders, once to give the
+        // Protected FACET (settings-choices-panel.tsx's own header) a plain
+        // value to match against. `activeState` and `protectedState` sit side
+        // by side here for the same reason the STATUS COLUMN keeps them as
+        // two badges rather than one three-way word — see the header above —
+        // and the toolbar keeps them as two independent facets rather than
+        // folding Protected into Status as a third option.
+        protectedState: v.isDefault ? "yes" : "no",
+      }
+    }),
   }
 }

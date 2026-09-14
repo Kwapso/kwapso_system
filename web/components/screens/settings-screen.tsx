@@ -28,16 +28,21 @@
 // it. It was the fourth card in the Appearance tab; see the note below (the
 // 2026-09-14 preview-led ruling) for where it stands now.
 //
-// PREVIEW-LED, 2026-09-14. Four Settings · Appearance layouts, one client
-// ruling: "for the settings design use preview led — put language first …
-// Represent in the preview better the background … Create a new component
-// in ui-ux if needed." LANGUAGE MOVED TO FIRST, above the other three, on
-// her own word — she did not argue the order and neither does this file.
-// SIZE, APPEARANCE (light/dark/system) AND BACKGROUND collapsed from three
-// boxes of option cards into ONE shared live preview
-// (`AppearancePreview`, kit v1.2.77) beside compact controls —
-// `shared/web/appearance-panel.tsx` is that shape; see its own header for
-// the full account, including the kit round trip.
+// PREVIEW-LED, 2026-09-14, IN TWO PASSES THE SAME DAY. Four Settings ·
+// Appearance layouts, one client ruling: "for the settings design use
+// preview led — put language first … Represent in the preview better the
+// background … Create a new component in ui-ux if needed." SIZE, APPEARANCE
+// (light/dark/system) AND BACKGROUND collapsed from three boxes of option
+// cards into ONE shared live preview (`AppearancePreview`, kit v1.2.77,
+// reworked in v1.2.78 after she saw it live and called it "shit" beside a
+// reference she liked better). "Put language first" shipped as its own
+// SECOND container above that one, and she corrected it once she saw it:
+// "What I meant by language first was inside the container, just to make it
+// the top section: Language · Size · Appearance · Background." ONE
+// container, four sections — `AppearancePanel` (`shared/web/appearance-panel.tsx`)
+// now owns all four, Language included; see that file's own header for the
+// full account, including the kit round trip and why Language sits in the
+// control column rather than above the preview row.
 //
 // THE FOURTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a section.
 // (It was the FIFTH of five until 11 Sep 2026, when Choices was retired in front
@@ -128,12 +133,19 @@
 //                        to by nothing else
 //                        (R64 · `sections-have-a-door`; that file has the
 //                        account of the regression that earned the law).
-//                        "This team"
-//                        below the two containers is what is LEFT of the team
-//                        area after that: `adminSections`, derived, and today
-//                        exactly one row — Internal rates. It is not a door to
-//                        anything else, and nothing on this tab depends on it
-//                        continuing to exist.
+//                        THE "THIS TEAM" LIST BELOW THE TWO CONTAINERS IS GONE,
+//                        2026-09-14. It used to link into the team area's own
+//                        Members/Member roles/Invites screens, subtracted down
+//                        to nothing once Internal rates left with the account
+//                        rate card on 10 Sep 2026 — but the collection SCREENS
+//                        those three would have opened were still reachable by
+//                        address, still drawing their own top tab strip, and a
+//                        client screenshot of exactly that page is the ruling
+//                        that closes this out: "what is this? told you to kill
+//                        it. Now this only lives on settings / team." Both
+//                        halves went together — web/lib/pages.ts carries the
+//                        TEAM_SECTIONS change and what each of the three now
+//                        resolves to instead.
 //                        INVITES left "This team" on 2026-09-09 — "the invites,
 //                        make it secondary button on the toolbar" — and is a
 //                        button in the members toolbar now.
@@ -142,11 +154,42 @@
 //                        own account, which is what the word means here.
 //   4. Modules        — the index; see the paragraph above for the word, the
 //                        position and the ruling.
-//                        A FIFTH TAB, "Choices", stood after this one and was
-//                        retired on 11 Sep 2026 — see the paragraph above.
+//                        A TAB CALLED "CHOICES" STOOD AFTER THIS ONE AND WAS
+//                        RETIRED ON 11 SEP 2026 — see the paragraph above.
 //                        `ManageDropdownsLink` used to open it via
 //                        `?tab=choices` and now points at the module settings
 //                        page that owns the group the form is asking about.
+//   5. Automations    — client ruling, 2026-09-14: "On Settings, add a tab
+//                        for Automations and show all the automations in the
+//                        system, filtered by module and by status." ONE
+//                        COMPONENT, TWO MOUNTINGS — `ModuleAutomations`
+//                        (module-automations.tsx) already drew this exact
+//                        list scoped to a single module's own settings page;
+//                        this tab is the SAME component, unscoped, so a
+//                        toolbar built for one mounting (search, sort, the
+//                        status filter with its later-arriving Protected
+//                        state — "in automations filters everywhere, add
+//                        filter to protected", the same day) is never built
+//                        twice. `scope: { kind: "all", modules }` is the only
+//                        difference from the per-module call, and `modules`
+//                        is `moduleSettingsIndex(can)` narrowed to the pages
+//                        that carry an automations section — the gear, the
+//                        Modules tab's index and this tab all read the same
+//                        `visibleModuleSettings` answer, so a reader who may
+//                        see Tickets but not Meetings sees Tickets' ten rows
+//                        here and none of the other module's, without this
+//                        file asking `can(` a second time (R61's own
+//                        argument, held here rather than restated).
+//                        THE ESTATE'S OWN JOBS APPEAR TOO. `team` (titled
+//                        "Housekeeping" on its own page) is an ordinary
+//                        `MODULE_SETTINGS` entry with an automations section
+//                        gated on `teams:update`, so `moduleSettingsIndex`
+//                        already includes it for any reader who holds that
+//                        right — the nightly sweep, the growth alarm and the
+//                        fault report are AS visible here as any module's own
+//                        automations, on the same terms as everywhere else in
+//                        this table, rather than a special case carved out
+//                        for this one tab.
 //
 // NOTIFICATIONS IS GONE, on purpose (client ruling, 2026-09-01) — it was never
 // live content in this app, only a tab named in the design kit's own reference
@@ -184,13 +227,12 @@ import { GoogleConnectionsSection } from "@/components/knowledge/google-connecti
 import { InvitationsPanel, useReceivedInvites } from "@/components/team/invitations"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { CONCEPT_ICON, TEAM_SECTIONS } from "@/lib/pages"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { AppearancePanel } from "@shared/web/appearance-panel"
-import { LanguageSection } from "@shared/web/language-section"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
 
@@ -200,8 +242,12 @@ import { NoAccess, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { MembersGallery } from "@/components/team/members-gallery"
 import { moduleSettingsIndex } from "@/components/screens/module-settings-screen"
+import { SettingsChoicesPanel } from "@/components/screens/settings-choices-panel"
+import { ModuleAutomations } from "@/components/screens/module-automations"
 import { RolesMatrix } from "@/components/team/roles-matrix"
 import { useScreenData } from "@/lib/use-screen-data"
+import { AUTOMATIONS } from "@shared/automations"
+import { formatCount } from "@shared/web/format-count"
 
 /** THE NARROWEST A MODULE CARD MAY BE before the Modules wall drops a column.
  *
@@ -287,25 +333,20 @@ export function SettingsScreen({
   const roles = rolesQ.data ?? []
   const members = membersQ.data ?? []
 
-  // THE TEAM'S OWN ADMIN NOT GIVEN A CONTAINER OF ITS OWN — Internal rates, and
-  // whatever the registry gains next. DERIVED rather than hand-listed for the
-  // reason this list always was: a section added to the registry appears here
-  // the day it is added.
-  //
-  // THREE KEYS ARE SUBTRACTED AND EACH ONE FOR ITS OWN REASON. `members` and
-  // `roles` are the two containers on this tab. `invites` LEFT THIS LIST on
-  // 2026-09-09 — "the invites, make it secondary button on the toolbar" — so it
-  // is a button in the members toolbar now rather than a row that navigates.
-  // `overview` is not subtracted here any more because it no longer exists at
-  // all: the team-overview screen was deleted the same day ("This overview
-  // about the team should not even exist"), and web/lib/pages.ts carries the
-  // whole of that decision.
-  const adminSections = TEAM_SECTIONS.filter(
-    (s) =>
-      s.placement === "tab" &&
-      !["members", "roles", "invites"].includes(s.key) &&
-      can(s.module, "read")
-  )
+  // THE "THIS TEAM" LIST — AND THE TAB STRIP IT WAS FOR — ARE GONE, 2026-09-14.
+  // This section used to derive `adminSections` from `TEAM_SECTIONS.filter(s
+  // => s.placement === "tab" && …)`, but `members`/`roles`/`invites` were the
+  // only rows that had ever carried `placement: "tab"` and all three were
+  // already subtracted (Internal rates, the one row this list ever rendered,
+  // went with the account rate card on 10 Sep 2026) — so the list had computed
+  // to `[]` and drawn nothing for days before anyone noticed. The client's
+  // ruling that killed the underlying strip too ("what is this? told you to
+  // kill it. Now this only lives on settings / team", 2026-09-14 — see
+  // web/lib/pages.ts) moved those three rows to `placement: "contextual"`,
+  // which makes this filter permanently empty rather than merely empty today.
+  // Removed instead of kept as inert scaffolding: TEAM_SECTIONS can carry a
+  // `placement: "tab"` row again if a future section needs one, and this list
+  // is one `.filter` away from coming back the day it does.
 
   // SWITCH TO A TEAM AND LAND ON ITS OWN PAGE. It used to land on `/t/<teamId>`
   // — the team overview, deleted on 2026-09-09 — so it lands on the agency's own
@@ -315,6 +356,35 @@ export function SettingsScreen({
     if (teamId !== ctx?.team?.id) await active.switchTeam(teamId)
     softNavigate("/kwapso")
   }
+
+  // ── THE AUTOMATIONS TAB'S OWN MODULES — computed once, shared by the tab's
+  // R16 count and the panel's own rows ─────────────────────────────────────
+  //
+  // Client, 2026-09-14: "On Settings, add a tab for Automations and show all
+  // the automations in the system, filtered by module and by status."
+  //
+  // NEVER A SECOND GATE. `moduleSettingsIndex(can)` is `visibleModuleSettings`'s
+  // own answer — R61 holds THAT to the one `can(` call in
+  // module-settings-screen.tsx — narrowed here to the pages that carry an
+  // "automations" kind section, the same test `ModuleSettingsScreen` itself
+  // runs to decide whether to draw the Automations tab on a single module's
+  // own page. A reader who may not see a module is never asked twice: they
+  // simply get no row for it, from the one function that already knows.
+  const automationModules = moduleSettingsIndex(can)
+    .filter(({ sections }) => sections.some((s) => s.kind === "automations"))
+    .map(({ page }) => ({ segment: page.segment, title: t(page.title) }))
+
+  // R16 — THE TAB'S COUNT, drawn once, through the one seam. `AUTOMATIONS`
+  // (shared/automations.ts) is the same registry `ModuleAutomations` itself
+  // filters — a code constant, so the exactness R16 asks for is free, the
+  // same argument module-settings-screen.tsx's own automations tab already
+  // makes for a single module. THIS IS A DIFFERENT NUMBER FROM THAT ONE, not
+  // a second copy of it: that tab counts one module's own rows, this counts
+  // every row across every module this reader may see — two honest answers
+  // to two different questions, never the same fact drawn twice.
+  const automationsCount = AUTOMATIONS.filter((a) =>
+    automationModules.some((m) => m.segment === a.segment)
+  ).length
 
   if (!ctx) return null
 
@@ -347,6 +417,35 @@ export function SettingsScreen({
       // Every group whose words a record actually stores is edited on that
       // module's own settings page, reached from the Modules tab beside this
       // line or from the gear on the module's own screen (R61's two doors).
+      //
+      // THE FIFTH TAB, 2026-09-14 — see this file's header, bullet 5, for the
+      // ruling and the one-component argument. `icon: "lightning"` is spelled
+      // out even though `TAB_ICONS["automations"]` (tabs-view.tsx) already
+      // resolves it — the same "spelled out anyway so the two agree on the
+      // page rather than by accident" the Modules tab's own `cube` keeps, and
+      // the identical bolt module-settings-screen.tsx already draws on a
+      // single module's own Automations tab, so the glyph means the same
+      // thing wherever this word appears.
+      {
+        value: "automations",
+        label: t("Automations"),
+        icon: "lightning",
+        badge: formatCount(automationsCount),
+        badgeVariant: "" as const,
+      },
+      // THE SIXTH TAB, 2026-09-14 — the client, pointing at the Contacts
+      // table: "create a tab in settings with choices where we see all the
+      // choices together… the value itself · module with the icon · status:
+      // active, inactive, and are protected." `icon: ""` on purpose —
+      // `TAB_ICONS["choices"]` (tabs-view.tsx) already resolves this word to
+      // `git-commit`, the same glyph module-settings-screen.tsx's own
+      // per-module Choices tab draws, and that table wins over anything a
+      // call site passes. No badge: `settings-choices-panel.tsx` counts its
+      // own rows once, through the kit panel's live "Showing X of Y" (R16),
+      // the same register every other bounded, non-recipe collection in this
+      // app uses (web/components/work/work-panels.tsx's Sprints/Apps
+      // panels) — a second count here would be the same fact twice.
+      { value: "choices", label: t("Choices"), icon: "", badge: "", badgeVariant: "" as const },
     ],
   }
 
@@ -377,44 +476,38 @@ export function SettingsScreen({
         onValueChange={setTab}
         renderPanel={(panel) => {
           if (panel.value === "appearance") {
+            // ONE CONTAINER, FOUR SECTIONS — client ruling, 2026-09-14, the
+            // correction to the preview-led layout that shipped first: "What
+            // I meant by language first was inside the container, just to
+            // make it the top section: Language · Size · Appearance ·
+            // Background." `AppearancePanel` (`shared/web/appearance-panel.tsx`)
+            // now owns all four, Language included, in one `SettingsSection`
+            // box beside the one shared live preview — see that file's own
+            // header for the full account, including why Language sits in the
+            // control column rather than above the preview row. Persisted the
+            // same way the other three are, on the person's own row, so it
+            // follows them between devices; the portal keeps its own compact
+            // twin in the header (`shared/web/language-menu.tsx`), because the
+            // portal has no settings screen at all.
             return (
-              <div className="flex flex-col gap-8">
-                {/* LANGUAGE, FIRST — client ruling, 2026-09-14, choosing the
-                    preview-led layout: "put language first". It has no visual
-                    analogue a preview can show (see `AppearancePanel`'s own
-                    header), so it keeps its own plain control in its own box,
-                    above the three settings a picture CAN show. Persisted the
-                    same way the others are, on the person's own row, so it
-                    follows them between devices; the portal keeps its own
-                    compact twin in the header (`shared/web/language-menu.tsx`),
-                    because the portal has no settings screen at all. */}
-                <LanguageSection save={(lang) => auth.setLanguage(lang)} />
-
-                {/* SIZE, APPEARANCE AND BACKGROUND — one shared live preview
-                    beside compact controls, replacing three separate boxes of
-                    option cards. Same ruling, same day: "Represent in the
-                    preview better the background … Create a new component in
-                    ui-ux if needed" — `AppearancePreview` (kit v1.2.77) is
-                    that component. See `shared/web/appearance-panel.tsx`'s own
-                    header for the full account. */}
-                <AppearancePanel
-                  scaleValue={active.user?.scale ?? null}
-                  saveScale={(scale) => auth.setScale(scale)}
-                  spineValue={active.user?.spine ?? null}
-                  saveSpine={async (spine) => {
-                    // Unlike Scale, applying the choice has no document-level
-                    // side effect to fire optimistically (app-shell.tsx reads
-                    // the rail's spine off `active.user`, not off a DOM
-                    // attribute this component could set itself) — so the
-                    // live update this tab sees comes from `active.refresh()`
-                    // rather than from realtime, which local dev doesn't even
-                    // proxy. Awaited: the section's own `saving` state should
-                    // cover the whole round trip, card press to rail repaint.
-                    await auth.setSpine(spine)
-                    await active.refresh()
-                  }}
-                />
-              </div>
+              <AppearancePanel
+                saveLanguage={(lang) => auth.setLanguage(lang)}
+                scaleValue={active.user?.scale ?? null}
+                saveScale={(scale) => auth.setScale(scale)}
+                spineValue={active.user?.spine ?? null}
+                saveSpine={async (spine) => {
+                  // Unlike Scale, applying the choice has no document-level
+                  // side effect to fire optimistically (app-shell.tsx reads
+                  // the rail's spine off `active.user`, not off a DOM
+                  // attribute this component could set itself) — so the
+                  // live update this tab sees comes from `active.refresh()`
+                  // rather than from realtime, which local dev doesn't even
+                  // proxy. Awaited: the section's own `saving` state should
+                  // cover the whole round trip, card press to rail repaint.
+                  await auth.setSpine(spine)
+                  await active.refresh()
+                }}
+              />
             )
           }
 
@@ -469,25 +562,6 @@ export function SettingsScreen({
                     canCreate={can("member_roles", "create")}
                   />
                 ) : null}
-
-                {/* WHAT ELSE IS ON THIS TEAM'S OWN ADMIN — see the note on
-                    `adminSections` above for which keys are subtracted and why
-                    each one is. */}
-                {teamId && adminSections.length > 0 && (
-                  <section className="flex flex-col gap-3">
-                    <Headline as="h2" size="h4">{t("This team")}</Headline>
-                    <List
-                      surface="none"
-                      className="rounded-[var(--radius)] bg-surface-panel"
-                      onItemClick={(item) => softNavigate(`/t/${teamId}/${item.id}`)}
-                      items={adminSections.map((s) => ({
-                        id: s.segment,
-                        title: t(s.title),
-                        trailing: <CaretRight className="text-muted-foreground size-4" />,
-                      }))}
-                    />
-                  </section>
-                )}
 
                 {/* THE TEAMS YOU ARE IN. Hidden, not deleted: the constant is
                     the whole of the switch, the list below is exactly what it
@@ -557,12 +631,12 @@ export function SettingsScreen({
             // match, and all nine of `contact-panels.tsx`/`client-org-panel.tsx`'s
             // bespoke rows). Nothing new is written here.
             //
-            // BY THE MODULE'S OWN NAME, and only that. The card carries a second
-            // line — the page's section titles, "Ticket types · Automations" —
-            // and it is deliberately NOT searched: the client asked for a
-            // toolbar and a sort by name, and a search box that also matches a
-            // subtitle answers a question nobody asked while making "why did
-            // Accounts come back for `automations`?" the reader's problem.
+            // BY THE MODULE'S OWN NAME, and only that. The card used to carry a
+            // second line — the page's section titles, "Ticket types ·
+            // Automations" — which R72 was earned by (client, 2026-09-14: "In
+            // settings, modules: delete this. Generally, I don't like
+            // subtitles, so stop putting them unless I ask"); with it gone
+            // there is nothing left to weigh a search box against.
             // `t(page.title)` rather than the raw key, so the search matches the
             // words actually on the card in the language actually on screen.
             const moduleQ = moduleQuery.trim().toLowerCase()
@@ -853,7 +927,7 @@ export function SettingsScreen({
                       empty={shownModules.length === 0}
                       emptyLabel={t("No modules match what you're looking for.")}
                     >
-                      {shownModules.map(({ page, sections }) => (
+                      {shownModules.map(({ page }) => (
                         <Card
                           key={page.segment}
                           variant="raised"
@@ -904,18 +978,20 @@ export function SettingsScreen({
                                   did when this was a span, and nothing about the
                                   drawing changes. */}
                               <CardTitle className="text-sm">{t(page.title)}</CardTitle>
-                              {/* WHAT IS ACTUALLY CONFIGURABLE THERE, in the words
-                                  the page's own section headings use — "Ticket
-                                  types" rather than a repeat of the module's name.
-                                  Off the FILTERED sections, so the line never
-                                  advertises a block this reader will not be shown.
-                                  The separator is punctuation and not a sentence,
-                                  so it is not a catalogue string; each name is one,
-                                  and each is already translated where
-                                  MODULE_SETTINGS declares it. */}
-                              <span className="text-muted-foreground w-full truncate text-xs">
-                                {sections.map((s) => t(s.title)).join(" · ")}
-                              </span>
+                              {/* NAME ONLY — R72 (`no-default-subtitles`). This used to
+                                  carry a second line, the page's own section titles
+                                  joined by " · " ("Ticket types · Automations"), read
+                                  off the FILTERED `sections` this row already carries
+                                  (so it never advertised a block this reader would not
+                                  be shown). The client killed it outright, 2026-09-14,
+                                  over this exact wall: "In settings, modules: delete
+                                  this. Generally, I don't like subtitles, so stop
+                                  putting them unless I ask." `sections` stays on the
+                                  row's own type ABOVE — `moduleSettingsIndex` still
+                                  filters a module out when it has none (R61 clause ii,
+                                  "the index is derived") — it is simply no longer
+                                  destructured here, because nothing in this JSX reads
+                                  it any more. */}
                             </CardContent>
                           </InAppLink>
                         </Card>
@@ -925,6 +1001,50 @@ export function SettingsScreen({
                 </CardContent>
               </Card>
             )
+          }
+
+          if (panel.value === "automations") {
+            // ONE COMPONENT, TWO MOUNTINGS — see this file's header, bullet
+            // 5. `ModuleAutomations` already draws this exact list, scoped to
+            // one module's own settings page; here it is the same component
+            // with `scope: { kind: "all", modules: automationModules }`,
+            // which is the ONLY difference from that call
+            // (module-settings-screen.tsx's own `{ kind: "module", segment }`).
+            // The toolbar — search, sort by name, the status filter with its
+            // three states including Protected — lives inside that one file
+            // and is never redrawn here.
+            //
+            // NOTHING TO SHOW AND NOTHING TO EXPLAIN, the same refusal the
+            // Modules panel gives above and for the same reason: a reader
+            // with no automations-bearing module is not told whether that is
+            // because the team has none or because they may see none of
+            // them, which is `automationModules.length === 0` either way.
+            if (automationModules.length === 0 || !teamId)
+              return (
+                <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
+                  <NoAccess />
+                </div>
+              )
+
+            return (
+              <ModuleAutomations
+                teamId={teamId}
+                scope={{ kind: "all", modules: automationModules }}
+                title={t("Automations")}
+              />
+            )
+          }
+
+          if (panel.value === "choices") {
+            // ONE SEAM, ONE GATE — see settings-choices-panel.tsx's own
+            // header for the full account. `can` is passed straight through
+            // rather than asked again: R61 (iii)'s "the settings host holds
+            // exactly one `can(` call" is written about
+            // module-settings-screen.tsx, and the same discipline applies
+            // here by the same argument — a reader who may see tickets but
+            // not the vocabulary is refused by `moduleSettingsIndex(can)`
+            // alone, never by a second permission spelled at this call site.
+            return teamId ? <SettingsChoicesPanel teamId={teamId} can={can} /> : null
           }
 
           return null

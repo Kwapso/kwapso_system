@@ -117,6 +117,21 @@ export type TableColumn = {
    * shaped cell itself. Absent means `row[key]`, i.e. compare what is drawn,
    * which stays correct for a column whose text IS the fact. */
   sortKey?: (row: TableRowData) => unknown
+  /** WHERE THE SEARCH TEXT COMES FROM, when the cell is not itself a string.
+   *
+   * `CollectionFrame`'s free-text match reads `String(row[key])` (R48/R53's
+   * own toolbar search box, wired straight through this component's
+   * `searchKeys`) — honest for a column whose cell IS its own text, and a
+   * silent no-op for one whose cell is a node: `String(<span>…</span>)` is
+   * `"[object Object]"`, so every row with anything richer than plain text in
+   * that column becomes unsearchable rather than merely unmatched, and
+   * nothing on screen says so. The name of the ROW KEY carrying that column's
+   * plain text — never a function, because `searchKeys` names a PROPERTY for
+   * `CollectionFrame`'s own matcher to read, not a value this file could hand
+   * it back already computed. Absent means `key`, i.e. search what is drawn,
+   * which stays correct for every column that was already plain text before
+   * this existed (Tasks, Contacts, Meetings all leave it unset). */
+  searchKey?: string
 }
 
 /** ── WHY A COLUMN HAS TO SAY WHAT IT IS ───────────────────────────────────────
@@ -374,7 +389,7 @@ export function RecordTable<T extends TableRowData>({
     <CollectionFrame
       config={config}
       data={shown}
-      searchKeys={columns.map((c) => c.key) as (keyof T)[]}
+      searchKeys={columns.map((c) => c.searchKey ?? c.key) as (keyof T)[]}
       className={className}
       useKitPanel={useKitPanel}
       narrowedOutside={narrowedOutside}

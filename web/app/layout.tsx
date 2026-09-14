@@ -103,8 +103,40 @@ export default function RootLayout({
        * record-chrome.tsx`'s `IDENTITY_ROW`, C4). That row now solves its
        * own contrast with a different FILL instead of a border — see its own
        * comment for the token and the reasoning; this rule is untouched for
-       * every other Badge in the app. */}
-      <body className="bg-background min-h-[100svh] antialiased [&_[data-slot=badge].bg-surface-quiet]:bg-surface-panel">
+       * every other Badge in the app.
+       *
+       * THE SELECTOR WENT DEAD, SILENTLY, AND THE CLIENT ASKED FOR THIS EXACT
+       * COLOUR A SECOND TIME — Settings › Team, 2026-09-14: "the chips in
+       * team this color #F7F2EB". Measuring the two chips that ruling names
+       * (the role badge on a member card, the invites-count badge on the
+       * toolbar) found them at `--surface-quiet` (#E2DDD4), not
+       * `--surface-panel` — this rule's own selector, unchanged since
+       * 2026-08-31, matching a class Badge no longer emits. `badge.tsx`'s
+       * `secondary` variant used to draw the literal utility class
+       * `bg-surface-quiet`; a later kit resync (v1.2.13 → v1.2.15, see
+       * `web/components/records/record-chrome.tsx`'s `IDENTITY_ROW`
+       * comment, which hit the identical dead match on the identity row's
+       * own rebind) turned it into `bg-[var(--badge-quiet-fill,
+       * var(--surface-quiet))]` — a CSS custom property with a fallback, not
+       * a class this selector's `.bg-surface-quiet` can find. So this line
+       * had painted nothing for two weeks: every plain badge app-wide,
+       * Team's two included, has been drawing the kit's quiet grey the whole
+       * time, invisibly, because a dead selector fails green — nothing here
+       * asserts the class it targets still exists.
+       *
+       * THE FIX REBINDS THE CUSTOM PROPERTY INSTEAD OF MATCHING A CLASS —
+       * badge.tsx's own documented escape hatch ("a caller rebinds
+       * `--badge-quiet-fill` locally"), the same mechanism `IDENTITY_ROW`
+       * and `tickets-collection.tsx`'s own triage card already use for a
+       * LOCAL rebind. Setting it here, on `<body>`, is the APP-WIDE default
+       * the two of them override: `--badge-quiet-fill` inherits down through
+       * every descendant, so `badge.tsx`'s `bg-[var(--badge-quiet-fill,…)]`
+       * class reads `--surface-panel` everywhere except where a nearer
+       * element (identity row, triage card) rebinds it again for its own
+       * ground — ordinary CSS custom-property inheritance, no `!important`,
+       * no class string to go stale the next time the kit's build changes
+       * its generated output. */}
+      <body className="bg-background min-h-[100svh] antialiased [--badge-quiet-fill:var(--surface-panel)]">
         {/* The mark's stylesheet and its animator, FIRST in the body: the
          * animator has to be published before the parser reaches the loader
          * further down, so the mark is already turning when the bundle is still

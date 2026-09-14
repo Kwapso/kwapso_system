@@ -6273,54 +6273,56 @@ describe("R64 — a team-area section has a door, or names the screen that took 
       .filter((m) => /placement:\s*"tab"/.test(m[0]))
       .map((m) => m[1])
 
-    // TRIPWIRE 1 — THE PARSE. Every clause below is a set relation against this
-    // set, and a set relation against an empty set is empty: a regex that
-    // stopped matching would report a perfectly doored app.
+    // TRIPWIRE 1 — THE PARSE, RETARGETED 2026-09-14. This used to require AT
+    // LEAST ONE `placement: "tab"` row, because a set relation against an
+    // empty set is empty and an empty set here used to mean only one thing: a
+    // broken regex. It no longer can mean only that. The client's ruling that
+    // day — "Team management is reachable only from Settings › Team. The team
+    // area's own standalone pages must go." — retired the team-area strip
+    // outright, and `members`/`roles`/`invites` (the only rows that had EVER
+    // carried `placement: "tab"`) moved to `placement: "contextual"` the same
+    // day (web/lib/pages.ts carries the whole decision). Zero is now the
+    // CORRECT reading, so the proof the regex still works is POSITIVE instead:
+    // it must find these three keys, by name, each `placement: "contextual"`.
+    for (const key of ["members", "roles", "invites"]) {
+      expect(
+        new RegExp(`key:\\s*"${key}"[^}]*placement:\\s*"contextual"`).test(table),
+        `R64 — TEAM_SECTIONS' \`${key}\` row is not \`placement: "contextual"\`. It moved off "tab" on 2026-09-14 when the team-area strip was retired; if it moved again, teach this law the new shape`
+      ).toBe(true)
+    }
     expect(
       tabSections.length,
-      `R64 — read no \`placement: "tab"\` section out of TEAM_SECTIONS. Either the team area has no strip left (which is a decision to take with the client, not a green build) or the slice above stopped matching ${PAGES_REL}`
-    ).toBeGreaterThan(0)
+      `R64 — TEAM_SECTIONS carries a \`placement: "tab"\` row again: ${tabSections.join(", ")}. That is a real decision (the team area gets its strip back), not a silent regression — if it is deliberate, restore clauses (ii) and the "subtracted" half of clause (vi) below rather than leaving them permanently dead (git history has the pre-2026-09-14 version of this file)`
+    ).toBe(0)
 
-    // ── ii · THE DOOR THAT IS LEFT, AND THAT IT REALLY IS ONE ───────────────
-    // The "This team" list is the app's one entrance to the team area. Checked
-    // FIRST and on its own, because everything after this is measured against
-    // what it subtracts — a check that read the subtraction off a panel that no
-    // longer navigates would be measuring a door that is not there.
-    const panelAt = tab.indexOf("const adminSections = TEAM_SECTIONS.filter(")
+    // ── ii · THE OLD DOOR IS GONE FOR GOOD, NOT JUST LEFT EMPTY ─────────────
+    // Until 2026-09-14 this clause read `adminSections` off ${TAB_REL} — the
+    // "This team" list, the app's one-time entrance to the team area — and
+    // checked what it subtracted. That computation had already gone quietly
+    // vacuous days earlier: `members`/`roles`/`invites` were the only rows
+    // that had EVER carried `placement: "tab"` and all three were ALREADY
+    // subtracted (Internal rates, the one row the list ever rendered, left
+    // with the account rate card on 10 Sep 2026), so `adminSections` was
+    // `[]` and the list drew nothing — while the COLLECTION SCREENS those
+    // three would have opened were still fully reachable by address, strip
+    // and all, which is the exact client screenshot that closed this out.
+    // Left in place as "harmless" is how the 2026-09-09 regression's own
+    // comment read at the time too, so this checks the removal HELD rather
+    // than assuming it: the mechanism is gone, not merely unused.
     expect(
-      panelAt,
-      `R64 — ${TAB_REL} no longer derives \`adminSections\` from TEAM_SECTIONS. That list is the whole of the app's entrance to the team area; if it was renamed, teach this law the new name — if it was DELETED, every tab section below needs a SECTION_HOSTED_ELSEWHERE line, which this check will then say out loud`
-    ).toBeGreaterThan(-1)
-    expect(
-      /softNavigate\(`\/t\/\$\{teamId\}\/\$\{item\.id\}`\)/.test(tab),
-      `R64 — ${TAB_REL} draws the "This team" list but nothing in it soft-navigates into /t/<teamId>/<segment>. The offered half of this law has to be real: a section is only 'doored' by that list if pressing its row actually opens it`
-    ).toBe(true)
+      tab.includes("adminSections"),
+      `R64 — ${TAB_REL} mentions \`adminSections\` again. That derivation was deleted 2026-09-14 because TEAM_SECTIONS can no longer carry a \`placement: "tab"\` row for it to filter (see tripwire 1 above) — if a tab section is back, restore the real clause rather than half-reviving a computation with nothing left to filter`
+    ).toBe(false)
+    // No tab section is ever subtracted any more — see tripwire 1 — so this is
+    // the empty set clause (vi) below unions with `orphanedContextual`, not a
+    // parse of a now-deleted filter literal.
+    const subtracted: string[] = []
 
-    // THE SUBTRACTION, off the filter's own array literal. Narrow on purpose —
-    // `!["…"].includes(s.key)` is the one shape that removes a section from the
-    // list, and reading every string in the filter instead would also collect
-    // `"tab"` and `"read"`, which are not sections.
-    const subtractAt = tab.slice(panelAt).match(/!\[([^\]]*)\]\.includes\(s\.key\)/)
-    expect(
-      subtractAt,
-      `R64 — could not read the \`!["…"].includes(s.key)\` subtraction out of ${TAB_REL}'s adminSections filter. That literal is the record of which sections lost their door; if the filter changed shape, teach this law the new one`
-    ).not.toBeNull()
-    const subtracted = [...(subtractAt?.[1] ?? "").matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1])
-
-    // TRIPWIRE 2 — the subtraction is a real subset of the sections. A key that
-    // is not a tab section means the two files have drifted apart, and it is
-    // also proof this parsed words rather than noise.
-    const notSections = subtracted.filter((k) => !tabSections.includes(k))
-    expect(
-      notSections,
-      `R64 — ${TAB_REL} subtracts a key that is not a \`placement: "tab"\` section in TEAM_SECTIONS: ${notSections.join(", ")}. Either the section moved or was deleted, in which case the subtraction is dead code, or this law is reading the wrong literal`
-    ).toEqual([])
-
-    // ── iii · EVERY SUBTRACTED SECTION NAMES ITS HOST, AND ONLY THOSE ───────
-    // Both directions, because each failure is invisible alone. A subtracted
+    // ── iii · EVERY DOORLESS SECTION NAMES ITS HOST, AND ONLY THOSE ────────
+    // Both directions, because each failure is invisible alone. A doorless
     // section with no line is a capability nobody can reach — the 2026-09-09
-    // regression, exactly. A line for a section that is NOT subtracted is a
-    // stale claim that will one day be read as cover for a real gap.
+    // regression, exactly. A line for a section that HAS a door is a stale
+    // claim that will one day be read as cover for a real gap.
     // ── v · THE CONTEXTUAL SECTIONS, AND THE BLINDNESS THAT EARNED THEM ────
     //
     // WHAT THIS LAW COULD NOT SEE UNTIL 11 SEP 2026. Everything above walks
@@ -6470,13 +6472,17 @@ describe("R64 — a team-area section has a door, or names the screen that took 
       const ids = [...m[2].matchAll(/action:\s*"([a-z]+\.[A-Za-z]+)"/g)].map((x) => x[1])
       if (ids.length) actsOf.set(m[1], [...(actsOf.get(m[1]) ?? []), ...ids])
     }
-    // TRIPWIRE 4 — the recipes parsed, and at least one subtracted section
-    // actually owes something. A green run over an app where no section owes an
-    // act would be the "check that measures nothing" this repo keeps earning.
-    const owed = subtracted.filter((k) => (actsOf.get(k) ?? []).length > 0)
+    // TRIPWIRE 4 — the recipes parsed, and at least one doorless section
+    // actually owes something. Reads `doorless` (clause vi, above this one in
+    // file order) rather than `subtracted`, which is always `[]` since
+    // 2026-09-14 (tripwire 1) — `members` is the doorless key that owes
+    // `members.changeRole`/`members.remove` now. A green run over an app
+    // where no section owes an act would be the "check that measures nothing"
+    // this repo keeps earning.
+    const owed = doorless.filter((k) => (actsOf.get(k) ?? []).length > 0)
     expect(
       owed.length,
-      `R64 — no subtracted section owes a single act, which means either ${SCREENS_REL}'s recipes stopped declaring \`actions:\` (teach this law the new shape) or the three administrative acts on a team's people have been deleted. Both are a decision, not a green build`
+      `R64 — no doorless section owes a single act, which means either ${SCREENS_REL}'s recipes stopped declaring \`actions:\` (teach this law the new shape) or the three administrative acts on a team's people have been deleted. Both are a decision, not a green build`
     ).toBeGreaterThan(0)
 
     const missing: string[] = []

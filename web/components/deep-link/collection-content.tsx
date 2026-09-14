@@ -57,12 +57,7 @@ import { invalidate } from "@shared/web/store"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
-import {
-  shapeAccountsList,
-  shapeInvitesList,
-  shapeMembersList,
-  shapeRolesList,
-} from "@/components/deep-link/shape"
+import { shapeAccountsList } from "@/components/deep-link/shape"
 import {
   resolveRecipe,
   withDataDrivenCollection,
@@ -74,16 +69,11 @@ import type { ModuleContentCtx } from "./module-content"
 export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
   const {
     t,
-    lang,
     module,
     teamId,
     can,
     go,
     overridesQ,
-    membersQ,
-    rolesQ,
-    roles,
-    invitesQ,
     accountsQ,
     knowledgeQ,
     knowledgeShapeQ,
@@ -135,85 +125,20 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
 
   const recipe = resolveRecipe(`${module}.list`, overridesQ.data, t)
   if (!recipe) return <NotFound />
-  if (module === "members") {
-    if (membersQ.error) return <LoadError what="members" />
-    if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeMembersList(membersQ.data, lang)
-    const membersRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
-    // No SectionWithCreate here — a member is never created directly (they
-    // arrive by accepting an invite), so there is no create action to
-    // coordinate and no double-button risk. The kit panel still draws the
-    // box and the real search/filter chrome this recipe already declares
-    // (the Role facet), which is what the legacy header drew by hand before.
-    return (
-      <ScreenRenderer
-        recipe={membersRecipe}
-        data={data}
-        rights={rights}
-        onAction={onAction}
-        onIntent={onIntent}
-        useKitPanel
-      />
-    )
-  }
-  if (module === "roles") {
-    if (rolesQ.error) return <LoadError what="roles" />
-    if (rolesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeRolesList(roles)
-    const rolesRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
-    return (
-      <SectionWithCreate
-        show={can("member_roles", "create")}
-        label={t("New role")}
-        icon="plus"
-        secondary={{
-          show: can("member_roles", "create"),
-          label: t("Import CSV"),
-          onClick: () => go(`/t/${teamId}/import/member_roles`),
-        }}
-        download={{
-          show: (data.rows?.length ?? 0) > 0, // export needs READ — implied by seeing this list
-          label: t("Export CSV"),
-          href: "/api/tenancy/roles/export",
-        }}
-        onCreate={() => go(sectionPath, { panel: "add", module: "roles" })}
-        useKitPanel
-      >
-        <ScreenRenderer
-          recipe={rolesRecipe}
-          data={data}
-          rights={rights}
-          onAction={onAction}
-          onIntent={onIntent}
-          useKitPanel
-        />
-      </SectionWithCreate>
-    )
-  }
-  if (module === "invites") {
-    if (invitesQ.error) return <LoadError what="invites" />
-    if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeInvitesList(invitesQ.data)
-    const invitesRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
-    return (
-      <SectionWithCreate
-        show={can("team_members", "create")}
-        label={t("Invite")}
-        icon="mail"
-        onCreate={() => go(sectionPath, { panel: "add", module: "invites" })}
-        useKitPanel
-      >
-        <ScreenRenderer
-          recipe={invitesRecipe}
-          data={data}
-          rights={rights}
-          onAction={onAction}
-          onIntent={onIntent}
-          useKitPanel
-        />
-      </SectionWithCreate>
-    )
-  }
+  // MEMBERS/ROLES/INVITES' COLLECTION SCREENS STOOD HERE and are deleted,
+  // 2026-09-14, with the rest of the team-area strip (see the comment beside
+  // `MovedToTeamTab` in module-content.tsx, which now catches all three
+  // modules before this function is ever called). The "New role"/"Import
+  // CSV"/"Export CSV"/"Invite" affordances the roles and invites blocks drew
+  // through `SectionWithCreate` did not simply go with them: "New role" and
+  // "Invite" already had real homes on Settings › Team
+  // (web/components/team/roles-matrix.tsx's own `+`,
+  // web/components/team/members-gallery.tsx's "Invite someone"), member CSV
+  // import is already reachable team-wide from the generic wizard at
+  // /t/<teamId>/import (web/components/screens/home-screen.tsx's "Import"
+  // card, gated per-target rather than per-screen), and roles' "Export CSV"
+  // — the one act that had no other door — moved onto roles-matrix.tsx's own
+  // header beside "New role", same href, same label.
   if (module === "processes") {
     // The whole screen is host-composed: the VALUE drill-down sits above the
     // list, and a map cannot be created without the apps it might belong to. Its

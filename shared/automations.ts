@@ -567,3 +567,24 @@ export function isAutomationOff(settings: unknown, key: string): boolean {
   if (!AUTOMATIONS.some((a) => a.key === key && a.switchable)) return false
   return (settings as Record<string, unknown>)[key] === AUTOMATION_OFF
 }
+
+/** THE THREE STATES AN AUTOMATION IS EVER IN, on any screen that lists them —
+ * added 14 Sep 2026 for the Automations toolbar's own status filter, and the
+ * client's confirmation the same day, shown a two-state draft: *"in
+ * automations filters everywhere, add filter to protected."* Protected first,
+ * because it is the branch `switchable` decides outright; on/off is the same
+ * reading `isAutomationOff` already gives every switch on this page. */
+export type AutomationStatus = "on" | "off" | "protected"
+
+/** THE ONE READING OF AN AUTOMATION'S STATUS — so a scoped toolbar (one
+ * module's settings page) and an unscoped one (every automation in the base,
+ * on one screen) derive the identical three states from `switchable` and the
+ * stored blob, rather than each typing its own copy of this branch. Never a
+ * typed list of three words: a row is `"protected"` exactly when it cannot be
+ * switched (R70 guarantees a `helpText` then, so the reason is never
+ * separated from the badge that names it), and otherwise `"on"` or `"off"`
+ * off the same door `isAutomationOff` already reads. */
+export function automationStatus(a: Automation, settings: unknown): AutomationStatus {
+  if (!a.switchable) return "protected"
+  return isAutomationOff(settings, a.key) ? "off" : "on"
+}

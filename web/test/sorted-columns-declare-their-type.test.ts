@@ -205,6 +205,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // should have.
       "web/components/accounts/contacts-screen.tsx",
       "web/components/meetings/meetings-screen.tsx",
+      // The system-wide Choices tab (Settings), 2026-09-14 — a table over
+      // every choice value this reader's own visible modules own. Like
+      // Contacts, it carries NO formatted cell: Value, Module and Status are
+      // all words, never a date or a number, so this file only adds column
+      // keys and no offenders.
+      "web/components/screens/settings-choices-panel.tsx",
       "web/components/work/tasks-screen.tsx",
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)

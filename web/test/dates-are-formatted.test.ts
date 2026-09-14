@@ -140,7 +140,7 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
     "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
     "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
-  "web/components/deep-link/shape.tsx:94":
+  "web/components/deep-link/shape.tsx:100":
     "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
@@ -152,7 +152,9 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "the knowledge section's two dead exports (`knowledgeFiledUnder`, " +
     "`shapeKnowledgeList` — superseded by `KnowledgeSourceCard`) and their " +
     "now-unused `Icon`/`IconName`/`KnowledgeSource` imports two lines above " +
-    "this one.)",
+    "this one; and to :100 on 14 Sep 2026, when the system-wide Choices tab's " +
+    "own shaper (`shapeChoicesTable`) landed five single-line imports and a " +
+    "`SelectableValue` type import above this one, six lines net.)",
   "web/components/work/work-panels.tsx:1500":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
