@@ -121,9 +121,15 @@ export function staffedOn(
 
 /** The same answer, fetched. Every screen that offers people reads the ONE
  * members cache four other screens already hold, so opening a form costs a round
- * trip only on a page that has never needed the list. */
-export function useAssignableMembers(teamId: string): PickablePerson[] {
-  const membersQ = useCached<TeamMember[]>(TEAM_RESOURCES.members.key(teamId), () =>
+ * trip only on a page that has never needed the list.
+ *
+ * `teamId` TAKES `null` (0091) for a caller whose team is not resolved yet —
+ * a dialog mounted unconditionally ahead of its own `open` gate, the same
+ * reason half the reads on this screen carry a ternary key. `null` reads as
+ * "no team yet" and primes nothing, exactly as every other `useCached(cond ?
+ * key : null, …)` call in this app already does. */
+export function useAssignableMembers(teamId: string | null): PickablePerson[] {
+  const membersQ = useCached<TeamMember[]>(teamId ? TEAM_RESOURCES.members.key(teamId) : null, () =>
     tenancy.members().then((r) => r.members)
   )
   return assignableMembers(membersQ.data)

@@ -188,7 +188,7 @@ describe("safeMediaKey — the door validates the key at the boundary", () => {
     }
     // The tripwire: a scan that finds no doors reports "all clear" like a pass.
     // FOUR now — the agency gateway grew /media/internal/ when the agency's own
-    // housekeeping landed (brand assets, staff photos, certificate PDFs). It is
+    // housekeeping landed (brand assets, staff photos). It is
     // on the AGENCY door only, and deliberately: a capability URL that leaked
     // into a client's hands has nowhere on the portal to be redeemed, which is
     // the routing half of the refusal every one of those API doors already makes.
@@ -267,7 +267,7 @@ describe("a reclaim is proved against the key some door actually mints", () => {
       }
     expect(
       reclaims,
-      "expected the reclaims: profile photo, team logo, account logo+cover, app logo, brand file, deliverable link+picture, staff photo, certificate file"
+      "expected the reclaims: profile photo, team logo, account logo+cover, app logo, brand file, deliverable link+picture, staff photo"
     ).toBeGreaterThanOrEqual(7)
   })
 
@@ -275,8 +275,8 @@ describe("a reclaim is proved against the key some door actually mints", () => {
     // THE BUG THIS CLOSES, MEASURED 5 SEP 2026: knowledge, brand assets, staff and
     // deliverables all minted `mediaKey(guard.teamId)` into the SAME bucket, so
     // `ownedMediaKey(url, base, teamId)` proved "this team" and could never prove
-    // "this module". A brand asset's URL pasted into a staff certificate's file
-    // field passes that proof — and the staff door's reclaim would then destroy the
+    // "this module". A brand asset's URL pasted into a staff photo's file field
+    // passes that proof — and the staff door's reclaim would then destroy the
     // brand library's file. One more segment makes it impossible by construction;
     // this keeps it that way.
     const byOwners = new Map<string, Set<string>>()
@@ -333,7 +333,7 @@ describe("every object prefix a tenant's files live under is written down", () =
     'guard.teamId, "tasks"': "the photo of the letter on a piece of our own admin (workers/content/src/routes/todos.ts)",
     'guard.teamId, "knowledge"': "the material behind a knowledge source (workers/content/src/routes/knowledge.ts)",
     'guard.teamId, "brand"': "the brand library's files (workers/content/src/routes/brand-assets.ts)",
-    'guard.teamId, "staff"': "staff photos and certificates — one generic upload door, two destination columns (workers/content/src/routes/staff.ts)",
+    'guard.teamId, "staff"': "a colleague's profile photo (workers/content/src/routes/staff.ts). Used to serve a second destination column, a certificate's file, before the certificate module was killed whole (team migration 0090)",
     'guard.teamId, "deliverables"': "what we handed over on an app (workers/content/src/routes/deliverables.ts)",
     // THE ONE MINT WHOSE MODULE IS NOT A LITERAL, and the only reason it is
     // allowed to be. The presign door serves several modules from one handler,

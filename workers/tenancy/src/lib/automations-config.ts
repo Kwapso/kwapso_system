@@ -31,6 +31,17 @@
 // person who would have been told is the person who would have caught it. The
 // decision is recorded where the machine surface's other decisions are
 // (`TOOLLESS_DOORS`, workers/mcp/test/filter-parity.test.ts).
+//
+// A SECOND WRITER, 2026-09-14, SAME BLOB. The Automations table grew an edit
+// sheet — name, description, status — and status is still this file's own
+// on/off word, untouched. Name/description are a TEAM OVERRIDE of the
+// registry's own English, and they fit in the same JSON column under a
+// reserved `overrides` key rather than a new table: see `shared/
+// automations.ts`'s "A TEAM'S OWN WORDS" note for the shape, and
+// `setAutomationOverride` below for the door. `readSegmentSettings`/
+// `writeSegmentSettings` are the read-modify-write the two writers share; each
+// still gates, refuses a key the registry does not know, and logs its own
+// activity row.
 
 import { AUTOMATION_OFF, AUTOMATIONS } from "@shared/automations"
 import { logActivity, type Actor } from "@shared/workers/activity"
@@ -72,6 +83,80 @@ export async function getAutomationSettings(
   return out
 }
 
+/** Read one segment's stored blob, parsed — `{}` when there is no row yet, or
+ * when the row holds something no door of ours could have written (start from
+ * the DEFAULT rather than a guess: every automation on, no team words). Shared
+ * by every write below, so the two writers can never disagree about what
+ * "nothing stored yet" means. */
+async function readSegmentSettings(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  segment: string
+): Promise<{ existing: boolean; settings: Record<string, unknown> }> {
+  const rows = await d1Query<{ settings: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — one row, `module` is the primary key.
+    "SELECT settings FROM automations WHERE module = ? LIMIT 1",
+    [segment]
+  )
+  const existing = rows[0]
+  let settings: Record<string, unknown> = {}
+  if (existing) {
+    try {
+      const parsed: unknown = JSON.parse(existing.settings)
+      if (typeof parsed === "object" && parsed !== null) settings = parsed as Record<string, unknown>
+    } catch {
+      settings = {}
+    }
+  }
+  return { existing: Boolean(existing), settings }
+}
+
+/** Write a segment's blob back — the byte cap, the row cap (insert-only, `screens`'
+ * own argument: an UPDATE to an existing segment changes no row count, a segment
+ * with no row yet is a new one and new rows are what the ceiling is for), and the
+ * upsert itself. Shared by both writers below; each still writes its OWN activity
+ * row, because "who switched what off" and "who renamed what" are different
+ * sentences in the trail. */
+async function writeSegmentSettings(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  segment: string,
+  existing: boolean,
+  settings: Record<string, unknown>
+): Promise<void> {
+  const json = JSON.stringify(settings)
+  if (json.length > MAX_SETTINGS_BYTES)
+    throw new GuardError(400, "settings_too_large", "That module has too many settings stored.")
+
+  if (!existing) {
+    const counted = await d1Query<{ n: number }>(
+      cfg,
+      guard.databaseId,
+      "SELECT COUNT(*) AS n FROM automations"
+    )
+    if ((counted[0]?.n ?? 0) >= MAX_AUTOMATION_MODULES)
+      throw new GuardError(
+        400,
+        "too_many_automation_modules",
+        `This team already holds automation settings for ${MAX_AUTOMATION_MODULES} modules, which is the limit.`
+      )
+  }
+
+  const now = new Date().toISOString()
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO automations (module, settings, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(segment)}, ${sqlString(json)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)})
+ON CONFLICT(module) DO UPDATE SET
+  settings = excluded.settings, updated_at = ${sqlString(now)},
+  editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)};`
+  )
+}
+
 /** Switch one automation off, or back on.
  *
  * `on` is the caller's answer and it arrives already type-checked at the route
@@ -99,65 +184,62 @@ export async function setAutomation(
     )
 
   const segment = entry.segment
-  const rows = await d1Query<{ settings: string }>(
-    cfg,
-    guard.databaseId,
-    // R14 hard cap — one row, `module` is the primary key.
-    "SELECT settings FROM automations WHERE module = ? LIMIT 1",
-    [segment]
-  )
-  const existing = rows[0]
-  let settings: Record<string, unknown> = {}
-  if (existing) {
-    try {
-      const parsed: unknown = JSON.parse(existing.settings)
-      if (typeof parsed === "object" && parsed !== null) settings = parsed as Record<string, unknown>
-    } catch {
-      // A blob no door of ours can have written. Start from the DEFAULT rather
-      // than from a guess — every automation on, then this one's answer applied.
-      settings = {}
-    }
-  }
+  const { existing, settings } = await readSegmentSettings(cfg, guard, segment)
   if (on) delete settings[key]
   else settings[key] = AUTOMATION_OFF
 
-  const json = JSON.stringify(settings)
-  if (json.length > MAX_SETTINGS_BYTES)
-    throw new GuardError(400, "settings_too_large", "That module has too many settings stored.")
-
-  // CAP THE TABLE, not just the row — `screens`' own argument. An update to an
-  // existing segment changes no row count; a segment with no row yet is a new
-  // row, and new rows are what the ceiling is for.
-  if (!existing) {
-    const counted = await d1Query<{ n: number }>(
-      cfg,
-      guard.databaseId,
-      "SELECT COUNT(*) AS n FROM automations"
-    )
-    if ((counted[0]?.n ?? 0) >= MAX_AUTOMATION_MODULES)
-      throw new GuardError(
-        400,
-        "too_many_automation_modules",
-        `This team already holds automation settings for ${MAX_AUTOMATION_MODULES} modules, which is the limit.`
-      )
-  }
-
-  const now = new Date().toISOString()
-  await d1ExecScript(
-    cfg,
-    guard.databaseId,
-    `INSERT INTO automations (module, settings, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(segment)}, ${sqlString(json)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)})
-ON CONFLICT(module) DO UPDATE SET
-  settings = excluded.settings, updated_at = ${sqlString(now)},
-  editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)};`
-  )
+  await writeSegmentSettings(cfg, guard, actor, segment, existing, settings)
   await logActivity(cfg, guard.databaseId, actor, {
     // SWITCHING ONE OFF AND BACK ON ARE TWO DIFFERENT SENTENCES IN THE TRAIL,
     // because "who stopped the resolution emails, and when" is the question
     // somebody asks three weeks later when a client says they heard nothing.
     type: on ? "Automation switched on" : "Automation switched off",
     description: `${actor.name} switched ${on ? "on" : "off"} the ${key} automation`,
+    relatedTable: "automations",
+    relatedRowId: segment,
+  })
+}
+
+/** A team's own name/description for one automation — see `shared/
+ * automations.ts`'s "A TEAM'S OWN WORDS" note for the whole account. Stored
+ * beside the on/off map in the SAME blob, under its own `overrides` key, so
+ * the two questions ("is it off" / "what does this team call it") can never
+ * collide on one value.
+ *
+ * `title`/`description` are already validated, optional text (R20, at the
+ * route) — `undefined` means "no words for this field", which CLEARS any
+ * override rather than leaving a stale one, matching the on/off store's own
+ * "absence is the default" discipline. Allowed on a PROTECTED automation too:
+ * her ruling only ever fenced the STATUS ("you cannot make it unprotected"),
+ * never the words describing it. */
+export async function setAutomationOverride(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  key: string,
+  title: string | undefined,
+  description: string | undefined
+): Promise<void> {
+  // THE SAME CLOSED KEY SPACE AS THE SWITCH, minus the `switchable` refusal —
+  // a team's own name for a protected automation is still allowed (see above).
+  const entry = AUTOMATIONS.find((a) => a.key === key)
+  if (!entry) throw new GuardError(400, "unknown_automation", "There's no automation by that name.")
+
+  const segment = entry.segment
+  const { existing, settings } = await readSegmentSettings(cfg, guard, segment)
+  const overrides =
+    typeof settings.overrides === "object" && settings.overrides !== null
+      ? { ...(settings.overrides as Record<string, unknown>) }
+      : {}
+  if (title || description) overrides[key] = { ...(title ? { title } : {}), ...(description ? { description } : {}) }
+  else delete overrides[key]
+  if (Object.keys(overrides).length > 0) settings.overrides = overrides
+  else delete settings.overrides
+
+  await writeSegmentSettings(cfg, guard, actor, segment, existing, settings)
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Automation renamed",
+    description: `${actor.name} changed how the ${key} automation is described`,
     relatedTable: "automations",
     relatedRowId: segment,
   })

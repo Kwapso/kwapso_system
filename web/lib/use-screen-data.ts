@@ -264,7 +264,7 @@ export function useScreenData({
   const purposesQ = useCached(enabled && onPurposes ? purposesKey(teamId as string) : null, () =>
     listFetch.purposes(teamId as string)
   )
-  // Staff profiles + certificates are NOT read here. They are read by the panel
+  // Staff profiles are NOT read here. They are read by the panel
   // on the member's own page (staff-panel.tsx), cache-first on the same keys the
   // live registry patches — the same shape every bespoke record screen uses, and
   // the right one for a collection that only ever appears on one screen.
@@ -324,7 +324,6 @@ export function useScreenData({
     // and the collection headings show, primed by the fetchers above.
     brand_assets: useCachedValue<number>(enabled ? totalKey("brand_assets", teamId as string) : null),
     purposes: useCachedValue<number>(enabled ? totalKey("purposes", teamId as string) : null),
-    staff_certificates: useCachedValue<number>(enabled ? totalKey("staff_certificates", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),

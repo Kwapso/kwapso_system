@@ -74,7 +74,7 @@ type Env = {
   MCP: Fetcher
   MEDIA: R2Bucket
   LEARNING_MEDIA: R2Bucket
-  /** the agency's own files — brand assets, staff photos, certificate PDFs. */
+  /** the agency's own files — brand assets, staff photos. */
   INTERNAL_MEDIA: R2Bucket
   /** shared secret for auth's /internal/* doors (same value as auth/tenancy/content). */
   INTERNAL_KEY?: string
@@ -194,7 +194,7 @@ async function handle(request: Request, env: Env, ctx?: ExecutionContext): Promi
     if (pathname.startsWith("/media/learning/") && isRead(request.method))
       return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range, request.method, edge)
 
-    // The agency's own files — brand assets, staff photos, certificate PDFs.
+    // The agency's own files — brand assets, staff photos.
     // Its own bucket, matched before the generic prefix for the same reason the
     // one above is: a more specific prefix has to win, or every internal URL
     // would be looked up in the wrong bucket and 404.

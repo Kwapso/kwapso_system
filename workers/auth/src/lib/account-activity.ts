@@ -104,6 +104,9 @@ export async function listAccountActivity(
     // is the safe answer here as everywhere: it leaves a name whole, and there
     // is none.
     actorIsClient: false,
+    // Same reasoning as `actorName` above: always you, so there is no OTHER
+    // person's face to show either.
+    actorPicture: null,
     createdAt: r.created_at,
     // NEITHER COLUMN EXISTS ON THIS TABLE, and that is the two-table split doing
     // what it is for rather than a gap to fill. `account_activity` lives in the

@@ -17,7 +17,6 @@ import {
   shapeHelpList,
   shapeInviteDetail,
   shapeInvitesList,
-  shapeMemberDetail,
   shapeMembersList,
   shapeRolesList,
 } from "@/components/deep-link/shape"
@@ -130,6 +129,8 @@ const activity: ActivityItem[] = [
     // R54: staff, so the screen shows the first name alone. A contact who acted
     // through the portal lands in this same feed and is named in full.
     actorIsClient: false,
+    // R35/R60: a stored picture on file for this actor.
+    actorPicture: "https://cdn.example.com/alaap.jpg",
     createdAt: "2026-06-14T09:00:00.000Z",
     // The row says WHICH KIND of thing happened and WHICH DOOR it came through.
     // Both are nullable on the type because rows written before the columns
@@ -200,6 +201,29 @@ describe("shapeActivity", () => {
   it("still marks the row with a fallback initial when actorName is null", () => {
     const [row] = shapeActivity([{ ...activity[0], actorName: null }], "en")
     expect(row.initials).toBe("?")
+  })
+
+  // R35/R60, client ruling: "make sure that in the footer for the activity, we
+  // see the avatars of the people ... right now it only shows the initials."
+  // Same surface as the `initials` case above — a second, easy-to-miss place
+  // the fix has to land, because this shaper feeds the recipe engine's own
+  // Team / Team member / Invite rails, not just the bespoke record path.
+  it("carries the actor's stored picture through, safe-checked", () => {
+    const [row] = shapeActivity(activity, "en")
+    expect(row.avatarSrc).toBe("https://cdn.example.com/alaap.jpg")
+  })
+
+  it("leaves avatarSrc undefined when the actor has no picture on file", () => {
+    const [row] = shapeActivity([{ ...activity[0], actorPicture: null }], "en")
+    expect(row.avatarSrc).toBeUndefined()
+  })
+
+  // `safeSrc` refuses a scheme it does not allow (rich-text.test.ts owns the
+  // full list) — asserted here so a row can never hand the kit's `<img>` a
+  // `javascript:` URL because the worker's own value was untrusted.
+  it("drops a picture URL safeSrc refuses", () => {
+    const [row] = shapeActivity([{ ...activity[0], actorPicture: "javascript:alert(1)" }], "en")
+    expect(row.avatarSrc).toBeUndefined()
   })
 })
 
@@ -284,20 +308,6 @@ describe("shapeHelpList", () => {
   })
 })
 
-describe("shapeMemberDetail", () => {
-  it("shapes the record fields and a shaped activity set", () => {
-    const data = shapeMemberDetail(member, activity, "en")
-    expect(data.record?.id).toBe("u1")
-    expect(data.record?.name).toBe("Alaap") // R54, via `personName`
-    // The EMAIL is untouched: it is an address, not a name, and the heading
-    // beside it is the only thing the ruling shortened.
-    expect(data.record?.email).toBe("alaap@x.com")
-    expect(data.record?.role).toBe("Admin")
-    expect(data.record).toHaveProperty("joined")
-    expect(data.sets?.activity?.[0].id).toBe("a1")
-  })
-})
-
 describe("shapeInviteDetail", () => {
   it("shapes the record + uses INVITE_STATUS for status", () => {
     const data = shapeInviteDetail(invite, audit, activity, "en")
@@ -349,6 +359,7 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   commercialsVisible: false,
   altNames: [],
   nameNarrowsAlone: "unreviewed",
+  accountManagerId: null,
   active: true,
   ...over,
 })
@@ -376,8 +387,31 @@ describe("shapeAccountsList", () => {
     // leading column (library v0.11.0), and it holds a NODE rather than a URL —
     // the slot renders whatever the column carries, so a bare `logoUrl` here
     // would print the path in the box.
-    expect(Object.keys(rows?.[0] ?? {}).sort()).toEqual(["detail", "id", "mark", "name"])
+    //
+    // `manager` is the fifth (0091, client ruling 14 Sep 2026) and, since the
+    // gallery/table pass this same day, it IS drawn — the account manager's
+    // avatar chip on the card wall and the table's own column.
+    //
+    // `country` and `status` are the sixth and seventh, added the same day for
+    // the table's own Country and Status columns (client ruling: "in the table
+    // columns: name status, account manager, country"). `status` is the
+    // archive flag worded — there is no separate `status` column on an account
+    // (0042) — and `logoUrl` is the eighth, the raw picture the gallery's own
+    // bigger card face reads (`mark` above is sized for a list row).
+    expect(Object.keys(rows?.[0] ?? {}).sort()).toEqual([
+      "country",
+      "detail",
+      "id",
+      "logoUrl",
+      "manager",
+      "mark",
+      "name",
+      "status",
+    ])
     expect(rows?.[0].mark, "the leading column must hold a node, not a string").toBeTypeOf("object")
+    expect(rows?.[0].manager, "nobody assigned yet is a real, honest answer").toBe("—")
+    expect(rows?.[0].country, "no country typed yet is a real, honest answer").toBe("—")
+    expect(rows?.[0].status, "the archive flag, worded, is a node — a coloured badge").toBeTypeOf("object")
   })
 
   it("names the parent when it is on the page, and still says nested when it isn't", () => {

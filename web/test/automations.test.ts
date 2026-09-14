@@ -192,11 +192,22 @@ describe("R70 — every automation is visible, and one that cannot be switched s
     expect(variant, `R70 — the Choices badge for "${term}" names no variant`).toBeTruthy()
 
     // 2 · THE AUTOMATIONS HALF SAYS THE SAME WORD, ONCE, THROUGH THE SAME PART.
-    const screen = stripComments(read(join(WEB, "components/screens/module-automations.tsx")))
+    //
+    // READ OFF `automation-edit-sheet.tsx` SINCE 2026-09-14, not the table.
+    // The client moved the row's own switch/badge off the list and into an
+    // edit sheet ("an edit button that opens a slide-in, and we can edit
+    // name, description, and status"); `module-automations.tsx` now draws a
+    // `RecordTable` and holds neither a `<Switch>` nor this badge anywhere in
+    // its own source. This is R70's OWN instruction, followed rather than
+    // amended around: "if the Choices screen changed, this check must follow
+    // it rather than be deleted" — the screen that changed here is this
+    // one's sibling, and the invariant (one mark, one guard, the reason never
+    // parted from it) is unchanged by which file draws it.
+    const screen = stripComments(read(join(WEB, "components/screens/automation-edit-sheet.tsx")))
     const said = screen.split(says).length - 1
     expect(
       said,
-      `R70 — the automations rows say "${term}" ${said} time(s) and must say it exactly once: the mark belongs to the ONE branch that draws a row nobody can switch. The client's ruling of 2026-09-11 is that an unswitchable automation wears the same word a protected choice does ("like we have protected choices to have protected automations"), and a second occurrence is a mark drawn somewhere a person CAN change the row`
+      `R70 — the automation edit sheet says "${term}" ${said} time(s) and must say it exactly once: the mark belongs to the ONE branch that draws a row nobody can switch. The client's ruling of 2026-09-11 is that an unswitchable automation wears the same word a protected choice does ("like we have protected choices to have protected automations"), and a second occurrence is a mark drawn somewhere a person CAN change the row`
     ).toBe(1)
     expect(
       new RegExp(`<${part}\\s[^>]*variant="${variant}"[^>]*>\\s*${literal}`).test(screen),

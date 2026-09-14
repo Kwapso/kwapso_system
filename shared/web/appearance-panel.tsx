@@ -160,16 +160,55 @@
 // THE ROW THAT LOOKS THE SAME BUT ACTS DIFFERENTLY IS THE ONE THING HERE A
 // FUTURE READER IS MOST LIKELY TO "FIX". It is not a bug: it is the client's
 // own answer to the exact question this file's own asymmetry raises, asked
-// of her directly rather than assumed. The caption beside Save/Discard below
-// (and `language-section.tsx`'s own header) are where that answer is
-// written down, on purpose, so the next person to read this file meets the
-// reason before they meet the itch to make all four rows match.
+// of her directly rather than assumed. The caption below (and
+// `language-section.tsx`'s own header) are where that answer is written
+// down, on purpose, so the next person to read this file meets the reason
+// before they meet the itch to make all four rows match.
+//
+// ── SAVE / DISCARD MOVED TO A PINNED BAR AT THE TOP, 14 SEP 2026 ───────────
+//
+// The client, over a screenshot of this panel and `roles-matrix.tsx`, the
+// same session as the ruling above: "We need some kind of hint or flag, very
+// visible, probably not at the bottom, that allows me to save or to
+// restart… to not save the changes." The design lane's own five-option
+// artifact settled the shape (Option A, a quiet band pinned directly under
+// the tab strip, reusing R63's own pinned-toolbar idiom) and the kit shipped
+// it as `UnsavedChangesBar` (`shared/ui/components/unsaved-changes-bar`,
+// v1.2.82). Save and Discard used to dock at the very bottom of the control
+// column, under the caption — invisible on any viewport taller than the
+// panel, which was her exact complaint. They are gone from there; the bar
+// above draws both now, reading this file's own `dirty` and calling the same
+// `handleSave`/`discard` this file already had. NOTHING ELSE about staging,
+// the pending/saved split, or the caption's own sentence changed — only
+// where the two buttons live.
+//
+// THE BAR IS `SettingsSection`'s OWN FIRST CHILD, NOT A SIBLING ABOVE IT —
+// R67 (`sections-stand-on-paper`) says why. A titled section's own body must
+// stand on paper, and this section's `<section>` already paints
+// `bg-surface-panel`; a pinned band sitting BESIDE the section, on the bare
+// tab-panel ground, is exactly the uncontained shape that check exists to
+// catch (it did, the first time this shipped — see the fix note in this
+// file's own commit). Riding inside costs one thing, stated plainly: the pin
+// is inset by the section's own padding rather than flush with its outer
+// rounded corners, because reaching the true edge would need
+// `shared/web/settings-section.tsx` (not this lane's file) to publish the
+// `--pinned-lead`/`--pinned-inset-x` pair `CollectionCard`
+// (`web/components/deep-link/screen-bits.tsx`) already publishes for exactly
+// that reason. `ground` is left at `UnsavedChangesBar`'s own default
+// (`"bare"`) for the same reason every other `PINNED_TOOLBAR` call site in
+// this app leaves the row it wraps unpainted: the wrapper already paints
+// `--pinned-ground`, resolved automatically off the section's own
+// `bg-surface-panel` — a second fill on the row itself would be the exact
+// "arbitrary form silently freezes every ground-aware token beneath it" trap
+// `ToolbarRow`'s own header warns about.
 
 import * as React from "react"
 
 import { AppearancePreview } from "@shared/ui/compositions/screens/settings"
-import { Button } from "@shared/ui/components/button/button"
+import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
+import { cn } from "@shared/ui/lib/utils"
 
 import { ScaleSection, applyScale, previewScaleStep } from "./scale-section"
 import { ThemeSection, applyThemeMode, readStoredMode, type ThemeMode } from "./theme-section"
@@ -198,12 +237,23 @@ export function AppearancePanel({
   /** Persist the spine choice. Called once, from Save, only when Background
    * actually changed. */
   saveSpine,
+  /** Told every time this panel's own `dirty` changes, and `false` once more
+   * on unmount — the Settings tab strip has no `forceMount` (R59's sibling
+   * gap this callback exists to close), so switching tabs unmounts this panel
+   * outright and a staged Size/Appearance/Background draft would vanish with
+   * no Save, no Discard, no warning. `settings-screen.tsx` is the one caller:
+   * it keeps a `dirtyTabs` map from this and the matching prop on
+   * `RolesMatrix`, and its own tab-change handler asks that map before it
+   * ever lets a switch through. Optional because nothing else mounts this
+   * panel today. */
+  onDirtyChange,
 }: {
   saveLanguage: (lang: Language) => Promise<unknown>
   scaleValue: string | null
   saveScale: (scale: string) => Promise<unknown>
   spineValue: string | null
   saveSpine: (spine: Spine) => Promise<unknown>
+  onDirtyChange?: (dirty: boolean) => void
 }) {
   const { t } = useLanguage()
 
@@ -239,6 +289,18 @@ export function AppearancePanel({
 
   const dirty = pendingScale !== savedScale || pendingSpine !== savedSpine || pendingTheme !== savedTheme
   const [saving, setSaving] = React.useState(false)
+
+  // REPORT UPWARD, AND `false` ON THE WAY OUT — see the prop's own doc. The
+  // cleanup fires both on every re-run (a `dirty` flip stages the new value
+  // through `false` first, which is harmless: the caller's next line is
+  // `onDirtyChange(dirty)` again) and on unmount, which is the one that
+  // matters — the moment the Settings tab strip throws this panel away, its
+  // caller's `dirtyTabs` entry is corrected to match rather than lingering
+  // stale.
+  React.useEffect(() => {
+    onDirtyChange?.(dirty)
+    return () => onDirtyChange?.(false)
+  }, [dirty, onDirtyChange])
 
   // The preview's resolved theme ("light"/"dark", never "system") — fed by
   // `ThemeSection` itself, which is the one place that already knows how to
@@ -293,6 +355,37 @@ export function AppearancePanel({
 
   return (
     <SettingsSection title={t("Appearance")} hideTitle>
+      {/* THE PINNED BAR — see the header, "SAVE / DISCARD MOVED TO A PINNED
+          BAR AT THE TOP". A child of `SettingsSection`, not a sibling: R67
+          (`sections-stand-on-paper`) holds every body a titled section draws
+          to standing on paper, and this section's own `<section>` already
+          paints `bg-surface-panel` — so mounting the bar here, rather than
+          beside the section on the bare tab-panel ground, is what keeps it
+          contained without this file reaching into `settings-section.tsx`
+          (not this lane's file) to publish the inset pair a truly edge-to-
+          edge pin would need. The one cost, stated: the bar pins inset by the
+          section's own padding rather than flush with its outer corners —
+          `pb-4 -mb-4` below is the section's own `gap-4` (this row is its
+          FIRST child, so the gap that needs painting is the one BELOW it,
+          between the bar and the grid), paid inside the pinned box and given
+          back, the identical pair every other `PINNED_TOOLBAR` call site in
+          this app spends so the gap stays painted rather than a hole the
+          grid scrolls through once this bar is stuck (R63). Renders nothing
+          at all while `!dirty`, so there is nothing to conditionally wrap. */}
+      {dirty && (
+        <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4 -mb-4")}>
+          <UnsavedChangesBar
+            dirty={dirty}
+            saving={saving}
+            message={t("You have unsaved changes")}
+            saveLabel={t("Save")}
+            savingLabel={t("Saving…")}
+            discardLabel={t("Discard")}
+            onSave={() => void handleSave()}
+            onDiscard={discard}
+          />
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
         <div className="flex flex-col gap-2 lg:sticky lg:top-4">
           <AppearancePreview
@@ -324,31 +417,15 @@ export function AppearancePanel({
           />
           <SpineSection value={pendingSpine} onChange={setPendingSpine} disabled={saving} />
 
-          {/* SAVE / DISCARD — Size, Appearance and Background only. The
-              caption says so in words, because the row above it (Language)
-              looks identical to the three it sits above and behaves nothing
-              like them — see the header, "THE ROW THAT LOOKS THE SAME BUT
-              ACTS DIFFERENTLY". Both controls are inert with nothing staged:
-              a Save that would do nothing is a lie about state. */}
-          <div className="flex flex-col gap-2 pt-2">
-            <p className="text-muted-foreground text-xs">
-              {t("Language changes right away. Size, appearance and background wait for Save.")}
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="cancel" disabled={!dirty || saving} onClick={discard}>
-                {t("Discard")}
-              </Button>
-              <Button
-                type="button"
-                loading={saving}
-                loadingLabel={t("Saving…")}
-                disabled={!dirty}
-                onClick={() => void handleSave()}
-              >
-                {t("Save")}
-              </Button>
-            </div>
-          </div>
+          {/* THE CAPTION — Save/Discard moved to the pinned bar above (14
+              Sep 2026); this sentence stays exactly where it was and says
+              exactly what it always said, because it is still true: the
+              row above it (Language) looks identical to the three it sits
+              beside and behaves nothing like them — see the header, "THE
+              ROW THAT LOOKS THE SAME BUT ACTS DIFFERENTLY". */}
+          <p className="text-muted-foreground pt-2 text-xs">
+            {t("Language changes right away. Size, appearance and background wait for Save.")}
+          </p>
         </div>
       </div>
     </SettingsSection>

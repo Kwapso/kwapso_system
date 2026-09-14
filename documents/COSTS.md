@@ -580,9 +580,14 @@ distinction that replaced them is the useful one:
 
 - **SUPERSEDED — reclaimed.** A picture or a file that a write stopped pointing at
   is deleted after the row moves, fail-soft, through `reclaimMedia`
-  (`shared/workers/image.ts`). Nine columns do this now: the profile photo, the
+  (`shared/workers/image.ts`). Eight columns do this now: the profile photo, the
   team logo, an account's logo and cover, an app's logo, a brand asset's file, a
-  deliverable's link file and picture, a staff photo and a certificate. Before
+  deliverable's link file and picture, and a staff photo. (A ninth, a
+  certificate's file, did this too until the certificate module was killed
+  whole on 14 Sep 2026 — a `DROP TABLE` removes rows, never R2 objects, so a
+  certificate's bytes already written are now unreclaimed and orphaned under
+  each team's `staff/` prefix: a real, small, ongoing cost rather than a
+  data-loss risk.) Before
   this, changing a client's logo left the old object in R2 for ever with no row
   pointing at it and no way to find it again — the key was in the column that had
   just been overwritten.

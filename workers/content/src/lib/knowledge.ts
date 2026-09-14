@@ -5224,9 +5224,9 @@ const RECORD_PATH: Record<string, string> = {
   accounts: "accounts",
   tasks: "tasks",
   // A COLLEAGUE OPENS AS THEIR MEMBER PAGE — `/t/<team>/members/<userId>`, which
-  // is where their profile and certificates are drawn (the `StaffPanel` under
-  // the member detail). The origin row id IS the user id, so the link resolves
-  // without a second lookup.
+  // is where their profile is drawn (the `StaffPanel` under the member detail).
+  // The origin row id IS the user id, so the link resolves without a second
+  // lookup.
   users: "members",
 }
 

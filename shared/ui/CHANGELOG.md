@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+### Added — `UnsavedChangesBar`, the dirty-draft flag and its two acts
+
+The consuming app (kwapso_system), 14 Sep 2026: the client, over a screenshot
+of Settings › Appearance and Settings › Team › Roles — both stage a draft
+behind a Save button today, one of them (Roles) with no way to back out at
+all — *"We need some kind of hint or flag, very visible, probably not at the
+bottom, that allows me to save or to restart… however we call it normally in
+UI, to not save the changes."* The consuming app's own design lane built a
+five-option comparison artifact against that sentence and she picked the
+first: a quiet band pinned directly under the tab strip, reusing the idiom
+the app's own collection toolbar already pins with (its R63) rather than a
+fourth kind of sticky chrome.
+
+`dirty` / `onSave` / `onDiscard` / `saving?`, plus every string as a prop
+(`message`, `saveLabel`, `discardLabel`, `savingLabel?`) — this file carries
+no English of its own, the same boundary every component in this package
+holds since `shared/ui/` is outside the consuming app's translation walk.
+Renders nothing at all while `dirty` is false. `ground` is `ToolbarRow`'s own
+`bare`/`page`/`panel` triple, not a fourth opinion about which paper a
+toolbar-shaped row stands on — `bare` (the default) is correct wherever a
+caller wraps this in the app's own `PINNED_TOOLBAR`, which already paints
+the ground and rounds the top corners behind it. The flag dot is
+`--warning`, never `--primary`/mango: both screens this ships on already
+spend their one mango on the Save button's own primary fill, and a second
+mango mark on the same view is the exact violation `roles-matrix.tsx`'s own
+header argues against at length. `role="status"` on the row itself is the
+whole of its accessibility contract — the row's own appearance is the
+announcement, the same shape the kit's `data-table.tsx` selection line
+already uses.
+
+See the component's own header for the full account, including why it does
+nothing special at narrow widths (the artifact's own ruling: "chrome
+describing form state, not a surface sliding in" — R59 governs modals and
+pickers, not this).
+
+### Fixed — `UnsavedChangesBar` narrows by truncating, not by wrapping
+
+The row shipped `flex-wrap`, so a long flag sentence at phone width dropped
+the two buttons to a second line instead of truncating — caught rendering
+the consuming app's own verify rig at 390px. The artifact's own words are
+explicit: "It just narrows: the caption text truncates before the buttons
+do." `flex-nowrap`, one line at every width, matching the row's own `min-w-0
+truncate` message span the header already documented.
+
 ### Added — `ThemeSwatch`, a small colour mark for Settings › Appearance's Light/Dark/System pills
 
 The consuming app (kwapso_system), 2026-09-14, the same day as the two

@@ -588,3 +588,48 @@ export function automationStatus(a: Automation, settings: unknown): AutomationSt
   if (!a.switchable) return "protected"
   return isAutomationOff(settings, a.key) ? "off" : "on"
 }
+
+// ── A TEAM'S OWN WORDS, 2026-09-14 ───────────────────────────────────────────
+//
+// The client, on the Automations table: *"we can edit name, description, and
+// status."* `title`/`description` above are CODE — English, translated at the
+// read (`TRANSLATED_WHERE_READ`), the same words for every team. A team that
+// renames "Reply and mention emails" to something that means more to them is
+// not editing the registry, it is standing a TEAM OVERRIDE in front of it.
+//
+// SAME BLOB, ONE MORE KEY, NO NEW TABLE. The door already keyed by segment
+// holds one JSON column per module; the on/off half of it is untouched — see
+// `isAutomationOff` above, which still reads `settings[key]` and nothing
+// else, so a stored `"off"` keeps meaning exactly what it always meant. The
+// override sits BESIDE that flat map, under its own reserved property
+// (`overrides`), so the two questions this file answers about one row —
+// "is it off" and "what does this team call it" — can never collide on one
+// value the way a single field trying to hold both would. `automationOverride`
+// below is the ONE resolver: a screen asks it for one automation's stored
+// override and falls back to the code default itself (`override?.title ??
+// t(a.title)`) — this file stays framework-agnostic and never calls `t(`.
+//
+// ABSENCE IS STILL THE DEFAULT. An override with neither field set is never
+// written (the write door drops it rather than storing `{}`), so a team that
+// has never renamed anything reads back exactly the code's own words — the
+// same discipline `isAutomationOff` already holds for the switch, one field
+// over.
+export type AutomationOverride = { title?: string; description?: string }
+
+/** A team's stored name/description for one automation, or `null` when it has
+ * none — read the same defensive way `isAutomationOff` reads the blob: a
+ * shape this app's own door could not have written (not an object, a numeric
+ * `title`, an empty string) is read as "no override" rather than guessed at. */
+export function automationOverride(settings: unknown, key: string): AutomationOverride | null {
+  if (typeof settings !== "object" || settings === null) return null
+  const overrides = (settings as Record<string, unknown>).overrides
+  if (typeof overrides !== "object" || overrides === null) return null
+  const entry = (overrides as Record<string, unknown>)[key]
+  if (typeof entry !== "object" || entry === null) return null
+  const title = (entry as Record<string, unknown>).title
+  const description = (entry as Record<string, unknown>).description
+  const out: AutomationOverride = {}
+  if (typeof title === "string" && title.trim()) out.title = title
+  if (typeof description === "string" && description.trim()) out.description = description
+  return out.title || out.description ? out : null
+}

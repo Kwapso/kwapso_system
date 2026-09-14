@@ -15,7 +15,7 @@
 //     handed would let a member of one team mint a `/media/internal/…` reference
 //     to another team's file and hang it on their own record.
 //   • BELIEVING A KEY FROM ANOTHER MODULE. The 5 Sep 2026 bug, one layer down: a
-//     brand asset's URL pasted into a certificate's file field. The module
+//     brand asset's URL pasted into a staff photo's file field. The module
 //     segment is what makes a reclaim able to say "this module", so it is proved
 //     here too and not only the team.
 //   • ANSWERING FOR AN OBJECT THAT ISN'T THERE. R40 says a record only ever

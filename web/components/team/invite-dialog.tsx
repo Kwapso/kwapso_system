@@ -23,7 +23,8 @@ import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { reportError } from "@shared/web/log"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 const emailField = { ...defaultFieldConfig, label: "Email", required: true }
 const roleField = { ...defaultFieldConfig, label: "Role", required: true }
@@ -43,7 +44,7 @@ export function InviteDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // Default the role to the first non-Admin; the hook seeds this on open.
   const initialValues = {
     email: "",
@@ -108,7 +109,7 @@ export function InviteDialog({
           id="invite-role"
           value={values.roleId}
           onChange={(roleId) => setValues((v) => ({ ...v, roleId }))}
-          options={roles.map((r) => ({ value: r.id, label: r.title }))}
+          options={sortedOptions(roles, lang, (r) => r.title).map((r) => ({ value: r.id, label: r.title }))}
           placeholder={t("Role")}
           searchPlaceholder={t("Search roles…")}
           emptyText={t("No role matched.")}

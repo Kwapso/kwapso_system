@@ -23,6 +23,7 @@ import { nameInitials } from "@/lib/identity"
 import { cursorKey } from "@/lib/live-resources"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { formatRelative } from "@shared/web/format"
+import { safeSrc } from "@shared/web/rich-text"
 import { useLanguage } from "@shared/web/language"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
@@ -53,6 +54,15 @@ export type ActivityFeedRow = {
   description: string
   actor: string | undefined
   initials: string
+  /** THE FACE (R35/R60) — the actor's own stored picture, the same field the
+   * team roster and every assignee picker already render, reached this time
+   * through the activity row's own `actorPicture` (`shared/types.ts`).
+   * `undefined` for a system/automation write and for an actor with no
+   * picture on file, which is what lets the kit's `ActivityFeed` fall back to
+   * `initials` exactly as it does today — never a broken `<img>` (R40's own
+   * argument for `safeSrc`, applied here at the one seam this feed's picture
+   * crosses from a stored value into something handed to `src`). */
+  avatarSrc: string | undefined
   timestamp: string
   dateTime: string
 }
@@ -163,6 +173,15 @@ export function useRecordActivity(
       // not the thing the ruling is about, and one-lettering every avatar in the
       // app would be a design change nobody asked for.
       initials: nameInitials(a.actorName),
+      // THE FACE (R35/R60). `safeSrc` — R40's render-side check, the same seam
+      // `RecordMarkGlyph` reads a stored path through — because a row's
+      // `actorPicture` is a value out of a database exactly as any other stored
+      // path is, scheme-checked here rather than trusted because the worker
+      // wrote it. `undefined`, not `null`, for "no picture": the kit's own
+      // `ActivityFeedItem.avatarSrc` is `string | undefined`, and its fallback
+      // check (`item.avatarSrc ?`) treats both the same, so there is nothing to
+      // gain by carrying the extra state through an extra hop.
+      avatarSrc: safeSrc(a.actorPicture ?? undefined),
       timestamp: formatRelative(a.createdAt, t, lang),
       dateTime: a.createdAt,
     })),

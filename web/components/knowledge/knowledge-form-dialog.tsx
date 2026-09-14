@@ -60,7 +60,8 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { isVideoLink } from "@shared/media-links"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import type { Translate } from "@shared/web/format"
 import { sightingsLine } from "@/components/knowledge/knowledge-source-card"
 
@@ -181,7 +182,7 @@ export function KnowledgeFormDialog({
    * above is derived from — meaningless, and unused, unless `mirrored`. */
   sightingsCount?: number
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -446,7 +447,7 @@ export function KnowledgeFormDialog({
           onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map(accountOption)}
+          options={sortedOptions(accountOptions, lang, (a) => a.name).map(accountOption)}
           emptyOption={{ value: AGENCY, label: t("The agency's own") }}
           placeholder={t("The agency's own")}
           searchPlaceholder={t("Search accounts…")}
@@ -526,7 +527,7 @@ export function KnowledgeFormDialog({
             id="knowledge-app"
             value={values.visibleToAppId}
             onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
-            options={appOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+            options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

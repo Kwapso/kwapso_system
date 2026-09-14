@@ -198,6 +198,14 @@ describe("a sortable column showing a formatted value declares what it is", () =
     // → something else, `field(` → a new helper, `<RecordTable` → a wrapper)
     // empties the census silently. An empty census passes every assertion above.
     expect(tableFiles.map((f) => f.rel).sort(), "no file renders a RecordTable any more").toEqual([
+      // The Accounts main screen's own alternate view, 14 Sep 2026 (client:
+      // "for accounts main: use gallery and add table as alternate view …
+      // name status, account manager, country"). Also NO formatted cell: Name,
+      // Status, Account manager and Country are all words or nodes, never a
+      // date or a number — only Name carries a `sort` (the door's own
+      // `ACCOUNT_SORTS` has no key for the other three), the same shape
+      // Contacts draws one file below.
+      "web/components/accounts/accounts-screen.tsx",
       // The client turned the Contacts screen into a table on 2026-09-09 ("for
       // contacts lets do view table"). It is in the census and carries NO
       // formatted cell — a contact row has no date and no money on it — so it
@@ -205,6 +213,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // should have.
       "web/components/accounts/contacts-screen.tsx",
       "web/components/meetings/meetings-screen.tsx",
+      // The Automations table (both Settings › Automations and each module's
+      // own settings page), 2026-09-14 — the client's ruling replaced the
+      // hand-rolled card list with "the list component exactly the same as
+      // we have in tickets". Like Contacts and Choices, it carries NO
+      // formatted cell: Name, Module and Status are all words.
+      "web/components/screens/module-automations.tsx",
       // The system-wide Choices tab (Settings), 2026-09-14 — a table over
       // every choice value this reader's own visible modules own. Like
       // Contacts, it carries NO formatted cell: Value, Module and Status are

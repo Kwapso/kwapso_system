@@ -81,15 +81,58 @@ const YES_NO: FacetOption[] = [
   { value: "yes", label: "Yes" },
 ]
 
+/** ACCOUNTS' OWN "Status" — the SAME door parameter as `YES_NO` above
+ * (`archived`, `AccountFilters.archived`), worded the way a reader asks the
+ * question rather than the way the column is named. Client ruling, 14 Sep
+ * 2026: "filter by account manager, country, status" — and the account's
+ * only real status word IS the archive flag (0042: a separate `status` column
+ * was removed for saying the same thing twice, `workers/tenancy/src/lib/
+ * accounts.ts`'s own header carries the finding). A dedicated pair rather
+ * than `YES_NO` because "No"/"Yes" answers a question this control never
+ * asks out loud — the label is "Status", not "Archived?". */
+const ACCOUNT_STATUS: FacetOption[] = [
+  { value: "no", label: "Active" },
+  { value: "yes", label: "Archived" },
+]
+
 /** THE PAGED COLLECTIONS' door filters, keyed by the collection's name in
  * `GROWING_COLLECTIONS` (shared/rules/registry.ts), so a check can find the door
  * that owns each one without anything being hand-paired.
  *
  * A collection missing from here offers no filters at all, which is a decision
- * and is written down in `UNFILTERED` beside the check. */
+ * and is written down in `UNFILTERED` beside the check.
+ *
+ * ACCOUNT MANAGER AND COUNTRY ARE HERE NOW (14 Sep 2026) — real door filters,
+ * not a client-side narrowing. `workers/tenancy/src/lib/accounts.ts`'s
+ * `AccountFilters` gained `manager` and `country` for exactly this ruling
+ * ("filter by account manager, country, status"), the fix the accounts screen's
+ * own header used to flag rather than fake. `manager` is a ROW facet (the door
+ * matches a `team_members` user id, so the screen supplies the options — see
+ * `accounts-screen.tsx`'s own manager-facet build) and is silently dropped by
+ * the door for a portal caller (see `AccountFilters.manager`'s own header) — a
+ * client narrowing by staffing would be enumerating who we assigned, not a
+ * question about their own data, so the CONTROL still renders (the screen has
+ * no reason to hide it) but the door answers as if it had not been asked.
+ * `country` is a CLOSED vocabulary in DATA rather than in code (the team's own
+ * "Country" dropdown, `shared/selectable-groups.ts`), so like `helpType` above
+ * it cannot be spelled here either — the screen fills it in from the same
+ * vocabulary the account form offers. */
 export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   accounts: [
-    { field: "archived", label: "Archived", options: YES_NO },
+    { field: "archived", label: "Status", options: ACCOUNT_STATUS },
+    // WHO IS RESPONSIBLE — a ROW facet: the door matches a `team_members` user
+    // id (`AccountFilters.manager`), so this file declares no options and the
+    // screen fills them in from `assignableMembers`, the same staff picker the
+    // account form's own manager field uses (R35: each with their face).
+    // Dropped SILENTLY by the door for a portal caller — see the header above
+    // and `AccountFilters.manager`'s own — so a client sees the control but a
+    // filter on it changes nothing, exactly as an unasked filter would.
+    { field: "manager", label: "Account manager" },
+    // WHERE THE ACCOUNT IS — a per-team vocabulary (`shared/selectable-groups.
+    // ts`'s "Country"), so it cannot be spelled here any more than `helpType`
+    // above it can: the screen fills it in from the team's own dropdown values,
+    // the same list the account form's own Country field offers.
+    { field: "country", label: "Country" },
   ],
   // TICKETS' OWN "Archived" — the exact Accounts/Processes shape, one door
   // parameter later. The client's 2026-08-31 ruling ("there can never be 2 rows

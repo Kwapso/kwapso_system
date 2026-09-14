@@ -58,14 +58,14 @@ const TOGGLE_TRACE: Record<string, string> = {
 
 /** The record kinds `set_record_active` covers that have NO screen to drive to.
  * The same split the individual tools were on, and the same reason: a staff
- * profile, a certificate and the three client-organisation lists are read on the
- * page of whoever they belong to, and the toggle names only the ROW — an id for
- * a client role says nothing about whose role it is, so there is no company to
+ * profile and the three client-organisation lists are read on the page of
+ * whoever they belong to, and the toggle names only the ROW — an id for a
+ * client role says nothing about whose role it is, so there is no company to
  * drive to and inventing a URL that resolves to nothing would be worse than
- * staying put. */
+ * staying put. A `staff_certificate` entry stood here too until the
+ * certificate module was killed whole on 14 Sep 2026. */
 export const SCREENLESS_TOGGLE_RECORDS: string[] = [
   "staff_profile",
-  "staff_certificate",
   "client_department",
   "client_role",
   "client_tool",
@@ -268,8 +268,7 @@ export function traceFor(
     // it is: a department, a role and a tool are all read on the company they
     // belong to, never on a collection of their own. These three carry
     // `accountId`, so the trace can say which company; their siblings carry only
-    // a row id and are listed in SCREENLESS_WRITE_TOOLS for the same reason the
-    // certificate writes are.
+    // a row id and are listed in SCREENLESS_WRITE_TOOLS for the same reason.
     case "create_client_department":
     case "create_client_role":
     case "create_client_tool":
@@ -409,10 +408,10 @@ export function traceFor(
     /* ------------------- the agency's own housekeeping ---------------------- */
     // A create lands on the LIST (row-level live-sync makes the new row appear
     // there); an edit or an archive lands on the record itself, because that is
-    // where the change is visible. The staff pair is the odd one out and for the
-    // owner's own reason: a profile and a certificate live on the MEMBER's page,
-    // so that is where a trace has to go — `/t/<team>/staff/<id>` would be a URL
-    // this app deliberately does not have.
+    // where the change is visible. The staff profile is the odd one out and for
+    // the owner's own reason: a profile lives on the MEMBER's page, so that is
+    // where a trace has to go — `/t/<team>/staff/<id>` would be a URL this app
+    // deliberately does not have.
     case "create_brand_asset":
       return { path: seg(teamId, "brand"), highlight: "main" }
     case "update_brand_asset":
@@ -424,7 +423,6 @@ export function traceFor(
     case "set_meeting_purpose_active":
       return { path: `${seg(teamId, "purposes")}/${str(input, "id")}`, highlight: "main" }
     case "save_staff_profile":
-    case "create_staff_certificate":
       return { path: `${seg(teamId, "members")}/${str(input, "userId")}`, highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
@@ -446,18 +444,19 @@ export function traceFor(
  * trace-parity test forces every new write tool to either map above or be
  * added here with a reason). */
 export const SCREENLESS_WRITE_TOOLS: string[] = [
-  // The three agency-internal writes that name a RECORD rather than the person
-  // it belongs to. A staff profile and a certificate are read on the member's
-  // own page (staff-panel.tsx) — there is no `/t/<team>/staff/<id>` URL, on
-  // purpose, because the owner's ruling is that they live on the member's page
-  // and not on a page of their own. Their sibling CREATE tools carry `userId`
-  // and do trace, which is the honest split: when the tool says whose it is, the
-  // panel can drive there; when it says only which row, it cannot, and inventing
-  // a URL that resolves to nothing would be worse than staying put.
-  "update_staff_certificate",
-  // THE EIGHT CLIENT-ORGANISATION EDITS, and it is the SAME split as the three
-  // above rather than a second excuse. A department, a role and a tool are read
-  // on the company they belong to, and these tools name only the ROW — an id for
+  // An `update_staff_certificate` entry stood here until the certificate
+  // module was killed whole on 14 Sep 2026 — a certificate-editing write that
+  // named a RECORD rather than the person it belonged to, read on the member's
+  // own page (staff-panel.tsx) rather than on a page of its own; there is no
+  // `/t/<team>/staff/<id>` URL, on purpose. Its sibling CREATE tool carried
+  // `userId` and did trace, which was the honest split: when the tool says
+  // whose it is, the panel can drive there; when it says only which row, it
+  // cannot, and inventing a URL that resolves to nothing would be worse than
+  // staying put.
+  //
+  // THE EIGHT CLIENT-ORGANISATION EDITS are the same split, for the same
+  // reason. A department, a role and a tool are read on the company they
+  // belong to, and these tools name only the ROW — an id for
   // a role says nothing about whose role it is, so there is no client to drive
   // to. Their CREATE siblings carry `accountId` and do trace, which is the line:
   // when the tool says whose it is, land there; when it says only which row,

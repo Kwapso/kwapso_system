@@ -59,6 +59,7 @@ import { formatDayMonth } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 /** WHERE THE EXACT ENTRY COUNT IS PARKED, for the tab badge above the panel to
  * read (R16 — the door's own COUNT(*), never the loaded page's length).
@@ -267,7 +268,7 @@ export function WorkLogsPanel({
    * the host knows what that record's feed is keyed on. */
   onActivityChanged?: () => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const filter = React.useMemo(() => ({ targetTable, targetId }), [targetTable, targetId])
   const listKey = recordTimeKey(targetTable, targetId)
   const summaryKey = recordTimeSummaryKey(targetTable, targetId)
@@ -398,7 +399,11 @@ export function WorkLogsPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("Everyone")}</SelectItem>
-                {summaryQ.data.people.map((p) => (
+                {sortedOptions(
+                  summaryQ.data.people,
+                  lang,
+                  (p) => staffNameFromSnapshot(p.userName) || t("Someone who has left")
+                ).map((p) => (
                   <SelectItem key={p.userId} value={p.userId}>
                     {staffNameFromSnapshot(p.userName) || t("Someone who has left")}
                   </SelectItem>

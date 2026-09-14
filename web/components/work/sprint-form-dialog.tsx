@@ -43,6 +43,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type SprintFormValues = {
   name: string
@@ -333,7 +334,7 @@ export function SprintFormDialog({
             id="sprint-app"
             value={values.appId || NONE}
             onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
-            options={apps.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+            options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             emptyOption={{ value: NONE, label: t("No app yet") }}
             placeholder={t("No app yet")}
             searchPlaceholder={t("Search apps…")}

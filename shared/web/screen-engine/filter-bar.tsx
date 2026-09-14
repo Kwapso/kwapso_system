@@ -349,7 +349,8 @@ import {
 } from "@shared/ui/components/filter-bar/filter-bar"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { cn } from "@shared/ui/lib/utils"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 import { facetOptions } from "./collection"
 import { type FacetOption, type FilterFacet } from "./config"
@@ -421,7 +422,7 @@ function useFilterBar<T>({
    * uses this today. */
   className?: string
 }): { pill: React.ReactNode; panel: React.ReactNode } {
-  const t = useT()
+  const { t, lang } = useLanguage()
   /** Is the panel open? Replaces the old Popover's own `open` state — same
    * idea (a facet's controls are hidden until asked for), a plain toggle
    * instead of a floating, portaled surface. */
@@ -673,7 +674,12 @@ function useFilterBar<T>({
         // grows into a field wider than the words it holds; below the
         // floor the row wraps, which is the only second line this panel
         // ever draws.
-        const facetOptionList = optionsFor(f)
+        // R75 — THE OPTIONS A PERSON PICKS FROM ARE A→Z. `optionsFor` above
+        // carries the DECLARED-vs-DERIVED and gated/narrowed logic; ordering
+        // is a display concern read the same way for every facet in the app,
+        // so it is applied once, here, rather than at every `filterFacets`
+        // declaration — a facet declared tomorrow inherits it for free.
+        const facetOptionList = sortedOptions(optionsFor(f), lang)
         // THE MARK RIDES BESIDE THE WORD, NEVER INSTEAD OF IT — client ask,
         // 2026-09-06: "in filter type i want to see the colored dot / on
         // filter app i wanna see the icon of the app". `FacetOption.mark`

@@ -55,7 +55,8 @@ import { primeCache, useCached } from "@shared/web/store"
 import type { StoryAttachment } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type StoryFormValues = {
   title: string
@@ -221,7 +222,7 @@ export function StoryFormDialog({
    * nothing; the upload below reads whichever of the two it has. */
   onSubmit: (values: StoryFormValues) => Promise<string | void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -424,7 +425,7 @@ export function StoryFormDialog({
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={options.map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
+      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -615,7 +616,7 @@ export function StoryFormDialog({
             onChange={(v) => setValues((s) => ({ ...s, ticketId: v === NONE ? "" : v }))}
             search={(term) => searchTickets(term, { appId: appId || undefined })}
             searchKey={pickerKey(`tickets:${appId || "any"}`, teamId)}
-            options={ticketOptions.map((o) => ({ value: o.id, label: o.label }))}
+            options={sortedOptions(ticketOptions, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label }))}
             emptyOption={{ value: NONE, label: t("No ticket") }}
             placeholder={t("No ticket")}
             searchPlaceholder={t("Search tickets…")}

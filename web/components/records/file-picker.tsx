@@ -17,7 +17,7 @@
 //
 // WHICH DOOR IT POSTS TO IS THE CALLER'S BUSINESS. Every upload door is gated on
 // the module that owns the thing being uploaded (a staff photo needs
-// `staff_profiles:create`, a brand asset needs `brand_assets:create`), so this
+// `staff_profiles:update`, a brand asset needs `brand_assets:create`), so this
 // control never picks one — it takes the upload as a function and stays a
 // picker.
 

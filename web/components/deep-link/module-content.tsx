@@ -45,7 +45,6 @@ import type { TaskView } from "@/lib/live-resources"
 import {
   shapeActivity,
   shapeBrandDetail,
-  shapeMemberDetail,
   shapePurposeDetail,
 } from "@/components/deep-link/shape"
 import { ActivityRail } from "@/components/records/activity-rail"
@@ -276,25 +275,27 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // both come from use-screen-data rather than being rebuilt beside the
     // control, so the door can only ever page the feed it is a door to.
     //
-    // `<ActivityRail>` DECIDES WHETHER TO DRAW ITSELF, off the same exact
+    // `RecordScreen` (member-screen.tsx's own host, `record-chrome.tsx`) DECIDES
+    // WHETHER TO DRAW THE DOOR ITSELF (`hasActivityDoor`), off the same exact
     // server total it would print (R16) — so a scope with no history at all
     // yields nothing here, and the footer keeps the eyebrow it already had.
-    const scopeRail =
-      activityKey === null ? undefined : (
-        <ActivityRail
-          activity={{
-            // The SAME shaper the engine's own footer summary and activity
-            // block read, so the three rows in the footer and the first page in
-            // the rail are the same rows dressed once.
-            items: shapeActivity(activityQ.data ?? [], lang),
-            total: activityTotal,
-            loading: activityQ.loading,
-            error: activityQ.error,
-            listKey: activityKey,
-            fetchPage: activityFetchPage,
-          }}
-        />
-      )
+    // Only the MEMBER branch reads this bundle today (`team.detail` and
+    // `invites.detail` were both retired — see the members branch below), so
+    // it is the raw `RailActivity` shape `RecordScreen.activity` wants rather
+    // than a pre-built `<ActivityRail>` node the way the generic engine's
+    // `activityAction` used to want.
+    const memberActivity =
+      activityKey === null ? undefined : {
+        // The SAME shaper the engine's own footer summary and activity block
+        // read, so the three rows in the footer and the first page in the
+        // rail are the same rows dressed once.
+        items: shapeActivity(activityQ.data ?? [], lang),
+        total: activityTotal,
+        loading: activityQ.loading,
+        error: activityQ.error,
+        listKey: activityKey,
+        fetchPage: activityFetchPage,
+      }
 
     // Import — no permission KEY of its own (gated per-target). Handle it before
     // the MODULE_PERMISSION lookup, which would otherwise NotFound it.
@@ -403,8 +404,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // `renderActivity` prop, whose only purpose was to put the app's own panel
     // inside that tab, is gone with the tabs it served
     // (shared/web/screen-engine/screen-renderer.tsx). `activityQ` is still read
-    // and still shaped into each detail's `sets.activity` below: the tab was a
-    // PLACE, not the data. web/components/records/activity-panel.tsx carries the ruling.
+    // and handed to `MemberScreen` below as the raw `RailActivity` bundle: the
+    // tab was a PLACE, not the data.
     if (module === "members") {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -412,32 +413,36 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (!member) return <p className="text-muted-foreground text-sm">{t("That member isn't on this team.")}</p>
       const base = resolveRecipe("members.detail", overridesQ.data, t)
       if (!base) return <NotFound />
-      // R8/R16's seam, over whatever collection tab this recipe declares. The
-      // total it is handed is this member's exact history count — what the
-      // slide-in off the footer's Latest activity column shows; there is no
-      // Activity tab left for it to badge.
-      let recipe = withTabCounts(base, { activity: activityTotal })
+      // THE SEAM EVERY RENDERED DETAIL RECIPE GOES THROUGH — `withTabCounts`
+      // is a genuine no-op here (`memberDetailRecipe` declares no `tabs` any
+      // more, and the function returns the recipe untouched when it finds
+      // none), kept rather than dropped so this recipe passes through the
+      // SAME seam `brand.detail`/`purposes.detail` do (`internalDetail`,
+      // below) and stays wired for free the day it ever grows a real
+      // collection tab again.
+      let recipe = withTabCounts(base, {})
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
-      const data = shapeMemberDetail(member, activityQ.data ?? [], lang)
       // THE ONE SCREEN A CARD ON SETTINGS › TEAM OPENS — client, 2026-09-10:
       // "when clickingon card in team, open full screen the profile (we wil ad
-      // more to this)". The head, the overview and the footer are still this
-      // recipe's, rendered by the engine; what `MemberScreen` adds is the two
-      // acts taken against their own doors and the room the sentence promises.
-      // R64 (`sections-have-a-door`) is why the acts live in that file rather
-      // than in the host's generic dispatcher — its header carries the whole
-      // argument, and `SECTION_HOSTED_ELSEWHERE` names it.
+      // more to this)", refined 2026-09-14 (chip above title, the picture, no
+      // tabs, the footer at the true bottom — member-screen.tsx's own header
+      // carries the whole account). `MemberScreen` draws the head, the first
+      // panel, the person's own profile and the footer itself now, through
+      // `RecordScreen`; this host hands it the member row, the resolved
+      // recipe (for its `actions` only) and the team's activity feed, already
+      // sliced to this scope. R64 (`sections-have-a-door`) is why the two acts
+      // are taken in that file rather than in the host's generic dispatcher —
+      // its header carries the whole argument, and `SECTION_HOSTED_ELSEWHERE`
+      // names it.
       return (
         <MemberScreen
           teamId={teamId as string}
           member={member}
           roles={roles}
           recipe={recipe}
-          data={data}
           rights={rights}
-          onIntent={onIntent}
-          activityAction={scopeRail}
+          activity={memberActivity}
           onRemoved={() => onIntent({ kind: "close" })}
         />
       )

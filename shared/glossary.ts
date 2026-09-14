@@ -283,7 +283,6 @@ export const GLOSSARY = {
   meetingNotes: { term: "Meeting notes", def: "What was said and decided in a meeting, written after it. Ours alone, a client never reads them." },
   department: { term: "Department", def: "The part of the agency a person or a meeting belongs to." },
   staffProfile: { term: "Staff profile", def: "What a colleague is like and how they work best. The team can read it; a client never can." },
-  certificate: { term: "Certificate", def: "A qualification someone on the team holds, who issued it, and when it lapses." },
 
   // GOOGLE, CONNECTED ONE PERSON AT A TIME. Every word here carries the same
   // sentence, because it is the decision the whole module is shaped around: the

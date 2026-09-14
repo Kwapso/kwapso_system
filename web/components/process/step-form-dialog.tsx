@@ -55,7 +55,8 @@ import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeHref } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { periodLabel } from "@shared/web/frequency"
 import { PERIODS } from "@shared/workers/savings"
 
@@ -199,7 +200,7 @@ export function StepFormDialog({
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const editing = initial !== undefined
   /** The step is CURRENTLY one branch of a fork exactly when a peer holds its
    * position — the same derivation the picture draws from, so the form can
@@ -413,7 +414,7 @@ export function StepFormDialog({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>{t("Nobody named yet")}</SelectItem>
-              {roles.map((r) => (
+              {sortedOptions(roles, lang, (r) => r.name).map((r) => (
                 <SelectItem key={r.id} value={r.id}>
                   {r.name}
                   {r.centsPerHour === null ? ` — ${t("no hourly cost yet")}` : ""}
@@ -442,7 +443,7 @@ export function StepFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>{t("Nothing named yet")}</SelectItem>
-                {tools.map((x) => (
+                {sortedOptions(tools, lang, (x) => x.name).map((x) => (
                   <SelectItem key={x.id} value={x.id}>
                     {x.name}
                   </SelectItem>

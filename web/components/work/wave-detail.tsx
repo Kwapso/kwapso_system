@@ -67,6 +67,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { RichText } from "@shared/web/rich-text-view"
 
 export function WaveDetailScreen({
@@ -427,7 +428,7 @@ export function WaveDetailScreen({
                             id="wave-add-sprint"
                             value=""
                             onChange={(sprintId) => void moveSprint(sprintId, waveId)}
-                            options={addable.map((s) => ({ value: s.id, label: s.name, picture: null }))}
+                            options={sortedOptions(addable, lang, (s) => s.name).map((s) => ({ value: s.id, label: s.name, picture: null }))}
                             placeholder={t("Put a sprint in this wave")}
                             searchPlaceholder={t("Search sprints…")}
                             emptyText={t("No sprint matched.")}

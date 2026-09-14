@@ -157,7 +157,14 @@ export function KnowledgeSourceCard({
             className="size-4"
           />
         </span>
-        <CardTitle className="min-w-0 basis-[12rem] truncate">
+        {/* `flex-1`, not a fixed `basis-[12rem]` (192px): that basis capped
+            the title well under the card's real width (~360px), truncating
+            titles after ~14–18 characters on a card with plenty of room
+            left. The header stays a row (icon beside the title), so the
+            title still stays on ONE line — `truncate` here is that layout's
+            requirement, not a style choice — it just gets the room the card
+            actually has before it clips. */}
+        <CardTitle className="min-w-0 flex-1 truncate">
           {source.active ? source.title : t("{title} (not in use)", { title: source.title })}
         </CardTitle>
       </CardHeader>

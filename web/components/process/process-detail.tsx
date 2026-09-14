@@ -107,6 +107,7 @@ import { usePermissions } from "@/lib/perms"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { formatDate } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RichText } from "@shared/web/rich-text-view"
@@ -854,7 +855,7 @@ export function ProcessDetailScreen({
       <ConnectProcessDialog
         open={linkOpen}
         onOpenChange={setLinkOpen}
-        options={(peerProcessesQ.data ?? [])
+        options={sortedOptions(peerProcessesQ.data ?? [], lang, (x) => x.name)
           .filter((x) => x.id !== processId && !links.some((l) => l.processId === x.id))
           .map((x) => ({ value: x.id, label: x.name }))}
         onSubmit={async (toProcessId, note) => {

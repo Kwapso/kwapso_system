@@ -112,6 +112,11 @@ const accountFields = (i: Record<string, unknown>): Record<string, unknown> => (
   currency: sent(i, "currency"),
   locale: sent(i, "locale"),
   timezone: sent(i, "timezone"),
+  // 0091 — the staff member responsible for this account. `undefined` when
+  // not sent (create: no manager yet; edit: leave whoever is there), a
+  // string when sent — the door checks it names a current STAFF member,
+  // never a client login (R20/R22).
+  accountManagerUserId: sent(i, "accountManagerUserId"),
 })
 
 /** WHO IS ON AN APP — the four fields the app doors read off the body for the
@@ -142,7 +147,7 @@ const appPeopleBody = (i: Record<string, unknown>): Record<string, unknown> => (
 const ACCOUNT_FIELD_SCHEMA = {
   code: S, email: S, phone: S, street: S, postalCode: S, city: S, country: S,
   industry: S, about: S, logoUrl: S, coverUrl: S, currency: S, locale: S,
-  timezone: S,
+  timezone: S, accountManagerUserId: S,
 }
 
 /** THE AGENCY-INTERNAL BODIES. One builder per door shape, so create and edit
@@ -185,14 +190,11 @@ const staffProfileBody = (i: Record<string, unknown>): Record<string, unknown> =
   roleModels: opt(i, "roleModels"),
   about: opt(i, "about"),
   photoUrl: opt(i, "photoUrl"),
-})
-
-const certificateBody = (i: Record<string, unknown>): Record<string, unknown> => ({
-  title: str(i, "title"),
-  issuer: opt(i, "issuer"),
-  issuedOn: opt(i, "issuedOn"),
-  expiresOn: opt(i, "expiresOn"),
-  fileUrl: opt(i, "fileUrl"),
+  // Team migration 0089 — the member detail head's own fields (R22 parity
+  // with the door's own `body.birthday`/`body.position`/`body.phone` reads).
+  birthday: opt(i, "birthday"),
+  position: opt(i, "position"),
+  phone: opt(i, "phone"),
 })
 
 /* ---------------------------------- the type ---------------------------------- */
@@ -548,14 +550,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "Companies and people in one list (people need the contacts right). `type` is 'entity' or 'individual'; `archived` and `portal` 'yes'/'no'; `cursor` pages.",
+      "Companies and people in one list (people need the contacts right). `type`, `archived`, `portal`, `manager`, `country` narrow it; `cursor` pages.",
     detail:
-      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. A person's row also carries `companyName` and `relationship`, the company they are a contact of and what they do there; both are empty on a company and on a person nobody has linked. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal`, `individualTotal` and `individualPortalTotal` are a different question, how many companies, how many people and how many of those people can sign in, across the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot; both by default), `parentId` (only the accounts sitting under that one), `manager` (a staff member's user id — only the accounts THEY are responsible for; from a portal-pinned caller this filter is silently ignored rather than honoured, because who we staffed is our own decision about them, not a fact they may enumerate by probing ids), `country` (an exact match against the team's own Country vocabulary). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. A person's row also carries `companyName` and `relationship`, the company they are a contact of and what they do there; both are empty on a company and on a person nobody has linked. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal`, `individualTotal` and `individualPortalTotal` are a different question, how many companies, how many people and how many of those people can sign in, across the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
-    schema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, sort: S, dir: S, cursor: S }),
+    schema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, manager: S, country: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "archived", "portal", "parentId", "sort", "dir", "cursor"])
+      for (const key of ["q", "type", "archived", "portal", "parentId", "manager", "country", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -577,7 +579,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Create an account. `accountType` is 'entity' or 'individual'. `code` is minted from the name if you leave it out; `parentAccountId` nests it.",
     detail:
-      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. Both are still live here, but the agency's own screens now only ever create companies: a person is made on a company's Contacts tab, which creates the account and then links it the way `link_contact` does. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
+      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. Both are still live here, but the agency's own screens now only ever create companies: a person is made on a company's Contacts tab, which creates the account and then links it the way `link_contact` does. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken). `accountManagerUserId` names the staff member responsible for this account — a current team member, checked to be one of our own staff and never a client login; leave it out for none yet.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
     schema: obj(
       { accountType: S, name: S, parentAccountId: S, ...ACCOUNT_FIELD_SCHEMA },
@@ -600,7 +602,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit an account's own details by `id`, never its parent (that is set_account_parent). Send only what you change; an empty string clears a field.",
     detail:
-      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them. `altNames` is declared spellings of this account's own name the knowledge base should also recognise (re-sent WHOLE, the list you name replaces the one the account has) — each has to be one word, and a common word is refused unless `nameNarrowsAlone` is 'allow', because a declared spelling matches on its own with no rarity check at all. `nameNarrowsAlone` is 'unreviewed' (the default), 'allow' (this account's own name may narrow a knowledge-base search on its own even though it is an ordinary word), or 'deny' (this word must never narrow a search on its own, even if it looks rare today).",
+      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them. `altNames` is declared spellings of this account's own name the knowledge base should also recognise (re-sent WHOLE, the list you name replaces the one the account has) — each has to be one word, and a common word is refused unless `nameNarrowsAlone` is 'allow', because a declared spelling matches on its own with no rarity check at all. `nameNarrowsAlone` is 'unreviewed' (the default), 'allow' (this account's own name may narrow a knowledge-base search on its own even though it is an ordinary word), or 'deny' (this word must never narrow a search on its own, even if it looks rare today). `accountManagerUserId` reassigns who is responsible for this account — a current team member, checked to be staff and never a client login; send it as an empty string to leave it unassigned.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
       {
@@ -2754,7 +2756,10 @@ export const SHARED_TOOLS: SharedTool[] = [
       "Write a colleague's profile (`userId` required). ONE door for both cases: if they have no profile yet this writes one, and if they do this replaces its fields, a person either has a profile or they don't, and asking the caller which would be a race between two open tabs.",
     binding: "CONTENT", method: "POST", path: "/api/content/staff/profiles",
     schema: obj(
-      { userId: S, headline: S, personalityType: S, strengths: S, weaknesses: S, roleModels: S, about: S, photoUrl: S },
+      {
+        userId: S, headline: S, personalityType: S, strengths: S, weaknesses: S, roleModels: S, about: S, photoUrl: S,
+        birthday: S, position: S, phone: S,
+      },
       ["userId"]
     ),
     buildBody: (i) => staffProfileBody(i),
@@ -2767,37 +2772,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       confirm: true,
       summarize: (i) => `Write ${memberLabel(i)}'s staff profile`,
     },
-  },
-
-  {
-    name: "list_staff_certificates",
-    summary:
-      "The qualifications the team holds. `userId` narrows to one person. Internal.",
-    detail:
-      "The qualifications the team holds. Pass `userId` for one person's. The door narrows, not the caller: filtering a capped list afterwards would disagree with the count beside it. Internal.",
-    binding: "CONTENT", method: "GET", path: "/api/content/staff/certificates",
-    schema: obj({ userId: S }),
-    buildQuery: (i) => (str(i, "userId") ? `?userId=${encodeURIComponent(str(i, "userId"))}` : ""),
-    agent: { write: false, summarize: (i) => (str(i, "userId") ? `Read ${memberLabel(i)}'s certificates` : "Read the team's certificates") },
-  },
-  {
-    name: "create_staff_certificate",
-    summary:
-      "Record a qualification (`userId`, `title`). `issuedOn` and `expiresOn` are YYYY-MM-DD days; anything that is not a real day is refused.",
-    detail:
-      "Record a qualification somebody holds (`userId` and `title` required). `issuedOn` / `expiresOn` are days, written YYYY-MM-DD, anything that is not a real calendar day is refused rather than stored, because an expiry that half parses is a certificate that silently never lapses.",
-    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates",
-    schema: obj({ userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["userId", "title"]),
-    buildBody: (i) => ({ userId: str(i, "userId"), ...certificateBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Record the "${str(i, "title")}" certificate for ${memberLabel(i)}` },
-  },
-  {
-    name: "update_staff_certificate",
-    summary: "Edit a certificate (by id). Same fields as recording one.",
-    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates/update",
-    schema: obj({ id: S, userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["id", "title"]),
-    buildBody: (i) => ({ id: str(i, "id"), userId: opt(i, "userId"), ...certificateBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit certificate ${str(i, "id")}` },
   },
 ]
 

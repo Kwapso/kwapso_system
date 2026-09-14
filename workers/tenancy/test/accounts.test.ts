@@ -1120,6 +1120,94 @@ describe("who can sign in: the portal filter and its badge", () => {
   })
 })
 
+// THE ACCOUNT MANAGER AND COUNTRY FILTERS — client ruling, 14 Sep 2026, verbatim:
+// "for accounts main: … filter by account manager, country, status." Status was
+// already `archived` (0042); these are the other two, added to `AccountFilters`
+// itself rather than narrowed on the client — see that type's own header.
+describe("filtering by account manager and country", () => {
+  const setManager = (id: string, managerId: string | null) =>
+    db().prepare("UPDATE accounts SET account_manager_user_id = ? WHERE id = ?").run(managerId, id)
+  const setCountry = (id: string, country: string | null) =>
+    db().prepare("UPDATE accounts SET country = ? WHERE id = ?").run(country, id)
+
+  it("by manager returns only that manager's accounts", async () => {
+    setManager(IDS.victimAccount, IDS.staffUser)
+    setManager(IDS.burglarAccount, IDS.burglarUser)
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: IDS.staffUser, type: "entity" })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
+  })
+
+  it("by country returns only that country", async () => {
+    setCountry(IDS.victimAccount, "Spain")
+    setCountry(IDS.burglarAccount, "France")
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { country: "Spain", type: "entity" })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
+  })
+
+  it("both together intersect", async () => {
+    setManager(IDS.victimAccount, IDS.staffUser)
+    setCountry(IDS.victimAccount, "Spain")
+    setManager(IDS.victimChild, IDS.staffUser)
+    setCountry(IDS.victimChild, "France")
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
+      manager: IDS.staffUser,
+      country: "Spain",
+    })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
+  })
+
+  it("an unknown manager id is an empty page, not a 400 — a filter, not a write", async () => {
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { manager: "NOBODY_LIKE_THIS" })
+    expect(page.rows).toEqual([])
+    expect(page.total).toBe(0)
+  })
+
+  it("a portal caller's manager filter is IGNORED, not honoured — a client must not enumerate staffing by filtering", async () => {
+    setManager(IDS.victimAccount, IDS.staffUser)
+    setManager(IDS.victimChild, IDS.burglarUser)
+    const client = await accountScope(cfg, { ...guard, userId: IDS.victimUser })
+    expect(client.kind).toBe("portal")
+    // Two different (fabricated) manager ids must return the SAME rows as an
+    // unfiltered read — proof the filter is DROPPED rather than applied. A
+    // filter that is applied and simply matches nothing would ALSO return
+    // nothing for a wrong id, which looks identical to "ignored" for exactly
+    // one probe; comparing against the caller's own unfiltered page is what
+    // tells the two apart.
+    const unfiltered = await listAccounts(cfg, guard, client, SEES_PEOPLE, {})
+    const probedReal = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: IDS.staffUser })
+    const probedFake = await listAccounts(cfg, guard, client, SEES_PEOPLE, { manager: "NOBODY_LIKE_THIS" })
+    expect(probedReal.rows.map((r) => r.id).sort()).toEqual(unfiltered.rows.map((r) => r.id).sort())
+    expect(probedFake.rows.map((r) => r.id).sort()).toEqual(unfiltered.rows.map((r) => r.id).sort())
+    expect(unfiltered.rows.length, "the probe proves nothing if the caller sees nothing").toBeGreaterThan(0)
+  })
+
+  it("a portal caller's COUNTRY filter still narrows — there is no staffing to enumerate through it", async () => {
+    setCountry(IDS.victimAccount, "Spain")
+    setCountry(IDS.victimChild, "France")
+    const client = await accountScope(cfg, { ...guard, userId: IDS.victimUser })
+    const page = await listAccounts(cfg, guard, client, SEES_PEOPLE, { country: "Spain" })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.victimAccount])
+  })
+
+  it("the HTTP door itself drops a portal caller's ?manager= rather than 400ing or narrowing", async () => {
+    setManager(IDS.victimAccount, IDS.staffUser)
+    const withReal = await worker.fetch(
+      req(`GET /api/tenancy/accounts?manager=${IDS.staffUser}`),
+      makeEnv(() => db(), IDS.victimUser)
+    )
+    const withFake = await worker.fetch(
+      req("GET /api/tenancy/accounts?manager=NOBODY_LIKE_THIS"),
+      makeEnv(() => db(), IDS.victimUser)
+    )
+    const bare = await worker.fetch(req("GET /api/tenancy/accounts"), makeEnv(() => db(), IDS.victimUser))
+    expect(withReal.status).toBe(200)
+    const [a, b, c] = await Promise.all([withReal.json(), withFake.json(), bare.json()])
+    const ids = (r: { accounts: { id: string }[] }) => r.accounts.map((x) => x.id).sort()
+    expect(ids(a as never)).toEqual(ids(c as never))
+    expect(ids(b as never)).toEqual(ids(c as never))
+  })
+})
+
 // A CONTACT'S OWN SCREEN reads the link table from the PERSON's side. This is the
 // read that made one table the right answer: Marta is a contact of two companies,
 // and a parent pointer has room for one of them.

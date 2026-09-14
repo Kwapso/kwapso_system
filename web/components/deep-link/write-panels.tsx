@@ -12,6 +12,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
 import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
+import { assignableMembers } from "@/lib/members"
 import { KnowledgeFormDialog } from "@/components/knowledge/knowledge-form-dialog"
 import { KnowledgeUploadDialog } from "@/components/knowledge/knowledge-upload-dialog"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
@@ -289,6 +290,9 @@ export function WritePanels({
         open={query.panel === "add" && query.module === "accounts" && can("accounts", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `account:new:${teamId}` : undefined}
+        // 0091 — off the SAME `membersQ` this file already reads (line 249's
+        // role-change picker), never a second fetch.
+        members={assignableMembers(membersQ.data)}
         onSubmit={createAccount}
       />
 

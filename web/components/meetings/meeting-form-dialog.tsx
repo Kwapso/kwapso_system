@@ -27,6 +27,7 @@ import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { toLocalInput, toMoment } from "@shared/web/format"
@@ -225,7 +226,7 @@ export function MeetingFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map(accountOption)}
+          options={sortedOptions(accountOptions, lang, (a) => a.name).map(accountOption)}
           emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
           placeholder={t("Nobody, it is ours")}
           searchPlaceholder={t("Search accounts…")}
@@ -238,7 +239,7 @@ export function MeetingFormDialog({
           id="meeting-app"
           value={values.appId}
           onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-          options={appOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+          options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
           emptyOption={{ value: NONE, label: t("Not about one app") }}
           placeholder={t("Not about one app")}
           searchPlaceholder={t("Search apps…")}
@@ -251,7 +252,7 @@ export function MeetingFormDialog({
           id="meeting-purpose"
           value={values.purposeId}
           onChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
-          options={purposeOptions.map((p) => ({ value: p.id, label: p.name }))}
+          options={sortedOptions(purposeOptions, lang, (p) => p.name).map((p) => ({ value: p.id, label: p.name }))}
           emptyOption={{ value: NONE, label: t("Not said") }}
           placeholder={t("Not said")}
           searchPlaceholder={t("Search reasons…")}

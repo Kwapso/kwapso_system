@@ -128,7 +128,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/t
 import { TabsView, defaultTabsConfig, type TabItem } from "@shared/web/screen-engine/tabs-view"
 
 import { InAppLink } from "@/components/shell/in-app-link"
-import { softNavigate } from "@/lib/nav"
+import { openInNewTab } from "@/lib/nav"
 import { NoAccess } from "@/components/deep-link/screen-bits"
 import { ModuleAutomations } from "@/components/screens/module-automations"
 import { SelectableScreen } from "@/components/choices/selectable-screen"
@@ -919,8 +919,12 @@ export function ModuleSettingsScreen({
               <ModuleAutomations
                 key={automationsSection.key}
                 teamId={teamId}
-                scope={{ kind: "module", segment }}
-                title={t(automationsSection.title)}
+                // NO `title` PROP ANY MORE — see module-automations.tsx's own
+                // header. `title: t(page.title)` here is the module's own
+                // display name ("Tickets", "Time", …), read by the table's
+                // Module column on every row, the same fact the unscoped
+                // Settings › Automations mounting already carries per module.
+                scope={{ kind: "module", segment, title: t(page.title) }}
               />
             ) : null
           if (panel.value === "choices")
@@ -948,8 +952,16 @@ export function ModuleSettingsScreen({
                     // section's Export CSV sends to `?groups=`, so the two
                     // halves of her sentence are one fact.
                     onImport={() =>
-                      softNavigate(
-                        `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(section.types.join(","))}`
+                      openInNewTab(
+                        `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(section.types.join(","))}`,
+                        // NO PER-GROUP WORD TO GIVE IT — see `IMPORT_TARGET_LABEL`'s
+                        // own note: the scope here lives in `?groups=`, which the tab
+                        // store never sees (its identity is the bare pathname), so a
+                        // richer label here would only be clobbered back to "Import"
+                        // the moment `deep-link-screen.tsx`'s own crumb effect runs.
+                        // Passing the same word it will settle on keeps this a single
+                        // paint rather than a flash.
+                        t("Import")
                       )
                     }
                     // STILL NO RECORD TO OPEN, and that is a decision rather

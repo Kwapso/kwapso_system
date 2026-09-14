@@ -77,7 +77,8 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 // every line, and a seam call is a judgement nobody has to re-make.
 import { safeSrc } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type GoogleSourceValues = {
   /** everything picked in this sitting. The three decisions below are one answer
@@ -172,7 +173,7 @@ export function GoogleSourceDialog({
   accountOptions: PickableRecord[]
   onSubmit: (values: GoogleSourceValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft<GoogleSourceValues & { search: string }>(
     draftKey,
     { items: [], shelf: "private", accountId: AGENCY, search: "" },
@@ -526,7 +527,7 @@ export function GoogleSourceDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map(accountOption)}
+          options={sortedOptions(accountOptions, lang, (a) => a.name).map(accountOption)}
           emptyOption={{ value: AGENCY, label: t("Ours, not an account's") }}
           placeholder={t("Ours, not an account's")}
           searchPlaceholder={t("Search accounts…")}

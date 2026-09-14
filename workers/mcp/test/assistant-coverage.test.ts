@@ -57,7 +57,7 @@ const VISIBLE = TEAM_MODULES.filter((m) => (offeredRights(m) as readonly string[
 /** Modules with a knowledge kind mirroring them: the kind's own `table` through
  * the map above, or the `modules` a kind DECLARES when its text carries more
  * than one module's material (only `person` does — a member row joined to the
- * staff profile and certificates). */
+ * staff profile). */
 const kindsByModule = new Map<string, string[]>()
 for (const k of INGEST_KINDS)
   for (const mod of k.modules ?? [TABLE_MODULE[k.table]].filter(Boolean))

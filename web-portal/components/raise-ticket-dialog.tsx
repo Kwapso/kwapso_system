@@ -41,7 +41,8 @@ import { ApiFailure, appModules } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { AppModule } from "@shared/types"
 import { useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 const descField = { ...defaultFieldConfig, label: "What do you need?", required: true }
 // WHICH PART OF WHICH SYSTEM (Aurora, 19 Aug 2026). ONE question, not two, and
@@ -71,7 +72,7 @@ export function RaiseTicketDialog({
   /** stable id for per-session draft persistence (CACHING.md §11) */
   draftKey: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { description: "", moduleId: "" }, open)
   const [busy, setBusy] = React.useState(false)
 
@@ -91,8 +92,8 @@ export function RaiseTicketDialog({
       group.modules.push(m)
       groups.set(m.appId, group)
     }
-    return [...groups.values()].sort((a, b) => a.appName.localeCompare(b.appName))
-  }, [mine])
+    return sortedOptions([...groups.values()], lang, (g) => g.appName)
+  }, [mine, lang])
   // Required only where it can be answered: a client whose apps have no sections
   // written down yet is not asked a question with no answers (the same rule the
   // agency form keeps, and it tightens by itself as the sections get written).
@@ -153,7 +154,7 @@ export function RaiseTicketDialog({
               {byApp.map((group) => (
                 <SelectGroup key={group.appName}>
                   <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium">{group.appName}</p>
-                  {group.modules.map((m) => (
+                  {sortedOptions(group.modules, lang, (m) => m.name).map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.mark ? `${m.mark} ` : ""}
                       {m.name}

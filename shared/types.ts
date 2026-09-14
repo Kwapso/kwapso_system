@@ -268,6 +268,15 @@ export type ActivityItem = {
    * looking at. `false` for a staff actor and for an unknown one, which is the
    * safe direction: it leaves a name whole rather than truncating one. */
   actorIsClient: boolean
+  /** THE FACE (R35/R60). The actor's own stored picture — `users.image_url`,
+   * the SAME field `SessionUser.imageUrl` and `TeamMember.imageUrl` already
+   * expose and already render (the rail avatar, the team roster, every
+   * assignee picker) — read a second way, against the row's own `creator_id`,
+   * rather than stored again: one write site (`workers/auth/src/lib/
+   * profile.ts`), a new reader. `null` for a system/automation write (no
+   * `creator_id` at all) and for an actor with no picture on file — either
+   * way the screen falls back to the initials tile it draws today. */
+  actorPicture: string | null
   createdAt: string
   /** WHICH OF THE EIGHT (shared/workers/activity-verbs.ts). `type` is the
    * sentence a person reads; this is the word a filter can stand on. Written on
@@ -1248,6 +1257,17 @@ export type Account = {
    * reasoning as `altNames` and `commercialsVisible`: a staff judgement about
    * how the corpus is searched, not the account's own record. */
   nameNarrowsAlone: "unreviewed" | "allow" | "deny"
+  /** THE STAFF MEMBER RESPONSIBLE FOR THIS ACCOUNT (0091, client ruling
+   * 14 Sep 2026: "who the account responsible or account manager is, like
+   * someone from staff"). A `team_members` user id, never a client login —
+   * `null` = nobody assigned yet. This door hands back the ID ONLY: the
+   * manager's FACE (name, picture — R35) is resolved client-side off the
+   * already-cached members list, the same seam an assignee's face already is
+   * (`web/lib/members.ts`), so a second network read is never spent on it
+   * (R56). `null` on the way out to a client login too — our own staffing
+   * decision about them, the same reasoning `commercialsVisible` makes a few
+   * lines up. */
+  accountManagerId: string | null
   /** WHERE THIS PERSON WORKS, AND WHAT THEY DO THERE — the contacts table's two
    * middle columns (client, 2026-09-09: "for contacts lets do view table, also
    * add column role after account").
@@ -2533,23 +2553,16 @@ export type StaffProfile = {
   roleModels: string | null
   about: string | null
   photoUrl: string | null
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  updatedAt: string | null
-  editorName: string | null
-}
-
-/** A credential a member holds — the legacy `certificates` table. */
-export type StaffCertificate = {
-  id: string
-  userId: string
-  title: string
-  issuer: string | null
-  /** the day it was granted / the day it lapses (YYYY-MM-DD), either may be null. */
-  issuedOn: string | null
-  expiresOn: string | null
-  fileUrl: string | null
+  /** A calendar day, `YYYY-MM-DD`, through `optionalDate` — never a timestamp
+   * (team migration 0089). Shown on the member's own detail head. */
+  birthday: string | null
+  /** Their title/role in the business, in their own words — distinct from
+   * `roleTitle` (the PERMISSION role a member holds), which is a different
+   * fact about a different thing (team migration 0089). */
+  position: string | null
+  /** A phone number, free text — what the detail head's Call button dials
+   * (team migration 0089). */
+  phone: string | null
   active: boolean
   createdAt: string
   creatorName: string | null

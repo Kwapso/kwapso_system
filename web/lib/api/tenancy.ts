@@ -449,6 +449,16 @@ export const tenancy = {
       body: JSON.stringify({ key, on }),
     }),
 
+  /** A team's own name/description for one automation — the edit sheet's other
+   * two fields. Needs teams:update, same door discipline as the switch above;
+   * an empty `title`/`description` clears that field's override back to the
+   * code's own words. */
+  setAutomationOverride: (key: string, title: string, description: string) =>
+    api<{ automations: Record<string, string> }>("/api/tenancy/config/automations/override", {
+      method: "POST",
+      body: JSON.stringify({ key, title, description }),
+    }),
+
   /* ---- the customer spine: accounts, their people, their logins ---- */
 
   /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the
@@ -478,6 +488,16 @@ export const tenancy = {
        * slicing the page it holds. */
       portal?: string
       parentId?: string
+      /** A `team_members` user id — only the accounts they are responsible for
+       * (0091). Silently DROPPED by the door for a portal caller (see
+       * `AccountFilters.manager`'s own header, workers/tenancy/src/lib/
+       * accounts.ts): who we staffed is our own decision about them, not a
+       * fact a client login may enumerate by probing ids. */
+      manager?: string
+      /** An exact match against the team's own "Country" vocabulary
+       * (`shared/selectable-groups.ts`). Client ruling, 14 Sep 2026: "filter
+       * by account manager, country, status." */
+      country?: string
       /** WHAT ORDER, one of the door's own sort names (ACCOUNT_SORTS), with
        * `dir` flipping it. Omit both for the door's default (newest first) —
        * the list pages, so this is the only honest place to ask. */

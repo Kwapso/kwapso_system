@@ -32,7 +32,7 @@ import { Headline } from "@shared/ui/components/typography/typography"
 
 import { PulseBand, pulseIsQuiet, usePulse } from "@/components/screens/pulse"
 import { letterMark } from "@/lib/identity"
-import { softNavigate } from "@/lib/nav"
+import { openInNewTab, softNavigate } from "@/lib/nav"
 import { usePermissions, type Can } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
@@ -115,7 +115,14 @@ function FirstSteps({ teamId, can, canImport }: { teamId: string; can: Can; canI
       </div>
       <List
         surface="none"
-        onItemClick={(item) => softNavigate(item.id)}
+        // THE MIDDLE STEP IS ALSO AN IMPORT DISPATCH, and the client's ruling on
+        // Import ("opens as a new solo tab… because now it redirects") holds
+        // here too — pressing it is the same act as any "Import CSV" button,
+        // just reached from Home instead of a collection's own toolbar. Every
+        // other step is an ordinary destination and keeps the plain redirect.
+        onItemClick={(item) =>
+          item.id === `/t/${teamId}/import` ? openInNewTab(item.id, t("Import")) : softNavigate(item.id)
+        }
         items={steps.map((s) => {
           const Icon = s.icon
           return {

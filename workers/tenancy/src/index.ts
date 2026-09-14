@@ -93,6 +93,8 @@
 //                                             only, for the same reason as the recipe store above
 //                                             and one more: a model that could silence the emails
 //                                             could make its own next mistake quiet)
+//   POST /api/tenancy/config/automations/override -> a team's own name/description for one
+//                                             automation (teams:update; same reason as the switch)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
 //   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
 //   GET  /api/tenancy/admin/db-sizes       -> size every DB (core included) + open alarms
@@ -171,7 +173,7 @@ import {
   postCreateInvite,
   postRevokeInvite,
 } from "./routes/invites"
-import { getAutomations, getScreens, postAutomation, postScreen } from "./routes/config"
+import { getAutomations, getScreens, postAutomation, postAutomationOverride, postScreen } from "./routes/config"
 import {
   getAccountDetail,
   getAccounts,
@@ -328,6 +330,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/config/screens": { handler: postScreen, kind: "mutation" },
   "GET /api/tenancy/config/automations": { handler: getAutomations, kind: "read" },
   "POST /api/tenancy/config/automations": { handler: postAutomation, kind: "mutation" },
+  "POST /api/tenancy/config/automations/override": { handler: postAutomationOverride, kind: "mutation" },
   "GET /api/tenancy/selectable": { handler: getSelectable, kind: "read" },
   "GET /api/tenancy/selectable/export": { handler: getSelectableExport, kind: "read" },
   "POST /api/tenancy/selectable": { handler: postCreateSelectable, kind: "mutation" },

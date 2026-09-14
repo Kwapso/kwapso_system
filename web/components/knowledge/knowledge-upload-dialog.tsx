@@ -46,7 +46,8 @@ import { Paperclip, UploadSimple } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { KNOWLEDGE_FILE_MAX_BYTES } from "@shared/workers/limits"
 
 /** The client-side cap. It is here so that a person who picked a 400 MB video
@@ -102,7 +103,7 @@ export function KnowledgeUploadDialog({
   /** stable id for per-session draft persistence (CACHING.md §11) */
   draftKey?: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
@@ -264,7 +265,7 @@ export function KnowledgeUploadDialog({
           onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map(accountOption)}
+          options={sortedOptions(accountOptions, lang, (a) => a.name).map(accountOption)}
           emptyOption={{ value: AGENCY, label: t("The agency's own") }}
           placeholder={t("The agency's own")}
           searchPlaceholder={t("Search accounts…")}
@@ -305,7 +306,7 @@ export function KnowledgeUploadDialog({
             id="knowledge-file-app"
             value={values.visibleToAppId}
             onChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
-            options={appOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+            options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

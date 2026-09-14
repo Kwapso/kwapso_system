@@ -42,7 +42,7 @@ export type Env = {
    * uploads it from the portal and we read it in the agency app, so a bucket only
    * one door can serve would be a file one of the two sides cannot open. */
   MEDIA: R2Bucket
-  /** The agency's OWN files — brand assets, staff photos, certificate PDFs, and
+  /** The agency's OWN files — brand assets, staff photos, and
    * the documents uploaded into the knowledge base — served by the gateway at
    * /media/internal/. ONE bucket for the internal modules rather than one each:
    * they hold the same kind of object for the same audience, and a bucket per

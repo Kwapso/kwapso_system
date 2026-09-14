@@ -68,7 +68,6 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   created: "created",
   added: "created",
   raised: "created",
-  recorded: "created",
   sent: "created",
   arranged: "created",
   cut: "created",

@@ -22,12 +22,19 @@ vi.mock("@/lib/api", () => ({
 
 /** One page of a much longer history — 2 rows on the wire, 143 in the table.
  * `nextCursor` null is the last page (which is how <LoadMore> stops offering). */
-const page = (rows: number, total: number, nextCursor: string | null = "opaque", from = 0) => ({
+const page = (
+  rows: number,
+  total: number,
+  nextCursor: string | null = "opaque",
+  from = 0,
+  actorPicture: string | null = null
+) => ({
   activity: Array.from({ length: rows }, (_, i) => ({
     id: `a${from + i}`,
     type: "edited",
     description: "changed the title",
     actorName: "Sam",
+    actorPicture,
     createdAt: "2026-08-09T10:00:00Z",
   })),
   total,
@@ -144,6 +151,36 @@ describe("useRecordActivity", () => {
     invalidate(recordActivityKey("help", id))
     await waitFor(() => expect(result.current.total).toBe(144))
     expect(result.current.rows).toHaveLength(3)
+  })
+
+  // R35/R60, client ruling: "make sure that in the footer for the activity, we
+  // see the avatars of the people ... right now it only shows the initials."
+  it("carries the actor's stored picture through as avatarSrc", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(1, 1, null, 0, "https://cdn.example.com/sam.jpg"))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    await waitFor(() => expect(result.current.total).toBe(1))
+    expect(result.current.items[0].avatarSrc).toBe("https://cdn.example.com/sam.jpg")
+  })
+
+  it("leaves avatarSrc undefined for an actor with no picture on file", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(1, 1, null, 0, null))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    await waitFor(() => expect(result.current.total).toBe(1))
+    expect(result.current.items[0].avatarSrc).toBeUndefined()
+  })
+
+  // `safeSrc` refuses a scheme it does not allow — asserted here so a row can
+  // never hand the kit's `<img>` a `javascript:` URL because the worker's own
+  // value was untrusted (the row is a value out of a database, R20's render
+  // side).
+  it("drops a picture URL safeSrc refuses", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(1, 1, null, 0, "javascript:alert(1)"))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    await waitFor(() => expect(result.current.total).toBe(1))
+    expect(result.current.items[0].avatarSrc).toBeUndefined()
   })
 
   it("keys the rows where the live registry's deps already point", async () => {

@@ -23,6 +23,7 @@ import { Timeline, type TimelineEvent } from "../../../shared/ui/components/time
 import { Title } from "../../../shared/ui/components/title/title"
 import { Toggle } from "../../../shared/ui/components/toggle/toggle"
 import { ToolbarRow } from "../../../shared/ui/components/toolbar-row/toolbar-row"
+import { UnsavedChangesBar } from "../../../shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
 import { ToggleGroup, ToggleGroupItem } from "../../../shared/ui/components/toggle-group/toggle-group"
 import {
   Tooltip,
@@ -292,6 +293,23 @@ export const samples: Samples = {
           </Button>
         }
         {...p.of("ToolbarRow")}
+      />
+    ),
+  },
+  /* `dirty` HARD-CODED TRUE — the same "dummy data, always" rule every other
+   * sample here follows: `dirty={false}` renders nothing at all, which would
+   * put an empty slot on the canvas and tell the owner nothing about what
+   * this part looks like. */
+  "unsaved-changes-bar": {
+    render: (p) => (
+      <UnsavedChangesBar
+        dirty
+        message="You have unsaved changes"
+        saveLabel="Save"
+        discardLabel="Discard"
+        onSave={noop}
+        onDiscard={noop}
+        {...p.of("UnsavedChangesBar")}
       />
     ),
   },

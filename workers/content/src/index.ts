@@ -84,7 +84,6 @@
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
 //   GET  /api/content/staff/profiles      -> the team's own profiles (?userId → one)
-//   GET  /api/content/staff/certificates  -> what people hold (?userId → one person's)
 //   GET  /api/content/health
 
 import { brand } from "@shared/brand"
@@ -212,14 +211,9 @@ import {
   postUpdateMeetingPurpose,
 } from "./routes/delivery"
 import {
-  getStaffCertificates,
-  getStaffCertificatesExport,
   getStaffProfiles,
-  postCreateStaffCertificate,
   postSaveStaffProfile,
-  postSetStaffCertificateActive,
   postSetStaffProfileActive,
-  postUpdateStaffCertificate,
   postStreamStaffFile,
   postUploadStaffFile,
 } from "./routes/staff"
@@ -589,11 +583,6 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/staff/profiles/active": { handler: postSetStaffProfileActive, kind: "mutation" },
   "POST /api/content/staff/upload": { handler: postUploadStaffFile, kind: "housekeeping" },
   "POST /api/content/staff/upload-stream": { handler: postStreamStaffFile, kind: "housekeeping" },
-  "GET /api/content/staff/certificates": { handler: getStaffCertificates, kind: "read" },
-  "GET /api/content/staff/certificates/export": { handler: getStaffCertificatesExport, kind: "read" },
-  "POST /api/content/staff/certificates": { handler: postCreateStaffCertificate, kind: "mutation" },
-  "POST /api/content/staff/certificates/update": { handler: postUpdateStaffCertificate, kind: "mutation" },
-  "POST /api/content/staff/certificates/active": { handler: postSetStaffCertificateActive, kind: "mutation" },
 
   // ── GOOGLE, CONNECTED ONE PERSON AT A TIME ─────────────────────────────────
   // Four services, each asked for separately, each connected to the CALLER's own

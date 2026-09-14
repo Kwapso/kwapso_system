@@ -165,6 +165,26 @@ export const RECORD_FACE: Record<
   waves: { idField: "id", resource: "waves", name: (r) => str(r, "name"), fallback: "Wave" },
 }
 
+/** THE WORD BESIDE "Import" ON THAT TARGET'S OWN TAB — the SAME word the nav
+ * already uses for it (R34: never a second name for one thing), keyed by the
+ * TARGET KEY the address carries as its "id"
+ * (`/t/<teamId>/import/<tableKey>`). That key is a table name, not always
+ * equal to the TEAM_SECTIONS `segment` or `module` for the section it belongs
+ * to (`brand`'s own module is `brand_assets`, but `purposes`'s is
+ * `delivery`) — so this is DATA, the same way `RECORD_FACE` above is, rather
+ * than a derivation that would silently mis-name the two that don't line up.
+ * A target with no line here keeps the bare word "Import" — the
+ * whole-vocabulary wizard (no target at all) and the module-settings scoped
+ * import (`selectable_data`, whose real scope travels in `?groups=` and never
+ * in this "id", so no single module word is honestly this tab's alone). */
+export const IMPORT_TARGET_LABEL: Record<string, string> = {
+  stories: "Stories",
+  meetings: "Meetings",
+  brand_assets: "Brand library",
+  meeting_purposes: "Meeting purposes",
+  member_roles: "Member roles",
+}
+
 /** DOES A LOADED LIST ALREADY HOLD THIS RECORD'S NAME — the question the crumb
  * asks first and the trail resolver asks in reverse (it reads exactly the levels
  * this answers no for). One function, so the two can never disagree about which
@@ -295,6 +315,32 @@ export function buildCrumbs({
   // and on the team overview itself there is nothing above it, so it stands alone.
   if (!topLevel) {
     if (!module || module === "team") return [{ label: teamName }]
+    // IMPORT IS A LEAF WITH NO RECORD BEHIND ITS "id". Every other module
+    // reached this way names a ROW `RECORD_FACE` can fetch by id; import's
+    // `/t/<teamId>/import/stories` carries a TARGET KEY instead, which is not
+    // in that table and never will be (there is no row to read). The general
+    // branch below assumes a record IS coming and, while none ever does,
+    // built its one crumb as an ANCESTOR link back to the bare collection
+    // (`section.href = sectionPath`) — the page you are actually on never
+    // got a crumb of its own. That is not just a wrong breadcrumb: the
+    // workspace tab store (`web/lib/workspace-tabs.ts`) reads a crumb's
+    // `href` as the tab's address, so the tab it opened for this screen
+    // carried the COLLECTION's path, not this one's — the strip could never
+    // match it against `currentPath` and fell back to the plain trail,
+    // which is the redirect the client saw when she pressed Import. So this
+    // screen gets its own one-line answer instead: ONE crumb, no href (it
+    // is the page you are on), and its word is "Import" plus the SAME word
+    // the nav uses for that target (R34 — never a second name for one
+    // thing), from `IMPORT_TARGET_LABEL` beside `RECORD_FACE` above. A
+    // target with no line there — the whole-vocabulary wizard, and the
+    // module-settings scoped import, whose real scope travels in `?groups=`
+    // and never in this "id" — keeps the bare word "Import", one shared tab
+    // across whichever screen opened it, matching the model's own path-only
+    // tab identity (the query string was never part of it, for any module).
+    if (module === "import") {
+      const word = recordId ? IMPORT_TARGET_LABEL[recordId] : undefined
+      return [{ label: word ? `${t("Import")} · ${word}` : t("Import") }]
+    }
     const section: Crumb = { label: t(sectionTitle(module)), href: recordId ? sectionPath : undefined }
     // On a section list, step one is the team; on a record, step one is the
     // section it came out of — always the thing DIRECTLY above, never the route.

@@ -385,7 +385,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
       : undefined
     if (!module) return emptyFeed()
     await requireRight(cfg, guard, module, "read")
-    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard), verb)))
+    return feed((await getActivity(env, cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard), verb)))
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
@@ -415,6 +415,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     ]
     return feed(
       (await getActivity(
+        env,
         cfg,
         guard,
         scope,
@@ -443,7 +444,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     if (!idx?.invite_row_id) return emptyFeed()
     id = idx.invite_row_id
   }
-  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard), verb)))
+  return feed((await getActivity(env, cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard), verb)))
 }
 
 /** POST /api/tenancy/activity/note — add a note to one record's history: the

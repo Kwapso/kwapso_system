@@ -95,6 +95,77 @@
 // characters (the same move `action-rows-wrap.test.ts` makes beside this file):
 // "what is this section standing inside" is a question about the JSX, and the
 // compiler is already a dependency here.
+//
+// ── AMENDMENT 8 (2026-09-14) — TWO BLIND SPOTS, FOUND BY THE LANE THAT HAD TO
+//    WORK AROUND THEM ─────────────────────────────────────────────────────
+//
+// A lane building the settings round's Automations tab
+// (`web/components/screens/module-automations.tsx`) hit this census twice in
+// one sitting and had to write around it both times — its own comment, beside
+// `<RecordTable useKitPanel>`, named both faults precisely before this
+// amendment existed to fix them:
+//
+//   1. IMPORT ALIASES WERE NOT RESOLVED. `shared/web/screen-engine/
+//      collection-frame.tsx` does `import { CollectionFrame as
+//      KitCollectionFrame } from "@shared/ui/components/collection-frame/
+//      collection-frame"` and renders `<KitCollectionFrame>`. The kit's own
+//      `CollectionFrame` paints `bg-surface-panel` unconditionally, so a
+//      `RecordTable useKitPanel` table genuinely stands on paper — but every
+//      lookup here (`declText`, `rootDecl`) was keyed by a tag's OWN spelling,
+//      and an import binding declares no `VariableStatement`/
+//      `FunctionDeclaration` of its own, so `KitCollectionFrame` resolved to
+//      NOTHING, which this walk read as "paints nothing," not as
+//      "unresolved." The lane's workaround was a class on the table that
+//      repeated, in a string, a fact the kit already paints — true, but a
+//      second coat of the census's own colour rather than a fix to the
+//      census. Fixed by resolving every `import { X as Y }` / `import Y from`
+//      binding ONE HOP through the SAME FILE LIST this walk already reads
+//      (the kit's, the app's), so a tag written under its imported name finds
+//      the declaration it names. The redundant class is gone —
+//      `module-automations.tsx`'s `<RecordTable>` carries no className any
+//      more, and the census finds the kit's real panel through the alias.
+//
+//   2. `componentPaints` WAS BRANCH-BLIND. It read a component's WHOLE
+//      function as one string, so `settings-choices-panel.tsx`'s
+//      `SettingsChoicesPanel` passed because an EARLY, UNRELATED return
+//      (`modulesWithChoices.length === 0`'s `NoAccess` box) happens to spell
+//      `bg-surface-panel` — a coincidence, not containment, and this file's
+//      own foundational finding restated one level down: a component can
+//      pass for the wrong reason, same as a section can. Fixed two ways at
+//      once: an early guard return (`if (cond) return …`, not the function's
+//      last statement) is cut from the text `componentPaints` scans, so a
+//      loading/error/access-denied branch can no longer vouch for content it
+//      has nothing to do with; and the scan gained a SECOND hop source
+//      alongside the existing same-file one — an import THIS component's OWN
+//      file writes — because `rootPaints` (amendment 5's real, AST-based
+//      cross-file walk) cannot reach the fix here either: `ModuleAutomations`
+//      returns a Fragment (`rootElements` hands back zero roots for one, on
+//      purpose — "no single box to stand in"), and `SettingsChoicesPanel`'s
+//      real content sits inside `<CollectionCreateActionProvider>`, which
+//      forwards `{children}` opaquely (the same shape amendment 7 already
+//      named for `bodies()`, blocking `rootElements` here instead). A
+//      component's own `getText()` still contains whatever JSX it wraps as
+//      literal source, so the table is right there in the text once an
+//      import is a hop source. NEVER A CHAIN ACROSS A SECOND FILE: only the
+//      ASKED-ABOUT component's own file is consulted this way, so amendment
+//      5's own fixture pair (`FixtureRootedMiddle`/`FixturePaintedLeaf`, two
+//      files with NO import line between them, written to prove `rootPaints`
+//      specifically resolves that shape) is untouched — there is nothing
+//      there to hop through, and the tripwire's `rootsFollowed >= 2` still
+//      holds.
+//
+// MEASURED, NOT ASSUMED: before and after, the census judges the SAME 46
+// sections/panels with the SAME 33 passing / 13 named in
+// `UNCONTAINED_SECTION_OK` — this amendment does not change what the census
+// concludes about the app as it stood, because the two blind spots' own
+// workarounds (the redundant class; the `NoAccess` coincidence) were already
+// making the census agree, for the wrong reason, with what turned out to be
+// true. What changed is provable by mutation, not by the pass/fail count
+// alone: strip either escape hatch — `module-automations.tsx`'s className, or
+// `settings-choices-panel.tsx`'s `NoAccess` fill — and the AMENDMENTS-1–7
+// census (no alias resolution, whole-function `componentPaints`) reports
+// three sections on the bare page ground; this one still reports zero,
+// because it was never leaning on either hatch to begin with.
 
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -758,22 +829,253 @@ describe("R67 — a titled section stands on paper", () => {
   function createPaintWalk(files: Parsed[]) {
     const declText = new Map<string, { text: string; rel: string }>()
     const fileTop = new Map<string, Map<string, string>>()
+
+    // ── AMENDMENT 8 (2026-09-14) — AN IMPORT ALIAS RESOLVES ONE HOP ──────────
+    // See this file's header for the full account (the lane that hit this,
+    // and why). `shared/web/screen-engine/collection-frame.tsx` does
+    // `import { CollectionFrame as KitCollectionFrame } from
+    // "@shared/ui/components/collection-frame/collection-frame"` and renders
+    // `<KitCollectionFrame>`. Every lookup below (`declText`, `rootDecl`) is
+    // keyed by a tag's OWN spelling, and an import binding declares no
+    // `VariableStatement`/`FunctionDeclaration` of its own — so a tag written
+    // under its imported name resolved to nothing, and "nothing" read as
+    // "paints nothing," not as "unresolved." `byPath`/`byRel` index this
+    // WALK'S OWN file list (the kit's, the app's, or — for the tripwire below
+    // — a fixture's), never the whole repo, so a fixture that imports nothing
+    // real simply finds no target and is unaffected.
+    const byPath = new Map<string, Parsed>()
+    const byRel = new Map<string, Parsed>()
+    for (const f of files) {
+      byPath.set(f.path, f)
+      byRel.set(f.rel, f)
+    }
+    type ImportBinding = { imported: string; specifier: string; fromRel: string }
+    const importAlias = new Map<string, ImportBinding>()
+
+    /** A module specifier, resolved ONE HOP off the file that wrote it — the
+     * three shapes this repo's tsconfigs actually declare (CLAUDE.md's own
+     * "paths" excerpt): `@shared/*` is always `shared/*` off the repo root;
+     * `@/*` is the IMPORTING file's own front door (`web/` or `web-portal/`
+     * — `shared/web/` files don't use it, so there is no third door to
+     * thread through); a bare `.`/`..` is relative to the importing file's
+     * own directory. Anything else (a bare package name) resolves to nothing
+     * — under-reaching, this walk's own direction throughout. */
+    function resolveSpecifier(fromRel: string, specifier: string): Parsed | undefined {
+      const fromFile = byRel.get(fromRel)
+      if (!fromFile) return undefined
+      let base: string | null = null
+      if (specifier.startsWith("@shared/")) base = join(ROOT, "shared", specifier.slice("@shared/".length))
+      else if (specifier.startsWith("@/")) {
+        const doorRoot = fromRel.startsWith("web-portal/")
+          ? join(ROOT, "web-portal")
+          : fromRel.startsWith("web/")
+            ? join(ROOT, "web")
+            : null
+        if (doorRoot) base = join(doorRoot, specifier.slice(2))
+      } else if (specifier.startsWith(".")) {
+        base = join(dirname(fromFile.path), specifier)
+      }
+      if (!base) return undefined
+      return byPath.get(`${base}.tsx`) ?? byPath.get(join(base, "index.tsx"))
+    }
+
+    /** A DEFAULT import resolves to the module's default export — the one
+     * name a `default` binding can mean, read off the target file's own
+     * `export default`. */
+    function defaultExportName(file: Parsed): string | undefined {
+      for (const st of file.tree.statements) {
+        if (ts.isExportAssignment(st) && !st.isExportEquals && ts.isIdentifier(st.expression))
+          return st.expression.text
+        if (
+          ts.isFunctionDeclaration(st) &&
+          st.name &&
+          ts.canHaveModifiers(st) &&
+          ts.getModifiers(st)?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+        )
+          return st.name.text
+      }
+      return undefined
+    }
+
+    // Every file's OWN import bindings, kept precisely per file (never
+    // collapsed "first wins" the way `importAlias` below is) — `componentPaints`
+    // needs to ask "does THIS SPECIFIC FILE import a name its OWN text
+    // references", and two files importing two different things under the
+    // same local name must not shadow one another.
+    const importsByFile = new Map<string, Map<string, ImportBinding>>()
     for (const f of files) {
       const tops = new Map<string, string>()
+      const imports = new Map<string, ImportBinding>()
       for (const st of f.tree.statements) {
         if (ts.isVariableStatement(st))
           for (const d of st.declarationList.declarations)
             if (ts.isIdentifier(d.name)) tops.set(d.name.text, d.getText())
         if (ts.isFunctionDeclaration(st) && st.name) tops.set(st.name.text, st.getText())
+        if (ts.isImportDeclaration(st) && st.importClause && ts.isStringLiteral(st.moduleSpecifier)) {
+          const specifier = st.moduleSpecifier.text
+          const clause = st.importClause
+          if (clause.name) {
+            const binding = { imported: "default", specifier, fromRel: f.rel }
+            imports.set(clause.name.text, binding)
+            if (!importAlias.has(clause.name.text)) importAlias.set(clause.name.text, binding)
+          }
+          if (clause.namedBindings && ts.isNamedImports(clause.namedBindings))
+            for (const el of clause.namedBindings.elements) {
+              const imported = (el.propertyName ?? el.name).text
+              const binding = { imported, specifier, fromRel: f.rel }
+              imports.set(el.name.text, binding)
+              if (!importAlias.has(el.name.text)) importAlias.set(el.name.text, binding)
+            }
+        }
       }
       fileTop.set(f.rel, tops)
+      importsByFile.set(f.rel, imports)
       for (const [name, text] of tops)
         if (/^[A-Z]/.test(name) && !declText.has(name)) declText.set(name, { text, rel: f.rel })
     }
 
-    // WHAT EACH COMPONENT PAINTS, resolved through the module-scope constants
-    // its own FILE declares (never a component it renders — see `paints`
-    // below for why that version was thrown away).
+    // ONE HOP, resolved through the same file list — a REAL local declaration
+    // always wins (an alias only fills the gap a bare import binding leaves).
+    for (const [aliasName, info] of importAlias) {
+      if (!/^[A-Z]/.test(aliasName) || declText.has(aliasName)) continue
+      const targetFile = resolveSpecifier(info.fromRel, info.specifier)
+      if (!targetFile) continue
+      const targetTops = fileTop.get(targetFile.rel)
+      if (!targetTops) continue
+      const targetName = info.imported === "default" ? defaultExportName(targetFile) : info.imported
+      if (!targetName) continue
+      const text = targetTops.get(targetName)
+      if (text !== undefined) declText.set(aliasName, { text, rel: targetFile.rel })
+    }
+
+    // `rootDecl` gets the SAME one-hop alias resolution, over real ts.Node
+    // declarations rather than text — `rootPaints`/`rootElements` need the
+    // node, not a string, to find what a component RETURNS.
+    const rootDecl = new Map<string, ts.Node>()
+    const fileTopNode = new Map<string, Map<string, ts.Node>>()
+    for (const f of files) {
+      const tops = new Map<string, ts.Node>()
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) tops.set(d.name.text, d)
+        if (ts.isFunctionDeclaration(st) && st.name) tops.set(st.name.text, st)
+      }
+      fileTopNode.set(f.rel, tops)
+      for (const [name, node] of tops)
+        if (/^[A-Z]/.test(name) && !rootDecl.has(name)) rootDecl.set(name, node)
+    }
+    for (const [aliasName, info] of importAlias) {
+      if (!/^[A-Z]/.test(aliasName) || rootDecl.has(aliasName)) continue
+      const targetFile = resolveSpecifier(info.fromRel, info.specifier)
+      if (!targetFile) continue
+      const targetTops = fileTopNode.get(targetFile.rel)
+      if (!targetTops) continue
+      const targetName = info.imported === "default" ? defaultExportName(targetFile) : info.imported
+      if (!targetName) continue
+      const node = targetTops.get(targetName)
+      if (node) rootDecl.set(aliasName, node)
+    }
+
+    // ── AMENDMENT 8's SECOND FIX — A PASS MEANS THE REAL ROOT, NOT A
+    //    COINCIDENTAL BRANCH ─────────────────────────────────────────────────
+    // The OLD `componentPaints` text-scanned a component's WHOLE function —
+    // every early return, every unrelated branch, all one string — so
+    // `settings-choices-panel.tsx`'s `SettingsChoicesPanel` passed because its
+    // OWN `NoAccess` branch (`modulesWithChoices.length === 0`) spells
+    // `bg-surface-panel`, a coincidence that has nothing to do with whether
+    // the table it actually renders (`RecordTable useKitPanel`, its REAL,
+    // final return) stands on paper. See this file's header for the full
+    // account and the module-automations.tsx comment that named both blind
+    // spots.
+    //
+    // TRIED FIRST AND MEASURED OUT: making the walk require EVERY root to
+    // independently paint (mirroring `rootPaints`'s own "every branch"
+    // philosophy, applied to the text question too). It broke the census far
+    // wider than it fixed: `panelCensus.boxed` — how many `<TabsView
+    // renderPanel>` mounts an ANCESTOR already paints — fell from the
+    // low double digits to ZERO, because `componentPaints` is what most of
+    // those ancestor chains actually resolve THROUGH (a `<Card>`, a record
+    // screen's own chrome), and plenty of them carry a harmless early return
+    // (a loading guard, a `return null`) beside their real, painted body.
+    // Requiring every one of those unrelated branches to ALSO paint is a
+    // different, much stricter law than R67 asks for here — it is the same
+    // over-reach this file's own header warns against for the naive "every
+    // screen's root is a panel" version. So the fix is narrower: EXCLUDE the
+    // coincidental branches from the text instead of requiring all of them
+    // to independently pass.
+    //
+    // A "main return" is READ OFF THE SOURCE, not assumed: the component's
+    // own function BODY (unwrapped one hop through a wrapping call like
+    // `React.forwardRef`/`React.memo`, since the kit's own components are
+    // written that way) is walked statement by statement, and any `if (cond)
+    // return …` — no `else`, not the LAST statement — is a GUARD, not
+    // content: `NoAccess`, an error state, a loading `Skeleton`, each read
+    // and discarded before the table `settings-choices-panel.tsx` actually
+    // renders is reached. Their text is cut from what gets scanned; the
+    // component's own SAME-FILE module-scope constants are still hop-
+    // expanded exactly as before, over what remains. A declaration this
+    // cannot make sense of as a function (a plain constant, a
+    // `React.createContext(...)`, anything a hop TARGET turns out to be
+    // rather than a component asked about directly) falls back to its own
+    // whole text, unchanged — the case this mechanism has always covered.
+    function mainBody(node: ts.Node): ts.Node | undefined {
+      if (ts.isFunctionDeclaration(node)) return node.body
+      if (ts.isVariableDeclaration(node) && node.initializer) {
+        let init: ts.Expression = node.initializer
+        if (ts.isCallExpression(init) && init.arguments.length > 0) {
+          const last = init.arguments[init.arguments.length - 1]
+          if (last && (ts.isArrowFunction(last) || ts.isFunctionExpression(last))) init = last
+        }
+        if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && ts.isBlock(init.body)) return init.body
+      }
+      return undefined
+    }
+    function isGuardReturn(st: ts.Statement): boolean {
+      if (!ts.isIfStatement(st) || st.elseStatement) return false
+      const then = st.thenStatement
+      if (ts.isReturnStatement(then)) return true
+      return ts.isBlock(then) && then.statements.length > 0 && then.statements.every((s) => ts.isReturnStatement(s))
+    }
+    function mainText(node: ts.Node): string {
+      const body = mainBody(node)
+      if (!body || !ts.isBlock(body)) return node.getText()
+      const stmts = body.statements
+      const keep: string[] = []
+      for (let i = 0; i < stmts.length; i++) {
+        if (i < stmts.length - 1 && isGuardReturn(stmts[i])) continue
+        keep.push(stmts[i].getText())
+      }
+      return keep.join("\n")
+    }
+    // AND ONE MORE HOP THIS WALK NOW MAKES: THROUGH AN IMPORT ITS OWN FILE
+    // WRITES, never a chain across a SECOND file. `module-automations.tsx`'s
+    // `ModuleAutomations` returns a Fragment (`<>…</>`) holding `<RecordTable
+    // useKitPanel>` and its own edit sheet — a shape `rootElements` reads as
+    // "no single box to stand in" and hands back ZERO roots (its own header,
+    // a few lines up) — so `rootPaints` can never resolve it, alias fix or
+    // not, and the WHOLE question rests on `componentPaints`. Its own TEXT
+    // names `RecordTable`, but `RecordTable` is not declared in THIS file —
+    // it is imported, so the SAME-FILE hop above (`tops`, which only ever
+    // held real `VariableStatement`/`FunctionDeclaration`s) could not reach
+    // it, alias fix or not. So the hop grows one more source: THIS component's
+    // own FILE's import bindings (`importsByFile`, built beside `fileTop`
+    // above) — a name this text references that the file imports (aliased,
+    // per fix #1, or plain) resolves through `declText`, exactly as a same-
+    // file constant does, and its text joins the scan. `settings-choices-
+    // panel.tsx`'s `SettingsChoicesPanel` needs the identical reach for a
+    // different structural reason: its real content sits inside
+    // `<CollectionCreateActionProvider>`, which forwards `{children}` (the
+    // same shape amendment 7 already named for `bodies()`, here blocking
+    // `rootElements` instead) — but a component's own `getText()` still
+    // contains whatever JSX it wraps as literal source, so `RecordTable`
+    // is right there in the text to hop through once imports are a source.
+    // NEVER RECURSIVE ACROSS A SECOND FILE: only THIS file's own bindings are
+    // consulted, each hop, so a fixture file with no import statements at all
+    // (amendment 5's own `root-walk-fixture-*.tsx`, which name each other with
+    // no `import` line between them) has nothing here to hop through —
+    // `componentPaints("FixtureRootedMiddle")` still cannot see
+    // `FixturePaintedLeaf`'s fill this way, and only `rootPaints` resolves it,
+    // exactly as that tripwire requires.
     const paintCache = new Map<string, boolean>()
     function componentPaints(name: string): boolean {
       const cached = paintCache.get(name)
@@ -781,8 +1083,10 @@ describe("R67 — a titled section stands on paper", () => {
       paintCache.set(name, false) // recursion guard
       const d = declText.get(name)
       if (!d) return false
+      const decl = rootDecl.get(name)
       const tops = fileTop.get(d.rel) ?? new Map<string, string>()
-      let text = d.text
+      const imports = importsByFile.get(d.rel) ?? new Map<string, ImportBinding>()
+      let text = decl ? mainText(decl) : d.text
       const seen = new Set([name])
       for (let hop = 0; hop < 8; hop++) {
         let grew = false
@@ -791,6 +1095,16 @@ describe("R67 — a titled section stands on paper", () => {
           if (new RegExp(`\\b${k}\\b`).test(text)) {
             seen.add(k)
             text += `\n${v}`
+            grew = true
+          }
+        }
+        for (const [localName] of imports) {
+          if (seen.has(localName)) continue
+          if (!new RegExp(`\\b${localName}\\b`).test(text)) continue
+          seen.add(localName)
+          const target = declText.get(localName)
+          if (target) {
+            text += `\n${target.text}`
             grew = true
           }
         }
@@ -868,17 +1182,11 @@ describe("R67 — a titled section stands on paper", () => {
       return found
     }
 
-    const rootDecl = new Map<string, ts.Node>()
-    for (const f of files)
-      for (const st of f.tree.statements) {
-        if (ts.isVariableStatement(st))
-          for (const d of st.declarationList.declarations)
-            if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
-              rootDecl.set(d.name.text, d)
-        if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
-          rootDecl.set(st.name.text, st)
-      }
-
+    // `rootDecl` (with its own one-hop alias resolution) was built above,
+    // beside `declText`/`fileTop` — see AMENDMENT 8's own header there for why
+    // the census of top-level declarations now happens in one place instead
+    // of two nearly-identical loops.
+    //
     // AMENDMENT 5 ITSELF: a component paints if its own classes do, if its
     // own `cva` does, or if the single element it RETURNS paints, resolved
     // the same way, transitively — ONE edge, the component's own root.

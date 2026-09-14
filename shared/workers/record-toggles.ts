@@ -315,18 +315,6 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     summary:
       "Take a staff profile down, or put it back, never deleted.",
   },
-  staff_certificate: {
-    binding: "CONTENT",
-    path: "/api/content/staff/certificates/active",
-    idField: "id",
-    gate: "staff_profiles:delete",
-    noun: "certificate",
-    on: "Restore",
-    off: "Archive",
-    confirm: "off",
-    summary:
-      "Archive a certificate, or put it back, never deleted.",
-  },
 }
 
 /** The entry a caller named, or undefined. `hasOwnProperty`, not bracket

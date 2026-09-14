@@ -193,11 +193,12 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // somebody sets and leaves, and what was SAID in the room is a different
   // question to ask a role about.
   delivery: "Meeting purposes",
-  // The person behind the member row: their profile and the certificates they
-  // hold. Visible to the team, never to a client — which is why it is its own
-  // permission row and not four more rights on `team_members`: an agency can
-  // want everyone to see who their colleagues are without everyone being able to
-  // change who is on the team.
+  // The person behind the member row: their profile. Visible to the team,
+  // never to a client — which is why it is its own permission row and not four
+  // more rights on `team_members`: an agency can want everyone to see who
+  // their colleagues are without everyone being able to change who is on the
+  // team. A `staff_certificates` table used to gate on this same right too,
+  // until the certificate module was killed whole on 14 Sep 2026.
   staff_profiles: "Staff profiles",
 
   // ── GOOGLE ─────────────────────────────────────────────────────────────────

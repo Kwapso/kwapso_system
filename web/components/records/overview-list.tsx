@@ -35,6 +35,13 @@ export function OverviewList({ items }: { items: DescriptionItem[] }) {
   return (
     <DescriptionList
       layout="rows"
+      // W2: an unset fact is DROPPED, not shown as "Not set" or a dash. The
+      // kit's own default (OVERRIDE 21) went the other way — it now shows
+      // "Not set" for an absent value unless the caller opts out — so every
+      // record's Overview panel opts back into "a missing row is right" by
+      // passing `null` here, once, rather than every call site inventing its
+      // own placeholder for a value it never got.
+      emptyValueLabel={null}
       items={items.map((i, n) => ({ id: i.id ?? `${n}-${i.label}`, label: i.label, value: i.value }))}
     />
   )

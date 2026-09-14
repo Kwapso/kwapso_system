@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 824 strings · 3 languages · 1363 of the entries below are hand-written seed.
+// 819 strings · 3 languages · 1349 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -111,7 +111,6 @@ export const CATALOGUE: Catalogue = {
   "Cancel": { de: "Abbrechen", es: "Cancelar", ca: "Cancel·lar" },
   "Cancel it": { de: "Abbrechen", es: "Cancelarlo", ca: "Cancel·la-ho" },
   "Cancelled": { de: "Storniert", es: "Cancelado", ca: "Cancel·lat" },
-  "Certificates": { de: "Zertifikate", es: "Certificados", ca: "Certificats" },
   "Change": { de: "Änderung", es: "Cambio", ca: "Canvi" },
   "Change email": { de: "E-Mail ändern", es: "Cambiar correo electrónico", ca: "Canviar correu electrònic" },
   "Change role": { de: "Rolle ändern", es: "Cambiar rol", ca: "Canviar rol" },
@@ -326,7 +325,6 @@ export const CATALOGUE: Catalogue = {
   "Load more time": { de: "Weitere Zeit laden", es: "Cargar más tiempo", ca: "Carrega més temps" },
   "Load more work": { de: "Weitere Arbeiten laden", es: "Cargar más trabajo", ca: "Carrega més treball" },
   "Loading…": { de: "Wird geladen…", es: "Cargando…", ca: "Carregant…" },
-  "Locked": { de: "Gesperrt", es: "Bloqueado", ca: "Bloquejat" },
   "Log time": { de: "Zeit erfassen", es: "Registrar tiempo", ca: "Registra temps" },
   "Logo": { de: "Logo", es: "Logo", ca: "Logo" },
   "Logos, decks, templates and photography.": { de: "Logos, Präsentationen, Vorlagen und Fotografie.", es: "Logos, presentaciones, plantillas y fotografía.", ca: "Logos, decks, plantilles i fotografia." },
@@ -499,7 +497,6 @@ export const CATALOGUE: Catalogue = {
   "Ready": { de: "Fertig", es: "Listo", ca: "Llest" },
   "Ready for review": { de: "Zur Überprüfung bereit", es: "Listo para revisar", ca: "A punt per revisar" },
   "Record an app": { de: "App aufnehmen", es: "Grabar una aplicación", ca: "Enregistrar una aplicació" },
-  "Record one": { de: "Einen aufnehmen", es: "Grabar uno", ca: "Enregistra un" },
   "Reference": { de: "Referenz", es: "Referencia", ca: "Referència" },
   "Related stories": { de: "Verwandte Stories", es: "Historias relacionadas", ca: "Històries relacionades" },
   "Relationship": { de: "Beziehung", es: "Relación", ca: "Relació" },
@@ -641,7 +638,6 @@ export const CATALOGUE: Catalogue = {
   "That ticket no longer exists.": { de: "Das Ticket existiert nicht mehr.", es: "Ese ticket ya no existe.", ca: "Aquest tiquet ja no existeix." },
   "The agency's own": { de: "Das Eigene der Agentur", es: "De la agencia.", ca: "Propi de l'agència." },
   "The assistant isn't available for your role here.": { de: "Der Assistent ist für Ihre Rolle hier nicht verfügbar.", es: "El asistente no está disponible para tu rol aquí.", ca: "L'assistent no està disponible per al teu rol aquí." },
-  "The certificate itself": { de: "Das Zertifikat selbst", es: "El certificado en sí.", ca: "El certificat en si." },
   "The client can see it now.": { de: "Der Kunde sieht es jetzt.", es: "El cliente ya puede verlo.", ca: "El client ja ho pot veure." },
   "The document was found but we couldn't read any words out of it. Open it in Google to read it there.": { de: "Das Dokument wurde gefunden, aber es ließen sich keine Wörter daraus lesen. Öffnen Sie es in Google, um es dort zu lesen.", es: "Se encontró el documento pero no pudimos leer ninguna palabra de él. Ábrelo en Google para leerlo allí.", ca: "El document s'ha trobat però no hem pogut llegir cap paraula. Obriu-lo a Google per llegir-lo allà." },
   "The link": { de: "Der Link", es: "El enlace.", ca: "L'enllaç." },
@@ -720,7 +716,6 @@ export const CATALOGUE: Catalogue = {
   "What should we call it?": { de: "Wie sollten wir es nennen?", es: "¿Cómo deberíamos llamarlo?", ca: "Com hauríem de dir-ho?" },
   "What should we call you?": { de: "Wie sollten wir Sie nennen?", es: "¿Cómo deberíamos llamarte?", ca: "Com hauríem de dir-te?" },
   "What they do, who they are, anything worth knowing.": { de: "Was sie tun, wer sie sind, alles Wissenswerte.", es: "Lo que hacen, quiénes son, cualquier cosa que valga la pena saber.", ca: "Què fan, qui són, qualsevol cosa que valgui la pena saber." },
-  "What they hold, who issued it, and when it lapses. The team can see this; no client can.": { de: "Was sie halten, wer es ausgestellt hat, und wann es verfällt. Das Team kann das sehen; kein Kunde kann es.", es: "Lo que tienen, quién lo emitió y cuándo vence. El equipo puede verlo; ningún cliente puede.", ca: "Què tenen, qui ho va emetre, i quan caduques. L'equip pot veure-ho; cap client pot." },
   "What this block of work is meant to achieve.": { de: "Was dieser Arbeitsblock erreichen soll.", es: "Lo que este bloque de trabajo pretende lograr.", ca: "Què hauria d'assolir aquest bloc de feina." },
   "What this has been worth": { de: "Was das wert war", es: "Lo que esto ha valido", ca: "Què ha valgut això" },
   "What this role is for (optional).": { de: "Wofür diese Rolle ist (optional).", es: "Para qué sirve este rol (opcional).", ca: "Per a què és aquest rol (opcional)." },

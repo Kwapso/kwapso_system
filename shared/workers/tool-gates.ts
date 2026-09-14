@@ -79,12 +79,9 @@ export const TOOL_GATES: Record<string, string> = {
   // The profile door is ONE door for "there wasn't one" and "there was", so it
   // is gated once on `update`: writing down what a colleague is like is the same
   // act either way, and a permission that depends on invisible state is one
-  // nobody can reason about. `create` gates the certificate door instead.
+  // nobody can reason about.
   save_staff_profile: "staff_profiles:update",
   set_staff_profile_active: "staff_profiles:delete",
-  create_staff_certificate: "staff_profiles:create",
-  update_staff_certificate: "staff_profiles:update",
-  set_staff_certificate_active: "staff_profiles:delete",
   add_knowledge_source: "knowledge:create",
   update_knowledge_source: "knowledge:update",
   set_knowledge_source_active: "knowledge:delete",

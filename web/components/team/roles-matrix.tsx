@@ -182,15 +182,96 @@
 // implied by seeing this list" applies here too, since the whole tab is
 // already gated on `member_roles:read`); Import is shown only for
 // `member_roles:create`, the same right the list screen's own button gated on.
+//
+// ── THE PINNED BAR, AND ROLES FINALLY GETS A DISCARD, 2026-09-14 ───────────
+//
+// This grid has staged every switch behind Save since the matrix shipped
+// (2026-09-09) with no way to back out short of un-toggling each cell by
+// hand — the design lane's own artifact named it outright: "there is no
+// Discard control on Roles today." The client, the same session as the
+// toolbar ruling below: "We need some kind of hint or flag, very visible,
+// probably not at the bottom, that allows me to save or to restart… to not
+// save the changes." Her own comparison artifact settled the shape (Option
+// A, a band pinned directly under the tab strip) and it shipped as the kit's
+// `UnsavedChangesBar` (v1.2.82) — see that file's own header for the
+// component itself.
+//
+// THE BOTTOM SAVE BUTTON IS GONE. It lived under the grid, past the legend,
+// invisible on any viewport shorter than the whole matrix — the same
+// "probably not at the bottom" complaint the bar exists to answer. `save()`
+// is unchanged; only what calls it moved.
+//
+// DISCARD IS NEW, AND IT IS THE DRAFT'S OWN RESET, NOT A DOOR CALL.
+// `discardDraft` rebuilds the same `server` object the reconciliation effect
+// already computes from `sheets` — the last-saved value of every active
+// role's sheet — and writes it straight back over `draft`, the identical
+// shape a fresh load or a server ping already produces. Nothing is sent
+// anywhere: discarding a draft that was never saved has no door to call.
+//
+// THE BAR SITS ABOVE THE TOOLBAR, INSIDE THE SAME COLUMN. `TeamPanel` is the
+// container this file already owns end to end (unlike `AppearancePanel`,
+// which sits inside the kit's own `SettingsSection` and deliberately stays
+// outside its padded box — see that file's header), so the pin rides inside
+// `TeamPanel`'s own flow rather than beside it. `ground` is left at
+// `UnsavedChangesBar`'s own default (`"bare"`): the `PINNED_TOOLBAR` wrapper
+// already paints `--pinned-ground`, resolved off `TeamPanel`'s own paper the
+// same way every other pinned row in this app leaves its own fill to the
+// wrapper.
+//
+// ── THE HEADER BECAME A REAL `<ToolbarRow>`, 2026-09-14 ─────────────────────
+//
+// The bespoke `<div className="flex flex-wrap items-center justify-end gap-2">`
+// this section used to draw — Import / Export / the black `+`, no search box —
+// is gone. Client, the same day: *"In Team Rules [Roles] at the toolbar with
+// search and the add button"*. The row's own five slots (R53) are now genuinely
+// the row's:
+//
+//   search   filters the MATRIX ROWS by module name. The rows are the team's
+//            module catalogue (this file's own header above explains why
+//            modules are rows and roles are columns since 2026-09-10) — so
+//            "search" here narrows WHICH MODULES are on screen, never which
+//            roles, because the roles are the columns and a matrix does not
+//            hide its own axis.
+//   sort     omitted, named in `TOOLBAR_SORT_EXEMPT` (`shared/rules/
+//            registry.ts`): the rows are `TEAM_MODULES`'s own fixed order,
+//            the order a permission matrix is read in top to bottom, and
+//            there is no second, equally valid order for a control to offer.
+//   actions  Import CSV, Export CSV, "Deactivated" (moved in from the bottom
+//            of this file the same day — see below) and the black `+`.
+//   empty    `false`, always — see the prop's own comment for why that is
+//            the honest answer and not a dodge.
+//
+// ── "DEACTIVATED" MOVED FROM THE FOOT OF THE GRID INTO THE TOOLBAR ──────────
+//
+// Client, 2026-09-14: *"In Roles Permission, remove the whole 'Deactivated'
+// from the bottom and make it a button in the toolbar, same as we have
+// Invites for Members."* So it is now built the same way Invites is built in
+// `members-gallery.tsx`: a secondary button, carrying a `formatCount` badge
+// (R16) of how many roles are switched off, opening an IN-PLACE disclosure —
+// never a new surface — that lists them through the app's one `<List>` seam
+// (`shared/web/list-compat.tsx`), the same component Invites' own disclosure
+// already uses. Each row carries the reactivate act directly, the way an
+// Invites row carries revoke: no second stop through `RolePanel` first. A
+// deactivated role's sheet is still frozen and still 404s (unchanged), so
+// this list reads straight off `roles`, never off `sheets` — it needs no
+// permissions read to draw and is not gated behind the matrix's own load.
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Download, Plus, Power, UploadSimple } from "@shared/ui/foundations/icons"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
-import { ToolbarAction } from "@/components/deep-link/screen-bits"
-import { softNavigate } from "@/lib/nav"
+import { ToolbarAction, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
+import { cn } from "@shared/ui/lib/utils"
+import { List } from "@shared/web/list-compat"
+import { formatCount } from "@shared/web/format-count"
+import { openInNewTab } from "@/lib/nav"
+import { IMPORT_TARGET_LABEL } from "@/components/deep-link/crumbs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -218,7 +299,8 @@ import { TeamPanel } from "@/components/team/team-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { rolePermsAllKey } from "@/lib/live-resources"
 import { invalidate, useCached } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 /** SERVER ⇄ KIT rights vocabulary — lifted unchanged from the per-role screen
  * this replaces. The app's sheet says read/create/update/delete; the kit says
@@ -306,6 +388,7 @@ export function RolesMatrix({
   roles,
   rolesLoading,
   canCreate,
+  onDirtyChange,
 }: {
   teamId: string
   /** The team's roles, already loaded by the tab (one read, two containers). */
@@ -315,8 +398,17 @@ export function RolesMatrix({
   rolesLoading: boolean
   /** `member_roles:create` — whether the quiet "New role" button is drawn. */
   canCreate: boolean
+  /** Told every time this grid's own `dirty` changes, and `false` once more on
+   * unmount — the Settings tab strip has no `forceMount`, so switching to
+   * another tab unmounts this component outright and a staged draft would
+   * vanish with no Save, no Discard, no warning. `settings-screen.tsx` is the
+   * one caller: it keeps a `dirtyTabs` map from this and the matching prop on
+   * `AppearancePanel`, and its own tab-change handler asks that map before it
+   * ever lets a switch through. Optional because nothing else mounts this
+   * grid today. */
+  onDirtyChange?: (dirty: boolean) => void
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [addOpen, setAddOpen] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
   // A ROLE'S OWN TWO ACTS, WHICH USED TO LIVE ON ITS PAGE AND THEN ON ITS ROW.
@@ -333,11 +425,16 @@ export function RolesMatrix({
   // through it. The ROW is for reading — a band you compare against the band
   // above it, which is the whole reason this grid replaced four screens.
   const [editing, setEditing] = React.useState<TeamRole | null>(null)
-  /** The role whose panel is open — set by pressing a row head, or a
-   * deactivated role's chip under the grid. */
+  /** The role whose panel is open — set by pressing a row head. */
   const [openRole, setOpenRole] = React.useState<TeamRole | null>(null)
   const [confirmOff, setConfirmOff] = React.useState<TeamRole | null>(null)
   const [busyActive, setBusyActive] = React.useState(false)
+  // THE TOOLBAR'S SEARCH BOX — narrows the matrix's ROWS, which are modules
+  // (this file's own header explains why modules are rows since 2026-09-10).
+  const [query, setQuery] = React.useState("")
+  // THE "DEACTIVATED" DISCLOSURE — closed by default, opened by the toolbar
+  // button, the same shape `invitesOpen` is in members-gallery.tsx.
+  const [deactivatedOpen, setDeactivatedOpen] = React.useState(false)
 
   // ACTIVE ROLES ONLY. A deactivated role's permissions are frozen and the door
   // 404s them (the same rule the per-role screen kept) — and a row of dashes for
@@ -345,6 +442,10 @@ export function RolesMatrix({
   const activeRoles = React.useMemo(() => roles.filter((r) => r.active), [roles])
   const roleIds = activeRoles.map((r) => r.id).join(",")
   const inactiveRoles = React.useMemo(() => roles.filter((r) => !r.active), [roles])
+  // THE TOOLBAR'S "DEACTIVATED" BADGE — `formatCount` (R16), the same seam
+  // `invitesBadge` reads through in members-gallery.tsx, so a team with
+  // nothing switched off gets a plain button rather than a "0" nobody needs.
+  const deactivatedBadge = formatCount(inactiveRoles.length)
 
   // ONE READ FOR THE WHOLE GRID. The door answers per role
   // (`tenancy.rolePermissions`), and roles are a BOUNDED collection (R14 — a
@@ -388,6 +489,17 @@ export function RolesMatrix({
     draft != null &&
     sheets.some((s) => JSON.stringify(draft[s.role.id]) !== JSON.stringify(s.perms.value))
 
+  // REPORT UPWARD, AND `false` ON THE WAY OUT — see the prop's own doc. The
+  // cleanup fires both on every re-run (harmless: the caller's next line is
+  // `onDirtyChange(dirty)` again) and on unmount, which is the one that
+  // matters — the moment the Settings tab strip throws this grid away, its
+  // caller's `dirtyTabs` entry is corrected to match rather than lingering
+  // stale.
+  React.useEffect(() => {
+    onDirtyChange?.(dirty)
+    return () => onDirtyChange?.(false)
+  }, [dirty, onDirtyChange])
+
   // THE ROLES THAT CANNOT BE CHANGED, as the kit wants them: `locked` is a fact
   // about a COLLECTION — "which roles' cells are fixed here" — and it is the
   // same answer on all twenty-two, because what is locked is the Admin ROLE
@@ -399,6 +511,12 @@ export function RolesMatrix({
   // viewer may edit roles at all; the Admin row is locked row-by-row above.
   const canSave = sheets != null && sheets.length > 0 && sheets[0].perms.canUpdate
 
+  // THE TOOLBAR'S SEARCH, APPLIED HERE — narrows the ROW list before it ever
+  // reaches the kit, the same "search first" order every collection screen in
+  // the app applies. Matched on the module's own translated label, which is
+  // the one word a reader is typing against.
+  const q = query.trim().toLowerCase()
+
   // THE MODULES, WHICH ARE THE KIT'S `modules` AND ARE THE ROWS since
   // 2026-09-10. They come off the first sheet: every role's sheet carries the same
   // module list in the same order, because the server builds it from the one
@@ -407,29 +525,31 @@ export function RolesMatrix({
   // the translated word lives — and now keeps `rights` the door's own too.
   const moduleColumns =
     sheets && draft
-      ? (sheets[0]?.perms.modules ?? []).map((m) => ({
-          id: m.key,
-          label: m.label,
-          // R36's fix, and the whole point of this release. `m.rights` is
-          // MODULE_OFFERED_RIGHTS as the door sends it, in the app's own
-          // vocabulary; the kit speaks in capability ids, so it goes through the
-          // one mapping this file already owns.
-          rights: m.rights.map((r) => RIGHT_TO_KIT[r]),
-          // WHAT EACH ROLE HOLDS HERE, keyed by role id. It is read straight off
-          // the draft with NO offered-filter over it: the kit does not count an
-          // unoffered capability as held whatever `held` names, so filtering
-          // here would be a second opinion about a question the component now
-          // answers. See this file's header.
-          held: Object.fromEntries(
-            sheets.map(({ role }) => [
-              role.id,
-              (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
-                .filter((r) => draft[role.id]?.[m.key]?.[r])
-                .map((r) => RIGHT_TO_KIT[r]),
-            ])
-          ),
-          locked: lockedRoleIds,
-        }))
+      ? sortedOptions(sheets[0]?.perms.modules ?? [], lang, (m) => m.label)
+          .filter((m) => !q || m.label.toLowerCase().includes(q))
+          .map((m) => ({
+            id: m.key,
+            label: m.label,
+            // R36's fix, and the whole point of this release. `m.rights` is
+            // MODULE_OFFERED_RIGHTS as the door sends it, in the app's own
+            // vocabulary; the kit speaks in capability ids, so it goes through
+            // the one mapping this file already owns.
+            rights: m.rights.map((r) => RIGHT_TO_KIT[r]),
+            // WHAT EACH ROLE HOLDS HERE, keyed by role id. It is read straight
+            // off the draft with NO offered-filter over it: the kit does not
+            // count an unoffered capability as held whatever `held` names, so
+            // filtering here would be a second opinion about a question the
+            // component now answers. See this file's header.
+            held: Object.fromEntries(
+              sheets.map(({ role }) => [
+                role.id,
+                (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
+                  .filter((r) => draft[role.id]?.[m.key]?.[r])
+                  .map((r) => RIGHT_TO_KIT[r]),
+              ])
+            ),
+            locked: lockedRoleIds,
+          }))
       : []
 
   // THE ROLES, WHICH ARE THE COLUMNS since 2026-09-10 (client: "the roles are
@@ -443,17 +563,20 @@ export function RolesMatrix({
           id: role.id,
           // THE COLUMN HEAD IS THE ROLE, AND PRESSING IT OPENS THE ROLE'S PANEL. A
           // `PermissionRole.label` is a `React.ReactNode`, which is what makes
-          // this possible without forking anything. The client's own preview
-          // draws the shape: the role's name with a quiet meta line under it.
+          // this possible without forking anything.
           //
-          // THE META LINE STAYS INSIDE THE BUTTON rather than moving to the
-          // kit's new `PermissionRole.description`, which v1.2.75 added for
-          // exactly this slot. The description is drawn OUTSIDE the label, so
-          // taking it would shrink the press target to the title alone — and
-          // the whole two-line stack being pressable is the shape the client
-          // approved when she asked for the overview on a row press. The prop
-          // is the better home for prose the row merely SAYS; this line is part
-          // of what she presses.
+          // THE META LINE UNDER THE NAME — "Locked" / "{count} people" — IS
+          // GONE, 2026-09-14: *"In Roles Permissions, remove the locked 5
+          // people under the role name. We don't want that."* R16 still holds:
+          // the member count was never said only here — `RolePanel`'s own
+          // overview already carries "{count} people" (see `role-panel.tsx`),
+          // which is exactly what this press opens, so the fact is one press
+          // away rather than lost. The LOCK state for Admin still has to be
+          // conveyed, and it still is — never as a word up here: every cell in
+          // a locked role's column is already drawn `cursor-not-allowed` and
+          // non-interactive by the kit's own `PermissionRun` (locked cells are
+          // a live-looking run nobody can press, with the reason on a hover
+          // tooltip), which does not depend on anything this column head says.
           //
           // THE TWO ICON BUTTONS THAT STOOD HERE ARE GONE — "rmeove this buttons
           // from th elist view" (client, 2026-09-09). They are in `RolePanel`'s
@@ -462,20 +585,31 @@ export function RolesMatrix({
           // overview.
           //
           // A BARE `<button>`, not a kit `Button`. Every `size` a kit button has
-          // fixes a HEIGHT and `whitespace-nowrap`, and this target is a
-          // two-line stack that must wrap in the first column of a grid that
-          // already scrolls. The kit's own focus rule is global (tokens.css §8
-          // rings every `:focus-visible` at the control's own radius), so a bare
-          // button is rung for free and defines nothing — which is the same
-          // reason the app's other forty row-shaped targets are bare buttons
-          // too. `text-start` because a button centres its text by default and a
-          // row head is prose.
+          // fixes a HEIGHT and `whitespace-nowrap`, and the kit's own focus rule
+          // is global (tokens.css §8 rings every `:focus-visible` at the
+          // control's own radius), so a bare button is rung for free and defines
+          // nothing — which is the same reason the app's other forty row-shaped
+          // targets are bare buttons too. `text-start` because a button centres
+          // its text by default and a row head is prose.
+          //
+          // THE EYEBROW STYLE, UNIFIED WITH "MODULE" — client, 2026-09-14: "if
+          // the column 1 header module is all cap, unify this for the role
+          // names." The first column's head is a plain `<th>`, styled
+          // `text-micro uppercase font-[var(--font-weight-medium)]
+          // text-ink-tertiary` by the kit's own `TableHead` (table.tsx) — every
+          // OTHER column's head is this button node instead, and a `<button>`
+          // is where that styling breaks: browsers ship their own UA default
+          // of `text-transform: none` directly on the element, which beats an
+          // inherited `uppercase` regardless of the ancestor `<th>`'s own
+          // class. So the four classes are restated here, explicitly, rather
+          // than trusted to inherit through a control that will not carry
+          // them.
           label: (
             <button
               type="button"
               onClick={() => setOpenRole(role)}
               aria-label={`${role.title} — ${t("Overview")}`}
-              className="flex cursor-pointer flex-col text-start"
+              className="cursor-pointer text-start text-micro font-[var(--font-weight-medium)] text-ink-tertiary uppercase"
             >
               {/* THE HOVER IS THE KIT'S LINK HOVER AND NOTHING ELSE — `.kw-link`
                   "inherits its ink, underlines on hover, occupies no box"
@@ -484,17 +618,6 @@ export function RolesMatrix({
                   table cell, and `motion-hover-lift` is the card's rule. This
                   file writes no duration and no curve (kit RULES §6.1). */}
               <span className="underline-offset-[0.1875rem] hover:underline">{role.title}</span>
-              <span className="text-muted-foreground text-micro">
-                {/* A WHOLE SENTENCE WITH A HOLE IN IT, never a number glued
-                    to a translated noun (R28): `t("people")` on its own is a
-                    fragment `isUserVisible` refuses, and it is also the one
-                    shape a translator cannot reorder. */}
-                {role.isDefault
-                  ? t("Locked")
-                  : role.memberCount === 1
-                    ? t("{count} person", { count: String(role.memberCount) })
-                    : t("{count} people", { count: String(role.memberCount) })}
-              </span>
             </button>
           ),
         }))
@@ -528,6 +651,21 @@ export function RolesMatrix({
     } finally {
       setSaving(false)
     }
+  }
+
+  /** DISCARD — the bar's own act, new 2026-09-14. Rebuilds the same `server`
+   * object the reconciliation effect above already derives from `sheets` (the
+   * last-saved value of every active role's sheet) and writes it straight
+   * back over `draft`. No door call: there is nothing to send back, only a
+   * local value to forget. `serverRef` is updated to match, the same pair the
+   * effect keeps in sync, so a realtime ping right after a discard does not
+   * read as a second, external change. */
+  function discardDraft() {
+    if (!sheets) return
+    const server: Record<string, PermissionValue> = {}
+    for (const s of sheets) server[s.role.id] = s.perms.value
+    setDraft(server)
+    serverRef.current = { key: roleIds, value: server }
   }
 
   async function updateDetails(role: TeamRole, title: string, description: string) {
@@ -567,15 +705,7 @@ export function RolesMatrix({
        argument, the measured contrast in both palettes, and the upstream ask
        that would delete this prop. */
     <TeamPanel narrowGround={false}>
-      {/* THE CONTAINER'S OWN HEAD — the collection's name, and its actions
-          beside it: "Import CSV" / "Export CSV" (moved in from the retired
-          roles list screen, 2026-09-14 — see this file's header, both through
-          `ToolbarAction` so they fold to their glyph like every other toolbar
-          action) and the one BLACK `+`, icon only. Not mango, not labelled,
-          and not `AddButton`; this file's header has all three reasons and
-          the client's two messages that settle them.
-
-          THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
+      {/* THE HEADING IS `sr-only`, NOT DELETED — client ruling, 2026-09-14:
           "remove members and roles titles too", the same call that took the
           visible "Members" heading next door. Both sections stand inside
           ONE tab panel already named "Team", so that shared name cannot
@@ -587,42 +717,191 @@ export function RolesMatrix({
           route: a screen reader's heading list still reads "Members" then
           "Roles", nothing extra shows on screen, and R67 (containment only,
           no heading required since its 2026-09-11 amendment) is untouched. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Headline as="h2" size="h4" className="sr-only">
-          {t("Roles")}
-        </Headline>
-        <div className="flex items-center gap-2">
-          {canCreate && (
-            <ToolbarAction
-              label={t("Import CSV")}
-              icon={<UploadSimple className="size-4" />}
-              onClick={() => softNavigate(`/t/${teamId}/import/member_roles`)}
+      <Headline as="h2" size="h4" className="sr-only">
+        {t("Roles")}
+      </Headline>
+
+      {/* THE PINNED BAR — see this file's header, "THE PINNED BAR, AND ROLES
+          FINALLY GETS A DISCARD". `pb-4 -mb-4` is `TeamPanel`'s own `gap-4`
+          between this and the toolbar column below, paid INSIDE the pinned
+          box and given back — the identical pair every other `PINNED_TOOLBAR`
+          call site in this app spends, so the gap is still painted rather
+          than a hole the rows scroll through once this bar is stuck (R63,
+          the exact bug `STICKY_FOLDER_TABS` was fixed out of). Gated on
+          `canSave` too: a viewer who cannot save can never make `dirty` true
+          in the first place (every cell is `disabled`), so this is belt and
+          braces, not a second gate doing real work. */}
+      {canSave && dirty && (
+        <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4 -mb-4")}>
+          <UnsavedChangesBar
+            dirty={dirty}
+            saving={saving}
+            message={t("You have unsaved changes")}
+            saveLabel={t("Save")}
+            savingLabel={t("Saving…")}
+            discardLabel={t("Discard")}
+            onSave={() => void save()}
+            onDiscard={discardDraft}
+          />
+        </div>
+      )}
+
+      {/* R49 — GAPLESS, ON PURPOSE, the same shape members-gallery.tsx wraps
+          its own <ToolbarRow> in and for the identical reason: `TeamPanel`
+          (team-panel.tsx) is `flex flex-col gap-4`, and the row already pays
+          its own trailing margin (`mb-[var(--toolbar-content-gap)]`,
+          screen-bits.tsx). Making the row a direct child of `TeamPanel` would
+          double-spend that gap on whatever renders after it — exactly what
+          `toolbar-content-gap` (R49, web/test/rules.test.ts) caught here.
+          The Deactivated disclosure and the grid below keep their OWN
+          `gap-4` rhythm between EACH OTHER, in the nested column below,
+          which is a second, deeper decision from this one. */}
+      <div className="flex min-w-0 flex-col">
+      {/* A REAL `<ToolbarRow>`, 2026-09-14 — client: "In Team Rules [Roles]
+          at the toolbar with search and the add button." This file's header
+          carries the full account of every slot; the short version is in
+          each prop's own comment below. */}
+      <ToolbarRow
+        // R50 — a REAL VALUE, and the honest one, not a dodge. What this row
+        // narrows is the team's own MODULE CATALOGUE (`TEAM_MODULES`, read
+        // off the first sheet below) — fixed furniture for a live team, never
+        // a collection a team empties out. `empty` asks one question, "does
+        // the RAW row list, before search, hold zero rows", and for a grid
+        // whose rows are the app's own module list the answer is always no.
+        empty={false}
+        search={
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            placeholder={t("Search modules…")}
+            className="w-full"
+          />
+        }
+        // R53 — NO `sort` HERE, and named in `TOOLBAR_SORT_EXEMPT`
+        // (`shared/rules/registry.ts`) rather than passed: the rows this grid
+        // draws are `TEAM_MODULES`'s own fixed order, which is the order a
+        // permission matrix is read in, top to bottom — there is no second,
+        // equally valid sequence for a control to offer over a fixed
+        // catalogue, the same shape TasksScreen's Calendar tab is already
+        // exempted for one slot along.
+        actions={
+          <>
+            {canCreate && (
+              <ToolbarAction
+                label={t("Import CSV")}
+                icon={<UploadSimple className="size-4" />}
+                onClick={() =>
+                  openInNewTab(
+                    `/t/${teamId}/import/member_roles`,
+                    `${t("Import")} · ${IMPORT_TARGET_LABEL.member_roles}`
+                  )
+                }
+              />
+            )}
+            {sheets && sheets.length > 0 && (
+              <ToolbarAction
+                label={t("Export CSV")}
+                icon={<Download className="size-4" />}
+                href="/api/tenancy/roles/export"
+              />
+            )}
+            {/* "DEACTIVATED", THE SAME SHAPE AS MEMBERS' "INVITES" — client,
+                2026-09-14: "In Roles Permission, remove the whole
+                'Deactivated' from the bottom and make it a button in the
+                toolbar, same as we have Invites for Members." Secondary
+                variant, an icon, a `formatCount` badge (R16) that renders
+                nothing at zero — see `deactivatedBadge` below — mirroring
+                `members-gallery.tsx`'s Invites button control for control. */}
+            <Button variant="secondary" onClick={() => setDeactivatedOpen((v) => !v)}>
+              <Power className="size-3.5" />
+              {t("Deactivated")}
+              {deactivatedBadge !== "" && <Badge>{deactivatedBadge}</Badge>}
+            </Button>
+            {/* THE BLACK `+`. Not mango, not labelled, and not `AddButton`;
+                this file's header has all three reasons and the client's two
+                messages that settle them. */}
+            {canCreate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="inverse"
+                    size="icon"
+                    aria-label={t("New role")}
+                    onClick={() => setAddOpen(true)}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("New role")}</TooltipContent>
+              </Tooltip>
+            )}
+          </>
+        }
+      />
+
+      {/* THE PANEL'S OWN RHYTHM, KEPT BETWEEN THESE TWO AND NOWHERE ELSE —
+          `gap-4`, the same number `TeamPanel` spends on its own children,
+          read one level down so it never touches the row above (see the
+          R49 comment on the outer wrapper). */}
+      <div className="flex min-w-0 flex-col gap-4">
+
+      {/* THE DEACTIVATED ROLES, IN PLACE — the button above reveals them
+          beside the grid, the identical shape `invitesOpen` reveals Members'
+          pending invites in. It reads off `roles` directly rather than
+          `sheets`, so it needs no permissions read and is not gated behind
+          the matrix's own load: a deactivated role's sheet is 404'd by
+          design (unchanged), and this list never asks for one. */}
+      {deactivatedOpen && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-muted-foreground text-micro uppercase">
+            {t("Deactivated roles")}
+          </h3>
+          {inactiveRoles.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("No deactivated roles.")}</p>
+          ) : (
+            <List
+              surface="none"
+              // OFF-BEIGE, NOT SOFT PAPER — the same reasoning
+              // `members-gallery.tsx`'s Invites list carries: this panel is
+              // `narrowGround={false}` soft paper below 45rem and a bare kit
+              // `<Table>` above it, so a `bg-card` row is the OTHER paper
+              // tone either way, never the 1.000 pairing RULES.md §2.6 warns
+              // against.
+              className="rounded-[var(--radius)] bg-card"
+              items={inactiveRoles.map((role) => ({
+                id: role.id,
+                initials: role.title.slice(0, 1).toUpperCase(),
+                title: role.title,
+                subtitle: role.description?.trim() ? role.description : undefined,
+                // REACTIVATE, ON THE ROW ITSELF — the same one-step act
+                // `RolePanel`'s own `onToggleActive` already takes for
+                // switching a role back ON (no confirm: turning access back
+                // on gives nothing away, unlike switching it off). Icon-only,
+                // Phosphor's `Power`, the app's one deactivate/reactivate
+                // glyph either direction. Drawn only for `member_roles:update`
+                // — a control that always fails is worse than no control.
+                trailing: canSave ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`${t("Activate")} — ${role.title}`}
+                        disabled={busyActive}
+                        onClick={() => void setActive(role, true)}
+                      >
+                        <Power className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("Activate")}</TooltipContent>
+                  </Tooltip>
+                ) : undefined,
+              }))}
             />
-          )}
-          {sheets && sheets.length > 0 && (
-            <ToolbarAction
-              label={t("Export CSV")}
-              icon={<Download className="size-4" />}
-              href="/api/tenancy/roles/export"
-            />
-          )}
-          {canCreate && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="inverse"
-                  size="icon"
-                  aria-label={t("New role")}
-                  onClick={() => setAddOpen(true)}
-                >
-                  <Plus className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("New role")}</TooltipContent>
-            </Tooltip>
           )}
         </div>
-      </div>
+      )}
 
       {sheetsQ.error ? (
         <ShapeStateBody
@@ -671,8 +950,23 @@ export function RolesMatrix({
             stickyGround="panel"
             label={t("Roles and what each one may do")}
             state={activeRoles.length === 0 ? "empty" : "ready"}
-            emptyTitle={t("No roles yet.")}
-            emptyDescription={t("A role is a set of rights you can give somebody. Create one to start.")}
+            // TWO DIFFERENT ZEROS, ONE `emptyTitle`/`emptyDescription` PAIR —
+            // the kit itself switches to its own empty register whenever
+            // EITHER axis is empty (`shownModules.length === 0 ||
+            // shownRoles.length === 0`), which now also fires when the
+            // toolbar's search narrows the module list to nothing. A team
+            // with no active roles and a search with no matches are not the
+            // same fact, so the words said are not the same either.
+            emptyTitle={
+              activeRoles.length === 0
+                ? t("No roles yet.")
+                : t("No modules match your search.")
+            }
+            emptyDescription={
+              activeRoles.length === 0
+                ? t("A role is a set of rights you can give somebody. Create one to start.")
+                : undefined
+            }
             disabled={!canSave || saving}
             // THE CHANGE IS NOT INSTANT HERE, so the kit's own default footnote
             // ("A change applies at once…") would be false. Twenty-two columns
@@ -770,51 +1064,15 @@ export function RolesMatrix({
               at it: "R Read · C Create · U Update · D Delete" in plain text, three
               millimetres under the kit's own legend saying the same four things
               with the real marks beside them. Two legends for one grid is one
-              more than the grid has meanings. */}
+              more than the grid has meanings.
 
-          {/* THE ROLES THAT ARE SWITCHED OFF, AND THE WAY BACK ON. They are
-              not rows: a deactivated role's sheet is frozen and the door 404s
-              it, so a row for one would be twenty-two columns of nothing. But
-              the way to reactivate one lived on the page that is gone, and a
-              switch with no way back is a delete wearing a nicer word — so they
-              are named here, quietly, under the grid they are not in. */}
-          {inactiveRoles.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground text-micro uppercase">
-                {t("Deactivated")}
-              </span>
-              {/* A CHIP OPENS THE ROLE'S PANEL; THE PANEL SWITCHES IT BACK ON.
-                  It used to reactivate on the press. That put an on/off control
-                  in the list view, which is the exact thing the client took out
-                  of the rows above — "rmeove this buttons from th elist view"
-                  — so the two would have disagreed within one container. Now
-                  every route to a role's on/off runs through `RolePanel`'s head,
-                  which is where she put it. */}
-              {inactiveRoles.map((role) => (
-                <Button
-                  key={role.id}
-                  variant="secondary"
-                  size="sm"
-                  disabled={busyActive}
-                  onClick={() => setOpenRole(role)}
-                >
-                  <Power className="size-3.5" />
-                  {role.title}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {canSave && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => void save()} disabled={!dirty || saving}>
-                {saving ? <Spinner /> : null}
-                {saving ? t("Saving…") : t("Save")}
-              </Button>
-            </div>
-          )}
+              THE SAVE BUTTON THAT USED TO STAND HERE IS GONE, 14 Sep 2026 — it
+              is the pinned bar's now; see this file's header, "THE PINNED
+              BAR, AND ROLES FINALLY GETS A DISCARD". `save()` is unchanged. */}
         </div>
       )}
+      </div>
+      </div>
 
       <RoleFormDialog
         open={editing !== null}
@@ -869,11 +1127,12 @@ export function RolesMatrix({
       />
 
       {/* THE ROLE'S OVERVIEW, AND THE ONLY PLACE ITS TWO ACTS NOW LIVE.
-          Opened by a row head above, or by a deactivated role's chip under the
-          grid. It opens NO DOOR: the sheet it summarises is the one this grid
-          already read (R56 — one read per unit), handed down. A deactivated
-          role has no sheet at all, by the door's design, so it gets `null` and
-          the panel says "Deactivated" rather than a summary of nothing.
+          Opened by a column head above — an ACTIVE role only, since a
+          deactivated role has no column at this orientation. Reactivating one
+          is the toolbar's "Deactivated" disclosure's own row act now
+          (2026-09-14), not a press that opens this panel first. It opens NO
+          DOOR: the sheet it summarises is the one this grid already read
+          (R56 — one read per unit), handed down.
 
           BOTH HANDOVERS CLOSE THIS PANEL FIRST. `FormShellDialog` is itself a
           `Sheet` and paints on the same z 55 layer, so two open drawers would

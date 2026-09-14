@@ -6,6 +6,7 @@
 import type { ActivityItem } from "@shared/types"
 import { countCollection } from "@shared/workers/count"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { idBatches } from "@shared/workers/limits"
 import {
   accountActivityClause,
   portalActivityClause,
@@ -13,7 +14,30 @@ import {
 } from "@shared/workers/account-scope"
 import { clientUserIds } from "./accounts"
 import type { MemberGuard } from "./permissions"
+import type { Env } from "../env"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+
+/** THE ACTOR'S FACE (R35/R60), read the SAME way `withEmails` (routes/accounts.ts)
+ * reads an email off `creator_id`: identity is global (`users`, `env.DB`, never
+ * mirrored into a team database), so the picture is joined on the way out for the
+ * ids THIS page actually returned, never a per-row query. BATCHED — the page is
+ * capped at PAGE_SIZE (+1 for hasMore) so one batch always covers it today, but a
+ * team feed's `creator_id`s are not deduplicated before this call and D1 refuses a
+ * statement over D1_MAX_BOUND_PARAMS, so the same guard applies regardless. */
+export async function actorPictures(env: Env, ids: string[]): Promise<Map<string, string | null>> {
+  const wanted = [...new Set(ids.filter((id) => id !== ""))]
+  const out = new Map<string, string | null>()
+  if (wanted.length === 0) return out
+  for (const batch of idBatches(wanted)) {
+    const found = await env.DB.prepare(
+      `SELECT id, image_url FROM users WHERE id IN (${batch.map(() => "?").join(", ")})`
+    )
+      .bind(...batch)
+      .all<{ id: string; image_url: string | null }>()
+    for (const u of found.results ?? []) out.set(u.id, u.image_url)
+  }
+  return out
+}
 
 type ActivityRow = {
   id: string
@@ -82,6 +106,11 @@ export function activityVisibilityClause(
  * cleanest possible bypass of it: "show me everything Alex did" answering with
  * rows from the modules the caller may not read. */
 export async function getActivity(
+  // FIRST, matching `listMembers`'s own order (lib/members.ts) — the one other
+  // reader of the global `users` table alongside a team-scoped one. Needed here
+  // for exactly the same reason: the face is `users.image_url`, never mirrored
+  // into the team database, so reaching it takes the native binding, not `cfg`.
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   scope: "team" | "user" | "role" | "invite" | "record" | "actor",
@@ -232,6 +261,12 @@ export async function getActivity(
     accountScope,
     page.rows.map((r) => r.creator_id ?? "")
   )
+  // R35/R60 — same shape as `clients` above, one statement for the whole page,
+  // against the global identity table rather than the team's own.
+  const pictures = await actorPictures(
+    env,
+    page.rows.map((r) => r.creator_id ?? "")
+  )
   return {
     ...page,
     rows: page.rows.map((r) => ({
@@ -240,6 +275,7 @@ export async function getActivity(
       description: r.description,
       actorName: r.creator_name,
       actorIsClient: r.creator_id !== null && clients.has(r.creator_id),
+      actorPicture: (r.creator_id && pictures.get(r.creator_id)) || null,
       createdAt: r.created_at,
       verb: r.verb,
       origin: r.origin,

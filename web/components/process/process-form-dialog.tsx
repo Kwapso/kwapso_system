@@ -25,7 +25,8 @@ import type { PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type ProcessFormValues = {
   appId: string
@@ -76,7 +77,7 @@ export function ProcessFormDialog({
   draftKey?: string
   onSubmit: (values: ProcessFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -144,7 +145,7 @@ export function ProcessFormDialog({
             id="process-app"
             value={values.appId}
             onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-            options={apps.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+            options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
             placeholder={t("Pick the app")}
             searchPlaceholder={t("Search apps…")}
             emptyText={t("No app matched.")}

@@ -219,6 +219,7 @@ const account: Account = {
   commercialsVisible: null,
   altNames: [],
   nameNarrowsAlone: "unreviewed",
+  accountManagerId: null,
   active: true,
   createdAt: "2026-01-01T00:00:00.000Z",
 }

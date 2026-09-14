@@ -16,16 +16,11 @@
 import * as React from "react"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
-  ScreenRenderer,
-} from "@shared/web/screen-engine/screen-renderer"
-import {
-  CollectionCreateActionProvider,
   CollectionEmptyState,
 } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Download, Graph, ListBullets, UploadSimple, Plus } from "@shared/ui/foundations/icons"
+import { Graph, ListBullets } from "@shared/ui/foundations/icons"
 
 import { WavesScreen } from "@/components/work/waves-screen"
 import { ProcessesScreen } from "@/components/process/processes-screen"
@@ -40,29 +35,26 @@ import {
   BrandLibraryScreen,
   PurposesScreen,
 } from "@/components/team/internal-screens"
-import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton, ToolbarAction } from "@/components/deep-link/screen-bits"
+import { NotFound, LoadError, SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
+import { AccountsScreen } from "@/components/accounts/accounts-screen"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
-import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, knowledgeKey } from "@/lib/live-resources"
+import { openInNewTab } from "@/lib/nav"
+import { IMPORT_TARGET_LABEL } from "@/components/deep-link/crumbs"
+import { content as contentApi } from "@/lib/api"
+import { knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
-import { CountedAbove } from "@/components/records/counted-tabs"
-import { formatCount } from "@shared/web/format-count"
-import { shapeAccountsList } from "@/components/deep-link/shape"
-import {
-  resolveRecipe,
-  withDataDrivenCollection,
-} from "@/lib/screens"
-import type { Account, KnowledgeSource } from "@shared/types"
+import { resolveRecipe } from "@/lib/screens"
+import type { KnowledgeSource } from "@shared/types"
 import type { ModuleContentCtx } from "./module-content"
 
 /** The list screen for `module`, or the honest refusal/empty state. */
@@ -75,6 +67,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     go,
     overridesQ,
     accountsQ,
+    membersQ,
     knowledgeQ,
     knowledgeShapeQ,
     companiesQ,
@@ -168,7 +161,9 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.stories}
         canCreate={can("work", "create")}
-        onImport={() => go(`/t/${teamId}/import/stories`)}
+        onImport={() =>
+          openInNewTab(`/t/${teamId}/import/stories`, `${t("Import")} · ${IMPORT_TARGET_LABEL.stories}`)
+        }
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -238,7 +233,9 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         canCreate={can("meetings", "create")}
         canReadPurposes={can("delivery", "read")}
         onPurposes={() => go(`/t/${teamId}/purposes`)}
-        onImport={() => go(`/t/${teamId}/import/meetings`)}
+        onImport={() =>
+          openInNewTab(`/t/${teamId}/import/meetings`, `${t("Import")} · ${IMPORT_TARGET_LABEL.meetings}`)
+        }
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -259,7 +256,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         total={totals.brand_assets}
         canCreate={can("brand_assets", "create")}
         onCreate={() => go(sectionPath, { panel: "add", module: "brand" })}
-        onImport={() => go(`/t/${teamId}/import/brand_assets`)}
+        onImport={() =>
+          openInNewTab(
+            `/t/${teamId}/import/brand_assets`,
+            `${t("Import")} · ${IMPORT_TARGET_LABEL.brand_assets}`
+          )
+        }
         exportHref="/api/content/brand-assets/export"
         onAction={onAction}
         onIntent={onIntent}
@@ -277,7 +279,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         total={totals.purposes}
         canCreate={can("delivery", "create")}
         onCreate={() => go(sectionPath, { panel: "add", module: "purposes" })}
-        onImport={() => go(`/t/${teamId}/import/meeting_purposes`)}
+        onImport={() =>
+          openInNewTab(
+            `/t/${teamId}/import/meeting_purposes`,
+            `${t("Import")} · ${IMPORT_TARGET_LABEL.meeting_purposes}`
+          )
+        }
         exportHref="/api/content/delivery/purposes/export"
         onAction={onAction}
         onIntent={onIntent}
@@ -285,234 +292,35 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
   if (module === "accounts") {
+    // ACCOUNTS MAIN — its own file now (`@/components/accounts/accounts-screen`),
+    // the same move Contacts made one module before it: the client's 14 Sep
+    // 2026 gallery/table ruling needs a piece of state (which body is on
+    // screen) this switch cannot hold — it is deliberately pure, no hooks, see
+    // this file's own header — so it lives in a real component instead.
+    // `AccountsScreen`'s own header carries the whole account: which gallery
+    // primitives were reused, why the kit's `Gallery` composition was not, and
+    // the one facet (of the three she asked for) that is flagged rather than
+    // faked because the door does not parse it.
     if (accountsQ.error) return <LoadError what="accounts" />
     if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const loaded = accountsQ.data
-    // COMPANIES / ALL — the strip Aurora asked for ("the Accounts tab is a bit
-    // confusing, she would like to see things by company, customer or
-    // contact"). It replaces the Type select rather than sitting beside it: two
-    // controls for one field is the clutter she was describing.
-    //
-    // CONTACTS LEFT THIS STRIP (client, 31 Aug 2026: "contacts as a real
-    // sidebar page, also remove the tab from inside accounts") — see the
-    // `contacts` module below, its own destination now, drawing the SAME
-    // grouped-by-company arrangement this strip used to hold on its third tab.
-    // What is left here answers "which companies do we work with"; All still
-    // shows every account, companies and people together.
-    //
-    // COMPANIES LEADS, AND IS WHERE THE SCREEN OPENS (the owner, 18 Aug 2026:
-    // "the tab order should be Companies, then Contacts, then All"). His model of
-    // the section is "an account is a company", so the bare URL is the companies
-    // and All is the one that carries `?tab=all` — a deliberate swap, because
-    // the tab a screen opens on should be the one somebody meant to arrive at.
-    //
-    // It is a SERVER narrowing, driven through the find's `fixed` question, so
-    // the paging, the search box, the other filters and the CSV export all narrow
-    // together — a tab that sieved the loaded page would show "the companies
-    // among the newest fifty" under a badge counting all of them.
-    const accountTab = ctx.query.tab === "all" ? "all" : "companies"
-    // R16: every badge is the door's exact COUNT(*), through the ONE seam — never
-    // the loaded page's length, which on a paged list is just "50" forever.
-    const accountsBadge = formatCount(totals.accounts)
-    const accountTabs = [
-      {
-        value: "companies",
-        label: t("Companies"),
-        icon: "building",
-        badge: formatCount(totals.accountsEntity),
-        badgeVariant: "" as const,
-      },
-      { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
-    ]
-    const canCreateAccount = can("accounts", "create")
-    // ARBITRATION (R16 iii): the badged strip WINS and the heading stands down,
-    // through the context rather than by saying the same number twice.
     return (
-      <CountedAbove active={accountsBadge !== ""}>
-      <div className="flex flex-col gap-4">
-        {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the industries and
-            countries an account is filed under (`accounts.industry`,
-            `accounts.country`). The heading's `action` slot rather than the
-            toolbar, which R50 withdraws entirely from a team with no accounts
-            yet — the exact moment the words matter. */}
-        <CollectionHeading sectionKey="accounts" total={totals.accounts} action={<ModuleSettingsGear teamId={teamId ?? null} segment="accounts" />} />
-        {/* THE CANONICAL SHAPE (client, 31 Aug 2026, a reference screenshot of
-            the kit's own collection composition — the "mini app" demo at
-            verify/, lorem-ipsum data, dark mode): title, then tabs INSIDE the
-            card, then — still inside the SAME card — the toolbar, then the
-            rows. Read precisely: "toolbar placement is not exactly correct.
-            should be under title (also inside of card) with All - and on the
-            right the button[s] tha[t] are currently on the right of the
-            toolbar. under the title, the full toolbar with search, filters,
-            view selector." — THEN CORRECTED, same day, once the actions had
-            landed beside the tabs instead: "never align the button with the
-            tabs — that button belongs in the right of the toolbar, part of
-            the toolbar." So the tabs (`tabs`, a `FolderTabStrip`) carry nothing
-            but themselves — the SHAPE now, not just the practice — and
-            New/Import/Export sit at the right of the toolbar
-            row itself (`actions`, PagedFind's own slot for exactly this) —
-            the native composition's own shape ("search, then filters, then
-            view switcher, then actions pinned right"), not the folder strip's
-            row. */}
-        {/* R14's other half: the list pages, so the search box and every filter
-            are answered by the DOOR. `status` options come from what is loaded
-            (the team's own words, which no enum here could keep up with) while
-            the filtering itself still happens over the whole collection. */}
-        <PagedFind<Account>
-          listKey={accountsKey(teamId as string)}
-          placeholder={t("Search accounts…")}
-          matches={{
-            none: t("No accounts match"),
-            one: t("1 account matches"),
-            many: t("{count} accounts match"),
-          }}
-          // THE ORDER, asked of the door for the reason the search box is: the
-          // list pages, so ordering the loaded page would arrange the newest
-          // fifty companies under a badge counting all of them. THE CLIENT'S
-          // OWN ADDITION ("i forgot in toolbar also the sort"): it stays in
-          // THIS toolbar row, below the tabs, exactly where it already was —
-          // moving the action buttons up did not touch it.
-          sorts={translatedSorts("accounts", t)}
-          defaultSort={COLLECTION_SORTS.accounts.defaultSort}
-          // R50 — the resting read's own row count, across BOTH tabs: a team
-          // with companies but no individuals yet is not a genuinely empty
-          // Accounts collection, only an empty Contacts one (its own screen).
-          restingEmpty={loaded.length === 0}
-          fixed={accountTab === "all" ? undefined : { type: "entity" }}
-          // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
-          // beside every other paged collection's. A `status` facet stood here
-          // and went with the column (0042) — its options were ROWS, which is
-          // what let one free-text field grow four spellings of two ideas.
-          facets={translatedFacets("accounts", t, {})}
-          fetchPage={(query, cursor) =>
-            tenancy
-              .accounts({ ...query, cursor })
-              .then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor, total: r.total }))
-          }
-          // THE TABS, ALONE — no action beside them any more (client ruling,
-          // 2026-08-31), and no ReactNode shape for one to hide inside: `tabs`
-          // is a `FolderTabStrip`, drawn by the slot itself. The row's own
-          // buttons moved to `actions` below, inside the toolbar `wrap` boxes
-          // with the rows.
-          tabs={{
-            config: { ...defaultTabsConfig, tabs: accountTabs },
-            value: accountTab,
-            // Companies is the bare URL now, so `?tab=` names only the one
-            // you have to ask for.
-            onValueChange: (v) => go(sectionPath, v === "companies" ? {} : { tab: v }),
-          }}
-          // NEW/IMPORT/EXPORT, AT THE RIGHT OF THE TOOLBAR — PagedFind's own
-          // `actions` slot, handed the same `queryString` the export href
-          // always carried, so moving the button here does not cost the
-          // "export what I'm looking at" narrowing (R16's own total, not the
-          // loaded page, decides whether Export shows at all — correct even
-          // before the first page answers).
-          actions={({ queryString }) => (
-            <>
-              {/* Parity, in the direction nobody checks. `export_accounts_csv`
-                  has been on the machine surface — and a declared import
-                  target — while this screen offered no way to do it: a
-                  machine could export the customer book and a person could
-                  not. Export needs READ, which is implied by seeing the
-                  list at all. */}
-              {/* ── THE TWO WORDS FOLD WHEN THE ROW IS TIGHT — 11 SEP 2026,
-                  measured on staging. This row is the SECOND toolbar the two
-                  CSV buttons broke, and it broke differently: its search slot
-                  has one tenant, so the slot's floor held the field at a
-                  readable width and the TRACK gave instead — 104px at 1100 and
-                  at 900, two lines, against the client's own "one row, always".
-                  Same cause, same fix, decided once in `ToolbarAction`
-                  (screen-bits.tsx) rather than here. */}
-              {(totals.accounts ?? 0) > 0 && (
-                <ToolbarAction
-                  label={t("Export CSV")}
-                  icon={<Download className="size-4" />}
-                  href={`/api/tenancy/accounts/export${queryString}`}
-                />
-              )}
-              {canCreateAccount && (
-                <ToolbarAction
-                  label={t("Import CSV")}
-                  icon={<UploadSimple className="size-4" />}
-                  onClick={() => go(`/t/${teamId}/import/accounts`)}
-                />
-              )}
-              {canCreateAccount && (
-                <AddButton
-                  label={t("New account")}
-                  onClick={() => go(sectionPath, { panel: "add", module: "accounts" })}
-                />
-              )}
-            </>
-          )}
-          // THE ONE CARD — toolbar, then rows, exactly the reference's
-          // [panel: toolbar, body]. Zero gap to the tabs above (this file's
-          // `tabs` slot, not the outer column's `gap-4`), the same join
-          // `SectionWithCreate`'s own `folderTabs` slot draws.
-          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
-        >
-          {(found) => {
-            const rows = found.active ? found.rows : loaded
-            if (rows === null) return <Skeleton variant="list" lines={4} />
-            const data = shapeAccountsList(rows)
-            // R62 — the frame draws both zeros from one register and chooses
-            // its words off `narrowedOutside`, so the sentence is no longer
-            // pushed down as an `emptyText` override.
-            const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
-            return (
-              // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
-              // `SectionWithCreate` does this identically) — the create button
-              // now lives in the toolbar above, but the engine's zero-state
-              // still needs to name the next act.
-              <CollectionCreateActionProvider
-                action={
-                  canCreateAccount
-                    ? {
-                        label: t("New account"),
-                        icon: <Plus className="size-4" />,
-                        onCreate: () => go(sectionPath, { panel: "add", module: "accounts" }),
-                        // …AND THE IMPORT ACT WITH IT. The toolbar's own
-                        // "Import CSV" button (above, in `actions`) is drawn
-                        // by `PagedFind`, which draws NOTHING while the
-                        // collection is empty (R50) — so on the one screen
-                        // where importing matters most, a brand-new team's
-                        // first account list, the way in was invisible.
-                        // `CollectionEmptyState` puts it back, in the body,
-                        // beside "Add the first".
-                        secondary: {
-                          label: t("Import CSV"),
-                          onClick: () => go(`/t/${teamId}/import/accounts`),
-                        },
-                      }
-                    : null
-                }
-              >
-                {/* No `useKitPanel`: `CollectionCard` above is the ONE box now
-                    (the "broken combination" screen-bits.tsx's own doc warns
-                    against is a card drawn twice, kit panel and CollectionCard
-                    both). */}
-                <ScreenRenderer
-                  recipe={accountsRecipe}
-                  data={data}
-                  rights={rights}
-                  onAction={onAction}
-                  onIntent={onIntent}
-                  /* R62 — the door above owns the search. */
-                  narrowedOutside={found.active}
-                />
-                {/* R14: every company AND every person is a row here — the list
-                    pages, and so do the matches when a find is on. */}
-                <LoadMore
-                  listKey={found.listKey ?? accountsKey(teamId as string)}
-                  label={t("Load more accounts")}
-                  fetchPage={found.fetchPage}
-                />
-              </CollectionCreateActionProvider>
-            )
-          }}
-        </PagedFind>
-      </div>
-      </CountedAbove>
+      <AccountsScreen
+        teamId={teamId as string}
+        t={t}
+        lang={ctx.lang}
+        go={go}
+        sectionPath={sectionPath}
+        tab={ctx.query.tab}
+        accountsQ={accountsQ}
+        membersQ={membersQ}
+        total={totals.accounts}
+        entityTotal={totals.accountsEntity}
+        recipe={recipe}
+        rights={rights}
+        can={can}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
     )
   }
   // CONTACTS — its own file (`@/components/accounts/contacts-screen`), not a branch

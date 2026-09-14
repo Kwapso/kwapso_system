@@ -219,7 +219,7 @@ Today it covers:
   - the knowledge base, `ask_knowledge`, `list_knowledge_sources`,
     `get_knowledge_status`
   - the agency's own housekeeping, `list_brand_assets`, `list_meeting_purposes`,
-    `list_staff_profiles`, `list_staff_certificates`
+    `list_staff_profiles`
   - importing, `list_import_targets`, `get_import_sample`, `list_imports`,
     `get_import`
   - the AI allowance and saved conversations, `get_ai_allowance`, `list_ai_usage`,
@@ -230,8 +230,10 @@ Today it covers:
   `?id=` filter EXPOSES + FORWARDS it (R19 parity). Pass `id` to fetch one record
   instead of pulling the whole collection (`list_help_tickets` also takes `scope`,
   `view`, the everyday list or the archive drawer, and `q`; `list_accounts` takes
-  `q`, `type`, `archived` and `parentId`, plus `sort`, `dir` and the paging
-  `cursor`; `list_stories` takes `q` beside its five). On every paged list the `total` counts the SAME filtered question the
+  `q`, `type`, `archived`, `portal`, `parentId`, `manager` and `country`, plus
+  `sort`, `dir` and the paging `cursor` (`manager` is silently dropped for a
+  portal-pinned caller — who staffed an account is our own decision about
+  them, not a fact they may enumerate by filtering); `list_stories` takes `q` beside its five). On every paged list the `total` counts the SAME filtered question the
   rows answer, so a narrowed call answers "how many are there?" in one round trip.
 
   **`my_permissions` is the one to call first.** `whoami` says who the token is and
@@ -250,7 +252,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **273 doors, 207 with a tool, 66 with a written reason**, the
+  red build. Today: **269 doors, 202 with a tool, 67 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -292,7 +294,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 217, **193 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 202, **178 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -349,29 +351,30 @@ Today it covers:
   `/api/content/knowledge/upload`, `/api/content/brand-assets/upload` and
   `/api/content/staff/upload` each take up to 25 MB of base64 data URL, on a
   surface whose whole ANSWER is capped at 400,000 characters. The RECORD half of
-  each is fully machine-writable, `add_knowledge_source`, `create_brand_asset`,
-  `save_staff_profile` and `create_staff_certificate` all carry the URL field, so a
+  each is fully machine-writable, `add_knowledge_source`, `create_brand_asset` and
+  `save_staff_profile` all carry the URL field, so a
   machine writes the row and references a file it already has a URL for. Uploading the bytes is a screen
   action.
 - **Export (full-field CSV):** `export_roles_csv`, `export_dropdown_values_csv`,
-  `export_accounts_csv`, `export_brand_assets_csv`, `export_meeting_purposes_csv`,
-  `export_certificates_csv`.
+  `export_accounts_csv`, `export_brand_assets_csv`, `export_meeting_purposes_csv`.
 
-  **Staff PROFILES have no export, on purpose.** A credential register is the kind
-  of thing somebody hands an auditor; a one-click spreadsheet of what each of your
-  colleagues is bad at is not a capability anybody asked for, and the write door
-  that fills those fields is confirm-gated for the same reason.
+  **Staff PROFILES have no export, on purpose.** A profile is about a person; a
+  one-click spreadsheet of what each of your colleagues is bad at is not a
+  capability anybody asked for, and the write door
+  that fills those fields is confirm-gated for the same reason. (`export_certificates_csv`
+  — the team's credential register — stood here until the certificate module was
+  killed whole on 14 Sep 2026, "kill the whole certificate module everywhere".)
 
   **An export is ONE WHOLE DOCUMENT. Never a page, and never a short file.** That is
   the deliberate answer to "why doesn't an export take a cursor?", and it is R14's own
   answer: all but one of these sit on **bounded** collections (a team's roles, its
-  dropdown vocabulary, its meeting purposes, its brand assets and its staff
-  certificates are all curated by hand and stop growing), and the law says in as
+  dropdown vocabulary, its meeting purposes and its brand assets
+  are all curated by hand and stop growing), and the law says in as
   many words that a bounded collection doesn't need a cursor to be
   honest. **Accounts is the one that grows**, every company and every person an agency
-  works with, so `export_accounts_csv` narrows by the same four filters as
-  `list_accounts` (`q`, `type`, `archived`, `parentId`), and past what one
-  file can carry the door
+  works with, so `export_accounts_csv` narrows by the same seven filters as
+  `list_accounts` (`q`, `type`, `archived`, `portal`, `parentId`, `manager`,
+  `country`), and past what one file can carry the door
   answers `export_too_large` rather than handing back the first rows as though they
   were all of them. The browser's Export CSV button gets exactly the same sentence from
   exactly the same door: a truncated export re-imported is data loss that looks like a
@@ -550,9 +553,13 @@ Today it covers:
   - the agency's own housekeeping, `create_brand_asset`,
     `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);
     `create_meeting_purpose`, `update_meeting_purpose`, `set_meeting_purpose_active`
-    (`delivery:*`); `save_staff_profile`, `set_staff_profile_active`,
-    `create_staff_certificate`, `update_staff_certificate`,
-    `set_staff_certificate_active` (`staff_profiles:*`).
+    (`delivery:*`); `save_staff_profile`, `set_staff_profile_active`
+    (`staff_profiles:update` / `:delete` — `create_staff_certificate` used to
+    be this module's only literal asker of `staff_profiles:create` before the
+    certificate module was killed whole on 14 Sep 2026, but the right stays
+    on the Roles screen: the record activity feed's own add-a-note write
+    still asks for it on every module `ACTIVITY_GATE_MAP` names, `staff_profiles`
+    included).
   - the knowledge base, `add_knowledge_source`, `update_knowledge_source`,
     `set_knowledge_source_active`, `sync_knowledge`, `sync_google_knowledge`. The
     same acts a person has on the Knowledge base screen, gated by the same

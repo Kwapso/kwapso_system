@@ -82,7 +82,8 @@ import { appStageMark } from "@shared/app-stages"
 import { ticketTypeKeptForMigration } from "@shared/types"
 import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 /** THE TICKET'S NAME, and since 2026-09-09 a ticket raised here HAS one.
  *
@@ -328,7 +329,7 @@ export function HelpFormDialog({
    * control that always refused would be worse than none. */
   canAttach?: boolean
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   // THE CLIENT PICKER ASKS THE DOOR, and page one is exactly why. This used to
   // read `accountsKey(teamId)` — the accounts LIST cache, whose fetcher primes a
@@ -1244,7 +1245,7 @@ export function HelpFormDialog({
           id="help-module"
           value={values.moduleId || NONE}
           onChange={(moduleId) => setValues((v) => ({ ...v, moduleId }))}
-          options={appModules.map((m) => ({ value: m.id, label: m.name, mark: m.mark }))}
+          options={sortedOptions(appModules, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, mark: m.mark }))}
           emptyOption={{ value: NONE, label: t("No module") }}
           placeholder={chosenAppId ? t("No module") : t("Choose an app first")}
           searchPlaceholder={t("Search modules…")}

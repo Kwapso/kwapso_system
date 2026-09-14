@@ -10,100 +10,94 @@
 // IT SUPERSEDES WHAT SHIPPED THE DAY BEFORE. A card on Settings › Team opened
 // `member-panel.tsx`, a `Sheet` carrying the person's four facts and their two
 // acts; that file is deleted with this change. Her sentence is the same one she
-// gave for module settings a day earlier — *"It cannot be a slide-in because
-// things can get quite complex here… I would rather it be full screen"* — and
-// "we will add more to this" says the rest out loud: this is a PLACE that grows,
-// not a panel that gets wider. A drawer is the wrong container for something
-// that will hold more next week, because the only way a drawer grows is sideways.
+// gave for module settings a day earlier — *"I would rather it be full
+// screen"* — and "we will add more to this" says the rest out loud: this is a
+// PLACE that grows, not a panel that gets wider.
 //
-// AND IT DOES NOT CONTRADICT "not taken anywhere else" (2026-09-09), which is
-// the ruling the gallery was built on. What she took away then was a ROW that
-// redirected you off the tab in place of showing you anything. What she has
-// asked for now is a screen, by name, for the one record on that tab that has
-// outgrown four lines in a drawer.
+// ── THE SECOND RULING, ON THIS SAME SCREEN, 2026-09-14 ──────────────────────
+//
+//   "I want the role as a chip on top of the title. I want them to have an
+//    image, like the profile picture. I want to be able to see it. Remove the
+//    tabs. Make sure that you put the footer where it belongs. More fields
+//    that I want on the first component inside where we currently have role,
+//    joined, and email: Full name · Birthday · Position · A button to send
+//    email · A button to call · The field for the phone number. Just put all
+//    of this in there."
+//
+// FOUR THINGS FOLLOWED, and all four are why this file no longer renders the
+// generic recipe engine (`ScreenRenderer`) at all.
+//
+// 1 · THE CHIP ABOVE THE TITLE (R65 — "the law she made for exactly this",
+//     about the member CARD on Settings › Team). The generic engine's own
+//     header (`shared/web/screen-engine/screen-renderer.tsx`'s `renderDetail`)
+//     has no chip slot at all — recipes on that path (`team.detail`,
+//     `invites.detail`…) never carried one. `RecordScreen`
+//     (`web/components/records/record-chrome.tsx`) — the SAME host every
+//     bespoke record detail in the app draws through (a Contact, a Ticket) —
+//     does: its `chips` prop rides INSIDE the title node, above the heading,
+//     by construction (that file's own "THE EYEBROW LEAVES AGAIN…" note). So
+//     this screen moved onto the bespoke path rather than growing the shared
+//     engine a feature nothing else needs, matching Contact and Ticket rather
+//     than inventing a fourth shape.
+//
+// 2 · THE PICTURE. Both detail paths hold the SAME 2026-09-01 ruling shut —
+//     "under no case - images on title" — and this screen does not fight it:
+//     `RecordScreen`'s own `leading`/`mark` are still inert. The picture lives
+//     in the FIRST PANEL instead (`member-head.tsx`), which is where her own
+//     sentence puts every other new fact too ("on the first component…").
+//
+// 3 · REMOVE THE TABS (R2). Moving to `RecordScreen` without ever building a
+//     `<TabsView>` — `children` (below) is one body, not a set of panels — is
+//     the HONEST route R2 itself names: "TabsView draws nothing below two
+//     views… make the member record a SINGLE-BODY screen". `member-screen` is
+//     listed in `RECORD_TABS_SINGLE_PANEL` (shared/rules/registry.ts) with
+//     this same reasoning, because moving onto `<RecordScreen>` makes this
+//     file visible to R2's census for the first time.
+//
+// 4 · THE FOOTER, WHERE IT BELONGS. The bug: the generic engine drew the ink
+//     footer as part of the SAME small card as the three-field Overview block
+//     — Header → Role/Joined/Email → FOOTER → (StaffPanel's profile and
+//     certificates, appended AFTER as an unrelated sibling `<div>`). The
+//     footer sat in the MIDDLE of the page. `RecordScreen`'s `panel={children}`
+//     wraps everything handed to it in ONE card and draws its `audit`/
+//     `activity` footer AFTER that — so putting BOTH the first panel
+//     (`MemberHead`) and `StaffPanel` inside `children` (below) puts the
+//     footer after both, at the true bottom of the page, exactly where
+//     Contact's and Ticket's already sit.
 //
 // ── WHY THE ADDRESS IS `/t/<teamId>/members/<userId>` ───────────────────────
 //
-// The same reasoning `web/components/screens/module-settings-screen.tsx` wrote
-// down for `/settings/tickets`, applied to a record instead of a page: the app's
-// URL grammar is pairs of (module, id) — `parseScreenPath` in
-// `shared/web/screen-engine/recipe.ts` — and `/accounts/BERG` has meant "the
-// accounts screen, showing BERG" since the day it shipped. `members` is already
-// a module in that grammar (`TEAM_SECTIONS`, `web/lib/pages.ts`) and a member's
-// id is already its second segment. So this address is not new: it is the one
-// this record has always answered to, and the change is that something in the
-// app finally LINKS to it.
+// Unchanged from the first ruling above — see BASE-MANUAL.md's URL grammar,
+// and `web/lib/pages.ts` (`TEAM_SECTIONS`) for why `/settings/team/<userId>`
+// and a query param were both worse.
 //
-// The two alternatives were both worse and both worth writing down.
-// `/settings/team/<userId>` reads well and collides: the second segment of
-// `/settings/…` is a module SETTINGS segment (`/settings/tickets`), so the day
-// somebody's settings segment is called `team` the address means two things —
-// exactly the collision `/tickets/settings` was rejected for. And a query
-// (`?tab=team&member=…`) would have cost no routing work at all, which is
-// precisely what is wrong with it: a full screen she asked for by name would
-// have had no address of its own, no workspace tab of its own, and no way back
-// to it from a link. It costs nothing here because `/t/<teamId>/…` is already
-// forwarded to this shell at every depth (`workers/gateway`'s route table), so
-// unlike `/settings/tickets` this needed no new line anywhere.
+// ── R64, AND WHY THE TWO ACTS ARE STILL TAKEN HERE ──────────────────────────
 //
-// ── WHAT IT DRAWS, AND WHY THROUGH THE ENGINE ──────────────────────────────
-//
-// The head, the overview block and the record footer are the RECIPE's
-// (`members.detail`, `web/lib/screens.ts`) rendered by `ScreenRenderer`, exactly
-// as this screen has drawn them since the base shipped. Nothing was rebuilt to
-// make it "full screen" — it always was one; what it lacked was a door. Below it
-// is `StaffPanel`, the person behind the member row, gated on `staff_profiles`.
-// That is already two blocks with different owners, which is the shape "we will
-// add more to this" asks for: a host that arranges, and blocks that own their
-// own reads.
-//
-// ── THE TWO ACTS ARE THIS FILE'S, AND THAT IS R64 ──────────────────────────
-//
-// `onAction` here is NOT the host's generic dispatcher. R64
-// (`sections-have-a-door`) requires that the file named in
-// `SECTION_HOSTED_ELSEWHERE` for a subtracted team-area section actually MAKE
-// the door call each of that section's acts dispatches — deriving what is owed
-// from the recipe's own `action:` ids and what proves it from
-// `web/lib/use-screen-actions.ts`'s own source. Naming a host that merely
-// forwards to that dispatcher would make the check a parser agreeing with
-// itself, which is the failure mode the law's own header rules out. So the two
-// acts are taken here, against the same two doors, with the same cache-first
-// handling the dispatcher uses (CACHING.md: prime with what the write returned,
-// invalidate the sibling whose count moved).
+// `onAction` still calls `tenancy.setMemberRole` / `tenancy.removeMember`
+// directly, unchanged — `SECTION_HOSTED_ELSEWHERE` (shared/rules/registry.ts)
+// names this file as the host that carries `members.changeRole` /
+// `members.remove`'s real door calls, and R64's own check reads those calls
+// off THIS file's source; nothing about that changed when the head moved off
+// the recipe engine. The buttons are now built by hand from `recipe.actions`
+// (gate + label + variant) rather than by `ScreenRenderer`'s `ActionButton`,
+// because `RecordScreen`'s `actions` slot takes a rendered node, not a recipe —
+// the data is the SAME recipe (`web/lib/screens.ts`'s `memberDetailRecipe`),
+// only who reads it moved.
 //
 // NOTHING IS SWALLOWED, and this is the half that matters most on this screen.
 // Both doors refuse for real reasons a person needs to read — "A team must keep
 // at least one admin." and "You can't remove yourself." — so a refusal is
 // surfaced as the DOOR'S OWN SENTENCE in a toast rather than a generic one.
-// `RolePickerDialog` toasts its own; the confirm below toasts what it caught.
 //
 // THE LAST-ADMIN FLOOR IS DELIBERATELY NOT SECOND-GUESSED HERE. It is enforced
-// inside the UPDATE itself (`workers/tenancy/src/lib/members.ts`), so it holds
-// against two simultaneous demotions; a count read on the client could be stale
-// by the time the button is pressed, and a control hidden on a stale count is a
-// capability that silently disappears. NEITHER ACT IS DRAWN ON YOURSELF, and
-// that one IS the door's own rule rather than a nicety — both handlers open with
-// a 409 `self` guard, so the recipe's actions are stripped on your own row by
-// the host (`module-content.tsx`, `member.isYou`) exactly as before.
-//
-// ── R59, AND WHICH HALF OF IT EACH SURFACE IS ──────────────────────────────
-//
-// This screen is a SCREEN, so R59 has nothing to say about it — the law sorts
-// SURFACES OVER a screen, and the client's line is that a form or a picker
-// slides in and only a yes/no warning is a centred overlay. Change role COLLECTS
-// a choice: `RolePickerDialog`, itself a `Sheet`. Remove asks a yes/no question
-// about somebody who already exists: `ConfirmAction`, a centred `AlertDialog`.
-// Both are the app's existing components, unforked.
+// inside the UPDATE itself (`workers/tenancy/src/lib/members.ts`).
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { ScreenRenderer } from "@shared/web/screen-engine/screen-renderer"
-import type {
-  ScreenActionContext,
-  ScreenData as EngineScreenData,
-  ScreenIntent,
-} from "@shared/web/screen-engine/screen-renderer"
+import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { invalidate, primeCache } from "@shared/web/store"
 import { staffFullName } from "@shared/staff-name"
@@ -111,6 +105,9 @@ import { useT } from "@shared/web/language"
 import type { TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
+import type { RailActivity } from "@/components/records/activity-rail"
+import { RecordScreen } from "@/components/records/record-chrome"
+import { MemberHead } from "@/components/team/member-head"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -121,10 +118,8 @@ export function MemberScreen({
   member,
   roles,
   recipe,
-  data,
   rights,
-  onIntent,
-  activityAction,
+  activity,
   onRemoved,
 }: {
   teamId: string
@@ -134,14 +129,18 @@ export function MemberScreen({
   /** The team's roles, for the picker. The host reads them across the whole
    * team area anyway, so this costs nothing. */
   roles: TeamRole[]
-  /** `members.detail`, resolved and translated by the host — including the two
-   * acts, already stripped on your own row. */
+  /** `members.detail` (web/lib/screens.ts), resolved and translated by the
+   * host — read here for its `actions` (label, gate, variant) ONLY. Its
+   * `header`/`tabs`/`fields` are unread: the head, the chip and the panel are
+   * this file's and `member-head.tsx`'s, not the recipe engine's (see this
+   * file's header). */
   recipe: ScreenRecipe
-  data: EngineScreenData
   rights: ScreenRights
-  onIntent: (intent: ScreenIntent) => void
-  /** The record footer's Latest activity eyebrow, which opens the rail. */
-  activityAction?: React.ReactNode
+  /** The team's activity feed, sliced to this member — R14's pager and R16's
+   * exact total, built once by the host for whichever of team/member/invite is
+   * on screen. `undefined` draws no footer door, same as an absent bundle
+   * anywhere else in the app (`hasActivityDoor`). */
+  activity?: RailActivity
   /** The person is gone — the host takes the reader off a record that no longer
    * exists, exactly as the deep-link confirm has always done. */
   onRemoved: () => void
@@ -176,30 +175,56 @@ export function MemberScreen({
    * this switch does not know about is reported rather than silently ignored —
    * a button that does nothing is the shape of bug this whole screen exists
    * because of (ERROR-HANDLING.md: never swallow). */
-  function onAction(actionId: string, _ctx: ScreenActionContext) {
+  function onAction(actionId: string) {
     if (actionId === "members.changeRole") setPickRole(true)
     else if (actionId === "members.remove") setConfirmRemove(true)
     else reportError("member-screen:unknown-action", new Error(actionId))
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <ScreenRenderer
-        recipe={recipe}
-        data={data}
-        rights={rights}
-        onAction={onAction}
-        onIntent={onIntent}
-        activityAction={activityAction}
-      />
-
-      {/* THE PERSON BEHIND THE MEMBER ROW — the owner's ruling, literally: a
-          profile and the certificates somebody holds go on their own page.
-          Gated on `staff_profiles`, so a role without that read right sees
-          nothing here and the profile is unchanged. This is also the block that
-          makes "we will add more to this" concrete: a second owner on the same
-          host, arranged and nothing else. */}
-      <StaffPanel teamId={teamId} userId={member.userId} memberName={name} />
+    <>
+      <RecordScreen
+        // THE CHIP, ABOVE THE TITLE (R65) — the SAME content the gallery card
+        // wears (`members-gallery.tsx`'s own `<Badge>{m.roleTitle}</Badge>`),
+        // through the host every bespoke record detail uses for its own
+        // identity row.
+        chips={<Badge>{member.roleTitle}</Badge>}
+        title={name}
+        actions={
+          recipe.actions.length > 0 ? (
+            <>
+              {recipe.actions.map((a) => {
+                const gs = gateState(rights, a.gate)
+                if (gs === "hidden") return null
+                return (
+                  <Button
+                    key={a.id}
+                    variant={a.variant}
+                    disabled={gs === "disabled"}
+                    onClick={() => onAction(a.action)}
+                  >
+                    {a.label}
+                  </Button>
+                )
+              })}
+            </>
+          ) : undefined
+        }
+        // NO `audit` — a MEMBERSHIP has no creator/editor the way an account or
+        // a ticket does (`TeamMember` carries none); the footer's Record column
+        // is simply absent, which is the kit's own honest answer to a fact the
+        // record doesn't know (record-chrome.tsx: "Renders no row for a fact
+        // the record doesn't know").
+        activity={activity}
+      >
+        {/* THE FIRST PANEL, THEN THE PERSON'S OWN PROFILE — BOTH inside this
+            ONE `children`, which is what puts the footer after both rather
+            than between them (see this file's header, point 4). */}
+        <div className="flex flex-col gap-8">
+          <MemberHead teamId={teamId} member={member} />
+          <StaffPanel teamId={teamId} userId={member.userId} memberName={name} />
+        </div>
+      </RecordScreen>
 
       {/* CHANGE ROLE — the app's existing picker, unchanged and unforked. It is
           a `Sheet` (R59: a picker collects, so it slides in), it hides the role
@@ -238,6 +263,6 @@ export function MemberScreen({
           }
         }}
       />
-    </div>
+    </>
   )
 }

@@ -36,7 +36,7 @@ resumable ledger, and the size + rate watch) ·
 | The client's own organisation | `client_departments` · `client_roles` (+ `client_role_departments` + `client_role_people`) · `client_tools` + `client_tool_prices` |
 | What we hand over | `deliverables` |
 | The work engine | `stories` (+ `story_attachments` + `story_processes`) + `sprints` · `waves` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
-| The agency's own housekeeping | `brand_assets` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
+| The agency's own housekeeping | `brand_assets` · `meeting_purposes` · `staff_profiles`. `staff_certificates` was removed on 14 Sep 2026 |
 | One person's own Google | `google_connections` + `google_sources` · `chat_people` |
 
 **Closing**, [Status: what's built vs. to build](#status-whats-built-vs-to-build) · *Resolutions (2026-06-13), cross-cutting model LOCKED*
@@ -592,6 +592,47 @@ deleted**: each keeps its id, its audit block and its history, shows greyed on
 the Dropdown values screen with an Activate button, and says `System` as its
 deactivator. Running it twice is a no-op.
 
+**Every pictograph swept out of `mark`, and protected made to imply active
+(team migration `0088`, 2026-09-14).** R66 (CLAUDE.md) records four client
+rulings against emoji in this app; the fifth is the one that reaches EXISTING
+data: "kill all the emojis… also, the status: if it's protected, it's always
+active." Two independent fixes, one migration:
+
+- **The pictograph sweep.** `optionalMark` (`shared/workers/validate.ts`) has
+  refused a pictograph at the write door since 2026-08-31, but migrations `0034`
+  and `0044` each guarded their own back-fill `AND mark IS NULL` — so neither
+  one could ever have replaced a mark that already held a pictograph, they only
+  filled the empty ones. `0088` is unguarded: it walks every character of every
+  `mark` (a `WITH RECURSIVE` walk, not an 8-way `UNION`, because D1's
+  compound-SELECT ceiling is five terms) against codepoint ranges hand-derived
+  from `optionalMark`'s own regex — the two must be kept in step by hand,
+  since SQL cannot call TypeScript — and NULLs the match. The one exemption is
+  R66's own class: a well-formed FLAG (a pair of Regional Indicator codepoints)
+  is left alone, even though `optionalMark` itself still refuses a new one at
+  the door.
+- **The reactivation, narrowed to the rows a PERSON produced.** A row both
+  `is_default = 1` (protected) and carrying a `deactivated_at` is possible
+  because `setSelectableDefault` never touched `deactivated_at` before this
+  change — a person could deactivate a value while unprotected, then protect
+  it. But `is_default = 1` is also the seeded/starting-vocabulary flag, and
+  several EARLIER migrations deliberately deactivate a starting value on
+  purpose and leave `is_default` untouched (`0026`'s duplicate retirement,
+  `0034`/`0044`'s retired ticket and story words, `0042`'s "Account status"
+  group) — a bare `WHERE is_default = 1 AND deactivated_at IS NOT NULL` would
+  have reactivated every one of those, undoing four separate rulings. So the
+  migration also requires `deactivator_id IS NOT NULL`: every migration in
+  this ledger writes a `deactivator_name` but leaves `deactivator_id` at its
+  column default (NULL, no actor to point at), while a person deactivating
+  through `setSelectableActive` always writes a real one. That discriminator
+  is what actually gets reactivated (`deactivated_at`, `deactivator_*`
+  cleared), so the invariant the Choices screen now displays ("Protected"
+  implies active) is true for every team from the moment this ships, without
+  resurrecting a word the client already asked retired. The door
+  (`workers/tenancy/src/lib/selectable.ts`) closes the gap going forward:
+  protecting a value now reactivates it in the same idempotent `UPDATE` if it
+  was deactivated — unconditionally, because a door call is always a person
+  acting on one row they chose, never a bulk sweep.
+
 ### help + help_threads. KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
 
 **This is the Tickets module.** There is no help section and there is no second
@@ -1014,6 +1055,38 @@ the idea existed, which is the same reason nothing here is ever deleted, and the
 same shape `meetings.status` already has (§ *meetings*). The `Account status`
 dropdown group is DEACTIVATED by the migration rather than deleted, so it stops
 being offered on the Dropdown values screen without losing its history.
+
+**`account_manager_user_id` (0091, `0091_accounts_get_an_account_manager`, 14 Sep
+2026)** — the STAFF MEMBER responsible for this account, the client's own
+ruling verbatim: "who the account responsible or account manager is, like
+someone from staff." Nullable, no backfill (nobody has been assigned yet on
+every account that existed before this shipped), and NO SQL FOREIGN KEY — the
+id it names is a `team_members`/`users` row, and those tables live in the
+GLOBAL core database while `accounts` lives in this team's own, reached over
+the REST door, so a cross-database REFERENCES constraint cannot be declared.
+`knowledge_sources.owner_user_id` (0012) is the standing precedent for this
+exact shape. Checked at the WRITE DOOR instead
+(`workers/tenancy/src/routes/accounts.ts`, `requireStaffMember`): the id shape
+first (R20, positional), then that it names a CURRENT `team_members` row of
+THIS team that does NOT also hold a `portal_users` row — a client login is an
+ordinary team member (grant → invite → accept), so membership alone cannot
+tell a colleague apart from a client sitting in the same table, and the check
+reads `portal_users` the same way `listMembers` computes `isClient`. Indexed
+(`idx_accounts_manager`), plain and non-unique, the same shape as
+`idx_accounts_parent` and the two assignee indexes on `stories`/`tasks`. On the
+WIRE it is `accountManagerId`, the id only — the manager's FACE (name,
+picture, R35) is resolved CLIENT-SIDE off the already-cached members list
+(`web/lib/members.ts`'s `assignableMembers`), the same seam an assignee's face
+already is, so a second network read is never spent on it (R56). `null` on
+the way out to a client login (`toAccount`'s `ours` branch): a staffing
+decision about them, the same reasoning `commercialsVisible` two lines up
+carries — the portal has never offered a "who is my contact" feature this
+would answer, so the conservative default withholds it. Not an import
+`TargetDef` column (`workers/data-ops/src/lib/targets.ts`'s `accounts`
+target): the same reasoning that target's own header already gives for
+leaving out the parent account and `stories`' header gives for leaving out the
+assignee — "ids in this app and names in a spreadsheet, and a wrong guess is
+worse than a blank" — set afterward, on the record, by the person who knows.
 
 **And already-there is not a move** (R17): `setAccountParent` compares the stored
 row's `parent_account_id` first and returns `false` without writing at all, so a
@@ -1935,7 +2008,32 @@ can answer *"what did we agree in March"*.
 once a year. A meeting is a record that accumulates forever. Sharing one permission
 row would mean granting the right to read every note ever taken in order to let
 somebody see the list of purposes.
-### brand_assets + meeting_purposes + staff_profiles + staff_certificates. KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`). THE AGENCY'S OWN HOUSEKEEPING
+### brand_assets + meeting_purposes + staff_profiles. KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`). THE AGENCY'S OWN HOUSEKEEPING
+
+**A fourth table, `staff_certificates`, was built the same day and DROPPED on
+14 Sep 2026** (team migration `0090_the_certificate_module_is_killed_everywhere`)
+at the client's ruling, verbatim: "Kill the whole certificate module
+everywhere." It was a credential register — a qualification a member held,
+who issued it, when it was granted and when it lapses, and the file that
+proved it — gated on the same `staff_profiles` permission as the table beside
+it (it never had a module of its own). Its screen (the Certificates panel on
+`staff-panel.tsx`), its dialog (`certificate-form-dialog.tsx`), its five
+worker routes, its three agent/MCP tools, its `export_certificates_csv`
+export, its glossary term and its knowledge-base ingestion all went with it.
+`staff_profiles` KEEPS the `create` right on the Roles screen even though
+`create_staff_certificate` was its only literal, per-door asker: the record
+activity feed's add-a-note write (R36's fifth source — `postActivityNote`
+gates on `<module>:create` for every module `ACTIVITY_GATE_MAP` names) still
+asks for it, because a colleague's profile can still take a note the same way
+every other record here can. **The bytes a certificate's file uploaded to
+`kwapso-internal-media` are NOT deleted by the DROP** — a `DROP TABLE` removes
+rows, never R2 objects, and the media-reclaim path that could have cleaned
+them up was deleted along with the routes that called it. They are now
+unreferenced objects under each team's own `staff/` prefix: a real, small,
+ongoing storage cost rather than a data-loss risk, and cheaper to leave than
+to build a one-off sweep for. `activity` rows for certificate writes survive
+untouched, the same way every other DROP in this ledger since `0077` leaves
+history alone.
 
 **A colour is not a picture of a colour (`0043`, 19 Aug 2026).** Twenty-four of
 the twenty-five `Color` rows held a LINK to a flat rectangle rendered by another
@@ -1960,8 +2058,9 @@ the one colour we host and every non-colour row alone. Proved row by row in
 `workers/tenancy/test/colour-is-not-a-picture.test.ts`, including the trap: a
 logo whose URL happens to end in six valid hex digits.
 
-Four tables, three permission modules, and the agency-internal side of the legacy
-Glide app finally landed. What they have in common is the whole of their security
+Three tables, three permission modules, and the agency-internal side of the legacy
+Glide app finally landed (a fourth table, `staff_certificates`, stood here until
+14 Sep 2026 — see above). What they have in common is the whole of their security
 story: **none of them carries an `account_id`**, because none of these rows
 belongs to a customer. There is nothing here for the account fence to fence, so
 the defence is at the door instead, and it is a REFUSAL rather than a filter:
@@ -1977,7 +2076,6 @@ applied here to a different secret.
 | `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere; `color_hex` (`0043`) holds a colour that IS the asset, and the two are exclusive — the migration cleared the URL on every row it converted. |
 | `meeting_purposes` | `delivery` | `purposes` | 27 | Why the agency meets, and the department it belongs to. |
 | `staff_profiles` | `staff_profiles` | `users` (six profile columns) | 6 | The person behind the member row: personality type, what they are best at, what they find hard, who they look up to, a photo. |
-| `staff_certificates` | `staff_profiles` | `certificates` | 5 | A qualification somebody holds, issuer, granted, lapses, the paper itself. |
 
 **The `delivery` module is now one table.** It was born holding two, a
 `programs` table behind the Delivery method page, and `meeting_purposes`, and
@@ -2009,10 +2107,34 @@ instant settle into one row (CONCURRENCY rule 2). The write is a single upsert
 door for both "there wasn't one" and "there was", a person either has a profile
 or they don't, and the screen filling in the form has no way of knowing which.
 
+**`birthday` · `position` · `phone` (0089,
+`0089_a_members_first_panel_gets_a_birthday_a_position_and_a_phone`, 14 Sep
+2026)** — the client's ruling on a member's own detail page: "More fields that
+I want on the first component inside where we currently have role, joined, and
+email: Full name · Birthday · Position · A button to send email · A button to
+call · The field for the phone number." Full name and email needed no new
+storage (`TeamMember.firstName`/`lastName`/`email`, already joined from the
+core `users` table); these three are the ones that live here, because
+`staff_profiles` is the one table a member's own facts already join — headline,
+personality type, strengths — team-visible, never a client's, gated on
+`staff_profiles` rather than `team_members`. All three NULLABLE, no backfill:
+"we don't know yet" is the same honest answer every other optional field on
+this table already gives. `birthday` is a calendar DAY through `optionalDate`
+(not a timestamp — nobody is born at a time of day this product needs to know);
+`position` and `phone` are plain short text through `optionalText`, the same
+seam the table's other free-text fields already go through. Drawn on the
+member's own detail head (`web/components/team/member-head.tsx`), not inside
+the "Profile" bio card below it — the CLIENT'S OWN GROUPING, "the first
+component ... where we currently have role, joined, and email" — while the edit
+control stays the one FormShell the profile already has
+(`staff-profile-dialog.tsx`), because all three are still one row on this same
+table. `phone` also feeds the head's Call button (`tel:`); email feeds Send
+email (`mailto:`) — R37 names both as the one shape of anchor that is NOT
+in-app soft-navigation.
+
 **Dates are days, and a value that is nearly a day is refused** (`optionalDate`,
 `workers/content/src/lib/internal-fields.ts`): `2026-02-31` rolls over into March
-in every naive parser, and an expiry that half parses is a certificate that
-silently never lapses.
+in every naive parser, and a date that half parses sorts, renders, and is wrong.
 
 **The two ungrouped legacy sets.** Sixteen of the legacy app's 154 dropdown
 values carried no group at all, ten country names, five company-size bands and

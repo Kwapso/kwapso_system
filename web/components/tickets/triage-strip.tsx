@@ -24,7 +24,8 @@ import { triageKey } from "@/lib/live-resources"
 import type { TeamMember } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { assignableMembers } from "@/lib/members"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 
 type Triage = Awaited<ReturnType<typeof contentApi.triage>>
@@ -40,7 +41,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
   const [picking, setPicking] = React.useState(false)
 
   const triage = triageQ.data
-  const t = useT()
+  const { t, lang } = useLanguage()
   if (!triage) return null
 
   async function assign(userId: string) {
@@ -93,7 +94,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
             ariaLabel={t("Who is on triage duty")}
             value=""
             onChange={assign}
-            options={onDutyCandidates.map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
+            options={sortedOptions(onDutyCandidates, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             placeholder={t("Pick who's on duty")}
             searchPlaceholder={t("Search people…")}
             emptyText={t("Nobody here matched.")}

@@ -282,10 +282,9 @@ const ARCHIVE_BUCKET = { staging: "kwapso-glide-archive-staging", production: "k
  *   content/routes/todos.ts          MEDIA           → team todos.file_url
  *   content/routes/brand-assets.ts   INTERNAL_MEDIA  → team brand_assets.file_url
  *   content/routes/staff.ts          INTERNAL_MEDIA  → team staff_profiles.photo_url
- *                                                      + staff_certificates.file_url
  *   content/routes/knowledge.ts      INTERNAL_MEDIA  → team knowledge_sources.file_url
  *
- * The last three doors hand a URL back to a FORM and the row is written by a
+ * The last two doors hand a URL back to a FORM and the row is written by a
  * different route, so the column was read off the write, not guessed from the
  * name.
  *
@@ -297,6 +296,16 @@ const ARCHIVE_BUCKET = { staging: "kwapso-glide-archive-staging", production: "k
  * bound and still served at /media/learning/, so it is enumerated and captured
  * like every other one, which is the half that was always doing the work. There
  * is simply no row left to cross-check it against.
+ *
+ * staff_certificates.file_url stood here for the same reason as
+ * staff_profiles.photo_url, until the certificate module was killed whole on
+ * 14 Sep 2026 (team migration 0090) — dropped for the identical reason
+ * LEARNING_MEDIA's two rows were: the table is gone, so the row that
+ * cross-checked it would throw rather than report a missing file. The bytes
+ * already written under the team's `staff/` prefix are not deleted by the
+ * DROP and are still IN the INTERNAL_MEDIA bucket, so they are still captured
+ * by the bucket-level backup below; there is simply no D1 row left to
+ * reconcile them against.
  *
  * HELP_MEDIA is bound by the content worker and appears in NO row here, because
  * nothing writes it: the ticket-attachment hook is deferred (OPERATIONS.md §R2
@@ -310,7 +319,6 @@ const TEAM_REFERENCES = [
   { table: "todos", column: "file_url" },
   { table: "brand_assets", column: "file_url" },
   { table: "staff_profiles", column: "photo_url" },
-  { table: "staff_certificates", column: "file_url" },
   { table: "knowledge_sources", column: "file_url" },
 ]
 

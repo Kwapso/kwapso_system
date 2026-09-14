@@ -290,10 +290,9 @@ export type IngestKind = {
    *
    * Only `person` needs it today, and it needs it because it is a JOIN across
    * the fence between the two databases: the row is `users` (the `team_members`
-   * module) and the text also carries the staff profile and certificates
-   * (`staff_profiles`). One source, two modules — and a census that read the
-   * table alone would report the second as missing from the corpus while its
-   * words were sitting in it.
+   * module) and the text also carries the staff profile (`staff_profiles`). One
+   * source, two modules — and a census that read the table alone would report
+   * the second as missing from the corpus while its words were sitting in it.
    *
    * Rot-checked by the coverage suite: every module named here must be a real
    * TEAM_MODULE, and the kind's own read must really mention the table behind
@@ -1551,7 +1550,7 @@ export const INGEST_KINDS: IngestKind[] = [
     // Membership is global — see `fromCoreDatabase`.
     fromCoreDatabase: true,
     // The row is a member (`team_members`); the TEXT also carries the staff
-    // profile and the certificates, so this one source covers both modules.
+    // profile, so this one source covers both modules.
     modules: ["team_members", "staff_profiles"],
     label: "colleagues",
     // v3: the SENTENCE, not the fact. v2 got the distinction right and read
@@ -1565,7 +1564,13 @@ export const INGEST_KINDS: IngestKind[] = [
     // ordinary role and nothing in `team_members` tells the two apart. The live
     // portal grant does. The bump is what walks the cursor back over the eight
     // rows already written — nulling nothing would have left them saying it.
-    textVersion: 3,
+    // v4 (14 Sep 2026): the "Certificates held:" paragraph left the body — the
+    // certificate module was killed whole ("kill the whole certificate module
+    // everywhere") and the query that fed it is gone from this file. A row
+    // already indexed with a colleague's certificates in its text keeps saying
+    // them until re-read, which is exactly the stale-wording case a bump exists
+    // for; every OTHER sentence this reader writes is unchanged.
+    textVersion: 4,
     read: async (cfg, guard, cursor, limit, env) => {
       // THE CORE HALF, over the native binding rather than the REST door: this
       // is the global database, which every worker reaches as `env.DB`.
@@ -1594,13 +1599,15 @@ export const INGEST_KINDS: IngestKind[] = [
       const members = results ?? []
       if (members.length === 0) return []
 
-      // THE TEAM HALF — the role's NAME, the profile and the certificates, all
-      // three keyed by ids this slice already holds. One statement each rather
-      // than one per person: the slice is `limit` rows, so a per-person read
-      // would be the N+1 this file avoids everywhere else.
+      // THE TEAM HALF — the role's NAME and the profile, both keyed by ids this
+      // slice already holds. One statement each rather than one per person: the
+      // slice is `limit` rows, so a per-person read would be the N+1 this file
+      // avoids everywhere else. A third statement here used to read the
+      // certificate table for the same slice; it went with the certificate
+      // module (team migration 0090).
       const ids = members.map((m) => sqlString(m.id)).join(", ")
       const roleIds = [...new Set(members.map((m) => sqlString(m.role_id)))].join(", ")
-      const [roles, profiles, certificates, portal] = await Promise.all([
+      const [roles, profiles, portal] = await Promise.all([
         // R14 hard cap: bounded by the slice's own distinct role ids.
         d1Query<{ id: string; title: string }>(
           cfg,
@@ -1623,14 +1630,6 @@ export const INGEST_KINDS: IngestKind[] = [
              FROM staff_profiles
             WHERE user_id IN (${ids}) AND deactivated_at IS NULL LIMIT ${limit}`
         ),
-        // R14 hard cap: ROLLUP_ROWS, the same ceiling every child list here takes.
-        d1Query<{ user_id: string; title: string; issuer: string | null; issued_on: string | null }>(
-          cfg,
-          guard.databaseId,
-          `SELECT user_id, title, issuer, issued_on FROM staff_certificates
-            WHERE user_id IN (${ids}) AND deactivated_at IS NULL
-            ORDER BY user_id, issued_on DESC LIMIT ${ROLLUP_ROWS}`
-        ),
         // NOT EVERYONE ON THE TEAM IS ONE OF US, and the fact that says so is
         // structural rather than a word. R21: "a client login is an ordinary
         // team member holding an ordinary role" — so a contact who can open the
@@ -1649,8 +1648,6 @@ export const INGEST_KINDS: IngestKind[] = [
       ])
       const roleName = new Map(roles.map((r) => [r.id, r.title]))
       const profileOf = new Map(profiles.map((p) => [p.user_id, p]))
-      const certsOf = new Map<string, typeof certificates>()
-      for (const c of certificates) certsOf.set(c.user_id, [...(certsOf.get(c.user_id) ?? []), c])
       const clientOf = new Map(portal.map((r) => [r.user_id, r.account_name]))
 
       return members.map((m) => {
@@ -1686,7 +1683,6 @@ export const INGEST_KINDS: IngestKind[] = [
         // it is a change to the answer contract and not a line in this reader.
         const role = roleName.get(m.role_id) ?? null
         const p = profileOf.get(m.id)
-        const certs = certsOf.get(m.id) ?? []
         // A CLIENT LOGIN, OR ONE OF US. `has`, not a truthy account name: a
         // grant whose account row has gone leaves the name null and the person
         // is still a client.
@@ -1732,14 +1728,6 @@ export const INGEST_KINDS: IngestKind[] = [
             p?.weaknesses ? `Working on: ${p.weaknesses}` : "",
             p?.role_models ? `Looks up to: ${p.role_models}` : "",
             p?.about ?? "",
-            certs.length
-              ? `Certificates held:\n${certs
-                  .map(
-                    (c) =>
-                      `- ${c.title}${c.issuer ? ` from ${c.issuer}` : ""}${c.issued_on ? `, ${c.issued_on}` : ""}`
-                  )
-                  .join("\n")}`
-              : "",
           ]
             .filter(Boolean)
             .join("\n\n"),

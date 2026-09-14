@@ -9,8 +9,8 @@ import { GuardError } from "@shared/workers/gating"
 
 /** A CALENDAR DAY, or nothing, or a refusal.
  *
- * Four of the six internal tables carry a date somebody types: when a post went
- * out, when a certificate was granted, when it lapses. They are DAYS, not
+ * Some of the internal tables carry a date somebody types: when a post went
+ * out, when a deliverable was dated. They are DAYS, not
  * instants — nobody publishes at 14:32:07 — so the stored shape is YYYY-MM-DD,
  * and this is the only door into it.
  *
@@ -54,7 +54,7 @@ export function optionalDate(value: unknown, field: string): string | null {
  * A `javascript:` / `data:` / `vbscript:` URL stored on a record is a
  * stored-XSS payload the moment a reader clicks it. Learning has carried this
  * rule privately since its first commit; the internal modules store links too (a
- * post's permalink, a brand asset's home, a certificate's PDF), so it is here
+ * post's permalink, a brand asset's home), so it is here
  * where all of them can reach it. Anything unrecognised is dropped rather than
  * refused — a link is optional, and losing a bad one costs nothing.
  */

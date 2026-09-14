@@ -6012,6 +6012,451 @@ ALTER TABLE role_permissions RENAME COLUMN can_edit TO can_update;
 DROP TABLE IF EXISTS data_import_sessions;
 `,
   },
+  {
+    // ── THE FIFTH RULING, AND WHAT THE FOURTH ONE MISSED ────────────────────
+    //
+    // The client, 14 Sep 2026, on the Choices tab: "for settings choices, let
+    // this be the last time I say it: kill all the emojis. I don't want to see
+    // it. The only thing that choices can have is either a color or an icon...
+    // also, the status: if it's protected, it's always active." R66 already
+    // tells the story of the first four rulings and the door
+    // (`optionalMark`, shared/workers/validate.ts) that finally closed on
+    // 2026-08-31. What R66's own header records is that CLOSING THE DOOR WAS
+    // NOT ENOUGH: every one of the eight back-fill statements in 0034 and 0044
+    // is guarded `AND mark IS NULL`, so they filled the EMPTY marks and
+    // stepped over precisely the rows a pictograph was already sitting in —
+    // the rows the ruling was about. This migration is the one that finally
+    // reaches them. NO `AND mark IS NULL` ANYWHERE BELOW — that guard is the
+    // named mistake, not a pattern to repeat a third time.
+    //
+    // ── "IS A PICTOGRAPH" MEANS WHAT `optionalMark` SAYS IT MEANS ──────────
+    //
+    // R66's own law: "WHAT COUNTS AS ONE IS THE DOOR'S OWN ANSWER, IMPORTED."
+    // The door is TypeScript (`optionalMark`, shared/workers/validate.ts) and
+    // this is SQL running inside a migration script — nothing here can import
+    // it or call it, so the codepoint ranges below are a SQL TRANSLATION of
+    // its own predicate, and the two must be kept in step BY HAND from now on:
+    // a future emoji release that changes what `\p{Extended_Pictographic}`
+    // matches changes the door and does not change this file, and the next
+    // pictograph-in-live-data sweep is the place that drifts, not this one.
+    //
+    // The ranges are not typed from a table — they are the EXHAUSTIVE, MEASURED
+    // output of running `optionalMark`'s own pattern
+    // (`\p{Extended_Pictographic}|\p{Regional_Indicator}` plus its three
+    // combiners, ZWJ U+200D / VARIATION SELECTOR-16 U+FE0F / COMBINING ENCLOSING
+    // KEYCAP U+20E3) against every codepoint from U+0000 to U+10FFFF in Node's
+    // own ICU build, then compressed into contiguous runs. That is why this list
+    // agrees with the door on the cases that read as surprising either way — a
+    // close button's multiplication-sign X (U+2715), a department's black
+    // rightwards arrowhead (U+27A4) and a black star (U+2605) are NOT
+    // Extended_Pictographic and are NOT touched, exactly as `optionalMark`'s own
+    // header already promises the kit's dingbats survive; the LOOK-ALIKE pair one
+    // codepoint along each — heavy multiplication X (U+2716) and black
+    // rightwards arrow (U+27A1) — ARE Extended_Pictographic, and are touched.
+    // Named by codepoint, never pasted as a glyph, the same convention
+    // `optionalMark`'s own header and R66 (CLAUDE.md) both keep — this migration
+    // IS the pictograph census's own VOCABULARY DATA target, so pasting one here
+    // would fail the very law this file exists to satisfy.
+    //
+    // ── THE ONE EXEMPTION: A FLAG IS A PAIR OF REGIONAL INDICATORS ──────────
+    //
+    // R66's fourth ruling carves out exactly one class: "keep emojis for
+    // countries and languages only" — a flag, Unicode's own shape for one,
+    // is a PAIR of Regional_Indicator codepoints naming a country. That is
+    // the one case this migration leaves alone even though it is inside the
+    // ranges above (a lone Regional_Indicator is not a flag and gets no
+    // exemption — it never drew a flag on screen, it is a stray half of one).
+    // `optionalMark` itself is NOT this generous — R66 says so directly, "the
+    // write door is NOT widened with it: optionalMark still refuses a flag
+    // too" — because the door is about what a TEAM types in FROM NOW ON, and
+    // the four language flags in `shared/i18n.ts` are the only place this app
+    // draws one on purpose. This migration is cleaning up what ALREADY EXISTS,
+    // under the LAW'S exemption (R66's own class, "keep emojis for countries
+    // and languages"), not the door's narrower one — a team that put an actual
+    // country flag on a value is doing the one thing her fourth ruling protects,
+    // and this sweep must not undo it while it undoes everything else.
+    //
+    // ── WHY THE WALK IS RECURSIVE, NOT AN 8-WAY UNION ────────────────────────
+    //
+    // A mark is at most `TEXT_LIMITS.tiny` (8) characters, so checking "does any
+    // character in this mark match" looks at first like eight `UNION ALL`ed
+    // `SELECT substr(mark, N, 1)`s. 0018 learned the hard way what that costs:
+    // D1's compound-SELECT ceiling is FIVE terms, not SQLite's 500, and eight is
+    // over it — the same trap `0025`'s and `0034`'s own comments warn about for
+    // an INSERT-per-value chain. A `WITH RECURSIVE` walk is a compound SELECT of
+    // exactly TWO terms (the base case and the recursive step) no matter how many
+    // characters it actually visits at runtime — the same construct
+    // `accounts.ts`'s ancestor walk already runs against this same database — so
+    // it reaches every character of an 8-character mark without ever writing a
+    // term count D1 will refuse.
+    //
+    // ── THE OTHER HALF: PROTECTED IS ALWAYS ACTIVE ───────────────────────────
+    //
+    // The same client sentence, second half: "also, the status: if it's
+    // protected, it's always active." `setSelectableDefault`
+    // (workers/tenancy/src/lib/selectable.ts) has never touched
+    // `deactivated_at`, so a PERSON could deactivate a value first (while not
+    // yet protected — `setSelectableActive` already refuses the other order)
+    // and then protect it through the door, leaving `is_default = 1` beside a
+    // real `deactivated_at`. The door is fixed in the same change (protecting
+    // a value now reactivates it, in one idempotent UPDATE — R17), and this
+    // migration is the data half of that fix — but ONLY for rows that gap
+    // actually produced.
+    //
+    // NOT EVERY protected-and-deactivated ROW IS THAT GAP, and this is the one
+    // place in this migration where "unconditional" would have been wrong.
+    // `is_default = 1` is the seeded/starting-vocabulary flag, and several
+    // EARLIER migrations in this same ledger deliberately deactivate a
+    // starting-vocabulary row ON PURPOSE and leave `is_default` untouched:
+    // 0026 retires a duplicate seeded value, 0034/0044 retire "Bug",
+    // "Feedback" and their story-type equivalents at the client's own ruling,
+    // 0042 retires the whole "Account status" group. Every one of those rows
+    // is protected AND deactivated TODAY, and a bare
+    // `WHERE is_default = 1 AND deactivated_at IS NOT NULL` would reactivate
+    // every one of them — undoing four separate, deliberate rulings in the
+    // name of enforcing a fifth. `team-schema.test.ts`'s own 0026 suite is what
+    // caught this: the duplicate this migration would have resurrected is
+    // exactly the row 0026 exists to keep retired.
+    //
+    // THE DISCRIMINATOR IS `deactivator_id`. Every migration above writes a
+    // `deactivator_name` (`'System'`, once `'Automatic clean-up'` on a
+    // different table) and leaves `deactivator_id`/`deactivator_email` at
+    // their column default, NULL — a migration has no actor row to point at.
+    // A PERSON deactivating through `setSelectableActive` always writes a real
+    // `deactivator_id` (`sqlString(actor.id)`, never conditional). So
+    // `deactivator_id IS NOT NULL` is exactly "a person did this", true of
+    // every row the door-level gap could have produced and false of every
+    // deliberate migration retirement — reached BY HAND, the same way the
+    // pictograph ranges above are, and worth restating for the same reason:
+    // nothing here can ask the door's own predicate directly, so the two are
+    // kept in step by a person reading both.
+    version: "0088_a_pictograph_is_not_a_mark_and_protected_is_always_active",
+    sql: `
+WITH RECURSIVE
+  mark_chars(id, mark, pos, ch) AS (
+    SELECT id, mark, 1, substr(mark, 1, 1) FROM selectable_data WHERE mark IS NOT NULL
+    UNION ALL
+    SELECT id, mark, pos + 1, substr(mark, pos + 1, 1)
+      FROM mark_chars
+     WHERE pos < length(mark)
+  ),
+  flagged(id) AS (
+    SELECT DISTINCT id FROM (SELECT id, unicode(ch) AS cp FROM mark_chars)
+     WHERE cp = 0xA9
+                  OR cp = 0xAE
+                  OR cp = 0x200D
+                  OR cp = 0x203C
+                  OR cp = 0x2049
+                  OR cp = 0x20E3
+                  OR cp = 0x2122
+                  OR cp = 0x2139
+                  OR cp BETWEEN 0x2194 AND 0x2199
+                  OR cp BETWEEN 0x21A9 AND 0x21AA
+                  OR cp BETWEEN 0x231A AND 0x231B
+                  OR cp = 0x2328
+                  OR cp = 0x23CF
+                  OR cp BETWEEN 0x23E9 AND 0x23F3
+                  OR cp BETWEEN 0x23F8 AND 0x23FA
+                  OR cp = 0x24C2
+                  OR cp BETWEEN 0x25AA AND 0x25AB
+                  OR cp = 0x25B6
+                  OR cp = 0x25C0
+                  OR cp BETWEEN 0x25FB AND 0x25FE
+                  OR cp BETWEEN 0x2600 AND 0x2604
+                  OR cp = 0x260E
+                  OR cp = 0x2611
+                  OR cp BETWEEN 0x2614 AND 0x2615
+                  OR cp = 0x2618
+                  OR cp = 0x261D
+                  OR cp = 0x2620
+                  OR cp BETWEEN 0x2622 AND 0x2623
+                  OR cp = 0x2626
+                  OR cp = 0x262A
+                  OR cp BETWEEN 0x262E AND 0x262F
+                  OR cp BETWEEN 0x2638 AND 0x263A
+                  OR cp = 0x2640
+                  OR cp = 0x2642
+                  OR cp BETWEEN 0x2648 AND 0x2653
+                  OR cp BETWEEN 0x265F AND 0x2660
+                  OR cp = 0x2663
+                  OR cp BETWEEN 0x2665 AND 0x2666
+                  OR cp = 0x2668
+                  OR cp = 0x267B
+                  OR cp BETWEEN 0x267E AND 0x267F
+                  OR cp BETWEEN 0x2692 AND 0x2697
+                  OR cp = 0x2699
+                  OR cp BETWEEN 0x269B AND 0x269C
+                  OR cp BETWEEN 0x26A0 AND 0x26A1
+                  OR cp = 0x26A7
+                  OR cp BETWEEN 0x26AA AND 0x26AB
+                  OR cp BETWEEN 0x26B0 AND 0x26B1
+                  OR cp BETWEEN 0x26BD AND 0x26BE
+                  OR cp BETWEEN 0x26C4 AND 0x26C5
+                  OR cp = 0x26C8
+                  OR cp BETWEEN 0x26CE AND 0x26CF
+                  OR cp = 0x26D1
+                  OR cp BETWEEN 0x26D3 AND 0x26D4
+                  OR cp BETWEEN 0x26E9 AND 0x26EA
+                  OR cp BETWEEN 0x26F0 AND 0x26F5
+                  OR cp BETWEEN 0x26F7 AND 0x26FA
+                  OR cp = 0x26FD
+                  OR cp = 0x2702
+                  OR cp = 0x2705
+                  OR cp BETWEEN 0x2708 AND 0x270D
+                  OR cp = 0x270F
+                  OR cp = 0x2712
+                  OR cp = 0x2714
+                  OR cp = 0x2716
+                  OR cp = 0x271D
+                  OR cp = 0x2721
+                  OR cp = 0x2728
+                  OR cp BETWEEN 0x2733 AND 0x2734
+                  OR cp = 0x2744
+                  OR cp = 0x2747
+                  OR cp = 0x274C
+                  OR cp = 0x274E
+                  OR cp BETWEEN 0x2753 AND 0x2755
+                  OR cp = 0x2757
+                  OR cp BETWEEN 0x2763 AND 0x2764
+                  OR cp BETWEEN 0x2795 AND 0x2797
+                  OR cp = 0x27A1
+                  OR cp = 0x27B0
+                  OR cp = 0x27BF
+                  OR cp BETWEEN 0x2934 AND 0x2935
+                  OR cp BETWEEN 0x2B05 AND 0x2B07
+                  OR cp BETWEEN 0x2B1B AND 0x2B1C
+                  OR cp = 0x2B50
+                  OR cp = 0x2B55
+                  OR cp = 0x3030
+                  OR cp = 0x303D
+                  OR cp = 0x3297
+                  OR cp = 0x3299
+                  OR cp = 0xFE0F
+                  OR cp = 0x1F004
+                  OR cp BETWEEN 0x1F02C AND 0x1F02F
+                  OR cp BETWEEN 0x1F094 AND 0x1F09F
+                  OR cp BETWEEN 0x1F0AF AND 0x1F0B0
+                  OR cp = 0x1F0C0
+                  OR cp BETWEEN 0x1F0CF AND 0x1F0D0
+                  OR cp BETWEEN 0x1F0F6 AND 0x1F0FF
+                  OR cp BETWEEN 0x1F170 AND 0x1F171
+                  OR cp BETWEEN 0x1F17E AND 0x1F17F
+                  OR cp = 0x1F18E
+                  OR cp BETWEEN 0x1F191 AND 0x1F19A
+                  OR cp BETWEEN 0x1F1AE AND 0x1F1E5
+                  OR cp BETWEEN 0x1F1E6 AND 0x1F1FF
+                  OR cp BETWEEN 0x1F201 AND 0x1F20F
+                  OR cp = 0x1F21A
+                  OR cp = 0x1F22F
+                  OR cp BETWEEN 0x1F232 AND 0x1F23A
+                  OR cp BETWEEN 0x1F23C AND 0x1F23F
+                  OR cp BETWEEN 0x1F249 AND 0x1F25F
+                  OR cp BETWEEN 0x1F266 AND 0x1F321
+                  OR cp BETWEEN 0x1F324 AND 0x1F393
+                  OR cp BETWEEN 0x1F396 AND 0x1F397
+                  OR cp BETWEEN 0x1F399 AND 0x1F39B
+                  OR cp BETWEEN 0x1F39E AND 0x1F3F0
+                  OR cp BETWEEN 0x1F3F3 AND 0x1F3F5
+                  OR cp BETWEEN 0x1F3F7 AND 0x1F3FA
+                  OR cp BETWEEN 0x1F400 AND 0x1F4FD
+                  OR cp BETWEEN 0x1F4FF AND 0x1F53D
+                  OR cp BETWEEN 0x1F549 AND 0x1F54E
+                  OR cp BETWEEN 0x1F550 AND 0x1F567
+                  OR cp BETWEEN 0x1F56F AND 0x1F570
+                  OR cp BETWEEN 0x1F573 AND 0x1F57A
+                  OR cp = 0x1F587
+                  OR cp BETWEEN 0x1F58A AND 0x1F58D
+                  OR cp = 0x1F590
+                  OR cp BETWEEN 0x1F595 AND 0x1F596
+                  OR cp BETWEEN 0x1F5A4 AND 0x1F5A5
+                  OR cp = 0x1F5A8
+                  OR cp BETWEEN 0x1F5B1 AND 0x1F5B2
+                  OR cp = 0x1F5BC
+                  OR cp BETWEEN 0x1F5C2 AND 0x1F5C4
+                  OR cp BETWEEN 0x1F5D1 AND 0x1F5D3
+                  OR cp BETWEEN 0x1F5DC AND 0x1F5DE
+                  OR cp = 0x1F5E1
+                  OR cp = 0x1F5E3
+                  OR cp = 0x1F5E8
+                  OR cp = 0x1F5EF
+                  OR cp = 0x1F5F3
+                  OR cp BETWEEN 0x1F5FA AND 0x1F64F
+                  OR cp BETWEEN 0x1F680 AND 0x1F6C5
+                  OR cp BETWEEN 0x1F6CB AND 0x1F6D2
+                  OR cp BETWEEN 0x1F6D5 AND 0x1F6E5
+                  OR cp = 0x1F6E9
+                  OR cp BETWEEN 0x1F6EB AND 0x1F6F0
+                  OR cp BETWEEN 0x1F6F3 AND 0x1F6FF
+                  OR cp BETWEEN 0x1F7DA AND 0x1F7FF
+                  OR cp BETWEEN 0x1F80C AND 0x1F80F
+                  OR cp BETWEEN 0x1F848 AND 0x1F84F
+                  OR cp BETWEEN 0x1F85A AND 0x1F85F
+                  OR cp BETWEEN 0x1F888 AND 0x1F88F
+                  OR cp BETWEEN 0x1F8AE AND 0x1F8AF
+                  OR cp BETWEEN 0x1F8BC AND 0x1F8BF
+                  OR cp BETWEEN 0x1F8C2 AND 0x1F8CF
+                  OR cp BETWEEN 0x1F8D9 AND 0x1F8FF
+                  OR cp BETWEEN 0x1F90C AND 0x1F93A
+                  OR cp BETWEEN 0x1F93C AND 0x1F945
+                  OR cp BETWEEN 0x1F947 AND 0x1F9FF
+                  OR cp BETWEEN 0x1FA58 AND 0x1FA5F
+                  OR cp BETWEEN 0x1FA6E AND 0x1FAFF
+                  OR cp BETWEEN 0x1FC00 AND 0x1FFFD
+  )
+UPDATE selectable_data
+   SET mark = NULL
+ WHERE id IN (SELECT id FROM flagged)
+   AND NOT (
+     -- THE ONE EXEMPTION: a well-formed flag, exactly two Regional Indicator
+     -- codepoints and nothing else — R66's fourth ruling, "keep emojis for
+     -- countries and languages only" — left alone even though a lone
+     -- Regional Indicator (no pair) is still refused above.
+     length(mark) = 2
+     AND unicode(substr(mark, 1, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
+     AND unicode(substr(mark, 2, 1)) BETWEEN 0x1F1E6 AND 0x1F1FF
+   );
+
+UPDATE selectable_data
+   SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL
+ WHERE is_default = 1 AND deactivated_at IS NOT NULL
+   -- deactivator_id IS NOT NULL — see this migration's own header. Reserved
+   -- for a row a PERSON deactivated through the door, never one a migration
+   -- retired on purpose (0026's duplicates, 0034/0044's retired ticket and
+   -- story words, 0042's Account status) — every one of those writes a
+   -- deactivator_name and leaves deactivator_id untouched (still NULL),
+   -- because a migration has no actor. Reactivating on that signal alone
+   -- would have resurrected Bug, Feedback and every deduplicated value this
+   -- ledger already retired on purpose.
+   AND deactivator_id IS NOT NULL;
+`,
+  },
+  {
+    // ── THE CLIENT'S RULING, ON A MEMBER'S OWN DETAIL PAGE ───────────────────
+    //
+    //   "More fields that I want on the first component inside where we
+    //    currently have role, joined, and email: Full name · Birthday ·
+    //    Position · A button to send email · A button to call · The field for
+    //    the phone number. Just put all of this in there."
+    //
+    // Full name and email are already on the row (`users.first_name` /
+    // `last_name` / `email`, joined in by `workers/tenancy/src/lib/members.ts`)
+    // — nothing to add for those two. Birthday, position and phone are not
+    // anywhere: `staff_profiles` is the one table a member's OWN facts already
+    // live in (headline, personality type, strengths, weaknesses, who they look
+    // up to — team-visible, never a client's, gated on its own permission
+    // module rather than `team_members`), so the three join it rather than
+    // starting a second table for the same person. All three NULLABLE, no
+    // backfill: "we don't know yet" is the honest answer for every row that
+    // exists today, the same answer `optionalDate`/`optionalText` already give
+    // back for an absent field on every other write through this door.
+    //
+    // `birthday` is a CALENDAR DAY, not a timestamp — stored `YYYY-MM-DD`
+    // through `optionalDate` (`workers/content/src/lib/internal-fields.ts`),
+    // the same door `staff_certificates` used for `issued_on`/`expires_on`
+    // before that module was retired: nobody is born at a time of day this
+    // product needs to know. `position` and `phone` are plain short text
+    // through `optionalText`, the same seam every other free-text profile
+    // field on this table already goes through.
+    version: "0089_a_members_first_panel_gets_a_birthday_a_position_and_a_phone",
+    sql: `
+ALTER TABLE staff_profiles ADD COLUMN birthday TEXT;
+ALTER TABLE staff_profiles ADD COLUMN position TEXT;
+ALTER TABLE staff_profiles ADD COLUMN phone TEXT;
+`,
+  },
+  {
+    // THE CERTIFICATE MODULE IS KILLED WHOLE — the client's ruling, verbatim:
+    // "Kill the whole certificate module everywhere."
+    //
+    // 0077/0078 are the precedent and the argument is the same, read once and
+    // not repeated in full here: DEACTIVATE-NEVER-DELETE is about a row in a
+    // LIVING feature, and by the time this runs there is no reader left — no
+    // type (`StaffCertificate` is gone from shared/types.ts), no lib (the
+    // certificate half of workers/content/src/lib/staff.ts deleted), no door
+    // (the five `/api/content/staff/certificates*` routes removed from
+    // workers/content/src/routes/staff.ts and workers/content/src/index.ts),
+    // no tool (workers/mcp/src/lib/tools.ts's `export_certificates_csv`, and
+    // `list_staff_certificates` / `create_staff_certificate` /
+    // `update_staff_certificate` off shared/workers/tool-catalog.ts), no
+    // TOOL_GATES entry, no RECORD_TOGGLES entry, no screen
+    // (web/components/team/certificate-form-dialog.tsx deleted; the panel it
+    // filled removed from web/components/team/staff-panel.tsx), no cache key,
+    // no live listener on either front door, no glossary term, no
+    // knowledge-base ingestion. THE AUDIT SURVIVES ANYWAY: "Ana recorded the
+    // Fire safety certificate" is an `activity` row and `activity` IS NOT
+    // TOUCHED — what is dropped is only the current-state table.
+    //
+    // UNLIKE 0077/0078, THIS TABLE NAMED NO MONEY AND NO SEPARATE PERMISSION
+    // MODULE — it was always gated on `staff_profiles`, the same right that
+    // gates the profile table beside it (shared/workers/tool-gates.ts,
+    // ACTIVITY_GATE_MAP). So there is no `role_permissions` row to clean up
+    // the way a purged MODULE needs one (0025's shape): nothing was ever
+    // written to that table under a `staff_certificates` module key, because
+    // no such key ever existed. The permission-row cleanup this migration
+    // does is therefore exactly the DROP below and nothing else.
+    //
+    // R2 BUCKET — the bytes already in `kwapso-internal-media`
+    // (`INTERNAL_MEDIA`), a certificate's uploaded file at
+    // `/media/internal/<team>/staff/<ulid>`, are NOT reclaimed by this
+    // migration and STAY exactly where they are. Nothing DELETEs an R2 object
+    // on a DROP TABLE — that link only ever ran the other way, `file_url`
+    // pointing at the bytes — and the module's own media-reclaim path (which
+    // proved a superseded URL against BOTH `staff_profiles.photo_url` and
+    // `staff_certificates.file_url`) is deleted along with the routes that
+    // called it, so no future write will reclaim them either. They are now
+    // unreferenced objects under the team's own `staff/` prefix — a real,
+    // small, ongoing cost rather than a data-loss risk, and cheaper to leave
+    // than to build a one-off sweep for.
+    //
+    // `IF EXISTS`, matching every DROP in this ledger since 0077; the index
+    // (`idx_staff_certificates_user`) is not named separately because SQLite
+    // drops a table's indexes with it.
+    version: "0090_the_certificate_module_is_killed_everywhere",
+    sql: `
+DROP TABLE IF EXISTS staff_certificates;
+`,
+  },
+  {
+    // ── THE ACCOUNT MANAGER — client ruling, 14 Sep 2026, verbatim ───────────
+    //
+    //   "Who the account responsible or account manager is, like someone from
+    //    staff. For this account manager, if this is not in the data, add it
+    //    there as well as in the crude [CRUD] screens."
+    //
+    // There is no such column today (checked: nothing in this ledger names a
+    // manager/responsible/owner on `accounts`). `account_manager_user_id`,
+    // nullable, NO BACKFILL — "nobody has been assigned yet" is the honest
+    // answer for every account that exists before this ships, the same answer
+    // `optionalText`/`optionalDate` already give back for any other absent
+    // field on this door.
+    //
+    // NO SQL FOREIGN KEY, and that is structural rather than a style choice:
+    // the id this points at is a STAFF USER, and `users` / `team_members` live
+    // in the GLOBAL core database (`env.DB`) while `accounts` lives in this
+    // team's own, reached over the REST door — SQLite cannot declare a
+    // REFERENCES constraint across two separate database files. This schema
+    // already has the precedent for exactly that shape:
+    // `knowledge_sources.owner_user_id` (0012) is a plain nullable TEXT column
+    // naming a user id with no REFERENCES clause, checked at the WRITE DOOR
+    // instead — the same shape this migration's own column takes. The door
+    // (workers/tenancy/src/routes/accounts.ts) checks the id positionally
+    // (R20) and then that it names a CURRENT STAFF member of this team — never
+    // a client login, which `team_members` cannot tell apart from staff on its
+    // own (a portal login is an ordinary team member) — refusing a 400
+    // otherwise.
+    //
+    // INDEXED the same shape as this table's own `parent_account_id`
+    // (`idx_accounts_parent`) and the two assignee columns one migration ledger
+    // over (`idx_tasks_assignee`, `idx_stories_assignee`): a plain, non-unique
+    // index — more than one account can share a manager, and reassigning one
+    // is an ordinary edit, not a rare event a unique index would have to
+    // protect.
+    version: "0091_accounts_get_an_account_manager",
+    sql: `
+ALTER TABLE accounts ADD COLUMN account_manager_user_id TEXT;
+CREATE INDEX idx_accounts_manager ON accounts (account_manager_user_id);
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

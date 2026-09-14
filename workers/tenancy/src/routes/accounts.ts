@@ -23,6 +23,7 @@ import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { isRareAccountToken } from "@shared/workers/account-rarity"
+import { clientUserIds } from "@shared/workers/record-link"
 import type { PortalUser } from "@shared/types"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
@@ -85,6 +86,42 @@ function accountFields(body: Record<string, unknown>) {
     locale: optionalText(body.locale, "Language", TEXT_LIMITS.short),
     timezone: optionalText(body.timezone, "Time zone", TEXT_LIMITS.short),
   }
+}
+
+/** THE ACCOUNT MANAGER (0091) — the SHAPE is checked at each call site, the
+ * same `optionalText(body.accountManagerUserId, …)` every other short-text
+ * field on this door goes through (R20 is positional: the call has to sit
+ * where the census can see it checking the field, not buried inside a
+ * helper) — this is the SECOND half, that the already-shaped id names a
+ * CURRENT member of THIS team who is STAFF, never a client login.
+ *
+ * WHY "STAFF" IS A SEPARATE CHECK FROM "A MEMBER". A client-portal login is an
+ * ordinary `team_members` row (grant → invite → accept is the only way to make
+ * one that works — `web/lib/members.ts`'s own header), so membership alone
+ * cannot tell a colleague apart from a client sitting in the same table. The
+ * fact lives in `portal_users`, this team's own database, read through the
+ * same `clientUserIds` seam `listMembers` uses to compute `isClient` — never a
+ * query of this file's own, for the reason `lib/accounts.ts`'s header gives
+ * for every other read of that table.
+ *
+ * Refuses with a clean 400 either way — a made-up id and a real client's id
+ * are both "not a person who can be an account manager", and the caller
+ * should hear the same plain sentence for both. */
+async function requireStaffMember(env: Env, cfg: D1Rest, guard: MemberGuard, userId: string): Promise<void> {
+  const member = await env.DB.prepare(
+    "SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL LIMIT 1"
+  )
+    .bind(guard.teamId, userId)
+    .first()
+  if (!member)
+    throw new GuardError(400, "invalid_input", "That's not a current member of this team.")
+  const clients = await clientUserIds(cfg, guard.databaseId, [userId])
+  if (clients.has(userId))
+    throw new GuardError(
+      400,
+      "invalid_input",
+      "The account manager has to be one of our own staff, not a client login."
+    )
 }
 
 /** A picked image becomes an object in R2, never a column — through the one
@@ -202,7 +239,13 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
  *
  * A `status` filter stood beside it until 0042, when the column it read went:
  * whether an account is live is the archive flag, and asking it twice is how one
- * free-text field grew four spellings of two ideas. */
+ * free-text field grew four spellings of two ideas.
+ *
+ * `manager` and `country` joined on 14 Sep 2026, the client's own ruling for
+ * this screen ("filter by account manager, country, status") — status was
+ * already `archived`; the other two were missing because the door did not
+ * parse them, and this is where that gap closed. See `AccountFilters` for why
+ * `manager` is silently dropped for a portal caller and `country` is not. */
 function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
   const rawArchived = queryText(url.searchParams.get("archived"), "Archived")
@@ -218,6 +261,17 @@ function accountQuery(url: URL): AccountFilters {
     archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
     portal: rawPortal === "yes" || rawPortal === "no" ? rawPortal : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
+    // WHO'S RESPONSIBLE — a `team_members` user id, bounded text like every
+    // other id on this door (`parentId`, two lines up). The SHAPE is the whole
+    // check here: `accountsWhere` is what silently drops it for a portal
+    // caller (see `AccountFilters.manager`), so this door never has to know
+    // which kind of caller it is answering.
+    manager: queryText(url.searchParams.get("manager"), "Manager"),
+    // WHERE THE ACCOUNT IS — an open, per-team vocabulary value
+    // (`shared/selectable-groups.ts`'s "Country"), so this is bounded text the
+    // same way `q` is, never a closed allow-list: `accountsWhere` matches it
+    // exactly, and a value naming nothing simply returns no rows.
+    country: queryText(url.searchParams.get("country"), "Country"),
   }
 }
 
@@ -233,9 +287,11 @@ function accountQuery(url: URL): AccountFilters {
  * worst of the three possible answers, and worse here than anywhere: the columns
  * lead with the import format, so re-importing a silently-truncated export is
  * data loss wearing a round trip's clothes. Over the cap the caller narrows with
- * q / type / archived / portal / parentId (the same five the screen's find bar
- * and `list_accounts` take), or reads the paged list. Both surfaces get this
- * same sentence from this same door. */
+ * q / type / archived / portal / parentId / manager / country (the same seven
+ * the screen's find bar and `list_accounts` take — `manager` silently dropped
+ * for a portal caller, same as the list, see `AccountFilters.manager`), or
+ * reads the paged list. Both surfaces get this same sentence from this same
+ * door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
@@ -333,10 +389,15 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
     return fail(400, "invalid_input", "An account is either a company or a person.")
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   const fields = accountFields(body)
+  // 0091: the SHAPE first, at the call site (R20) — then, only for a real id,
+  // that it names a current staff member (requireStaffMember's own header).
+  const accountManagerUserId = optionalText(body.accountManagerUserId, "Account manager", TEXT_LIMITS.short)
+  if (accountManagerUserId) await requireStaffMember(env, cfg, guard, accountManagerUserId)
   const id = await createAccount(cfg, guard, scope, actor, {
     accountType,
     name,
     parentAccountId: optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short),
+    accountManagerUserId: accountManagerUserId ?? null,
     ...fields,
     // A picked image is a data URL on the way in and an object in R2 by the time
     // the row is written — see accountImages.
@@ -454,6 +515,14 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     return fail(400, "invalid_input", `nameNarrowsAlone must be "unreviewed", "allow" or "deny".`)
   const rawAltNames = Array.isArray(body.altNames) ? body.altNames : undefined
   const altNames = await declaredAltNames(cfg, guard, scope, id, rawAltNames, nameNarrowsAlone)
+  // 0091 — the SHAPE first, at the call site (R20), same as every other field
+  // on this PATCH; then the same tri-state `accountPatch` above gives every
+  // other field: absent key = say nothing (`undefined`, keeps whoever is
+  // there), present = the validated value (a real, current staff member,
+  // checked by `requireStaffMember`) or `null` (clear it).
+  const cleanAccountManagerUserId = optionalText(body.accountManagerUserId, "Account manager", TEXT_LIMITS.short)
+  if (cleanAccountManagerUserId) await requireStaffMember(env, cfg, guard, cleanAccountManagerUserId)
+  const accountManagerUserId = "accountManagerUserId" in body ? (cleanAccountManagerUserId ?? null) : undefined
   // A NEW image only. `accountPatch` keeps absent/null/"" meaning what they mean
   // (leave it, clear it), and only a data URL is something to store — so the
   // upload happens for exactly the field the person just changed.
@@ -469,6 +538,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
     altNames,
     nameNarrowsAlone,
+    accountManagerUserId,
   })
   await publishChange(env, guard.teamId, "accounts", id)
   // THE PICTURE THAT IS NO LONGER ANYBODY'S — deleted AFTER the row moved, and

@@ -393,15 +393,17 @@ export function AppDetailScreen({
     // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
     // sits where an icon sits and never inside a sentence") — it already draws
     // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
-    { label: t("Stage"), value: app.stage || "—" },
-    { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
+    // No "—" fallback: `undefined` lets `OverviewList`'s `emptyValueLabel={null}`
+    // drop the row instead (W2 — an unset fact is dropped, not dashed).
+    { label: t("Stage"), value: app.stage || undefined },
+    { label: t("About"), value: app.about ? <RichText html={app.about} /> : undefined },
     {
       label: t("Account context"),
-      value: app.clientContext ? <RichText html={app.clientContext} /> : "—",
+      value: app.clientContext ? <RichText html={app.clientContext} /> : undefined,
     },
-    { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
-    { label: t("Key actors"), value: app.keyActors || "—" },
-    { label: t("Address"), value: app.url || "—" },
+    { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : undefined },
+    { label: t("Key actors"), value: app.keyActors || undefined },
+    { label: t("Address"), value: app.url || undefined },
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 

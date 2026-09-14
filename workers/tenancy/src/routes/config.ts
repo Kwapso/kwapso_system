@@ -11,10 +11,10 @@
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
 import { publishChange } from "@shared/workers/realtime"
-import { getAutomationSettings, setAutomation } from "../lib/automations-config"
+import { getAutomationSettings, setAutomation, setAutomationOverride } from "../lib/automations-config"
 import { getScreenOverrides, setScreenOverride } from "../lib/screens-config"
 import { gatedBody } from "@shared/workers/route"
-import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { teamContext } from "../context"
 import type { Env } from "../env"
 
@@ -90,6 +90,25 @@ export async function postAutomation(request: Request, env: Env): Promise<Respon
   await setAutomation(cfg, guard, actor, key, body.on === true)
   // R1 — the settings page is live like every other screen, so a second admin
   // watching it sees the switch move rather than a stale answer.
+  await publishChange(env, guard.teamId, "automations", key)
+  return json({ automations: await getAutomationSettings(cfg, guard) })
+}
+
+/** A team's own name/description for one automation — the edit sheet's other
+ * two fields, alongside the switch above. Same gate, same refusal, same
+ * publish: `setAutomationOverride` (workers/tenancy/src/lib/automations-
+ * config.ts) is the only difference from `postAutomation`, and it is the one
+ * this file's own header already explains — allowed on a protected row, where
+ * the switch is not. */
+export async function postAutomationOverride(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ key?: string; title?: unknown; description?: unknown }>(
+    request, env, "teams", "update"
+  )
+  await refusePortalCaller(cfg, guard)
+  const key = requireText(body.key, "Automation", TEXT_LIMITS.short)
+  const title = optionalText(body.title, "Name", TEXT_LIMITS.short)
+  const description = optionalText(body.description, "Description", TEXT_LIMITS.long)
+  await setAutomationOverride(cfg, guard, actor, key, title, description)
   await publishChange(env, guard.teamId, "automations", key)
   return json({ automations: await getAutomationSettings(cfg, guard) })
 }

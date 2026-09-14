@@ -1,45 +1,36 @@
-// Staff-profile routes — a member's profile and the certificates they hold.
+// Staff-profile routes — a member's profile. One internal module now: the
+// certificate register that used to sit beside it was killed whole ("kill the
+// whole certificate module everywhere") and removed in the same change as team
+// migration `0090_the_certificate_module_is_killed_everywhere`.
 //
-// TWO THINGS ARE DIFFERENT HERE from the other three internal modules, and both
-// are about the same fact: these rows are about a PERSON.
+// THE PROFILE IS ONE DOOR, not a create and an edit. A person either has a
+// profile or they don't, and the screen filling in the form has no way of
+// knowing which — two doors would push that question onto the caller, and
+// the answer they would both use is a read-then-decide, which is a race
+// between two open tabs. So it is an upsert, gated once on `edit`: writing
+// down what a colleague is like is the same act whether or not a row already
+// existed, and a permission that depends on invisible state is one nobody
+// can reason about.
 //
-//   • THE PROFILE IS ONE DOOR, not a create and an edit. A person either has a
-//     profile or they don't, and the screen filling in the form has no way of
-//     knowing which — two doors would push that question onto the caller, and
-//     the answer they would both use is a read-then-decide, which is a race
-//     between two open tabs. So it is an upsert, gated once on `edit`: writing
-//     down what a colleague is like is the same act whether or not a row already
-//     existed, and a permission that depends on invisible state is one nobody
-//     can reason about. `create` gates the CERTIFICATE door instead, where a new
-//     record really is a new record.
-//   • THERE IS NO PROFILE EXPORT. A credential register is the kind of thing
-//     somebody hands an auditor; a one-click spreadsheet of what the team is bad
-//     at is a capability nobody asked for.
+// THERE IS NO PROFILE EXPORT. A profile is about a person; a one-click
+// spreadsheet of what the team is bad at is a capability nobody asked for.
 //
 // R21 on every door, both halves. This is the sharpest case of agency-only
 // material in the app: a client login reading a colleague's weaknesses.
 
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
-import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
-import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
+import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { INLINE_SAFE_UPLOAD, ownedMediaKey, parseUploadDataUrl, reclaimMedia, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
-  countStaffCertificates,
   countStaffProfiles,
-  createStaffCertificate,
-  listStaffCertificates,
-  listStaffCertificatesForExport,
   listStaffProfiles,
   saveStaffProfile,
-  setStaffCertificateActive,
   setStaffProfileActive,
-  updateStaffCertificate,
-  type StaffCertificateInput,
   type StaffProfileInput,
 } from "../lib/staff"
 import type { Env } from "../env"
@@ -69,15 +60,13 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
   requireText(body.userId, "Member", TEXT_LIMITS.short)
   const { id, created, supersededUrls } = await saveStaffProfile(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "staff_profiles", id, created ? "add" : "edit")
-  // The photo or the certificate this write stopped pointing at. AFTER the row
-  // moved, fail-soft, and proved against the SAME owners list the upload doors in
-  // this file mint with — `(guard.teamId, "staff")`, which is what makes "this
-  // team's staff material" provable rather than merely "this team's".
-  //
-  // The upload door here is generic: one endpoint whose answer lands on either a
-  // profile's photo or a certificate's file, and it never learns which. So the
-  // reclaim cannot live beside the put — it lives beside each RECORD write, which
-  // is the only place that knows what was superseded.
+  // The photo this write stopped pointing at. AFTER the row moved, fail-soft,
+  // and proved against the owners list the upload door in this file mints with —
+  // `(guard.teamId, "staff")`, which is what makes "this team's staff material"
+  // provable rather than merely "this team's". Used to also carry
+  // `staff_certificates` here, because one generic upload door answered for both
+  // a profile's photo and a certificate's file and never learned which — that
+  // second destination went with the certificate module (0090).
   await reclaimMedia(
     env.INTERNAL_MEDIA,
     await unreferencedKeys(
@@ -85,15 +74,7 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
       guard.databaseId,
       "/media/internal/",
       supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
-      // BOTH destinations, from BOTH doors. One generic upload endpoint answers
-      // with a URL that lands on either a profile's photo or a certificate's
-      // file and never learns which, so a photo and a certificate can name the
-      // same object — and a reclaim that asked only about its own table would
-      // delete the other's file.
-      [
-        { table: "staff_profiles", columns: ["photo_url"] },
-        { table: "staff_certificates", columns: ["file_url"] },
-      ]
+      [{ table: "staff_profiles", columns: ["photo_url"] }]
     ),
     { db: env.DB, source: "content", place: "POST /api/content/staff/profile, photo reclaim" }
   )
@@ -115,9 +96,9 @@ export async function postSetStaffProfileActive(request: Request, env: Env): Pro
   return json({ profiles: await listStaffProfiles(cfg, guard), total: await countStaffProfiles(cfg, guard) })
 }
 
-/** Upload a profile photo or a certificate PDF as a base64 data URL. Gated
- * staff_profiles:update — the same right that writes the row the URL lands on.
- * HOUSEKEEPING: it writes a file, not a record, so there is nothing to broadcast. */
+/** Upload a profile photo as a base64 data URL. Gated staff_profiles:update —
+ * the same right that writes the row the URL lands on. HOUSEKEEPING: it writes
+ * a file, not a record, so there is nothing to broadcast. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 export async function postUploadStaffFile(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "staff_profiles", "update")
@@ -130,10 +111,10 @@ export async function postUploadStaffFile(request: Request, env: Env): Promise<R
   // A key of the team id alone was minted by FOUR modules into the same
   // bucket — knowledge, brand assets, staff and deliverables — so
   // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
-  // module": a brand asset's URL pasted into a staff certificate's file field
-  // would pass the ownership test and be destroyed by the staff door's own
-  // reclaim. One more segment makes that impossible by construction rather than
-  // by everybody remembering. Objects written under the old bare-team shape stay
+  // module": a brand asset's URL pasted into a staff photo's file field would
+  // pass the ownership test and be destroyed by the staff door's own reclaim.
+  // One more segment makes that impossible by construction rather than by
+  // everybody remembering. Objects written under the old bare-team shape stay
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
@@ -142,11 +123,8 @@ export async function postUploadStaffFile(request: Request, env: Env): Promise<R
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType: parsed.contentType })
 }
 
-/* ------------------------------ certificates ------------------------------ */
-
-
-/** A profile photo or a certificate — STREAMED. The same capability as the door above,
- * with the file arriving AS the request body instead of inside it.
+/** A profile photo — STREAMED. The same capability as the door above, with the
+ * file arriving AS the request body instead of inside it.
  *
  * WHY A SECOND DOOR RATHER THAN A CHANGED ONE, and why all four upload doors now
  * come in pairs: the upload CONTRACT differs, and a browser holds its own copy of
@@ -208,10 +186,10 @@ export async function postStreamStaffFile(request: Request, env: Env): Promise<R
   // A key of the team id alone was minted by FOUR modules into the same
   // bucket — knowledge, brand assets, staff and deliverables — so
   // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
-  // module": a brand asset's URL pasted into a staff certificate's file field
-  // would pass the ownership test and be destroyed by the staff door's own
-  // reclaim. One more segment makes that impossible by construction rather than
-  // by everybody remembering. Objects written under the old bare-team shape stay
+  // module": a brand asset's URL pasted into a staff photo's file field would
+  // pass the ownership test and be destroyed by the staff door's own reclaim.
+  // One more segment makes that impossible by construction rather than by
+  // everybody remembering. Objects written under the old bare-team shape stay
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
@@ -219,109 +197,4 @@ export async function postStreamStaffFile(request: Request, env: Env): Promise<R
   await env.INTERNAL_MEDIA.put(key, request.body, { httpMetadata: { contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType })
-}
-
-export async function getStaffCertificates(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "staff_profiles", "read")
-  await refusePortalCaller(cfg, guard)
-  // ?userId= narrows at the DOOR rather than in the client: a member's page
-  // shows one person's certificates, and filtering a capped list after the fact
-  // would disagree with the count beside it (R16).
-  const userId = queryText(new URL(request.url).searchParams.get("userId"), "Member")
-  // These are independent reads — one wait, not 2.
-  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard, userId), countStaffCertificates(cfg, guard, userId)])
-  return json({
-    certificates,
-    total,
-  })
-}
-
-export async function getStaffCertificatesExport(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "staff_profiles", "read")
-  await refusePortalCaller(cfg, guard)
-  const { rows, complete } = await listStaffCertificatesForExport(cfg, guard)
-  if (!complete)
-    return exportTooLarge(EXPORT_HARD_CAP, "certificates", "Archive the ones that have lapsed, then export again.")
-  const csv = toCsv(
-    ["userId", "title", "issuer", "issuedOn", "expiresOn", "fileUrl", "active", "created_at", "created_by", "updated_at", "updated_by"],
-    rows.map((c) => [
-      c.user_id, c.title, c.issuer, c.issued_on, c.expires_on, c.file_url,
-      c.deactivated_at == null, c.created_at, c.creator_name, c.updated_at, c.editor_name,
-    ])
-  )
-  return csvResponse("certificates.csv", csv)
-}
-
-export async function postCreateStaffCertificate(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<StaffCertificateInput>(
-    request, env, "staff_profiles", "create"
-  )
-  await refusePortalCaller(cfg, guard)
-  requireText(body.userId, "Member", TEXT_LIMITS.short)
-  requireText(body.title, "Title", TEXT_LIMITS.short)
-  const id = await createStaffCertificate(cfg, guard, actor, body)
-  await publishChange(env, guard.teamId, "staff_certificates", id, "add")
-  // These are independent reads — one wait, not 2.
-  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
-  return json({
-    certificates,
-    total,
-  })
-}
-
-export async function postUpdateStaffCertificate(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<StaffCertificateInput & { id?: string }>(
-    request, env, "staff_profiles", "update"
-  )
-  await refusePortalCaller(cfg, guard)
-  const id = requireText(body.id, "Certificate", TEXT_LIMITS.short)
-  requireText(body.title, "Title", TEXT_LIMITS.short)
-  const { supersededUrls } = await updateStaffCertificate(cfg, guard, actor, id, body)
-  await publishChange(env, guard.teamId, "staff_certificates", id)
-  // The certificate file this edit replaced or cleared — same owners list, same
-  // base, same fail-soft order as the profile photo above.
-  await reclaimMedia(
-    env.INTERNAL_MEDIA,
-    await unreferencedKeys(
-      cfg,
-      guard.databaseId,
-      "/media/internal/",
-      supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
-      // BOTH destinations, from BOTH doors. One generic upload endpoint answers
-      // with a URL that lands on either a profile's photo or a certificate's
-      // file and never learns which, so a photo and a certificate can name the
-      // same object — and a reclaim that asked only about its own table would
-      // delete the other's file.
-      [
-        { table: "staff_profiles", columns: ["photo_url"] },
-        { table: "staff_certificates", columns: ["file_url"] },
-      ]
-    ),
-    { db: env.DB, source: "content", place: "POST /api/content/staff/certificate/update, file reclaim" }
-  )
-  // These are independent reads — one wait, not 2.
-  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
-  return json({
-    certificates,
-    total,
-  })
-}
-
-/** Archive / restore a certificate — never deleted. Gated staff_profiles:delete. */
-export async function postSetStaffCertificateActive(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; active?: unknown }>(
-    request, env, "staff_profiles", "delete"
-  )
-  await refusePortalCaller(cfg, guard)
-  const id = requireText(body.id, "Certificate", TEXT_LIMITS.short)
-  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "id and active are required.")
-  // R17: a no-op repeat moves zero rows → no ping, no duplicate history.
-  const changed = await setStaffCertificateActive(cfg, guard, actor, id, body.active)
-  if (changed) await publishChange(env, guard.teamId, "staff_certificates", id)
-  // These are independent reads — one wait, not 2.
-  const [certificates, total] = await Promise.all([listStaffCertificates(cfg, guard), countStaffCertificates(cfg, guard)])
-  return json({
-    certificates,
-    total,
-  })
 }

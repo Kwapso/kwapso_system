@@ -4,44 +4,42 @@
 // which is where the owner asked for it: "they go on each member's own page,
 // visible to the team, never to a client."
 //
-// It sits BELOW the member recipe rather than inside it as a tab, and that is a
-// decision rather than a shortcut. A tab hides one of two things behind the
-// other, and these two are read together: you look up a colleague to see who
-// they are AND what they hold. The member's Overview and Activity tabs above
-// stay exactly what they were — the team's record of the membership — and this
-// is the record of the person.
+// It sits BELOW the first panel (`member-head.tsx`: the picture, the role
+// chip's own facts, the two acts) rather than inside a tab, and that is a
+// decision rather than a shortcut. The first panel is the team's record of the
+// membership; this is the record of the person. Both are now `children` of the
+// SAME `<RecordScreen>` (member-screen.tsx) — a single body, no tab strip
+// (client ruling, "remove the tabs") — so this panel draws no `Card` of its own
+// any more (see the block below): the outer Card is already there.
 //
-// Both collections are gated on `staff_profiles`, so a role without that read
-// right sees nothing here at all, and the member page it hangs off is unchanged.
-// There is no client-facing counterpart anywhere: the module has no portal door.
+// A second collection, the certificates a member held, sat here beside the
+// profile until the certificate module was killed whole on 14 Sep 2026 ("kill
+// the whole certificate module everywhere") and removed in the same change as
+// team migration `0090_the_certificate_module_is_killed_everywhere`.
+//
+// Gated on `staff_profiles`, so a role without that read right sees nothing
+// here at all, and the member page it hangs off is unchanged. There is no
+// client-facing counterpart anywhere: the module has no portal door.
 
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { CertificateFormDialog, type CertificateValues } from "@/components/team/certificate-form-dialog"
-import { RecordActionsMenu } from "@/components/records/record-chrome"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/team/staff-profile-dialog"
 import { OverviewList } from "@/components/records/overview-list"
 import { content } from "@/lib/api"
-import { staffCertificatesKey, staffProfilesKey, totalKey } from "@/lib/live-resources"
+import { staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { RecordMark } from "@shared/web/record-mark"
-import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
-import { safeHref } from "@shared/web/rich-text"
-import { primeCache, useCached, useCachedValue } from "@shared/web/store"
-import type { StaffCertificate, StaffProfile } from "@shared/types"
+import { primeCache, useCached } from "@shared/web/store"
+import type { StaffProfile } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
 import { useConfirm } from "@shared/web/use-confirm"
-import { AddButton } from "@/components/deep-link/screen-bits"
-import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 export function StaffPanel({
   teamId,
@@ -52,45 +50,34 @@ export function StaffPanel({
   userId: string
   memberName: string
 }) {
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const { can } = usePermissions(teamId)
   const mayRead = can("staff_profiles", "read")
   const mayWrite = can("staff_profiles", "update")
-  const mayAdd = can("staff_profiles", "create")
   const mayArchive = can("staff_profiles", "delete")
 
-  // Both sets are read WHOLE and picked from here: one profile per member and a
-  // handful of certificates each, so the team's entire set is smaller than one
-  // page of tickets — and a panel that fetched per-member would re-fetch on
-  // every colleague you clicked through to.
+  // Read WHOLE and picked from here: one profile per member, so the team's
+  // entire set is smaller than one page of tickets — and a panel that fetched
+  // per-member would re-fetch on every colleague you clicked through to.
   const profilesQ = useCached<StaffProfile[]>(mayRead ? staffProfilesKey(teamId) : null, () =>
     content.staffProfiles().then((r) => {
       primeCache(totalKey("staff_profiles", teamId), r.total)
       return r.profiles
     })
   )
-  const certsQ = useCached<StaffCertificate[]>(mayRead ? staffCertificatesKey(teamId) : null, () =>
-    content.staffCertificates().then((r) => {
-      primeCache(totalKey("staff_certificates", teamId), r.total)
-      return r.certificates
-    })
-  )
-  const teamCertTotal = useCachedValue<number>(mayRead ? totalKey("staff_certificates", teamId) : null)
 
   const [profileOpen, setProfileOpen] = React.useState(false)
-  const [certOpen, setCertOpen] = React.useState(false)
-  const [editingCert, setEditingCert] = React.useState<StaffCertificate | null>(null)
-  // The one confirm dialog this panel's two red actions share
-  // (shared/web/use-confirm.tsx) — deactivating a profile and archiving a
-  // certificate. Their confirm-free restores don't go through it.
+  // The one confirm dialog this panel's red action asks through
+  // (shared/web/use-confirm.tsx) — deactivating a profile. The confirm-free
+  // restore beside it doesn't go through it.
   const { busy: archiveBusy, ask, run, dialog: archiveDialog } = useConfirm()
 
   if (!mayRead) return null
 
-  // A FAILED READ SAYS SO. Neither read was ever checked here, so a failed
-  // fetch used to spin the skeleton below for ever — no retry, no explanation,
-  // no way out (work-logs-panel.tsx carries the same guard on its own list).
-  if (profilesQ.error || certsQ.error)
+  // A FAILED READ SAYS SO. The read was never checked here, so a failed fetch
+  // used to spin the skeleton below for ever — no retry, no explanation, no way
+  // out (work-logs-panel.tsx carries the same guard on its own list).
+  if (profilesQ.error)
     return (
       <ShapeStateBody
         shape="recordChrome"
@@ -101,7 +88,6 @@ export function StaffPanel({
             variant="secondary"
             onClick={() => {
               profilesQ.refresh()
-              certsQ.refresh()
             }}
           >
             {t("Try again")}
@@ -109,7 +95,7 @@ export function StaffPanel({
         }
       />
     )
-  if (profilesQ.data === undefined || certsQ.data === undefined) return <Skeleton variant="list" lines={3} />
+  if (profilesQ.data === undefined) return <Skeleton variant="list" lines={3} />
 
   // The LIVE profile if there is one; otherwise the last one that was taken
   // down. Switching one off used to make it vanish from the only screen that
@@ -119,20 +105,11 @@ export function StaffPanel({
   // the one to show.)
   const forMember = profilesQ.data.filter((p) => p.userId === userId)
   const profile = forMember.find((p) => p.active) ?? forMember[forMember.length - 1] ?? null
-  const certificates = certsQ.data.filter((c) => c.userId === userId)
 
   async function saveProfile(values: StaffProfileValues) {
     const { profiles } = await content.saveStaffProfile({ userId, ...values })
     primeCache(staffProfilesKey(teamId), profiles)
     toast.success(t("Profile saved."))
-  }
-
-  async function saveCertificate(values: CertificateValues) {
-    const { certificates: next } = editingCert
-      ? await content.updateStaffCertificate({ id: editingCert.id, ...values })
-      : await content.createStaffCertificate({ userId, ...values })
-    primeCache(staffCertificatesKey(teamId), next)
-    toast.success(editingCert ? t("Certificate saved.") : t("Certificate recorded."))
   }
 
   /** SWITCH THE PROFILE OFF, or bring it back. A colleague who leaves keeps a
@@ -161,28 +138,6 @@ export function StaffPanel({
       () => content.setStaffProfileActive(profile.id, true).then(({ profiles }) => primeCache(staffProfilesKey(teamId), profiles)),
       t("Profile activated."),
       t("Couldn't update the profile.")
-    )
-  }
-
-  function archiveCertificate(cert: StaffCertificate) {
-    ask({
-      title: t("Archive {title}?", { title: cert.title }),
-      body: t("It stops showing as a live certificate. Nothing is deleted, and you can restore it any time."),
-      action: t("Archive"),
-      run: () =>
-        run(
-          () => content.setStaffCertificateActive(cert.id, false).then(({ certificates: next }) => primeCache(staffCertificatesKey(teamId), next)),
-          t("Archived."),
-          t("Couldn't update the certificate.")
-        ),
-    })
-  }
-
-  async function restoreCertificate(cert: StaffCertificate) {
-    await run(
-      () => content.setStaffCertificateActive(cert.id, true).then(({ certificates: next }) => primeCache(staffCertificatesKey(teamId), next)),
-      t("Restored."),
-      t("Couldn't update the certificate.")
     )
   }
 
@@ -255,148 +210,28 @@ export function StaffPanel({
             ))}
         </div>
       </div>
-      <Card>
-        <CardContent className="flex items-start gap-4 p-4">
-          {/* THE FACE. `photoUrl` is stored, edited and round-tripped through the
-              form, and was rendered by nothing at all — on the one screen in the
-              app whose whole subject is a person. A circle, because a person is
-              (shared/web/record-mark.tsx), and it stands whether or not there is
-              a photo, so the row does not reflow the day somebody adds one. */}
-          <RecordMark picture={profile?.photoUrl} name={memberName} shape="round" />
-          <div className="min-w-0 flex-1">
-            {profileItems.length > 0 ? (
-              <OverviewList items={profileItems} />
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                {t("Nothing written about")} {memberName} {t("yet. The team can read what goes here; no client ever can.")}
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex flex-wrap items-center gap-2 text-lg font-medium">
-          {t("Certificates")}
-          {/* R16: the number is the door's exact total through the ONE seam. This
-              one counts the TEAM's register, which is what the door counts — a
-              per-person figure would need its own COUNT(*) and this panel is not
-              where somebody comes to ask it. */}
-          {formatCount(teamCertTotal) ? (
-            <Badge variant="secondary">{formatCount(teamCertTotal)}</Badge>
-          ) : null}
-        </h2>
-        {mayAdd && (
-          // R50, ONE LAYER DOWN (client, 2026-09-10, over the same shape on
-          // Settings › Integrations: "with the plus and no tokens yet?? makes
-          // no sense, duplicated"). The `CollectionEmptyState` below already
-          // carries the one first-add, so this heading button stands down while
-          // the register is empty rather than offering the act twice.
-          <AddButton
-            label={t("Record one")}
-            onClick={() => {
-              setEditingCert(null)
-              setCertOpen(true)
-            }}
-            empty={certificates.length === 0}
-          />
-        )}
-      </div>
-      <Card>
-        <CardContent className="flex flex-col gap-4 p-4">
-          {certificates.length === 0 ? (
-            // No `staff_certificates` import target — a certificate is filed
-            // one at a time, with the file it proves attached.
-            <CollectionEmptyState
-              title={t("Nothing recorded for {name} yet.", { name: memberName })}
-              onCreate={
-                mayAdd
-                  ? () => {
-                      setEditingCert(null)
-                      setCertOpen(true)
-                    }
-                  : undefined
-              }
-            />
+      {/* NO CARD HERE — this panel is now `children` of the member's own
+          `<RecordScreen>` (member-screen.tsx), which already wraps the whole
+          panel in ONE Card (the kit's `RecordDetail`). A second `Card` here
+          would be the exact "container inside a container" the client
+          rejected on this same shape (`overview-list.tsx`'s own header). */}
+      <div className="flex items-start gap-4">
+        {/* THE FACE. `photoUrl` is stored, edited and round-tripped through the
+            form, and was rendered by nothing at all — on the one screen in the
+            app whose whole subject is a person. A circle, because a person is
+            (shared/web/record-mark.tsx), and it stands whether or not there is
+            a photo, so the row does not reflow the day somebody adds one. */}
+        <RecordMark picture={profile?.photoUrl} name={memberName} shape="round" />
+        <div className="min-w-0 flex-1">
+          {profileItems.length > 0 ? (
+            <OverviewList items={profileItems} />
           ) : (
-            certificates.map((c) => {
-              const link = safeHref(c.fileUrl)
-              return (
-                <div key={c.id} className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm font-medium">
-                      {link ? (
-                        <a
-                          href={link}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="text-primary underline-offset-2 hover:underline"
-                        >
-                          {c.title}
-                        </a>
-                      ) : (
-                        c.title
-                      )}
-                      {!c.active && (
-                        <Badge variant="secondary" className="text-muted-foreground text-badge">
-                          {t("Archived")}
-                        </Badge>
-                      )}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {[
-                        c.issuer,
-                        c.issuedOn ? `${t("granted")} ${formatDate(c.issuedOn, lang)}` : null,
-                        c.expiresOn ? `${t("lapses")} ${formatDate(c.expiresOn, lang)}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || t("No details recorded")}
-                    </p>
-                  </div>
-                  {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2, N4). The row was
-                      the certificate's name, its state, three details and two
-                      labelled buttons — five units, and the buttons made it a
-                      row of facts and actions interleaved. The facts stay on the
-                      left where they read as a title and a meta line; the
-                      actions live in one trigger on the right. */}
-                  <RecordActionsMenu
-                    tone="row"
-                    actions={[
-                      ...(mayWrite
-                        ? [
-                            {
-                              key: "edit",
-                              label: t("Edit"),
-                              icon: <PencilSimple className="size-3.5" />,
-                              onSelect: () => {
-                                setEditingCert(c)
-                                setCertOpen(true)
-                              },
-                            },
-                          ]
-                        : []),
-                      ...(mayArchive
-                        ? [
-                            {
-                              key: c.active ? "archive" : "restore",
-                              label: c.active ? t("Archive") : t("Restore"),
-                              icon: <Power className="size-3.5" />,
-                              destructive: c.active,
-                              disabled: archiveBusy,
-                              onSelect: c.active
-                                ? () => archiveCertificate(c)
-                                : () => void restoreCertificate(c),
-                            },
-                          ]
-                        : []),
-                    ]}
-                  />
-                </div>
-              )
-            })
+            <p className="text-muted-foreground text-sm">
+              {t("Nothing written about")} {memberName} {t("yet. The team can read what goes here; no client ever can.")}
+            </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <StaffProfileDialog
         open={profileOpen}
@@ -417,28 +252,13 @@ export function StaffPanel({
                 roleModels: profile.roleModels ?? "",
                 about: profile.about ?? "",
                 photoUrl: profile.photoUrl ?? "",
+                birthday: profile.birthday ?? "",
+                position: profile.position ?? "",
+                phone: profile.phone ?? "",
               }
             : undefined
         }
         onSubmit={saveProfile}
-      />
-      <CertificateFormDialog
-        open={certOpen}
-        onOpenChange={setCertOpen}
-        draftKey={`certificate:${editingCert?.id ?? "new"}:${userId}`}
-        subjectName={memberName}
-        initial={
-          editingCert
-            ? {
-                title: editingCert.title,
-                issuer: editingCert.issuer ?? "",
-                issuedOn: editingCert.issuedOn ?? "",
-                expiresOn: editingCert.expiresOn ?? "",
-                fileUrl: editingCert.fileUrl ?? "",
-              }
-            : undefined
-        }
-        onSubmit={saveCertificate}
       />
 
       {archiveDialog}

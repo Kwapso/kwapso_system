@@ -268,6 +268,9 @@ export function useScreenActions(teamId: string | null) {
         city: values.city.trim() || undefined,
         country: values.country.trim() || undefined,
         industry: values.industry.trim() || undefined,
+        // 0091 — undefined when nobody was picked, same shape as every other
+        // optional field on this create call.
+        accountManagerUserId: values.accountManagerId || undefined,
         about: values.about.trim() || undefined,
         logoUrl: values.logoUrl || undefined,
         coverUrl: values.coverUrl || undefined,

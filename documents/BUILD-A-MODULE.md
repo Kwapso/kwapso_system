@@ -1044,6 +1044,26 @@ again, which is the only property that matters here.
   reads it, empty object included. A name ending `_OK` or `_EXEMPT` declared
   with `const` anywhere under `web/test/` or `web-portal/test/` turns the
   build red, naming the file, until it moves.
+- **R74 `import-opens-a-tab`** — if your module gets an "Import CSV" door (or
+  any navigation onto `/t/<teamId>/import…`), dispatch it through
+  `openInNewTab` (`web/lib/nav.ts`), never a plain `go`/`softNavigate` — it
+  opens the wizard as its own fronted workspace tab instead of redirecting
+  the tab you were already in (the client's ruling, 2026-09-14). The check is
+  positional: a census off the disk reads which FUNCTION the import address's
+  template literal sits inside the parentheses of, so a new import button
+  written the old way is held to this without anybody adding it to a list.
+- **R75 `alphabetical-options`** — if your module offers a filter facet, it
+  needs nothing: every `FilterFacet` renders through `filter-bar.tsx`'s own
+  `optionsFor`, sorted there once for the whole app. If your module hand-rolls
+  a `<Select>`/`<SelectItem>` list or hands a picker an `options` prop, wrap
+  the array in `sortedOptions(ARRAY, lang[, labelOf])`
+  (`shared/web/sorted-options.ts`) right where the `.map()` reads it — locale-
+  aware, comparing the label. The one way out is a control whose list is a
+  designed SEQUENCE rather than a name a reader searches by word (a scale, a
+  team's own drag-ordered vocabulary, a step's place in a workflow): name it in
+  `ORDERED_OPTIONS_OK` (`shared/rules/registry.ts`) with the real reason. A
+  collection's own "sort by" menu (`sortOptions`) is a different question this
+  law does not reach.
 
 **The words** (the ones that catch every new module, every time)
 

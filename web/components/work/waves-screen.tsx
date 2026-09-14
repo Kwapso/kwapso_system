@@ -474,7 +474,7 @@ export function WaveCollection({
             <CollectionEmptyState
               title={t("No waves yet.")}
               description={t(
-                "A wave is a package of sprints an account bought — sell it first, plan the sprints inside it afterwards."
+                "A wave is a package of sprints an account bought: sell it first, plan the sprints inside it afterwards."
               )}
               onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
             />

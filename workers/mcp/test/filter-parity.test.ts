@@ -126,6 +126,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "which of the software's own automatic behaviours this team has switched off. It answers about the APP rather than about the team's data, and every fact in it already ships in the code a machine client could read (`shared/automations.ts`); what a token would gain is the team's stored overrides of a registry it cannot act on anyway, since the write below is off this surface.",
   "POST /api/tenancy/config/automations":
     "silencing an automation is the one setting a machine must not be able to change, and it is a stronger case than the recipe store below it. Every switchable automation here TELLS SOMEBODY SOMETHING — a client that their ticket was answered, a member that their role changed, whoever is on triage what is waiting. A model that could switch those off could make its own next mistake quiet, and the person who would have caught it is exactly the person who stops being told. The decision belongs to somebody holding `teams:update` who is looking at the page that says what each one does (R70).",
+  "POST /api/tenancy/config/automations/override":
+    "renaming what an automation is called for this team is authoring copy for a settings page, the same act `POST /api/tenancy/config/screens` is already off this surface for — the only way to judge new words for a row is to look at the page they render on, which a machine client has not got.",
   "POST /api/tenancy/config/screens":
     "authoring a screen recipe changes what every person on the team sees, and the only way to judge one is to look at the screen it draws — which a machine client has not got. (The route table used to call this door 'agent-callable' while it sat on neither catalogue; the comment was the thing that was wrong, and it has been corrected rather than the door quietly opened.)",
 
@@ -170,7 +172,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the streamed twin of the brand-asset upload — the file is the request body, which is not a shape a JSON-RPC call has. Same conclusion as the buffered door beside it, reached from the transport rather than from the argument size.",
 
   "POST /api/content/staff/upload-stream":
-    "the streamed twin of the staff-file upload — a photo or a certificate PDF as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
+    "the streamed twin of the staff-file upload — a profile photo as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
 
   "POST /api/content/deliverables/upload-stream":
     "the fourth byte-shovel, and the only one with no buffered twin — a module written after that pair stopped being worth shipping. The transport is the whole answer: this surface is JSON-RPC, a tool call IS a JSON object, so there is no request body for a tool to stream into and no way to express 'the bytes are the body' as an argument. Nothing is lost. `create_deliverable` and `update_deliverable` both carry `url`, so a machine that already has an address for the material — a recording, a document, an API reference, which is what most deliverables are — files the record in full. What it cannot do is hold a PDF, and it never could.",
@@ -221,7 +223,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/brand-assets/upload":
     "a byte-shovel, and the arithmetic is the whole answer: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
   "POST /api/content/staff/upload":
-    "the third of the byte-shovels, and the narrowest: a profile photo or a certificate PDF, up to 25 MB of base64. save_staff_profile and create_staff_certificate both carry the URL field, so the record half is fully machine-writable; the bytes are not, for the arithmetic reason the other two give.",
+    "the third of the byte-shovels, and the narrowest: a profile photo, up to 25 MB of base64. save_staff_profile carries the URL field, so the record half is fully machine-writable; the bytes are not, for the arithmetic reason the other two give.",
 
   /* -------------------------------- auth --------------------------------- */
   "POST /api/auth/email/start":

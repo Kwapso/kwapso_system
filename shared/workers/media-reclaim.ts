@@ -60,9 +60,12 @@ import { d1Query, type D1Rest } from "./d1-rest"
 
 /** WHERE A REFERENCE COULD STILL LIVE: a table, and the columns on it that hold a
  * `/media/...` path. Every column that can point at this module's objects has to
- * be listed, including the ones on OTHER tables — the staff upload door's answer
- * lands on a profile's photo or a certificate's file and never learns which, so
- * both are named or half the question goes unasked.
+ * be listed, including the ones on OTHER tables — a generic upload door's answer
+ * can land on more than one destination table without learning which, so every
+ * one of them is named or half the question goes unasked. (Until 14 Sep 2026 the
+ * staff upload door had two such destinations, a profile's photo and a
+ * certificate's file; the certificate module was killed whole and the second
+ * one went with it.)
  *
  * Table and column names are interpolated into the statement because SQL has no
  * identifier parameters. They are compile-time literals at every call site — never

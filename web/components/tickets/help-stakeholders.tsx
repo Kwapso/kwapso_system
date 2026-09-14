@@ -16,7 +16,8 @@ import type { HelpStakeholder } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
 import { ApiFailure } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { RecordPicker } from "@/components/records/record-picker"
@@ -41,7 +42,7 @@ export function HelpStakeholders({
   canAdd: boolean
   onAdd: (userId: string) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [picked, setPicked] = React.useState("")
   const [busy, setBusy] = React.useState(false)
 
@@ -101,7 +102,7 @@ export function HelpStakeholders({
           <RecordPicker
             value={picked}
             onChange={setPicked}
-            options={addable.map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
+            options={sortedOptions(addable, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             placeholder={t("Pick someone to keep in the loop")}
             searchPlaceholder={t("Search members…")}
             emptyText={t("Nobody here matched.")}

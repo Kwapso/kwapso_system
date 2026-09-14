@@ -17,9 +17,11 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
 import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
+import { safeSrc } from "@shared/web/rich-text"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Icon } from "@shared/web/screen-engine/icon"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { Swatch } from "@/components/records/record-picker"
+import type { PickablePerson } from "@/lib/members"
 import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
 import { CONCEPT_ICON } from "@/lib/pages"
 // THE CLASS, NOT THE CHIP. `REF_LEADS_NAME` is the one spelling of "a shrink-0
@@ -96,6 +98,10 @@ export function shapeActivity(items: ActivityItem[], lang: Language): ActivityFe
     // let the empty string straight through.
     actor: (a.actorIsClient ? a.actorName : staffNameFromSnapshot(a.actorName)) || undefined,
     initials: nameInitials(a.actorName),
+    // THE FACE (R35/R60), the same field and the same `safeSrc` seam
+    // `use-record-activity.ts` reads it through — the fix this file's own
+    // header warns fixes land in one shaper and not the other.
+    avatarSrc: safeSrc(a.actorPicture ?? undefined),
     timestamp: formatRelative(a.createdAt, t, lang),
     dateTime: a.createdAt,
   }))
@@ -381,8 +387,24 @@ export function shapeAccountsList(
    * `contacts-by-company.tsx` — was deleted 14 Sep 2026 as unreached dead
    * code; kept here because it is still the correct shape for a heading that
    * already names the parent, not a leftover.) */
-  sayParent = true
+  sayParent = true,
+  /** 0091 — who each row's account manager is, resolved off the SAME cached
+   * members list every picker in the app already reads (R56: no second
+   * fetch for this column). `[]` costs nothing: every row's `manager` is
+   * then "—", exactly what an account with nobody assigned already shows.
+   * DRAWN NOW — the gallery card wall and the table's own column
+   * (`web/components/accounts/accounts-screen.tsx`, client ruling 14 Sep
+   * 2026), the view this field was declared ahead of. */
+  members: PickablePerson[] = [],
+  /** THE WORDS ON THIS ROW — "Active"/"Archived" below, and nothing else
+   * today (the parent's own `(archived)` suffix on `name` stays untranslated,
+   * a pre-existing gap this pass did not touch). No hook to call
+   * `useLanguage()` with (a pure shaper, no React tree), so `t` is built the
+   * same way `shapeActivity` above builds it. */
+  lang: Language = "en"
 ): ScreenData {
+  const t = translator(lang)
+  const managerById = new Map(members.map((m) => [m.id, m]))
   // The hierarchy, readable in the list itself: name the parent when it is on
   // the page we loaded (for a normal agency, the whole tree is), and otherwise
   // still say the account is nested. Both lines are true — one is just more
@@ -430,6 +452,45 @@ export function shapeAccountsList(
         // a free-text column that drifted into four spellings of two ideas, and
         // every one of 106 contacts read "Active".
         detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "—",
+        // 0091 — the account manager's face (R35), or "—" for nobody
+        // assigned yet. `a.accountManagerId` is `null` for a client login
+        // (`toAccount`'s own withholding) as well as for "nobody assigned",
+        // so this column reads the same honest dash either way.
+        manager: (() => {
+          const m = a.accountManagerId ? managerById.get(a.accountManagerId) : undefined
+          return m ? (
+            <span className="flex items-center gap-2">
+              <RecordMark picture={m.photo} name={m.name} shape="round" />
+              {m.name}
+            </span>
+          ) : (
+            "—"
+          )
+        })(),
+        // THE POSTAL ADDRESS' OWN FIELD (shared/types.ts's `Account.country`),
+        // for the table's Country column — client ruling 14 Sep 2026. Plain
+        // data, not app copy, so it is never a `t()` call (R28 covers what the
+        // app SAYS, not a value somebody picked from the Country dropdown).
+        country: a.country ?? "—",
+        // THE ARCHIVE FLAG, SAID AS A WORD (0042's own finding, read the other
+        // way round): there is no `status` COLUMN on an account — one was
+        // removed for drifting into four spellings of the same fact
+        // (`workers/tenancy/src/lib/accounts.ts`'s own header) — so "Status" IS
+        // `active`, worded and, per the Choices rule, coloured where the word
+        // carries a colour. It does not sit in a `selectable_data` group (it is
+        // not a Choice at all, it is the archive flag), so there is no vocabulary
+        // colour to read off one — `success`/`secondary` are the kit's own
+        // closest pair (R32: a token, never a hex), matching the quiet grey
+        // every other archived row in this app already wears.
+        status: (
+          <Badge variant={a.active ? "success" : "secondary"}>
+            {a.active ? t("Active") : t("Archived")}
+          </Badge>
+        ),
+        // THE RAW PICTURE, for the gallery card's own bigger face
+        // (`size="band"`, the way `members-gallery.tsx` draws one) — `mark`
+        // above is sized for a LIST row and is the wrong box to stretch.
+        logoUrl: a.logoUrl,
       }
     }),
   }
@@ -508,20 +569,6 @@ export function shapeContactsTable(contacts: Account[]): ScreenData {
       account: a.companyName ?? "—",
       role: a.relationship ?? "—",
     })),
-  }
-}
-
-export function shapeMemberDetail(member: TeamMember, activity: ActivityItem[], lang: Language): ScreenData {
-  return {
-    record: {
-      id: member.userId,
-      name: personName(member),
-      email: member.email,
-      role: member.roleTitle,
-      joined: formatDate(member.joinedAt, lang),
-      image: member.imageUrl ?? "",
-    },
-    sets: { activity: shapeActivity(activity, lang) },
   }
 }
 
@@ -639,8 +686,24 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
  * `moduleSettingsIndex`), never a second map typed here. The Choices tab
  * builds this once, off the one gate (`settings-choices-panel.tsx`), and
  * hands it to the shaper below so a pure function never has to ask
- * `usePermissions` a question of its own. */
-export type ChoiceGroupHome = { segment: string; title: string; colour?: (value: string) => string }
+ * `usePermissions` a question of its own.
+ *
+ * `colour` AND `icon` ARE THE WHOLE MENU (client, 14 Sep 2026: "the only thing
+ * that choices can have is either a color or an icon"). `colour` is wired —
+ * `ticketTypeColour` (`web/lib/type-colours.ts`), the one group that has one
+ * today (`module-settings-screen.tsx`). `icon` is the SEAM and not yet a real
+ * one: no group carries a per-value icon today, so nothing sets this key —
+ * it is typed here so the day a type gains one, `shapeChoicesTable` needs no
+ * second edit, the same reason `colour` was typed before a second group ever
+ * used it. NEVER BOTH on one group — a value has a colour or an icon, never
+ * two marks fighting for the same slot, which is the same "one glyph, one
+ * slot" rule `type-marks.ts` states for the mark this replaces. */
+export type ChoiceGroupHome = {
+  segment: string
+  title: string
+  colour?: (value: string) => string
+  icon?: (value: string) => IconName | null | undefined
+}
 
 /** The system-wide Choices tab (Settings), a table over every choice value
  * this reader's own visible modules own — see `settings-choices-panel.tsx`
@@ -648,25 +711,34 @@ export type ChoiceGroupHome = { segment: string; title: string; colour?: (value:
  * words: *"the value itself · module with the icon · status: active,
  * inactive, and are protected."*
  *
- * ── THE VALUE, WITH ITS MARK (R35) ──────────────────────────────────────────
+ * ── THE VALUE: A COLOUR, AN ICON, OR NOTHING — NEVER THE MARK ───────────────
  *
- * The same face `selectable-screen.tsx` already draws for the identical row —
- * a colour swatch on a palette group (Ticket type), the value's own mark on
- * one that has it, nothing on one that has neither (that third case is this
- * screen's own gap, inherited rather than introduced: `ValueRow` has never
- * drawn a fallback initial for a mark-less value, and closing it is a change
- * to that shared row, not to this one).
+ * The client's fifth ruling on emoji, 14 Sep 2026, and the one that finally
+ * reaches this screen rather than just the write door: *"kill all the
+ * emojis. I don't want to see it. The only thing that choices can have is
+ * either a color or an icon. So far, only ticket types have color."* Before
+ * this, a value with no colour fell back to its own `mark` — a two-letter
+ * code by convention, but in LIVE data sometimes exactly the pictograph she
+ * has ruled against four times already (R66, CLAUDE.md; `0088`'s migration is
+ * the data-side sweep). `v.mark` is not read here AT ALL any more, by any
+ * group, for any reason — not a filtered "unless it looks like an emoji", a
+ * flat refusal, because the ruling is flat too ("kill ALL the emojis").
+ *
+ * WHAT MAY STILL DRAW BESIDE THE WORD is exactly her sentence: a COLOUR
+ * swatch, if the value's group carries one (`ChoiceGroupHome.colour` —
+ * `ticketTypeColour`, the one group that has one today), or an ICON, if it
+ * carries one (`ChoiceGroupHome.icon` — typed and ready, unset by every group
+ * today because none has a per-value icon yet; see that type's own header).
+ * NEVER BOTH: `icon` is only ever consulted when `colour` came back nothing.
+ * A group with neither draws the bare word, same as before.
  *
  * A PLAIN STRING WHEN THERE IS NOTHING TO DRAW BESIDE THE WORD, and that is
  * a search/sort decision as much as a visual one: `record-table.tsx`'s
  * `searchKeys`/its own `ordered()` both read `String(row[key])` when a column
  * declares no `searchKey`/`sortKey` of its own, and a React element strings to
- * `"[object Object]"`. Every one of the nine vocabularies but Ticket type
- * carries no colour, and most values in any of them carry no mark either, so
- * leaving the cell as the bare word for those rows is what keeps them
- * searchable and sortable through the plain path — `valueText` still rides
- * beside the cell for the rows that DO wear a swatch or a mark, which is what
- * the column's own `searchKey`/`sortKey` read instead.
+ * `"[object Object]"`. `valueText` rides beside the cell for the rows that DO
+ * wear a swatch or an icon, which is what the column's own `searchKey`/
+ * `sortKey` read instead.
  *
  * ── THE MODULE, WITH THE MODULE'S ICON ──────────────────────────────────────
  *
@@ -674,29 +746,32 @@ export type ChoiceGroupHome = { segment: string; title: string; colour?: (value:
  * table the Modules wall (`settings-screen.tsx`) reads for its own cards, so
  * a module wears the same glyph whether it is a card there or a cell here.
  *
- * ── STATUS: ACTIVE, INACTIVE, AND PROTECTED IS NOT A THIRD STATE ────────────
+ * ── STATUS IS ONE WORD: PROTECTED · ACTIVE · INACTIVE ───────────────────────
  *
- * `active`/`inactive` is one switch; `isDefault` ("Protected", the client's
- * own renaming — `selectable-screen.tsx`'s header carries that ruling) is a
- * SEPARATE flag that can be true on either side of it. The door proves the
- * two are independent rather than assumed: `setSelectableDefault`
- * (workers/tenancy/src/lib/selectable.ts) asks no question about
- * `deactivated_at` before writing `is_default`, and the only refusal in
- * `setSelectableActive` runs the other direction (a PROTECTED value refuses
- * to be switched off — it does not refuse to be protected while off). So a
- * row reached by deactivating first and protecting second is Inactive AND
- * Protected at once, which the existing row/chip already draw as two
- * independent badges rather than one three-way word. This column does the
- * same: the active word is never absent (unlike the row it is drawn from,
- * which shows nothing at all for the active case), because a table column
- * with no filled cell on most rows reads as broken; Protected rides beside it
- * only when it applies. `statusText` — the search/sort text — folds both
- * into one string for the same reason `valueText`/`moduleText` exist: the
- * cell is a node, the comparison needs a word. `protectedState` rides beside
- * `activeState` as the same kind of field for the same reason: the toolbar's
- * Protected facet (settings-choices-panel.tsx) needs a plain "yes"/"no" to
- * match against, read off the identical `v.isDefault` the badge above already
- * reads — one flag asked twice, not a second one invented. */
+ * The client's ruling, same sentence as the emoji one: *"also, the status: if
+ * it's protected, it's always active. So you don't need to put active
+ * protected, just protected."* Before this, `active`/`inactive` and
+ * `isDefault` ("Protected") were drawn as two INDEPENDENT badges, because the
+ * door genuinely let them disagree — `setSelectableDefault`
+ * (workers/tenancy/src/lib/selectable.ts) used to write `is_default` with no
+ * question asked about `deactivated_at`, so a value deactivated first and
+ * protected second sat there reading "Inactive Protected". THAT GAP IS CLOSED
+ * AT THE DOOR NOW, in the same change that added this comment: protecting a
+ * value reactivates it, in one idempotent UPDATE (R17), and `0088`'s
+ * migration reactivates every row already in that state. So "protected"
+ * TRULY IMPLIES "active" from here on, and the display can finally say what
+ * she asked for instead of working around a database that could still
+ * disagree with it: ONE word, `Protected` outranking `Active`/`Inactive`
+ * (never "Active Protected" — protected values are never shown inactive,
+ * which is the invariant the door now keeps rather than a display choice this
+ * file is making). `statusText` is the same word — there is no second badge
+ * left to fold in. `statusState` is the facet's own plain field, the SAME
+ * three-way derivation the column draws, read by the toolbar's ONE Status
+ * facet (settings-choices-panel.tsx) — the separate Protected yes/no facet
+ * that stood beside it is GONE: it asked a question Status now already
+ * answers, and keeping both would let a reader filter "Active" and
+ * "Protected" as if a row could be excluded from one by matching the other,
+ * which the invariant above makes impossible. */
 export function shapeChoicesTable(
   values: SelectableValue[],
   groupHome: Map<string, ChoiceGroupHome>,
@@ -709,22 +784,30 @@ export function shapeChoicesTable(
       const segment = home?.segment ?? ""
       const moduleTitle = home ? t(home.title) : v.type
       const colour = home?.colour?.(v.value)
+      // NEVER BOTH — see `ChoiceGroupHome`'s own header. Colour is the one
+      // that is actually wired today, so it wins the slot on the chance a
+      // caller ever set both.
+      const icon = colour ? undefined : home?.icon?.(v.value)
       const valueCell =
-        colour || v.mark ? (
+        colour ? (
           <span className={REF_LEADS_NAME}>
-            {colour ? (
-              <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
-            ) : (
-              <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
-                {v.mark}
-              </span>
-            )}
+            <Swatch colour={colour ?? NEUTRAL_TYPE_COLOUR} />
+            <span className="min-w-0 truncate">{v.value}</span>
+          </span>
+        ) : icon ? (
+          <span className={REF_LEADS_NAME}>
+            <Icon name={icon} className="text-muted-foreground size-4 shrink-0" />
             <span className="min-w-0 truncate">{v.value}</span>
           </span>
         ) : (
           v.value
         )
-      const statusWord = v.active ? t("Active") : t("Inactive")
+      // PROTECTED OUTRANKS ACTIVE/INACTIVE — see this function's own header.
+      // The invariant the door and 0088's migration now keep is what makes
+      // this a safe simplification rather than a display choice papering over
+      // a database that could still disagree: a protected row is never
+      // inactive, so there is no case this ordering hides.
+      const statusWord = v.isDefault ? t("Protected") : v.active ? t("Active") : t("Inactive")
       return {
         id: v.id,
         value: valueCell,
@@ -745,25 +828,16 @@ export function shapeChoicesTable(
         // or sort can.
         moduleSegment: segment,
         status: (
-          <span className="inline-flex items-center gap-2">
-            <Badge variant="secondary" className={v.active ? undefined : "opacity-60"}>
-              {statusWord}
-            </Badge>
-            {v.isDefault && <Badge variant="secondary">{t("Protected")}</Badge>}
-          </span>
+          <Badge variant="secondary" className={v.active ? undefined : "opacity-60"}>
+            {statusWord}
+          </Badge>
         ),
-        statusText: v.isDefault ? `${statusWord} ${t("Protected")}` : statusWord,
-        activeState: v.active ? "active" : "inactive",
-        // THE FACET'S OWN PLAIN FIELD, SAME `v.isDefault` AS THE BADGE ABOVE —
-        // not a second source of truth, the one flag read twice: once to
-        // decide whether the Protected badge renders, once to give the
-        // Protected FACET (settings-choices-panel.tsx's own header) a plain
-        // value to match against. `activeState` and `protectedState` sit side
-        // by side here for the same reason the STATUS COLUMN keeps them as
-        // two badges rather than one three-way word — see the header above —
-        // and the toolbar keeps them as two independent facets rather than
-        // folding Protected into Status as a third option.
-        protectedState: v.isDefault ? "yes" : "no",
+        statusText: statusWord,
+        // THE FACET'S OWN PLAIN FIELD, SAME THREE-WAY DERIVATION AS THE BADGE
+        // ABOVE — one flag pair read once, not a second source of truth. See
+        // this function's own header for why Protected is no longer a
+        // separate facet beside this one.
+        statusState: v.isDefault ? "protected" : v.active ? "active" : "inactive",
       }
     }),
   }

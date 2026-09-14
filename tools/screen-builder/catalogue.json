@@ -1,21 +1,21 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.81",
-  "sha": "dd73bf63d0599eed40e5ac2f0383a73de66a063e",
+  "tag": "v1.2.83",
+  "sha": "81213891a4b5f81c4c90ea2423e493b09954eaa2",
   "syncedAt": "2026-09-14"
  },
- "generatedAt": "2026-09-14T14:21:24.643Z",
+ "generatedAt": "2026-09-14T21:14:41.253Z",
  "counts": {
-  "components": 119,
+  "components": 120,
   "hooks": 2,
-  "withVariants": 42,
+  "withVariants": 43,
   "withoutVariants": 77,
-  "cvaSites": 51,
-  "variantGroups": 78,
-  "variantOptions": 253,
+  "cvaSites": 52,
+  "variantGroups": 79,
+  "variantOptions": 256,
   "typedEnumProps": 42,
-  "typedBooleanProps": 315,
+  "typedBooleanProps": 317,
   "compositions": 47,
   "icons": 1512,
   "tokens": 365,
@@ -8647,6 +8647,81 @@
    "description": "Typography — Headline, Text, Hint (0 direct call sites; the three shapes every other component's copy is measured against). DESIGN SOURCE Kit chapter 3, transcribed into tokens.css §5 as the thirteen steps plus the additive caption step, ea"
   },
   {
+   "name": "unsaved-changes-bar",
+   "kind": "component",
+   "files": [
+    "components/unsaved-changes-bar/unsaved-changes-bar.tsx"
+   ],
+   "exports": [
+    {
+     "name": "UnsavedChangesBar",
+     "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx"
+    }
+   ],
+   "cva": [
+    {
+     "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
+     "name": "unsavedChangesBarVariants",
+     "line": 110,
+     "base": "flex min-w-0 flex-nowrap items-center justify-between gap-3 px-4 py-3",
+     "groups": [
+      {
+       "name": "ground",
+       "options": [
+        {
+         "name": "bare",
+         "classes": "",
+         "note": "Nothing painted — the right answer wherever a caller wraps this row in the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`), which already paints the ground behind it. The default, because a row that paints nothing cannot paint the wrong thing."
+        },
+        {
+         "name": "page",
+         "classes": "bg-surface-panel",
+         "note": "Standing directly on off-beige (a page, a body pane) — takes soft paper, `ToolbarRow`'s own `page` token."
+        },
+        {
+         "name": "panel",
+         "classes": "bg-surface-raised",
+         "note": "Standing directly on soft paper (a card, a panel, a sheet) — takes off-beige, `ToolbarRow`'s own `panel` token."
+        }
+       ]
+      }
+     ],
+     "defaults": {
+      "ground": "bare"
+     },
+     "compound": [],
+     "unresolved": [],
+     "usedBy": [
+      "UnsavedChangesBar"
+     ]
+    }
+   ],
+   "typedProps": [
+    {
+     "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
+     "type": "UnsavedChangesBarProps",
+     "variantsFrom": [
+      "unsavedChangesBarVariants"
+     ],
+     "props": [
+      {
+       "name": "dirty",
+       "optional": false,
+       "kind": "boolean",
+       "note": "Whether there is a staged draft to flag. `false` renders nothing at all — the artifact's own spec, \"appears ONLY when there are unsaved changes\" — so a caller never has to wrap this in its own conditional."
+      },
+      {
+       "name": "saving",
+       "optional": true,
+       "kind": "boolean",
+       "note": "True while `onSave`'s own request is in flight. Both acts disable — Discard because there is nothing left to safely discard mid-request, Save through the kit `Button`'s own `loading` treatment (a spinner, in place of `saveLabel` when `savingLabel` is given)."
+      }
+     ]
+    }
+   ],
+   "description": "UnsavedChangesBar — the flag for a dirty staged draft, and the two acts that resolve it (2 direct call sites: kwapso_system's Settings › Appearance and Settings › Team › Roles, both staging draft state behind Save today). DESIGN SOURCE The "
+  },
+  {
    "name": "use-debounce",
    "kind": "hook",
    "files": [
@@ -9339,6 +9414,11 @@
   },
   {
    "component": "toolbar-row",
+   "kind": "source-only",
+   "detail": "on disk, not in manifest.json"
+  },
+  {
+   "component": "unsaved-changes-bar",
    "kind": "source-only",
    "detail": "on disk, not in manifest.json"
   }

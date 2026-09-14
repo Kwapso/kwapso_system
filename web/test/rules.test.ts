@@ -2304,11 +2304,14 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
     // …and the badge builders route through the seam. The deep-link switch's
     // badges are all on the COLLECTION half (a record detail badges its tabs
-    // through withTabCounts instead), so that is the file named here — it used to
-    // be module-content.tsx, before the switch became two files.
+    // through withTabCounts instead) — it used to be module-content.tsx, before
+    // the switch became two files, and the ACCOUNTS badges moved a second time,
+    // 14 Sep 2026: the gallery/table view toggle needed a piece of state the
+    // switch cannot hold (it is deliberately pure), so `accounts-screen.tsx`
+    // carries them now, the same move Contacts already made.
     expect(read(join(WEB, "components", "shell", "team-section-nav.tsx"))).toContain("formatCount")
-    const collections = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
-    expect(collections).toContain("formatCount")
+    const accountsScreen = read(join(WEB, "components", "accounts", "accounts-screen.tsx"))
+    expect(accountsScreen).toContain("formatCount")
 
     // (ii) THE PLACE — every registry section with a count key whose placement
     // isn't "tab" renders a CollectionHeading (derived, never hand-listed).
@@ -5152,6 +5155,8 @@ describe("RULES — the laws of the base", () => {
       "agent-label-vocabulary", // R71: workers/data-ops/test/agent-label-vocabulary.test.ts — every summarize() poisoned with the `help` alias on its module/table/targetTable field, derived off the schema field name
       "no-default-subtitles", // R72: web/test/no-default-subtitles.test.ts — the heading-adjacent prose sibling census over both front doors, plus the three heading-drawing chokepoints read directly for a re-grown subtitle/description prop
       "registry-backed-exemptions", // R73: the exemption-shaped-const census, above, right after law-id-origin
+      "import-opens-a-tab", // R74: web/test/import-opens-a-tab.test.ts — every go()/softNavigate() targeting the import wizard must be openInNewTab() instead, plus Home's own named clause
+      "alphabetical-options", // R75: web/test/alphabetical-options.test.ts — the filter-bar.tsx central-seam guard, the SelectItem/options() census over both front doors, and roles-matrix.tsx's own named clause
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

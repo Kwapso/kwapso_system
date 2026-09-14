@@ -146,25 +146,16 @@ const MCP_ONLY: McpTool[] = [
     path: "/api/content/delivery/purposes/export",
   },
   {
-    name: "export_certificates_csv",
-    description:
-      "The team's credential register as CSV, who holds what, who issued it, when it lapses. Staff PROFILES have no export: a credential register is the kind of thing somebody hands an auditor, and a one-click spreadsheet of what the team is bad at is not.",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/staff/certificates/export",
-  },
-  {
     name: "export_accounts_csv",
     description:
-      "Every account you can see as CSV, companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME five filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `archived` ('yes' or 'no'), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot), `parentId`. Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR, a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
-    inputSchema: obj({ q: S, type: S, archived: S, portal: S, parentId: S }),
+      "Every account you can see as CSV, companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME seven filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `archived` ('yes' or 'no'), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot), `parentId`, `manager` (a staff member's user id), `country` (an exact match against the team's Country vocabulary). Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR, a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
+    inputSchema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, manager: S, country: S }),
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/accounts/export",
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "archived", "portal", "parentId"])
+      for (const key of ["q", "type", "archived", "portal", "parentId", "manager", "country"])
         if (typeof i[key] === "string" && i[key]) q.push(`${key}=${encodeURIComponent(String(i[key]))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -402,8 +393,8 @@ const RECORD_ACTIVE_GENERIC: McpTool = {
     "publishes as named tools (set_account_active, set_role_active, …) — this is the same operation, " +
     "generic. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, " +
     "app, app_module, process, wave, client_department, client_role, client_tool, " +
-    "meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile " +
-    "or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a " +
+    "meeting, knowledge_source, deliverable, brand_asset, meeting_purpose " +
+    "or staff_profile. `id` is that record's id — except a role, which takes `roleId` — and a " +
     "deliverable also needs `appId`. `active` false switches it off (archive, deactivate, revoke, " +
     "cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED, and " +
     "calling it twice changes nothing the second time. Each kind needs its own module's right — see " +

@@ -1742,7 +1742,28 @@ export function AppShell({
               }`}
             >
               <Icon className="size-5 shrink-0" />
-              <span className="w-full text-center leading-tight">{item.title}</span>
+              {/* ITEM 7, verify/qa-walk-1/REPORT.md — walk-mobile.mjs's own
+                  check 4 (NAV-WRAPS): "Knowledge base"/"Wissensdatenbank"/
+                  "Base de conocimiento"/"Base de coneixement" all need more
+                  ink than a fifth of 375px gives them, and with no
+                  `white-space` rule here the label wrapped to two lines. L10
+                  ("titles equal the nav's names") rules out shortening the
+                  word, so this is `truncate` (nowrap + ellipsis), not a
+                  smaller phrase: the row stays ONE line at every width, and
+                  the FULL name is still the real text a screen reader reads —
+                  ellipsis clips paint, not content. `title` adds the same
+                  full name as a native tooltip for a mouse, the cheapest form
+                  of "the label as tooltip" this needs. NOTE FOR THE REPORT:
+                  this does not silence NAV-WRAPS itself — that check measures
+                  ink-width against the slot for the word in isolation,
+                  independent of `white-space`/`text-overflow`, so it still
+                  (correctly) reports that Spanish's 121px does not fit a
+                  72–76px slot at any legible font size — see the K8/item-7
+                  memo in FIXES.md for the full arithmetic and why a smaller
+                  font or fewer nav items was rejected. */}
+              <span className="w-full truncate text-center leading-tight" title={item.title}>
+                {item.title}
+              </span>
             </button>
           )
         })}
@@ -1765,7 +1786,11 @@ export function AppShell({
             }`}
           >
             <DotsThree className="size-5 shrink-0" />
-            <span className="w-full text-center leading-tight">{t("More")}</span>
+            {/* Same `truncate` treatment as the row above — one line at
+                every width, full word kept as the real (and tooltip) text. */}
+            <span className="w-full truncate text-center leading-tight" title={t("More")}>
+              {t("More")}
+            </span>
           </button>
         )}
       </nav>

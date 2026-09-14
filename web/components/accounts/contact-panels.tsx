@@ -37,6 +37,7 @@ import { sliceKey, type PanelHost } from "@/components/work/work-panels"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 
@@ -310,7 +311,11 @@ export function ContactTicketsPanel({
   // them off (config.ts: "the distinct values are derived from the data").
   // This tab is a page-one SUMMARY (the file header), so that data is exactly
   // what a filter here can honestly promise to narrow.
-  const statuses = Array.from(new Set(q.data.map((tk) => tk.status))).sort()
+  const statuses = sortedOptions(
+    Array.from(new Set(q.data.map((tk) => tk.status))),
+    lang,
+    (s) => s
+  )
   const needle = query.trim().toLowerCase()
   const shown = q.data.filter(
     (tk) =>
@@ -341,7 +346,7 @@ export function ContactTicketsPanel({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("All")}</SelectItem>
-                    {statuses.map((s) => (
+                    {sortedOptions(statuses, lang, (s) => s).map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>

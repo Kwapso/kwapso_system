@@ -165,7 +165,6 @@ const MCP_ONLY_TOOLS: Record<string, string> = {
   export_dropdown_values_csv: EXPORT_REASON,
   export_brand_assets_csv: EXPORT_REASON,
   export_meeting_purposes_csv: EXPORT_REASON,
-  export_certificates_csv: EXPORT_REASON,
   export_accounts_csv: EXPORT_REASON,
   list_import_targets: IMPORT_BATCH_REASON,
   get_import_sample: IMPORT_BATCH_REASON,

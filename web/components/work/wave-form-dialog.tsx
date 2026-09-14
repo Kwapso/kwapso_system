@@ -36,7 +36,8 @@ import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type WaveFormValues = {
   accountId: string
@@ -79,7 +80,7 @@ export function WaveFormDialog({
   draftKey?: string
   onSubmit: (values: WaveFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -144,7 +145,7 @@ export function WaveFormDialog({
             // account always wears a mark (client, 2026-09-09), and on staging
             // 48 of 134 hold a picture — so without `face` two rows in three
             // drew nothing beside the ones that do.
-            options={clients.map(accountOption)}
+            options={sortedOptions(clients, lang, (c) => c.name).map(accountOption)}
             placeholder={t("Pick the account")}
             searchPlaceholder={t("Search accounts…")}
             emptyText={t("No account matched.")}

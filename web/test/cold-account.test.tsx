@@ -178,17 +178,36 @@ describe("F2 · every declared import target has a way in from a screen", () => 
     .map((f) => stripComments(f.source))
     .join("\n")
 
-  /** THE CANARY, and it runs first. `import/accounts` has had a button since
+  /** THE CANARY, and it runs first. `import/meetings` has had a button since
    * the importer shipped, so a census that cannot find THAT one is a broken
-   * census and every zero below would be a lie. */
+   * census and every zero below would be a lie.
+   *
+   * IT USED TO BE `import/accounts` — the canary moved, not the mechanism,
+   * when the accounts button it was anchored to went (see the note on the
+   * `it.each` below). Any surviving per-module route proves the census still
+   * works; `meetings` was picked because nothing in this session touches it. */
   it("finds an import route that is definitely there", () => {
     expect(agencySource, "the census cannot find a route that exists — every result below is meaningless").toContain(
-      "import/accounts"
+      "import/meetings"
     )
   })
 
+  // ACCOUNTS IS NOT IN THIS LIST ANY MORE. The client's own ruling, 14 Sep
+  // 2026, verbatim: "On Accounts, kill the Export and Import buttons. Not
+  // needed." That removed the accounts collection's own "Import CSV" button —
+  // its one DEDICATED route in from a screen — so `agencySource` genuinely no
+  // longer contains the literal `import/accounts`, and asserting it would be
+  // asserting a route that no longer exists.
+  //
+  // THE TARGET ITSELF IS NOT GONE, and neither is every way in: the door
+  // (`POST /api/data-ops/import/batch/*`), the TargetDef
+  // (workers/data-ops/src/lib/targets.ts) and its sample file all stay, and
+  // the GENERIC `/t/<team>/import` screen asserted two tests down accepts an
+  // accounts CSV exactly as it always did — a file's target is read off its
+  // own columns at the plan step, never off which button somebody pressed to
+  // get there. What is gone is the one-click shortcut from the accounts
+  // collection's own toolbar; the importer itself is unchanged.
   it.each([
-    ["accounts", "the customer spine"],
     ["meetings", "two years of somebody's diary"],
     ["stories", "the work in hand"],
     ["brand_assets", "the agency's own material"],

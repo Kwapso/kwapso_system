@@ -1397,11 +1397,24 @@ export function TodosPanel({
   accountId,
   canCancel,
   onNew,
+  onOpenTicket,
 }: {
   teamId: string
   accountId?: string
   canCancel: boolean
   onNew?: () => void
+  /** A to-do the CLIENT raised has no detail screen of its own — but it may
+   * carry `ticketId`, the ticket it was raised on. Given, an OPEN row's title
+   * becomes a real `OpenLink` to that ticket, the same idiom every sibling
+   * panel in this file uses (`softNavigate(host.base + ...)` — see
+   * `StoriesPanel`/`SprintsPanel`/etc. above). Omitted, the row stays plain
+   * text: this panel mounts from a caller with no `host`/`onIntent` wiring of
+   * its own too (`account-detail.tsx`, `contact-detail.tsx`), and a row with
+   * genuinely nowhere to go should not draw an affordance that leads nowhere
+   * (item 6, verify/qa-walk-1/REPORT.md — "looks identical to every other
+   * clickable record row" is the bug when there IS a destination and nothing
+   * points to it; it is correct, not a bug, on the rows that truly have none). */
+  onOpenTicket?: (ticketId: string) => void
 }) {
   const { t, lang } = useLanguage()
   const [view, setView] = React.useState<TodoViewName>("open")
@@ -1560,10 +1573,24 @@ export function TodosPanel({
             mark={<RecordMark name={todo.title} />}
           >
             <div className="min-w-0 flex-1">
-              <p className={`${REF_LEADS_NAME} text-sm`}>
-                <RecordRef value={todo.ref} />
-                <span className="min-w-0 truncate">{todo.title}</span>
-              </p>
+              {/* A to-do has no detail screen of its own, but one raised on a
+                  ticket carries `ticketId` — opening that IS opening what the
+                  row is about, the same "record it carries" reasoning R35 uses
+                  elsewhere. A row with no ticket to open stays plain text: it
+                  had no affordance before and gets none now, rather than one
+                  that looks pressable and leads nowhere (item 6,
+                  verify/qa-walk-1/REPORT.md). */}
+              {todo.ticketId && onOpenTicket ? (
+                <span className={`${REF_LEADS_NAME} text-sm`}>
+                  <RecordRef value={todo.ref} />
+                  <OpenLink label={todo.title} onOpen={() => onOpenTicket(todo.ticketId!)} />
+                </span>
+              ) : (
+                <p className={`${REF_LEADS_NAME} text-sm`}>
+                  <RecordRef value={todo.ref} />
+                  <span className="min-w-0 truncate">{todo.title}</span>
+                </p>
+              )}
               <p className="text-muted-foreground truncate text-xs">
                 {meta.filter(Boolean).join(" · ")}
                 {todo.fileName && (

@@ -302,6 +302,10 @@ export function AccountDetailScreen({
       city: values.city.trim() || null,
       country: values.country.trim() || null,
       industry: values.industry.trim() || null,
+      // 0091 — always sent (edit mode always shows this field), so a save
+      // here can never leave a stale manager, the same reasoning altNames
+      // below already carries.
+      accountManagerUserId: values.accountManagerId || null,
       about: values.about.trim() || null,
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
@@ -452,7 +456,28 @@ export function AccountDetailScreen({
     .filter(Boolean)
     .join(", ")
 
+  // 0091 — THE MANAGER'S FACE, resolved off the members list this screen
+  // already holds (R56: one read, not a second one for this chip). The door
+  // hands back the id only (`account.accountManagerId`); the name and
+  // picture are looked up here the same way `stakeholders-panel.tsx` already
+  // resolves a staff face off `app.staff`'s ids.
+  const manager = members.find((m) => m.id === account.accountManagerId)
+
   const overviewItems = [
+    // FIRST ROW (client ruling, 14 Sep 2026): "who the account responsible
+    // or account manager is." An avatar chip, never a bare name (R35) — "—"
+    // is a real, honest answer for the accounts that predate this field.
+    {
+      label: t("Account manager"),
+      value: manager ? (
+        <span className="flex items-center gap-2">
+          <RecordMark picture={manager.photo} name={manager.name} shape="round" />
+          {manager.name}
+        </span>
+      ) : (
+        "—"
+      ),
+    },
     { label: t("Parent account"), value: parent ? parent.name : t("Sits on its own") },
     { label: t("Reference"), value: account.code || "—" },
     { label: t("Industry"), value: account.industry || "—" },
@@ -846,6 +871,7 @@ export function AccountDetailScreen({
         open={editOpen}
         onOpenChange={setEditOpen}
         draftKey={`account:edit:${accountId}`}
+        members={members}
         initial={{
           accountType: account.accountType,
           name: account.name,
@@ -856,6 +882,7 @@ export function AccountDetailScreen({
           city: account.city ?? "",
           country: account.country ?? "",
           industry: account.industry ?? "",
+          accountManagerId: account.accountManagerId ?? "",
           about: account.about ?? "",
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",

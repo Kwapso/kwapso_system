@@ -357,16 +357,24 @@ function ValueRow({
         <ValueEditor v={v} ctx={ctx} />
       ) : (
         <>
-          {/* THE TYPE MARK, where it is SET (CHECKLIST 11.8). It
-              sits in the leading icon slot and is `aria-hidden`,
-              with the word right beside it, two of the four
-              conditions UI-CONVENTIONS §5 puts on a type mark, and
-              this screen is the third one (it is data, set here). */}
-          {v.mark && (
-            <span aria-hidden className="w-5 shrink-0 text-base leading-none">
-              {v.mark}
-            </span>
-          )}
+          {/* NO MARK GLYPH HERE ANY MORE — the client's ruling on the Choices
+              tab, 14 Sep 2026, is written about that screen but is blanket in
+              its own words: *"kill all the emojis. I don't want to see it.
+              The only thing that choices can have is either a color or an
+              icon."* This row used to draw `v.mark` (CHECKLIST 11.8's type
+              mark) in the leading slot for every group that is not a
+              coloured wall of chips (`ChipWall`/`ValueChip` above never drew
+              it — a coloured group's colour IS the mark, see `RowContext`'s
+              own header). No group mounted through this row carries a colour
+              or an icon today, so the honest draw is nothing beside the
+              word, same as `shapeChoicesTable` now does on the system-wide
+              Choices tab (deep-link/shape.tsx) for the identical case. THE
+              DATA IS UNTOUCHED — `mark` still exists on the row, is still
+              editable through Rename (`ValueEditor`, unaffected by this),
+              and is still read by the screens that draw a type's own glyph
+              OUTSIDE Settings (a sprint's board, a story's chip) — this is a
+              display change to ONE row, not a data change and not a second
+              write-door refusal beside `optionalMark`'s. */}
           {/* THE WORD, AND IT OPENS NOTHING. It used to be a real anchor to
               `/t/<teamId>/dropdowns/<id>`, a value's own record screen — and
               this row was that screen's only door anywhere in the app. Both

@@ -43,7 +43,6 @@ import type {
   Meeting,
   MeetingPersonLink,
   MeetingPurpose,
-  StaffCertificate,
   StaffProfile,
   StoryAttachment,
   TicketStageHistory,
@@ -1305,26 +1304,9 @@ export const content = {
     api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles", post(input)),
   setStaffProfileActive: (id: string, active: boolean) =>
     api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles/active", post({ id, active })),
-  /** A profile photo or a certificate, streamed as the request body. */
+  /** A profile photo, streamed as the request body. */
   uploadStaffFile: (dataUrl: string) =>
     sendFile<{ url: string; contentType: string }>("/api/content/staff/upload-stream", "staff", dataUrl),
-
-  /** `userId` narrows at the DOOR, not in the client: a member's page shows one
-   * person's certificates, and filtering a capped list afterwards would disagree
-   * with the count beside it (R16). */
-  staffCertificates: (userId?: string) =>
-    api<{ certificates: StaffCertificate[]; total: number }>(
-      `/api/content/staff/certificates${userId ? `?userId=${enc(userId)}` : ""}`
-    ),
-  createStaffCertificate: (input: Partial<StaffCertificate> & { userId: string }) =>
-    api<{ certificates: StaffCertificate[]; total: number }>("/api/content/staff/certificates", post(input)),
-  updateStaffCertificate: (input: Partial<StaffCertificate> & { id: string }) =>
-    api<{ certificates: StaffCertificate[]; total: number }>("/api/content/staff/certificates/update", post(input)),
-  setStaffCertificateActive: (id: string, active: boolean) =>
-    api<{ certificates: StaffCertificate[]; total: number }>(
-      "/api/content/staff/certificates/active",
-      post({ id, active })
-    ),
 
   // ── GOOGLE ─────────────────────────────────────────────────────────────────
   // Your own connections, and what you have chosen to share through them. Every

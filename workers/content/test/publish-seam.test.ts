@@ -42,7 +42,7 @@ const HOUSEKEEPING = [
   "POST /api/content/uploads/confirm",
   // The agency's own housekeeping: two more byte-shovels, same reasoning. The
   // brand library re-hosts 74 legacy files that die with the Glide account, and
-  // a staff photo or a certificate PDF lands the same way. Neither writes a row
+  // a staff photo lands the same way. Neither writes a row
   // — the create/edit that references the URL pings its own.
   "POST /api/content/brand-assets/upload",
   "POST /api/content/brand-assets/upload-stream",

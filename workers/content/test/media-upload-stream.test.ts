@@ -174,7 +174,7 @@ describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate, segment })
     // WHY THE MODULE IS IN THERE. Four modules wrote into this one bucket under
     // the bare `team01/` prefix, so `ownedMediaKey(url, base, teamId)` — the proof
     // a reclaim stands on — could say "this team's" and never "this module's". A
-    // brand asset's URL pasted into a staff certificate's file field would have
+    // brand asset's URL pasted into a staff photo's file field would have
     // passed that proof and been deleted by the staff door's reclaim.
     expect(key.split("/")[1], "the module owns its own prefix").toBe(segment)
     // `/media/*` is served with no session, so the key IS the credential and must

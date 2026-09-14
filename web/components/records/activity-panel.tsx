@@ -108,6 +108,12 @@ export function ActivityPanel({
           description: a.description,
           actor: a.actor,
           initials: a.initials,
+          // THE FACE (R35/R60, client ruling: "make sure ... we see the avatars
+          // of the people"). `useRecordActivity` already resolves the actor's
+          // stored picture and safe-checks it (R40); this feed draws it, the
+          // kit's own `ActivityFeed` falling back to `initials` when it is
+          // absent — same rule as everywhere else a record shows its face.
+          avatarSrc: a.avatarSrc,
           time: a.timestamp,
           dateTime: a.dateTime,
         }))}

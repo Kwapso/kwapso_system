@@ -633,6 +633,7 @@ export function TasksScreen({
           teamId={teamId}
           canCancel={canCancelTodo}
           onNew={canRaiseTodo ? () => setTodoOpen(true) : undefined}
+          onOpenTicket={(id) => onIntent({ kind: "open", module: "tickets", id })}
         />
       </section>
 

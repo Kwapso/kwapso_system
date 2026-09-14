@@ -40,6 +40,7 @@ import { PRIORITY_LABEL, departmentAsks, departmentGlyph, priorityScore } from "
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
+import { sortedOptions } from "@shared/web/sorted-options"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -194,7 +195,7 @@ export function TaskFormDialog({
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={options.map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
+      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -300,7 +301,7 @@ export function TaskFormDialog({
             onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
             search={(term) => searchAccounts(term)}
             searchKey={pickerKey("accounts", teamId)}
-            options={accounts.map(accountOption)}
+            options={sortedOptions(accounts, lang, (a) => a.name).map(accountOption)}
             emptyOption={{ value: NONE, label: t("Which account is it for?") }}
             placeholder={t("Which account is it for?")}
             searchPlaceholder={t("Search accounts…")}

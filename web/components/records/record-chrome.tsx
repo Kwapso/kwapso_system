@@ -334,6 +334,11 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
     description: item.description,
     actor: item.actor,
     initials: item.initials,
+    // THE FACE (R35/R60, client ruling: "make sure ... we see the avatars of
+    // the people ... right now it only shows the initials"). Same field, same
+    // fallback, as the rail's own feed (activity-panel.tsx) — one row read
+    // once (R5), drawn in both places it summarises.
+    avatarSrc: item.avatarSrc,
     time: item.timestamp,
     dateTime: item.dateTime,
   }))
@@ -1601,4 +1606,28 @@ export const STICKY_TABS =
   "lg:[&>[role=tablist]]:-mx-[var(--space-7)] " +
   "lg:[&>[role=tablist]]:w-[calc(100%_+_var(--space-7)_+_var(--space-7))] " +
   "lg:[&>[role=tablist]]:-mt-[calc(var(--space-7)_+_var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
-  "lg:gap-[var(--space-7)]"
+  "lg:gap-[var(--space-7)] " +
+  /* A DESKTOP SCROLL AFFORDANCE — item 3, QA walk 1 (verify/qa-walk-1/REPORT.md).
+   * The kit's `TabsList` (tabs.tsx) already scrolls this strip on overflow
+   * (`overflow-x-auto`) — a live measurement on App detail at 1280 found
+   * `scrollWidth 1307 / clientWidth 973`, genuinely draggable, `scrollLeft`
+   * clamping at exactly the 334px overflow. So this is not a kit gap in the
+   * SCROLLING (M3's mechanism is present and works at every width, desktop
+   * included) — it is a kit gap in the HINT: `[scrollbar-width:none]` +
+   * `[&::-webkit-scrollbar]:hidden` (tabs.tsx) hide the one native affordance
+   * unconditionally, which is right for a touch strip (M3: "short enough to
+   * be dragged") and wrong for a mouse, which has no drag-to-reveal gesture
+   * and no other cue that the last tab is cut mid-word rather than just
+   * short. Filed as a KIT GAP in FIXES.md (K8/item-3 memo): the kit should
+   * offer a scroll-hint (a thin scrollbar, or an edge fade) at
+   * `(pointer:fine)` widths rather than hiding it everywhere. Smallest
+   * app-side answer that does not fork `TabsList` or add a second tab
+   * component (R39) — un-hide the native scrollbar, thin, ONLY where a mouse
+   * is present, through the same descendant-selector technique already used
+   * on this exact strip (the dark-mode fill fix above). Touch/M3 is
+   * untouched: `(pointer:fine)` excludes it. */
+  "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]]:[scrollbar-width:thin] " +
+  "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar]:!block " +
+  "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar]:!h-1.5 " +
+  "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar-thumb]:!bg-border " +
+  "[@media(hover:hover)_and_(pointer:fine)]:[&>[role=tablist]::-webkit-scrollbar-thumb]:!rounded-pill"

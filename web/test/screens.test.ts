@@ -111,7 +111,15 @@ describe("tabCountKey / withTabCounts", () => {
   // the client killed the Activity tab across the app on 2026-09-06 (a record's
   // history is read from the footer's Latest activity column and opens in a
   // slide-in off it — web/components/records/activity-panel.tsx carries the ruling), so
-  // the five detail recipes are a single `description` block each.
+  // the five detail recipes were down to a single `description` block each —
+  // and `members.detail` went further still, 2026-09-14 (chip above title, the
+  // picture, no strip — `web/components/team/member-screen.tsx`'s own header):
+  // it moved onto the bespoke `RecordScreen` host and now declares no `tabs` at
+  // all, so it can no longer lend this fixture an "overview" tab to borrow.
+  // `brand.detail` is the same generic-engine shape `members.detail` used to be
+  // (one `description`-block "Overview" tab, `internalDetailTabs` above), so
+  // the fixture borrows from it instead — the SEAM under test doesn't care
+  // which detail recipe it reads, only that a real one still has this shape.
   //
   // The SEAM did not go with them. `withTabCounts` is what badges whatever
   // collection tab a detail recipe declares, derived from each tab's own block
@@ -122,14 +130,14 @@ describe("tabCountKey / withTabCounts", () => {
   // changed is that the input has to be written down instead of borrowed. The
   // base recipe is still the starting point, so a change to its shape still
   // reaches this test.
-  const base = BASE_RECIPES["members.detail"] as ScreenRecipe
+  const base = BASE_RECIPES["brand.detail"] as ScreenRecipe
   const overview = (base.tabs ?? []).find((t) => t.key === "overview")!
   const activity: RecipeTab = {
     key: "activity",
     label: "Activity",
     block: { kind: "activity", source: "activity" },
   }
-  const memberDetail: ScreenRecipe = { ...base, tabs: [overview, activity] }
+  const detailFixture: ScreenRecipe = { ...base, tabs: [overview, activity] }
 
   it("names the collection a tab reveals, and null for the record's own fields", () => {
     expect(tabCountKey(activity)).toBe("activity") // the feed the block names
@@ -137,7 +145,7 @@ describe("tabCountKey / withTabCounts", () => {
   })
 
   it("badges the collection tab and leaves the record's own tab alone", () => {
-    const next = withTabCounts(memberDetail, { activity: 24_011 })
+    const next = withTabCounts(detailFixture, { activity: 24_011 })
     expect(next.tabs?.find((t) => t.key === "activity")?.badge).toBe("24k")
     expect(next.tabs?.find((t) => t.key === "overview")?.badge).toBeUndefined()
   })
@@ -146,17 +154,17 @@ describe("tabCountKey / withTabCounts", () => {
     // A "0" beside a history reads as "nothing ever happened here" — which,
     // while page one is still in flight, is a lie the badge tells for free.
     for (const total of [0, undefined]) {
-      const next = withTabCounts(memberDetail, { activity: total })
+      const next = withTabCounts(detailFixture, { activity: total })
       expect(next.tabs?.find((t) => t.key === "activity")?.badge).toBe("")
     }
     // A tab whose collection is missing from `totals` is the same case, not a crash.
-    expect(withTabCounts(memberDetail, {}).tabs?.find((t) => t.key === "activity")?.badge).toBe("")
+    expect(withTabCounts(detailFixture, {}).tabs?.find((t) => t.key === "activity")?.badge).toBe("")
   })
 
   it("returns a fresh copy and never mutates the base recipe", () => {
-    const next = withTabCounts(memberDetail, { activity: 7 })
-    expect(next).not.toBe(memberDetail)
-    expect(next.tabs).not.toBe(memberDetail.tabs)
+    const next = withTabCounts(detailFixture, { activity: 7 })
+    expect(next).not.toBe(detailFixture)
+    expect(next.tabs).not.toBe(detailFixture.tabs)
     expect(activity.badge).toBeUndefined() // the shipped default is still untouched
   })
 

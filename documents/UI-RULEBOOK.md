@@ -37,9 +37,9 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L10)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
 - [3. Detail screens](#3-detail-screens) (D1 to D12)
-- [4. Collections](#4-collections) (K1 to K16)
+- [4. Collections](#4-collections) (K1 to K17)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
 - [7. Typography](#7-typography) (T1 to T8)
@@ -620,6 +620,27 @@ settings page's title actually IS a `navPageTitle` call rather than a literal st
 back in agreement with it by hand — this entry states the ruling as she gave it and the
 mechanism as it is built, honestly short of a census over every settings page in the app.
 
+### L11: pressing Import opens its own workspace tab, fronted, and never redirects the one you were in
+
+**The rule.** *"Make sure that it opens as a new solo tab on the breadcrumbs, because now
+it redirects. In the places where we have import, make sure that's what it does."* —
+client, testing Import, 2026-09-14. Every "Import CSV" door, and the generic wizard link on
+Home, used to navigate the CURRENT workspace tab straight to the import wizard, so the
+collection she pressed it from vanished from the strip until she clicked Back — the "just
+redirected me" she was reporting.
+
+**The mechanism.** `openInNewTab` (`web/lib/nav.ts`) is the one door: a SOLO tab is a trail
+of one entry, which `visitTrail` (`web/lib/workspace-tabs.ts`, the model behind the
+breadcrumb-tab strip) already generalises to on its own terms — no ancestors, one entry,
+itself the only and active level. Every import dispatch calls it instead of the plain
+`go`/`softNavigate` this section's own `<InAppLink>` inline-interception pattern otherwise
+uses. Pressing Import again on the same target fronts the tab already open rather than
+opening a second one, and closing it returns to the tab that was open before — the ordinary
+tab-strip behaviour [K4](#k4-a-tab-that-reveals-a-collection-carries-the-count-as-a-badge-and-the-heading-stands-down)'s
+own model already gives every other tab, extended to this one door.
+
+**Law.** [R74](../RULES.md) (`import-opens-a-tab`).
+
 ---
 
 ## 3. Detail screens
@@ -1170,6 +1191,44 @@ September and the member card shipped the opposite way a day later, green, becau
 in the build knew the two were the same question.
 
 **Law.** [R65](../RULES.md) (`chip-above-title`).
+
+### K17: the options a control offers are A to Z, in the reader's own language
+
+**The rule.** *"In settings, automations, make sure that in the sort component, in the
+modules component, you sort it A to Z. This here, but everywhere in the app, make it a
+law."* A CHOICE a control offers — a filter facet's options, a `<Select>`'s items, a
+picker's list — is alphabetical, comparing the label a person reads, locale-aware
+(`sortedOptions()`, `shared/web/sorted-options.ts`, `localeCompare` against the app's
+CURRENT language from `useLanguage()` — never the browser's own locale, and never a plain
+`.sort()`). This is a statement about CHOICES, not ROWS: a collection's own records keep
+the sort control [K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)
+already gives them.
+
+**One seam carries the client's own example for free.** Every [K7](#k7-the-collection-toolbar-is-one-row-heading-search-filter-add)
+filter facet — declared options or derived from the rows on screen — renders through
+`shared/web/screen-engine/filter-bar.tsx`'s own `optionsFor`, the one chokepoint every
+facet on both front doors passes through. Sorting its result there is what puts Settings ›
+Automations' Module and Status filters — her named example — and Settings › Choices'
+beside them, in order, without a second line at either screen's own `filterFacets`
+declaration.
+
+**The rest is fixed at the point a control is built**, not where its data happens to be
+computed: the array handed straight to a hand-rolled `<Select>`/`<SelectItem>` `.map()`,
+or to a picker's `options` prop, opens with `sortedOptions(`.
+
+**The one thing that must NOT sort.** A control whose list is not a naming vocabulary at
+all — a size SCALE (Compact→Regular→Large, `shared/web/scale-section.tsx`, the client's
+own example of the shape this rule does not touch), a frequency (day→week→month→year), a
+step's place in a workflow somebody actually designed, a TEAM's own drag-ordered
+vocabulary (an app's stage, a sprint or story type — `selectable_data`, the same
+protected order R70 already holds a switch's own visibility to) — is named in
+`ORDERED_OPTIONS_OK` (`shared/rules/registry.ts`) with the real reason, reasoned per entry,
+rot-checked both ways. **A collection's own "sort by" menu is a different question
+entirely** — `CollectionConfig.sortOptions`/`COLLECTION_SORTS` says WHICH FIELD to order a
+collection BY ("Newest first", "Priority order"), a designed landing sequence
+(`web/lib/collection-sorts.ts`'s own header), and this law does not reach it.
+
+**Law.** [R75](../RULES.md) (`alphabetical-options`).
 
 ---
 
@@ -2975,14 +3034,14 @@ library, not a synthesised weight in the host.
 
 ## Rule index
 
-**128 rules.**
+**130 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L10 (10) |
+| 2. Page layout and width | L1 to L11 (11) |
 | 3. Detail screens | D1 to D12 (12) |
-| 4. Collections | K1 to K16 (16) |
+| 4. Collections | K1 to K17 (17) |
 | 5. Buttons and actions | B1 to B12 (12) |
 | 6. Forms and dialogs | F1 to F10 (10) |
 | 7. Typography | T1 to T8 (8) |
@@ -3021,6 +3080,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R63 | [K14](#k14-the-toolbar-stays-on-top-while-the-rows-scroll-under-it-and-the-pin-is-the-rows) | R64 | [L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place) |
 | R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
 | R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R72 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
+| R74 | [L11](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in) | R75 | [K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language) |
 
 ### The seven files that carry most of it
 

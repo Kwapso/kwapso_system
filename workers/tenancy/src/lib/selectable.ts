@@ -430,8 +430,28 @@ export async function setSelectableActive(
  * door change that buys a reader nothing. It is the same ruling CLAUDE.md
  * records for `help`/Tickets: the human-facing word moves, the identifier stays.
  *
+ * PROTECTING ALSO REACTIVATES — the client's ruling, 14 Sep 2026: "also, the
+ * status: if it's protected, it's always active." `setSelectableActive` already
+ * refuses to deactivate a value THAT IS ALREADY protected (below), but nothing
+ * stopped the other order — deactivate a value first, while it is not yet
+ * protected, then protect it, and the row ends up protected AND inactive with
+ * neither door ever having refused either half. Two ways to close that: REFUSE
+ * to protect a deactivated value (a second two-step dance, mirroring the other
+ * direction), or REACTIVATE it as part of protecting it. This takes the second
+ * one, because R17 gives it a single idempotent UPDATE and a refusal does not —
+ * "protected is always active" reads as a fact the ROW keeps, not a second
+ * error a caller has to route around before protecting something. The predicate
+ * that guards the UPDATE below is the current-state check R17 always asks for,
+ * widened by one clause: a row changes when `is_default` is actually flipping,
+ * OR (protecting it AND it is still deactivated) — so protecting an
+ * already-protected, already-active row remains the zero-row no-op it always
+ * was, and protecting an already-protected row that is somehow still
+ * deactivated (0088's migration reactivates every existing one, but the door
+ * must not depend on that having run) reactivates it on the spot.
+ *
  * R17: the current-state predicate rides the UPDATE, so protecting a value that
- * is already protected moves zero rows and writes no history. */
+ * is already protected AND already active moves zero rows and writes no
+ * history. */
 export async function setSelectableDefault(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -448,12 +468,40 @@ export async function setSelectableDefault(
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
+  // Read BEFORE the write, so the activity description can say whether this
+  // call also reactivated the row — the one fact `changed[0]` alone can't tell
+  // apart from an ordinary protect.
+  const reactivates = isDefault && row.deactivated_at != null
+
   const now = new Date().toISOString()
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE selectable_data SET is_default = ?, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND is_default <> ? RETURNING id`,
-    [isDefault ? 1 : 0, now, id, isDefault ? 1 : 0]
+    `UPDATE selectable_data
+        SET is_default = ?,
+            -- Protecting clears deactivation; un-protecting never touches it —
+            -- the two flags are coupled in one direction only, the direction
+            -- her ruling names ("protected is always active", never the
+            -- reverse).
+            deactivated_at = CASE WHEN ? = 1 THEN NULL ELSE deactivated_at END,
+            deactivator_id = CASE WHEN ? = 1 THEN NULL ELSE deactivator_id END,
+            deactivator_email = CASE WHEN ? = 1 THEN NULL ELSE deactivator_email END,
+            deactivator_name = CASE WHEN ? = 1 THEN NULL ELSE deactivator_name END,
+            updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)}
+      WHERE id = ?
+        AND (is_default <> ? OR (? = 1 AND deactivated_at IS NOT NULL))
+      RETURNING id`,
+    [
+      isDefault ? 1 : 0,
+      isDefault ? 1 : 0,
+      isDefault ? 1 : 0,
+      isDefault ? 1 : 0,
+      isDefault ? 1 : 0,
+      now,
+      id,
+      isDefault ? 1 : 0,
+      isDefault ? 1 : 0,
+    ]
   )
   if (!changed[0]) return false
 
@@ -463,7 +511,7 @@ export async function setSelectableDefault(
     // use either way) and the two hand-written `VERB_BY_PHRASE` lines these
     // replaced are gone. See shared/workers/activity-verbs.ts.
     type: isDefault ? "Dropdown value protected" : "Dropdown value no longer protected",
-    description: `${actor.name} ${isDefault ? "protected" : "took the protection off"} the "${row.value}" ${row.type} value`,
+    description: `${actor.name} ${isDefault ? "protected" : "took the protection off"} the "${row.value}" ${row.type} value${reactivates ? " and reactivated it — protected is always active" : ""}`,
     relatedTable: "selectable_data",
     relatedRowId: id,
   })

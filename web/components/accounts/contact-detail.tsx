@@ -80,6 +80,7 @@ import { accountKey, accountsKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
+import { useAssignableMembers } from "@/lib/members"
 import { invalidate, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -123,6 +124,10 @@ export function ContactDetailScreen({
   const canEdit = can("accounts", "update")
   const canArchive = can("accounts", "delete")
   const canSeeContacts = can("contacts", "read")
+  // 0091 — required by the shared AccountFormDialog even though a contact's
+  // own edit never draws the picker (company-only, account-form-dialog.tsx's
+  // own `isCompany` gate). The same cache four other screens already hold.
+  const members = useAssignableMembers(teamId)
   const canSeeLogins = can("portal_users", "read")
   const canGrant = can("portal_users", "create")
   const canRevoke = can("portal_users", "delete")
@@ -621,6 +626,7 @@ export function ContactDetailScreen({
         open={editOpen}
         onOpenChange={setEditOpen}
         draftKey={`contact:edit:${accountId}`}
+        members={members}
         initial={{
           accountType: "individual",
           name: account.name,
@@ -631,6 +637,7 @@ export function ContactDetailScreen({
           city: account.city ?? "",
           country: account.country ?? "",
           industry: account.industry ?? "",
+          accountManagerId: account.accountManagerId ?? "",
           about: account.about ?? "",
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",

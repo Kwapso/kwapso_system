@@ -215,9 +215,27 @@ const membersListRecipe: ScreenRecipe = {
   }),
 }
 
-/** Member detail (Overview). Actions change-role + remove are gated by
- * team_members update/delete; the host hides them on your own row. Its Activity
- * tab went with every other one on 2026-09-06 — see the team recipe above. */
+/** Member detail. Actions change-role + remove are gated by team_members
+ * update/delete; the host hides them on your own row. Its Activity tab went
+ * with every other one on 2026-09-06 — see the team recipe above.
+ *
+ * NOT RENDERED BY THE GENERIC ENGINE ANY MORE — client ruling, 2026-09-14
+ * ("chip on top of title", "an image… I want to be able to see it", "remove
+ * the tabs", "put the footer where it belongs"). `web/components/team/
+ * member-screen.tsx` renders this record through `RecordScreen`
+ * (`web/components/records/record-chrome.tsx`) — the same bespoke host every
+ * other record detail (a Contact, a Ticket) draws through — because the
+ * generic engine's own header has no chip slot and nothing here needed the
+ * fourth shape. This recipe stays alive for its `gate` (the screen-level read
+ * gate) and its `actions` (label + gate + variant, read by the host to build
+ * the two buttons; the door calls they dispatch are R64's own proof, read off
+ * member-screen.tsx). `header`/`tabs`/`fields` are gone: the head is
+ * `member-head.tsx`'s (picture, full name, birthday, position, phone number,
+ * role, joined, email, plus the two acts), and there is deliberately no tab
+ * strip — a single body, the honest route R2 itself names ("TabsView draws
+ * nothing below two views… make the member record a SINGLE-BODY screen").
+ * `member-screen` is in `RECORD_TABS_SINGLE_PANEL` (shared/rules/registry.ts)
+ * saying so. */
 const memberDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "members" },
@@ -238,27 +256,6 @@ const memberDetailRecipe: ScreenRecipe = {
       variant: "destructive",
       gate: { module: "team_members", right: "delete" },
     },
-  ],
-  header: { title: "name", subtitle: "email", avatar: "image" },
-  tabs: [
-    {
-      key: "overview",
-      label: "Overview",
-      icon: CONCEPT_ICON.overview,
-      block: {
-        kind: "description",
-        columns: 1,
-        rows: [
-          { label: "Role", column: "role" },
-          { label: "Joined", column: "joined" },
-          { label: "Email", column: "email" },
-        ],
-      },
-    },
-    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
-    // is reached from the record footer's Latest activity column and opens in a
-    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
-    // the ruling and the argument.
   ],
 }
 
@@ -406,17 +403,35 @@ const ticketsListRecipe: ScreenRecipe = {
 /* -------------------------------- accounts -------------------------------- */
 
 /** Accounts list — every company and every person the team works with, in one
- * list (they are one table). A row's summary line carries what you'd read out
- * loud: what it is, its reference, where it stands, and the account it sits
- * under. PAGED (R14) — the list grows with ordinary use, so the frame's own
- * "Showing X of Y" stays off and the exact total is badged once, above. */
+ * list (they are one table). PAGED (R14) — the list grows with ordinary use,
+ * so the frame's own "Showing X of Y" stays off and the exact total is
+ * badged once, above.
+ *
+ * THIS RECIPE NO LONGER RENDERS THROUGH `ScreenRenderer`, the same way
+ * Contacts' does not (see `contacts.list` below): the client's ruling of
+ * 14 Sep 2026 — "for accounts main: use gallery and add table as alternate
+ * view. filter by account manager, country, status. sort by name" — needs a
+ * card wall the engine's own `display: "gallery"` (the kit's image-led
+ * `Gallery`, `components/gallery`) cannot draw (no avatar-chip slot, and its
+ * own header names accounts by name as the one collection it refuses), so
+ * both bodies are host-composed in `web/components/accounts/accounts-screen.tsx`
+ * — a `CardGrid` wall (Members' own reference) and a `RecordTable`, exactly
+ * `contacts-screen.tsx`'s shape one view along. `display`, `leading` and
+ * `fields` below are therefore VESTIGIAL — kept in case a team's JSON
+ * override (M2) still reads them, never consulted by the live screen — and
+ * `AccountsScreen` builds its own gallery tiles and table columns off
+ * `shapeAccountsList`'s row shape instead. */
 const accountsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
   binding: { module: "accounts" },
   gate: { module: "accounts", right: "read" },
-  fields: [field("name", "Account"), field("detail", "Details")],
+  // 0091 — `manager` is a NODE column (an avatar chip + name, or "—") on
+  // every row `shapeAccountsList` produces, client ruling 14 Sep 2026: "who
+  // the account responsible or account manager is." DRAWN NOW, on both the
+  // gallery card and the table's own column — see the recipe's own header.
+  fields: [field("name", "Account"), field("detail", "Details"), field("manager", "Account manager")],
   // THE COMPANY'S OWN LOGO, in the row (library v0.11.0). `renderList` had no
   // leading slot until then, so 17 of 24 companies and 31 of 106 contacts carried
   // a picture the door sent and no list drew — the owner asked why there were no

@@ -162,10 +162,52 @@ export const SEED: Catalogue = {
    * Idioma·Tamaño·Apariencia·Fondo, Idioma·Mida·Aparença·Fons; Save →
    * Speichern/Guardar/Desar). */
   Discard: { de: "Verwerfen", es: "Descartar", ca: "Descartar" },
+
+  /* ── The pinned unsaved-changes bar's own flag sentence, added 2026-09-14
+   * alongside `UnsavedChangesBar` (kit v1.2.82) — the same register the
+   * neighbouring entries in this block already keep: German stays formal
+   * (Sie), Spanish and Catalan stay informal (tú/tens), matching "No invites
+   * waiting for you." two hundred lines below (tienes/tens). Hand-translated
+   * here rather than left for `TRANSLATION_CEILING` to absorb — the house
+   * rule for a new string landing the same day as its own ceiling check. */
+  "You have unsaved changes": {
+    de: "Sie haben ungespeicherte Änderungen.",
+    es: "Tienes cambios sin guardar.",
+    ca: "Tens canvis sense desar.",
+  },
   "Language changes right away. Size, appearance and background wait for Save.": {
     de: "Die Sprache ändert sich sofort. Größe, Darstellung und Hintergrund warten auf Speichern.",
     es: "El idioma cambia de inmediato. Tamaño, apariencia y fondo esperan a guardar.",
     ca: "L'idioma canvia de seguida. Mida, aparença i fons esperen a desar.",
+  },
+
+  /* ── The Settings tab strip's own unsaved-changes guard, added 2026-09-14
+   * beside `settings-screen.tsx`'s `handleTabChange` — the kit's `AlertDialog`
+   * (R59) that stops a dirty Appearance or Team › Roles draft from being
+   * thrown away in silence by a tab switch. The question follows the same
+   * "infinitive/¿…?/Vols…?" shape "Switch off this module?" and "Deactivate
+   * this profile?" already use a few hundred lines below, and "Discard" here
+   * shares its German/Spanish/Catalan root with the bar's own `Discard`
+   * entry above rather than inventing a second word for the same act. */
+  "Discard your unsaved changes?": {
+    de: "Ungespeicherte Änderungen verwerfen?",
+    es: "¿Descartar los cambios sin guardar?",
+    ca: "Vols descartar els canvis sense desar?",
+  },
+  "Switching tabs throws away what you changed here.": {
+    de: "Beim Wechsel der Registerkarte gehen deine Änderungen hier verloren.",
+    es: "Si cambias de pestaña, perderás los cambios que hiciste aquí.",
+    ca: "Si canvies de pestanya, perdràs els canvis que has fet aquí.",
+  },
+  "Keep editing": {
+    de: "Weiter bearbeiten",
+    es: "Seguir editando",
+    ca: "Continuar editant",
+  },
+  "Discard changes": {
+    de: "Änderungen verwerfen",
+    es: "Descartar cambios",
+    ca: "Descartar canvis",
   },
 
   "That didn't save. Try again.": {
@@ -1002,8 +1044,6 @@ export const SEED: Catalogue = {
   "Binned, nothing was counted.": { de: "Verworfen, es wurde nichts gezählt.", es: "Descartado, no se contó nada.", ca: "Descartat, no s'ha comptat res."},
   "Can't show this one": { de: "Kann das hier nicht anzeigen", es: "No se puede mostrar este", ca: "No es pot mostrar aquest"},
   "Cancelled, the record and its notes are kept.": { de: "Abgesagt, der Datensatz und seine Notizen bleiben erhalten.", es: "Cancelado, se conservan el registro y sus notas.", ca: "Cancel·lat, es conserven el registre i les seves notes."},
-  "Certificate recorded.": { de: "Zertifikat erfasst.", es: "Certificado registrado.", ca: "Certificat registrat."},
-  "Certificate saved.": { de: "Zertifikat gespeichert.", es: "Certificado guardado.", ca: "Certificat desat."},
   "Change what it says, who has it, or what it touches.": { de: "Ändern Sie, was darin steht, wer sie hat und worauf sie zugreift.", es: "Cambia lo que dice, quién lo tiene y a qué llega.", ca: "Canvia el que diu, qui el té i a què arriba."},
   "Change what it's called, or where it has got to.": { de: "Ändern Sie, wie es heißt oder wie weit es ist.", es: "Cambia cómo se llama o en qué punto está.", ca: "Canvia com es diu o en quin punt està."},
   "Choose a company": { de: "Unternehmen wählen", es: "Elige una empresa", ca: "Tria una empresa"},
@@ -1050,7 +1090,6 @@ export const SEED: Catalogue = {
   "Couldn't save that.": { de: "Das konnte nicht gespeichert werden.", es: "No se pudo guardar eso.", ca: "No s'ha pogut desar."},
   "Couldn't save the account.": { de: "Der Kunde konnte nicht gespeichert werden.", es: "No se pudo guardar la cuenta.", ca: "No s'ha pogut desar el compte."},
   "Couldn't save the app.": { de: "Die App konnte nicht gespeichert werden.", es: "No se pudo guardar la app.", ca: "No s'ha pogut desar l'app."},
-  "Couldn't save the certificate.": { de: "Das Zertifikat konnte nicht gespeichert werden.", es: "No se pudo guardar el certificado.", ca: "No s'ha pogut desar el certificat."},
   "Couldn't save the meeting.": { de: "Der Termin konnte nicht gespeichert werden.", es: "No se pudo guardar la reunión.", ca: "No s'ha pogut desar la reunió."},
   "Couldn't save the notes.": { de: "Die Notizen konnten nicht gespeichert werden.", es: "No se pudieron guardar las notas.", ca: "No s'han pogut desar les notes."},
   "Couldn't save the profile.": { de: "Das Profil konnte nicht gespeichert werden.", es: "No se pudo guardar el perfil.", ca: "No s'ha pogut desar el perfil."},
@@ -1076,7 +1115,6 @@ export const SEED: Catalogue = {
   "Couldn't switch. Try again.": { de: "Der Wechsel hat nicht geklappt. Bitte versuchen Sie es erneut.", es: "No se pudo cambiar. Inténtalo de nuevo.", ca: "No s'ha pogut canviar. Torna-ho a provar."},
   "Couldn't translate that.": { de: "Das konnte nicht übersetzt werden.", es: "No se pudo traducir eso.", ca: "No s'ha pogut traduir."},
   "Couldn't update that value.": { de: "Der Wert konnte nicht aktualisiert werden.", es: "No se pudo actualizar ese valor.", ca: "No s'ha pogut actualitzar aquest valor."},
-  "Couldn't update the certificate.": { de: "Das Zertifikat konnte nicht aktualisiert werden.", es: "No se pudo actualizar el certificado.", ca: "No s'ha pogut actualitzar el certificat."},
   "Couldn't update the profile.": { de: "Das Profil konnte nicht aktualisiert werden.", es: "No se pudo actualizar el perfil.", ca: "No s'ha pogut actualitzar el perfil."},
   "Couldn't update the role.": { de: "Die Rolle konnte nicht aktualisiert werden.", es: "No se pudo actualizar el rol.", ca: "No s'ha pogut actualitzar el rol."},
   "Couldn't update the source.": { de: "Die Quelle konnte nicht aktualisiert werden.", es: "No se pudo actualizar el origen.", ca: "No s'ha pogut actualitzar l'origen."},
@@ -1095,7 +1133,6 @@ export const SEED: Catalogue = {
   "Disconnected here. Remove {brand} in your Google account too.": { de: "Hier getrennt. Entfernen Sie {brand} auch in Ihrem Google-Konto.", es: "Desconectado aquí. Quita {brand} también en tu cuenta de Google.", ca: "Desconnectat aquí. Treu {brand} també del teu compte de Google."},
   "Disconnected.": { de: "Getrennt.", es: "Desconectado.", ca: "Desconnectat."},
   "Edit app": { de: "App bearbeiten", es: "Editar app", ca: "Editar app"},
-  "Edit certificate": { de: "Zertifikat bearbeiten", es: "Editar certificado", ca: "Editar certificat"},
   "Edit process": { de: "Prozess bearbeiten", es: "Editar proceso", ca: "Editar procés"},
   "Edit step": { de: "Schritt bearbeiten", es: "Editar paso", ca: "Editar pas"},
   "Edit story": { de: "Aufgabe bearbeiten", es: "Editar historia", ca: "Editar història"},
@@ -1142,7 +1179,6 @@ export const SEED: Catalogue = {
   "No company matched.": { de: "Kein Unternehmen gefunden.", es: "Ninguna empresa coincide.", ca: "Cap empresa coincideix."},
   "No date": { de: "Kein Datum", es: "Sin fecha", ca: "Sense data"},
   "No date on it": { de: "Kein Datum daran", es: "No tiene fecha", ca: "No té data"},
-  "No details recorded": { de: "Keine Details festgehalten", es: "Sin detalles anotados", ca: "Sense detalls anotats"},
   "No role matched.": { de: "Keine Rolle gefunden.", es: "Ningún rol coincide.", ca: "Cap rol coincideix."},
   "No sprints start this month.": { de: "In diesem Monat beginnt kein Sprint.", es: "Ningún sprint empieza este mes.", ca: "Aquest mes no comença cap sprint."},
   "No steps yet. Add the first one and say how long it takes and how often it happens, that is what a saving is measured from.": { de: "Noch keine Schritte. Fügen Sie den ersten hinzu und sagen Sie, wie lange er dauert und wie oft er vorkommt, daran wird die Ersparnis gemessen.", es: "Aún no hay pasos. Añade el primero y di cuánto tarda y cada cuánto ocurre, de ahí se mide el ahorro.", ca: "Encara no hi ha passos. Afegeix el primer i digues quant dura i cada quant passa, d'aquí es mesura l'estalvi."},
@@ -1285,8 +1321,6 @@ export const SEED: Catalogue = {
   "each time": { de: "pro Durchlauf", es: "cada vez", ca: "cada vegada"},
   "explained": { de: "erklärt", es: "explicado", ca: "explicat"},
   "folder": { de: "Ordner", es: "carpeta", ca: "carpeta"},
-  "granted": { de: "ausgestellt", es: "expedido", ca: "expedit"},
-  "lapses": { de: "läuft ab", es: "caduca", ca: "caduca"},
   "logged": { de: "erfasst", es: "registrado", ca: "registrat"},
   "no explanation yet": { de: "noch keine Erklärung", es: "sin explicación aún", ca: "encara sense explicació"},
   "not billable": { de: "nicht abrechenbar", es: "no facturable", ca: "no facturable"},
@@ -2123,10 +2157,10 @@ export const SEED: Catalogue = {
     es: "Aún no hay waves.",
     ca: "Encara no hi ha waves.",
   },
-  "A wave is a package of sprints an account bought — sell it first, plan the sprints inside it afterwards.": {
-    de: "Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat — zuerst verkaufen, die Sprints darin danach planen.",
-    es: "Una wave es un paquete de sprints que una cuenta ha comprado — véndela primero, planifica los sprints dentro de ella después.",
-    ca: "Una wave és un paquet de sprints que un compte ha comprat — ven-la primer, planifica els sprints dins d'ella després.",
+  "A wave is a package of sprints an account bought: sell it first, plan the sprints inside it afterwards.": {
+    de: "Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat: zuerst verkaufen, die Sprints darin danach planen.",
+    es: "Una wave es un paquete de sprints que una cuenta ha comprado: véndela primero, planifica los sprints dentro de ella después.",
+    ca: "Una wave és un paquet de sprints que un compte ha comprat: ven-la primer, planifica els sprints dins d'ella després.",
   },
   "Nobody named yet": {
     de: "Noch niemand benannt",
@@ -2931,6 +2965,12 @@ export const SEED: Catalogue = {
    * "fonts" for what the assistant may read, which is the word the knowledge
    * list already uses ("{count} sources match"). */
   Shape: { de: "Form", es: "Forma", ca: "Forma" },
+  /* THE ACCOUNTS SCREEN'S OWN VIEW SWITCH (14 Sep 2026, client ruling: "for
+   * accounts main: use gallery and add table as alternate view"). Same
+   * register as "Shape" above it — plain, short, the ordinary word a
+   * 45–55-year-old manager already uses for each shape. */
+  Gallery: { de: "Galerie", es: "Galería", ca: "Galeria" },
+  Table: { de: "Tabelle", es: "Tabla", ca: "Taula" },
   "{count} sources": { de: "{count} Quellen", es: "{count} fuentes", ca: "{count} fonts" },
   "A map of the whole knowledge base, grouped by account": {
     de: "Eine Karte der ganzen Wissensbasis, nach Konto gruppiert",
@@ -3434,7 +3474,6 @@ export const SEED: Catalogue = {
   "Any {what}": { de: "Alle {what}", es: "Cualquier {what}", ca: "Qualsevol {what}" },
   "Archive this ticket?": { de: "Dieses Ticket archivieren?", es: "¿Archivar este ticket?", ca: "Vols arxivar aquest tiquet?" },
   "Archive {name}?": { de: "„{name}“ archivieren?", es: "¿Archivar «{name}»?", ca: "Vols arxivar «{name}»?" },
-  "Archive {title}?": { de: "„{title}“ archivieren?", es: "¿Archivar «{title}»?", ca: "Vols arxivar «{title}»?" },
   "Assign": { de: "Zuweisen", es: "Asignar", ca: "Assignar" },
   "Awaiting your input": { de: "Wartet auf Ihre Angaben", es: "Pendiente de tu aportación", ca: "Pendent de la teva aportació" },
   "Background": { de: "Hintergrund", es: "Fondo", ca: "Fons" },
@@ -3488,7 +3527,6 @@ export const SEED: Catalogue = {
   "Invite someone by email and choose their role. The invite waits here until they accept it.": { de: "Laden Sie jemanden per E-Mail ein und wählen Sie seine Rolle. Die Einladung wartet hier, bis sie angenommen wird.", es: "Invita a alguien por correo y elige su rol. La invitación espera aquí hasta que la acepte.", ca: "Convida algú per correu i tria el seu rol. La invitació espera aquí fins que l'accepti." },
   "It comes out of Meetings. The record and its notes stay exactly where they are, and you can put it back any time.": { de: "Es verschwindet aus Terminen. Der Eintrag und seine Notizen bleiben genau dort, wo sie sind, und Sie können es jederzeit zurückholen.", es: "Desaparece de Reuniones. El registro y sus notas se quedan exactamente donde están, y puedes recuperarlo cuando quieras.", ca: "Desapareix de Reunions. El registre i les seves notes es queden exactament on són, i el pots recuperar quan vulguis." },
   "It drops out of the pickers everywhere it's offered. Anything already using it keeps it, and you can turn it back on any time.": { de: "Es verschwindet aus allen Auswahllisten, in denen es angeboten wird. Alles, was es bereits verwendet, behält es, und Sie können es jederzeit wieder aktivieren.", es: "Desaparece de los selectores donde se ofrece. Lo que ya lo use lo conserva, y puedes reactivarlo cuando quieras.", ca: "Desapareix dels selectors on s'ofereix. El que ja l'utilitzi el conserva, i el pots tornar a activar quan vulguis." },
-  "It stops showing as a live certificate. Nothing is deleted, and you can restore it any time.": { de: "Es wird nicht mehr als aktives Zertifikat angezeigt. Es wird nichts gelöscht, und Sie können es jederzeit wiederherstellen.", es: "Deja de mostrarse como certificado activo. No se elimina nada, y puedes restaurarlo cuando quieras.", ca: "Deixa de mostrar-se com a certificat actiu. No s'elimina res, i el pots restaurar quan vulguis." },
   "It stops showing as a live colleague. What was written stays written, and the panel reads it back the moment it comes on again.": { de: "Er wird nicht mehr als aktiver Kollege angezeigt. Was geschrieben wurde, bleibt geschrieben, und das Panel liest es wieder ein, sobald er reaktiviert wird.", es: "Deja de mostrarse como compañero activo. Lo que se escribió sigue escrito, y el panel vuelve a leerlo en cuanto se reactiva.", ca: "Deixa de mostrar-se com a company actiu. El que es va escriure continua escrit, i el panell ho torna a llegir tan bon punt es reactiva." },
   "It stops showing in the everyday lists. Everything on it, its work and its history, stays exactly where it is, and you can bring it back any time.": { de: "Es verschwindet aus den alltäglichen Listen. Alles darin, seine Arbeit und sein Verlauf, bleibt genau dort, wo es ist, und Sie können es jederzeit zurückholen.", es: "Deja de aparecer en las listas del día a día. Todo lo que contiene, su trabajo y su historial, se queda exactamente donde está, y puedes recuperarlo cuando quieras.", ca: "Deixa d'aparèixer a les llistes del dia a dia. Tot el que conté, la seva feina i el seu historial, es queda exactament on és, i el pots recuperar quan vulguis." },
   "It stops showing in the everyday lists. The conversation and its history stay exactly as they are, and you can take it back out any time.": { de: "Es verschwindet aus den alltäglichen Listen. Die Unterhaltung und ihr Verlauf bleiben genau, wie sie sind, und Sie können es jederzeit wieder hervorholen.", es: "Deja de aparecer en las listas del día a día. La conversación y su historial se quedan tal como están, y puedes recuperarlo cuando quieras.", ca: "Deixa d'aparèixer a les llistes del dia a dia. La conversa i el seu historial es queden tal com estan, i el pots recuperar quan vulguis." },
@@ -3543,7 +3581,6 @@ export const SEED: Catalogue = {
   "Nothing in the triage queue matches what you asked for.": { de: "Nichts in der Sichtungswarteschlange passt zu Ihrer Anfrage.", es: "Nada en la cola de clasificación coincide con lo que buscas.", ca: "Res a la cua de classificació coincideix amb el que busques." },
   "Nothing matched that.": { de: "Nichts passt dazu.", es: "Nada coincide con eso.", ca: "Res no hi coincideix." },
   "Nothing matched. Try fewer words, or clear the filters.": { de: "Nichts gefunden. Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Nada coincide. Prueba con menos palabras o borra los filtros.", ca: "Res no coincideix. Prova amb menys paraules o esborra els filtres." },
-  "Nothing recorded for {name} yet.": { de: "Für {name} wurde noch nichts erfasst.", es: "Aún no hay nada registrado para {name}.", ca: "Encara no hi ha res enregistrat per a {name}." },
   "Nothing waiting.": { de: "Nichts wartet.", es: "Nada en espera.", ca: "Res en espera." },
   "Nothing's on the go right now. Any one of these is a good place to start.": { de: "Gerade ist nichts in Arbeit. Jeder dieser Punkte ist ein guter Anfang.", es: "Ahora mismo no hay nada en marcha. Cualquiera de estos es un buen punto de partida.", ca: "Ara mateix no hi ha res en marxa. Qualsevol d'aquests és un bon punt de partida." },
   "Open the recording": { de: "Aufzeichnung öffnen", es: "Abrir la grabación", ca: "Obrir la gravació" },
@@ -3732,6 +3769,20 @@ export const SEED: Catalogue = {
   "Deactivated": { de: "Deaktiviert", es: "Desactivados", ca: "Desactivats" },
   "Locked by policy": { de: "Durch Richtlinie gesperrt", es: "Bloqueado por política", ca: "Bloquejat per política" },
   "nothing": { de: "nichts", es: "nada", ca: "res" },
+  /* THE ROLES TOOLBAR, 2026-09-14 — "Deactivated" moved from a quiet label at
+   * the foot of the grid into a toolbar button, the same shape Members'
+   * "Invites" already is, opening an in-place disclosure. Seeded in all
+   * three so TRANSLATION_CEILING does not move (R44 — the pin falls and
+   * never rises), the same discipline the search-empty pair below keeps.
+   * "Deactivated roles" and "No deactivated roles." build off the same
+   * `Roles`/`Deactivated` vocabulary already seeded above; "No modules
+   * match your search." reuses the exact German and the exact shape of
+   * Spanish/Catalan `No tasks match your search.` and `No modules match
+   * what you're looking for.` already carry, one module noun swapped for
+   * another. */
+  "Deactivated roles": { de: "Deaktivierte Rollen", es: "Roles desactivados", ca: "Rols desactivats" },
+  "No deactivated roles.": { de: "Keine deaktivierten Rollen.", es: "No hay roles desactivados.", ca: "No hi ha rols desactivats." },
+  "No modules match your search.": { de: "Keine Module passen zu Ihrer Suche.", es: "Ningún módulo coincide con tu búsqueda.", ca: "Cap mòdul coincideix amb la teva cerca." },
   /* The legend's THIRD register, new with kit v1.2.75 and drawn only once the
    * grid actually withholds something (it does: 15 of the 88 boxes in a role's
    * band, R36). It teaches the em dash that stands where a switch would be, and
@@ -3969,13 +4020,37 @@ export const SEED: Catalogue = {
 
   /* ── The Automations toolbar, 14 Sep 2026 (search, sort by name, filter by
      status) — and the Settings › Automations tab's own module filter beside
-     it, same round. */
+     it, same round. Reworked the same day into a `RecordTable` (the client's
+     ruling: "the list component exactly the same as we have in tickets"),
+     which is why the empty-state sentence below now matches the Choices
+     table's own phrasing rather than the bare "No automations." this
+     replaced. */
   "Search automations…": { de: "Automatisierungen durchsuchen…", es: "Buscar automatizaciones…", ca: "Cercar automatitzacions…" },
-  "Search automations": { de: "Automatisierungen durchsuchen", es: "Buscar automatizaciones", ca: "Cercar automatitzacions" },
-  "Off": { de: "Aus", es: "Desactivado", ca: "Desactivat" },
-  "No automations.": { de: "Keine Automatisierungen.", es: "No hay automatizaciones.", ca: "No hi ha automatitzacions." },
-  "Filter by module": { de: "Nach Modul filtern", es: "Filtrar por módulo", ca: "Filtrar per mòdul" },
-  "All modules": { de: "Alle Module", es: "Todos los módulos", ca: "Tots els mòduls" },
+  "No automations match what you're looking for.": {
+    de: "Keine Automatisierungen passen zu Ihrer Suche.",
+    es: "Ninguna automatización coincide con lo que buscas.",
+    ca: "Cap automatització coincideix amb el que busques.",
+  },
+
+  /* ── The choices module (new/create button + form), 14 Sep 2026 — moved from
+     catalogue to seed because these two strings were hand-written directly in
+     the catalogue by another lane on 14 Sep 2026 and must live here instead. */
+  "New choice": { de: "Neue Option", es: "Nueva opción", ca: "Nova opció" },
+  "Choose a module": { de: "Modul wählen", es: "Elige un módulo", ca: "Tria un mòdul" },
+  "Choose a group": { de: "Gruppe wählen", es: "Elige un grupo", ca: "Tria un grup" },
+  "Choose which module this belongs to, then add the value.": { de: "Wähle, zu welchem Modul das gehört, und füge dann den Wert hinzu.", es: "Elige a qué módulo pertenece esto y luego añade el valor.", ca: "Tria a quin mòdul pertany això i després afegeix el valor." },
+
+  /* ── The account manager field (accounts detail), 14 Sep 2026. */
+  "Account manager": { de: "Kundenmanager", es: "Gerente de Cuenta", ca: "Responsable de Compte" },
+
+  /* ── Member detail screen (contact card for staff/team member), moved from
+     catalogue to seed because these were hand-written directly in the catalogue. */
+  "Full name": { de: "Vollständiger Name", es: "Nombre completo", ca: "Nom complet" },
+  "Birthday": { de: "Geburtstag", es: "Cumpleaños", ca: "Aniversari" },
+  "Position": { de: "Position", es: "Puesto", ca: "Càrrec" },
+  "Phone number": { de: "Telefonnummer", es: "Número de teléfono", ca: "Número de telèfon" },
+  "Send email": { de: "E-Mail senden", es: "Enviar correo", ca: "Enviar correu" },
+  "Call": { de: "Anrufen", es: "Llamar", ca: "Trucar" },
 
   /* ── The system-wide Choices tab (Settings), 14 Sep 2026 — a table over
      every choice value this reader's own visible modules own. */

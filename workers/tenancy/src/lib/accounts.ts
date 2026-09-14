@@ -58,6 +58,11 @@ type AccountRow = {
   /** 0085, c-hijack B: a person declared that this account's collapsed
    * single-token name may narrow a knowledge-base search on its own. */
   name_narrows_alone: number
+  /** 0091: the staff member responsible for this account — a `team_members`
+   * user id, checked at the door (never a client login), never a SQL foreign
+   * key (see the migration's own header: `users`/`team_members` are in the
+   * global core database, `accounts` is in this team's own). */
+  account_manager_user_id: string | null
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -144,6 +149,7 @@ const LINKED_COMPANY = (field: string) => `CASE WHEN account_type = 'individual'
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
   street, postal_code, city, country, industry, about, logo_url, cover_url, code,
   currency, locale, timezone, commercials_visible, alt_names, name_narrows_alone,
+  account_manager_user_id,
   deactivated_at,
   created_at, creator_name, updated_at, editor_name,
   ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
@@ -244,6 +250,14 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     // that is a staff judgement about corpus behaviour, not their record.
     altNames: ours ? [] : parseAltNames(r.alt_names),
     nameNarrowsAlone: ours ? "unreviewed" : (NARROWS_ALONE_WIRE[r.name_narrows_alone] ?? "unreviewed"),
+    // 0091, THE ACCOUNT MANAGER — `null` on the way OUT to a client login, the
+    // same reasoning `commercialsVisible` makes two lines up: WHO WE STAFFED
+    // ON THIS ACCOUNT is our own staffing decision about them, not a setting
+    // for them to read, and the portal has never offered a "who is my contact"
+    // feature this would answer. Staff resolve the face (name, picture) off
+    // the id client-side, the same seam an assignee's face already is (R35) —
+    // this door hands back the id and nothing more.
+    accountManagerId: ours ? null : r.account_manager_user_id,
     // WHERE SHE WORKS AND WHAT SHE DOES THERE — the contacts table's two middle
     // columns, and the third pair of fields this projection withholds from a
     // client login. Not because a role is a secret: because a person can be a
@@ -320,6 +334,29 @@ export type AccountFilters = {
    * door has to answer it, so the rows, the `total` beside them and the CSV
    * export all say the same thing. */
   portal?: "yes" | "no"
+  /** WHO IS RESPONSIBLE — the 0091 column, `account_manager_user_id`, as a
+   * `team_members` user id. Client ruling, 14 Sep 2026, verbatim: "for
+   * accounts main: … filter by account manager, country, status." Status was
+   * already `archived`; this is the second of the other two.
+   *
+   * STAFF ONLY, SILENTLY. `toAccount` already nulls `accountManagerId` on the
+   * way OUT to a portal caller (0091's own header: "our own staffing decision
+   * about them, not theirs to read"), and a WHERE clause that still narrowed
+   * by it would let the same caller learn the same fact by absence instead of
+   * by value — probe two ids, watch which one keeps an account in the page.
+   * So `accountsWhere` drops this filter outright for `scope.kind ===
+   * "portal"`, exactly the way an unasked filter is always dropped: never a
+   * 400, because "you asked about someone else's staffing" is not a malformed
+   * request, it is a request answered as if the question had not been asked
+   * (R21). */
+  manager?: string
+  /** WHERE THE ACCOUNT IS — the same value `country` already carries on the
+   * row, matched exactly against the team's own "Country" vocabulary
+   * (`shared/selectable-groups.ts`). Open to every caller inside the fence,
+   * staff and portal alike: unlike the manager, there is no staffing fact to
+   * enumerate through it — a client narrowing their OWN world by country
+   * learns nothing they could not already read on the rows in front of them. */
+  country?: string
 }
 
 /** MAY THIS CALLER LIST PEOPLE? — the `contacts` right, arriving as a boolean
@@ -443,6 +480,21 @@ function accountsWhere(
   if (opts.parentId) {
     filters.push("parent_account_id = ?")
     params.push(opts.parentId)
+  }
+  // THE ACCOUNT MANAGER — see `AccountFilters.manager`'s own header for the
+  // full argument. `scope.kind === "portal"` is read POSITIONALLY here rather
+  // than folded into `opts` upstream, because this is the one place a caller's
+  // KIND decides whether a FILTER is even asked — the same place the fence
+  // itself is built, so "was this narrowed by scope?" has one place to look.
+  if (opts.manager && scope.kind === "staff") {
+    filters.push("account_manager_user_id = ?")
+    params.push(opts.manager)
+  }
+  // THE COUNTRY — an exact match against the team's own vocabulary value,
+  // honoured for every caller inside the fence (see `AccountFilters.country`).
+  if (opts.country) {
+    filters.push("country = ?")
+    params.push(opts.country)
   }
   return { sql: where([fence.sql, ...filters]), params }
 }
@@ -742,6 +794,11 @@ export async function createAccount(
     currency?: string
     locale?: string
     timezone?: string
+    /** 0091 — a current STAFF member of this team, validated at the door
+     * (routes/accounts.ts) before this function ever sees it: an id shape,
+     * then a current `team_members` row that is not a client login. `null`/
+     * absent = nobody assigned yet. */
+    accountManagerUserId?: string | null
   }
 ): Promise<string> {
   if (input.parentAccountId) {
@@ -773,6 +830,7 @@ export async function createAccount(
     currency: input.currency ?? null,
     locale: input.locale ?? null,
     timezone: input.timezone ?? null,
+    account_manager_user_id: input.accountManagerUserId ?? null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,
@@ -890,6 +948,10 @@ export async function updateAccount(
      * the rarity gate, "deny" refuses to narrow on it at all (beating rarity
      * AND an alias/code match), "unreviewed" is the default. */
     nameNarrowsAlone?: NarrowsAlone
+    /** 0091 — a current STAFF member of this team, ALREADY VALIDATED at the
+     * door the same way `altNames` above is: `undefined` keeps whoever is
+     * there, `null` clears it, a string sets it. */
+    accountManagerUserId?: Patch
   }
 ): Promise<{ supersededUrls: (string | null)[] }> {
   // THE STORED ROW, not the caller's view of it — see accountRowOrThrow.
@@ -917,6 +979,7 @@ export async function updateAccount(
     currency: keep(input.currency, before.currency),
     locale: keep(input.locale, before.locale),
     timezone: keep(input.timezone, before.timezone),
+    accountManagerUserId: keep(input.accountManagerUserId, before.account_manager_user_id),
   }
 
   const changed = await refusingDuplicate(REFERENCE_TAKEN, () =>
@@ -925,7 +988,7 @@ export async function updateAccount(
       guard.databaseId,
       `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
          country = ?, industry = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
-         locale = ?, timezone = ?, commercials_visible = ?, alt_names = ?, name_narrows_alone = ?,
+         locale = ?, timezone = ?, account_manager_user_id = ?, commercials_visible = ?, alt_names = ?, name_narrows_alone = ?,
          ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
@@ -944,6 +1007,7 @@ export async function updateAccount(
         next.currency,
         next.locale,
         next.timezone,
+        next.accountManagerUserId,
         input.commercialsVisible === undefined ? before.commercials_visible : input.commercialsVisible ? 1 : 0,
         input.altNames === undefined ? before.alt_names : JSON.stringify(input.altNames),
         input.nameNarrowsAlone === undefined

@@ -379,7 +379,14 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     // `update_internal_rate`, `set_role_rate`) were gated and so were never in
     // this count. Nothing was granted and nothing was withheld: the ungated set
     // is three names smaller because three tools stopped existing.
-    const UNGATED_CEILING = 52
+    //
+    // 52 → 51 on 2026-09-14. The client killed the certificate module whole
+    // ("kill the whole certificate module everywhere"), and one of its three
+    // tools was a READ — `list_staff_certificates`. Same shape as above: reads
+    // carry no `TOOL_GATES` line, so its removal moves this DOWN by exactly one.
+    // `create_staff_certificate` and `update_staff_certificate` were gated
+    // (`staff_profiles:create` / `:update`) and so were never in this count.
+    const UNGATED_CEILING = 51
     expect(
       ungated.map((t) => t.name).sort(),
       `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +
@@ -549,10 +556,15 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     //     `list_account_rates`, `create_account_rate` and `update_account_rate` —
     //     and exactly ONE of them carried a detail (`create_account_rate`, which
     //     spelled out that `centsPerHour` is whole cents: 4,500 = 45.00).
+    //   · 120 → 118 on 2026-09-14. The certificate module was killed whole, and
+    //     TWO of its three tools carried a detail: `list_staff_certificates`
+    //     (which spelled out why `userId` narrows at the door, not the client)
+    //     and `create_staff_certificate` (which spelled out the day-parsing
+    //     refusal). `update_staff_certificate` had only a summary.
     //
     // `get_app_impact` keeps its detail and had it rewritten in the first of the
     // two commits, so it is still counted here.
-    const DETAILED_TOOLS = 120
+    const DETAILED_TOOLS = 118
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

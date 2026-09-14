@@ -133,7 +133,7 @@ export async function postUploadBrandAsset(request: Request, env: Env): Promise<
   // A key of the team id alone was minted by FOUR modules into the same
   // bucket — knowledge, brand assets, staff and deliverables — so
   // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
-  // module": a brand asset's URL pasted into a staff certificate's file field
+  // module": a brand asset's URL pasted into a staff photo's file field
   // would pass the ownership test and be destroyed by the staff door's own
   // reclaim. One more segment makes that impossible by construction rather than
   // by everybody remembering. Objects written under the old bare-team shape stay
@@ -210,7 +210,7 @@ export async function postStreamBrandAsset(request: Request, env: Env): Promise<
   // A key of the team id alone was minted by FOUR modules into the same
   // bucket — knowledge, brand assets, staff and deliverables — so
   // `ownedMediaKey(url, base, teamId)` could prove "this team" and never "this
-  // module": a brand asset's URL pasted into a staff certificate's file field
+  // module": a brand asset's URL pasted into a staff photo's file field
   // would pass the ownership test and be destroyed by the staff door's own
   // reclaim. One more segment makes that impossible by construction rather than
   // by everybody remembering. Objects written under the old bare-team shape stay

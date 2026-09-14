@@ -993,7 +993,11 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // rewrote this kind's note on the other line. The reader's TEXT is untouched
   // by both lines — hence version 3, unmoved — so this is a comment-only re-pin
   // of the kind the header above already describes.
-  person: { version: 3, digest: "075e20f57d17a4b1" },
+  // v4 (14 Sep 2026): the "Certificates held:" paragraph left the reader's
+  // body — the certificate module was killed whole and the query that fed it
+  // is gone from knowledge-ingest.ts. A row already indexed with a colleague's
+  // certificates in its text would keep saying them forever without this bump.
+  person: { version: 4, digest: "476f23cdf5899b67" },
   // v2 (10 Sep 2026): THE READER WAS SAYING SOMETHING FALSE, and this is the
   // bump that reaches the rows already filed. It used to take
   // `MAX(CASE WHEN is_default = 1 … THEN value END)` and write "<X> is picked
@@ -1149,7 +1153,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // is and is not: it hashes the FILE, deliberately, so it cannot tell a comment
 // from a rewrite — and that is the safe direction. It asks the question; the
 // person answering it has to look.
-const SHARED_DIGEST = "436e1aa72f674bdb"
+// RE-PINNED ONCE MORE, 14 Sep 2026, and again for a COMMENT: the `modules`
+// field's own JSDoc, above the kinds array, dropped "and certificates" from
+// its explanation of the `person` kind's cross-database JOIN — the
+// certificate module was killed whole and the sentence was describing a
+// table that no longer exists. Bytes changed outside every kind's own slice,
+// so this fired correctly; no word any kind SAYS changed (that repair is
+// `person`'s own textVersion bump, in READER_DIGESTS above), so no other
+// textVersion moved.
+const SHARED_DIGEST = "8a2e7515891e2073"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

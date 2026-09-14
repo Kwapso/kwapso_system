@@ -50,7 +50,8 @@ import { richTextValue, safeSrc } from "@shared/web/rich-text"
 import { fileToDataUrl } from "@/lib/image"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 export type AppFormValues = {
   name: string
@@ -181,7 +182,7 @@ export function AppFormDialog({
   /** the team, so the stage picker can read the team's own vocabulary */
   teamId: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const editing = initial !== undefined
   const stages = useAppStages(teamId)
   const [values, setValues, clearDraft] = useFormDraft(
@@ -334,7 +335,7 @@ export function AppFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term, { type: "entity" })}
           searchKey={pickerKey("companies", teamId)}
-          options={accounts.map(accountOption)}
+          options={sortedOptions(accounts, lang, (a) => a.name).map(accountOption)}
           placeholder={t("One of ours")}
           searchPlaceholder={t("Search companies…")}
           emptyText={t("No company matched.")}
@@ -472,7 +473,7 @@ export function AppFormDialog({
           {members.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
           ) : (
-            members.map((m) => (
+            sortedOptions(members, lang, (m) => m.name).map((m) => (
               <Label key={m.id} className="flex">
                 <Checkbox
                   checked={values.staffUserIds.includes(m.id)}
@@ -518,7 +519,7 @@ export function AppFormDialog({
             id="app-lead"
             value={lead || NOBODY}
             onChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
-            options={members
+            options={sortedOptions(members, lang, (m) => m.name)
               .filter((m) => values.staffUserIds.includes(m.id))
               .map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
             emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
@@ -539,7 +540,7 @@ export function AppFormDialog({
                 {t("Nobody is on this account's books yet.")}
               </p>
             ) : (
-              contacts.map((c) => (
+              sortedOptions(contacts, lang, (c) => c.name).map((c) => (
                 <Label key={c.id} className="flex">
                   <Checkbox
                     checked={values.stakeholderContactIds.includes(c.id)}
@@ -583,7 +584,7 @@ export function AppFormDialog({
             // Stakeholders tab — no photo comes through `listAccountLinks`
             // today, so this falls back to their initial the way every
             // unphotographed person does, never to a client/company square.
-            options={contacts
+            options={sortedOptions(contacts, lang, (c) => c.name)
               .filter((c) => values.stakeholderContactIds.includes(c.id))
               .map((c) => ({ value: c.id, label: c.name, shape: "round" as const }))}
             emptyOption={{ value: NOBODY, label: t("Not said") }}

@@ -366,19 +366,13 @@ export const listFetch = {
       primeCache(totalKey("purposes", teamId), r.total)
       return r.purposes
     }),
-  // Read WHOLE rather than per-member: one profile each and a handful of
-  // certificates, so the team's whole set is smaller than one page of tickets —
-  // and a member page that pulled its own would refetch on every colleague you
-  // clicked through to.
+  // Read WHOLE rather than per-member: one profile each, so the team's whole
+  // set is smaller than one page of tickets — and a member page that pulled
+  // its own would refetch on every colleague you clicked through to.
   staffProfiles: (teamId: string) =>
     contentApi.staffProfiles().then((r) => {
       primeCache(totalKey("staff_profiles", teamId), r.total)
       return r.profiles
-    }),
-  staffCertificates: (teamId: string) =>
-    contentApi.staffCertificates().then((r) => {
-      primeCache(totalKey("staff_certificates", teamId), r.total)
-      return r.certificates
     }),
 }
 
@@ -741,14 +735,11 @@ export function deliverablesKey(appId: string): string {
 export function purposesKey(teamId: string): string {
   return `purposes:${teamId}`
 }
-/** Staff profiles and certificates are read on a MEMBER's page, so they are
- * keyed by the team (the whole set is small — one profile per member) and the
- * member page picks its own out. */
+/** Staff profiles are read on a MEMBER's page, so they are keyed by the team
+ * (the whole set is small — one profile per member) and the member page picks
+ * its own out. */
 export function staffProfilesKey(teamId: string): string {
   return `staff_profiles:${teamId}`
-}
-export function staffCertificatesKey(teamId: string): string {
-  return `staff_certificates:${teamId}`
 }
 
 /** The process-map list's cache key (the paged maps list). */
@@ -1866,24 +1857,18 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.purposes(t),
     deps: (_t, id) => [`activity:record:meeting_purposes:${id}`],
   },
-  // A profile and a certificate have no by-id read door of their own, because
-  // neither is ever opened on a screen of its own — both are read on the
-  // MEMBER's page, from the whole (small, one-per-member) set. So the row-level
-  // fetchOne re-reads the set and picks the row out, which is the honest way to
-  // patch one row when the door answers in collections.
+  // A profile has no by-id read door of its own, because it is never opened on
+  // a screen of its own — it is read on the MEMBER's page, from the whole
+  // (small, one-per-member) set. So the row-level fetchOne re-reads the set and
+  // picks the row out, which is the honest way to patch one row when the door
+  // answers in collections. A `staff_certificates` entry stood here beside it
+  // until the certificate module was killed whole on 14 Sep 2026.
   staff_profiles: {
     key: (t) => staffProfilesKey(t),
     idField: "id",
     fetchOne: (id) => contentApi.staffProfiles().then((r) => r.profiles.find((p) => p.id === id) ?? null),
     fetchList: (t) => listFetch.staffProfiles(t),
     deps: (_t, id) => [`activity:record:staff_profiles:${id}`],
-  },
-  staff_certificates: {
-    key: (t) => staffCertificatesKey(t),
-    idField: "id",
-    fetchOne: (id) => contentApi.staffCertificates().then((r) => r.certificates.find((c) => c.id === id) ?? null),
-    fetchList: (t) => listFetch.staffCertificates(t),
-    deps: (_t, id) => [`activity:record:staff_certificates:${id}`],
   },
   // WHAT WE HANDED OVER — and the ping carries the APP it sits on, not the
   // deliverable's own id. The same shape `account_links` and `portal_users`

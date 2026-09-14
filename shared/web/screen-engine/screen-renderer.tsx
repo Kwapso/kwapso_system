@@ -24,7 +24,8 @@ import {
 import { defaultCollectionConfig, validateField } from "./config"
 import { TAB_ICONS, kitIcon } from "./tabs-view"
 import { cn } from "@shared/ui/lib/utils"
-import { useT } from "@shared/web/language"
+import { useLanguage, useT } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -445,7 +446,7 @@ function ScreenForm({
   // itself: a notes editor is a `div`, so its label cannot come from the
   // `<label for>` the `Field` below draws and has to be spoken as an aria name
   // instead. Everything else on this form reads its words through `Field`.
-  const t = useT()
+  const { t, lang } = useLanguage()
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
   )
@@ -522,7 +523,7 @@ function ScreenForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(data.options?.[f.optionsFrom ?? f.column] ?? []).map((o) => (
+              {sortedOptions(data.options?.[f.optionsFrom ?? f.column] ?? [], lang).map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>

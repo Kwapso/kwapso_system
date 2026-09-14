@@ -213,6 +213,16 @@
 
 import * as React from "react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
@@ -311,6 +321,73 @@ export function SettingsScreen({
   // `web/components/accounts/` that already ship a single-option control.
   const [moduleSortDir, setModuleSortDir] = React.useState<"asc" | "desc">("asc")
 
+  // ── THE UNSAVED-TAB GUARD ────────────────────────────────────────────────
+  //
+  // `TabsView` renders through the kit's Radix `Tabs` with no `forceMount`
+  // (see its own header), so switching tabs UNMOUNTS whichever panel you are
+  // leaving. Appearance and Team › Roles now stage edits behind a pinned
+  // Save/Discard bar (`shared/web/appearance-panel.tsx`, `roles-matrix.tsx`),
+  // and an unmount throws that draft away with no Save, no Discard and no
+  // warning — the opposite of what the bar is for.
+  //
+  // PREFERRED OVER `forceMount`. Keeping every Settings panel mounted at once
+  // would keep every panel's OWN reads and effects alive at all times —
+  // `MembersGallery`/`RolesMatrix`'s own door reads (R56: one read per unit,
+  // not one read forever), the Automations tab's toolbar state, the Modules
+  // wall's search box — none of which this screen wants running for a tab
+  // nobody is looking at. A guard on the one seam that already knows when a
+  // switch is about to happen is the smaller change.
+  //
+  // `dirtyTabs` is fed by the two staged panels' own `onDirtyChange` — the
+  // narrowest prop each file grew for this (see each panel's own doc), called
+  // from an effect off their existing `dirty` state and with `false` on
+  // unmount. Any tab this screen never stages stays permanently `false` here
+  // and is never asked to guard anything.
+  const [dirtyTabs, setDirtyTabs] = React.useState<Record<string, boolean>>({})
+  // The tab a press was ASKING to switch to, held only while the discard
+  // dialog is open — `null` means the dialog is closed. Set by the guard
+  // below, cleared by either of the dialog's two answers.
+  const [pendingTabSwitch, setPendingTabSwitch] = React.useState<string | null>(null)
+
+  // THE GUARD ITSELF — the one place a tab switch is allowed to happen.
+  // `TabsView`'s own `onValueChange` calls this instead of `setTab` directly,
+  // so every switch (a click on the strip, and nothing else — this screen
+  // never calls `setTab` from anywhere but here and the dialog's own Discard
+  // answer) passes through it. When the CURRENT tab is dirty, the switch does
+  // not happen yet: R59 (a yes/no warning is the one centred overlay) says
+  // this is the kit's `AlertDialog`, opened below instead.
+  function handleTabChange(next: string) {
+    if (dirtyTabs[tab]) {
+      setPendingTabSwitch(next)
+      return
+    }
+    setTab(next)
+  }
+
+  // THE TWO CALLBACKS THEMSELVES, MEMOISED. Each panel's own effect depends
+  // on `[dirty, onDirtyChange]` (see either file's own doc) — the textbook
+  // shape for "tell the parent, and tell it `false` on the way out". Handing
+  // it a fresh arrow function on every render of THIS screen would change
+  // that second dependency every time this screen re-renders for any reason
+  // at all (the Modules wall's search box, a tab switch, a live members
+  // ping…), which reruns the panel's effect, which calls `setDirtyTabs`,
+  // which re-renders this screen, which hands the panel a new function
+  // again — an infinite loop, caught live in `verify/appearance-panel`'s own
+  // rig before it ever reached the real screen. `useCallback` with an empty
+  // dependency array is correct because both closures only ever reach a
+  // `useState` setter (React guarantees its own identity never changes) and
+  // a literal tab key — there is nothing about either closure that a later
+  // render could make stale.
+  const setAppearanceDirty = React.useCallback(
+    (dirty: boolean) =>
+      setDirtyTabs((prev) => (prev.appearance === dirty ? prev : { ...prev, appearance: dirty })),
+    []
+  )
+  const setTeamDirty = React.useCallback(
+    (dirty: boolean) => setDirtyTabs((prev) => (prev.team === dirty ? prev : { ...prev, team: dirty })),
+    []
+  )
+
   // MEMBERS + ROLES — ONE READ, TWO CONTAINERS. `useScreenData` loads members
   // only "on its own module" (its own doc), which `module: "members"` turns on;
   // roles load across the whole team area regardless, so this one call feeds
@@ -365,26 +442,49 @@ export function SettingsScreen({
   //
   // NEVER A SECOND GATE. `moduleSettingsIndex(can)` is `visibleModuleSettings`'s
   // own answer — R61 holds THAT to the one `can(` call in
-  // module-settings-screen.tsx — narrowed here to the pages that carry an
-  // "automations" kind section, the same test `ModuleSettingsScreen` itself
-  // runs to decide whether to draw the Automations tab on a single module's
-  // own page. A reader who may not see a module is never asked twice: they
-  // simply get no row for it, from the one function that already knows.
-  const automationModules = moduleSettingsIndex(can)
+  // module-settings-screen.tsx. Computed ONCE, up here, and reused by the
+  // Modules tab's own count below AND by the Modules panel's rows further
+  // down (`renderPanel` closes over this same `const`) — one call, not two.
+  const moduleIndex = moduleSettingsIndex(can)
+
+  // R16 — THE MODULES TAB'S COUNT, drawn once, off the same raw index the
+  // panel maps — before ITS OWN search narrows what it shows — so the badge
+  // and the panel can never disagree. Client, 2026-09-14: "In settings
+  // modules, I also want to see the counter in the top, and the same for
+  // team. I want to see how many team members." `CardGrid`'s own `label`
+  // prop below is an aria-label, not a printed count, so this is the one
+  // place the number appears (R16).
+  const modulesCount = moduleIndex.length
+
+  // THE AUTOMATIONS TAB'S OWN MODULES — narrowed here to the pages that
+  // carry an "automations" kind section, the same test `ModuleSettingsScreen`
+  // itself runs to decide whether to draw the Automations tab on a single
+  // module's own page. A reader who may not see a module is never asked
+  // twice: they simply get no row for it, from the one function that already
+  // knows.
+  const automationModules = moduleIndex
     .filter(({ sections }) => sections.some((s) => s.kind === "automations"))
     .map(({ page }) => ({ segment: page.segment, title: t(page.title) }))
 
-  // R16 — THE TAB'S COUNT, drawn once, through the one seam. `AUTOMATIONS`
-  // (shared/automations.ts) is the same registry `ModuleAutomations` itself
-  // filters — a code constant, so the exactness R16 asks for is free, the
-  // same argument module-settings-screen.tsx's own automations tab already
-  // makes for a single module. THIS IS A DIFFERENT NUMBER FROM THAT ONE, not
-  // a second copy of it: that tab counts one module's own rows, this counts
-  // every row across every module this reader may see — two honest answers
-  // to two different questions, never the same fact drawn twice.
+  // R16 — THE AUTOMATIONS TAB'S COUNT, drawn once, through the one seam.
+  // `AUTOMATIONS` (shared/automations.ts) is the same registry
+  // `ModuleAutomations` itself filters — a code constant, so the exactness
+  // R16 asks for is free, the same argument module-settings-screen.tsx's own
+  // automations tab already makes for a single module. THIS IS A DIFFERENT
+  // NUMBER FROM THAT ONE, not a second copy of it: that tab counts one
+  // module's own rows, this counts every row across every module this reader
+  // may see — two honest answers to two different questions, never the same
+  // fact drawn twice.
   const automationsCount = AUTOMATIONS.filter((a) =>
     automationModules.some((m) => m.segment === a.segment)
   ).length
+
+  // R16 — THE TEAM TAB'S COUNT. `members` (`membersQ.data`, above) is the
+  // exact array `MembersGallery` itself renders; that panel draws no total
+  // of its own (only its own Invites sub-count, a different fact — see
+  // `invitesBadge` in members-gallery.tsx), so this badge is the one place
+  // the number appears. Same client ruling as `modulesCount`, above.
+  const membersCount = members.length
 
   if (!ctx) return null
 
@@ -397,7 +497,7 @@ export function SettingsScreen({
       // `members` and whose label says Team is the next reader's wrong guess,
       // and `?tab=` links to it are ours (settings-screen is the only writer),
       // so there is nothing outside this file to keep in step.
-      { value: "team", label: t("Team"), icon: "users-three", badge: "", badgeVariant: "" as const },
+      { value: "team", label: t("Team"), icon: "users-three", badge: formatCount(membersCount), badgeVariant: "" as const },
       { value: "integrations", label: t("Integrations"), icon: "key", badge: "", badgeVariant: "" as const },
       // THE INDEX (client, 2026-09-09) — see this file's header for the word,
       // the position, and for the Choices tab that stood after it until
@@ -408,7 +508,7 @@ export function SettingsScreen({
       // site passes. Spelled out anyway so the two agree on the page rather
       // than by accident — the same word draws the same glyph everywhere,
       // which is the whole reason that table exists.
-      { value: "modules", label: t("Modules"), icon: "cube", badge: "", badgeVariant: "" as const },
+      { value: "modules", label: t("Modules"), icon: "cube", badge: formatCount(modulesCount), badgeVariant: "" as const },
       // THE "CHOICES" TAB STOOD HERE AND WAS RETIRED ON 11 SEP 2026, at the
       // client's ruling: *"implement this module settings across app … end goal
       // kill the big tab 'choice options'."* It held the team's WHOLE
@@ -473,7 +573,7 @@ export function SettingsScreen({
       <TabsView
         config={tabsConfig}
         value={tab}
-        onValueChange={setTab}
+        onValueChange={handleTabChange}
         renderPanel={(panel) => {
           if (panel.value === "appearance") {
             // ONE CONTAINER, FOUR SECTIONS — client ruling, 2026-09-14, the
@@ -529,6 +629,10 @@ export function SettingsScreen({
                   await auth.setSpine(spine)
                   await active.refresh()
                 }}
+                // THE UNSAVED-TAB GUARD'S OWN FEED — see `setAppearanceDirty`
+                // above for what it does and why it is memoised rather than
+                // written inline here.
+                onDirtyChange={setAppearanceDirty}
               />
             )
           }
@@ -582,6 +686,9 @@ export function SettingsScreen({
                     roles={roles}
                     rolesLoading={rolesQ.data === undefined && !rolesQ.error}
                     canCreate={can("member_roles", "create")}
+                    // THE UNSAVED-TAB GUARD'S OWN FEED — see
+                    // `setTeamDirty` above.
+                    onDirtyChange={setTeamDirty}
                   />
                 ) : null}
 
@@ -643,7 +750,15 @@ export function SettingsScreen({
             // somebody who may see tickets but not the team's vocabulary gets
             // neither. Nothing about `selectable_data` is spelled out here on
             // purpose — a second copy of the gate is how two doors start
-            // disagreeing (R61 holds this to one expression).
+            // disagreeing (R61 holds this to one expression). R61's own
+            // census (iii) reads this literal call OFF THIS PANEL'S OWN TEXT
+            // — "the index is derived, not listed" — so this stays the real
+            // call rather than a reference to `moduleIndex` above (the SAME
+            // answer, computed a second time for the Modules tab's own R16
+            // count): a hand-optimised `const modules = moduleIndex` reads
+            // identically to a human but is invisible to a positional scan
+            // for `moduleSettingsIndex(`, and R61 would have no way to tell
+            // that apart from a hand-kept list.
             const modules = moduleSettingsIndex(can)
 
             // SEARCHED FIRST, THEN ORDERED — the same order every collection in
@@ -1084,6 +1199,57 @@ export function SettingsScreen({
           return null
         }}
       />
+
+      {/* THE UNSAVED-TAB GUARD'S OWN DIALOG — R59: a yes/no warning is the one
+          centred overlay, the kit's `AlertDialog`, never a `Sheet`. Shape and
+          copy voice copied from the app's other confirms over a reversible
+          choice (`roles-matrix.tsx`'s own deactivate-role warning is one: a
+          question for a title, one plain sentence for the body, the safe
+          answer as `AlertDialogCancel` — focused by Radix by default — and
+          the losing answer as a destructive `AlertDialogAction`). "Losing"
+          is the operative word here too: nothing is deleted on a server, but
+          a discarded draft is gone the same way an unsaved page reload would
+          lose it, which is exactly the shape this law is for. */}
+      <AlertDialog
+        open={pendingTabSwitch !== null}
+        onOpenChange={(open) => !open && setPendingTabSwitch(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Discard your unsaved changes?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Switching tabs throws away what you changed here.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {/* KEEP EDITING — the default answer, and Radix's own initial
+                focus (the safe answer, same as every other `AlertDialog` in
+                this app). Closing the dialog without switching is the whole
+                of it: `tab` never moved, so the panel that was dirty is
+                still mounted, still dirty, still showing exactly what was
+                there before the press. */}
+            <AlertDialogCancel>{t("Keep editing")}</AlertDialogCancel>
+            {/* DISCARD CHANGES — performs the switch that was on hold. The
+                leaving panel unmounts on the next render the same way it
+                always would have; its draft dies exactly as it did before
+                this guard existed, and that is now a CHOSEN outcome rather
+                than a silent one. Nothing to await: discarding a draft that
+                was never sent anywhere has no door to call, the same
+                argument `roles-matrix.tsx`'s own `discardDraft` makes about
+                itself. */}
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault()
+                if (pendingTabSwitch) setTab(pendingTabSwitch)
+                setPendingTabSwitch(null)
+              }}
+            >
+              {t("Discard changes")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

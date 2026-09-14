@@ -9,6 +9,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import { D1_MAX_BOUND_PARAMS } from "@shared/workers/limits"
+
 const queries: string[] = []
 /** the bound values too: the fixed scopes now name their table as a PARAMETER
  * (they are the generic read with the table supplied by the scope), so a check
@@ -30,10 +32,20 @@ vi.mock("@shared/workers/d1-rest", () => ({
     value === null || value === undefined ? "NULL" : `'${String(value).replaceAll("'", "''")}'`,
 }))
 
-const { getActivity } = await import("../src/lib/activity-read")
+const { getActivity, actorPictures } = await import("../src/lib/activity-read")
+const { d1Query } = await import("@shared/workers/d1-rest")
 
 const cfg = {} as never
 const guard = { databaseId: "db", teamId: "t", userId: "u" } as never
+/** THE FACE'S OWN DOOR (R35/R60) — a second binding, and the reason it is not
+ * `d1Query`: the picture lives on the GLOBAL `users` table, read through the
+ * native `env.DB`, never the per-team REST door every other read in this file
+ * goes through. Answers nobody every time, which is right for every assertion
+ * below: none of them is about a face, and a picture join that changed the
+ * SQL shape these tests read would be exactly the false failure to avoid. */
+const env = {
+  DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: [] }) }) }) },
+} as never
 /** the caller may read ONE module — the R18 filter must appear in every read. */
 const ALLOWED = ["learning"]
 
@@ -58,7 +70,7 @@ beforeEach(() => {
 
 describe("activity scopes fail CLOSED (R18)", () => {
   it("the team feed always carries the visibility filter", async () => {
-    await getActivity(cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, null)
+    await getActivity(env, cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, null)
     expect(queries.length).toBeGreaterThan(0)
     for (const q of queries) {
       expect(q, `unfiltered team read: ${q}`).toMatch(/WHERE/i)
@@ -69,7 +81,7 @@ describe("activity scopes fail CLOSED (R18)", () => {
   it("an id-scope with NO id returns nothing — never the whole feed", async () => {
     for (const scope of ["user", "role", "invite", "record"] as const) {
       queries.length = 0
-      const out = await getActivity(cfg, guard, scope, undefined, undefined, null, null, STAFF, null)
+      const out = await getActivity(env, cfg, guard, scope, undefined, undefined, null, null, STAFF, null)
       expect(out.rows, `${scope} without an id must return no rows`).toEqual([])
       expect(out.total, `${scope} without an id must report no total`).toBe(0)
       expect(queries.filter(unfiltered), `${scope} without an id issued an unfiltered read`).toEqual([])
@@ -77,7 +89,7 @@ describe("activity scopes fail CLOSED (R18)", () => {
   })
 
   it("a record scope with no table returns nothing", async () => {
-    const out = await getActivity(cfg, guard, "record", "row1", undefined, null, null, STAFF, null)
+    const out = await getActivity(env, cfg, guard, "record", "row1", undefined, null, null, STAFF, null)
     expect(out.rows).toEqual([])
     expect(queries.filter(unfiltered)).toEqual([])
   })
@@ -85,17 +97,17 @@ describe("activity scopes fail CLOSED (R18)", () => {
   it("an UNKNOWN scope string still gets the team filter, never a bare read", async () => {
     // The route validates the scope, but the reader must not depend on that:
     // two independent layers, because the cost of this one being wrong is a leak.
-    await getActivity(cfg, guard, "everything" as never, undefined, undefined, ALLOWED, null, STAFF, null)
+    await getActivity(env, cfg, guard, "everything" as never, undefined, undefined, ALLOWED, null, STAFF, null)
     for (const q of queries) expect(q, `unfiltered read for an unknown scope: ${q}`).toMatch(/WHERE/i)
   })
 
   it("a caller allowed NOTHING sees only rows that name no record", async () => {
-    await getActivity(cfg, guard, "team", undefined, undefined, [], null, STAFF, null)
+    await getActivity(env, cfg, guard, "team", undefined, undefined, [], null, STAFF, null)
     for (const q of queries) expect(q).toContain("related_table IS NULL")
   })
 
   it("an id-scope WITH its id is scoped to that record", async () => {
-    await getActivity(cfg, guard, "user", "user-9", undefined, null, null, STAFF, null)
+    await getActivity(env, cfg, guard, "user", "user-9", undefined, null, null, STAFF, null)
     expect(queries.length).toBeGreaterThan(0)
     expect(queries.every((q) => /related_table = \? AND related_row_id = \?/.test(q))).toBe(true)
     // BOTH statements — the page read and the COUNT — name the same one record.
@@ -115,7 +127,7 @@ describe("a client login's record reads are fenced on every table (the help leak
   it("every table the feed answers about carries a fence for a portal caller", async () => {
     for (const table of ["help", "learning", "selectable_data", "users", "member_roles", "invite_logs", "accounts", "account_links", "portal_users"]) {
       queries.length = 0
-      await getActivity(cfg, guard, "record", "row-1", table, null, null, PORTAL, null)
+      await getActivity(env, cfg, guard, "record", "row-1", table, null, null, PORTAL, null)
       expect(queries.length, `${table} issued no read at all`).toBeGreaterThan(0)
       for (const q of queries)
         expect(fenced(q), `record scope on "${table}" read with NO fence: ${q}`).toBe(true)
@@ -123,25 +135,25 @@ describe("a client login's record reads are fenced on every table (the help leak
   })
 
   it("a table nobody has decided about is CLOSED, not open", async () => {
-    await getActivity(cfg, guard, "record", "row-1", "invoices", null, null, PORTAL, null)
+    await getActivity(env, cfg, guard, "record", "row-1", "invoices", null, null, PORTAL, null)
     for (const q of queries) expect(q, `an undecided table read openly: ${q}`).toContain("0 = 1")
   })
 
   it("help — the table the leak went through — reads NOTHING for a client login", async () => {
-    await getActivity(cfg, guard, "record", "ticket-1", "help", null, null, PORTAL, null)
+    await getActivity(env, cfg, guard, "record", "ticket-1", "help", null, null, PORTAL, null)
     for (const q of queries) expect(q).toContain("0 = 1")
   })
 
   it("the fixed scopes (user / role / invite) are fenced too — they were not", async () => {
     for (const scope of ["user", "role", "invite"] as const) {
       queries.length = 0
-      await getActivity(cfg, guard, scope, "row-1", undefined, null, null, PORTAL, null)
+      await getActivity(env, cfg, guard, scope, "row-1", undefined, null, null, PORTAL, null)
       for (const q of queries) expect(q, `the ${scope} scope carried no fence: ${q}`).toContain("0 = 1")
     }
   })
 
   it("an account-owned record still resolves to the caller's own world", async () => {
-    await getActivity(cfg, guard, "record", "A_MINE", "accounts", null, null, PORTAL, null)
+    await getActivity(env, cfg, guard, "record", "A_MINE", "accounts", null, null, PORTAL, null)
     for (const q of queries) {
       expect(q).toContain("related_table = 'accounts'")
       expect(q, "a closed answer would lock the client out of their own history").not.toContain("0 = 1")
@@ -157,7 +169,7 @@ describe("a client login's record reads are fenced on every table (the help leak
   it("STAFF are not fenced (a fence that refuses everybody is a broken door)", async () => {
     for (const table of ["help", "accounts"]) {
       queries.length = 0
-      await getActivity(cfg, guard, "record", "row-1", table, null, null, STAFF, null)
+      await getActivity(env, cfg, guard, "record", "row-1", table, null, null, STAFF, null)
       for (const q of queries) expect(q, `staff were fenced out of ${table}: ${q}`).not.toContain("0 = 1")
     }
   })
@@ -175,7 +187,7 @@ describe("a client login's record reads are fenced on every table (the help leak
 // clause must be ADDITIVE, never a replacement for the filter or the fence.
 describe("the actor scope carries everything the team feed carries (R18)", () => {
   it("names the actor AND keeps the visibility filter", async () => {
-    await getActivity(cfg, guard, "actor", "user-7", undefined, ALLOWED, null, STAFF, null)
+    await getActivity(env, cfg, guard, "actor", "user-7", undefined, ALLOWED, null, STAFF, null)
     expect(queries.length).toBeGreaterThan(0)
     for (const q of queries) {
       expect(q, `actor read lost the R18 clause: ${q}`).toContain("related_table")
@@ -187,7 +199,7 @@ describe("the actor scope carries everything the team feed carries (R18)", () =>
   })
 
   it("a caller allowed NOTHING sees only the actor's rows that name no record", async () => {
-    await getActivity(cfg, guard, "actor", "user-7", undefined, [], null, STAFF, null)
+    await getActivity(env, cfg, guard, "actor", "user-7", undefined, [], null, STAFF, null)
     for (const q of queries) {
       expect(q).toContain("related_table IS NULL")
       expect(q).toContain("creator_id = ?")
@@ -198,7 +210,7 @@ describe("the actor scope carries everything the team feed carries (R18)", () =>
     // The worst shape available: a client login naming one of OUR staff. The
     // account fence must survive the extra clause, or this is the team feed's
     // old leak wearing a person's name.
-    await getActivity(cfg, guard, "actor", "staff-1", undefined, ALLOWED, null, PORTAL, null)
+    await getActivity(env, cfg, guard, "actor", "staff-1", undefined, ALLOWED, null, PORTAL, null)
     expect(queries.length).toBeGreaterThan(0)
     for (const q of queries) {
       expect(q, "the portal fence must ride the actor read").toContain("'A_MINE'")
@@ -207,7 +219,7 @@ describe("the actor scope carries everything the team feed carries (R18)", () =>
   })
 
   it("an actor scope with NO id returns nothing — never everyone's", async () => {
-    const out = await getActivity(cfg, guard, "actor", undefined, undefined, ALLOWED, null, STAFF, null)
+    const out = await getActivity(env, cfg, guard, "actor", undefined, undefined, ALLOWED, null, STAFF, null)
     expect(out.rows).toEqual([])
     expect(out.total).toBe(0)
     expect(queries.filter(unfiltered)).toEqual([])
@@ -216,7 +228,7 @@ describe("the actor scope carries everything the team feed carries (R18)", () =>
 
 describe("the verb filter narrows every scope, and only narrows", () => {
   it("rides the team feed alongside the R18 clause", async () => {
-    await getActivity(cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, "archived")
+    await getActivity(env, cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, "archived")
     for (const q of queries) {
       expect(q).toContain("verb = ?")
       expect(q, "narrowing by verb must not drop the visibility filter").toContain("related_table")
@@ -225,7 +237,7 @@ describe("the verb filter narrows every scope, and only narrows", () => {
   })
 
   it("rides the record scope too — one record's history, one kind of event", async () => {
-    await getActivity(cfg, guard, "record", "row-1", "help", null, null, STAFF, "deleted")
+    await getActivity(env, cfg, guard, "record", "row-1", "help", null, null, STAFF, "deleted")
     for (const q of queries) {
       expect(q).toContain("verb = ?")
       expect(q).toContain("related_table = ? AND related_row_id = ?")
@@ -233,7 +245,156 @@ describe("the verb filter narrows every scope, and only narrows", () => {
   })
 
   it("no verb means no clause — the filter is absent, not defaulted", async () => {
-    await getActivity(cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, null)
+    await getActivity(env, cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, null)
     for (const q of queries) expect(q).not.toContain("verb = ?")
+  })
+})
+
+// THE FACE, BATCHED (R35/R60). `actorPictures` reads the GLOBAL `users` table
+// through the native `env.DB` binding — a REAL D1 statement, not the REST door
+// this file stubs above — so it is the one lookup in this reader D1's own
+// 100-bound-parameter ceiling actually applies to. It must chunk with the SAME
+// helper (`idBatches`) and the SAME cap (`D1_MAX_BOUND_PARAMS`) `withEmails`
+// (routes/accounts.ts) already does, and this is the test that proves the
+// chunking runs rather than merely reads well in a comment.
+//
+// TESTED DIRECTLY, not through `getActivity`: a page is capped at PAGE_SIZE (50,
+// shared/workers/paging.ts), which is under D1_MAX_BOUND_PARAMS (100) — so no
+// call `getActivity` can make today ever hands `actorPictures` more ids than one
+// batch holds, by construction. That is exactly why the guard has to live inside
+// `actorPictures` itself (the comment on it says so) rather than being trusted to
+// the page size never changing — and it is why proving it needs a list built
+// past the cap directly, not a mocked page pretending to be one.
+describe("R35/R60 — actorPictures batches instead of binding one statement", () => {
+  it("resolves every id's picture across more than one D1 batch", async () => {
+    const total = D1_MAX_BOUND_PARAMS + 37
+    const ids = Array.from({ length: total }, (_, i) => `actor-${i}`)
+    const batchesSeen: string[][] = []
+    const pictureEnv = {
+      DB: {
+        prepare: () => ({
+          bind: (...bound: string[]) => {
+            batchesSeen.push(bound)
+            return {
+              all: async () => ({
+                results: bound.map((id) => ({ id, image_url: `pic-${id}` })),
+              }),
+            }
+          },
+        }),
+      },
+    } as never
+
+    const pictures = await actorPictures(pictureEnv, ids)
+
+    expect(batchesSeen.length, "more ids than one D1 batch holds must issue more than one query").toBeGreaterThan(
+      1
+    )
+    for (const batch of batchesSeen)
+      expect(batch.length, `a batch of ${batch.length} exceeds D1's ${D1_MAX_BOUND_PARAMS}`).toBeLessThanOrEqual(
+        D1_MAX_BOUND_PARAMS
+      )
+    // Every id, across whichever batch answered it, made it back into one map —
+    // batching must never lose or duplicate a result.
+    for (const id of ids) expect(pictures.get(id)).toBe(`pic-${id}`)
+  })
+
+  it("de-dupes and drops empty ids before ever building a batch", async () => {
+    let calls = 0
+    const pictureEnv = {
+      DB: {
+        prepare: () => ({
+          bind: (...bound: string[]) => {
+            calls++
+            return { all: async () => ({ results: bound.map((id) => ({ id, image_url: null })) }) }
+          },
+        }),
+      },
+    } as never
+    const pictures = await actorPictures(pictureEnv, ["u1", "u1", "", "u2"])
+    expect(calls).toBe(1)
+    expect([...pictures.keys()].sort()).toEqual(["u1", "u2"])
+  })
+
+  it("an empty id list issues no query at all", async () => {
+    let calls = 0
+    const pictureEnv = {
+      DB: {
+        prepare: () => {
+          calls++
+          return { bind: () => ({ all: async () => ({ results: [] }) }) }
+        },
+      },
+    } as never
+    const pictures = await actorPictures(pictureEnv, [])
+    expect(calls).toBe(0)
+    expect(pictures.size).toBe(0)
+  })
+})
+
+// THE CONTRACT `getActivity` PROMISES CALLERS: `actorPicture: string | null` on
+// every row — a face when the global table has one, `null` for a person with none
+// AND for a system/automation actor (`creator_id === null`, so it is never even
+// asked about). One page, one statement to the face's own door, exactly like
+// `clients` (R54) right above it in the reader.
+describe("R35/R60 — actorPicture rides every row getActivity returns", () => {
+  it("threads a found picture, nulls a missing one, and nulls a system actor", async () => {
+    const rows = [
+      {
+        id: "a1",
+        type: "t",
+        description: "d",
+        created_at: "2026-01-01T00:00:00Z",
+        creator_name: "Ann",
+        creator_id: "user-1",
+        verb: null,
+        origin: null,
+      },
+      {
+        id: "a2",
+        type: "t",
+        description: "d",
+        created_at: "2026-01-01T00:00:00Z",
+        creator_name: "Bo",
+        creator_id: "user-2",
+        verb: null,
+        origin: null,
+      },
+      {
+        id: "a3",
+        type: "t",
+        description: "d",
+        created_at: "2026-01-01T00:00:00Z",
+        creator_name: null,
+        creator_id: null,
+        verb: null,
+        origin: null,
+      },
+    ]
+    // ONCE: the very next `d1Query` call is the page SELECT built above — the
+    // COUNT alongside it in the same `Promise.all` falls straight back through to
+    // the shared mock's default `[{ n: 0 }]`, exactly as every other test here
+    // relies on.
+    vi.mocked(d1Query).mockImplementationOnce(async () => rows as never)
+
+    const pictureEnv = {
+      DB: {
+        prepare: () => ({
+          bind: (...bound: string[]) => ({
+            all: async () => ({
+              results: bound
+                .filter((id) => id === "user-1" || id === "user-2")
+                .map((id) => ({ id, image_url: id === "user-1" ? "pic-1" : null })),
+            }),
+          }),
+        }),
+      },
+    } as never
+
+    const out = await getActivity(pictureEnv, cfg, guard, "team", undefined, undefined, ALLOWED, null, STAFF, null)
+    const byId = new Map(out.rows.map((r) => [r.id, r]))
+    expect(byId.get("a1")?.actorPicture, "a face the users table has").toBe("pic-1")
+    expect(byId.get("a2")?.actorPicture, "a real person with no picture on file").toBeNull()
+    expect(byId.get("a3")?.actorPicture, "a system/automation actor — no creator_id to even ask about").toBeNull()
   })
 })

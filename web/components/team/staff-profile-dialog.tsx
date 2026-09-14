@@ -39,6 +39,10 @@ export type StaffProfileValues = {
   roleModels: string
   about: string
   photoUrl: string
+  /** Team migration 0089 — the member detail head's own fields. */
+  birthday: string
+  position: string
+  phone: string
 }
 
 const EMPTY: StaffProfileValues = {
@@ -49,6 +53,9 @@ const EMPTY: StaffProfileValues = {
   roleModels: "",
   about: "",
   photoUrl: "",
+  birthday: "",
+  position: "",
+  phone: "",
 }
 
 export function StaffProfileDialog({
@@ -87,6 +94,9 @@ export function StaffProfileDialog({
         roleModels: values.roleModels.trim(),
         about: values.about.trim(),
         photoUrl: values.photoUrl.trim(),
+        birthday: values.birthday.trim(),
+        position: values.position.trim(),
+        phone: values.phone.trim(),
       })
       clearDraft()
       onOpenChange(false)
@@ -104,6 +114,22 @@ export function StaffProfileDialog({
         value={values[key]}
         onChange={(e) => set(key)(e.target.value)}
         placeholder={placeholder}
+        disabled={busy}
+      />
+    </Field>
+  )
+
+  /** BIRTHDAY — a calendar day, not a prose field, so it gets its own control
+   * rather than going through `text()` above: an `<Input type="date">`, the
+   * same shape the certificate form's own two date fields used before the
+   * certificate module was killed whole on 14 Sep 2026. */
+  const dateField = (key: keyof StaffProfileValues, label: string) => (
+    <Field config={{ ...defaultFieldConfig, label, required: false }} htmlFor={`staff-${key}`} className={fieldSpacing}>
+      <Input
+        id={`staff-${key}`}
+        type="date"
+        value={values[key]}
+        onChange={(e) => set(key)(e.target.value)}
         disabled={busy}
       />
     </Field>
@@ -146,6 +172,14 @@ export function StaffProfileDialog({
       {prose("weaknesses", "What they find hard", "Written kindly, this is here to help people work together.")}
       {text("roleModels", "Who they look up to", "Someone, or a way of working")}
       {prose("about", "Anything else", "The rest of the picture.")}
+      {/* THE DETAIL HEAD'S OWN THREE — client ruling, on the member's own
+          detail page: "Full name · Birthday · Position · … The field for the
+          phone number." Full name and email already come from the member row
+          itself; these three are the ones that live here, on the profile
+          (team migration 0089). */}
+      {dateField("birthday", "Birthday")}
+      {text("position", "Position", "Their title at the business")}
+      {text("phone", "Phone number", "The number the Call button on their page dials")}
       {/* THE PHOTO ITSELF. This field used to ask for "a link, or the URL of a
           file you uploaded" — with nowhere in the app to upload one, so the
           only honest answer was a link to somewhere else. The door has always

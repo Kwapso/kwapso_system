@@ -4,10 +4,9 @@
 // Three groups, and they are in this order because that is their order of
 // consequence:
 //
-//   1. A DATE IS A DAY OR IT IS A REFUSAL. Four of the six internal tables carry
+//   1. A DATE IS A DAY OR IT IS A REFUSAL. Some of the internal tables carry
 //      a date somebody types, and a value that NEARLY parses is the worst kind
-//      of bad data: it sorts, it renders, and it is wrong. An expiry that half
-//      parses is a certificate that silently never lapses.
+//      of bad data: it sorts, it renders, and it is wrong.
 //   2. A LINK IS NOT A SCRIPT. These tables store URLs somebody clicks.
 //   3. NONE OF IT REACHES A CLIENT — structurally, the way R24 makes the same
 //      promise about margin: not by a condition somebody can invert, but by the
@@ -139,7 +138,6 @@ describe("the agency's own housekeeping never reaches the client's side", () => 
     const forbidden = [
       "brand_assets",
       "staff_profiles",
-      "staff_certificates",
       "meeting_purposes",
       "/api/content/brand-assets",
       "/api/content/delivery",

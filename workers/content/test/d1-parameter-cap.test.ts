@@ -203,6 +203,8 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "the dropdown groups one query module names — one per `vocabulary` marker in its own field list, fixed at author time",
       "tenancy/src/lib/activity-read.ts: allowedTables":
         "the modules a caller may read — one per TEAM_MODULES entry, fixed at author time",
+      "tenancy/src/lib/activity-read.ts: batch":
+        "one idBatches chunk, capped at D1_MAX_BOUND_PARAMS by the same helper accounts.ts uses, looking up users.image_url on the global DB for an activity page's distinct creators; the batching is proved by workers/tenancy/test/activity-scope.test.ts (a page of D1_MAX_BOUND_PARAMS + 37 ids issues more than one query and no batch exceeds the cap)",
       "tenancy/src/lib/work-engine.ts: BORROWED":
         "a module-level constant: the tables the work engine borrows. Fixed at author time.",
       // A column list, not an id list: bounded by the table's own shape, and D1

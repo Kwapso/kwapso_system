@@ -96,7 +96,10 @@ import { LANGUAGES } from "@shared/i18n"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
+import { RecordPicker } from "@/components/records/record-picker"
+import type { PickablePerson } from "@/lib/members"
 
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }
 const emailField = { ...defaultFieldConfig, label: "Email", required: false }
@@ -106,6 +109,12 @@ const postalField = { ...defaultFieldConfig, label: "Postal code", required: fal
 const cityField = { ...defaultFieldConfig, label: "City", required: false }
 const countryField = { ...defaultFieldConfig, label: "Country", required: false }
 const industryField = { ...defaultFieldConfig, label: "Industry", required: false }
+// 0091, client ruling 14 Sep 2026: "who the account responsible or account
+// manager is, like someone from staff." Not required — most existing
+// accounts have nobody assigned yet, and a required dropdown would make
+// somebody guess (the same reasoning the four `picker(...)` fields below
+// already carry for the team's own vocabulary).
+const accountManagerField = { ...defaultFieldConfig, label: "Account manager", required: false }
 const aboutField = { ...defaultFieldConfig, label: "About", required: false }
 const languageField = { ...defaultFieldConfig, label: "Language", required: false }
 const logoField = { ...defaultFieldConfig, label: "Logo", required: false }
@@ -172,6 +181,9 @@ export type AccountFormValues = {
   city: string
   country: string
   industry: string
+  /** 0091 — a `team_members` user id, or "" for nobody assigned yet. Picked
+   * from `members`, the same assignee picker the rest of the app uses (R35). */
+  accountManagerId: string
   /** rich text (HTML), authored in the library Notes editor */
   about: string
   /** a data URL from the picker, or a URL already on the record */
@@ -199,6 +211,7 @@ const EMPTY: AccountFormValues = {
   city: "",
   country: "",
   industry: "",
+  accountManagerId: "",
   about: "",
   logoUrl: "",
   coverUrl: "",
@@ -218,6 +231,7 @@ export function AccountFormDialog({
   initial,
   onSubmit,
   draftKey,
+  members = [],
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -226,8 +240,15 @@ export function AccountFormDialog({
   onSubmit: (values: AccountFormValues) => Promise<void>
   /** stable id for per-session draft persistence; omit to disable. */
   draftKey?: string
+  /** 0091 — who this account can be assigned to. THE SAME PICKER THE REST OF
+   * THE APP USES, never a new one: `useAssignableMembers(teamId)`, our own
+   * staff only, each with their FACE (R35) — the identical prop
+   * `AppFormDialog` already takes for its own person field. Optional
+   * (defaults to `[]`, an empty picker) so a caller that has no opinion —
+   * most of this suite's own render calls — is not forced to fabricate one. */
+  members?: PickablePerson[]
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(draftKey, initial ?? EMPTY, open)
   const [busy, setBusy] = React.useState(false)
@@ -303,7 +324,7 @@ export function AccountFormDialog({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NONE}>{placeholder}</SelectItem>
-          {options.map((o) => (
+          {sortedOptions(options, lang).map((o) => (
             <SelectItem key={o.value} value={o.value}>
               {o.label}
             </SelectItem>
@@ -443,6 +464,31 @@ export function AccountFormDialog({
         LANGUAGES.map((l) => ({ value: l.code, label: l.english })),
         (v) => set({ locale: v }),
         t("Ours")
+      )}
+
+      {/* 0091 — WHO IS RESPONSIBLE, client ruling 14 Sep 2026. `RecordPicker`,
+          not the plain `Select` the four fields above use: a member carries a
+          FACE (R35), and this is THE assignee picker the rest of the app
+          already reaches for (task-form-dialog.tsx, story-form-dialog.tsx) —
+          options only (the members list is a bounded, already-cached read,
+          never a paged one), so no `search`/`searchKey`.
+          COMPANIES ONLY, the same `isCompany` gate the Industry field above
+          uses: a company is what has an account manager in this product, a
+          contact is somebody AT one. */}
+      {isCompany && (
+        <Field config={accountManagerField} htmlFor="account-manager" className={fieldSpacing}>
+          <RecordPicker
+            id="account-manager"
+            value={values.accountManagerId || NONE}
+            onChange={(v) => set({ accountManagerId: v === NONE ? "" : v })}
+            options={sortedOptions(members, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
+            emptyOption={{ value: NONE, label: t("Nobody yet") }}
+            placeholder={t("Nobody yet")}
+            searchPlaceholder={t("Search members…")}
+            emptyText={t("Nothing matched.")}
+            disabled={busy}
+          />
+        </Field>
       )}
 
       <Field config={aboutField} htmlFor="account-about" className={fieldSpacing}>
