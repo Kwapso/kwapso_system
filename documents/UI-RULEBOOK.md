@@ -949,11 +949,26 @@ Evidence: `A-3.59.37`, `A-4.05.42`, `A-4.07.02`.
 
 ### K8: the filter control is an icon-only button when it has no active filter
 
-A funnel glyph in a `variant="ghost" size="icon"` button. It grows a label and a count
-only once a filter is applied.
+> **AMENDED (14 Sep 2026, QA walk finding): the rule below is stale — the shipped filter
+> pill has never been icon-only, on purpose, under two dated client rulings.**
+> `shared/web/screen-engine/filter-bar.tsx` passes `addFilterLabel = t("Filter")`
+> unconditionally to the kit's `KitFilterBar`: the word is always on screen, beside a
+> `Badge` carrying the active-filter count. Two verbatim rulings, quoted in the source —
+> **2026-09-02**: *"the toolbar shows a count and nothing else"* (the chip wall came off,
+> the pill is what was left standing); **2026-09-03**: *"The count design should replicate
+> the count design that we have on the top lines, like this Mango round background with no
+> border behind the number,"* landed in `b2018c9f`
+> (`feat(filter-bar): one container for the filter pill and panel, an always-on mango
+> count, kit v1.2.33`), which is also where the label was fixed to the plain, un-numbered
+> word "Filter" — the count moved into a real `Badge`, so the label no longer needed to
+> fold a number into a sentence. Two dated, sourced rulings beat the undated old-app
+> screenshots below; the shipped behaviour is the current one.
 
-Evidence: `A-4.00.19`, `A-4.05.45` (bare funnel button beside the search field) versus
-`A-3.59.37` (a wider "Filter" dropdown when the screen has facets in play).
+Old rule, kept as history: a funnel glyph in a `variant="ghost" size="icon"` button, with
+no label, growing a label and a count only once a filter was applied.
+
+Evidence for the old rule: `A-4.00.19`, `A-4.05.45` (bare funnel button beside the search
+field) versus `A-3.59.37` (a wider "Filter" dropdown when the screen had facets in play).
 
 ### K9: a card grid is used only when the record has an image
 
@@ -1230,6 +1245,33 @@ collection BY ("Newest first", "Priority order"), a designed landing sequence
 
 **Law.** [R75](../RULES.md) (`alphabetical-options`).
 
+### K18: a record with a face defaults to the gallery; the table is the alternate view
+
+**The rule.** *"for accounts main: use gallery and add table as alternate view. filter by
+account manager, country, status. sort by name - in the table columns: name status,
+account manager, country."* — client, 14 Sep 2026. The general shape: a collection whose
+records carry a picture or a logo opens on the gallery (`CardGrid` + `RecordMark`, the same
+wall `members-gallery.tsx` already composes), offers the list as a table through
+`<ToolbarRow>`'s structured `view` slot ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default),
+the kit's `ViewSwitch`), and the table's own first column is the record's name carrying its
+mark — never a bare label. Accounts is the first screen built to the shape:
+`AccountsScreen` (`web/components/accounts/accounts-screen.tsx`) opens on
+`view === "gallery"` ("the one on first load"), and its table draws four columns in her own
+order — Name · Status · Account manager · Country — with only Name sortable
+(`ACCOUNT_SORTS` has no order for the other three).
+
+**Not a law, and the reason is on the record.** The engine's own `display: "gallery"`
+(`screen-renderer.tsx`) would be the obvious chokepoint to derive this from — census every
+recipe carrying a `picture`/`logoUrl`-shaped field for `display: "gallery"` — but Accounts'
+own recipe (`accountsListRecipe`, `web/lib/screens.ts`) sets `display: "list"` and says so
+itself: the screen no longer renders through `ScreenRenderer` at all, and `display`,
+`leading` and `fields` on that recipe are explicitly VESTIGIAL, "kept in case a team's JSON
+override still reads them, never consulted by the live screen." A census built against
+`recipe.display` would therefore fail on the very screen the ruling is about — reading a
+field the shipped code has already said it ignores is not an honest check, so this stays a
+rulebook entry rather than a law until a real registry of host-composed screens exists to
+check against instead.
+
 ---
 
 ## 5. Buttons and actions
@@ -1318,8 +1360,20 @@ Evidence: `A-3.55.34`, `A-3.59.42`, `A-4.00.30`, `A-4.00.44`, `A-4.06.12`, `A-4.
 `A-4.07.11`, `A-4.07.34`. The old app uses a bare plus in every one, on desktop and
 mobile, on top-level collections and on sub-collections.
 
-The one exception: the portal's "New Ticket" keeps its label, because a client visits
-rarely and needs the invitation (`P-4.10.05`, `P-4.10.12`, `P-4.10.19`).
+The one exception, historically: the portal's "New Ticket" kept its label, because a
+client visits rarely and needs the invitation (`P-4.10.05`, `P-4.10.12`, `P-4.10.19`).
+
+> **AMENDED (2026-08-31): the exception is gone — there is no exception.** The client's own
+> ruling, quoted verbatim in the portal's own source: *"+ actions never have a word, they
+> are only the + icon."* `web-portal/components/tickets-screen.tsx:100-108` ships the
+> portal's create action as the identical icon-only pattern every other add button in the
+> app uses — the words become the accessible name and the tooltip, the same seam the
+> agency's own `AddButton` draws create actions from — and the labelled button moves to the
+> empty state instead (composition 27.21's own carved-out exception: "the only place a
+> labelled create button is allowed, because there is no toolbar + to lean on and the
+> screen exists to be filled"). A later, dated, sourced ruling beats an undated old-app
+> screenshot; there is now exactly ONE shape for a collection's create action across both
+> front doors.
 
 ### B4: import and export keep their labels and their icons
 
@@ -1436,40 +1490,103 @@ picture across every module never has to open each module's settings page in tur
 both are gated the identical way B10 already is: `moduleSettingsIndex(can)`, never a second
 `can(` call.
 
-### B12: settings changes preview first and apply on Save
+### B12: settings changes preview first and apply on Save, through the pinned bar
 
-**The rule.** *"We need, in Settings › Appearance, when I'm changing it, to have some kind
-of save button so that I can first preview it and, once I'm happy with what I see,
-implement it across the app."* — client, 2026-09-14. Size, Appearance (light/dark) and
-Background now stage a PENDING value each; `AppearancePreview` renders the pending three,
-and nothing outside the tab moves until Save — the real font size, the real `data-theme`,
-the real rail colour all keep showing the SAVED three until she presses it.
+**The rule.** *"We need some kind of hint or flag, very visible, probably not at the
+bottom, that allows me to save or to restart… however we call it normally in UI, to not
+save the changes."* — client, 14 Sep 2026, over a screenshot of Settings › Appearance and
+Settings › Team › Roles — both already staged a draft behind a Save button, Roles with no
+way to back out at all. Her own design lane built a five-option comparison artifact against
+that sentence and she picked the first, **Option A: a quiet band pinned directly under the
+tab strip**, reusing the idiom the app's own collection toolbar already pins with (R63)
+rather than a fourth kind of sticky chrome.
 
-**The contract.**
+**The affordance is the kit's `UnsavedChangesBar`** (`shared/ui/components/unsaved-changes-bar/`,
+v1.2.82) — `dirty` / `onSave` / `onDiscard` / `saving?`, every string a prop, nothing
+rendered at all while `dirty` is false. Adopted on two screens:
 
-- **Save** commits whichever of the three actually changed, in one pass — the same two
-  persistence doors (`saveScale`, `saveSpine`) and the same device-local write
+- **Settings › Appearance** (`shared/web/appearance-panel.tsx`) — Size, Appearance
+  (light/dark) and Background stage a PENDING value each; `AppearancePreview` renders the
+  pending three, and nothing outside the tab moves until Save — the real font size, the
+  real `data-theme`, the real rail colour all keep showing the SAVED three until she
+  presses it. **Save** commits whichever of the three actually changed, in one pass — the
+  same two persistence doors (`saveScale`, `saveSpine`) and the same device-local write
   (`applyThemeMode` + `localStorage`) this panel always called, just called once, from one
-  place, instead of once per press.
-- **Discard** sets all three pending values back to saved; nothing is sent anywhere.
-- **Both are inert with nothing staged** (`dirty` false) — a Save that would do nothing is
-  a lie about state, so the row disables both rather than leaving a press with nothing to
-  commit.
-- **The seam that moves is WHEN, never WHERE.** Size and Background were already persisted
-  on the person's own session row; Appearance was already device-local. Both are reused
-  exactly as they were — only the moment of writing moves, from every press to one Save.
+  place, instead of once per press. **Discard** sets all three pending values back to
+  saved; nothing is sent anywhere.
+- **Settings › Team › Roles** (`web/components/team/roles-matrix.tsx`) — the whole
+  permission grid stages every switch behind Save, the way it has since the matrix
+  shipped, but with no way to back out short of un-toggling each cell by hand: the design
+  lane's own artifact named it outright, *"there is no Discard control on Roles today."*
+  The bottom Save button — invisible on any viewport shorter than the whole matrix, the
+  same "probably not at the bottom" complaint the bar exists to answer — is gone; `save()`
+  is unchanged, only what calls it moved. **Discard** is new, and it is the draft's own
+  reset, not a door call: `discardDraft` rebuilds the same `server` object the
+  reconciliation effect already computes — the last-saved value of every active role's
+  sheet — and writes it straight back over `draft`.
+
+**Both are inert with nothing staged** (`dirty` false) — a Save that would do nothing is a
+lie about state, so the row disables both rather than leaving a press with nothing to
+commit.
 
 **The one documented exception, in her own words: *"keep language instant."*** Language is
-the fourth section of the same panel and stays wired the way it always was — applied and
-persisted the instant a pill is pressed, never staged, never part of `dirty`, untouched by
-Discard. Put to her plainly before it shipped that way: the preview shows a chip, a title
-and a lorem body, none of which read differently in another language, so staging Language
-would show her nothing changing while she waited to press Save — the one control where
-"preview it first" has nothing to preview. Recorded here as a decision rather than left to
-read as an inconsistency the next reader notices between Language and its three
+the fourth section of the Appearance panel and stays wired the way it always was — applied
+and persisted the instant a pill is pressed, never staged, never part of `dirty`, untouched
+by Discard. Put to her plainly before it shipped that way: the preview shows a chip, a
+title and a lorem body, none of which read differently in another language, so staging
+Language would show her nothing changing while she waited to press Save — the one control
+where "preview it first" has nothing to preview. Recorded here as a decision rather than
+left to read as an inconsistency the next reader notices between Language and its
 neighbours.
 
-**Code.** `shared/web/appearance-panel.tsx`.
+**Switching a Settings tab while a panel is dirty asks first.** The tab strip's own
+`onValueChange` is intercepted by one guard (`handleTabChange`,
+`web/components/screens/settings-screen.tsx`): when the CURRENT tab is staged and dirty,
+the switch does not happen yet — [R59](#f10-a-form-is-a-slide-in-a-warning-is-an-overlay)
+(a yes/no warning is the one centred overlay) says this is the kit's `AlertDialog`, never a
+second sheet sliding over the first, and the two answers are "Keep editing" (focused by
+default, the safe answer) or a destructive "Discard your unsaved changes?" that runs the
+tab's own Discard path before switching.
+
+**What is still open.** The guard above catches a tab SWITCH inside Settings. It does not
+catch leaving the screen altogether — closing the tab, following a link elsewhere in the
+app, or closing the browser with a dirty Appearance or Roles draft still staged. No
+`beforeunload` handler and no hook into the app shell's own navigation dispatch exists yet:
+an app-wide navigate-away guard is a named gap, not a shipped behaviour.
+
+**Code.** `shared/web/appearance-panel.tsx`, `web/components/team/roles-matrix.tsx`,
+`web/components/screens/settings-screen.tsx`.
+
+### B13: a protected value is always active — there is no such state as "active, protected"
+
+**The rule.** *"if it's protected, it's always active, so you don't need to put active
+protected, just protected."* — client, 14 Sep 2026, over Choices' own status column.
+Protection and activity are not two independent flags a reader reconciles by hand: every
+screen that shows the state draws ONE word, `Protected`, standing in for the whole thing,
+mutually exclusive against `Active`/`Inactive` (`selectable-screen.tsx`,
+`settings-choices-panel.tsx` — the latter's own header: "every Protected row IS an Active
+row, so a second facet asking 'is it protected?' beside a Status facet that already offers
+'Protected' as one of its three values" would draw a state that can never match a real
+row).
+
+**The door.** `setSelectableActive` already refused to deactivate a protected, active value
+(409 `default_value`) before this ruling. The gap was the other order: deactivate a value
+first, while it is not yet protected, then protect it, and the row ended up protected AND
+inactive with neither door ever having refused either half. `setSelectableDefault`
+(`workers/tenancy/src/lib/selectable.ts`) closes it — protecting a value now REACTIVATES it
+in the same call, on the same idempotent UPDATE R17 already asks for (a single
+current-state predicate, `is_default <> ? OR (protecting AND still deactivated)`), rather
+than a second refusal a caller has to route around before protecting something. Migration
+`0088_a_pictograph_is_not_a_mark_and_protected_is_always_active` backfills every row the
+old two-step gap could already have produced.
+
+**The check.** `workers/tenancy/test/selectable-protected-active.test.ts` already proves
+both directions — against a real `node:sqlite` schema rather than a mocked door, because
+the invariant lives in a hand-written SQL `UPDATE ... WHERE` predicate a mock would accept
+whether or not it was correct. This law is that check's own account, not a second one
+written beside it.
+
+**Law.** [R76](../RULES.md) (`protected-is-active`).
 
 ---
 
@@ -1536,12 +1653,26 @@ reporting the collision on staging in August 2026.
 
 ### F4: Cancel sits beside Submit, and its position flips on mobile
 
-Desktop: Submit then Cancel, right-aligned. Mobile: Cancel left, Submit right, both
-`flex-1`.
+> **AMENDED (2026-08-31): the shipped order is Cancel before Submit, right-aligned, and it
+> does not flip on mobile.** The client's own pass over `FormShell`, verbatim: *"on
+> add/edit - also put the cancel button there. I know I can click out, but also add it."*
+> `FormShell`'s action bar (`shared/web/form-shell.tsx`) draws a real Cancel control for the
+> first time, mirroring the kit's own `form.tsx` Cancel call site — `variant="cancel"`,
+> rendered, in the file's own words, "BEFORE its submit button" — inside one row,
+> `flex items-center justify-end gap-2`, the same order and the same alignment at every
+> width. There is no responsive flip in the shipped shell: the old-app evidence below (this
+> rule's founding source) described a mobile reversal this shell never drew, and the
+> dated, sourced ruling above is the later and more specific fact. Read this note before
+> acting on the paragraph beneath it.
 
-Evidence: `P-4.10.31` (desktop, Submit then Cancel) and `P-4.10.36` (mobile, Cancel then
-Submit, each half-width). The old app deliberately reverses them, so the destructive-ish
-option is never under the thumb's resting position on a phone.
+Old rule, kept as history: desktop was Submit then Cancel, right-aligned; mobile was
+Cancel left, Submit right, both `flex-1`.
+
+Evidence for the old rule: `P-4.10.31` (desktop, Submit then Cancel) and `P-4.10.36`
+(mobile, Cancel then Submit, each half-width). The old app deliberately reversed them, so
+the destructive-ish option was never under the thumb's resting position on a phone — a
+concern the shipped shell answers a different way instead (Cancel is `variant="cancel"`, a
+quiet dismissal, never styled as the destructive action).
 
 ### F5: a field is label left, requirement right, control below
 
@@ -3034,15 +3165,15 @@ library, not a synthesised weight in the host.
 
 ## Rule index
 
-**130 rules.**
+**132 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
 | 2. Page layout and width | L1 to L11 (11) |
 | 3. Detail screens | D1 to D12 (12) |
-| 4. Collections | K1 to K17 (17) |
-| 5. Buttons and actions | B1 to B12 (12) |
+| 4. Collections | K1 to K18 (18) |
+| 5. Buttons and actions | B1 to B13 (13) |
 | 6. Forms and dialogs | F1 to F10 (10) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
