@@ -553,9 +553,32 @@ export const TRUNCATED_TURN_NOTE =
  *  note when the model's own output budget ran out mid-answer, so "the model
  *  finished" and "the model was cut off" can never look identical to a reader —
  *  which is exactly how they looked before this existed. */
+/** AN EMPTY REPLY IS A STALL, NOT A GREETING. Until 14 Sep 2026 the line below
+ *  read `reply.text?.trim() || "Hi — how can I help with your team today?"`,
+ *  under the comment "some models return empty text on a bare greeting — always
+ *  say SOMETHING". So when the deployed model thought for 10,143 characters
+ *  about the owner's five-part ticket question, decided inside that thinking to
+ *  call four tools, and then emitted nothing at all — `finish_reason: "stop"`,
+ *  no text, no tool call — the person was GREETED. Every figure the turn had
+ *  fetched was correct and in front of the model. The reply read as the
+ *  assistant ignoring the question, and a day went on fixing the plumbing
+ *  around a sentence the app itself had written. The loop now nudges once
+ *  (STALL_NUDGE) and only lands here when the model stalls twice in one turn,
+ *  at which point the honest sentence is this one. */
+export const STALLED_TURN_NOTE =
+  "I lost the thread of that one partway and couldn't finish the answer — ask me again, or narrow it down and I'll be quicker."
+
+/** MODEL-FACING, NEVER SAVED: the one push a stalled model gets before the turn
+ *  gives up. Measured on the replayed context that produced the greeting — with
+ *  this appended, the same model wrote the answer: every figure it already had,
+ *  and a plain list of what it had not fetched. It forbids further tool calls
+ *  on purpose: the stall happened at the exact moment the model meant to call
+ *  one, and inviting it to try again invites the same silence. */
+export const STALL_NUDGE =
+  "You stopped without answering. Using ONLY the results already above, write the answer now — every part of the question you can answer from them, in plain words — and say plainly which parts you could not. Do not call any more tools."
+
 export function finalAnswerText(reply: Pick<ModelReply, "text" | "truncated">): string {
-  // Some models return empty text on a bare greeting — always say SOMETHING.
-  const text = reply.text?.trim() || "Hi — how can I help with your team today?"
+  const text = reply.text?.trim() || STALLED_TURN_NOTE
   return reply.truncated ? `${text}\n\n${TRUNCATED_TURN_NOTE}` : text
 }
 
@@ -1676,6 +1699,10 @@ async function runPlanLoop(
   // spent the budget inside the very step that earned the retry.
   const RETRY_BUDGET = 2
   let failedSteps = 0
+  /** Whether this TURN has already nudged a silent model (see the stall branch
+   *  in the loop). Once per turn, not per step: a model that stalls twice is
+   *  told so, never nudged until MAX_STEPS runs out at a credit a step. */
+  let nudged = false
 
   const startedAt = Date.now()
   /** THE ONE WAY A TURN STOPS FOR TIME — one sentence, one saved message, one
@@ -1793,6 +1820,43 @@ async function runPlanLoop(
       await refundUnspentUnit() // this step's unit bought no completion — hand it back
       await log()
       return { done: true, threadId, reply: msg, quota, failure }
+    }
+
+    // ── AN EMPTY REPLY IS A STALL, NOT AN ANSWER (14 Sep 2026) ─────────────
+    //
+    // No text, no tool call, and not cut off by max_tokens: the model ended its
+    // step having said nothing. Replayed against the deployed model on the very
+    // context that produced it — six correct tool results, one compound
+    // question — it thought for 10,143 characters, ended "Let me do these
+    // calls:", and then sent `finish_reason: "stop"` and silence; the calls it
+    // decided on never reached the wire. Not a timeout, not a refusal, and until
+    // this branch existed it fell through to the final-answer path below, whose
+    // fallback greeted the person (STALLED_TURN_NOTE says what that cost).
+    //
+    // One nudge, model-facing only: with STALL_NUDGE appended to that same
+    // context the model wrote the answer. A second stall in one turn ends it
+    // with the honest sentence. Both are RECORDED, because a stall spends a
+    // credit and buys nothing, and the owner could not count them before.
+    const stalled = !reply.toolCalls.length && !reply.text?.trim() && !reply.truncated
+    if (stalled) {
+      const thought = reply.reasoning ?? ""
+      await recordWorkerError(
+        env.DB,
+        "data-ops",
+        nudged ? "agent/stalled-twice" : "agent/stalled",
+        new Error(
+          `${model.name} ended a step with no text and no tool call after ${thought.length} chars of reasoning` +
+            (thought ? ` — tail: ${JSON.stringify(thought.slice(-200))}` : "")
+        ),
+        undefined,
+        { teamId: guard.teamId, userId: actor.id }
+      )
+      if (!nudged) {
+        nudged = true
+        convo.push({ role: "assistant", content: "" })
+        convo.push({ role: "user", content: STALL_NUDGE })
+        continue
+      }
     }
 
     if (!reply.toolCalls.length) {

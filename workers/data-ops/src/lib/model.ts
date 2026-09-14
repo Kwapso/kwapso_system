@@ -56,7 +56,20 @@ export type ToolCall = { id: string; name: string; input: Record<string, unknown
  *  nothing else in the reply saying so. Read in ONE place (readFinishReason) and
  *  carried through both the complete() and stream() paths, so a step-cap failure
  *  can never reach the caller looking identical to a clean stop. */
-export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsage; truncated?: boolean }
+export type ModelReply = {
+  text: string
+  toolCalls: ToolCall[]
+  usage?: TokenUsage
+  truncated?: boolean
+  /** The model's HIDDEN reasoning, when the provider hands it over
+   *  (`reasoning_content` on a reasoning model; gpt-oss also sends the same text
+   *  as `reasoning`). Never shown, never saved, never sent back — it exists so a
+   *  step that ended with no text and no tool call can be recorded with what the
+   *  model was thinking when it fell silent, which is the one fact that told the
+   *  greeting bug apart from a model that had simply finished (agent.ts,
+   *  STALLED_TURN_NOTE). */
+  reasoning?: string
+}
 
 /** `finish_reason` DECIDES NOTHING BY ITSELF — it only tells the caller whether
  *  `text` is the whole of what the model wrote. "length" is the one value that
@@ -437,7 +450,10 @@ class WorkersAiModel implements Model {
       workersAiBody({ messages, tools, stream: false }) as never,
       this.affinity() as never
     )) as {
-      choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] }; finish_reason?: string }[]
+      choices?: {
+        message?: { content?: string; reasoning_content?: string; tool_calls?: OpenAiToolCall[] }
+        finish_reason?: string
+      }[]
       usage?: WorkersAiUsage
     }
     const choice = data?.choices?.[0]
@@ -448,6 +464,7 @@ class WorkersAiModel implements Model {
       toolCalls: toCalls(msg.tool_calls),
       usage: readUsage(data.usage),
       truncated: readFinishReason(choice?.finish_reason),
+      ...(msg.reasoning_content ? { reasoning: msg.reasoning_content } : {}),
     }
   }
 
@@ -483,6 +500,7 @@ export async function parseOpenAiStream(
   const decoder = new TextDecoder()
   let buffer = ""
   let text = ""
+  let reasoning = ""
   let usage: TokenUsage | undefined
   let finishReason: string | undefined
   const calls = new Map<number, ToolBuild>()
@@ -499,7 +517,12 @@ export async function parseOpenAiStream(
       if (!body || body === "[DONE]") continue
       let ev: {
         choices?: {
-          delta?: { content?: string; tool_calls?: (OpenAiToolCall & { index?: number })[] }
+          delta?: {
+            content?: string
+            reasoning_content?: string
+            reasoning?: string
+            tool_calls?: (OpenAiToolCall & { index?: number })[]
+          }
           finish_reason?: string | null
         }[]
         usage?: WorkersAiUsage
@@ -520,6 +543,11 @@ export async function parseOpenAiStream(
         text += delta.content
         onText(delta.content)
       }
+      // Hidden thinking is kept OFF the screen and off `text` — it is evidence,
+      // not an answer. gpt-oss puts the same slice under both names, so one is
+      // read, never both.
+      const thought = delta.reasoning_content ?? delta.reasoning
+      if (thought) reasoning += thought
       for (const [i, tc] of (delta.tool_calls ?? []).entries()) {
         const at = tc.index ?? i
         const build = calls.get(at) ?? { id: "", name: "", json: "" }
@@ -538,6 +566,7 @@ export async function parseOpenAiStream(
       .map(([i, b]) => ({ id: b.id || `call_${i}`, name: b.name, input: parseArgs(b.json) })),
     usage,
     truncated: readFinishReason(finishReason),
+    ...(reasoning ? { reasoning } : {}),
   }
 }
 
