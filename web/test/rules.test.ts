@@ -643,6 +643,48 @@ describe("RULES — the laws of the base", () => {
     }
   })
 
+  // THE SINGLE-PANEL EXEMPTION'S OWN BLIND SPOT. `RECORD_TABS_SINGLE_PANEL`
+  // (read above, and the `continue` in the test before this one) answers
+  // exactly one question — does this record draw a STRIP — and it has never
+  // been asked whether a record draws a FOOTER. Nothing enforced that a
+  // record detail actually FEEDS the footer at all: the host-level test below
+  // proves the rail's plumbing exists somewhere in the app, never that any one
+  // screen hands it anything.
+  //
+  // `member-screen.tsx` is the proof the gap was real, not hypothetical. It is
+  // the one entry `RECORD_TABS_SINGLE_PANEL` names, and it shipped passing
+  // `RecordScreen` an `activity` bundle with real rows for a member who had
+  // ever been role-changed or removed — and NOTHING for one who hadn't, which
+  // is every founding/seeded admin, since only an ACCEPTED INVITE writes a
+  // "Member joined" row. No `audit` either (a membership genuinely has no
+  // creator/editor — record-chrome.tsx's own rule for a fact the record
+  // doesn't know). `RecordDetail`'s own `showActivityColumn`
+  // (record-detail.tsx) draws the Latest-activity column on three things: rows,
+  // a note composer, or the rail's own door — and with all three absent the
+  // whole footer card (`showFooter`) draws NOTHING. record-chrome.tsx's own
+  // "the footer" section says what every OTHER record does about this: "A
+  // record with no history keeps exactly the footer it has today: the
+  // eyebrow, and — where the reader may write one — the note field, which is
+  // how a first entry gets made" — `onAddNote` is that unconditional fallback,
+  // and it is the one thing `member-screen.tsx` never passed.
+  //
+  // So this runs over EVERY record detail the census catches, single-panel or
+  // not — RECORD_TABS_SINGLE_PANEL exempts the TAB STRIP and nothing else, and
+  // must never be read here. A record with real `audit` facts (createdBy/
+  // editedBy — true of every bespoke detail but a membership) has its
+  // unconditional fallback already; one without it must offer `onAddNote`
+  // instead, or its footer goes dark on the first day nothing has happened
+  // yet.
+  it("record-detail-tabs: every record detail feeds the footer unconditionally — audit or a note door, never neither", () => {
+    const offenders = recordDetailComponents()
+      .filter((c) => !c.source.includes("audit=") && !c.source.includes("onAddNote="))
+      .map((c) => c.name)
+    expect(
+      offenders,
+      `${offenders.join(", ")} hands RecordScreen neither audit nor onAddNote — its footer goes dark the day its activity feed is empty (RECORD_TABS_SINGLE_PANEL does not excuse this; it exempts the tab strip only)`
+    ).toEqual([])
+  })
+
   // R2's SECOND HALF, AND IT MOVED FROM THE SCREENS TO THE HOST — 7 Sep 2026.
   //
   // Until today this law demanded `<ActivityPanel>` of each of the thirteen

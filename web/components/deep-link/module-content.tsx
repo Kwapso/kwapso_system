@@ -43,7 +43,6 @@ import { invalidate } from "@shared/web/store"
 import { softNavigate } from "@/lib/nav"
 import type { TaskView } from "@/lib/live-resources"
 import {
-  shapeActivity,
   shapeBrandDetail,
   shapePurposeDetail,
 } from "@/components/deep-link/shape"
@@ -69,7 +68,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "knowledgeShapeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "knowledgeShapeQ" | "companiesQ" | "totals" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -201,7 +200,6 @@ function internalDetail(
 export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
   const {
     t,
-    lang,
     noAccess,
     enabled,
     perms,
@@ -215,10 +213,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     overridesQ,
 
     membersQ,
-    activityQ,
-    activityTotal,
-    activityKey,
-    activityFetchPage,
     // THE TEAM'S ROLES — the member profile's role picker. Read across the
     // whole team area anyway, so this costs nothing.
     roles,
@@ -251,51 +245,17 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       )
     if (perms === undefined) return <Skeleton variant="list" lines={4} />
 
-    // ── THE DOOR TO THE HISTORY, FOR THE THREE SCOPE FEEDS ───────────────────
-    //
-    // The client, 2026-09-06: "I don't want to have activity as a tab anywhere
-    // but on the footer, on top of the dates. On the right column, on Latest
-    // Activity, I would like some view or expand or whatever, and this would
-    // open a slide-in with all the activity."
-    //
-    // WHY THIS IS ONE NODE AND NOT THREE. The team overview, a member and an
-    // invite read the SAME `/api/tenancy/activity` door under three scopes,
-    // resolved once in use-screen-data from what is on screen (`activityScope`,
-    // and the key that mirrors it). So there is one feed in view at a time, and
-    // one door to draw for it — built here, handed to whichever of the three
-    // detail branches below is rendering. Building it inside each branch would
-    // be three copies of one decision, which is the shape the Activity tab was
-    // in before it was deleted.
-    //
-    // THIS IS WHAT MAKES THOSE SCREENS PAGEABLE AGAIN (R14). The team feed is
-    // the fastest-growing table in the base — every mutation writes a row — and
-    // between the tab's removal and this line there was no control anywhere in
-    // `web/` that could ask it for page two. `listKey` is the key page one was
-    // parked under and `fetchPage` is the one fetcher that spends its cursor;
-    // both come from use-screen-data rather than being rebuilt beside the
-    // control, so the door can only ever page the feed it is a door to.
-    //
-    // `RecordScreen` (member-screen.tsx's own host, `record-chrome.tsx`) DECIDES
-    // WHETHER TO DRAW THE DOOR ITSELF (`hasActivityDoor`), off the same exact
-    // server total it would print (R16) — so a scope with no history at all
-    // yields nothing here, and the footer keeps the eyebrow it already had.
-    // Only the MEMBER branch reads this bundle today (`team.detail` and
-    // `invites.detail` were both retired — see the members branch below), so
-    // it is the raw `RailActivity` shape `RecordScreen.activity` wants rather
-    // than a pre-built `<ActivityRail>` node the way the generic engine's
-    // `activityAction` used to want.
-    const memberActivity =
-      activityKey === null ? undefined : {
-        // The SAME shaper the engine's own footer summary and activity block
-        // read, so the three rows in the footer and the first page in the
-        // rail are the same rows dressed once.
-        items: shapeActivity(activityQ.data ?? [], lang),
-        total: activityTotal,
-        loading: activityQ.loading,
-        error: activityQ.error,
-        listKey: activityKey,
-        fetchPage: activityFetchPage,
-      }
+    // THE DOOR TO A MEMBER'S OWN HISTORY used to be built here, from the fixed
+    // `scope=user` feed (`activityScope`/`activityKey`/`activityQ`/
+    // `activityTotal`/`activityFetchPage`, use-screen-data.ts). It moved onto
+    // `member-screen.tsx` itself, reading through `useRecordActivity("users",
+    // userId)` — the ONE generic (table, id) path (R5) every other bespoke
+    // record detail already reads its footer through, and the only shape that
+    // also hands the screen a working `addNote` (see that file's own header
+    // for the bug this closed: a member with no logged history drew no ink
+    // footer at all, audit and note composer both absent). `team.detail` and
+    // the standalone `invites` detail were already retired by the time this
+    // moved, so nothing else needed the old three-scope bundle.
 
     // Import — no permission KEY of its own (gated per-target). Handle it before
     // the MODULE_PERMISSION lookup, which would otherwise NotFound it.
@@ -403,9 +363,10 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // Latest activity column and opens in a slide-in off it — so the engine's
     // `renderActivity` prop, whose only purpose was to put the app's own panel
     // inside that tab, is gone with the tabs it served
-    // (shared/web/screen-engine/screen-renderer.tsx). `activityQ` is still read
-    // and handed to `MemberScreen` below as the raw `RailActivity` bundle: the
-    // tab was a PLACE, not the data.
+    // (shared/web/screen-engine/screen-renderer.tsx). `MemberScreen` below
+    // still reads the data, now through the generic (table, id) path (R5)
+    // rather than a bundle this host builds for it: the tab was a PLACE, not
+    // the data.
     if (module === "members") {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -429,12 +390,13 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // tabs, the footer at the true bottom — member-screen.tsx's own header
       // carries the whole account). `MemberScreen` draws the head, the first
       // panel, the person's own profile and the footer itself now, through
-      // `RecordScreen`; this host hands it the member row, the resolved
-      // recipe (for its `actions` only) and the team's activity feed, already
-      // sliced to this scope. R64 (`sections-have-a-door`) is why the two acts
-      // are taken in that file rather than in the host's generic dispatcher —
-      // its header carries the whole argument, and `SECTION_HOSTED_ELSEWHERE`
-      // names it.
+      // `RecordScreen`; it reads its own activity feed (R5's generic (table,
+      // id) path — see that file's own header for why) rather than being
+      // handed one, so this host only supplies the member row and the
+      // resolved recipe (for its `actions` only). R64 (`sections-have-a-door`)
+      // is why the two acts are taken in that file rather than in the host's
+      // generic dispatcher — its header carries the whole argument, and
+      // `SECTION_HOSTED_ELSEWHERE` names it.
       return (
         <MemberScreen
           teamId={teamId as string}
@@ -442,7 +404,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           roles={roles}
           recipe={recipe}
           rights={rights}
-          activity={memberActivity}
           onRemoved={() => onIntent({ kind: "close" })}
         />
       )

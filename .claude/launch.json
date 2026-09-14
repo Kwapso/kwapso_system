@@ -127,6 +127,19 @@
                 "verify/roles-unsaved"
             ],
             "port": 4179
+        },
+        {
+            "_": "A member's own record page — the ink footer fix (R2/R2 census). A static build of verify/member-detail/. Run `node verify/member-detail/build.mjs` first; this just serves the output. Not app auth — mounts the real <RecordScreen> directly with two hand-built RailActivity bundles (one with rows, one with none) standing in for useRecordActivity's network fetch.",
+            "name": "verify-member-detail",
+            "runtimeExecutable": "python3",
+            "runtimeArgs": [
+                "-m",
+                "http.server",
+                "4183",
+                "--directory",
+                "verify/member-detail"
+            ],
+            "port": 4183
         }
     ]
 }

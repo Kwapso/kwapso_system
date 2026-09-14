@@ -105,12 +105,12 @@ import { useT } from "@shared/web/language"
 import type { TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
-import type { RailActivity } from "@/components/records/activity-rail"
 import { RecordScreen } from "@/components/records/record-chrome"
 import { MemberHead } from "@/components/team/member-head"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
+import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { reportError } from "@shared/web/log"
 
 export function MemberScreen({
@@ -119,7 +119,6 @@ export function MemberScreen({
   roles,
   recipe,
   rights,
-  activity,
   onRemoved,
 }: {
   teamId: string
@@ -136,11 +135,6 @@ export function MemberScreen({
    * file's header). */
   recipe: ScreenRecipe
   rights: ScreenRights
-  /** The team's activity feed, sliced to this member — R14's pager and R16's
-   * exact total, built once by the host for whichever of team/member/invite is
-   * on screen. `undefined` draws no footer door, same as an absent bundle
-   * anywhere else in the app (`hasActivityDoor`). */
-  activity?: RailActivity
   /** The person is gone — the host takes the reader off a record that no longer
    * exists, exactly as the deep-link confirm has always done. */
   onRemoved: () => void
@@ -150,16 +144,45 @@ export function MemberScreen({
   const [confirmRemove, setConfirmRemove] = React.useState(false)
   const name = staffFullName(member)
 
+  // THE MEMBER'S OWN HISTORY, THROUGH THE ONE GENERIC (table, id) PATH (R5) —
+  // not the ad-hoc `scope=user` feed the host used to build (module-content.tsx
+  // used to hand this screen a hand-assembled `RailActivity`, read through
+  // `GET /api/tenancy/activity?scope=user&id=<userId>`). Both read the exact
+  // same rows: `scope=user` IS the generic (table, id) read with `table` fixed
+  // to `"users"` (`FIXED_SCOPE_TABLES`, workers/tenancy/src/lib/activity-read.ts
+  // — "user / role / invite ARE the generic (table, id) read with the table
+  // supplied by the scope name … so they resolve to a table here and share the
+  // ONE branch below"), and `members.ts` writes every membership event
+  // (`Member role changed`, `Member removed`, `Member joined`) against
+  // `relatedTable: "users"`, `relatedRowId: <that member's own userId>`.
+  //
+  // WHY THE SWITCH: the hand-assembled bundle carried no `addNote`, because
+  // `RailActivity` (activity-rail.tsx) is structurally typed to the six fields
+  // the rail itself needs and the host never built a seventh. Every OTHER
+  // bespoke record detail (Contact, Account, a ticket…) reads through this
+  // same `useRecordActivity` hook and always hands its `addNote` straight to
+  // `RecordScreen`'s `onAddNote` — this screen was the one exception, and it
+  // is why a member with no logged history (never role-changed, never
+  // removed — which is every seeded/founding admin, since only an ACCEPTED
+  // INVITE writes a "Member joined" row) drew no ink footer at all: no audit
+  // (a membership genuinely has no creator/editor), zero activity rows, and no
+  // note composer to fall back on is the one combination `RecordDetail` itself
+  // (`showActivityColumn`, record-detail.tsx) draws NOTHING for.
+  const activity = useRecordActivity("users", member.userId)
+
   // ── THE TWO DOORS ───────────────────────────────────────────────────────
   // Cache-first (CACHING.md): each door answers with the WHOLE list, so the
   // members cache is primed with what the write returned rather than dropped
   // and re-read. `member_roles` is invalidated beside it because a role's member
-  // count moved, and the person's own activity feed gained a row.
+  // count moved, and the person's own activity feed gained a row — under the
+  // SAME generic key `activity` above reads (`recordActivityKey("users", id)`),
+  // now that this screen reads through that seam instead of the old
+  // `activity:user:<id>` scope key.
   async function changeRole(roleId: string) {
     const { members: next } = await tenancy.setMemberRole(member.userId, roleId)
     primeCache(`members:${teamId}`, next)
     invalidate(`member_roles:${teamId}`)
-    invalidate(`activity:user:${member.userId}`)
+    invalidate(recordActivityKey("users", member.userId))
     toast.success(t("Role updated."))
   }
 
@@ -167,7 +190,7 @@ export function MemberScreen({
     const { members: next } = await tenancy.removeMember(member.userId)
     primeCache(`members:${teamId}`, next)
     invalidate(`member_roles:${teamId}`)
-    invalidate(`activity:user:${member.userId}`)
+    invalidate(recordActivityKey("users", member.userId))
     toast.success(t("Member removed."))
   }
 
@@ -215,7 +238,17 @@ export function MemberScreen({
         // is simply absent, which is the kit's own honest answer to a fact the
         // record doesn't know (record-chrome.tsx: "Renders no row for a fact
         // the record doesn't know").
+        //
+        // `onAddNote` IS WHAT MAKES THE FOOTER RELIABLE WITH NO AUDIT AND NO
+        // HISTORY YET — the same pairing every other bespoke detail passes
+        // (Contact, Account, a knowledge source…): `RecordDetail`'s own
+        // `showActivityColumn` draws the column when it has rows, a composer,
+        // OR the rail's door, so a member with zero logged events still gets a
+        // footer with somewhere to write a first entry, exactly the same
+        // guarantee CH27.8 makes for every other record.
         activity={activity}
+        onAddNote={rights.team_members?.create ? activity.addNote : undefined}
+        notePlaceholder={t("Add a note")}
       >
         {/* THE FIRST PANEL, THEN THE PERSON'S OWN PROFILE — BOTH inside this
             ONE `children`, which is what puts the footer after both rather
