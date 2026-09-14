@@ -75,7 +75,7 @@ Levels: **E** easy (one source, direct) · **M** medium (paraphrase, no title) �
 | M16 | Which tasks were reviewed for the flu clinic this week? | para, latest | FluClinic review of tasks, 8 Sep |
 | M17 | What was set up for Claude to talk to GlideOS? | para | GlideOS MCP setup, 24 Aug |
 | M18 | What did we discuss in the Jourfix? | para | Jourfix, 4 Sep |
-| M19 | What is task 3144 and where does it stand? | exact | FluClinic task 3144, 25 Aug + ticket record |
+| M19 | What is ticket #1636 about, and where does it stand? | exact | Real Kwapso ticket, ref T1644: "Ticket #1636 - Customer signature not visible", resolved |
 | M20 | What happened in the last flu-clinic sprint of August? | para, latest | Aug sprint final, 21 Aug |
 
 ## H · Hard — joins, time, and more than one project

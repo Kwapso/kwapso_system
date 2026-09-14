@@ -125,6 +125,18 @@ export type IngestRow = {
    * carries both: a folder somebody filed as team material and one they kept to
    * themselves come back from the same read, and the shelf is on each item. */
   ownerUserId: string | null
+  /** THE SHARING LABEL (0073's tenth Vectorize label) — written truthfully on
+   * every path that knows the answer, the owner's ruling, 12 Sep 2026 ("keep
+   * it for everything"). NOTHING READS THIS AS A FENCE (`readerClause` is
+   * `ownerClause AND appClause`, full stop, a census confirmed it across both
+   * front doors and all eight workers), so a wrong or absent value here cannot
+   * widen or narrow who may read the row — it only leaves the label honest or
+   * not. Absent (the internally-mirrored kinds — a ticket, a task, a role —
+   * that have no sharing choice to report) reads as the column's own default,
+   * 'agency'. Set by the four Google lanes' own `fencing()` (knowledge-google.ts),
+   * off each item's `shelf`/`accountId` — see that function's header for the
+   * two different rules Drive/Chat and Gmail/Calendar answer with. */
+  sharedWith?: "private" | "agency_client" | "agency"
   /** TRUE WHEN EVERY WORD OF THE BODY IS ONE THE APP WROTE for this row.
    *
    * The reader is the only thing that can answer this. Its body is a sentence
@@ -2100,11 +2112,11 @@ async function sweepKind(
       cfg,
       guard.databaseId,
       `INSERT INTO knowledge_sources
-         (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
+         (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, shared_with,
           app_id, ticket_id, sprint_id, record_date, event_id, event_id_from,
           title, summary, body, body_bytes, generated_only,
           source_url, created_at, creator_name, accounts, grain_pieces)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)}, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)}, ?, ?)
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
@@ -2141,6 +2153,31 @@ async function sweepKind(
                      -- clearing it turns it back into a card.
                      generated_only = excluded.generated_only,
                      owner_user_id = excluded.owner_user_id,
+                     -- RE-DECIDED ON EVERY SWEEP, same reasoning as accounts above:
+                     -- a Drive folder's shelf or a Gmail thread's matched client can
+                     -- change between sweeps, and shared_with (0073's tenth
+                     -- Vectorize label) is written truthfully now on every path that
+                     -- knows the answer -- the owner's ruling, 12 Sep 2026. NOTHING
+                     -- READS THIS AS A FENCE (readerClause is ownerClause AND
+                     -- appClause, full stop -- see IngestRow.sharedWith's own
+                     -- comment), so re-deciding it on every sweep costs nothing a
+                     -- read could ever notice; it only keeps a descriptive label honest.
+                     shared_with = excluded.shared_with,
+                     -- AND THE CHUNKS WILL LAG IT. The clause below clears
+                     -- content_hash -- which is what triggers a re-embed, and so
+                     -- what refreshes the chunk-level copy and the Vectorize
+                     -- shared label -- ONLY when owner_user_id moved. A row whose
+                     -- shared_with changes while its owner does not keeps a stale
+                     -- copy at the chunk level until something else re-embeds that
+                     -- source. Left that way DELIBERATELY: nothing reads either
+                     -- copy, so widening the trigger would buy a re-embed of the
+                     -- whole base to correct a label no read consults.
+                     --
+                     -- SO THIS IS THE PRECISE SHAPE OF THE BACKFILL somebody will
+                     -- owe the day this label is first consumed: not a re-index of
+                     -- everything, only the rows where the two facts have drifted
+                     -- apart since. Whoever adds that first filter reads this
+                     -- comment before believing the chunk-level value.
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
                      -- THE GIVE-UP COUNTER IS PER TEXT, NOT PER SOURCE. It resets
@@ -2170,6 +2207,11 @@ async function sweepKind(
         // — which is the direction that matters, and the hash is cleared with it
         // so the chunks are rebuilt under the new fence.
         row.ownerUserId,
+        // Absent (every internally-mirrored kind — a ticket, a task, a role —
+        // that has no sharing choice to report) writes the column's own
+        // default explicitly: 'agency' is the honest answer for material with
+        // no private/client distinction to draw, not a placeholder.
+        row.sharedWith ?? "agency",
         row.appId ?? null,
         row.ticketId ?? null,
         row.sprintId ?? null,

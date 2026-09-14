@@ -5885,6 +5885,41 @@ CREATE TABLE automations (
 );
 `,
   },
+  {
+    // A PERSON'S OWN DECLARATION that this account's single-token name may
+    // narrow a knowledge-base search on its own — c-hijack B
+    // (.session-notes/lanes/NOTE-c-hijack-B-declared-safety.md), named but not
+    // built until the owner's ruling "if you know how to fix it, fix it."
+    //
+    // ONE INTEGER, NOT THREE STATES. 0 = not reviewed (the default: A's rarity
+    // ceiling alone decides), 1 = a person looked at this account's collapsed
+    // name and said it may narrow alone. There is no "reviewed and refused" —
+    // refusing is simply never ticking the box, which is where every account
+    // starts.
+    //
+    // SAME DOCTRINE AS `alt_names` (0083): declared beats inferred. A rarity
+    // ceiling (`ACCOUNT_TOKEN_MAX_CHUNKS`, `@shared/workers/account-rarity`)
+    // narrows the window but cannot close it — Bergman S.A.'s surname sits at
+    // the theoretical minimum (1 chunk) and no positive threshold can exclude
+    // it without also excluding real, safe client names. This column is how
+    // Bergman gets closed: by a person ticking a box, not by a number.
+    //
+    // READ BY `accountsNamedIn` (workers/content/src/lib/knowledge.ts):
+    // bypasses the rarity gate exactly as `code` already does, but NOT the
+    // ambiguous-token check (A2) — two accounts both declaring the same word
+    // still resolves to neither, because that is evidence about the WORD.
+    //
+    // ALSO READ BY THE ACCOUNT WRITE DOOR (workers/tenancy/src/routes/accounts.ts)
+    // for the OTHER half of the same doctrine: a declared `alt_names` spelling
+    // that is a common word is exactly as dangerous as an undeclared
+    // single-token name, and the door refuses one unless this flag is set —
+    // so the two declared-safety doors (a spelling, and "this word may narrow
+    // alone") share one signal rather than each inventing its own.
+    version: "0085_a_person_can_say_this_name_narrows_alone",
+    sql: `
+ALTER TABLE accounts ADD COLUMN name_narrows_alone INTEGER NOT NULL DEFAULT 0;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

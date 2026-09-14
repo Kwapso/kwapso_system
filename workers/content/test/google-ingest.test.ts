@@ -46,9 +46,20 @@ const holder = vi.hoisted(() => ({
    * the first). Null by default, so every other test sees the fixture's own
    * single recipient and every count in this file stays what it was. */
   mailTo: null as string | null,
+  /** MAIL_1's `From` header, when a test needs the thread to name NO known
+   * contact at all (shared_with's "no client matched" branch — 0073's tenth
+   * Vectorize label). Null by default, so every other test sees the fixture's
+   * own Bergman sender and every count in this file stays what it was. */
+  mailFrom: null as string | null,
   /** Extra chat messages one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   chat: [] as Record<string, unknown>[],
+  /** a-names/chat-filing: messages for a NAMED SPACE other than "spaces/AAA" —
+   * keyed by the space's own externalId, so a new fixture space can carry its
+   * own conversation without touching AAA's. Empty by default: every space
+   * this file already knows about keeps reading the AAA-shaped fixture below,
+   * unchanged. */
+  chatBySpace: new Map<string, Record<string, unknown>[]>(),
 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
@@ -113,7 +124,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       {
         id: "MAIL_1",
         threadId: "TH_1",
-        from: "Luis Vera <luis@bergman.example>",
+        from: holder.mailFrom ?? "Luis Vera <luis@bergman.example>",
         to: holder.mailTo ?? "me@kwapso.app",
         subject: holder.mailSubject ?? "Re: the dispatch screen — Ãlaap Kanchawala",
         snippet: "a snippet",
@@ -157,7 +168,10 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
           ...holder.events,
         ],
     }),
-    chatMessages: async () => ({ learned: new Map<string, string>(), messages: [
+    chatMessages: async (_token: string, spaceName: string) => {
+      if (holder.chatBySpace.has(spaceName))
+        return { learned: new Map<string, string>(), messages: holder.chatBySpace.get(spaceName) }
+      return { learned: new Map<string, string>(), messages: [
       {
         id: "spaces/AAA/messages/MSG_2",
         space: "spaces/AAA",
@@ -181,7 +195,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         createdAt: "2026-08-03T10:00:00.000Z",
       },
       ...holder.chat,
-    ] }),
+    ] } },
   }
 })
 
@@ -193,6 +207,7 @@ import {
   eventNamedBy,
   GOOGLE_SOURCE_KINDS,
   googleStateKeys,
+  refileChatSources,
 } from "../src/lib/knowledge-google"
 
 const db = () => holder.db as DatabaseSync
@@ -254,6 +269,7 @@ type SourceRow = {
   compartment: string
   account_id: string | null
   owner_user_id: string | null
+  shared_with: string
   title: string
   body: string
   source_url: string | null
@@ -263,7 +279,7 @@ type SourceRow = {
 const sources = (): SourceRow[] =>
   db()
     .prepare(
-      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url, accounts
+      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, shared_with, title, body, source_url, accounts
          FROM knowledge_sources WHERE origin_table LIKE 'google_%' ORDER BY origin_table, origin_row_id`
     )
     .all() as SourceRow[]
@@ -307,7 +323,9 @@ beforeEach(() => {
   holder.events = []
   holder.mailSubject = null
   holder.mailTo = null
+  holder.mailFrom = null
   holder.chat = []
+  holder.chatBySpace.clear()
   holder.driveText.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
@@ -404,6 +422,77 @@ describe("the shelf is the fence", () => {
   })
 })
 
+// shared_with (0073's tenth Vectorize label) — written truthfully now on
+// every path that knows the answer, the owner's ruling, 12 Sep 2026. TWO
+// RULES, because Drive/Chat and Gmail/Calendar answer a different question —
+// see knowledge-google.ts's fencing() for the reasoning; these are the
+// mutation proofs, both sides of both booleans.
+describe("shared_with is written truthfully on every Google path", () => {
+  it("Drive: a team-shelved folder's contents are 'agency'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Bergman dispatch rollout")?.shared_with).toBe("agency")
+  })
+
+  it("Drive: a private-shelved folder's contents are 'private'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with).toBe("private")
+  })
+
+  it("Chat: a team-shelved space is 'agency'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Delivery room")?.shared_with).toBe("agency")
+  })
+
+  it("Gmail: a thread with a known contact is 'agency_client' — accountId is set, never shelf", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Re: the dispatch screen")?.shared_with).toBe("agency_client")
+  })
+
+  it("Gmail: a thread naming NO known contact is 'agency' — never 'private', even though the mailbox itself is always privately owned", async () => {
+    holder.mailFrom = "A Stranger <stranger@nobody-we-know.example>"
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+    expect(mail.account_id, "the fixture's own premise — nobody matched").toBeNull()
+    expect(mail.owner_user_id, "still privately owned — shelf and shared_with answer different questions").toBe(
+      IDS.staffUser
+    )
+    expect(mail.shared_with).toBe("agency")
+  })
+
+  it("Calendar: an event with a client on the guest list is 'agency_client'", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("Quarterly review")?.shared_with).toBe("agency_client")
+  })
+
+  it("Calendar: an event with nobody known on the guest list is 'agency'", async () => {
+    holder.events = [
+      {
+        id: "EVENT_STRANGER",
+        summary: "Internal sync",
+        description: "Agreed to move the driver app forward.",
+        start: "2026-08-05T09:00:00.000Z",
+        end: "2026-08-05T09:30:00.000Z",
+        url: "https://calendar.example/EVENT_STRANGER",
+        attendees: [],
+      },
+    ]
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const event = byTitle("Internal sync") as SourceRow
+    expect(event.account_id).toBeNull()
+    expect(event.shared_with).toBe("agency")
+  })
+
+  it("RE-DECIDED ON EVERY SWEEP, same as owner_user_id beside it: re-shelving a Drive folder moves shared_with too", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with).toBe("private")
+    db().exec(`UPDATE google_sources SET shelf = 'team' WHERE id = 'S_MINE_${IDS.staffUser}';`)
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(byTitle("My own reading list")?.shared_with, "the label moved with the shelf, not stuck at CREATE time").toBe(
+      "agency"
+    )
+  })
+})
+
 describe("the compartment is decided, not guessed", () => {
   it("a folder filed under a client puts its contents in that client's compartment", async () => {
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
@@ -428,6 +517,355 @@ describe("the compartment is decided, not guessed", () => {
     expect(byTitle("Quarterly review")?.account_id, "an event with a client on the invitation is theirs").toBe(
       IDS.victimAccount
     )
+  })
+})
+
+// a-names/chat-filing (12 Sep 2026). The owner's own complaint: a Chat space is
+// NAMED after the client it is about, and nothing joined that name to the
+// account it names — every chat source filed to the agency, whatever the space
+// was called. This is the fallback ONLY: a space with a DECLARED account_id
+// ("Delivery room", the shared fixture above) never reaches this code at all,
+// proven by every test above continuing to pass unchanged. `accountsNamedIn`
+// is the exact function a question is resolved through — no second matcher —
+// so the rarity gate, kb_CD's DENY and the multi-company refusal all apply
+// here for free, unmodified.
+describe("a-names/chat-filing: an unfiled chat space resolves its own name, the same way a question does", () => {
+  function nameSpace(id: string, externalId: string, name: string): void {
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('${id}', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', '${externalId}', '${name}', 'team', NULL, '2026-01-01', '${IDS.staffUser}');`
+    )
+  }
+  function seedName(name: string, refId: string): void {
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_${name}_${refId}', 'account', '${refId}', '${name}', NULL, 'account:${refId}', '2026-01-01');`
+    )
+  }
+  function chatFixture(spaceId: string, msgId: string, text: string, createdAt: string) {
+    return [
+      {
+        id: `${spaceId}/messages/${msgId}`,
+        space: spaceId,
+        sender: "Ana",
+        senderNamed: true,
+        senderIsApp: false,
+        thread: `${spaceId}/threads/T1`,
+        url: `https://chat.google.com/room/${msgId}`,
+        text,
+        createdAt,
+      },
+    ]
+  }
+
+  it("case 1 — a space named for ONE client files its material to that client", async () => {
+    seedName("rarespacename", IDS.victimAccount)
+    nameSpace("S_ONE", "spaces/ONE", "RareSpaceName")
+    holder.chatBySpace.set("spaces/ONE", chatFixture("spaces/ONE", "M1", "the room's own conversation", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("RareSpaceName"))
+    expect(filed?.account_id).toBe(IDS.victimAccount)
+    expect(filed?.compartment).toBe(`account:${IDS.victimAccount}`)
+  })
+
+  it("case 2 — a space matching no client, or the agency's own name, stays agency", async () => {
+    nameSpace("S_TWO", "spaces/TWO", "Team")
+    holder.chatBySpace.set("spaces/TWO", chatFixture("spaces/TWO", "M2", "general chatter", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("Team"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 3 — a space naming a word TWO clients share resolves to NEITHER, same as a question would", async () => {
+    seedName("ambigspace", IDS.victimAccount)
+    seedName("ambigspace", IDS.burglarAccount)
+    nameSpace("S_THREE", "spaces/THREE", "AmbigSpace")
+    holder.chatBySpace.set("spaces/THREE", chatFixture("spaces/THREE", "M3", "which client is this", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("AmbigSpace"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 3b — a space naming TWO DIFFERENT real clients by their own distinct names stays agency too, never picks one", async () => {
+    // Unlike case 3's ONE shared token (already resolved to neither INSIDE
+    // accountsNamedIn), this is the fan-out shape: two genuinely different,
+    // unambiguous two-word names, each safe on its own — the shape a
+    // scalar `account_id` column cannot hold two answers to, so the space
+    // stays agency exactly as an over-fragile single-token match would.
+    seedName("Alpha Beta", IDS.victimAccount)
+    seedName("Gamma Delta", IDS.burglarAccount)
+    nameSpace("S_THREEB", "spaces/THREEB", "Alpha Beta and Gamma Delta sync")
+    holder.chatBySpace.set(
+      "spaces/THREEB",
+      chatFixture("spaces/THREEB", "M3B", "a joint sync between two clients", "2026-08-05T09:00:00.000Z")
+    )
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.title.startsWith("Alpha Beta"))
+    expect(filed?.account_id).toBeNull()
+    expect(filed?.compartment).toBe("agency")
+  })
+
+  it("case 4 — RE-DECIDED on every sweep: a rename moves the filing on the very next tick, not a one-time backfill", async () => {
+    seedName("firstspacename", IDS.victimAccount)
+    nameSpace("S_FOUR", "spaces/FOUR", "FirstSpaceName")
+    holder.chatBySpace.set("spaces/FOUR", chatFixture("spaces/FOUR", "M4", "before the rename", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    // The THREAD's own id, not the message's — `chatThreads` folds messages
+    // into one row per conversation, and the thread id is what stays stable
+    // across the rename below (same room, same conversation, new name).
+    expect(sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FOUR"))?.account_id).toBe(
+      IDS.victimAccount
+    )
+
+    // Google renames the space (the owner renames the room) — the space's row
+    // is the SAME source, same origin id, new name and a new resolution.
+    seedName("secondspacename", IDS.burglarAccount)
+    db().exec(`UPDATE google_sources SET name = 'SecondSpaceName' WHERE id = 'S_FOUR';`)
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FOUR"))
+    expect(filed?.account_id, "the SAME conversation, refiled to the NEW resolution — not stuck on the first sweep's answer").toBe(
+      IDS.burglarAccount
+    )
+  })
+
+  it("a DECLARED account always wins, even when the space's own name would resolve to a different client", async () => {
+    // Named "RareSpaceName" (the exact string case 1 proves resolves to
+    // Bergman) but DECLARED to Delaval — a human's own filing decision, made
+    // when they shared the space, is never second-guessed by a name match.
+    seedName("rarespacename", IDS.victimAccount)
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('S_DECLARED', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', 'spaces/FIVE', 'RareSpaceName', 'team', '${IDS.burglarAccount}', '2026-01-01', '${IDS.staffUser}');`
+    )
+    holder.chatBySpace.set("spaces/FIVE", chatFixture("spaces/FIVE", "M5", "a declared space", "2026-08-05T09:00:00.000Z"))
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const filed = sources().find((s) => s.origin_table === "google_chat" && s.origin_row_id.includes("spaces/FIVE"))
+    expect(filed?.account_id, "the declared account, not the name's own match").toBe(IDS.burglarAccount)
+  })
+})
+
+// fix/kb-chat-backfill (12 Sep 2026). `refileChatSources` brings the
+// BACK-CATALOGUE in line with what `resolveChatSpaceAccounts` decides today —
+// rows a live sweep never re-reads and so a-names/chat-filing's own logic
+// never reaches. Every case here writes stale `knowledge_sources` rows
+// DIRECTLY (bypassing the sweep entirely) to prove the repair, not the sweep.
+describe("fix/kb-chat-backfill: refileChatSources brings stale rows in line, idempotently", () => {
+  const cfg = {} as never
+  const guard = { databaseId: "db", userId: IDS.staffUser } as never
+
+  function nameSpace(id: string, externalId: string, name: string, accountId: string | null = null): void {
+    db().exec(
+      `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id, created_at, creator_id)
+       VALUES ('${id}', 'C_${IDS.staffUser}_chat', '${IDS.staffUser}', 'chat', '${externalId}', '${name}', 'team', ${accountId ? `'${accountId}'` : "NULL"}, '2026-01-01', '${IDS.staffUser}');`
+    )
+  }
+  function seedName(name: string, refId: string): void {
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_${name}_${refId}', 'account', '${refId}', '${name}', NULL, 'account:${refId}', '2026-01-01');`
+    )
+  }
+  /** A source and its chunk, filed exactly where the OLD (pre-fix) sweep left
+   * it — written straight through SQL, never through a real sweep, which is
+   * the whole point: this proves the REPAIR, not the live filing path. */
+  function staleSource(id: string, externalId: string, accountId: string | null, compartment: string): void {
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, created_at)
+         VALUES ('${id}', 'message', 'google_chat', '${externalId}/threads/T1', '${compartment}', ${accountId ? `'${accountId}'` : "NULL"}, 'Stale — Ana', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_${id}', '${id}', '${compartment}', 0, 'left over from before the fix', '2026-01-01');`
+    )
+  }
+  function chunkCompartment(sourceId: string): string {
+    return (
+      db().prepare(`SELECT compartment FROM knowledge_chunks WHERE source_id = ?`).get(sourceId) as {
+        compartment: string
+      }
+    ).compartment
+  }
+
+  it("moves a stale source to the account its space resolves to today, source AND chunk together", async () => {
+    seedName("rarebackfillname", IDS.victimAccount)
+    nameSpace("S_BF1", "spaces/BF1", "RareBackfillName")
+    staleSource("SRC_BF1", "spaces/BF1", null, "agency")
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.byAccount).toEqual({ [IDS.victimAccount]: 1 })
+    expect(result.toAgency).toBe(0)
+
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF1'`).get() as {
+      account_id: string
+      compartment: string
+    }
+    expect(row.account_id).toBe(IDS.victimAccount)
+    expect(row.compartment).toBe(`account:${IDS.victimAccount}`)
+    expect(chunkCompartment("SRC_BF1"), "the CHUNK moved too — retrieval reads this column, not the source's").toBe(
+      `account:${IDS.victimAccount}`
+    )
+  })
+
+  it("a second run moves ZERO — idempotent, not merely repeatable", async () => {
+    seedName("idempotentname", IDS.victimAccount)
+    nameSpace("S_BF2", "spaces/BF2", "IdempotentName")
+    staleSource("SRC_BF2", "spaces/BF2", null, "agency")
+
+    const first = await refileChatSources(cfg, guard)
+    expect(first.moved).toBe(1)
+    const second = await refileChatSources(cfg, guard)
+    expect(second.moved, "nothing left to correct the second time").toBe(0)
+    expect(second.byAccount).toEqual({})
+  })
+
+  it("dryRun reports the move but writes nothing", async () => {
+    seedName("dryrunname", IDS.victimAccount)
+    nameSpace("S_BF3", "spaces/BF3", "DryRunName")
+    staleSource("SRC_BF3", "spaces/BF3", null, "agency")
+
+    const result = await refileChatSources(cfg, guard, { dryRun: true })
+    expect(result.moved).toBe(1)
+    expect(result.byAccount).toEqual({ [IDS.victimAccount]: 1 })
+
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF3'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id, "the dry run counted the move — it did not make it").toBeNull()
+    expect(row.compartment).toBe("agency")
+  })
+
+  it("a DECLARED account always wins over a stale name-matched filing", async () => {
+    seedName("shouldnotwin", IDS.burglarAccount)
+    nameSpace("S_BF4", "spaces/BF4", "ShouldNotWin", IDS.victimAccount)
+    // Filed under the WRONG account by the old code — the declared value is
+    // Bergman, but this row was somehow left on Delaval.
+    staleSource("SRC_BF4", "spaces/BF4", IDS.burglarAccount, `account:${IDS.burglarAccount}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF4'`).get() as {
+      account_id: string
+      compartment: string
+    }
+    expect(row.account_id, "the DECLARED account, never the name match").toBe(IDS.victimAccount)
+    expect(row.compartment).toBe(`account:${IDS.victimAccount}`)
+  })
+
+  it("a space now naming two clients reverts a previously-filed source back to agency", async () => {
+    // Filed to Bergman by an earlier, safe resolution — the space has since
+    // been renamed (or a second client's alias now also matches it), so today
+    // it is genuinely ambiguous and the safe answer is neither.
+    seedName("nowambiguous", IDS.victimAccount)
+    seedName("nowambiguous", IDS.burglarAccount)
+    nameSpace("S_BF5", "spaces/BF5", "NowAmbiguous")
+    staleSource("SRC_BF5", "spaces/BF5", IDS.victimAccount, `account:${IDS.victimAccount}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.toAgency).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_BF5'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id).toBeNull()
+    expect(row.compartment).toBe("agency")
+    expect(chunkCompartment("SRC_BF5")).toBe("agency")
+  })
+
+  // TWO DEFECTS FOUND IN REVIEW, 12 Sep 2026 — the hub's own live dry run
+  // against real staging, invisible to every case above because both are
+  // properties of REAL data a synthetic fixture had no reason to contain:
+  // duplicate `google_sources` rows for one space, and a person's name
+  // resolving to their own individual account.
+
+  it("a space named or renamed more than once is resolved and moved ONCE, not once per duplicate row", async () => {
+    seedName("dupspacename", IDS.victimAccount)
+    // Two rows, ONE space, DIFFERENT names: an earlier capture (deactivated —
+    // Google's own history of a rename, resolving to NOTHING on its own
+    // stale name) and the live one (resolves to Bergman). Same shape as the
+    // 37-rows/11-spaces ratio measured on real staging.
+    nameSpace("S_DUP_OLD", "spaces/DUP", "OldSpaceName")
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-06-01' WHERE id = 'S_DUP_OLD';`)
+    nameSpace("S_DUP_NEW", "spaces/DUP", "DupSpaceName")
+    staleSource("SRC_DUP", "spaces/DUP", null, "agency")
+
+    // DRY RUN, deliberately — the shape the real defect actually surfaced in:
+    // nothing is written between visits to the same space's duplicate rows,
+    // so a loop that does not deduplicate finds the SAME "needs to move" row
+    // again on the second visit and counts it twice. A real (non-dry) run
+    // would silently hide this the second time, because the first visit
+    // would already have fixed the row — which is exactly why the hub's
+    // dry run caught it and a live run would not have.
+    const result = await refileChatSources(cfg, guard, { dryRun: true })
+    // ONE move, not two: the row this LIKE query finds is one real source,
+    // and it must be counted once whichever of the two google_sources rows
+    // the loop reaches — the inflation the dry run actually measured (37
+    // rows visited instead of 11 spaces, ~4x on every count).
+    expect(result.moved).toBe(1)
+    expect(result.byAccount, "the LIVE row's name resolved this, not the deactivated one").toEqual({
+      [IDS.victimAccount]: 1,
+    })
+    const dryRow = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DUP'`).get() as {
+      account_id: string | null
+    }
+    expect(dryRow.account_id, "the dry run counted the move — it did not make it").toBeNull()
+
+    // FOR REAL, now — the live row's resolution is what actually lands.
+    const real = await refileChatSources(cfg, guard)
+    expect(real.moved).toBe(1)
+    const row = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DUP'`).get() as {
+      account_id: string | null
+    }
+    expect(row.account_id, "the LIVE row's name won, not the deactivated one").toBe(IDS.victimAccount)
+  })
+
+  it("a DM space named after a CLIENT'S CONTACT files to that client's company, never the contact's own account", async () => {
+    // Luis Vera — this file's own shared fixture (`parent_account_id`, a
+    // different column with a different job: general hierarchy, not the
+    // contact relationship `account_links` is). The link this function
+    // actually reads is written explicitly here, the same way a-names'
+    // own tests do it.
+    db().exec(
+      `INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_LUIS_BF', '${IDS.victimAccount}', '${CONTACT}', '2026-01-01');`
+    )
+    seedName("Luis Vera", CONTACT)
+    nameSpace("S_DM_CONTACT", "spaces/DMC", "Luis Vera")
+    staleSource("SRC_DM_CONTACT", "spaces/DMC", null, "agency")
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.byAccount, "Bergman's own id, never Luis's individual account id").toEqual({
+      [IDS.victimAccount]: 1,
+    })
+    const row = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DM_CONTACT'`).get() as {
+      account_id: string
+    }
+    expect(row.account_id).toBe(IDS.victimAccount)
+    expect(row.account_id).not.toBe(CONTACT)
+  })
+
+  it("a DM space named after a COLLEAGUE (no company link at all) stays agency, never files to a person", async () => {
+    const COLLEAGUE_PERSON = "A_NAMES_COLLEAGUE_PERSON"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, created_at, creator_id)
+         VALUES ('${COLLEAGUE_PERSON}', 'individual', 'Aurora Thalassa', '2026-01-01', '${IDS.staffUser}');`
+    )
+    seedName("Aurora Thalassa", COLLEAGUE_PERSON)
+    nameSpace("S_DM_COLLEAGUE", "spaces/DMCOL", "Aurora Thalassa")
+    staleSource("SRC_DM_COLLEAGUE", "spaces/DMCOL", COLLEAGUE_PERSON, `account:${COLLEAGUE_PERSON}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved, "moved OUT of the wrong filing, back to agency").toBe(1)
+    expect(result.toAgency).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_DM_COLLEAGUE'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id).toBeNull()
+    expect(row.compartment).toBe("agency")
   })
 })
 
@@ -462,8 +900,14 @@ describe("d-ingest-filing: accounts[] holds every client a thread concerns, acco
   })
 
   it("a Drive file and a Chat conversation stay singly-filed — no signal to collect for either", async () => {
-    // Ruling, 11 Sep 2026: Drive/Chat's account is a human filing decision made
-    // once, not a text match, so there is nothing for accounts[] to add.
+    // Ruling, 11 Sep 2026, STILL TRUE OF accounts[] — the PLURAL array, not
+    // `account_id`. `account_id` for Chat is no longer only a human filing
+    // decision made once (a-names/chat-filing, 12 Sep 2026: a space with no
+    // declared account resolves its own NAME the same way a question does) —
+    // but that is one value, and there was never more than one candidate to
+    // collect into a second field the way a mail thread can name several
+    // known contacts at once. Drive's own account_id is still exactly the
+    // human decision this comment always described.
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     expect(JSON.parse(byTitle("Bergman dispatch rollout")!.accounts)).toEqual([])
   })

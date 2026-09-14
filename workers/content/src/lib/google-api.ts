@@ -42,6 +42,7 @@ import {
 import { DRIVE_BYTES_CAP, boundedBytes, looksLikeProse } from "./file-text"
 import { readSource, readersFor, type ReaderEnv } from "./source-readers"
 import { GuardError } from "@shared/workers/gating"
+import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
 /** Rows one Google list call will ask for. Google's own maximums are far higher;
@@ -770,10 +771,52 @@ function escapeDriveLiteral(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")
 }
 
-/** How many characters of one file we will read back. A Drive folder can hold a
- * 400-page document; a bounded read is what keeps one file from being a worker's
- * whole memory budget. */
-const DRIVE_TEXT_CAP = 100_000
+/** How many characters of one file we will read back.
+ *
+ * IT IS THE ROW'S OWN CEILING NOW, AND THAT IS THE WHOLE FIX. It was 100_000,
+ * and the number was not the defect — the SILENCE was.
+ *
+ * TWO CEILINGS STOOD IN A ROW AND ONLY THE SECOND ONE SPOKE. `capToRow`
+ * (knowledge-files.ts) exists to cut a document to what a D1 row may hold AND
+ * SAY SO: its own header states the rule as "never silently trimmed, not never
+ * trimmed", and it writes the sentence a person reads on the row. But it only
+ * ever saw text that had already been through THIS cap, fifteen times smaller —
+ * so on every Google source it was handed 100,000 characters, found them
+ * comfortably under 1.5 MB, and returned `note: null`. The honest cut sat
+ * downstream of the silent one and could never fire.
+ *
+ * WHAT THAT COST, measured on staging 13 Sep 2026 after the owner said the
+ * transcripts "seem to get cut off at a weird point". Ten live sources were
+ * sitting at 99,994-99,998 characters, every one of them ending mid-word — four
+ * meeting transcripts and the six Gemini notes documents that mirror them. The
+ * Jourfix of 11 September is 410 KB in Drive and 100 KB here: we held roughly a
+ * quarter of the meeting, `transcript_note` was NULL, `file_note` was NULL, and
+ * the screen, the reader and the exam all believed they had the whole thing. A
+ * wrong answer that looks like an answer.
+ *
+ * SO THERE IS ONE CEILING AND IT IS THE ONE THAT TALKS. Reading up to
+ * `DOCUMENT_LIMIT_BYTES` CHARACTERS always hands `capToRow` at least as many
+ * characters as it can possibly keep (a character is never less than a byte), so
+ * nothing is lost to the read any more: either the document fits and is whole,
+ * or it does not and the row says how big it was and what to do.
+ *
+ * AND THE MEMORY ARGUMENT THIS COMMENT USED TO MAKE STILL HOLDS. The read below
+ * is STREAMING and stops at the cap — that is the 20 Aug 2026 fix, and it is
+ * what makes a bigger number safe where `await res.text()` on a 40 MB export was
+ * not. The ceiling is also not new load: the upload door already accepts a
+ * 1.5 MB document and indexes it, so this only lets a file the app would take by
+ * hand arrive through Drive as well. Cost, priced rather than assumed: bge-m3 is
+ * 1,075 neurons per million input tokens, so re-reading all ten capped sources
+ * at four times the text is roughly 800 neurons, about a cent.
+ *
+ * MAIL IS NOT INCLUDED and keeps its own cap below — a sweep reads fifty
+ * messages a page and several pages a tick, so the same number there would be
+ * fifty times this one in a single worker. */
+const DRIVE_TEXT_CAP = DOCUMENT_LIMIT_BYTES
+
+/** What we keep of ONE EMAIL BODY. Deliberately still the old, smaller number:
+ * see the last paragraph above — a file is read one at a time, a mailbox is not. */
+const MAIL_TEXT_CAP = 100_000
 
 /** One file's readable text. A Google Doc/Sheet/Slide is EXPORTED as plain text
  * (its bytes are not a document); anything else is downloaded as-is, and a
@@ -1479,7 +1522,7 @@ function toMailMessage(data: Record<string, unknown>, withBody: boolean): MailMe
     snippet: str(data.snippet),
     date: headers.get("date") ?? null,
     url: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(str(data.id))}`,
-    text: withBody ? readMailText(payload).slice(0, DRIVE_TEXT_CAP) : "",
+    text: withBody ? readMailText(payload).slice(0, MAIL_TEXT_CAP) : "",
   }
 }
 

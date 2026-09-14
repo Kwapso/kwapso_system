@@ -1204,6 +1204,26 @@ export type Account = {
   /** may this account see money figures on its own work? `null` on the way OUT
    * to a client login — the agency's own switch ABOUT them, never for them. */
   commercialsVisible: boolean | null
+  /** DECLARED spellings of this account's own name (0083, c-misspell) — a
+   * person's own list, never a generated variant, read by the knowledge
+   * base's name matcher exactly like the account's `code`: an exact match,
+   * no rarity gate. `[]` on the way out to a client login, the same
+   * reasoning as `commercialsVisible`: this is a staff judgement about how
+   * the corpus is searched, not the account's own record. */
+  altNames: string[]
+  /** DECLARED (0085, c-hijack B), and TRI-STATE since the owner's second
+   * ruling the same night: a boolean can only ever ADD a narrow (bypass the
+   * corpus rarity gate the way `code` already does), which does nothing for
+   * an already-rare name — Bergman S.A.'s surname is one chunk, narrows on
+   * rarity alone regardless of any flag. The residual that actually needed
+   * closing is the OPPOSITE: a way to say this word must NEVER narrow alone,
+   * beating rarity AND an alias/code match. `"unreviewed"` is the default (A's
+   * rarity ceiling alone decides); `"allow"` bypasses the ceiling; `"deny"`
+   * refuses to narrow on this word at all, however it would otherwise
+   * qualify. `"unreviewed"` on the way out to a client login, the same
+   * reasoning as `altNames` and `commercialsVisible`: a staff judgement about
+   * how the corpus is searched, not the account's own record. */
+  nameNarrowsAlone: "unreviewed" | "allow" | "deny"
   /** WHERE THIS PERSON WORKS, AND WHAT THEY DO THERE — the contacts table's two
    * middle columns (client, 2026-09-09: "for contacts lets do view table, also
    * add column role after account").
@@ -1520,7 +1540,21 @@ export type KnowledgeAnswer = {
   /** what the record summaries say this question is ABOUT. Evidence for the
    * reader; deliberately NOT an input to the ranking — see §3 of
    * workers/content/src/lib/knowledge.ts. */
-  records: { sourceId: string; title: string }[]
+  records: {
+    sourceId: string
+    title: string
+    /** THE RECORD ITSELF, one hop past the source — the SAME field a passage
+     * and its citation carry (`recordPath` in `KnowledgePassage`/
+     * `KnowledgeCitation`), computed by the same `recordPath()` function.
+     * `records` is a knowledge SOURCE id, in a different namespace from the
+     * meeting/ticket/process id a caller reaches through every other door —
+     * a model that had only `sourceId` to go on once handed one to
+     * `get_meeting_transcript` and was told "that meeting doesn't exist",
+     * true of the source id and false of the meeting it named. Null where
+     * there is no record screen to open, same as everywhere else this field
+     * appears. */
+    recordPath: string | null
+  }[]
   passages: KnowledgePassage[]
   citations: KnowledgeCitation[]
   /** how many chunks the search considered (the bounded candidate set) */
@@ -2513,7 +2547,7 @@ export type GoogleService = (typeof GOOGLE_SERVICES)[number]
  * folders and Chat spaces. Sharing is the act: nothing in a Drive or a Chat is
  * reachable until somebody hands it over, and what they hand over carries a
  * shelf and a client with it. */
-const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
+export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
 export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
 
 /** The two services that are reached WHOLESALE unless somebody narrows them —
@@ -2707,9 +2741,13 @@ export type GoogleItem = {
   /** EVERY account this item concerns, when the read that fetched it could tell
    * more than one — GMAIL and CALENDAR only, off the same address/attendee
    * match `accountId` uses, kept instead of discarded past the first hit
-   * (google-read.ts's `matchedAccounts`). Undefined on Drive and Chat, whose
-   * account is a human filing decision made once, at connect time, and is
-   * never more than one by construction — there is nothing to collect.
+   * (google-read.ts's `matchedAccounts`). Undefined on Drive and Chat: a
+   * Drive item's account is still a human filing decision made once, at
+   * connect time. A Chat item's is too, WHEN one was declared — but since
+   * a-names (12 Sep 2026) an undeclared space resolves its own name the same
+   * way a question does (`accountsNamedIn`, `knowledge-google.ts`'s chat
+   * kind), which is still exactly one candidate either way, never more than
+   * one by construction — there is nothing to collect for either kind.
    * Additive to `accountId` (migration 0073): the compartment stays the one
    * value it has to be, this is the wider "also concerns" list. */
   accounts?: string[]

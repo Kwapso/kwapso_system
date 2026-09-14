@@ -31,20 +31,34 @@
 //        (ii) had under the old column, wearing a different hat. The real
 //        question is a PER-ROW predicate: does anything that CLAIMS an
 //        origin (its own INSERT names `origin_table` in its column list)
-//        skip the fold it obligates? Every `INSERT INTO knowledge_sources`
-//        under `workers/content/src/` is censused — three today, pinned —
-//        and each is decided individually: two are exempt because they never
-//        claim an origin (a typed note, an uploaded file — knowledge.ts),
-//        one is compliant because it claims one and folds
-//        (knowledge-ingest.ts). The mistake this catches is ordinary and
-//        real: copy the note or file INSERT, add `origin_table`/
-//        `origin_row_id` because the new reader mirrors something, and
-//        forget the `ON CONFLICT` — a second, silent duplication path into
-//        the exact subsystem this rebuild exists to de-duplicate. Proved
-//        both ways below: breaking the compliant site's ON CONFLICT target
-//        turns it red; adding an unfolded origin claim to an exempt site
-//        also turns it red — the second is the one that matters, because it
-//        proves the rule decides a ROW rather than counting a population.
+//        skip the SAFE HANDLING it obligates? Every `INSERT INTO
+//        knowledge_sources` under `workers/content/src/` is censused —
+//        three sites, pinned, same count as before this law was rewritten —
+//        and each is decided individually: one is exempt
+//        because it never claims an origin (a typed note — knowledge.ts),
+//        one is compliant because it claims one and FOLDS
+//        (knowledge-ingest.ts, `ON CONFLICT` — a sweep that re-reads on a
+//        schedule and means "refresh this row"), and one is compliant a
+//        DIFFERENT way (b-upload-dup, 11 Sep 2026): the uploaded-file create
+//        (knowledge.ts) now claims an origin (`uploadIdentity()`, keyed on
+//        content hash) and explicitly SELECTs for an existing row and
+//        THROWS before ever reaching its own INSERT if one exists —
+//        `PRE_CHECK_REFUSAL_OK` below, reasoned per site. Folding would be
+//        the WRONG behaviour here: a re-upload is a person's mistake to be
+//        told about ("already in the library"), never a re-read to merge
+//        silently into the existing row the way a sweep's mirror is. The
+//        mistake this whole law catches is ordinary and real: copy an
+//        INSERT, add `origin_table`/`origin_row_id` because the new reader
+//        mirrors something, and reach neither an `ON CONFLICT` NOR a
+//        pre-check — a second, silent duplication path into the exact
+//        subsystem this rebuild exists to de-duplicate. Proved three ways
+//        below: breaking the compliant fold site's ON CONFLICT target turns
+//        it red; breaking the compliant pre-check site's own guard turns it
+//        red (knowledge-upload-dedup.test.ts, not here — this file censuses
+//        SHAPE, that one proves BEHAVIOUR); and adding an unhandled origin
+//        claim to the exempt site also turns it red here — the last one is
+//        the one that matters for THIS file, because it proves the rule
+//        decides a ROW rather than counting a population.
 //
 // THE PARSER'S OWN CAUTION, answered before trusting it: could
 // `INSERT INTO knowledge_sources` and its `ON CONFLICT` be split across a
@@ -119,11 +133,33 @@ describe("R68 — one identity per source", () => {
     )
   })
 
-  it("every INSERT into knowledge_sources that claims an origin folds on it — three sites, pinned", () => {
+  // A CLAIMED ORIGIN MAY BE HANDLED SAFELY TWO WAYS, NOT JUST ONE: fold
+  // (`ON CONFLICT`, a sweep refreshing a row it expects to have seen before)
+  // or an explicit pre-check-and-refuse (a person's own act, where silently
+  // merging into someone else's existing row would be the wrong answer, not
+  // a convenience). This is DATA, not a third regex, so a new site choosing
+  // this pattern is a reviewed, named decision — reasoned per site, rot-
+  // checked the same way `folds` is: `signature` is a substring unique to
+  // ONE literal in `file`, because knowledge.ts holds two INSERT sites and a
+  // per-file exemption would silently cover both.
+  const PRE_CHECK_REFUSAL_OK: { file: string; signature: string; reason: string }[] = [
+    {
+      file: "lib/knowledge.ts",
+      signature: "file_url",
+      reason:
+        "b-upload-dup (11 Sep 2026): createFileSource SELECTs for an existing " +
+        "(origin_table, origin_row_id) and THROWS a clean 409 before this INSERT " +
+        "runs at all — see the SELECT immediately above it and " +
+        "knowledge-upload-dedup.test.ts for the behaviour proof. A re-upload must " +
+        "be refused and told about the original, never folded into it.",
+    },
+  ]
+
+  it("every INSERT into knowledge_sources that claims an origin folds OR pre-checks — three sites, pinned", () => {
     const files = sourceFiles(CONTENT_SRC, { extensions: [".ts"], skipTests: true })
     const INSERT_START = /INSERT INTO knowledge_sources\b/
 
-    const sites: { file: string; literal: string; claimsOrigin: boolean; folds: boolean }[] = []
+    const sites: { file: string; literal: string; claimsOrigin: boolean; folds: boolean; preChecked: boolean }[] = []
     for (const f of files) {
       for (const literal of templateLiterals(f.source)) {
         if (!INSERT_START.test(literal)) continue
@@ -132,6 +168,7 @@ describe("R68 — one identity per source", () => {
           literal,
           claimsOrigin: /\borigin_table\b/.test(literal),
           folds: /ON CONFLICT\s*\(\s*origin_table\s*,\s*origin_row_id\s*\)/.test(literal),
+          preChecked: PRE_CHECK_REFUSAL_OK.some((p) => p.file === f.rel && literal.includes(p.signature)),
         })
       }
     }
@@ -150,16 +187,17 @@ describe("R68 — one identity per source", () => {
     ).toEqual(
       [
         "lib/knowledge.ts", // the typed-note create — no origin, exempt
-        "lib/knowledge.ts", // the uploaded-file create — no origin, exempt
+        "lib/knowledge.ts", // the uploaded-file create — claims an origin, pre-checks
         "lib/knowledge-ingest.ts", // the generic sweep — claims an origin, folds
       ].sort()
     )
 
-    const violators = sites.filter((s) => s.claimsOrigin && !s.folds)
+    const violators = sites.filter((s) => s.claimsOrigin && !s.folds && !s.preChecked)
     expect(
       violators.map((s) => s.file),
       "these INSERTs claim an origin (origin_table in the column list) without folding on it " +
-        "(ON CONFLICT (origin_table, origin_row_id)) — a second, silent duplication path into " +
+        "(ON CONFLICT (origin_table, origin_row_id)) or a named, reasoned pre-check " +
+        "(PRE_CHECK_REFUSAL_OK above) — a second, silent duplication path into " +
         "the exact subsystem this rebuild exists to de-duplicate:\n" +
         violators.map((s) => s.file).join("\n")
     ).toEqual([])

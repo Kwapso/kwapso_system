@@ -328,7 +328,7 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/data-ops/admin/seed-targets | data-ops | seed the global import catalog (owner-only, x-admin-key) |
 | POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key; every grant writes a `credit_grants` row in the same batch as the balance) |
 | GET /api/data-ops/agent/usage | data-ops | the team's AI quota snapshot (free + credits) |
-| POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you); accepts attached CSVs, planned through the import batch engine, run via run_import_batch behind the confirm panel (AGENTIC-IMPORT §8.5) |
+| POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you). It still ACCEPTS attached CSVs — planned through the import batch engine, run via run_import_batch behind the confirm panel — but nothing sends any: the chat's own upload was removed on 13 Sep 2026 and the Import screen is the way in (AGENTIC-IMPORT §8.5) |
 | POST /api/data-ops/agent/confirm | data-ops | approve/decline a proposed dangerous action; resume the turn |
 | GET /api/data-ops/agent/threads | data-ops | the caller's saved agent conversations |
 | GET /api/data-ops/agent/thread | data-ops | one conversation's messages (`?id=`) |

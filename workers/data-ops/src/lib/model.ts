@@ -56,7 +56,20 @@ export type ToolCall = { id: string; name: string; input: Record<string, unknown
  *  nothing else in the reply saying so. Read in ONE place (readFinishReason) and
  *  carried through both the complete() and stream() paths, so a step-cap failure
  *  can never reach the caller looking identical to a clean stop. */
-export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsage; truncated?: boolean }
+export type ModelReply = {
+  text: string
+  toolCalls: ToolCall[]
+  usage?: TokenUsage
+  truncated?: boolean
+  /** The model's HIDDEN reasoning, when the provider hands it over
+   *  (`reasoning_content` on a reasoning model; gpt-oss also sends the same text
+   *  as `reasoning`). Never shown, never saved, never sent back — it exists so a
+   *  step that ended with no text and no tool call can be recorded with what the
+   *  model was thinking when it fell silent, which is the one fact that told the
+   *  greeting bug apart from a model that had simply finished (agent.ts,
+   *  STALLED_TURN_NOTE). */
+  reasoning?: string
+}
 
 /** `finish_reason` DECIDES NOTHING BY ITSELF — it only tells the caller whether
  *  `text` is the whole of what the model wrote. "length" is the one value that
@@ -381,7 +394,29 @@ export function selectModel(env: Env, sessionKey?: string): Model {
  * figures as the number to plan with. Cloudflare does bill neurons and a metered
  * model can exceed its price sheet (deepseek-v4-pro metered 24x), which is an
  * argument for reading the meter — never for reading it once. */
-export const DEFAULT_AGENT_MODEL = "@cf/moonshotai/kimi-k2.6"
+/** ── AND ON 14 SEP 2026 IT WENT BACK TO gpt-oss-120b, MEASURED ON THE OWNER'S OWN
+ *    QUESTION ────────────────────────────────────────────────────────────────
+ *
+ * The 21/22 above is a retrieval bench (`kb-bench-is-title-anchored`: 22/22
+ * green while paraphrases refuse), and it never asked how long a step takes.
+ * On the owner's five-part ticket question — four tool steps, nine parallel
+ * queries on one of them, every result correct — kimi-k2.6 on this binding
+ * measured, off `agent_messages` on staging:
+ *
+ *     one step (nine query_records, all green)   109 s
+ *     the composing step, every figure in hand   still writing at +210 s
+ *     the same question in the owner's thread    three deadline exits, one stall
+ *
+ * It thinks ~10,000 characters per step (2,700 completion tokens, read off the
+ * REST door), at ~25 tokens a second, so any question needing four steps runs
+ * past the 210-second bound that must stay under the platform's ~230-second
+ * kill. And once, having decided its tool calls inside that thinking, it emitted
+ * nothing at all (agent.ts, STALLED_TURN_NOTE). gpt-oss-120b, replayed on the
+ * identical context: 6.9 s, tool calls on the wire, a third of the neurons per
+ * token. Speed is the whole finding — kimi is the better reader and the
+ * assistant could not finish a sentence on it. Both wrangler pins moved with
+ * this line, which is `no-quiet-downgrade`'s own rule. */
+export const DEFAULT_AGENT_MODEL = "@cf/openai/gpt-oss-120b"
 
 class WorkersAiModel implements Model {
   readonly canActWithTools = true
@@ -437,7 +472,10 @@ class WorkersAiModel implements Model {
       workersAiBody({ messages, tools, stream: false }) as never,
       this.affinity() as never
     )) as {
-      choices?: { message?: { content?: string; tool_calls?: OpenAiToolCall[] }; finish_reason?: string }[]
+      choices?: {
+        message?: { content?: string; reasoning_content?: string; tool_calls?: OpenAiToolCall[] }
+        finish_reason?: string
+      }[]
       usage?: WorkersAiUsage
     }
     const choice = data?.choices?.[0]
@@ -448,6 +486,7 @@ class WorkersAiModel implements Model {
       toolCalls: toCalls(msg.tool_calls),
       usage: readUsage(data.usage),
       truncated: readFinishReason(choice?.finish_reason),
+      ...(msg.reasoning_content ? { reasoning: msg.reasoning_content } : {}),
     }
   }
 
@@ -483,6 +522,7 @@ export async function parseOpenAiStream(
   const decoder = new TextDecoder()
   let buffer = ""
   let text = ""
+  let reasoning = ""
   let usage: TokenUsage | undefined
   let finishReason: string | undefined
   const calls = new Map<number, ToolBuild>()
@@ -499,7 +539,12 @@ export async function parseOpenAiStream(
       if (!body || body === "[DONE]") continue
       let ev: {
         choices?: {
-          delta?: { content?: string; tool_calls?: (OpenAiToolCall & { index?: number })[] }
+          delta?: {
+            content?: string
+            reasoning_content?: string
+            reasoning?: string
+            tool_calls?: (OpenAiToolCall & { index?: number })[]
+          }
           finish_reason?: string | null
         }[]
         usage?: WorkersAiUsage
@@ -520,6 +565,11 @@ export async function parseOpenAiStream(
         text += delta.content
         onText(delta.content)
       }
+      // Hidden thinking is kept OFF the screen and off `text` — it is evidence,
+      // not an answer. gpt-oss puts the same slice under both names, so one is
+      // read, never both.
+      const thought = delta.reasoning_content ?? delta.reasoning
+      if (thought) reasoning += thought
       for (const [i, tc] of (delta.tool_calls ?? []).entries()) {
         const at = tc.index ?? i
         const build = calls.get(at) ?? { id: "", name: "", json: "" }
@@ -538,6 +588,7 @@ export async function parseOpenAiStream(
       .map(([i, b]) => ({ id: b.id || `call_${i}`, name: b.name, input: parseArgs(b.json) })),
     usage,
     truncated: readFinishReason(finishReason),
+    ...(reasoning ? { reasoning } : {}),
   }
 }
 

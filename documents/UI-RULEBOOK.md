@@ -1970,7 +1970,7 @@ also how the check tells them apart.
 inside its own title block is exempt from C12 either way. This asks whether the sentence
 should exist at all — a boxed subtitle passes C12 and fails this one.
 
-**Law.** [R71](../RULES.md) (`no-default-subtitles`).
+**Law.** [R72](../RULES.md) (`no-default-subtitles`).
 
 ---
 
@@ -2830,7 +2830,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R39 | [G1](#g1-a-record-type-carries-a-glyph), [U1](#u1-every-part-of-the-kit-is-either-reached-or-has-a-written-reason) | R62 | [K15](#k15-the-two-zeros-look-the-same-the-add-button-is-the-only-difference) |
 | R63 | [K14](#k14-the-toolbar-stays-on-top-while-the-rows-scroll-under-it-and-the-pin-is-the-rows) | R64 | [L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place) |
 | R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
-| R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R71 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
+| R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R72 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
 
 ### The seven files that carry most of it
 

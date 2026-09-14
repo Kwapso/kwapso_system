@@ -307,7 +307,33 @@ describe("repeatGuard: the same read twice in one turn is answered once", () => 
     const g = repeatGuard()
     expect(g.recall(false, read({ scope: "all" }))).toBeNull()
     g.remember(false, read({ scope: "all" }), "OK. Result data: {…}")
-    expect(g.recall(false, read({ scope: "all" }))).toBe("OK. Result data: {…}")
+    // THE ANSWER COMES BACK WHOLE. The note rides behind it and never replaces
+    // it: a model that cannot read the result has been given nothing at all.
+    expect(g.recall(false, read({ scope: "all" }))).toContain("OK. Result data: {…}")
+  })
+
+  // THE SILENT REPEAT IS THE ONE THAT LOOPS. Measured on staging 13 Sep 2026:
+  // `describe_module` for tickets was called six times in one turn, five of them
+  // answered from this cache with bytes identical to the first — which is exactly
+  // the input that had just made the model ask. Nothing in the reply said "you
+  // have been here before", so there was no signal to stop on, and most of a
+  // twelve-step budget went on it.
+  it("says it is a repeat, and says it louder the third time", () => {
+    const g = repeatGuard()
+    g.remember(false, read({ scope: "all" }), "rows")
+    const first = g.recall(false, read({ scope: "all" })) ?? ""
+    const second = g.recall(false, read({ scope: "all" })) ?? ""
+    const third = g.recall(false, read({ scope: "all" })) ?? ""
+    for (const r of [first, second, third]) expect(r.startsWith("rows")).toBe(true)
+    expect(first).toContain("already called")
+    // It ESCALATES — a second ask is a slip, a fourth is a loop, and the words
+    // have to be different or there is nothing new to react to.
+    expect(second).toContain("loop")
+    expect(third).toContain("loop")
+    expect(second).not.toBe(first)
+    // And it names the tool, so the sentence is about something rather than
+    // being a general scolding the model has to work out the subject of.
+    expect(first).toContain("list_help_tickets")
   })
 
   it("a DIFFERENT question is a different call — paging on must still work", () => {
@@ -322,7 +348,7 @@ describe("repeatGuard: the same read twice in one turn is answered once", () => 
     g.remember(false, { id: "c1", name: "list_help_tickets", input: { scope: "all", view: "archived" } }, "same")
     expect(
       g.recall(false, { id: "c2", name: "list_help_tickets", input: { view: "archived", scope: "all" } })
-    ).toBe("same")
+    ).toContain("same")
   })
 
   it("a WRITE is never short-circuited — that decision belongs to the door", () => {

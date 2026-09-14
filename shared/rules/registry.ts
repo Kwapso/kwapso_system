@@ -640,6 +640,14 @@ export const RULES_REGISTRY: Rule[] = [
   },
   {
     id: "R71",
+    dimension: "ai",
+    law: "A HUMAN-FACING LABEL SPEAKS THE APP'S WORD, NEVER THE ALIAS A TOOL DESCRIPTION OFFERED THE MODEL. `describe_module` and `query_records` accept a module by any of its aliases — their own description says so, in words: \"`help` reaches tickets\" — because CLAUDE.md's own \"don't finish the rename\" keeps `help` as the permission module, the table, the API path and the MCP tool names on purpose. Nothing stops the model reaching for exactly the word its tool description just offered it, and the agent's step chip / confirm panel built its label straight from that raw argument, so the alias printed VERBATIM on a screen the product has no section named after. Any `summarize()` in `shared/workers/tool-catalog.ts` that builds a label from a schema field spelled `module`, `table` or `targetTable` must route the value through `queryLabel` (which wraps query-grammar's own `canonicalModule`) before it reaches a sentence — never the raw argument.",
+    why: "The owner's own report, 13 Sep 2026, reading the assistant's step chips on staging verbatim: \"See what help can be asked\", \"Look up help\", \"Count help by account\", \"Count help by app\". A person reads those, and the product has no help section — it has Tickets, and CLAUDE.md is explicit that the rename stops at the door: the module, the table, the API path and the tool names stay `help`, but nothing SPOKEN to a person may. The bug was not a typo — the tool's own description tells the model \"`help` reaches tickets\", so the model was following an instruction the catalogue itself gave it, and the label-building code echoed that instruction's own word back onto the screen. The fix reuses `canonicalModule`, the query engine's own answer to \"what did they actually mean\", rather than re-deriving a second map that could drift from the door's — the same reuse-a-seam discipline CLAUDE.md's planning ritual asks for. Checked by RUNNING every tool's `summarize()` with a poisoned alias, derived off the schema field NAME rather than a hand-list of the two tools that leaked, so a future module's `module`/`table`/`targetTable` argument is covered without anyone updating this law — the same shape R22's body-parity proof stands on (prove it by calling the function, not by reading it).",
+    checkId: "agent-label-vocabulary",
+    status: "enforced",
+  },
+  {
+    id: "R72",
     dimension: "ui",
     law: "NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED. The client's ruling, 2026-09-14, over Settings › Modules' own intro sentence: \"In settings, modules: delete this. Generally, I don't like subtitles, so stop putting them unless I ask.\" The second sentence is the wider one and the one this law enforces — she had already said the narrower version twice the same week about two other screens (\"in ticket settings (or any other module) no subtilte\", 10 Sep; \"ticket types should be … without subtitle, make this. always\", 11 Sep), and both landed as one-screen fixes: `shared/web/settings-section.tsx` deleted the field outright, and `MODULE_SETTINGS` lost its `description` column with it. This is the third saying, about a fourth screen neither fix touched, and it is not about one screen any more — it is a DEFAULT for the whole app. A SUBTITLE IS, PRECISELY: a prose element (`<p>`, `<span>`, `<small>`, `<em>`, `<strong>` — R67's own `READABLE_PROSE` set, reused for the same reason R67 reused it: a real kit component is always Capitalised, so `<Text>`, `<CollectionEmptyState>`, `<NothingYet>` and every other genuine-content component are invisible to a lowercase-tag census by construction) standing as the immediate next SIGNIFICANT sibling of a heading (`<h1>`-`<h4>`, the kit's `<Headline>`) inside the same JSX children array — blank text and a `{/* comment */}` are transparent to the pair, the same move R67's own walk makes. THREE SHAPES ARE DELIBERATELY NOT A SUBTITLE: a form field's helper text (rendered through the kit's `Field`, which has no heading sibling to stand beside — a label, not a title); an empty state's explanation (`CollectionEmptyState`/`PortalEmpty`/`NothingYet`/`ShapeStateBody`, Capitalised, so already outside the census); and the reason a switched-off automation cannot be turned on, which R70 *requires* as `helpText` and which answers \"why can I not change this\" rather than \"what is this section for\". A REAL BLIND SPOT, WRITTEN DOWN: a heading a CHOKEPOINT COMPONENT draws for its caller (`SettingsSection`, `ToolbarRow`'s `title`, `CollectionHeading`) is invisible to the sibling census if a caller passes prose as that component's `children` — heading and prose then sit in two different JSX children arrays. Those three are held shut the narrower way instead: none may re-grow a prop shaped like a subtitle (`subtitle`/`description`/`subheading`/`caption`, matched as a declared TYPE member so a comment merely discussing the word does not trip it), which is the only door wide enough to let the blind spot matter — `shared/web/settings-section.tsx`'s own header states the argument this check imports: \"a section cannot declare a subtitle it has nowhere to put.\" `SUBTITLE_OK` (this file) is the way out `SUBTITLE_OK`'s own way out for the rest of the app — a reasoned, file-keyed line, rot-checked both ways so the list can only shrink, the same discipline `UNCONTAINED_SECTION_OK` (R67) and `HAND_ROLLED_OK` (the kit-motion check) already use.",
     why: "R67 already polices a titled section, and the two laws share a census file and a house term (\"title block\") without being the same law. R67's subject is WHERE content stands: a sentence inside the title block is explicitly exempt from R67 (amendment 4's `carriesHeading` skip) because R67 has nothing to say about whether the sentence should exist, only about the ground it stands on if it does — a boxed subtitle passes R67 outright. This law's subject is whether the sentence exists at all, independent of containment; an unboxed subtitle fails both laws, and a BOXED one now fails only this one, which is the proof they are answering different questions rather than one question twice. R67's own header makes the same point from the other side, about the seven module settings pages it cannot reach: \"reaching them means judging a component by the PROPS it is handed rather than the JSX it writes, which is a different check with a different oracle.\" That is what this file does, and it is why the fix is a new law rather than a sixth amendment to R67. Getting the boundary right mattered more than catching every case: a census that flagged a field's helper text, an empty-state sentence or R70's required automation reason would be turned off within a day, so each of the three is excluded STRUCTURALLY — by tag name (a real component is Capitalised, a bare `<p>` is not) or by having no heading sibling at all — rather than by a growing list of exceptions somebody has to keep arguing for.",
@@ -1393,9 +1401,59 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // NOT one of the three — it is data, not catalogued copy, and never
   // touches `t()` (see `WhatItDid` in web/components/assistant/agent-sources.tsx).
   // Same $0-spend reason as every entry above it.
-  de: 19,
-  es: 19,
-  ca: 19,
+  //
+  // RAISED 19 -> 20 in all three, 11 Sep 2026, tracker `b-gmail`: one new
+  // sentence in the knowledge form's "Who can use it" field, said only for a
+  // mirrored source genuinely sitting at "private" — see the file's own
+  // comment on why the control used to show a wrong state instead of this
+  // sentence. Same $0-spend reason as every entry above it.
+  //
+  // RAISED 20 -> 23 in all three, 11 Sep 2026, c-hijack B / c-misspell's
+  // write door (0085): the account form's two new field labels (declared
+  // spellings, and the "may narrow alone" checkbox) and their placeholder
+  // example. Same $0-spend reason as every entry above it — accepted debt,
+  // not a regression to chase.
+  //
+  // RAISED 23 -> 26 in all three, same day, 0086: the boolean checkbox
+  // became a tri-state control (the owner's correction — an ALLOW alone
+  // cannot close an already-rare name, only a DENY can) — one field label
+  // and three option words replaced the single checkbox sentence. Same
+  // $0-spend reason as every entry above it.
+  //
+  // RAISED 26 -> 33 in all three, 12 Sep 2026: the knowledge create dialog's
+  // three video-link states (owner's own words — "show me it's loading,
+  // show me what kind of transcript it's extracting, and then tell me when
+  // it's done") added seven new sentences (the loading label, the pre-submit
+  // hint, the two word-count sentences, and the three kind words) — none
+  // translated yet, accepted debt in the same change that added them,
+  // exactly as R44 asks.
+  //
+  // RAISED 33 -> 34 in all three, same day: the hub's own review of this
+  // branch found that "null-safe is not honest" — a bare video link whose
+  // door reply carried neither `read` nor `refusedBecause` (a door that
+  // hasn't landed the feature yet, or genuinely found nothing to say) was
+  // falling through to the generic "assistant can now use it" toast, a
+  // promise the source's empty body would not keep. One more sentence for
+  // that third state, said plainly instead.
+  //
+  // RAISED 34 -> 37 in all three, same day: the owner's own ask ("I would
+  // love to see the steps... show progress, where we are, and what's
+  // happening") added the theatrical narration on the knowledge create
+  // dialog's video-link save — two predicted steps and the honesty-timeout
+  // sentence, three new sentences none translated yet, accepted debt in
+  // the same change that added them.
+  // RAISED 37 -> 39 in all three on 14 Sep 2026. Two sentences, and they are
+  // the SAME sentence said in the one place a reader can act on it. The owner
+  // opened a 142,429-character transcript, scrolled to the bottom, and found it
+  // stopping mid-word — the screen only ever asked for the first 20,000, and
+  // the notice saying so sat at the TOP of the tab, thousands of pixels above
+  // the cut he actually hit. The cap is raised (200,000 now, which holds every
+  // source in the base whole) and past it the cut speaks WHERE IT HAPPENS.
+  // Accepted debt in the same change that added them, per this law's own
+  // sanctioned move.
+  de: 39,
+  es: 39,
+  ca: 39,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -1965,7 +2023,7 @@ export const TWO_READS_ONE_DOOR: Record<string, string> = {
     "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
 }
 
-/** R71 — THE FILES THAT STILL DRAW A SUBTITLE UNDER A HEADING, and the reason
+/** R72 — THE FILES THAT STILL DRAW A SUBTITLE UNDER A HEADING, and the reason
  * each does. Sits beside R67's own exemption table on purpose — same house
  * pattern (file-keyed, rot-checked both ways) — and is a DIFFERENT law: R67
  * asks where a titled section's content stands, this asks whether a sentence

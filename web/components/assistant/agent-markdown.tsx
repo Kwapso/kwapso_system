@@ -40,35 +40,66 @@
 
 import * as React from "react"
 
+import { ArticleBody } from "@shared/ui/components/article-body/article-body"
 import { Cite } from "@shared/ui/components/agent-chat/agent-chat"
 import { inline, mdBlocks, type MdBlock } from "@shared/web/markdown-html"
 import { splitCites } from "@shared/agent-cites"
 import { splitReply } from "@/lib/agent-segments"
 import { AgentBlockView } from "@/components/assistant/agent-blocks"
-import { PROSE } from "@shared/web/rich-text-view"
+import { ON_INVERSE_UNTIL_THE_KIT_RULES, PROSE } from "@shared/web/rich-text-view"
 
-// ITEM 3 (owner, 31 Aug 2026): "fix the color of the texts from assistant...
-// you invented that color. refer to guide and rules for colors!" Tracing every
-// text colour in the assistant's bubble back to its source turned up exactly
-// one that wasn't an app token: `inline()` (shared/web/markdown-html.ts) emits
-// a bare `<a>` with no class at all, so a link inside a reply rendered in the
-// BROWSER's own default blue — never an app colour, and the one genuine hit
-// for "invented" in this trace. `RichText`'s own renderer (rich-text-view.tsx,
-// used for ticket replies) never had this gap: it draws through the kit's
-// `ArticleBody`, which already states the rule in its own words — "A link is
-// ink, underlined, never coloured" — as `[&_a]:text-foreground [&_a]:underline
-// [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong`.
-// `AgentMarkdown` builds its own HTML rather than going through `ArticleBody`
-// (this file's header explains why: a `<Cite>` component can't be injected
-// into a string), so it never inherited that rule — copied here verbatim
-// rather than re-derived, so the two renderers say the same thing about a
-// link once the kit ever unifies them.
-const LINK_INK = [
-  "[&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem]",
-  "[&_a]:decoration-hair-strong",
-  "[&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso",
-  "[&_a:hover]:decoration-current",
-].join(" ")
+// THE REPLY IS DRAWN BY THE KIT'S PROSE REGISTERS NOW, NOT BY THIS FILE.
+//
+// ITEM (owner, 13 Sep 2026): "the words are too stuck together... I would like
+// to increase line spacing and introduce more line breaks, especially in the
+// agent's responses."
+//
+// He was reading a real defect, not a taste. The header above says the text
+// segments are "injected with RichText's PROSE classes so a reply reads like
+// any other rich text in the app" — and that stopped being true the day PROSE
+// was NARROWED. `rich-text-view.tsx` now says so in its own words: PROSE is
+// the blockquote override "and nothing else, because ArticleBody now supplies
+// the prose". `RichText` moved onto `ArticleBody` and took the prose with it;
+// this renderer never did, and nothing failed, because a missing register is
+// invisible to every check in this repo.
+//
+// So for however long that has been true, every assistant reply has rendered
+// its paragraphs and lists with NO rhythm rules at all: Tailwind's preflight
+// zeroes `p` margins and strips `ul` markers, so two paragraphs sat flush
+// against each other and a bulleted list drew no bullets and no indent. The
+// model's markdown was correct the whole time; the page was throwing it away.
+//
+// `ArticleBody` is the kit's answer and the app already draws ticket replies
+// with it. Its rhythm rules are DIRECT-CHILD selectors (`[&>*+*]`), which is
+// exactly why the blocks are its children here rather than sitting in a
+// wrapper div: one wrapper leaves the root with a single child and silently
+// kills the spacing, the same trap `RichText` documents over its injection.
+//
+// `size="compact"` matches `RichText` (14/1.45, what these panels have always
+// used). `measure={false}` because the panel is already a narrow column and a
+// second cap would leave a ragged gutter — the kit's own stated condition for
+// turning it off.
+//
+// THE INK HAS TO FOLLOW THE BUBBLE. History renders BOTH roles through this
+// component (use-agent-chat.tsx), and your own bubble is an inverse fill, where
+// `ArticleBody`'s absolute inks are a measured 1.95:1 against the ground — the
+// defect `ON_INVERSE_UNTIL_THE_KIT_RULES` was written for. Reused here rather
+// than restated, so the day the kit ships an inverse register both call sites
+// are found by one search.
+//
+// LINK_INK IS GONE, AND THAT IS THE POINT. It was this file's verbatim copy of
+// `ArticleBody`'s own link rule, kept "so the two renderers say the same thing
+// about a link once the kit ever unifies them". They are unified now: there is
+// one renderer of that rule again, and it is the kit's.
+//
+// `overflow-wrap: anywhere` IS THE NO-SIDEWAYS-SCROLL HALF (owner, same day:
+// "on any screen size, I would never like to scroll horizontally in the
+// chat"). A pasted URL, a ULID or a long reference is ONE unbreakable token,
+// and an unbreakable token sizes its box no matter how narrow the column is.
+// `break-words` is not enough — it only breaks where the browser already sees
+// an opportunity. Tables and refused code fences carry their own scroll boxes
+// (below); this covers the prose.
+const PROSE_RHYTHM = "[overflow-wrap:anywhere]"
 
 /** One line of prose — the inline markup injected as before, with the kit's
  * citation mark standing where the model put it. A line with no mark is one
@@ -189,7 +220,15 @@ function Block({ block }: { block: MdBlock }) {
   )
 }
 
-export function AgentMarkdown({ text }: { text: string }) {
+export function AgentMarkdown({
+  text,
+  onInverse = false,
+}: {
+  text: string
+  /** True for a turn drawn on the inverse fill — your own message. See the
+   *  comment over `PROSE_RHYTHM` for why the ink cannot be absolute there. */
+  onInverse?: boolean
+}) {
   const segments = React.useMemo(() => splitReply(text), [text])
   if (!segments.length) return null
   return (
@@ -208,11 +247,17 @@ export function AgentMarkdown({ text }: { text: string }) {
         const blocks = mdBlocks(seg.text)
         if (!blocks.length) return null
         return (
-          <div key={i} className={`${PROSE} ${LINK_INK}`}>
+          <ArticleBody
+            key={i}
+            as="div"
+            size="compact"
+            measure={false}
+            className={`${PROSE} ${PROSE_RHYTHM} ${onInverse ? ON_INVERSE_UNTIL_THE_KIT_RULES : ""}`}
+          >
             {blocks.map((b, j) => (
               <Block key={j} block={b} />
             ))}
-          </div>
+          </ArticleBody>
         )
       })}
     </div>

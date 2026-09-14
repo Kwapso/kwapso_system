@@ -483,6 +483,24 @@ export function KnowledgeDetailScreen({
                       plainText of this same body, so both read the same words
                       and only the layout differs. */}
                   <RichText html={translation.of(item.body)} />
+                  {/* THE CUT SPEAKS WHERE IT HAPPENS, not only in the preface.
+                      The same sentence is already above the material, and that
+                      was the whole of it until 14 Sep 2026 — when the owner
+                      reached the bottom of a 142,429-character transcript,
+                      found it stopping mid-word, and had nothing in front of
+                      him to explain it. A notice at the top of a page this long
+                      is a notice read minutes and thousands of pixels before
+                      the thing it describes, which is the same as not having
+                      one. So it is said twice, and the SECOND one is the one
+                      that does the work: it is the only one a reader who
+                      scrolled can possibly be looking at. */}
+                  {item.bodyTruncated && (
+                    <p className="text-muted-foreground mt-3 text-sm">
+                      {t("That is the end of what this screen shows, not the end of the material —")}{" "}
+                      {Math.round(item.bodyBytes / 1000).toLocaleString()}{" "}
+                      {t("KB is kept in full and every word of it is searchable. Open the original below to read the rest.")}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-muted-foreground text-sm">{t("No text yet.")}</p>

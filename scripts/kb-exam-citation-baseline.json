@@ -1,0 +1,466 @@
+{
+  "capturedFrom": "c26e5f00cbb7d849a017413afd62cac91b0d2504",
+  "capturedAt": "2026-09-12T16:15:14.556Z",
+  "rows": {
+    "A-O1": {
+      "found": true,
+      "citations": [
+        "01M27P9V9CYXGV4P4M82NCHQK7",
+        "01M27PAW5JR6ANRQ4WP2DXC0SC",
+        "01M27PB2SD5M0R217EGV2WM40D"
+      ]
+    },
+    "A-O2": {
+      "found": true,
+      "citations": [
+        "01M27E4C823SV37D6J6DCZ0AQE"
+      ]
+    },
+    "A-O3": {
+      "found": true,
+      "citations": [
+        "01M27E93VC5GXWDV8J1RC10X0X",
+        "01M27EPY786X8Q9QM2QN9M62E3",
+        "01M27EQ6JS9D94PHATB3T2WPF9",
+        "01M27EQ9N1YZ3X2SPD6RC7S5XD",
+        "01M27EQZQ37J2X71V6DV7J1G7W",
+        "01M2A8H3MDEAP4HJ1RXYZ6970V"
+      ]
+    },
+    "A-O5": {
+      "found": true,
+      "citations": [
+        "01M27ETVKPDQAN05BJRGYP2EH5",
+        "01M27VEVX558PTJHFY4XGN885F"
+      ]
+    },
+    "A-O6": {
+      "found": true,
+      "citations": [
+        "01M27E3D1HXV6MTNN61ME373KR",
+        "01M27E53V1EFQCBN5A9NWC03GV",
+        "01M27ETVKPDQAN05BJRGYP2EH5",
+        "01M28E64C88JKDMTM8AEJH68ZA"
+      ]
+    },
+    "A-O7": {
+      "found": true,
+      "citations": [
+        "01M27VEVX558PTJHFY4XGN885F"
+      ]
+    },
+    "A-E1": {
+      "found": true,
+      "citations": [
+        "01M27EV46Z3ZQA458ZZJ0NR7AT",
+        "01M27GM1ZZA6PZMY6R8R67BM5T",
+        "01M27GQXFB4Q1R8GJ31KMQJGYW",
+        "01M27GXS3V9CZJDRT8KW5NTA9P"
+      ]
+    },
+    "A-E2": {
+      "found": true,
+      "citations": [
+        "01M27GXXN14VRFHQS43M7SHS8A"
+      ]
+    },
+    "A-E3": {
+      "found": true,
+      "citations": [
+        "01M27GY3PN6M7R6K2AFNGEXAY0",
+        "01M27HHE5H7C702WQMFFK2JK9K"
+      ]
+    },
+    "A-E5": {
+      "found": true,
+      "citations": [
+        "01M27E3KNGDR5YVMZ6F0Y0D15T",
+        "01M27GZ5073K9NRVV33QAZ8NZ3",
+        "01M27HH7YR426HPWPWSJ9KM2KS",
+        "01M27HHP1GBFYMFFJYSGXRQPPM",
+        "01M27VEVX558PTJHFY4XGN885F"
+      ]
+    },
+    "A-E7": {
+      "found": true,
+      "citations": [
+        "01M27CRH5KVMS09KGY2PCGTW9R",
+        "01M27E0D6WVDBCDYZY7P940670",
+        "01M27F1B5SG6YSH62F0QJ500MR",
+        "01M27HGS94TFEHH1KTCYDK8MN5",
+        "01M27QH75TYEEF3PJRDBXHQ3E5"
+      ]
+    },
+    "A-E10": {
+      "found": true,
+      "citations": [
+        "01M27GYA7PPSN0D6KGVR4S92NA"
+      ]
+    },
+    "A-E11": {
+      "found": true,
+      "citations": [
+        "01M27GKTHJY7P84JC0YCETH8XE"
+      ]
+    },
+    "A-E13": {
+      "found": true,
+      "citations": [
+        "01M27D8KBQN32D2P7TECSXF707",
+        "01M27E10N0TBNMQZCJ1SBT8MBR",
+        "01M27GJ4ZYET90S0Y81P0FT51R",
+        "01M27GSBRVQHZXE7MQM442QMTB",
+        "01M27GSSWWZKB0B73WQQDDENGW",
+        "01M27S9G76G5F2KH3EJGWWXF8Y"
+      ]
+    },
+    "A-M1": {
+      "found": true,
+      "citations": [
+        "01M27D83M5X7HPYXDBP12NJ2FZ",
+        "01M27GKMXH7EW2KMT32PXPTTSG"
+      ]
+    },
+    "A-M2": {
+      "found": true,
+      "citations": [
+        "01M27E10N0TBNMQZCJ1SBT8MBR",
+        "01M27GJDDG7N66D4P4NNHM8JN8"
+      ]
+    },
+    "A-M4": {
+      "found": true,
+      "citations": [
+        "01M27BEWX4A1Z60VHR8VKN57MK",
+        "01M27E5HD5PT7NCK1ZX5M8YKN4",
+        "01M27GJDDG7N66D4P4NNHM8JN8",
+        "01M27GKTHJY7P84JC0YCETH8XE",
+        "01M27HH7YR426HPWPWSJ9KM2KS"
+      ]
+    },
+    "A-M6": {
+      "found": true,
+      "citations": [
+        "01M27E3SEP99CQ8CBH9GFAWHSP"
+      ]
+    },
+    "A-M7": {
+      "found": true,
+      "citations": [
+        "01M27BFYT8ZP9X6AGKYVV4VCC5",
+        "01M27E3SEP99CQ8CBH9GFAWHSP",
+        "01M27GS3NDHX78TQEFX9SBFDW9",
+        "01M27NXFVQGDCQXQJRN6SXTE1M",
+        "01M288BFY4295QXH427S5QK1EY"
+      ]
+    },
+    "A-M8": {
+      "found": true,
+      "citations": [
+        "01M27GKC1DW6G2DP4XBK93MNA7",
+        "01M27GSBRVQHZXE7MQM442QMTB",
+        "01M27S9G76G5F2KH3EJGWWXF8Y"
+      ]
+    },
+    "A-M9": {
+      "found": true,
+      "citations": [
+        "01M27D5RGY6QMD7NF2168GYCBM"
+      ]
+    },
+    "A-M10": {
+      "found": true,
+      "citations": [
+        "01M27E5HD5PT7NCK1ZX5M8YKN4",
+        "01M27GRK06VYCB09QMJWYXVCNR"
+      ]
+    },
+    "A-M11": {
+      "found": true,
+      "citations": [
+        "01M27GYRT4GVCTXZCR70HXBFE6"
+      ]
+    },
+    "A-M12": {
+      "found": true,
+      "citations": [
+        "01M27E3KNGDR5YVMZ6F0Y0D15T",
+        "01M27HHP1GBFYMFFJYSGXRQPPM"
+      ]
+    },
+    "A-M13": {
+      "found": true,
+      "citations": [
+        "01M27E3SEP99CQ8CBH9GFAWHSP",
+        "01M27E7Y8N6ZQME2P1NMA8MZB7",
+        "01M27GRE3SMV1D4WGKFCX4NEMS",
+        "01M28BFCGWDEPTYCPDHD6NXE23"
+      ]
+    },
+    "A-M16": {
+      "found": true,
+      "citations": [
+        "01M27GSBRVQHZXE7MQM442QMTB",
+        "01M27GSYF98YAJFXQXCVTTVAAZ",
+        "01M27GZ5073K9NRVV33QAZ8NZ3",
+        "01M27HH3GFWQKHYGKED9W5ZFWW"
+      ]
+    },
+    "A-M17": {
+      "found": true,
+      "citations": [
+        "01M27DSBKS8HXDRRXP4MECKYBR",
+        "01M27GM1ZZA6PZMY6R8R67BM5T",
+        "01M27GR9WAWX4KK956YW2700KT",
+        "01M27GRE3SMV1D4WGKFCX4NEMS"
+      ]
+    },
+    "A-M19": {
+      "found": true,
+      "citations": [
+        "01M27B4DT8AVQM5HK4TFQR96S3",
+        "01M27CEQ8RVGND9Q0RCZ5QK3H5",
+        "01M27H0FFC1D1SP6ATF15HWG43",
+        "01M27HB3BCXDSGAH956HTB33R5",
+        "01M27HN7QT21JMZJV9WMS8XFH6",
+        "01M27PDQ43C6S4NZ4M87BPXP92"
+      ]
+    },
+    "B-M7": {
+      "found": true,
+      "citations": [
+        "01M27D8KBQN32D2P7TECSXF707",
+        "01M27GS3NDHX78TQEFX9SBFDW9",
+        "01M27VEVX558PTJHFY4XGN885F",
+        "01M27ZPSGZVKRCJT0GVGB8YTT0"
+      ]
+    },
+    "B-M16": {
+      "found": true,
+      "citations": [
+        "01M27CB99R124Z8Z2CNVSWZG3Z",
+        "01M27E0ZS4RSR6MW9DJKJW401C",
+        "01M27GXS3V9CZJDRT8KW5NTA9P",
+        "01M27NCF79B6VGS3GFHQDCRQC6"
+      ]
+    },
+    "B-M17": {
+      "found": true,
+      "citations": [
+        "01M27HGYVK259AREEQJN9PD05P",
+        "01M28E64C88JKDMTM8AEJH68ZA"
+      ]
+    },
+    "B-M18": {
+      "found": true,
+      "citations": [
+        "01M27DCC4G8BDYS4XC70NJQ6R6",
+        "01M27E3YGTK89EQHYP7A29VEFF",
+        "01M27E43H0C8M73JD45DTM3JWV",
+        "01M27GZ1KR5YR06AVMAY6491B6"
+      ]
+    },
+    "A-H1": {
+      "found": true,
+      "citations": [
+        "01M27E10N0TBNMQZCJ1SBT8MBR",
+        "01M27E3KNGDR5YVMZ6F0Y0D15T",
+        "01M27ETVKPDQAN05BJRGYP2EH5",
+        "01M27HH7YR426HPWPWSJ9KM2KS"
+      ]
+    },
+    "A-H3": {
+      "found": true,
+      "citations": [
+        "01M27E196HKEKVMJXK58P4S4D8",
+        "01M27E3D1HXV6MTNN61ME373KR",
+        "01M27E3KNGDR5YVMZ6F0Y0D15T",
+        "01M27GY3PN6M7R6K2AFNGEXAY0",
+        "01M27GYA7PPSN0D6KGVR4S92NA",
+        "01M27HH7YR426HPWPWSJ9KM2KS"
+      ]
+    },
+    "A-H5": {
+      "found": true,
+      "citations": [
+        "01M27E3KNGDR5YVMZ6F0Y0D15T",
+        "01M27VEVX558PTJHFY4XGN885F"
+      ]
+    },
+    "A-H7": {
+      "found": true,
+      "citations": [
+        "01M27GY3PN6M7R6K2AFNGEXAY0",
+        "01M27HHE5H7C702WQMFFK2JK9K"
+      ]
+    },
+    "A-H8": {
+      "found": true,
+      "citations": [
+        "01M27CEY8B2P71CQYBCM54HNAM",
+        "01M27E4JQHQAJSKW6C5ZSR63JX",
+        "01M27E53V1EFQCBN5A9NWC03GV",
+        "01M27HGYVK259AREEQJN9PD05P",
+        "01M28E64C88JKDMTM8AEJH68ZA"
+      ]
+    },
+    "A-H9": {
+      "found": true,
+      "citations": [
+        "01M27BH0CCFE2ZP5YG1D3MSFW0",
+        "01M27BH5947A38M0GEJ73K8KV3",
+        "01M27GSBRVQHZXE7MQM442QMTB",
+        "01M27S9G76G5F2KH3EJGWWXF8Y"
+      ]
+    },
+    "A-H12": {
+      "found": true,
+      "citations": [
+        "01M27GSSWWZKB0B73WQQDDENGW"
+      ]
+    },
+    "A-H13": {
+      "found": true,
+      "citations": [
+        "01M27GS3NDHX78TQEFX9SBFDW9",
+        "01M27GT4JXZJTZZ0BGHQTRW4SE"
+      ]
+    },
+    "A-H14": {
+      "found": true,
+      "citations": [
+        "01M27B427QH5HHX73TH6MWWVFP",
+        "01M27CC6JSHER2M7GGGZD6GKDX",
+        "01M27ERZFGX64R3QJ30SEG2K5V",
+        "01M27ES390HXVERGSA70NWY302",
+        "01M27ETH80MMT1PTD865XKP3XG",
+        "01M28E64C88JKDMTM8AEJH68ZA"
+      ]
+    },
+    "A-H15": {
+      "found": true,
+      "citations": [
+        "01M27GKTHJY7P84JC0YCETH8XE"
+      ]
+    },
+    "A-X1": {
+      "found": true,
+      "citations": [
+        "01M27BF2SHVSRZZACA3DNW8HWY",
+        "01M27BFHXM02R19X8DW1Y7KRE1",
+        "01M27DW9GNK7P80C450ARG8T24",
+        "01M27E4C823SV37D6J6DCZ0AQE",
+        "01M27QBJVAK7S4299A6MYEATKG",
+        "01M287EYDS4PC9EV3QWVQRG4NE"
+      ]
+    },
+    "A-X2": {
+      "found": false,
+      "citations": []
+    },
+    "A-X3": {
+      "found": false,
+      "citations": []
+    },
+    "A-X4": {
+      "found": false,
+      "citations": []
+    },
+    "A-X5": {
+      "found": false,
+      "citations": []
+    },
+    "A-X6": {
+      "found": false,
+      "citations": []
+    },
+    "A-X7": {
+      "found": false,
+      "citations": []
+    },
+    "A-X8": {
+      "found": true,
+      "citations": [
+        "01M27ECM2K05B7XA8X4PGP46XM"
+      ]
+    },
+    "A-X9": {
+      "found": false,
+      "citations": []
+    },
+    "A-X10": {
+      "found": true,
+      "citations": [
+        "01M27GSSWWZKB0B73WQQDDENGW",
+        "01M27HHE5H7C702WQMFFK2JK9K",
+        "01M27JKCQYYQPGZV0QRS4GKSG6",
+        "01M28APXNN90JBDQM6Y52V98PS",
+        "01M28CBD0XAT2GDZE3SAQKXSWK"
+      ]
+    },
+    "A-X11": {
+      "found": true,
+      "citations": [
+        "01M27DRZPKV51HCXXE5CYCW1TW",
+        "01M27QSVVQ3BKXTP8EZKWEGJRH",
+        "01M28S60MNEK92AX65DWDV3VJ2"
+      ]
+    },
+    "A-X12": {
+      "found": true,
+      "citations": [
+        "01M27BH5947A38M0GEJ73K8KV3",
+        "01M27D8KBQN32D2P7TECSXF707",
+        "01M27GM1ZZA6PZMY6R8R67BM5T",
+        "01M27GSBRVQHZXE7MQM442QMTB",
+        "01M27S9G76G5F2KH3EJGWWXF8Y",
+        "01M2B4X5851MZPJQT0QTGBEEKV"
+      ]
+    },
+    "A-X18": {
+      "found": true,
+      "citations": [
+        "01M27BSVHMXJDCTYFW46NHDVQT",
+        "01M27E10N0TBNMQZCJ1SBT8MBR",
+        "01M27E196HKEKVMJXK58P4S4D8",
+        "01M27ETVKPDQAN05BJRGYP2EH5",
+        "01M27GJDDG7N66D4P4NNHM8JN8",
+        "01M27GZ5073K9NRVV33QAZ8NZ3"
+      ]
+    },
+    "A-X20": {
+      "found": false,
+      "citations": []
+    },
+    "A-D6": {
+      "found": true,
+      "citations": [
+        "01M27GSSWWZKB0B73WQQDDENGW",
+        "01M27HHE5H7C702WQMFFK2JK9K",
+        "01M27JKCQYYQPGZV0QRS4GKSG6",
+        "01M27NN13GPCGKDCCF45RR6AHP",
+        "01M28APXNN90JBDQM6Y52V98PS"
+      ]
+    },
+    "A-D7": {
+      "found": true,
+      "citations": [
+        "01M27GKMXH7EW2KMT32PXPTTSG"
+      ]
+    },
+    "A-D9": {
+      "found": false,
+      "citations": []
+    },
+    "A-D10": {
+      "found": false,
+      "citations": []
+    },
+    "X8-notowner": {
+      "found": true,
+      "citations": [
+        "01M27ECM2K05B7XA8X4PGP46XM"
+      ]
+    }
+  }
+}

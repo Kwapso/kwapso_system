@@ -61,7 +61,48 @@ import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { isVideoLink } from "@shared/media-links"
 import { useT } from "@shared/web/language"
+import type { Translate } from "@shared/web/format"
 import { sightingsLine } from "@/components/knowledge/knowledge-source-card"
+
+/** THE THEATRICAL STEPS (owner's own ask, 12 Sep: "I would love to see the
+ * steps... show progress, where we are, and what's happening... so much
+ * better for the user to be transparent"). Predicted CLIENT-SIDE, never
+ * pushed from the door — he accepted that in writing ("Client-side
+ * narration — this is great") — so every step describes INTENT, never a
+ * RESULT: "Reading the transcript…" is a prediction anyone would make
+ * before reading it; "Read 1,873 words" is a fact only the door's own
+ * response may state (`linkReadSentence`, the one place a number appears).
+ *
+ * TIMED OFF A REAL MEASUREMENT, not a guess: the owner's own Tella recording
+ * (`content.kwapso.com/video/hogo-cv-upload-optimised-5snm`, 1,873 words —
+ * the exact number in his own report) took 2.4s end to end against the
+ * shipped reader, measured directly on 12 Sep 2026. Both later steps land
+ * inside that window; the honesty timeout below is nowhere near either. */
+const NARRATION_STEPS: { text: (t: Translate) => string }[] = [
+  { text: (t) => t("Reading the link…") },
+  { text: (t) => t("Making sense of what it says…") },
+  { text: (t) => t("Almost done…") },
+]
+/** When each step after the first is due, in the same order as the array
+ * above (the first is immediate). Kept beside the steps rather than folded
+ * into the same object so the STEPS read as prose and the TIMING reads as
+ * numbers — two different things a reviewer checks for two different
+ * reasons. */
+const NARRATION_STEP_DELAYS_MS = [1200, 2400]
+
+/** THE HONESTY BOUND (owner's own condition, 12 Sep: "if there is some
+ * infinite delay or failure, you can catch that, then that's fine"). Set
+ * off the DOOR'S OWN declared ceiling, never guessed: every link fetch this
+ * feature can reach is capped server-side at `LINK_FETCH_TIMEOUT_MS` (10s —
+ * `workers/content/src/lib/source-readers.ts`, R11), and YouTube, Loom and
+ * Tella are all statically known hosts (`LINK_TYPES`), so none of the three
+ * ever pays a second, discovery fetch on top of that one. 15s is that 10s
+ * ceiling plus a margin for the request's own round trip: long enough to
+ * never fire while the door is still legitimately inside its own guarantee
+ * (measured real case: 2.4s), short enough that a reply that never arrives
+ * — a dropped connection, a hung tab — is named rather than spun on
+ * forever. */
+const NARRATION_TIMEOUT_MS = 15_000
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
@@ -100,7 +141,11 @@ export function KnowledgeFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (values: KnowledgeFormValues) => Promise<void>
+  /** Void on an ordinary save (every EDIT, and a CREATE that isn't a bare video
+   * link) — closes and clears the draft, exactly as before this field existed.
+   * A CREATE that read a video link and couldn't returns `refusedBecause`
+   * instead, which keeps the dialog open and renders the sentence in place. */
+  onSubmit: (values: KnowledgeFormValues) => Promise<{ refusedBecause?: string | null } | void>
   /** the accounts this caller may file under — already fenced by their own read */
   /** the team whose clients the compartment picker searches (accounts PAGE, R14) */
   teamId: string | null
@@ -151,27 +196,91 @@ export function KnowledgeFormDialog({
     open
   )
   const [busy, setBusy] = React.useState(false)
+  // WHY IT COULDN'T READ THE LINK, verbatim from the door (see `onSubmit`'s own
+  // type) — two genuinely different sentences (a host we don't recognise vs.
+  // one we do that simply publishes no transcript), composed server-side and
+  // shown AS WRITTEN, never paraphrased into one generic failure and never a
+  // toast that disappears before it's read. Cleared the moment the person
+  // changes the link — a stale refusal about the last URL would describe the
+  // wrong thing the moment they paste a new one.
+  const [linkRefusal, setLinkRefusal] = React.useState<string | null>(null)
+  // WHICH PREDICTED STEP IS SHOWING, and whether the honesty bound has been
+  // crossed. Both reset to their starting values the instant a save starts
+  // or settles (`startNarration`/`stopNarration` below) — neither survives
+  // past the request that scheduled it, which is what stops a stale "Almost
+  // done…" from outliving the request it was ever about.
+  const [narrationStep, setNarrationStep] = React.useState(0)
+  const [narrationTimedOut, setNarrationTimedOut] = React.useState(false)
+  const narrationTimers = React.useRef<ReturnType<typeof setTimeout>[]>([])
+
+  function stopNarration() {
+    // BELT ON TOP OF THE SUSPENDERS BELOW: the render itself never shows a
+    // predicted step once `busy` is false, and a `linkRefusal` is checked
+    // BEFORE any of the busy/narration branches — so the real outcome wins
+    // even in the hypothetical where `busy` got stuck. This function's own
+    // job is narrower: kill the pending timers so they cannot fire a
+    // `setState` into a component that has moved on to a different request
+    // (or, via the `useEffect` cleanup below, has unmounted) — not the sole
+    // guarantee that a stale step is never SEEN, which the render's own
+    // structure already provides on its own. Called from every exit of
+    // `submit()` (success, refusal, throw) via `finally`, and once more on
+    // unmount.
+    narrationTimers.current.forEach(clearTimeout)
+    narrationTimers.current = []
+    setNarrationStep(0)
+    setNarrationTimedOut(false)
+  }
+
+  function startNarration() {
+    stopNarration()
+    NARRATION_STEP_DELAYS_MS.forEach((delay, i) => {
+      narrationTimers.current.push(setTimeout(() => setNarrationStep(i + 1), delay))
+    })
+    narrationTimers.current.push(setTimeout(() => setNarrationTimedOut(true), NARRATION_TIMEOUT_MS))
+  }
+
+  // A REQUEST THAT NEVER GETS TO `finally` — the dialog itself unmounting
+  // mid-flight — must not leave a timer alive to call `setState` on a
+  // component that no longer exists. `FormShellDialog` already refuses to
+  // let a busy form be dismissed, so this is a backstop for a case that
+  // should not happen rather than the primary guard.
+  React.useEffect(() => stopNarration, [])
 
   // A LINK IS NOT A SOURCE — IT IS A LINK TO ONE.
   //
   // Every unreadable thing that ever reached this knowledge base was accepted,
   // stored and quietly never read, and nobody was told. A link with nothing
-  // beside it is that shape exactly: a row that looks filed and holds nothing.
-  //
-  // THE GATE IS THE EMPTY BODY, NOT THE HOST. A list of video services is wrong
-  // the moment somebody uses one that is not on it — which is what happened, with
-  // a Tella recording behind a custom domain. `isVideoLink` still runs, but only
-  // to choose which sentence to show: "we can't watch a video" is the right thing
-  // to say about a recording and the wrong thing to say about a documentation
-  // page, and both are refused either way.
+  // beside it used to be that shape exactly — a row that looks filed and holds
+  // nothing — for EVERY host. It no longer is for a VIDEO link: the owner's own
+  // words, 12 Sep, "whether I paste Tella, Loom, or YouTube doesn't matter... it
+  // will paste [and] show me what kind of transcript it's extracting" — so a
+  // bare video link is now the expected, submittable shape, and the door reads
+  // it for real (`read`/`refusedBecause` on the response). An ordinary page is
+  // still refused with nothing beside it: this app does not fetch arbitrary
+  // pages, and "we don't open the page for you" stays true for everything that
+  // isn't a video.
   const link = values.sourceUrl.trim()
-  const nothingToRead = !!link && !richTextValue(values.body).trim()
+  const linkIsVideo = isVideoLink(link)
+  const nothingToRead = !!link && !linkIsVideo && !richTextValue(values.body).trim()
+  // THE ONE CASE THE SUBMIT BUTTON SAYS SOMETHING DIFFERENT FOR — a real read
+  // behind the door, seconds rather than an ordinary write's milliseconds. Only
+  // when there is no body already: a video link with words already pasted
+  // beside it is an ordinary note that happens to carry a link, and saving it
+  // is the same instant write every other source gets.
+  const willReadVideoLink = !!link && linkIsVideo && !richTextValue(values.body).trim()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
+    // A NEW ATTEMPT CLEARS THE LAST ONE'S ANSWER. Resubmitting the same URL
+    // after a refusal must not keep showing that refusal WHILE the new
+    // attempt is running — that would read as "still refusing" for a
+    // request that hasn't answered yet, the same honesty failure this
+    // whole feature exists to avoid, just on the other field.
+    setLinkRefusal(null)
+    if (willReadVideoLink) startNarration()
     try {
-      await onSubmit({
+      const result = await onSubmit({
         title: values.title.trim(),
         body: richTextValue(values.body),
         sourceUrl: values.sourceUrl.trim(),
@@ -182,6 +291,15 @@ export function KnowledgeFormDialog({
         // person did not choose.
         visibleToAppId: values.visibility === "app" ? values.visibleToAppId : "",
       })
+      // A REFUSAL IS NOT A THROW — the source still saved (as an ordinary,
+      // unreadable-video note), so closing the dialog and clearing the draft
+      // would be right for THAT fact and wrong for this one: the person asked
+      // for a transcript and needs to see why they didn't get one before the
+      // form disappears. Stays open; the sentence renders under the link field.
+      if (result && "refusedBecause" in result && result.refusedBecause) {
+        setLinkRefusal(result.refusedBecause)
+        return
+      }
       clearDraft()
       onOpenChange(false)
     } catch (err) {
@@ -193,6 +311,12 @@ export function KnowledgeFormDialog({
             : t("Couldn't add it to the knowledge base.")
       )
     } finally {
+      // THE HONESTY CONDITION'S OTHER HALF: the request has settled — one way
+      // or another, success, refusal or throw — so whatever the narration was
+      // about is over. Stopped here rather than only inside the try's happy
+      // path, so a THROWN request lands on the real error immediately instead
+      // of finishing its predicted steps first.
+      stopNarration()
       setBusy(false)
     }
   }
@@ -217,6 +341,12 @@ export function KnowledgeFormDialog({
         // NOTHING PASTED MEANS NO SOURCE. The door says the same thing; this
         // stops a person getting there and being told no.
         disabled: !values.title.trim() || nothingToRead,
+        // THE OWNER'S OWN WORDS: "show me it's loading" — a video read is a
+        // real fetch behind this door, seconds rather than an ordinary save's
+        // milliseconds, and "Submitting…" would read as stuck. Every other
+        // save on this form (and every other form in the app) still says
+        // "Submitting…" — see `SubmitConfig.loadingLabel`'s own header.
+        loadingLabel: willReadVideoLink ? t("Reading the link…") : undefined,
       }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
@@ -257,19 +387,55 @@ export function KnowledgeFormDialog({
         <Input
           id="knowledge-link"
           value={values.sourceUrl}
-          onChange={(e) => setValues((v) => ({ ...v, sourceUrl: e.target.value }))}
+          onChange={(e) => {
+            const sourceUrl = e.target.value
+            setValues((v) => ({ ...v, sourceUrl }))
+            // A refusal describes the LAST url. The moment they change it, it
+            // describes nothing that's still true — cleared rather than left
+            // to read as an answer about whatever they've just typed instead.
+            if (linkRefusal) setLinkRefusal(null)
+          }}
           placeholder="https://…"
           disabled={busy || textOwnedElsewhere}
         />
-        {nothingToRead ? (
+        {linkRefusal ? (
+          // RENDERED AS WRITTEN, never wrapped in t() — this is the door's own
+          // composed sentence (see `onSubmit`'s type), the same shape as
+          // `knowledgeAnswer`'s `reason`: DATA the response carries, not
+          // catalogued UI copy. Two genuinely different sentences live here
+          // (a host we don't recognise vs. one that publishes no transcript)
+          // and neither gets paraphrased into the other.
+          <p className="text-warning mt-2 text-sm">{linkRefusal}</p>
+        ) : busy && willReadVideoLink && narrationTimedOut ? (
+          // THE HONESTY BOUND CROSSED. Not a paraphrase of a real error — the
+          // door has not answered at all — so this says exactly that, plainly,
+          // rather than a predicted step pretending it still knows what is
+          // happening. See `NARRATION_TIMEOUT_MS`'s own header for the
+          // measurement this bound is set against.
+          <p className="text-warning mt-2 text-sm">{t("This is taking longer than it should.")}</p>
+        ) : busy && willReadVideoLink && narrationStep > 0 ? (
+          // A PREDICTED STEP — INTENT, never a RESULT. See `NARRATION_STEPS`'s
+          // own header for why that is honest here and a word count would not
+          // be. Step 0 is never drawn here: the submit button already says
+          // "Reading the link…" (its own `loadingLabel`), and the same
+          // sentence in two places on screen at once is noise, not
+          // transparency — this line only speaks once there is something
+          // NEW to say.
+          <p className="text-muted-foreground mt-2 text-xs">{NARRATION_STEPS[narrationStep].text(t)}</p>
+        ) : busy && willReadVideoLink ? (
+          // Step 0, still in flight: nothing here yet, on purpose — see the
+          // branch above. Rendering the pre-submit hint below would say "we'll
+          // read this when you save it" about a save that is already running.
+          null
+        ) : nothingToRead ? (
           <p className="text-warning mt-2 text-sm">
-            {isVideoLink(link)
-              ? t(
-                  "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript above and this source is good to go."
-                )
-              : t(
-                  "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
-                )}
+            {t(
+              "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
+            )}
+          </p>
+        ) : willReadVideoLink ? (
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t("We'll read this video's captions or transcript when you save it.")}
           </p>
         ) : null}
       </Field>
@@ -292,39 +458,57 @@ export function KnowledgeFormDialog({
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
-        <Select
-          // A MIRRORED source has no "Only me" item below, so its currently
-          // derived-private state has nowhere to render as a selected item —
-          // Radix shows a blank trigger rather than guess. "Team" is the honest
-          // fallback: submitting it changes nothing about that derived state
-          // either, since the door no longer writes owner_user_id for a mirrored
-          // source at all (see the file header).
-          value={mirrored && values.visibility === "private" ? "team" : values.visibility}
-          onValueChange={(visibility) =>
-            setValues((v) => ({
-              ...v,
-              visibility:
-                visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
-            }))
-          }
-          disabled={busy}
-        >
-          <SelectTrigger id="knowledge-visibility">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
-            {/* THE MIDDLE ANSWER (12.3). Offered only when this caller is on an
-                app, the door refuses any other, so a picker with nothing in it
-                would be an option that can only end in a refusal. */}
-            {appOptions.length > 0 && (
-              <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
-            )}
-            {/* NOT OFFERED ON A MIRRORED SOURCE. See the file header — a choice
-                the next sweep silently erases is not a choice. */}
-            {!mirrored && <SelectItem value="private">{t("Only me")}</SelectItem>}
-          </SelectContent>
-        </Select>
+        {/* A MIRRORED source that is CURRENTLY private (nobody else has seen it
+            yet) used to be shown here as "Anyone who can read the knowledge
+            base" — a display coercion, because Radix has nothing to label a
+            "private" value with when that item is not offered below, and
+            "team" was picked as a harmless-looking fallback. It was not
+            harmless: the trigger read as an open source that was, in fact,
+            readable by nobody but its connector. Tracker `b-gmail`, caught by
+            testing the actual door rather than trusting the screen — a real
+            teammate, signed in as themselves, could not read a source this
+            control displayed as "anyone can". Say the true word instead, and
+            say why nothing here can change it — the state is a FACT about who
+            has seen it (see the file header), never a choice this form makes
+            for a mirrored source, so there is nothing to offer a control for. */}
+        {mirrored && values.visibility === "private" ? (
+          <div>
+            <p className="text-sm">{t("Only me")}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("Who can read this follows who has already seen it — it isn't set here.")}
+            </p>
+          </div>
+        ) : (
+          <Select
+            value={values.visibility}
+            onValueChange={(visibility) =>
+              setValues((v) => ({
+                ...v,
+                visibility:
+                  visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
+              }))
+            }
+            disabled={busy}
+          >
+            <SelectTrigger id="knowledge-visibility">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
+              {/* THE MIDDLE ANSWER (12.3). Offered only when this caller is on an
+                  app, the door refuses any other, so a picker with nothing in it
+                  would be an option that can only end in a refusal. */}
+              {appOptions.length > 0 && (
+                <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
+              )}
+              {/* NOT OFFERED ON A MIRRORED SOURCE. See the file header — a choice
+                  the next sweep silently erases is not a choice. (A mirrored
+                  source already sitting at "private" never reaches this branch
+                  at all — see above.) */}
+              {!mirrored && <SelectItem value="private">{t("Only me")}</SelectItem>}
+            </SelectContent>
+          </Select>
+        )}
         {/* No line at all when nobody has sighted it yet (sweep hasn't run since
             the fold-writer shipped, or never will for this kind) — the same
             "null means undrawn, not drawn empty" rule `sightingsLine`'s own

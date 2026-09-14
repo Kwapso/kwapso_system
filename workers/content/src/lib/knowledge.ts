@@ -111,6 +111,7 @@ import { countCollection } from "@shared/workers/count"
 import { brand } from "@shared/brand"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { isRareAccountToken } from "@shared/workers/account-rarity"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -130,7 +131,8 @@ import type {
   KnowledgeSource,
 } from "@shared/types"
 import type { Env } from "../env"
-import { contextLineFor } from "./source-readers"
+import { contextLineFor, type ReadKind } from "./source-readers"
+import { extractLink } from "./knowledge-files"
 import {
   CHUNK_TARGET_CHARS,
   chunkText,
@@ -144,6 +146,7 @@ import {
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
+import { uploadIdentity } from "./knowledge-identity"
 import { passageId, READER_SHORTLIST_CAP } from "./knowledge-reader"
 import {
   chunkVectorId,
@@ -404,6 +407,51 @@ const MIN_VECTOR_SCORE = 0.5
  * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
  * silent change to what "found" means for a caller that never asked for the
  * reader. See `retrieve`'s own comment at the point this is used. */
+/* PUT BACK TO 0.3 ON 12 SEP 2026, hours after I raised it, because the raise
+ * broke a question nobody was watching and FOUR measured points now show that
+ * no floor can do the job at all.
+ *
+ *   "What is the capital of France?"                    top-1 0.335  MUST refuse
+ *   "what horsepower do we have and what is
+ *    everyone specialised in?"  (d-paraphrase's third)  top-1 0.399  MUST answer
+ *   A-M1 (the exam's own reader canary)                 top-1 0.444  MUST answer
+ *   A-X9 ("...at dinner on the 14th")                   top-1 0.466  MUST refuse
+ *
+ * A question that must be REFUSED sits BELOW one that must be ANSWERED, and
+ * another sits ABOVE both. There is no line through that set. The raise to 0.4
+ * was fitted to the first and third points alone, which is why it looked clean:
+ * the second point is not in the exam, so nothing went red when 0.399 fell one
+ * thousandth on the wrong side of it and d-paraphrase silently lost a question
+ * that had been proven working the day before.
+ *
+ * SO THE FLOOR GOES BACK TO BEING WHAT ITS NAME SAYS — a guard against pure
+ * noise — and the DECISION moves to the reader, which now has to quote the
+ * words it is relying on (`knowledge-reader.ts`, cite-or-drop). Measured at 0.3
+ * with that in place: France refuses, horsepower answers again citing the Week
+ * recap, A-M1 and A-O1 answer. A-X9 still answers and is tracked as its own
+ * open failure; it did so identically at 0.4, so the floor never touched it.
+ *
+ * ONE HONEST QUALIFICATION, because the obvious reading of that table is wrong.
+ * Cite-or-drop is NOT what refuses France. I checked by deleting it: with both
+ * the substring check and the length floor disabled and a logger on the raw
+ * model reply, the model claims NOTHING for France, twice over. What changed is
+ * that asking for a QUOTE alongside each id makes this model far more willing
+ * to return an empty list than asking for a bare id list did — a prompt effect,
+ * and prompt effects on this model have already failed twice tonight when leant
+ * on. What IS structural is the other direction: a fabricated or irrelevant
+ * claim can no longer be smuggled in behind an id, because the words have to be
+ * in the passage the model was shown.
+ *
+ * WHAT CATCHES IT IF THIS MODEL DRIFTS: France is a refusal row in the exam, and
+ * the refusal ceiling is now a THROW inside `npm run check` rather than a line
+ * in a report (`enforceRefusalCeiling`). A regression here turns the build red
+ * and names the row. That control, not this constant, is the reason 0.3 is safe
+ * to ship — and it is why the trade is worth making at all: at 0.4 a correct
+ * answer was certainly lost, where at 0.3 an incorrect one is caught if it comes
+ * back.
+ *
+ * `KNOWLEDGE_READER_MIN_SCORE` still overrides it, and still exists so the next
+ * person moves this with measurements rather than with an argument. */
 const READER_HALLUCINATION_FLOOR = 0.3
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
@@ -545,15 +593,44 @@ const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_i
 
 /** The columns ONE source carries. The body comes too — but only as far as a
  * person can read (see BODY_INLINE_CHARS), because a detail screen is a screen. */
+// Declared ABOVE `DETAIL_COLS`, which reads it at module load: the constant it
+// replaced was an import and so already initialised, and leaving it below put
+// the whole file in a temporal dead zone — 75 suites failed to LOAD, which is
+// the failure shape that reports as a red build rather than a red test.
+const BODY_INLINE_CHARS = 200_000
+
 const DETAIL_COLS = LIST_COLS.replace("NULL AS body", `substr(body, 1, ${bodyInlineChars()}) AS body`)
 
 /** How much of a source's material a screen is handed inline. This is a DISPLAY
  * decision and nothing else: the whole document is stored and every word of it
  * is searchable. `bodyBytes` on the row says how much there really is, so the
  * screen can say "showing the first part of 412 KB" rather than quietly
- * presenting an excerpt as the whole thing. */
+ * presenting an excerpt as the whole thing.
+ *
+ * IT USED TO BE `TEXT_LIMITS.long` (20,000), AND THAT WAS A CATEGORY ERROR.
+ * `TEXT_LIMITS.long` is the cap on what a person may TYPE into a description or
+ * an article — a WRITE validator, borrowed here to decide how much of somebody
+ * else's two-hour transcript they may READ. The two numbers have nothing to do
+ * with each other, and the borrowed one was the smaller by an order of
+ * magnitude.
+ *
+ * THE OWNER FOUND IT ON THE SAME MEETING TWICE, 13-14 Sep 2026. The first time
+ * was the real silent cut in the READER (`DRIVE_TEXT_CAP`), which threw away
+ * three quarters of the document before it was ever stored; that is fixed and
+ * this meeting is 142,429 characters in the database, ending where the
+ * transcript itself ends. He reloaded the page and it still stopped mid-word,
+ * because the SCREEN was only ever asking for the first 20,000 of them — 14% —
+ * and the notice explaining that sat at the top of the tab, thousands of pixels
+ * above the place he actually hit the cut. Same experience, entirely different
+ * cause, and the second one looked exactly like the first one not being fixed.
+ *
+ * 200,000 characters holds every source in the base whole (the largest today is
+ * 170,015) and a two-hour transcript with room to spare. Past it the screen
+ * still cuts — a screen has to — and now SAYS SO WHERE THE CUT IS rather than
+ * only in a preface. Only the DETAIL read carries body at all (`LIST_COLS`
+ * selects `NULL AS body`), so no list pays for this. */
 function bodyInlineChars(): number {
-  return TEXT_LIMITS.long
+  return BODY_INLINE_CHARS
 }
 
 /** A JSON array column, defensively — same shape as `sharding.ts`'s
@@ -619,6 +696,30 @@ function toSource(r: SourceRow): KnowledgeSource {
     // rather than reading an empty array as "filed nowhere".
     accounts: parseIdList(r.accounts),
     apps: parseIdList(r.apps),
+    // `shared_with` IS WRITTEN TRUTHFULLY NOW, on every path that knows the
+    // answer — the owner's ruling, 12 Sep 2026: "keep it for everything."
+    // NOTHING READS THIS AS A FENCE: the permission check is `readerClause`
+    // (`ownerClause AND appClause`), and this column, and its Vectorize
+    // 'shared' label, are not inputs to it, anywhere — a census confirmed
+    // zero WHERE clauses and zero Vectorize query predicates on it across
+    // both front doors and all eight workers. Whoever adds the FIRST real
+    // filter on this column must add it to `readerClause` deliberately, not
+    // assume it already gates something because a value already exists.
+    //
+    // SEVEN WRITE PATHS, all of them: `createSource` and `updateSource`
+    // (typed notes — the SAME `privateToMe` boolean that already sets
+    // `owner_user_id`), `createFileSource` (an uploaded file, identical
+    // shape), the shared upsert in knowledge-ingest.ts (every mirrored kind,
+    // reading `IngestRow.sharedWith` — see its own header for Gmail/
+    // Calendar's and Drive/Chat's two different rules, both set once in
+    // knowledge-google.ts's `fencing()`). PORTAL UPLOAD IS THE EIGHTH
+    // CANDIDATE AND DOES NOT EXIST: a client login has no door onto the
+    // knowledge base at all (R21 — `workers/portal-gateway/src/index.ts`'s
+    // own allow-list has no `/api/content/knowledge*` entry), so there is no
+    // gap here, only a door that was never opened. Every kind this app
+    // mirrors off its OWN tables (a ticket, a task, a role) has no sharing
+    // choice to report and is correctly left at the column's default,
+    // 'agency', by the same shared upsert.
     sharedWith: r.shared_with === "private" || r.shared_with === "agency_client" ? r.shared_with : "agency",
     generatedOnly: r.generated_only === 1,
     sightingsCount: r.sightings_count,
@@ -1263,16 +1364,25 @@ function readInput(input: SourceInput): {
   // nobody was told. Paste what it says and the source is welcome; paste nothing
   // and there is no row pretending to hold an answer.
   //
-  // NOTHING IS FETCHED. There is no reader for a web page yet, and a network call
-  // with a timeout on every paste would be a lot of machinery to decide something
-  // this line already decides correctly without it.
-  if (sourceUrl && !plainText(body ?? "").trim())
+  // THE OWNER REVERSED THIS FOR VIDEO LINKS, 11 Sep 2026, DELIBERATELY — the
+  // comment above stood as "we don't open the page for you" for two weeks and
+  // is wrong for exactly the shape it was written about. His own words: "For
+  // YouTube, Loom, Tella, and any other video URLs where we can extract a
+  // transcription... Let's build it... Whether I paste Tella, Loom, or
+  // YouTube doesn't matter." So a VIDEO link with no pasted material is no
+  // longer refused here — `createSource` below now calls `extractLink`
+  // (source-readers.ts, R42's table) and either finds real words or an
+  // honest note explaining why not, the same two-promise shape `extractFile`
+  // already gives an unreadable upload. NOTHING ELSE CHANGED: a link this
+  // table does not know how to read at all (`isVideoLink` false — an
+  // ordinary web page, not a video) still has no reader here and is still
+  // refused exactly as before, because there genuinely is nothing built to
+  // fetch it.
+  if (sourceUrl && !plainText(body ?? "").trim() && !isVideoLink(sourceUrl))
     throw new GuardError(
       400,
-      isVideoLink(sourceUrl) ? "video_needs_transcript" : "link_needs_material",
-      isVideoLink(sourceUrl)
-        ? "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
-        : "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
+      "link_needs_material",
+      "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
     )
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
@@ -1352,8 +1462,21 @@ async function requireAccount(
   return rows[0]
 }
 
+/** What `createSource` reports about a video link it read on the caller's
+ * behalf — the contract `postCreateKnowledge`'s response carries so the
+ * loading UX (kb_review's, on `web/`) can say "done — read 1,240 words of
+ * YouTube captions" or the honest refusal, off one synchronous call and no
+ * streaming. Never both non-null, never both null: a video link with nothing
+ * pasted is always either read or refused, one sentence either way — the
+ * same discipline `LinkExtraction` already keeps one file down. */
+export type CreateSourceResult = {
+  id: string
+  read: { provider: string; kind: ReadKind; words: number } | null
+  refusedBecause: string | null
+}
+
 /** Write a source a PERSON typed, and index it in the same call so the assistant
- * knows about it before they have finished reading the toast. Returns its id.
+ * knows about it before they have finished reading the toast.
  *
  * THE BODY GOES IN AS A BOUND PARAMETER, not through `sqlString`. D1 refuses a
  * SQL statement over 100 KB, so the interpolated write this used to do put a
@@ -1367,7 +1490,7 @@ export async function createSource(
   guard: MemberGuard,
   actor: Actor,
   input: SourceInput
-): Promise<string> {
+): Promise<CreateSourceResult> {
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
   if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
@@ -1376,6 +1499,32 @@ export async function createSource(
   // (what a search may ADMIT).
   const accountsFiled = await Promise.all(v.accountIds.map((aid) => requireAccount(cfg, guard, aid)))
   const appsFiled = await Promise.all(v.appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
+  // THE VIDEO LINK IS READ HERE, ONCE, BEFORE ANY ROW EXISTS — the owner's
+  // reversal (readInput's own comment says the words). `readInput` already
+  // let a video link with no pasted material past its refusal; this is where
+  // that promise is kept. R42: `extractLink` is the one table both doors ask,
+  // never a reader chosen here.
+  //
+  // TWO OUTCOMES, NEVER A THIRD. Real words become the body, exactly as if
+  // the person had pasted them. No words becomes `extract.note` AS the body —
+  // visible, and still an ordinary editable note, so "paste the transcript
+  // yourself" (the owner's own fallback, unchanged) is the text already
+  // sitting in the box rather than a sentence in a toast that vanishes. This
+  // is never a 400: a video link is accepted and kept either way, the same
+  // two promises `extractFile` already makes an unreadable upload.
+  let body = v.body
+  let read: CreateSourceResult["read"] = null
+  let refusedBecause: string | null = null
+  if (v.sourceUrl && !plainText(body ?? "").trim() && isVideoLink(v.sourceUrl)) {
+    const extract = await extractLink(v.sourceUrl)
+    body = extract.text ?? extract.note
+    read = extract.read
+    // `refusedBecause` mirrors `extract.note`, but ONLY when nothing was
+    // read — `note` also carries a non-refusal "this was cut to fit" message
+    // on a huge success (`capToRow`), which is not a refusal and must never
+    // read as one.
+    refusedBecause = extract.text ? null : extract.note
+  }
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1383,24 +1532,29 @@ export async function createSource(
     noun: "note",
     title: v.title,
     accountName: account?.name ?? null,
-    detail: v.body ?? "",
+    detail: body ?? "",
   })
   await d1Query(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes, source_url,
-       owner_user_id, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, shared_with, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
       v.accountId,
       v.title,
       summary,
-      v.body,
-      byteLength(v.body),
+      body,
+      byteLength(body),
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id`, reused rather than
+      // recomputed — 0073's tenth Vectorize label, written truthfully now on
+      // every path that knows the answer (the owner's ruling, 12 Sep 2026).
+      // NOTHING READS THIS AS A FENCE — see IngestRow.sharedWith's own header.
+      v.privateToMe ? "private" : "agency",
       v.visibleToAppId,
       JSON.stringify(accountsFiled.map((a) => a.id)),
       JSON.stringify(appsFiled.map((a) => a.id)),
@@ -1418,7 +1572,7 @@ export async function createSource(
     relatedTable: "knowledge_sources",
     relatedRowId: id,
   })
-  return id
+  return { id, read, refusedBecause }
 }
 
 /** How big a piece of material really is, measured the way the database
@@ -1478,6 +1632,28 @@ export async function createFileSource(
   // search may ADMIT).
   const accountsFiled = await Promise.all(accountIds.map((aid) => requireAccount(cfg, guard, aid)))
   const appsFiled = await Promise.all(appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
+  // R68 IDENTITY, FINALLY WIRED IN. `uploadIdentity()` has existed since the
+  // identity rebuild and was never called from here — every INSERT below left
+  // `origin_table`/`origin_row_id` NULL, so the same file uploaded twice made
+  // two rows, silently (tracker b-upload-dup). "An upload IS its bytes" — its
+  // own header — so a file with no readable text has nothing to be identical
+  // BY, and is deliberately left uncompared here rather than colliding every
+  // unreadable file with every other one on the hash of an empty string.
+  const identity = input.extract.text ? uploadIdentity(contentHash(input.extract.text)) : null
+  if (identity) {
+    const dupe = await d1Query<{ id: string; title: string; created_at: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id, title, created_at FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ? LIMIT 1`,
+      [identity.originTable, identity.originRowId]
+    )
+    if (dupe[0])
+      throw new GuardError(
+        409,
+        "already_in_library",
+        `"${dupe[0].title}" is already in the library, added on ${dupe[0].created_at.slice(0, 10)}. Nothing new was saved.`
+      )
+  }
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1493,13 +1669,15 @@ export async function createFileSource(
   await d1Query(
     cfg,
     guard.databaseId,
-    `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes,
+    `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
-       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
+       owner_user_id, shared_with, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
        accounts, apps)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
+      identity?.originTable ?? null,
+      identity?.originRowId ?? null,
       compartment,
       input.accountId,
       input.title,
@@ -1512,6 +1690,9 @@ export async function createFileSource(
       input.file.bytes,
       input.extract.note,
       input.privateToMe ? guard.userId : null,
+      // THE SAME BOOLEAN THAT JUST SET `owner_user_id` — see createSource's
+      // own comment beside the identical line.
+      input.privateToMe ? "private" : "agency",
       visibleToAppId,
       now,
       now,
@@ -1590,6 +1771,16 @@ export async function updateSource(
   // the stored body alone rather than writing an excerpt over the document.
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
   const owner = v.privateToMe ? guard.userId : null
+  // THE SAME BOOLEAN, reused rather than recomputed — 0073's tenth Vectorize
+  // label, written truthfully now on every path that knows the answer (the
+  // owner's ruling, 12 Sep 2026). A SEVENTH path beyond the six the census
+  // named: an existing note or file's privacy toggled here would otherwise
+  // leave `shared_with` describing the value it had on CREATE, silently wrong
+  // from the moment anyone edits the very field it is supposed to echo. Not
+  // written on the MIRRORED branch below, for the identical reason `owner`
+  // is not: the ingest sweep owns that column for a mirrored source and would
+  // overwrite this on its next tick regardless — see the comment above.
+  const sharedWith = v.privateToMe ? "private" : "agency"
   // WHO MAY READ IT is one decision with three answers, and the ACCOUNT/APP half
   // of it is editable on all three families — a MIRRORED source's filing is
   // exactly the thing that stays editable when its words do not, and limiting a
@@ -1627,7 +1818,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
-         owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
+         owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1635,6 +1826,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,
@@ -1650,7 +1842,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, body = ?, body_bytes = ?, summary = ?, source_url = ?,
-         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
+         account_id = ?, compartment = ?, owner_user_id = ?, shared_with = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
          updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1661,6 +1853,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        sharedWith,
         visibleToApp,
         accountsJson,
         appsJson,
@@ -2427,6 +2620,33 @@ export function isVectorizeRateLimited(e: unknown): boolean {
   return message.includes("code = 40041") || /too many requests/i.test(message)
 }
 
+/** THE SAME SENTENCE `isVectorizeRateLimited` SAYS, IN SQL — because the
+ * counter was written under an older rule and the rows it parked are still
+ * parked.
+ *
+ * `indexOneSource` stopped advancing `embed_attempts` on a Vectorize 429 the
+ * day that was understood: a burst of 429s is a fact about the INFRASTRUCTURE
+ * at that instant, never about any one document. But rows that reached
+ * `EMBED_ATTEMPT_CAP` BEFORE that change are sitting at the cap with a rate
+ * limit recorded as the reason — and the revisit pass selects
+ * `embed_attempts < EMBED_ATTEMPT_CAP`, so it skips them. For ever. Their text
+ * will not change (they are mirrors of a story and a task nobody is editing),
+ * which is the only other thing that clears the counter.
+ *
+ * MEASURED ON STAGING, 14 Sep 2026: exactly two, a 342-character story and a
+ * 97-character task, both `VECTOR_DELETE_ERROR (code = 40041): Too Many
+ * Requests`, both at `embed_attempts = 5`. I told the owner they were "queued,
+ * not abandoned". They were abandoned, and nothing in the app would ever have
+ * said so — a permanently-skipped row looks exactly like a row whose turn has
+ * not come.
+ *
+ * So the cap is lifted for exactly the failure that was never supposed to
+ * count toward it. The two spellings are kept beside each other deliberately:
+ * `isVectorizeRateLimited` reads a thrown Error, this reads the string that
+ * error was SAVED as, and a test asserts the same message satisfies both. */
+export const RATE_LIMITED_ERROR_SQL =
+  "(index_error LIKE '%code = 40041%' OR LOWER(index_error) LIKE '%too many requests%')"
+
 /** THE ONE EXPRESSION THAT DECIDES "IS THIS SOURCE ACTUALLY BROKEN" —
  * measured against the raw `index_error IS NOT NULL` count and found to
  * overstate it roughly twelve to one (38 raw vs. 3 real, staging, 11 Sep
@@ -2502,8 +2722,13 @@ export async function revisitUnhealthySources(
     cfg,
     guard.databaseId,
     // R14: bounded by INDEX_REVISIT_LIMIT.
+    // THE CAP, EXCEPT FOR THE FAILURE THAT WAS NEVER A REASON — see
+    // `RATE_LIMITED_ERROR_SQL`. A row at the cap whose recorded error is a
+    // Vectorize 429 got there under the old rule, and no amount of waiting
+    // un-parks it.
     `SELECT id FROM knowledge_sources
-      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL}) AND embed_attempts < ${EMBED_ATTEMPT_CAP}
+      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL})
+        AND (embed_attempts < ${EMBED_ATTEMPT_CAP} OR ${RATE_LIMITED_ERROR_SQL})
       ORDER BY updated_at ASC LIMIT ${limit}`
   )
   let recovered = 0
@@ -2589,8 +2814,11 @@ export type CompartmentChoice = {
   reason: string
   /** the records this question looks like it is about, best first. It rides the
    * ANSWER and never the ranking (see §3 in the header) — a wrong guess here is
-   * something a reader can disagree with, not something that hid the passage. */
-  records: { sourceId: string; title: string }[]
+   * something a reader can disagree with, not something that hid the passage.
+   * `recordPath` reuses the SAME resolver a passage's own citation does, so a
+   * caller handed one of these is never stuck holding a knowledge-source id
+   * that no other door recognises. */
+  records: { sourceId: string; title: string; recordPath: string | null }[]
   /** c-hijack (A3). Present ONLY when the narrow came from a single
    * FRAGILE collapsed token (`accountsNamedIn`'s own flag) — never from an
    * alias/code match, never from a multi-token match, never from standing on
@@ -2687,10 +2915,10 @@ async function deriveRoute(
   // handed them over in whatever order the database returned, so "best first" —
   // which is what the sentence claims — was a coincidence of row order.
   const ids = near.map((h) => h.id.replace(/:summary$/, ""))
-  const titles = await sourceTitles(cfg, guard, ids)
+  const found = await sourceTitles(cfg, guard, ids)
   const records = ids.flatMap((sourceId) => {
-    const title = titles.get(sourceId)
-    return title ? [{ sourceId, title }] : []
+    const row = found.get(sourceId)
+    return row ? [{ sourceId, title: row.title, recordPath: row.recordPath }] : []
   })
   return {
     ...choice,
@@ -2745,81 +2973,69 @@ async function sourceTitles(
   cfg: D1Rest,
   guard: MemberGuard,
   ids: string[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, { title: string; recordPath: string | null }>> {
   if (!ids.length) return new Map()
   const owner = readerClause(guard)
-  const rows = await d1Query<{ id: string; title: string }>(
+  const rows = await d1Query<{
+    id: string
+    title: string
+    origin_table: string | null
+    origin_row_id: string | null
+    compartment: string
+  }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: `ids` is at most ROUTER_TOP_RECORDS, and the LIMIT says so
     // at the statement. The ids are ULIDs this worker wrote and read back, never
     // anything off a request, so they are interpolated like every other
     // server-owned value (CONVENTIONS) and the statement binds one parameter.
-    `SELECT id, title FROM knowledge_sources
+    //
+    // `origin_table`/`origin_row_id`/`compartment` ride this read for the same
+    // reason they ride `toPassage`'s (§ above `recordPath`): a `records` row
+    // names a knowledge SOURCE, in a namespace no other door recognises, and
+    // without these three columns the caller has no way to tell the two apart.
+    `SELECT id, title, origin_table, origin_row_id, compartment FROM knowledge_sources
       WHERE id IN (${ids.map((id) => sqlString(id)).join(", ")}) AND ${owner.sql} AND deactivated_at IS NULL
       LIMIT ${ROUTER_TOP_RECORDS}`,
     owner.params
   )
-  return new Map(rows.map((r) => [r.id, r.title]))
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      { title: r.title, recordPath: recordPath(r.origin_table, r.origin_row_id, r.compartment) },
+    ])
+  )
 }
 
 /** IS THIS TOKEN RARE ENOUGH TO NAME AN ACCOUNT ON ITS OWN — c-hijack, 11 Sep
- * 2026. This USED to ask the same question `EXACT_TERM_MAX_CHUNKS` answers for
- * the lexical arm's rare-token bypass, on the theory that one number could
- * serve two questions. It could not: `EXACT_TERM_MAX_CHUNKS` (100) was
- * measured against DIGIT-BEARING reference terms — ticket numbers, years — a
- * population where "how many chunks mention this" tracks "how distinctive is
- * this" reasonably well. Account-name tokens are ORDINARY WORDS, and that
- * correlation does not hold: measured against every one of the 26 staging
- * accounts whose canonical name collapses to a single surviving token —
- *
- *     0  Natalya · Sadia · Sandra (person accounts, no material yet)
- *     1  bergman   ← Bergman S.A.        — an ordinary surname, HIJACKS
- *     2  klaus, 5 manuel, 7 markus (person accounts)
- *    35  green     ← re-green            — an ordinary word, HIJACKS
- *    56  pickl     ← Pickl               — UNCERTAIN, see below
- *    72  demo      ← DEMO                — an ordinary word, HIJACKS
- *    79  solutions ← VU Solutions        — an ordinary word, HIJACKS (KB-AUDIT §4.2)
- *   106  larissa   ← Larissa Grün        — a rare surname, safe
- *   115  aws       ← aWs                 — a common tech acronym, LIKELY HIJACKS
- *   115  nareyka   ← Björn Nareyka       — a rare surname, safe
- *   116+ looom, safety4you, 196+, PLATINUM, fluclinic, assecuranz,
- *        amstella, padelbase, kwapso, confia, hogo, alaap — brand names and
- *        real client names, all safe, up to 4,860 (the owner's own name)
- *
- * — no single ceiling separates every hijack from every safe name. "aws" and
- * "nareyka" tie at 115: one is a common acronym, the other a rare surname,
- * and corpus frequency cannot tell them apart. PLATINUM (246, an ordinary
- * word) sits BELOW several genuinely safe real client names. This ceiling is
- * therefore set to close the THREE proven cases (green, demo, solutions — all
- * ≥35) while preserving every person-account name measured (≤7) — bergman (1)
- * is not closeable by any positive threshold, and "aws"/"platinum" are not
- * closeable without also excluding legitimately safe, higher-count real
- * client names. Both are named, tracked residuals (c-hijack's own report),
- * not silently accepted. Pickl (56) falls on the excluded side as an HONEST
- * side effect — its own count is high enough to look exactly like the
- * three proven hijacks from corpus frequency alone, and nothing here can
- * tell whether that is coincidence or the same defect wearing a fourth name;
- * see the same report before assuming either way.
- *
- * UNFENCED (whole-team chunk count over FTS5), because this runs BEFORE the
- * compartment is known — narrowing to a compartment is the very question
- * this function exists to answer. */
-const ACCOUNT_TOKEN_MAX_CHUNKS = 30
-
-async function isRareAccountToken(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
-  const rows = await d1Query<{ n: number }>(
-    cfg,
-    guard.databaseId,
-    "SELECT COUNT(*) AS n FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?",
-    [`"${term}"`]
-  )
-  return (rows[0]?.n ?? 0) <= ACCOUNT_TOKEN_MAX_CHUNKS
-}
+ * 2026, moved to `@shared/workers/account-rarity` (0085, c-hijack B) so the
+ * account write door can reuse the SAME check rather than a second one hand-
+ * copied beside it: a declared `alt_names` spelling on a common word is exactly
+ * as dangerous as an undeclared single-token name, and it needs the same
+ * rarity floor before `name_narrows_alone` is allowed to bypass it. The full
+ * measured distribution and why one ceiling cannot close every case (Bergman
+ * at 1 chunk; "aws"/"platinum"-shaped ties with safe names) lives on
+ * `ACCOUNT_TOKEN_MAX_CHUNKS` at its new home. */
 
 /** The account a question names, or null. Reads `knowledge_names` (0073)
  * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
  *
+ * NAMED VIA A CONTACT NOW TOO (a-names, 12 Sep 2026): `knowledge_names` holds
+ * `kind = 'contact'` rows whose `ref_id` is the LINKED COMPANY's account id,
+ * never the contact's own — so a contact resolves through the exact same
+ * code below as an account does, no second path. COLLEAGUES are deliberately
+ * NOT here: every real colleague's name clears `ACCOUNT_TOKEN_MAX_CHUNKS` by
+ * two to three orders of magnitude (they are who the whole corpus is ABOUT),
+ * so there is no ceiling that admits one without also admitting "green" or
+ * "demo" — and a colleague has no single compartment to narrow to anyway
+ * (their own profile files under the agency compartment; the meetings they
+ * are actually in are filed under whichever CLIENT compartment each one
+ * belongs to, so narrowing to the agency would hide every one of them).
+ * `nameArm` already reaches colleagues correctly, at the chunk level, inside
+ * whichever compartment the router picked by other means — see its own
+ * header.
+ *
+
  * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
  * "DEMO" → "demo" — 26 of 134 staging accounts have a canonical name that
  * collapses to ONE surviving token (`tokenise` drops short words and shatters
@@ -2886,9 +3102,15 @@ export async function accountsNamedIn(
 ): Promise<{ id: string; name: string; fragile: boolean }[]> {
   const terms = questionTerms(question, 8)
   if (!terms.length) return []
-  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
+  const clauses = terms.map(() => `LOWER(kn.name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
-  const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
+  const candidates = await d1Query<{
+    kind: string
+    ref_id: string
+    name: string
+    alias_of: string | null
+    name_narrows_alone: number
+  }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: NAMED_ACCOUNTS_CAP × 2, not NAMED_ACCOUNTS_CAP itself — a
@@ -2901,9 +3123,20 @@ export async function accountsNamedIn(
     // below (a token-subset check, a rarity check), so fetching exactly the
     // target count would silently under-fill again the first time one
     // candidate failed to confirm.
-    `SELECT ref_id, name, alias_of FROM knowledge_names
-      WHERE kind = 'account' AND (${clauses.join(" OR ")})
-      ORDER BY LENGTH(name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
+    //
+    // JOINED against `accounts` for `name_narrows_alone` (0085, c-hijack B) —
+    // `knowledge_names.ref_id` is always an `accounts.id`, on BOTH kinds this
+    // reads now: an account row names itself, and a contact row (a-names)
+    // names the COMPANY it is linked to (`rebuildNameIndex`'s own header says
+    // why — nothing is ever indexed under a contact's own individual-account
+    // id). No schema change to `knowledge_names` itself: the flag lives once,
+    // on the account it declares something about, and is read at match time
+    // rather than denormalised into a table `rebuildNameIndex` fully deletes
+    // and reinserts on every run.
+    `SELECT kn.kind, kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
+       FROM knowledge_names kn JOIN accounts a ON a.id = kn.ref_id
+      WHERE kn.kind IN ('account', 'contact') AND (${clauses.join(" OR ")})
+      ORDER BY LENGTH(kn.name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
     params
   )
   const asked = new Set(terms)
@@ -2925,11 +3158,29 @@ export async function accountsNamedIn(
   const seen = new Set<string>()
   const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
-    // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
-    // no token-count/rarity gate. `alias_of` carries the canonical name back.
-    // NEVER fragile (c-hijack A3's own boundary): a code is a deliberate,
-    // declared handle, and a search that finds nothing under it is a real
-    // answer about that account, not a bad guess to retry past.
+    // A DENY (c-hijack B's second half) BEATS EVERYTHING BELOW, INCLUDING
+    // AN ALIAS/CODE MATCH. The spec error this closes: the ALLOW half of
+    // `name_narrows_alone` is an `OR` against the rarity gate, so it can only
+    // ever ADD a narrow — it does nothing for an already-rare name like
+    // Bergman S.A.'s surname (1 chunk, well under the ceiling, narrows on
+    // rarity alone regardless of the flag). A person saying "this word must
+    // NOT narrow alone" needs the opposite shape: checked FIRST, before the
+    // alias branch even asks whether this row has a code, or the same
+    // declared spelling that made the alias branch fire in the first place
+    // would still let it through.
+    //
+    // `kind === "account"` GUARDS THIS TOO (a-names). The flag is the
+    // COMPANY's own declaration about the COMPANY's own name — a contact
+    // filed under a company that has declared its own name unsafe to narrow
+    // on has said nothing at all about whether ITS employee's surname is
+    // safe, so a contact row is never blocked by a deny it never made either.
+    if (c.kind === "account" && c.name_narrows_alone === 2) continue
+    // AN ALIAS ROW (today, the account's code or a declared `alt_names`
+    // spelling) — exact match or nothing, no token-count/rarity gate.
+    // `alias_of` carries the canonical name back. NEVER fragile (c-hijack
+    // A3's own boundary): a code is a deliberate, declared handle, and a
+    // search that finds nothing under it is a real answer about that
+    // account, not a bad guess to retry past.
     if (c.alias_of) {
       if (asked.has(c.name.toLowerCase()) && !seen.has(c.ref_id)) {
         seen.add(c.ref_id)
@@ -2950,7 +3201,25 @@ export async function accountsNamedIn(
       continue
     }
     // THE COLLAPSED CASE — one surviving token, held back for the second pass.
-    if (await isRareAccountToken(cfg, guard, nameTerms[0])) {
+    // `name_narrows_alone = 1` (ALLOW) bypasses the RARITY gate exactly as
+    // `code` bypasses it above — a person decided, so corpus frequency stops
+    // being the question — but NOT the second pass below: a declared token
+    // shared by two accounts is still evidence about the WORD, not either
+    // company, so A2 still resolves it to neither, whatever either declares.
+    // Short-circuited so a declared account never pays for the FTS rarity
+    // query at all. (`=== 2`, DENY, already `continue`d above this line.)
+    //
+    // `kind === "account"` GUARDS THE ALLOW TOO (a-names), the same way it
+    // guards the DENY above: the flag lives on the COMPANY's own row and says
+    // the COMPANY's canonical name is safe (or unsafe) — it says nothing
+    // about whether one of that company's CONTACTS' names is, so a contact
+    // row never reads it either way and always pays for the live rarity
+    // check. Nobody has ever been asked to declare a person's name safe, and
+    // this is not the door that invents that decision for them.
+    if (
+      (c.kind === "account" && c.name_narrows_alone === 1) ||
+      (await isRareAccountToken(cfg, guard, nameTerms[0]))
+    ) {
       const token = nameTerms[0]
       const list = pendingByToken.get(token) ?? []
       list.push({ id: c.ref_id, name: c.name })
@@ -3022,13 +3291,135 @@ export async function accountsNamedIn(
  * reinserting is simpler than an upsert keyed on `(kind, ref_id, name)` —
  * which cannot express a RENAME, because the old name is part of the key an
  * upsert would leave behind as an orphan row. */
+/** One row this rebuild writes to `knowledge_names` — hoisted out of the
+ * function itself so `contactNameRows` can build the same shape. */
+type NameRow = {
+  id: string
+  kind: string
+  ref_id: string
+  name: string
+  alias_of: string | null
+  compartment: string
+}
+
+/** CONTACTS INTO THE NAME INDEX (a-names, 12 Sep 2026) — the same protection
+ * account names already have, extended to the individual people linked to a
+ * client company (`account_links`; "contact" is a role on that link, not an
+ * account_type — see the table's own header comment).
+ *
+ * REF_ID IS THE COMPANY, NEVER THE CONTACT'S OWN ID. Measured before this was
+ * written: 119 `knowledge_sources` are filed under an individual account, and
+ * all five of their chunks are notification emails on one QA fixture
+ * ("Alaap Kanchwala (portal test 1)") — against 3,235 sources filed under
+ * entity accounts. Nothing is ever indexed under a real contact's own id, so
+ * a compartment built from it would search a client's material and find none
+ * of it. Every row here carries the LINKED company's account id instead, so
+ * `accountsNamedIn` needs no separate path to read it — it is the same
+ * `kind`/`ref_id` shape an account row already has.
+ *
+ * ONE PERSON, MORE THAN ONE COMPANY — SKIPPED, NOT FANNED OUT. Two of the
+ * team's distinct contacts are linked to two different companies each (one is
+ * a c-hijack test fixture: "Marta Ruiz", filed under both "Bergman S.A." and
+ * "Bergmann GmbH"). A name that resolves to more than one company is evidence
+ * about the coincidence, not about either company — seeding it under either
+ * would narrow a search to a confidently WRONG client, so a contact linked to
+ * more than one company is not seeded at all, the same safe direction the
+ * single-collapsed-token ambiguity check in `accountsNamedIn` already takes.
+ *
+ * TWO ROWS PER SAFE CONTACT, NEVER THREE. The full "First Last" name rides
+ * the SAME multi-token bypass an account's two-word name already gets — two
+ * specific words together is not a coincidence, so no rarity check runs for
+ * it at all. The SURNAME ALONE gets a second row, but ONLY when it clears the
+ * live rarity check — never the free `name_narrows_alone` bypass (see
+ * `accountsNamedIn`'s own comment on why a contact never reads it: that flag
+ * describes the COMPANY's own name, not one of its contacts'). The FIRST NAME
+ * ALONE is never seeded, on purpose: it is the single most dangerous shape
+ * measured (Mark, Max, Alex, Peter — ordinary English words at 16 to 624
+ * chunks each on real staging), and the full name plus a rarity-gated surname
+ * already answers every question shape a person would actually ask.
+ *
+ * TOKENISE DECIDES WHAT SURVIVES, NOT A GUESS. A name part shorter than 3
+ * characters or holding a non-ASCII letter can collapse or vanish entirely
+ * (`tokenise`'s own rule — "Björn" survives as nothing at all); this reads
+ * `tokenise(fullName)` before deciding what to seed, exactly as an account's
+ * collapsed name is read, rather than assuming the written name is what a
+ * question would ever match.
+ *
+ * QA FIXTURES EXCLUDED BY NAME. The "(portal test N)" rows exist to exercise
+ * the portal's own account-switcher, not to be found by a question — seeded,
+ * they would teach the index to answer a real question about "Alaap
+ * Kanchwala" out of a notification-email fixture. */
+async function contactNameRows(cfg: D1Rest, guard: MemberGuard): Promise<NameRow[]> {
+  const links = await d1Query<{ person_id: string; person_name: string; company_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by how many contacts this team holds.
+    `SELECT p.id AS person_id, p.name AS person_name, al.account_id AS company_id
+       FROM account_links al
+       JOIN accounts p ON p.id = al.person_account_id
+       JOIN accounts c ON c.id = al.account_id
+      WHERE al.deactivated_at IS NULL AND p.deactivated_at IS NULL AND c.deactivated_at IS NULL
+        AND p.name IS NOT NULL
+      LIMIT 2000`
+  )
+  const byPerson = new Map<string, { name: string; companies: Set<string> }>()
+  for (const l of links) {
+    const entry = byPerson.get(l.person_id) ?? { name: l.person_name, companies: new Set<string>() }
+    entry.companies.add(l.company_id)
+    byPerson.set(l.person_id, entry)
+  }
+
+  const rows: NameRow[] = []
+  for (const { name, companies } of byPerson.values()) {
+    if (companies.size !== 1) continue
+    if (/\(portal test/i.test(name)) continue
+    const companyId = [...companies][0]
+    const compartment = accountCompartment(companyId)
+    const tokens = [...tokenise(name).keys()]
+    if (tokens.length >= 2) {
+      rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name, alias_of: null, compartment })
+      // The SURNAME — the LAST surviving token, per the steer that a surname
+      // is far more often rare than a first name. Rarity-checked here, at
+      // seed time, so a name that fails it is not written at all rather than
+      // written and refused on every read.
+      const surname = tokens[tokens.length - 1]
+      if (await isRareAccountToken(cfg, guard, surname))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: surname, alias_of: null, compartment })
+    } else if (tokens.length === 1) {
+      // A genuinely single-word identity (no surname on file) — the same
+      // treatment a collapsed account name already gets: seeded only if the
+      // one surviving token clears the rarity gate.
+      if (await isRareAccountToken(cfg, guard, tokens[0]))
+        rows.push({ id: ulid(), kind: "contact", ref_id: companyId, name: tokens[0], alias_of: null, compartment })
+    }
+    // tokens.length === 0: tokenise() kept nothing (e.g. every part under 3
+    // characters) — nothing safe to seed, and nothing seeded.
+  }
+  return rows
+}
+
 export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
   const accounts = await d1Query<{ id: string; name: string; code: string | null; alt_names: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: bounded by how many accounts this team holds — an
     // agency's own client roster, not a growing log.
-    "SELECT id, name, code, alt_names FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+    //
+    // `account_type = 'entity'` ONLY (a-names, 12 Sep 2026) — a REAL bug this
+    // change found rather than assumed fixed: this query had no such filter
+    // since 0073, so every INDIVIDUAL account (every contact) was already
+    // seeded here too, as an ordinary `kind = 'account'` row whose compartment
+    // was built from the CONTACT'S OWN id — a compartment nothing is ever
+    // filed under (see `contactNameRows`'s own header: 119 sources filed under
+    // an individual account, all five real chunks one QA fixture's own
+    // notification emails). A full "First Last" contact name is two tokens,
+    // which bypasses rarity unconditionally, so this fired on every question
+    // naming a contact by their full name — narrowing to a compartment
+    // guaranteed to hold nothing, silently rescued only by A3's retry when the
+    // narrow found nothing. `contactNameRows` is the real, correct route for
+    // this population now (`kind = 'contact'`, `ref_id` = the LINKED company),
+    // so a contact's own individual-account row has no business here at all.
+    "SELECT id, name, code, alt_names FROM accounts WHERE account_type = 'entity' AND deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
   const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
     cfg,
@@ -3036,14 +3427,6 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
     "SELECT id, name, account_id FROM apps WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
 
-  type NameRow = {
-    id: string
-    kind: string
-    ref_id: string
-    name: string
-    alias_of: string | null
-    compartment: string
-  }
   const rows: NameRow[] = []
   for (const a of accounts) {
     if (!a.name) continue
@@ -3070,6 +3453,7 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
       compartment: app.account_id ? accountCompartment(app.account_id) : AGENCY_COMPARTMENT,
     })
   }
+  for (const c of await contactNameRows(cfg, guard)) rows.push(c)
 
   const now = new Date().toISOString()
   await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_names")
@@ -3100,7 +3484,7 @@ export function knowledgeAnswer(input: {
   reason: string
   /** what the record summaries said this question is about. Evidence for the
    * reader, never an input to the ranking (§3). */
-  records: { sourceId: string; title: string }[]
+  records: { sourceId: string; title: string; recordPath: string | null }[]
   passages: KnowledgePassage[]
   candidates: number
   /** what the live rows say RIGHT NOW about the records being cited — see
@@ -3532,27 +3916,52 @@ async function recencyArm(
   kinds: string[] | null
 ): Promise<CandidateRow[]> {
   const owner = ownerClause(guard)
-  const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
-  const params: string[] = [...owner.params]
-  if (compartments.length) {
-    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
-    params.push(...compartments)
-  }
   // INTERPOLATED, NOT BOUND — matching `retrieve`'s own `chipClause` a few
   // lines below, which reads this exact list the same way: a source chip key
   // resolves through `kindsForChips` against `SOURCE_CHIP_KEYS`, a fixed,
   // code-declared vocabulary (shared/knowledge-chips.ts), never free text off
   // a request. Two spellings of "bind one per element" for the same
   // server-controlled list would be a second convention for the same fact.
-  if (kinds?.length) where.push(`kind IN (${kinds.map((k) => sqlString(k)).join(", ")})`)
-  const sources = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    // R14 hard cap: RECENCY_TOP_K, said here.
-    `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}
-      ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
-    params
-  )
+  const kindClause = kinds?.length ? ` AND kind IN (${kinds.map((k) => sqlString(k)).join(", ")})` : ""
+  // ONE COMPARTMENT AT A TIME — kb tag-diagnosis, 12 Sep 2026. This used to
+  // take RECENCY_TOP_K over the UNION of every searched compartment, and a
+  // client-named question always searches `[account:X, agency]` together
+  // (`deriveCompartment`'s own comment). `agency` is shared by EVERY client
+  // question and carries far more traffic than any one client's material —
+  // measured live: the newest 8 across `[account:HOGO, agency]` and the
+  // newest 8 across `[account:Padelbase, agency]` were THE IDENTICAL 8 ROWS,
+  // every one of them `agency`, every one dated the same day, because
+  // `agency`'s own volume fills an 8-row window before the account side ever
+  // gets a turn. Not a ranking flaw — a STARVATION one: a person asking
+  // "what's the latest on HOGO" got this morning's chat mirrors instead of
+  // HOGO's own material, every time, and the answer looked plausible enough
+  // that nobody would have reported it as a bug. Taking the newest
+  // `RECENCY_TOP_K` PER compartment (never a global cap moved instead) means
+  // the account side always gets its own share of the window regardless of
+  // how much `agency` traffic exists alongside it. `compartments.length ? … :
+  // [null]` — a null compartment means "no filter, search everything", the
+  // question-names-nobody case, and asking it once with no filter is
+  // BYTE-FOR-BYTE the query this function already ran for that case before
+  // this change; nothing about that shape moves. */
+  const sources: { id: string }[] = []
+  for (const compartment of compartments.length ? compartments : [null]) {
+    const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
+    const params: string[] = [...owner.params]
+    if (compartment !== null) {
+      where.push("compartment = ?")
+      params.push(compartment)
+    }
+    const rows = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap: RECENCY_TOP_K, said here — per compartment, not overall,
+      // which is the whole point; see the comment above.
+      `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}${kindClause}
+        ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
+      params
+    )
+    sources.push(...rows)
+  }
   if (!sources.length) return []
   // THE FIRST CHUNK OF EACH — a source's opening piece is its best single
   // representative when nothing else is narrowing which paragraph matters,
@@ -4021,6 +4430,13 @@ export async function retrieve(
      * safe to expose unjudged. See the point this is used in the function
      * body, and `knowledge-reader.ts`'s own header, for the whole argument. */
     read?: (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
+    /** DO NOT WRITE A REFUSAL ROW if this call refuses — for a PROVISIONAL
+     * first pass, where a refusal is not yet a refusal but a reason to look
+     * again. Without it one refused question writes TWO rows to
+     * `knowledge_refusals` and doubles the count on the screen that exists to
+     * make refusals arguable. The deciding pass logs normally, so every path
+     * still logs exactly once. */
+    quiet?: boolean
   }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
@@ -4194,7 +4610,7 @@ export async function retrieve(
     // retried and STILL found nothing, `route` above is already the wide one
     // and its reason already says so — this refusal describes exactly what
     // was tried, not just the last attempt.
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
+    if (!input.quiet) await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
     return knowledgeAnswer({
       question,
       compartments: route.compartments,
@@ -4386,7 +4802,7 @@ export async function retrieve(
   // genuinely holds nothing" apart from "something was close" — logged with
   // the FUSED candidates rather than the (empty, by construction) `passages`.
   if (!decided.found)
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
+    if (!input.quiet) await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
   if (!input.compose || !decided.found) return decided
   const written = await input.compose(decided.passages, decided.citations)
   // Nothing written (the model was unreachable, or said nothing) is not an error:
@@ -4897,4 +5313,34 @@ async function crossCheck(
     })
   )
   return out
+}
+
+/** THE SECOND LOOK'S WHOLE DECISION, in one function, because the alternative
+ * was a test that MIRRORS this logic rather than runs it — and a mirror keeps
+ * passing for ever after the thing it mirrors has changed
+ * (.session-notes/lanes/NOTE-a-mock-cannot-fail-the-way-the-real-thing-fails.md,
+ * three instances recorded). It lives here rather than beside its one caller
+ * because R23 forbids a ROUTE file assembling an answer, and a route naming
+ * `found` is how that check reads "assembling".
+ *
+ * Three rules, and the third is the one with teeth:
+ *   • an answer that was found stands, and the retry never runs — a question
+ *     that already works costs exactly what it cost before;
+ *   • a second look that also finds nothing leaves the FIRST refusal in place,
+ *     rather than inventing a third shape;
+ *   • a second look that THROWS leaves the first refusal in place too. A role
+ *     without the assistant right cannot spend a unit; turning "we have nothing
+ *     on that" into an error page for that person would be a worse failure than
+ *     the one this exists to fix. */
+export async function secondLook<T extends { found: boolean }>(
+  first: T,
+  retry: () => Promise<T>
+): Promise<T> {
+  if (first.found) return first
+  try {
+    const again = await retry()
+    return again.found ? again : first
+  } catch {
+    return first
+  }
 }

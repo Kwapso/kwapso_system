@@ -160,8 +160,23 @@ function checkValue(field: QueryField, op: QueryOp, raw: unknown, index: number)
   // a seven-value lifecycle is told the seven rather than handed nothing back. A
   // TEAM-EDITED vocabulary is NOT checked here: those words belong to the team
   // and change without a deploy, so the honest answer to a wrong one is no rows.
-  if (field.type === "enum" && field.values && op !== "contains" && !field.values.includes(value))
-    bad(`"${value}" isn't a ${field.name}. It is one of: ${field.values.join(", ")}.`)
+  //
+  // CAPITALISATION IS NOT A WRONG ANSWER. Measured on staging, 2026-09-13: asked
+  // "how many total open tickets (to be triaged) are there?", the model filtered
+  // `status = "New"` and was refused with the seven values — six of which it had
+  // just been shown, in lower case, by the refusal itself. It had read the word
+  // off the SCREEN, where the same value is drawn `New` because that is how a
+  // status is written for a person, and a model composing a sentence capitalises
+  // what a sentence capitalises. The list is the dictionary either way: matching
+  // it case-insensitively cannot invent a value, it can only recognise one, and
+  // what goes on to the statement is the DECLARED spelling, never the caller's.
+  // (A declared list holding two values that differ only in case would make this
+  // ambiguous; `query-vocabulary.test.ts` asserts no fixed enum in the app does.)
+  if (field.type === "enum" && field.values && op !== "contains") {
+    const declared = field.values.find((v) => v.toLowerCase() === value.toLowerCase())
+    if (!declared) bad(`"${value}" isn't a ${field.name}. It is one of: ${field.values.join(", ")}.`)
+    return declared as string
+  }
   if (field.type === "date") return dateBound(value, edgeFor(op, index))
   return value
 }
@@ -171,11 +186,66 @@ function checkValue(field: QueryField, op: QueryOp, raw: unknown, index: number)
  * letting one filter turn into a scan of a whole row. */
 const FIELDS_PER_CLAUSE = 5
 
+/** THE POSITIONAL TUPLE, ACCEPTED AS THE UNAMBIGUOUS EQUIVALENT of the declared
+ * `{field, op, value}` object.
+ *
+ * Measured on staging, 2026-09-13: asked "how many total open tickets... avg per
+ * account and per app", the model sent three filters — each a bare
+ * `[field, op, value]` — and every one was refused with "Each filter must be an
+ * object like {field, op, value}." The model then diagnosed its own mistake out
+ * loud ("the filters I sent weren't in the right shape... let me run them again
+ * properly") and the turn still ended with nothing, because the shape it reaches
+ * for on its own was never accepted.
+ *
+ * There is no ambiguity to protect against: a clause has exactly three possible
+ * parts (field, op, value) and a VALUELESS op (isNull/notNull) has exactly two,
+ * so a 2- or 3-element array maps onto them one for one. Refusing an
+ * unambiguous, obviously-intended shape costs a whole turn for nothing the
+ * caller could have been more precise about — `tool-catalog.ts`'s schema now
+ * teaches the object shape structurally (an `items` object with `field`/`op`),
+ * and this is the belt beside those suspenders for a model that sends the tuple
+ * anyway. */
+function normaliseClauseShape(raw: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > 3) return null
+  const [field, op, value] = raw
+  return raw.length === 2 ? { field, op } : { field, op, value }
+}
+
+/** THE REFUSAL SAYS THE FIELDS, rather than sending the caller to go and ask.
+ *
+ * Measured on staging, 13 Sep 2026, on the owner's own question ("who has triaged
+ * the maximum number of tickets? show me a graph by month"). The assistant called
+ * describe_module, read the answer, filtered `triagedById`, and got back
+ *
+ *   "triagedById" isn't a field here. Call describe_module to see what is.
+ *
+ * — so it called describe_module again. That call was a byte-identical repeat, so
+ * the agent answered it from its own cache, which is correct and which changed
+ * nothing: the model had the same words in front of it and guessed a second name,
+ * `assignedTo`, which is also not a field. Seven of the turn's twelve steps went
+ * on that circuit and the turn ended with no answer.
+ *
+ * The refusal had the list in its hand the whole time. `mod.fields` is right
+ * there — the same array describe_module reads — and printing it turns a round
+ * trip into a correction the model can act on in the same breath. Exactly the
+ * shape of `unknownModule` above, which was written for the same fault one level
+ * up, and of the status refusal beside it, which already named its seven values.
+ *
+ * NOT A WIDENING: it names what a caller with this module's read right may
+ * already ask describe_module for, and nothing else. Bulky columns included —
+ * they are askable, they are simply not in the default projection. */
+function unknownField(mod: QueryModule, asked: string): never {
+  return bad(
+    `"${asked}" isn't a field here. The fields are: ${mod.fields.map((f) => f.name).join(", ")}.`
+  )
+}
+
 /** One filter, checked end to end. */
 function parseClause(mod: QueryModule, raw: unknown): ParsedClause {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
-    bad("Each filter must be an object like {field, op, value}.")
-  const clause = raw as Record<string, unknown>
+  const tupled = normaliseClauseShape(raw) ?? raw
+  if (typeof tupled !== "object" || tupled === null || Array.isArray(tupled))
+    bad("Each filter must be an object like {field, op, value} (or the equivalent list [field, op, value]).")
+  const clause = tupled as Record<string, unknown>
   // ONE FIELD, OR SEVERAL. Several means "any of these matches", which is what a
   // search box is: the accounts door looks in the name, the code and the email
   // and calls the three of them `q`. Without this the grammar could express
@@ -187,7 +257,7 @@ function parseClause(mod: QueryModule, raw: unknown): ParsedClause {
   const fields = named.map((n) => {
     if (typeof n !== "string") bad("Each filter needs a `field` name.")
     const f = queryField(mod, n as string)
-    if (!f) bad(`"${String(n)}" isn't a field here. Call describe_module to see what is.`)
+    if (!f) unknownField(mod, String(n))
     return f as QueryField
   })
   if (typeof clause.op !== "string" || !(QUERY_OPS as readonly string[]).includes(clause.op))
@@ -246,7 +316,7 @@ export function parseQuery(
     return (raw as unknown[]).map((n) => {
       if (typeof n !== "string") bad(`\`${what}\` must be a list of field names.`)
       const f = queryField(mod, n as string)
-      if (!f) bad(`"${String(n)}" isn't a field here. Call describe_module to see what is.`)
+      if (!f) unknownField(mod, String(n))
       return f as QueryField
     })
   }

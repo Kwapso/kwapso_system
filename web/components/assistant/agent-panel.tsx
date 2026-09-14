@@ -12,7 +12,7 @@
 // This file is the RENDER SHELL only. The whole state machine — the transcript,
 // streaming consumption (text deltas / live step rows / the confirm pause /
 // terminal settle), per-device + cross-device thread resume, the broken-stream
-// re-sync, staged file attachments (the chat import) and the send / confirm /
+// re-sync, and the send / confirm /
 // new-chat / open-thread actions — lives in web/lib/use-agent-chat.tsx. The
 // usage + history dialogs are self-contained components beside this one.
 //
@@ -21,7 +21,7 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { Check, ClockCounterClockwise, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
+import { Check, ClockCounterClockwise, Plus, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -81,7 +81,14 @@ function SourceChips({
     articles: t("Knowledge articles"),
   }
   return (
-    <div className="flex flex-col gap-1 px-1">
+    // `pb-3` SEPARATES THE SCOPE FROM THE CONVERSATION (owner, 13 Sep 2026:
+    // "can we make sure that the data source chip selector and the first
+    // message sent by me have a little bit of padding between them?"). The
+    // host below is a plain `flex-col` with no gap of its own, so the last
+    // chip's own box was the only thing between this row and the first
+    // bubble — two different KINDS of thing (a control you set once for the
+    // thread, and the thread itself) reading as one stack.
+    <div className="flex flex-col gap-1 px-1 pb-3">
       {/* A VISIBLE caption, not just the group's aria-label — the owner saw
        * this row on staging with no other context ("i dont understand what
        * this black pills with sources are"): `aria-label` names the group for
@@ -144,7 +151,7 @@ function SourceChips({
    v1.2.28) and a floating panel on a narrow one, because the kit drops its
    third column below `md` and a phone cannot spend 380px on it. Those are two
    BOXES, not two assistants: everything inside — the transcript, the streamed
-   steps, the confirm pause, the citations, the composer, the attachments — is
+   steps, the confirm pause, the citations, the composer — is
    the same tree in both, rendered once below and handed to whichever box this
    width calls for. There is no second copy of the panel and no second copy of
    its state; `useAgentChat` is called once, in `AgentPanel`, above this.
@@ -302,12 +309,37 @@ function PanelFrame({ docked, children }: { docked: boolean; children: React.Rea
         // add/edit [panel]". That panel is `FormShellDialog`'s Sheet
         // (shared/web/form-shell.tsx), fixed the same day to
         // `w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]` — 420px
-        // floor, 34% of the viewport in between, 640px ceiling, with the
-        // matching `max-w` so the floor and ceiling never fight on a view
-        // narrower than 420px either. Copied verbatim rather than re-derived,
-        // so the two surfaces track the SAME number if it ever changes again,
-        // not two numbers that happened to agree today.
-        "w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]",
+        // floor, 34% of the viewport in between, 640px ceiling, with a
+        // matching `max-w` meant to stop the floor and the ceiling fighting on
+        // a view narrower than 420px. Copied verbatim rather than re-derived,
+        // so the two surfaces track the SAME number if it ever changes again.
+        //
+        // AND THE COPY BROUGHT A CAP THAT CANNOT WORK HERE. Measured live on
+        // staging at a 375px viewport, 13 Sep 2026, while checking the owner's
+        // "on any screen size, I would never like to scroll horizontally in
+        // the chat": the panel was 473px wide with its right edge at 489 —
+        // 114px off the screen, clipped rather than scrollable, so the last
+        // characters of every line were simply unreachable.
+        //
+        // WHY `min(100%, 40rem)` NEVER PROTECTED ANYTHING ON THIS SURFACE. A
+        // percentage resolves against the CONTAINING BLOCK, and a Radix
+        // popover's content does not sit against the viewport — it sits inside
+        // `[data-radix-popper-content-wrapper]`, which is `position: fixed`
+        // with `min-width: max-content`. So the wrapper took its width from
+        // the content (473px, the 420px floor plus insets) and the content's
+        // `100%` then resolved against the wrapper: 100% of itself. Circular,
+        // and therefore no cap at all. Read off `getComputedStyle` rather than
+        // reasoned about — `max-width: min(100%, 720px)` on a box 472.5px wide.
+        // The SHEET is not affected and keeps its own line: a Dialog's content
+        // has no popper wrapper, so its `100%` is the viewport's.
+        //
+        // THE CAP HAS TO NAME THE VIEWPORT, then. `100vw` minus twice
+        // `collisionPadding` (16 each side, set just above) is the same gutter
+        // Radix would have left on its own, so the panel lands where collision
+        // handling already wanted it. Verified live at 375px before this was
+        // written: 339px wide, left 18, right 357, document scrollWidth equal
+        // to clientWidth, and no turn's right edge past 339.
+        "w-[clamp(26.25rem,34vw,40rem)] max-w-[min(calc(100vw-2rem),40rem)]",
         // ITEM 2 (owner, 31 Aug 2026): "make it taller until the top of the
         // page (while keeping its bubble behaviour)". `h-[100dvh]` is
         // deliberately larger than any viewport EVER is — the kit's own
@@ -367,7 +399,6 @@ export function AgentPanel({
   docked: boolean
 }) {
   const { t, lang } = useLanguage()
-  const attachInputRef = React.useRef<HTMLInputElement>(null)
   const { can } = usePermissions(teamId)
   const canUse = can("agent", "create")
 
@@ -625,9 +656,9 @@ export function AgentPanel({
           {t("The assistant isn't available for your role here.")}
         </div>
       ) : (
-        // agent-chat-host scopes the composer autofocus selector. Dropping files
-        // anywhere on the panel stages them for the chat import, same as the
-        // composer's own paperclip (library 0.4.0 attach slot).
+        // agent-chat-host scopes the composer autofocus selector. (It also
+        // used to be the panel-wide drop zone for the chat import; that went
+        // with the upload — see the comment over the composer below.)
         //
         // PADDING, REGULARIZED (owner, 1 Sep 2026, round 2 on this: "the
         // padding in the assistant on the sides is excessive. regularize with
@@ -644,21 +675,14 @@ export function AgentPanel({
         // AgentChat itself sets no horizontal inset of its own, so this is
         // still the one place the whole conversation's gutter is set.
         // `pb-4` is new: NOTHING below the composer/confirm-panel previously
-        // reserved room from the panel's own bottom edge, so with neither an
-        // attachment strip nor a pending confirm in view the composer's own
-        // pill could sit flush against it — the "missing… padding from the
-        // bottom" the owner saw. Three children still carry their own
-        // VERTICAL-only inset that would double up on the horizontal if it
-        // came back: the attach row's `pb-2`, the confirm panel's `py-4`, and
-        // `AssistantLimitNotice`'s own `mb-2`.
-        <div
-          className="agent-chat-host flex min-h-0 flex-1 flex-col px-4 pb-4"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            void chat.addAttachments(e.dataTransfer.files)
-          }}
-        >
+        // reserved room from the panel's own bottom edge, so with no pending
+        // confirm in view the composer's own pill could sit flush against it
+        // — the "missing… padding from the bottom" the owner saw. Two
+        // children still carry their own VERTICAL-only inset that would
+        // double up on the horizontal if it came back: the confirm panel's
+        // `py-4` and `AssistantLimitNotice`'s own `mb-2`. (A third, the
+        // staged-attachment row's `pb-2`, went with the upload.)
+        <div className="agent-chat-host flex min-h-0 flex-1 flex-col px-4 pb-4">
           {/* WHY IT COULDN'T ANSWER, when the model door was the reason.
               PINNED UNDER THE HEADER, above the conversation — the first
               placement put it under the composer, which on screen reads as a
@@ -692,41 +716,29 @@ export function AgentPanel({
               last one would silently WIDEN the search. */}
           <SourceChips sources={chat.sources} onToggle={chat.toggleSource} disabled={chat.busy} />
 
-          {/* ITEM 4, REVERSED (owner: "right of the send" on 31 Aug, then "move
-              the attach button to the left of the send button" on 1 Sep), THEN
-              FOUND ACTUALLY OVERLAPPING ON LIVE RENDER (owner, 1 Sep, round 6:
-              "13, attach is overlapping, and not fully visible").
-              AgentChat's composer is one opaque pill (Textarea + Send) with
-              no attach slot to reach INTO — TicketThread already carries
-              exactly this feature as a real prop (`onAttach`, a paperclip
-              drawn inside its own pill, left of the field); AgentChat has no
-              equivalent yet (logged for Aurora — the real fix is that prop,
-              mirrored from TicketThread's).
-              THE TWO SIDES ARE NOT SYMMETRIC, and that is why this is a
-              different reservation, not just a different `end-*` number.
-              "Right of Send" could vacate space by pushing the COMPOSER's own
-              trailing padding wider (`pe-11` on `agent-chat-composer`), which
-              carries Send inward WITH it — Send stayed the last flex child,
-              just closer to centre. "Left of Send" must NOT move Send at
-              all, so the reservation instead goes on the TEXTAREA itself
-              (below): the composer's own edge padding and Send's position are
-              both untouched, and the textarea's typed text simply wraps well
-              before ITS OWN right edge — which is exactly the strip
-              immediately left of Send, since the textarea's right edge IS
-              Send's left edge.
-              WHY IT OVERLAPPED: Send here is `Button size="sm"` — height
-              `--control-height-dense` (32px) but WIDTH is `px-4` (16px) either
-              side of the `Send` glyph, NOT a forced square. Measured on an
-              actual render (this file's own comment claimed a 32px SQUARE
-              Send, copied from a DIFFERENT composer, `copilot-overlay.tsx`'s,
-              without checking this one): Send is ~45px wide, so a strip sized
-              for a 32px Send left the paperclip's own 32px lapping ~11px into
-              it. Re-measured this time, not re-derived: composer `pe-2` (8px)
-              + Send's real ~45px + a gap ≈ 60px before Send's own left edge —
-              `end-16` (64px) puts the paperclip comfortably past it, and
-              `pe-28` (112px) on the textarea clears the paperclip's own 32px
-              with room to spare, so typed text never runs under either
-              control. `bottom-2` still matches Send's own vertical inset. */}
+          {/* THE CHAT'S FILE UPLOAD IS GONE (owner, 13 Sep 2026: "the file
+              upload feature is pretty useless, so let's get rid of that
+              completely at the moment").
+              WHAT WENT, AND WHAT DID NOT. This removes the ENTRANCE — the
+              paperclip beside Send, the hidden file input, the panel-wide
+              drop zone and the staged-file strip — and with it the client
+              plumbing behind them (`addAttachments` / `attached` /
+              `removeAttachment` in use-agent-chat.tsx). The IMPORT itself is
+              untouched: `run_import_batch` is still a real tool on the
+              catalogue with its own gate, its confirm payload and its MCP
+              twin, and the Import screen still uploads a spreadsheet the
+              ordinary way (`web/components/screens/import-screen.tsx`, which
+              is why `web/lib/file-to-csv.ts` stays). Pulling the server half
+              as well would have meant re-reasoning R9/R13/R19/R22/R27 parity
+              and the MCP twin's own exemption line for a feature the owner
+              asked to hide "at the moment" — so the capability sits behind a
+              door nobody can open from the chat, and putting the door back is
+              this commit reverted rather than a rebuild.
+              THE TEXTAREA GOT ITS STRIP BACK. It reserved `pe-28` (112px) so
+              typed text cleared BOTH the paperclip and Send; with only Send
+              left the measured need is composer `pe-2` (8px) + Send's real
+              ~45px + a gap, so `pe-14` (56px) is the honest number and the
+              other 56px is returned to the words. */}
           <div className="relative min-h-0 flex-1">
             {/* Fill the panel and shed the component's own card chrome (it
              * ships as a standalone fixed-height card) so it reads as one
@@ -736,11 +748,38 @@ export function AgentPanel({
             <AgentChat
               className={cn(
                 "h-full rounded-none border-0 bg-transparent",
-                // ITEM 4's paperclip (see the comment below, over the attach
-                // Button) reserves its own strip on the TEXTAREA now, not the
-                // composer's edge padding — see that comment for why the two
-                // are not interchangeable.
-                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:pe-28",
+                // The strip typed text must not run under — Send alone now
+                // that the paperclip is gone (see the comment above this
+                // element for the measurement).
+                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:pe-14",
+                // AND THE CARET NEEDS SOMEWHERE TO STAND (owner, 13 Sep 2026:
+                // "the cursor is barely visible whenever I click inside the
+                // empty input box... why not just shift the placeholder that
+                // says 'Ask about your work' a tiny bit to the right so the
+                // cursor can start a bit later and not get cut off?"). His
+                // diagnosis was right and so was his fix.
+                //
+                // MEASURED on staging before and after, not reasoned about:
+                // the textarea's `padding-inline-start` computed to 0px, so
+                // the caret painted at x=0 of the content box — the exact
+                // column the placeholder's own first glyph starts in. A caret
+                // is one or two device pixels and a browser draws it centred
+                // on that offset, so half of it lands outside the box and the
+                // other half sits ON the "A". Nothing is clipping the pill:
+                // the textarea already starts 23px inside it. The collision is
+                // between the caret and the TEXT, which is why widening the
+                // pill would not have helped and a colour change would not
+                // either.
+                //
+                // `ps-1.5` (6px) is the whole fix, and it moves BOTH — caret
+                // and placeholder shift together, so the gap the owner asked
+                // for opens in front of the words rather than inside them. Set
+                // here rather than on the pill because the pill's own
+                // `padding-inline-start` is the kit's (22.5px) and is doing a
+                // different job; this is the text's own inset. Verified live
+                // at 6px: the textarea still fits its pill with the `pe-14`
+                // strip intact, and the caret stands clear of the "A".
+                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:ps-1.5",
                 // ITEM (owner, 1 Sep 2026, on the text-write field
                 // specifically): "this is the color of the text write field
                 // #F7F2EB (like everywhere else!)". #F7F2EB is `--kw-soft-
@@ -817,13 +856,56 @@ export function AgentPanel({
                 // `data-slot` of its own to target directly; it is reached
                 // structurally, as "the first DIV inside a turn's own
                 // column div" (the sr-only role name before it is a SPAN,
-                // so `:first-of-type` on `div` skips it correctly). The
-                // MINIMAL padding the owner asked for (`px-4 py-3` →
-                // `px-2 py-1.5`) still rides this selector. Logged for
-                // Aurora same as the others: a REAL per-bubble className
+                // so `:first-of-type` on `div` skips it correctly). Logged
+                // for Aurora same as the others: a REAL per-bubble className
                 // slot on AgentChat would retire this the day it ships.
-                "[&_[data-slot=agent-chat-turn]>div>div:first-of-type]:px-2",
-                "[&_[data-slot=agent-chat-turn]>div>div:first-of-type]:py-1.5",
+                //
+                // THE PADDING CAME BACK UP (owner, 13 Sep 2026: "the words in
+                // the chat bubbles are too close to the border"). It was cut
+                // to `px-2 py-1.5` on 1 Sep for "minimum padding around it",
+                // in the same breath as lifting the turn's 62% width cap —
+                // and the two do not sit together: once a bubble may run the
+                // panel's FULL width, the inset is the only thing left
+                // holding the words off the edge, so the change that made the
+                // measure long also made the gutter the thing you notice.
+                // `px-3.5 py-2.5` is the middle of the two readings — clear
+                // of the edge, still tighter than the kit's own `px-4 py-3`,
+                // so the panel keeps the denser feel the 1 Sep pass was
+                // after.
+                "[&_[data-slot=agent-chat-turn]>div>div:first-of-type]:px-3.5",
+                "[&_[data-slot=agent-chat-turn]>div>div:first-of-type]:py-2.5",
+                // NOTHING IN A BUBBLE MAY SIZE THE PANEL (owner, same day: "on
+                // any screen size, I would never like to scroll horizontally
+                // in the chat"). Two different mechanisms, because the
+                // sideways scroll had two different causes and fixing either
+                // alone leaves the other.
+                //
+                // (1) `min-w-0` on the turn and its column. Every ancestor
+                // between the bubble's contents and the panel is a flex item,
+                // and a flex item's `min-width` is `auto` — it REFUSES to
+                // shrink below its content. That is why a wide child pushed
+                // the whole conversation sideways rather than being clipped:
+                // nothing above it was allowed to be narrower than it.
+                //
+                // (2) containment, and NOT ON THE BUBBLE. `min-w-0` lets a box
+                // shrink; it does not stop a box being SIZED BY ITS CONTENTS,
+                // which is the half `agent-markdown.tsx` learned the hard way
+                // on its own tables. The tempting one-liner is `contain:
+                // inline-size` on the bubble itself — and it is wrong here: a
+                // contained box takes its width from the room it is GIVEN
+                // rather than from its words, so every bubble in the panel
+                // would stretch to full width and a one-word "ok" would draw
+                // the same box as a paragraph. The shrink-to-fit bubble is
+                // deliberate (see the `max-w-full` ruling above: full width is
+                // a CEILING, not a stretch). So containment goes on the
+                // handful of children that can actually be wide, each in its
+                // own file: a markdown table and a refused code fence
+                // (agent-markdown.tsx), and a drawn table block
+                // (agent-blocks.tsx). Prose needs none — it wraps, and
+                // `overflow-wrap: anywhere` there covers the one token that
+                // cannot.
+                "[&_[data-slot=agent-chat-turn]]:min-w-0",
+                "[&_[data-slot=agent-chat-turn]>div]:min-w-0",
                 // `relative` moved UP a level, off the bubble and onto the
                 // COLUMN that holds it (the bubble, its sources, its
                 // footnote) — see the long comment above the `eyebrow`
@@ -991,56 +1073,7 @@ export function AgentPanel({
               }
               onSend={(text) => void chat.send(text)}
             />
-            <input
-              ref={attachInputRef}
-              type="file"
-              accept=".csv,.tsv,.xlsx,.xls,text/csv"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void chat.addAttachments(e.currentTarget.files)
-                e.currentTarget.value = ""
-              }}
-            />
-            {/* THE CHAT IMPORT's launcher, now genuinely IN the composer's own
-                row, LEFT of Send (see the long comment above this wrapper for
-                why "left" is a different reservation, not just a different
-                `end-*`, and why the first numbers overlapped — Send is wider
-                than this file assumed). `end-16` clears Send's real ~45px
-                width with a gap; `bottom-2` still matches Send's own inset. */}
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("Attach a file to import")}
-              onClick={() => attachInputRef.current?.click()}
-              disabled={chat.busy || !!chat.pending}
-              className="absolute end-16 bottom-2 size-8"
-            >
-              <Paperclip className="size-4" aria-hidden />
-            </Button>
           </div>
-
-          {/* Files staged for the next message. A quiet strip under the
-              composer rather than a second control beside it — the ICON
-              moved to sit with Send (above); the file list itself is
-              secondary information, not a control, so it stays out of that
-              row. Renders only once something is actually staged. */}
-          {chat.attached.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 pb-2">
-              {chat.attached.map((f, i) => (
-                <Badge key={`${f.name}-${i}`} variant="secondary" className="gap-1">
-                  {f.name}
-                  <button
-                    type="button"
-                    aria-label={t("Remove attachment")}
-                    onClick={() => chat.removeAttachment(i)}
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
 
           {/* A paused turn: the proposed actions + approve / decline. */}
           {chat.pending && (

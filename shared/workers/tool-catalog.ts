@@ -26,8 +26,24 @@
 // scripts/smoke-mcp.mjs reads it off this path to derive the R19 filter check,
 // and it is the one reader that cannot follow an import.
 
-import { B, N, obj, S, str } from "./tool-args"
+import { B, enumOf, N, obj, S, str } from "./tool-args"
 import { brand } from "../brand"
+import { canonicalModule } from "./query-grammar"
+
+/** THE WORD A PERSON READS, never the alias the model was told it could type.
+ * `describe_module`/`query_records` accept a module by any of its aliases
+ * (`help` reaches tickets — CLAUDE.md's own "don't finish the rename": the
+ * permission module, the table and the tool names stay `help` on purpose, but
+ * nothing spoken TO a person may). The step chip and the confirm panel build
+ * their label from the model's raw argument, so an alias the tool description
+ * itself invites the model to use ("`help` reaches tickets") would otherwise
+ * print verbatim on screen. `canonicalModule` is query-grammar's own answer to
+ * "what did they actually mean" — reused rather than re-derived, so this can
+ * never name a module the query engine itself would refuse. Falls back to the
+ * raw text for a name canonicalModule doesn't recognise (never silently blank),
+ * and a stray underscore (a raw canonical key like `work_logs`) reads as a
+ * space, because a label is a sentence, not a column name. */
+const queryLabel = (raw: string): string => (raw ? (canonicalModule(raw) ?? raw).replace(/_/g, " ") : "")
 
 /* ---------------------- the body builders a tool declares --------------------- */
 
@@ -305,7 +321,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildQuery: (i) => (str(i, "module") ? `?module=${encodeURIComponent(str(i, "module"))}` : ""),
     agent: {
       write: false,
-      summarize: (i) => (str(i, "module") ? `See what ${str(i, "module")} can be asked` : "See what can be queried"),
+      summarize: (i) =>
+        str(i, "module") ? `See what ${queryLabel(str(i, "module"))} can be asked` : "See what can be queried",
     },
   },
   {
@@ -320,9 +337,19 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj(
       {
         module: S,
-        where: { type: "array" },
-        groupBy: { type: "array" },
-        fields: { type: "array" },
+        // ITEMS, NOT A BARE ARRAY. A model told only "where is an array" has no
+        // structural reason to prefer `{field,op,value}` over the positional
+        // triple it reaches for on its own — measured on staging, 2026-09-13:
+        // three separate filters, each a bare `[field, op, value]`, refused by
+        // the same message three times running in the one turn that opened this
+        // fix. `items` is the cheapest fix available: it teaches "each filter is
+        // an OBJECT" structurally instead of leaving the model to infer it from
+        // prose. The parser (query-engine.ts, parseClause) also normalises the
+        // tuple as an accepted equivalent — belt and suspenders, since a model
+        // that ignores the schema is exactly the failure mode being fixed.
+        where: { type: "array", items: { type: "object", properties: { field: {}, op: S, value: {} }, required: ["field", "op"] } },
+        groupBy: { type: "array", items: S },
+        fields: { type: "array", items: S },
         countOnly: B,
         sort: S,
         dir: S,
@@ -347,8 +374,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       write: false,
       summarize: (i) =>
         Array.isArray(i.groupBy) && i.groupBy.length
-          ? `Count ${str(i, "module")} by ${(i.groupBy as unknown[]).join(" and ")}`
-          : `Look up ${str(i, "module")}`,
+          ? `Count ${queryLabel(str(i, "module"))} by ${(i.groupBy as unknown[]).join(" and ")}`
+          : `Look up ${queryLabel(str(i, "module"))}`,
     },
   },
   {
@@ -573,10 +600,14 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit an account's own details by `id`, never its parent (that is set_account_parent). Send only what you change; an empty string clears a field.",
     detail:
-      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them.",
+      "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them. `altNames` is declared spellings of this account's own name the knowledge base should also recognise (re-sent WHOLE, the list you name replaces the one the account has) — each has to be one word, and a common word is refused unless `nameNarrowsAlone` is 'allow', because a declared spelling matches on its own with no rarity check at all. `nameNarrowsAlone` is 'unreviewed' (the default), 'allow' (this account's own name may narrow a knowledge-base search on its own even though it is an ordinary word), or 'deny' (this word must never narrow a search on its own, even if it looks rare today).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
-      { id: S, name: S, ...ACCOUNT_FIELD_SCHEMA, commercialsVisible: B },
+      {
+        id: S, name: S, ...ACCOUNT_FIELD_SCHEMA, commercialsVisible: B,
+        altNames: { type: "array" },
+        nameNarrowsAlone: enumOf(["unreviewed", "allow", "deny"]),
+      },
       ["id", "name"]
     ),
     buildBody: (i) => ({
@@ -584,6 +615,11 @@ export const SHARED_TOOLS: SharedTool[] = [
       name: str(i, "name"),
       ...accountFields(i),
       commercialsVisible: typeof i.commercialsVisible === "boolean" ? i.commercialsVisible : undefined,
+      altNames: Array.isArray(i.altNames) ? i.altNames : undefined,
+      nameNarrowsAlone:
+        i.nameNarrowsAlone === "unreviewed" || i.nameNarrowsAlone === "allow" || i.nameNarrowsAlone === "deny"
+          ? i.nameNarrowsAlone
+          : undefined,
     }),
     // IDENTITY WRITE (accounts.email) → confirm. It carries the same field
     // create_account confirms for, and for the same stated reason: an account's
@@ -1804,7 +1840,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Ask the knowledge base; `q` stands alone. Mark claims [[src:…]] by `sourceId`; never write a list of sources. `found` false: say so, not from memory.",
     detail:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. WRITE `q` SO IT STANDS ALONE: retrieval sees only that string, never the conversation around it, so resolve any pronoun, \"it\"/\"that\", or follow-up shorthand yourself before calling — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), never the two words as typed. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: answer from the passages, and mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports — the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice. `read` true asks a second model to re-read the shortlist before deciding what counts as evidence, which recovers a real answer a plain similarity score would have refused (a paraphrase, thin material) — it ALSO costs one assistant credit, separate from `compose`, so asking for both on one turn spends two; leave it off for the ordinary case, where the similarity floor alone decides.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. WRITE `q` SO IT STANDS ALONE: retrieval sees only that string, never the conversation around it, so resolve any pronoun, \"it\"/\"that\", or follow-up shorthand yourself before calling — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), never the two words as typed. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: answer from the passages, and mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports — the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` rides `records`, `citations` and `passages` alike — where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sourceId` NAMES THE KNOWLEDGE SOURCE, never the record it mirrors, and the two are different ids in different id spaces: never hand a `sourceId` to a tool that reads the record itself (`get_meeting_transcript` and its like) — take the segment after the last slash in `recordPath` for that, `sourceId` is not it. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice. `read` true asks a second model to re-read the shortlist before deciding what counts as evidence, which recovers a real answer a plain similarity score would have refused (a paraphrase, thin material) — it ALSO costs one assistant credit, separate from `compose`, so asking for both on one turn spends two; leave it off for the ordinary case, where the similarity floor alone decides.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
     schema: obj({ q: S, accountId: S, sources: { type: "array" }, limit: N, compose: B, read: B }, ["q"]),
     buildQuery: (i) => {

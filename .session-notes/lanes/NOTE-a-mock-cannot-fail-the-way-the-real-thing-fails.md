@@ -126,16 +126,51 @@ their real corpus counts — `ACCOUNT_TOKEN_MAX_CHUNKS`'s own header in
 `workers/content/src/lib/knowledge.ts` has the full table) and reseeding
 every fixture at the REAL number, not a round one chosen for convenience.
 
-## The shape, stated once, across both instances
+## Instance 3 — a file I was told to write already existed, and the only signal was one letter in `git status`
 
-A fixture — mocked or seeded — that is easier to satisfy than the real case
-it stands in for is not a smaller version of the real test, it is a
-different, weaker claim wearing the real test's name. The tell in both
-instances: the number (120 filler chunks; an injected callback standing in
-for a real model call) was picked for convenience or to "clearly"
-demonstrate the shape, never measured against what the real system actually
-does. **Measure the real value first, seed or mock at that number, and only
-then decide whether the mechanism holds.**
+Found by kb_CD, 2026-09-11, hours after instance 2, writing up instance 2
+itself. The hub named this file's own path as where a second instance
+should go. kb_CD wrote a NEW file at that exact path without reading it
+first — and it already held kb_A's real, detailed instance 1 above. The
+`Write` overwrote it, in memory, before a single line had been staged.
+
+It was caught by `git status --short` showing `M` for the path, not `A`.
+One letter. Nothing else distinguished the moment of near-total data loss
+from the moment of ordinary, successful work — no error, no warning, no test
+that could have run, because the destructive act was a file write, not a
+mechanism a test suite reaches at all. `git diff` confirmed what had been
+about to be discarded; `git checkout --` restored it before it reached a
+commit; kb_A's content survived; kb_CD's own instance 2 write-up was folded
+in as an addition afterwards, in the same file, rather than a competing one.
+
+The hub's own correction, worth carrying rather than kb_CD's: *"From now on,
+when I name a file path, assume it exists and read it first."* That is the
+INSTRUCTION half. The MEASUREMENT half, which is this note's actual subject,
+is the same shape as instances 1 and 2 from a different angle: **the thing
+that would have caught this earlier — checking whether the path already
+existed before writing to it — was skipped, exactly the way a real model
+call was skipped in instance 1 and a real chunk count was skipped in
+instance 2.** A `Write` tool that requires reading an existing file first is
+itself a guard against exactly this, and it did not stop this one because
+the file's existence was never checked before the tool was called with
+enough confidence to bypass asking. The near-miss did not look different
+from success until somebody read one character of a `git status` line —
+which is the same sentence instances 1 and 2 could each be summarised in,
+with "chunk count" and "token budget" swapped for "a diff nobody looked at
+before writing."
+
+## The shape, stated once, across all three instances
+
+A fixture, a mock, or an ACTION taken on trust — mocked, seeded, or simply
+assumed — that is easier to satisfy (or safer to skip checking) than the
+real case it stands in for is not a smaller version of doing it properly,
+it is a different, weaker claim wearing the real one's name. The tell in
+all three instances: a number or an assumption (120 filler chunks; an
+injected callback standing in for a real model call; a file path assumed
+new) was picked for convenience, or skipped, rather than measured or
+checked against what the real system — or the real disk — actually holds.
+**Measure the real value first, or read the real state first, and only
+then decide whether the mechanism (or the write) is safe.**
 
 Before trusting a test that mocks a call or seeds a threshold, ask:
 

@@ -306,6 +306,14 @@ export function AccountDetailScreen({
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
       locale: values.locale.trim() || null,
+      // 0083/c-misspell, 0085/c-hijack B — the two declared knowledge-base
+      // safety fields, always sent from this screen (edit mode always shows
+      // them) so a save here can never leave one stale.
+      altNames: values.altNames
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+      nameNarrowsAlone: values.nameNarrowsAlone,
     })
     refresh()
     toast.success(t("Account updated."))
@@ -852,6 +860,8 @@ export function AccountDetailScreen({
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",
           locale: account.locale ?? "",
+          altNames: account.altNames.join(", "),
+          nameNarrowsAlone: account.nameNarrowsAlone,
         }}
         onSubmit={save}
       />

@@ -110,6 +110,46 @@ const aboutField = { ...defaultFieldConfig, label: "About", required: false }
 const languageField = { ...defaultFieldConfig, label: "Language", required: false }
 const logoField = { ...defaultFieldConfig, label: "Logo", required: false }
 const coverField = { ...defaultFieldConfig, label: "Cover image", required: false }
+// c-hijack B / c-misspell (0083, 0085): how the KNOWLEDGE BASE recognises this
+// account's own name, comma-separated in the UI and split to a list at the
+// boundary — the same shape every other free-text field on this form already
+// crosses. Placement is deliberate: past `about`, with the record's own
+// details, because this is still a fact ABOUT the account, not a settings
+// screen (R61 is for a MODULE's own switches, not one field on one record).
+const altNamesField = {
+  ...defaultFieldConfig,
+  label: "Other spellings the knowledge base should also recognise",
+  required: false,
+}
+// TRI-STATE, not a checkbox — the owner's second ruling the same night a
+// boolean shipped: an ALLOW can only ever ADD a narrow (it bypasses the
+// rarity gate), so it does nothing for a name that is already rare enough to
+// narrow on its own — the residual that needed closing was the OPPOSITE, a
+// way to say a word must NEVER narrow alone. See accountsNamedIn's own header
+// for why "unreviewed"/"allow"/"deny" and not two independent booleans (a
+// second flag could be set alongside the first, and a name cannot both
+// always and never narrow alone).
+const narrowsAloneField = {
+  ...defaultFieldConfig,
+  label: "May this name narrow a knowledge base search on its own?",
+  required: false,
+}
+
+/** APPROXIMATE, AND VISIBILITY-ONLY. A rough echo of the server's `tokenise`
+ * (workers/content/src/lib/knowledge-text.ts): letters and digits only, a
+ * fragment under three characters dropped. It decides whether the "may
+ * narrow alone" checkbox is worth asking at all — never whether a search
+ * actually narrows, which is `accountsNamedIn`'s call, server side, against
+ * the real corpus and the real stopword list. Good enough to answer "does
+ * this name collapse to one word a person might want to review?" without
+ * carrying the server's full tokeniser into the browser for a single yes/no. */
+function collapsesToOneWord(name: string): boolean {
+  const words = name
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && w.length <= 24)
+  return words.length === 1
+}
 
 // Radix Select can't hold an empty value, so "not chosen" is a sentinel. One
 // constant for all four pickers — four spellings of the same idea is how one of
@@ -139,6 +179,14 @@ export type AccountFormValues = {
   coverUrl: string
   /** the language this account is written to (a BCP-47 tag, or "" for ours) */
   locale: string
+  /** declared spellings of this account's own name (0083), comma-separated
+   * here and split to a list at the door — see `altNamesField` above. Always
+   * "" on a create: a brand-new account has no misspellings on file yet. */
+  altNames: string
+  /** 0085/0086 — whether this account's collapsed single-token name may
+   * narrow a knowledge-base search on its own. Only ever shown, and
+   * therefore only ever meaningfully set, when `collapsesToOneWord(values.name)`. */
+  nameNarrowsAlone: "unreviewed" | "allow" | "deny"
 }
 
 const EMPTY: AccountFormValues = {
@@ -155,6 +203,8 @@ const EMPTY: AccountFormValues = {
   logoUrl: "",
   coverUrl: "",
   locale: "",
+  altNames: "",
+  nameNarrowsAlone: "unreviewed",
 }
 
 /** The first letters of a name, for the logo placeholder. */
@@ -412,6 +462,43 @@ export function AccountFormDialog({
           className="min-h-32"
         />
       </Field>
+
+      {/* KNOWLEDGE-BASE NAME MATCHING (0083/c-misspell, 0085/c-hijack B) — edit
+          mode only. A brand-new account has no search history to declare
+          anything about yet, and the checkbox below needs a real, saved name
+          to judge, not a draft still being typed. */}
+      {isEdit && (
+        <>
+          <Field config={altNamesField} htmlFor="account-alt-names" className={fieldSpacing}>
+            <Input
+              id="account-alt-names"
+              value={values.altNames}
+              onChange={(e) => set({ altNames: e.target.value })}
+              placeholder={t("Padelbase, Asekurans")}
+              disabled={busy}
+            />
+          </Field>
+
+          {collapsesToOneWord(values.name) && (
+            <Field config={narrowsAloneField} htmlFor="account-narrows-alone" className={fieldSpacing}>
+              <Select
+                value={values.nameNarrowsAlone}
+                onValueChange={(v) => set({ nameNarrowsAlone: v as AccountFormValues["nameNarrowsAlone"] })}
+                disabled={busy}
+              >
+                <SelectTrigger id="account-narrows-alone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unreviewed">{t("Not reviewed")}</SelectItem>
+                  <SelectItem value="allow">{t("May narrow a search on its own")}</SelectItem>
+                  <SelectItem value="deny">{t("Must never narrow a search on its own")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+        </>
+      )}
 
       {/* HIDDEN UNTIL THERE IS A REAL PICTURE — the same fix as the app form's
           logo field, and the same reason: on a brand-new account `values.name`

@@ -1134,7 +1134,22 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // hashes the file, not a diff of meaning), and that is the correct,
 // conservative failure mode: the alternative is a check that trusts a
 // human's claim that "only a comment changed" instead of verifying it.
-const SHARED_DIGEST = "5d3f8dc8b4364fe6"
+// RE-PINNED, 12 Sep 2026: the shared upsert gained `shared_with` (0073's
+// tenth Vectorize label, written truthfully now — the owner's ruling, "keep
+// it for everything") in its INSERT column list and its ON CONFLICT SET
+// clause. NO textVersion BUMP: `shared_with` is a label copied off
+// `IngestRow.sharedWith`, never a word in `title` or `body` — nothing any
+// kind SAYS changed, only a column alongside the words it already says.
+// RE-PINNED ONCE MORE, 2026-09-12, and this time for a COMMENT. The hub added a
+// paragraph to the shared upsert explaining that the chunk-level copy of
+// shared_with lags the row's own, because content_hash is only cleared on an
+// owner_user_id change. Bytes changed, so this digest was right to fire; not one
+// word any kind SAYS changed, so no textVersion moved. Worth leaving on the
+// record because it is the cheapest possible demonstration of what this check
+// is and is not: it hashes the FILE, deliberately, so it cannot tell a comment
+// from a rewrite — and that is the safe direction. It asks the question; the
+// person answering it has to look.
+const SHARED_DIGEST = "436e1aa72f674bdb"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

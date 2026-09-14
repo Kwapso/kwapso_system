@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest"
 
 import { sseFrame, terminalEvent } from "../src/routes/agent"
-import { finalAnswerText, TRUNCATED_TURN_NOTE } from "../src/lib/agent"
+import { finalAnswerText, STALLED_TURN_NOTE, TRUNCATED_TURN_NOTE } from "../src/lib/agent"
 import { parseOpenAiStream, selectModel, toOpenAiMessages } from "../src/lib/model"
 import type { ChatMessage } from "../src/lib/model"
 import type { ChatOutcome, StreamEvent } from "@shared/types"
@@ -346,11 +346,11 @@ describe("finalAnswerText: a truncated turn says so, in the reply itself", () =>
     expect(text).toBe(`the four payment branches (flu-private, flu-com\n\n${TRUNCATED_TURN_NOTE}`)
   })
 
-  it("an empty truncated reply still gets the greeting fallback AND the note", () => {
-    // Belt and braces: even the "say SOMETHING" fallback must not silently hide
+  it("an empty truncated reply gets the stall sentence AND the note", () => {
+    // Belt and braces: even the empty-reply sentence must not silently hide
     // that the turn was cut off, however unlikely an empty-but-truncated reply is.
     const text = finalAnswerText({ text: "  ", truncated: true })
-    expect(text).toBe(`Hi — how can I help with your team today?\n\n${TRUNCATED_TURN_NOTE}`)
+    expect(text).toBe(`${STALLED_TURN_NOTE}\n\n${TRUNCATED_TURN_NOTE}`)
   })
 
   // MUTATION PROOF: delete the `reply.truncated ?` branch and this goes red —

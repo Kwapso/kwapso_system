@@ -1,9 +1,9 @@
 {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.75",
-  "sha": "26f09cb09114fbe413c81d60ab16b2e073c4d29b",
+  "tag": "v1.2.76",
+  "sha": "8c1d6f07fdeca7a49730e20aa4e387ba43b13430",
   "hash": "b668ea1f579336f02e9bc43b448f6eb3445aa94dd247655ac8ad73fbe6cd9fd7",
-  "syncedAt": "2026-09-10",
+  "syncedAt": "2026-09-12",
   "iconArt": {
     "count": 1512,
     "source": "kwapso-ui-ux"

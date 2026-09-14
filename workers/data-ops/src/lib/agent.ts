@@ -55,8 +55,33 @@ const MAX_STEPS = 12
  * A ceiling the app owns turns that into a sentence. It is generous on purpose —
  * a genuine four-step job with a document read in it is allowed to take a minute
  * and a half — and it is checked BETWEEN steps rather than interrupting one, so
- * the turn always ends on a whole tool call with its result recorded. */
-const TURN_DEADLINE_MS = 150_000
+ * the turn always ends on a whole tool call with its result recorded.
+ *
+ * ── 150s -> 210s ON 14 Sep 2026, AND THE NUMBER IS MEASURED ────────────────
+ *
+ * 52 model calls on one staging thread: median 9 SECONDS, p90 48, slowest 170.
+ * At the median a turn affords sixteen steps and the bound is irrelevant; the
+ * variance is the whole problem, and three calls in fifty-two took over a
+ * minute. The owner's five-part question needs five or six steps and hit two
+ * slow ones.
+ *
+ * WHY 210 AND NOT MORE. The app's bound exists to fire BEFORE the platform's,
+ * because the platform's exit is the empty bubble. We have one observation of
+ * where that is: the 14 Sep turn wrote its last row at +230s and died there.
+ * One observation is not a limit, so this stays comfortably under it rather
+ * than creeping up to it — 210 buys 40% more room and still stops first. If a
+ * turn is ever killed below 210, this comes DOWN, not the other way.
+ *
+ * IT COSTS NOTHING EXTRA. A step is one AI credit and MAX_STEPS is unchanged at
+ * twelve, so the most a turn can spend is exactly what it could spend before.
+ * This only lets a turn reach steps it had already paid for the right to take
+ * when the calls happen to be slow. */
+const TURN_DEADLINE_MS = 210_000
+
+/** The race's own loser, as an IDENTITY rather than an Error subclass: it is
+ * compared with `===` in exactly one place and must never be mistaken for a
+ * provider failure by any `instanceof` on the way past. */
+const TURN_RAN_OUT = Symbol("the turn ran out of time")
 
 /** THE VOCABULARY CONTRACT (R9). A dropdown write is gated on the option already
  * existing, so "create X and move everything onto it" is two calls whose ORDER is
@@ -239,6 +264,28 @@ export const SYSTEM = [
   "When the user attaches spreadsheet files, the app plans the import and hands you an ATTACHED-IMPORT-PLAN block: present the plan in a sentence or two (which tables, how many rows, what will be skipped and why), then call run_import_batch with that block's batchId and a short summary — the app shows its own confirm panel, so don't ask for confirmation in chat. If they only asked about the files, just answer.",
   "If something fails partway, stop and say plainly what was done and what wasn't.",
   "Be warm, brief, and plain-spoken. If a task is quicker for them to do by hand, gently say so.",
+  // HOW A REPLY IS LAID OUT (owner, 13 Sep 2026, on the chat panel: "the
+  // system prompt... should always not drown the user's words but answer
+  // accurately", and "the words are too stuck together. I would like some line
+  // breaks, visuals, and rich text... Include tables, lists, etc.").
+  //
+  // TWO SENTENCES THAT PULL AGAINST EACH OTHER, ON PURPOSE. "Don't drown me"
+  // is about LENGTH and "make it visual" is about SHAPE, and a model told only
+  // the second writes longer. So the length rule is stated first and in
+  // absolute terms, and the formatting rule is explicitly about how the same
+  // words are arranged rather than a licence to add more.
+  //
+  // EVERY MARK NAMED HERE IS ONE THE RENDERER ACTUALLY DRAWS, and the list is
+  // deliberately no longer than that: `shared/web/markdown-html.ts` groups
+  // paragraphs, `- ` and `1. ` lists, `#`-prefixed headings (CLAMPED to h3/h4,
+  // which is why one hash and two both land on the same size and the prompt
+  // does not offer a third), and GFM pipe tables — which need the `|---|`
+  // delimiter row, because without it a line full of pipes is prose and
+  // reaches the reader as pipes. Inline it draws `**bold**`, `*italic*`,
+  // `` `code` `` and `[label](url)`. Nothing else exists: a `>` quote, a
+  // checkbox, a footnote or a nested numbered list is invented markup that
+  // arrives as literal characters, so none of them is advertised.
+  "HOW TO LAY A REPLY OUT. Answer first, in one sentence, then the detail — never open with a preamble about what you are about to do. Say only what was asked: the shortest complete answer wins, and a reply that runs past a screen had better be a list of real things rather than paragraphs of throat-clearing. Then SHAPE it, because the app renders your markdown properly. Leave a BLANK LINE between paragraphs, and keep a paragraph to two or three sentences — a wall of text is the one thing the reader cannot skim. Use '- ' bullets for a handful of points, '1. ' for an order, and '## ' for a heading when a longer answer has genuine sections. When you are laying out rows and columns that the drawn-block catalogue below does not cover — or when you have already spent this reply's one block — use a markdown table: a header row, then a '|---|---|' row under it (without that row it arrives as raw pipes), then one row each. Use **bold** for the one figure or name the reader is looking for, and `backticks` for a value copied exactly from the data. That is the whole set — anything else is not rendered and reaches them as stray punctuation. None of this is permission to write more: the same answer, laid out, is the goal.",
   // R54, THE ASSISTANT'S HALF. The screens shorten a colleague's name where they
   // draw one; you are the one surface that composes its own sentences, so the
   // rule has to be said rather than applied. It is said about the OUTPUT and not
@@ -420,10 +467,19 @@ export function readBudget(total = TURN_READ_CHARS) {
  * result is data the model must never take orders from (TOOL_RESULT_TAG, and the
  * system prompt that names it), and that has to hold for the sentences we write
  * ourselves too. */
-export function trimResult(data: unknown, allowance: number = RECORD_CHARS): string {
+export function trimResult(data: unknown, allowance: number = RECORD_CHARS, contract = false): string {
   const whole = typeof data === "string" ? data : JSON.stringify(data)
   if (whole === undefined) return "" // a door that answered with nothing at all
   if (whole.length <= RESULT_CHARS) return whole
+  // A CONTRACT IS NEVER A PAGE. Its entries are not alike and the first eight
+  // do not stand for the rest — a schema with its tail dropped is a list of
+  // fields that tells the model the ones it cannot see do not exist. It still
+  // obeys the turn's reading allowance (nothing here may read without bound);
+  // it simply is not row-trimmed to fit a page budget it was never a page for.
+  if (contract)
+    return whole.length <= allowance
+      ? whole
+      : `${whole.slice(0, allowance)}\n[Trimmed here: the result was longer than ${allowance} characters, so what is above is incomplete.]`
   const rows = data && typeof data === "object" && !Array.isArray(data) ? rowList(data) : null
   // A RECORD READ: few rows, and the text in them is what was asked for.
   if (rows && rows[1].length <= LIST_ROWS) return record(data as Record<string, unknown>, rows, allowance)
@@ -497,9 +553,32 @@ export const TRUNCATED_TURN_NOTE =
  *  note when the model's own output budget ran out mid-answer, so "the model
  *  finished" and "the model was cut off" can never look identical to a reader —
  *  which is exactly how they looked before this existed. */
+/** AN EMPTY REPLY IS A STALL, NOT A GREETING. Until 14 Sep 2026 the line below
+ *  read `reply.text?.trim() || "Hi — how can I help with your team today?"`,
+ *  under the comment "some models return empty text on a bare greeting — always
+ *  say SOMETHING". So when the deployed model thought for 10,143 characters
+ *  about the owner's five-part ticket question, decided inside that thinking to
+ *  call four tools, and then emitted nothing at all — `finish_reason: "stop"`,
+ *  no text, no tool call — the person was GREETED. Every figure the turn had
+ *  fetched was correct and in front of the model. The reply read as the
+ *  assistant ignoring the question, and a day went on fixing the plumbing
+ *  around a sentence the app itself had written. The loop now nudges once
+ *  (STALL_NUDGE) and only lands here when the model stalls twice in one turn,
+ *  at which point the honest sentence is this one. */
+export const STALLED_TURN_NOTE =
+  "I lost the thread of that one partway and couldn't finish the answer — ask me again, or narrow it down and I'll be quicker."
+
+/** MODEL-FACING, NEVER SAVED: the one push a stalled model gets before the turn
+ *  gives up. Measured on the replayed context that produced the greeting — with
+ *  this appended, the same model wrote the answer: every figure it already had,
+ *  and a plain list of what it had not fetched. It forbids further tool calls
+ *  on purpose: the stall happened at the exact moment the model meant to call
+ *  one, and inviting it to try again invites the same silence. */
+export const STALL_NUDGE =
+  "You stopped without answering. Using ONLY the results already above, write the answer now — every part of the question you can answer from them, in plain words — and say plainly which parts you could not. Do not call any more tools."
+
 export function finalAnswerText(reply: Pick<ModelReply, "text" | "truncated">): string {
-  // Some models return empty text on a bare greeting — always say SOMETHING.
-  const text = reply.text?.trim() || "Hi — how can I help with your team today?"
+  const text = reply.text?.trim() || STALLED_TURN_NOTE
   return reply.truncated ? `${text}\n\n${TRUNCATED_TURN_NOTE}` : text
 }
 
@@ -550,10 +629,14 @@ function rowList(data: object): [string, unknown[]] | null {
   return null
 }
 
-/** Tool result → the fenced DATA string the model sees. */
-function fence(result: ToolResult, allowance?: number): string {
+/** Tool result → the fenced DATA string the model sees.
+ *
+ * `whole` is the tool's own `wholeResult` — a CONTRACT rather than a page, which
+ * must never arrive with half of it dropped. See `wholeResult` in tools.ts for
+ * the turn that earned it. */
+function fence(result: ToolResult, allowance?: number, whole = false): string {
   return result.ok
-    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data, allowance)}`
+    ? `${SAVED_RESULT_PREFIX}${trimResult(result.data, allowance, whole)}`
     : `FAILED: ${result.error ?? "unknown error"}`
 }
 
@@ -599,15 +682,60 @@ function fence(result: ToolResult, allowance?: number): string {
  *
  * It does not lower MAX_STEPS or end the turn. It replaces ONE call's result with
  * a sentence naming the cheaper route, so the model still has its remaining steps
- * and now has something to do with them. */
+ * and now has something to do with them.
+ *
+ * ── AND IT COUNTED THE CHEAPER ROUTE AGAINST ITSELF (13 Sep 2026) ───────────
+ *
+ * The counter was keyed on the tool's NAME alone. That was right when a module
+ * had its own list tool: five calls to `list_meetings` really were five goes at
+ * one collection. `query_records` is not that — it is the ONE read door for
+ * every module, so "the same tool" stopped meaning "the same question" and the
+ * guard started firing on people asking DIFFERENT ones.
+ *
+ * Measured on staging the day it was found. The owner asked "how many total open
+ * tickets (to be triaged) are there? and avg per account and per app? and how
+ * many more than 1 week old?" — which is four genuinely different questions and
+ * correctly four calls. The fifth tripped the limit, and from then on EVERY call
+ * came back as the nudge. The model read it, agreed with it out loud — "I'm
+ * being throttled on repeated calls, let me run one clean query at a time",
+ * then "let me try one fresh query now, the paging guard may have reset" — and
+ * was nudged again, eleven times, until MAX_STEPS ended the turn with no answer.
+ * A livelock: the nudge hands back `ok: true`, so nothing counts it as a failure
+ * and nothing stops it.
+ *
+ * WORSE, IT WAS NUDGING TOWARD WHAT THE MODEL WAS ALREADY DOING. The sentence
+ * recommends `total` and `groupBy` as the cheap route — and two of the calls it
+ * refused were `groupBy` calls. It told him to do the thing it had just stopped
+ * him doing, which is the shape of advice that cannot be followed.
+ *
+ * SO A COUNT OR A GROUPBY IS NOT A PAGE. Those two shapes ARE the cheaper route:
+ * they read no rows, they answer in one call, and no number of them is a walk
+ * through a collection. They are not counted and never nudged. A ROW READ still
+ * is, which keeps every tooth the 30 Aug case earned — those twelve
+ * `list_meetings` calls were all row reads and would all still be caught.
+ *
+ * The sentence's own claim — "each time for another page" — is true again. */
 const SAME_TOOL_LIMIT = 4
+
+/** THE TWO SHAPES THAT ANSWER WITHOUT READING ROWS, and so cannot be paging.
+ * `countOnly` asks for the number alone; `groupBy` asks for counts per client or
+ * per month. Both are what the nudge itself recommends. */
+function asksWithoutReadingRows(input: Record<string, unknown> | undefined): boolean {
+  if (!input) return false
+  if (input.countOnly === true) return true
+  return Array.isArray(input.groupBy) && input.groupBy.length > 0
+}
 
 export function pagingGuard() {
   const calls = new Map<string, number>()
   return {
     /** null to run normally, or the sentence to hand back instead. */
-    check: (write: boolean, name: string): string | null => {
+    check: (write: boolean, name: string, input?: Record<string, unknown>): string | null => {
       if (write) return null
+      // Neither counted nor refused — see the paragraph above. A turn made
+      // entirely of counts and groupBys can run to MAX_STEPS without ever
+      // meeting this guard, which is correct: it never read a row.
+      if (asksWithoutReadingRows(input)) return null
       const n = (calls.get(name) ?? 0) + 1
       calls.set(name, n)
       if (n <= SAME_TOOL_LIMIT) return null
@@ -624,8 +752,34 @@ export function pagingGuard() {
   }
 }
 
+/** WHAT THE SECOND AND THIRD IDENTICAL CALL ARE TOLD, on top of the answer.
+ *
+ * Handing back the cached bytes alone is correct and it is not enough: the model
+ * receives exactly what it received the first time, which is precisely the input
+ * that led it to ask again. Nothing in the reply says "you have been here
+ * before", so there is no signal to break the circuit on.
+ *
+ * Measured on staging 13 Sep 2026, on one question: `describe_module` for
+ * tickets was called SIX times in a turn, five of them answered from this cache.
+ * Each recall is silent, cheap and useless, and together they spent most of a
+ * twelve-step budget. (The thing that SENT it back each time — a field refusal
+ * that said "call describe_module" instead of naming the fields — is fixed at
+ * its own door in query-engine.ts. This is the belt beside that: the door can
+ * only fix the loops it is part of, and a model can repeat a call for reasons
+ * no door knows about.)
+ *
+ * The note is APPENDED to the real answer, never a replacement for it — the
+ * model must still be able to read the result — and it escalates, because a
+ * second ask is a slip and a fourth is a loop. */
+function repeatNote(n: number, name: string): string {
+  return n === 1
+    ? `\n\n(You already called ${name} with these exact arguments earlier in this turn. This is that same answer, unchanged. Use it — asking again will not produce anything new.)`
+    : `\n\n(This is the ${n + 1}th time you have called ${name} with these exact arguments this turn. The answer cannot change within one turn. You are in a loop: stop calling it, use the answer above, and if it does not contain what you need then say so in your reply rather than asking again.)`
+}
+
 export function repeatGuard() {
   const seen = new Map<string, string>()
+  const recalls = new Map<string, number>()
   // Key order must not make two identical calls look different, so the fields are
   // sorted: {scope,view} and {view,scope} are one call.
   const key = (tc: ToolCall): string =>
@@ -633,9 +787,17 @@ export function repeatGuard() {
       Object.fromEntries(Object.entries(tc.input ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)))
     )}`
   return {
-    /** The fenced result this exact read already produced this turn, or null. */
-    recall: (write: boolean, tc: ToolCall): string | null =>
-      write ? null : (seen.get(key(tc)) ?? null),
+    /** The fenced result this exact read already produced this turn, with a note
+     *  saying it is a repeat — or null when this call is new. */
+    recall: (write: boolean, tc: ToolCall): string | null => {
+      if (write) return null
+      const k = key(tc)
+      const cached = seen.get(k)
+      if (cached === undefined) return null
+      const n = (recalls.get(k) ?? 0) + 1
+      recalls.set(k, n)
+      return cached + repeatNote(n, tc.name)
+    },
     remember: (write: boolean, tc: ToolCall, content: string): void => {
       if (!write) seen.set(key(tc), content)
     },
@@ -1002,7 +1164,7 @@ async function refuseStep(
   tc: ToolCall,
   summary: string,
   reason: string
-): Promise<{ message: ChatMessage; ok: boolean }> {
+): Promise<{ message: ChatMessage; ok: boolean; terminal: true }> {
   ctx.emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
   ctx.emit?.({ t: "step_end", tool: tc.name, ok: false, summary, error: reason.slice(0, 140) })
   await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
@@ -1011,7 +1173,15 @@ async function refuseStep(
     toolCallsJson: JSON.stringify([{ tool: tc.name, summary, status: "failed" }]),
     source: ctx.source,
   })
-  return { message: { role: "tool", content: reason, toolCallId: tc.id, toolName: tc.name }, ok: false }
+  // TERMINAL, AND THE ONLY THING IN THIS FILE THAT IS. `refuseStep` is reached
+  // from exactly two places — an unticked source chip, and R24's outbound money
+  // taint — and both are FENCES rather than outcomes: the door was never asked,
+  // there is nothing for the model to fix, and asking again inside the same turn
+  // is precisely what must not happen. Everything else that comes back `ok:false`
+  // is a DOOR'S OWN ANSWER and is recoverable; see `runPlanLoop`'s failure budget
+  // for why that difference had to be made explicit rather than inferred from
+  // `ok` alone.
+  return { message: { role: "tool", content: reason, toolCallId: tc.id, toolName: tc.name }, ok: false, terminal: true }
 }
 
 /** WHAT A CONFIRM-NEEDING CALL IS TOLD when something else in its turn was
@@ -1050,7 +1220,10 @@ const HELD_BACK_BY_MONEY =
  * read-only turn titles by the prompt, not "List roles" (what usageTitle documents).
  * The confirm path loses nothing — requiresConfirm is false for every read, so a stored
  * proposal always holds at least one write to title the folded row. */
-async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatMessage; ok: boolean }> {
+async function runToolCall(
+  ctx: StepCtx,
+  tc: ToolCall
+): Promise<{ message: ChatMessage; ok: boolean; terminal?: boolean }> {
   const { emit, tally } = ctx
   const t = getTool(tc.name)
   const summary = t ? t.summarize(tc.input, ctx.names) : `Run ${tc.name}`
@@ -1093,7 +1266,7 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   // THE SAME TOOL AGAIN, ARGUMENTS NUDGED — see pagingGuard. The step row is still
   // emitted and still written, for the same reason the repeat above is: the model
   // really did ask, and a trail that hid it would make the next one invisible.
-  const nudge = t ? ctx.paging.check(!!t.write, tc.name) : null
+  const nudge = t ? ctx.paging.check(!!t.write, tc.name, tc.input) : null
   if (nudge !== null) {
     const capped = `${summary} — asked again; narrowing is cheaper than the next page`
     emit?.({ t: "step_start", tool: tc.name, summary: capped, ids: traceIds(tc.input) })
@@ -1130,7 +1303,7 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   if (t?.write) {
     tally.actions.push(result.ok ? summary : `${summary} (failed)`)
   }
-  const content = fence(result, ctx.budget.allowance())
+  const content = fence(result, ctx.budget.allowance(), t?.wholeResult === true)
   ctx.budget.spend(content.length)
   // Only a result worth replaying is remembered: a failure is not the answer to
   // the question, and a retry after a bad minute is a reasonable thing to do.
@@ -1497,19 +1670,59 @@ async function runPlanLoop(
     quota = await getQuota(env, guard.teamId)
   }
 
+  // HOW MANY STEPS MAY FAIL BEFORE THE TURN GIVES UP.
+  //
+  // Until 13 Sep 2026 the answer was ZERO: the first step in which any tool call
+  // came back `ok:false` ended the whole turn, with MAX_STEPS nowhere near
+  // exhausted. The owner hit it head-on — he asked "how many total open tickets
+  // are there? and avg per account and per app?", the model sent its filters in
+  // the wrong shape, every call was refused, and it then said, out loud, in the
+  // reply he actually read:
+  //
+  //     "All four lookups were refused - the filters I sent weren't in the right
+  //      shape... Let me run them again properly."
+  //
+  // It never ran them again. It could not: the turn was already over. The model
+  // had diagnosed its own mistake correctly and the loop had already decided the
+  // conversation was finished. That is the worst shape a failure can take - the
+  // fix was known, by the only party who could apply it, one step too late.
+  //
+  // A BUDGET RATHER THAN A REMOVAL, because zero and infinity are both wrong. A
+  // model that retries an impossible call would otherwise spend every remaining
+  // step, and each step is a real model call the team pays for. Two is what the
+  // evidence asks for: the reported failure needed exactly ONE retry, and a
+  // second covers a model that fixes one thing and trips on another. Past that
+  // the turn stops and explains itself exactly as it always did.
+  //
+  // IT COUNTS STEPS, NOT CALLS, and that distinction is the whole reason it
+  // works. The owner's step held FOUR failing calls; counting calls would have
+  // spent the budget inside the very step that earned the retry.
+  const RETRY_BUDGET = 2
+  let failedSteps = 0
+  /** Whether this TURN has already nudged a silent model (see the stall branch
+   *  in the loop). Once per turn, not per step: a model that stalls twice is
+   *  told so, never nudged until MAX_STEPS runs out at a credit a step. */
+  let nudged = false
+
   const startedAt = Date.now()
+  /** THE ONE WAY A TURN STOPS FOR TIME — one sentence, one saved message, one
+   *  return, reached from BOTH places a turn can run out of it. It was inline in
+   *  the between-steps check and nowhere else, which is precisely why the second
+   *  place had no sentence at all. */
+  const stoppedPartway = async (): Promise<ChatOutcome> => {
+    const note =
+      "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
+      "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
+    say(note)
+    await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
+    await log()
+    return { done: true as const, threadId, reply: note, quota }
+  }
+
   for (let step = 0; step < MAX_STEPS; step++) {
     // BETWEEN steps, never inside one: a turn stopped here has a whole tool call
     // behind it whose result is already saved, so what it says is true.
-    if (step > 0 && Date.now() - startedAt > TURN_DEADLINE_MS) {
-      const note =
-        "That one is taking longer than I should keep you waiting for, so I've stopped partway. " +
-        "I did some of it — ask me again and I'll carry on, or narrow it down and I'll be quicker."
-      say(note)
-      await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
-      await log()
-      return { done: true, threadId, reply: note, quota }
-    }
+    if (step > 0 && Date.now() - startedAt > TURN_DEADLINE_MS) return await stoppedPartway()
     stepUnit = null
     if (!(loopOpts.prepaid && step === 0)) {
       const c = await consumeAiUnit(env, guard.teamId)
@@ -1529,22 +1742,60 @@ async function runPlanLoop(
 
     let reply: ModelReply
     try {
+      // ── AND THE DEADLINE COULD NOT SEE INSIDE A STEP (14 Sep 2026) ──────────
+      //
+      // `TURN_DEADLINE_MS` was checked BETWEEN steps and nowhere else, so one
+      // slow model call walked straight through it. Measured on staging on the
+      // owner's own five-part question: step 4 began at +88s (under the 150s
+      // bound, so the check correctly let it start) and the model did not answer
+      // until +230s. The assistant row for that step was written and then the
+      // request died — no tool results, no wrap-up, NO MESSAGE OF ANY KIND. The
+      // person got an empty bubble.
+      //
+      // Which is the exact outcome TURN_DEADLINE_MS was written to prevent, in
+      // this file's own words twenty lines above: "a 144-second one was killed
+      // by the platform mid-request and the person received an EMPTY BUBBLE —
+      // no answer, no error, no sign anything had happened." The bound existed
+      // and could not reach the only call long enough to need it.
+      //
+      // `env.AI.run` takes no abort signal, so the call is not cancelled — it is
+      // RACED. The provider may well finish and bill for it (which is why the
+      // step's credit is not refunded here: it really was spent). What changes
+      // is that the turn stops WAITING, and a person who asked a hard question
+      // gets the same honest sentence they would have got had the step boundary
+      // happened to fall a second earlier.
+      //
+      // It never shortens a turn that was going to finish: the budget handed to
+      // the race is whatever is LEFT of the same 150 seconds, so a call that
+      // would have returned inside the deadline is untouched.
+      const leftOfTurn = TURN_DEADLINE_MS - (Date.now() - startedAt)
+      if (leftOfTurn <= 0) return await stoppedPartway()
+      const inTime = <T,>(work: Promise<T>): Promise<T> =>
+        Promise.race([
+          work,
+          new Promise<never>((_, reject) => setTimeout(() => reject(TURN_RAN_OUT), leftOfTurn)),
+        ])
       if (streaming) {
         // First delta of a NEW model turn gets the blank-line separator when earlier
         // text already streamed (e.g. a lead-in before steps, then the wrap-up after).
         let first = true
-        reply = await model.stream!(convo, toolsNow(), (d) => {
+        reply = await inTime(model.stream!(convo, toolsNow(), (d) => {
           emit!({ t: "text", d: (first && spoke ? "\n\n" : "") + d })
           first = false
           spoke = true
-        })
+        }))
       } else {
-        reply = await model.complete(convo, toolsNow())
+        reply = await inTime(model.complete(convo, toolsNow()))
       }
       // Every model turn's tokens land on this command's one usage row — the
       // cache read/write split included, which is the whole measurement.
       opts.tally.tokens = addTokens(opts.tally.tokens, reply.usage)
     } catch (e) {
+      // THE TURN RAN OUT OF TIME, which is not a model failure and must not be
+      // reported as one: nothing is wrong with the provider, the key or the
+      // app. It takes the same exit the between-steps check takes, so a person
+      // cannot tell which side of a step boundary they happened to land on.
+      if (e === TURN_RAN_OUT) return await stoppedPartway()
       // A model/runtime hiccup becomes a friendly, saved turn — never an uncaught 500.
       // The OWNER must be able to see WHY, so the real error still goes to the store
       // (best-effort; never blocks the reply).
@@ -1569,6 +1820,43 @@ async function runPlanLoop(
       await refundUnspentUnit() // this step's unit bought no completion — hand it back
       await log()
       return { done: true, threadId, reply: msg, quota, failure }
+    }
+
+    // ── AN EMPTY REPLY IS A STALL, NOT AN ANSWER (14 Sep 2026) ─────────────
+    //
+    // No text, no tool call, and not cut off by max_tokens: the model ended its
+    // step having said nothing. Replayed against the deployed model on the very
+    // context that produced it — six correct tool results, one compound
+    // question — it thought for 10,143 characters, ended "Let me do these
+    // calls:", and then sent `finish_reason: "stop"` and silence; the calls it
+    // decided on never reached the wire. Not a timeout, not a refusal, and until
+    // this branch existed it fell through to the final-answer path below, whose
+    // fallback greeted the person (STALLED_TURN_NOTE says what that cost).
+    //
+    // One nudge, model-facing only: with STALL_NUDGE appended to that same
+    // context the model wrote the answer. A second stall in one turn ends it
+    // with the honest sentence. Both are RECORDED, because a stall spends a
+    // credit and buys nothing, and the owner could not count them before.
+    const stalled = !reply.toolCalls.length && !reply.text?.trim() && !reply.truncated
+    if (stalled) {
+      const thought = reply.reasoning ?? ""
+      await recordWorkerError(
+        env.DB,
+        "data-ops",
+        nudged ? "agent/stalled-twice" : "agent/stalled",
+        new Error(
+          `${model.name} ended a step with no text and no tool call after ${thought.length} chars of reasoning` +
+            (thought ? ` — tail: ${JSON.stringify(thought.slice(-200))}` : "")
+        ),
+        undefined,
+        { teamId: guard.teamId, userId: actor.id }
+      )
+      if (!nudged) {
+        nudged = true
+        convo.push({ role: "assistant", content: "" })
+        convo.push({ role: "user", content: STALL_NUDGE })
+        continue
+      }
     }
 
     if (!reply.toolCalls.length) {
@@ -1675,6 +1963,15 @@ async function runPlanLoop(
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
     const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, paging, budget, sources: opts.sources, context: convo, emit }
+    // TWO DIFFERENT WORDS FOR TWO DIFFERENT THINGS, and conflating them is the
+    // bug this loop had. `blocked` is a FENCE - a source chip the person
+    // unticked, or R24's outbound money taint. The door was never asked, there
+    // is nothing for the model to fix, and retrying inside the same turn is
+    // exactly what must not happen, so it ends the turn on the spot regardless
+    // of the budget. `failed` is a DOOR'S OWN ANSWER - a malformed filter, a
+    // field that does not exist, a permission the caller lacks, a 500. The model
+    // can see it in `convo` and act on it, which is what the budget buys.
+    let blocked = false
     let failed = false
     for (const tc of reply.toolCalls) {
       const t = getTool(tc.name)
@@ -1693,7 +1990,7 @@ async function runPlanLoop(
           HELD_BACK_BY_CHIPS
         )
         convo.push(message)
-        failed = true
+        blocked = true
         continue
       }
       // …AND THE SAME FOR THE MONEY, for the same reason and with its own
@@ -1710,12 +2007,20 @@ async function runPlanLoop(
           HELD_BACK_BY_MONEY
         )
         convo.push(message)
-        failed = true
+        blocked = true
         continue
       }
-      const { message, ok } = await runToolCall(stepCtx, tc)
+      const { message, ok, terminal } = await runToolCall(stepCtx, tc)
       convo.push(message)
-      if (!ok) failed = true
+      // `terminal` is set by `refuseStep` and by nothing else - see its own
+      // comment. Reading it here rather than re-deriving the fence keeps the two
+      // from ever drifting apart: a new fence added inside `runToolCall` arrives
+      // here already terminal, and a new DOOR failure arrives already
+      // recoverable, without this line being touched.
+      if (!ok) {
+        if (terminal) blocked = true
+        else failed = true
+      }
       // STAGE TWO OF THE CATALOGUE, and the widening is decided HERE rather than
       // inside the tool. `load_tools` returns a receipt; what the model may
       // actually call next step is read off the call's OWN INPUT by the same loop
@@ -1726,7 +2031,21 @@ async function runPlanLoop(
       if (ok && tc.name === "load_tools" && Array.isArray(tc.input.names))
         for (const n of tc.input.names) if (typeof n === "string") loaded.add(n)
     }
-    if (failed) {
+    if (failed) failedSteps++
+    // THE RETRY, AND THE ONE LINE THAT MAKES IT SAFE. A fence ends the turn
+    // immediately - `blocked` is never granted a retry, whatever the budget says,
+    // which is what keeps `source-chip-gate.test.ts`'s invariant ("the refusal
+    // must come back ok:false so the turn stops and explains itself") true word
+    // for word. An ordinary failure ends it only once the budget is spent, so
+    // the model gets the failing result back in `convo` and another turn of the
+    // loop to do what it already said it would.
+    //
+    // NOTHING IS RE-RUN BY THIS CODE. The retry is the MODEL's: it sees the
+    // door's own error text and decides. So a write that failed is not attempted
+    // again behind anybody's back - the next attempt is a fresh decision with
+    // the failure in front of it, and every gate, confirm and fence it has to
+    // pass is unchanged.
+    if (blocked || failedSteps > RETRY_BUDGET) {
       // The model explains (unmetered): the FAILED reasons are in the convo, so the
       // reply says what was refused and why — not a canned "something went wrong".
       const note = await failureWrapUp(model, convo, toolsNow(), opts.tally)

@@ -4,7 +4,7 @@
 // (sections-stand-on-paper.test.ts's own reason for the same directive).
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// R71 — NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED.
+// R72 — NO SUBTITLE UNDER A HEADING, UNLESS SHE ASKED.
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // THE CLIENT, 2026-09-14, over Settings › Modules' own intro sentence:
@@ -193,7 +193,7 @@ const CHOKEPOINTS = [
  * "description" nine times while declaring no such prop). */
 const SUBTITLE_PROP = /\b(subtitle|description|subheading|caption)\s*\??\s*:/i
 
-describe("R71 — no subtitle under a heading, unless she asked", () => {
+describe("R72 — no subtitle under a heading, unless she asked", () => {
   const files = parse(APP_DIRS)
   const offenders = census(files)
 
@@ -209,11 +209,11 @@ describe("R71 — no subtitle under a heading, unless she asked", () => {
     ).toBeGreaterThan(0)
   })
 
-  it("no heading draws a subtitle beneath it, or the file says why it may (R71)", () => {
+  it("no heading draws a subtitle beneath it, or the file says why it may (R72)", () => {
     const unexplained = offenders.filter((o) => !(o.rel in SUBTITLE_OK))
     expect(
       unexplained.map((o) => `${o.where} — <${o.heading}> is immediately followed by <${o.prose}>`),
-      "R71 — 'Generally, I don't like subtitles, so stop putting them unless I ask' (client, 2026-09-14). " +
+      "R72 — 'Generally, I don't like subtitles, so stop putting them unless I ask' (client, 2026-09-14). " +
         "Delete the sentence, fold it into the heading, or move it where R33/R62/R70 already carry one " +
         "(a field's own helper text, an empty state's explanation, an automation's required reason) — " +
         "or name the file in SUBTITLE_OK with the real reason it is none of those:"
@@ -230,7 +230,7 @@ describe("R71 — no subtitle under a heading, unless she asked", () => {
     ).toEqual([])
   })
 
-  it("no chokepoint that draws a heading for its caller re-grows a subtitle prop (R71)", () => {
+  it("no chokepoint that draws a heading for its caller re-grows a subtitle prop (R72)", () => {
     // THE BLIND SPOT'S OWN GUARD. The sibling census cannot see a subtitle
     // passed as `children` to a component that draws its OWN heading — so the
     // three components that do that are read directly instead, for the one

@@ -23,7 +23,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 
@@ -37,8 +37,9 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify, hasRecencyIntent, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
+import { diversify, hasRecencyIntent, indexSource, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
 import { passageId } from "../src/lib/knowledge-reader"
+import { d1Query } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
@@ -623,6 +624,48 @@ describe("the recency arm — a question that wants what is new (KB-AUDIT.md §4
   })
 })
 
+// kb tag-diagnosis, 12 Sep 2026. MEASURED against real staging: a client-named
+// recency question searches `[account:X, agency]` together, and `agency` is
+// shared by EVERY client question and carries far more traffic than any one
+// client's own material — the newest 8 across `[account:HOGO, agency]` and
+// the newest 8 across `[account:Padelbase, agency]` were the IDENTICAL 8
+// rows, every one `agency`, every one dated the same day. A person asking
+// "what's the latest on HOGO" got this morning's chat mirrors instead of
+// HOGO's own material, every time, and the answer looked plausible enough
+// that nobody would have reported it as a bug. Fixed by taking the newest
+// RECENCY_TOP_K PER compartment rather than over their union, so the
+// high-traffic side of a search can never fill the account-specific side's
+// own share of the window.
+describe("the recency arm's window is per compartment, not per union (kb tag-diagnosis, 12 Sep 2026)", () => {
+  beforeEach(async () => {
+    // Bergman's OWN, older, real material — the account-specific side.
+    const bergmanId = await addSource(IDS.staffUser, {
+      title: "Bergman onboarding notes",
+      body: "Bergman S.A. asked about the invoice export timeline for their onboarding.",
+      accountId: IDS.victimAccount,
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-08-01' WHERE id = '${bergmanId}'`)
+    // FLOOD THE AGENCY COMPARTMENT — nine fresher, unrelated sources, one
+    // more than a single recency window (RECENCY_TOP_K), so a UNION'd top-K
+    // over both compartments would fill entirely with these and never reach
+    // Bergman's own material at all.
+    for (let i = 0; i < 9; i++) {
+      const id = await addSource(IDS.staffUser, {
+        title: `Agency chatter ${i}`,
+        body: "Ordinary agency-wide traffic with nothing to do with Bergman.",
+      })
+      db().exec(`UPDATE knowledge_sources SET record_date = '2026-09-${10 + i}' WHERE id = '${id}'`)
+    }
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+  })
+
+  it("a recency question naming a client still surfaces that client's own older material, despite heavy agency traffic crowding the union", async () => {
+    const answer = await ask(IDS.staffUser, "what's the latest on Bergman?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(true)
+    expect(titles(answer)).toContain("Bergman onboarding notes")
+  })
+})
+
 describe("the compartment is derived, and it is the reasoning that ships", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
@@ -1049,6 +1092,393 @@ describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed 
     expect(titles(answer)).toContain("Lighting spec sheet")
     expect(answer.reason).toContain("found nothing there")
   })
+
+  // THE QUESTION THE HUB ASKED ME TO PROVE, NOT REASON ABOUT (11 Sep 2026):
+  // can A3's unnarrowed retry reach a source the CALLER'S OWN FENCE would
+  // have refused? `route.compartments` only decides which COMPARTMENTS the
+  // candidate arms search — the read-back that turns a candidate id into a
+  // passage (`retrieve`'s `readerClause(guard, "s.")` join) runs
+  // unconditionally, after every `searchArms` call including the retry, and
+  // never reads `route.compartments` at all. So a private source sitting in
+  // the wide-open retry's path must still be invisible to a colleague who
+  // has no sighting of it and does not own it — proved here by mutation,
+  // not asserted from reading the source.
+  it("SECURITY: the unnarrowed retry cannot surface a source the caller's own fence would refuse", async () => {
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, owner_user_id, team_visible, created_at)
+         VALUES ('S_LUMEN_PRIVATE', 'note', 'Lumen — my own read on the relocation', 'account:${ELSEWHERE}', '${OTHER_STAFF}', 0, '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_LUMEN_PRIVATE', 'S_LUMEN_PRIVATE', 'account:${ELSEWHERE}', 0, 'my private note: the Lumen relocation review moved to next quarter', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_LUMEN_PRIVATE';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    // IDS.staffUser is not OTHER_STAFF, holds no sighting of this source, and
+    // does not own it — the retry's own widened search WILL surface this
+    // chunk as a candidate (proved by the sibling test above, same shape,
+    // same account, no owner set); the only thing standing between that
+    // candidate and an answer is the read-back fence.
+    const answer = await ask(IDS.staffUser, "what is the Lumen relocation?")
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
+})
+
+// c-hijack (B): a person's OWN declaration that a single-token name may
+// narrow a search alone — 0085, built after A/A2/A3 because the owner's
+// ruling ("if you know how to fix it, fix it") replaced the 1.5-day estimate
+// in NOTE-c-hijack-B-declared-safety.md with "one hour, not 1.5 days."
+//
+// THE DECLARED FLAG IS AN ADDITIONAL BYPASS, NEVER A REQUIREMENT — `OR`, not
+// `AND`, in `accountsNamedIn`'s own condition. An already-rare name (Bergman
+// S.A.'s surname, 1 chunk) keeps narrowing exactly as A already made it,
+// undeclared; what the flag adds is a SECOND way in, for a name that is NOT
+// rare (an ordinary word with real chunk volume — the "aws"/"platinum"
+// shape A's own header names as unclosable by any threshold).
+describe("c-hijack (B): a declared name_narrows_alone bypasses the rarity gate, never the A2 ambiguity check", () => {
+  const PREMIUM = "A_HIJACK_B_PREMIUM"
+  const RARE = "A_HIJACK_B_RARE"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${PREMIUM}', 'entity', 'Premium', NULL, '2026-01-01'),
+         ('${RARE}', 'entity', 'Vandenbroucke', NULL, '2026-01-01');`
+    )
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_FILLER_B', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    // 50 — well over ACCOUNT_TOKEN_MAX_CHUNKS (30): "premium" is an ordinary
+    // word this corpus already talks about a lot, the same shape as the real
+    // "aws"/"platinum" ties A's own header names as unclosable by rarity alone.
+    const rows: string[] = []
+    for (let i = 0; i < 50; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_PREM_${i}', 'S_FILLER_B', 'agency', ${i}, 'we offer a premium tier on request', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_FILLER_B';"
+    )
+    // Real material under Premium's OWN compartment, so a successful narrow
+    // finds something rather than tripping A3's retry — these tests are about
+    // WHETHER it narrows, not what happens when a narrow finds nothing.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_PREMIUM_OWN', 'note', 'Renewal notes', 'account:${PREMIUM}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_PREMIUM_OWN', 'S_PREMIUM_OWN', 'account:${PREMIUM}', 0, 'Premium renewal status: approved for another year', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_PREMIUM_OWN';`
+    )
+  })
+
+  it("an ordinary, non-rare single-token name does NOT narrow while undeclared", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("the SAME name narrows once a person declares name_narrows_alone", async () => {
+    db().exec(`UPDATE accounts SET name_narrows_alone = 1 WHERE id = '${PREMIUM}'`)
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([`account:${PREMIUM}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("an already-rare name keeps narrowing UNDECLARED — the flag adds a bypass, it is never a requirement", async () => {
+    // Vandenbroucke: a genuinely rare surname, no filler chunks at all —
+    // exactly Bergman S.A.'s own shape (A's header: 1 chunk, undeclared,
+    // hijacks today). If the `OR` had silently become an `AND`, this is the
+    // test that would catch it — every one of the three proven A fixes
+    // (green, demo, solutions) is this same undeclared-but-rare shape.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_RARE_OWN', 'note', 'Contract notes', 'account:${RARE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_RARE_OWN', 'S_RARE_OWN', 'account:${RARE}', 0, 'The Vandenbroucke renewal finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_RARE_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what happened with the Vandenbroucke renewal?")
+    expect(answer.compartments).toEqual([`account:${RARE}`, "agency"])
+    expect(answer.found).toBe(true)
+  })
+
+  it("A2 still wins over TWO declared accounts sharing the same token — resolves to neither", async () => {
+    // A second account declares the SAME collapsed token "premium" — two real
+    // companies both claiming one ordinary word is evidence about the WORD,
+    // never either company, exactly as A2 already established for undeclared
+    // matches. "re-premium" collapses to "premium" the same way A2's own
+    // "re-rosewood" collapses to "rosewood" — a dropped short prefix.
+    const PREMIUM_2 = "A_HIJACK_B_PREMIUM_2"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${PREMIUM_2}', 'entity', 're-premium', NULL, '2026-01-01', 1);
+       UPDATE accounts SET name_narrows_alone = 1 WHERE id = '${PREMIUM}';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.compartments).not.toContain(`account:${PREMIUM}`)
+    expect(answer.compartments).not.toContain(`account:${PREMIUM_2}`)
+  })
+
+  // c-hijack (B), THE SECOND HALF (0086) — the owner's correction, the same
+  // night: `name_narrows_alone = 1` (ALLOW) is an `OR` against the rarity
+  // gate, so it can only ever ADD a narrow. It does NOTHING for a name that
+  // is already rare enough to narrow on its own — Bergman S.A.'s surname is
+  // one chunk, well under ACCOUNT_TOKEN_MAX_CHUNKS, and narrows on rarity
+  // alone whether or not anyone ever declares it. The residual that actually
+  // needed closing was the OPPOSITE: a way to say a word must NEVER narrow
+  // alone. `= 2` (DENY) is that control, checked FIRST, before either the
+  // rarity gate or the alias/code branch.
+  it("a DENY beats rarity — the shape an ALLOW alone could never close, and the one that would have caught the spec error", async () => {
+    const DENIED = "A_HIJACK_B_DENIED"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${DENIED}', 'entity', 'Wexford', NULL, '2026-01-01', 2);
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_DENIED_OWN', 'note', 'Onboarding notes', 'account:${DENIED}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_DENIED_OWN', 'S_DENIED_OWN', 'account:${DENIED}', 0, 'The Wexford onboarding finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_DENIED_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    // Same shape as the "already-rare name keeps narrowing UNDECLARED" test
+    // above (one chunk, no filler) — the ONLY difference is the DENY. Without
+    // it, this question would narrow exactly like Vandenbroucke's did.
+    const answer = await ask(IDS.staffUser, "what happened with the Wexford onboarding?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("a DENY beats an alias/code match too — a declared 'never narrow alone' must not be defeated by the account's own code", async () => {
+    const DENIED_CODE = "A_HIJACK_B_DENIED_CODE"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${DENIED_CODE}', 'entity', 'Wexford Logistics', 'WEXFORD', '2026-01-01', 2);
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_DENIED_CODE_OWN', 'note', 'Shipping notes', 'account:${DENIED_CODE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_DENIED_CODE_OWN', 'S_DENIED_CODE_OWN', 'account:${DENIED_CODE}', 0, 'The WEXFORD shipment finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_DENIED_CODE_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what happened with the WEXFORD shipment?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+})
+
+// a-names. A contact is an INDIVIDUAL account linked to a company through
+// `account_links` — "contact" is a role on that link, not an account_type
+// (the table's own header comment). `ref_id` on a contact's `knowledge_names`
+// row is the LINKED COMPANY's id, never the contact's own: nothing is ever
+// indexed under a real contact's own individual-account id (measured before
+// this was built — 119 sources filed that way, all five real chunks a QA
+// fixture's own notification emails, against 3,235 under real client
+// accounts), so a compartment built from a contact's own id would search
+// nothing.
+describe("a-names: a contact narrows a search the same way a client name does", () => {
+  const NKEMCO = "A_NAMES_NKEMCO"
+  const PERSON_JN = "A_NAMES_JAMES_NKEMELU"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${NKEMCO}', 'entity', 'Nkemco', NULL, '2026-01-01'),
+         ('${PERSON_JN}', 'individual', 'James Nkemelu', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_JN', '${NKEMCO}', '${PERSON_JN}', '2026-01-01');`
+    )
+    // "james" is an ordinary English word this corpus already talks about a
+    // lot — the exact shape a first name must NEVER be seeded alone for.
+    // "nkemelu" is a genuinely rare surname (zero filler chunks).
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_JAMES_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    const rows: string[] = []
+    for (let i = 0; i < 40; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_JAMES_${i}', 'S_JAMES_FILLER', 'agency', ${i}, 'james said the room was ready', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_JAMES_FILLER';"
+    )
+    // Real material under Nkemco's own compartment, so a successful narrow
+    // finds something rather than tripping A3's retry.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_NKEMCO_OWN', 'note', 'Renewal notes', 'account:${NKEMCO}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_NKEMCO_OWN', 'S_NKEMCO_OWN', 'account:${NKEMCO}', 0, 'Nkemelu renewal status: approved for another year', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_NKEMCO_OWN';`
+    )
+  })
+
+  it("the full name narrows to the linked company, via the existing multi-token bypass", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the James Nkemelu renewal?")
+    expect(answer.compartments).toEqual([`account:${NKEMCO}`, "agency"])
+    expect(answer.reason).toContain("James Nkemelu")
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("the surname alone narrows too, once it clears the rarity gate", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the Nkemelu renewal?")
+    expect(answer.compartments).toEqual([`account:${NKEMCO}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("the first name is NEVER seeded alone, however ordinary or rare it is", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [NKEMCO]
+    )
+    expect(rows.map((r) => r.name.toLowerCase())).not.toContain("james")
+    // And a question naming ONLY the first name does not narrow — "james" is
+    // exactly ordinary enough that if it HAD been seeded alone, this would
+    // hijack every question anybody ever asked containing the word.
+    const answer = await ask(IDS.staffUser, "is james back from leave yet?")
+    expect(answer.compartments).not.toContain(`account:${NKEMCO}`)
+  })
+
+  it("a contact linked to more than one company narrows to NEITHER — never fanned out", async () => {
+    const SECOND = "A_NAMES_SECOND_CO"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES ('${SECOND}', 'entity', 'Secondco', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at) VALUES ('L_JN_2', '${SECOND}', '${PERSON_JN}', '2026-01-01');`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND (ref_id = ? OR ref_id = ?)",
+      [NKEMCO, SECOND]
+    )
+    // Not seeded under EITHER company — the ambiguity is caught before a row
+    // is even written, not resolved later at match time.
+    expect(rows).toEqual([])
+    const answer = await ask(IDS.staffUser, "did James Nkemelu confirm the renewal?")
+    expect(answer.compartments).not.toContain(`account:${NKEMCO}`)
+    expect(answer.compartments).not.toContain(`account:${SECOND}`)
+  })
+
+  it("a contact never bypasses rarity through the COMPANY's own name_narrows_alone", async () => {
+    // "Ordinaire" declares its OWN collapsed name safe — that says nothing
+    // about a contact filed under it. "Regular" is the surname, deliberately
+    // as ordinary as "premium" (c-hijack B's own proven case), with the same
+    // shape of filler chunks well over the ceiling.
+    const ORDINAIRE = "A_NAMES_ORDINAIRE"
+    const PERSON_PR = "A_NAMES_PAT_REGULAR"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${ORDINAIRE}', 'entity', 'Ordinaire', NULL, '2026-01-01', 1),
+         ('${PERSON_PR}', 'individual', 'Pat Regular', NULL, '2026-01-01', 0);
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_PR', '${ORDINAIRE}', '${PERSON_PR}', '2026-01-01');`
+    )
+    const rows: string[] = []
+    for (let i = 0; i < 40; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_REG_${i}', 'S_JAMES_FILLER', 'agency', ${100 + i}, 'this is a regular occurrence around here', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id LIKE 'C_REG_%';"
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const seeded = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [ORDINAIRE]
+    )
+    // "pat regular" (2 tokens) is seeded via the multi-token bypass; "regular"
+    // alone is NOT, because it fails the live rarity check and the company's
+    // OWN name_narrows_alone flag must not rescue it — the SEED-TIME half of
+    // the guard.
+    expect(seeded.map((r) => r.name.toLowerCase())).toContain("pat regular")
+    expect(seeded.map((r) => r.name.toLowerCase())).not.toContain("regular")
+    const answer = await ask(IDS.staffUser, "was this a regular occurrence?")
+    expect(answer.compartments).not.toContain(`account:${ORDINAIRE}`)
+
+    // THE MATCH-TIME HALF, proven directly: a 'contact' row naming "regular"
+    // alone, inserted straight into `knowledge_names` (never through the
+    // seeder — this is `accountsNamedIn`'s OWN refusal under test, not
+    // `contactNameRows`'s, so a future seeder that got the seed-time gate
+    // wrong could not silently make this pass). If the `kind === "account"`
+    // guard on `name_narrows_alone` were ever dropped, ORDINAIRE's own
+    // declared flag would rescue this row and the question below would
+    // wrongly narrow.
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_REGULAR_DIRECT', 'contact', '${ORDINAIRE}', 'regular', NULL, 'account:${ORDINAIRE}', '2026-01-01');`
+    )
+    const direct = await ask(IDS.staffUser, "was this a regular occurrence?")
+    expect(direct.compartments).not.toContain(`account:${ORDINAIRE}`)
+  })
+
+  it("a contact is never BLOCKED by the company's own DENY either — a rare surname still narrows", async () => {
+    // "Blockco" declares its OWN name must never narrow alone — that is a
+    // fact about Blockco's name, not about a contact filed under it. "Nkeme"
+    // is a genuinely rare surname (no filler chunks at all), so a DENY
+    // leaking onto a contact row would silently refuse a narrow the rarity
+    // gate alone would have granted.
+    const BLOCKCO = "A_NAMES_BLOCKCO"
+    const PERSON_TN = "A_NAMES_TARA_NKEME"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${BLOCKCO}', 'entity', 'Blockco', NULL, '2026-01-01', 2);
+       INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${PERSON_TN}', 'individual', 'Tara Nkeme', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_TN', '${BLOCKCO}', '${PERSON_TN}', '2026-01-01');
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_BLOCKCO_OWN', 'note', 'Case notes', 'account:${BLOCKCO}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_BLOCKCO_OWN', 'S_BLOCKCO_OWN', 'account:${BLOCKCO}', 0, 'Nkeme raised a question about the Blockco case', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_BLOCKCO_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what question did Nkeme raise about the case?")
+    expect(answer.compartments).toEqual([`account:${BLOCKCO}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Case notes")
+  })
+
+  it("a QA account-switcher fixture is never seeded, by name", async () => {
+    const QA_CO = "A_NAMES_QA_CO"
+    const QA_PERSON = "A_NAMES_QA_PERSON"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${QA_CO}', 'entity', 'Qaco', NULL, '2026-01-01'),
+         ('${QA_PERSON}', 'individual', 'Alaap Kanchwala (portal test 1)', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_QA', '${QA_CO}', '${QA_PERSON}', '2026-01-01');`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [QA_CO]
+    )
+    expect(rows).toEqual([])
+  })
 })
 
 // c-misspell. The owner asked the live assistant "What is happening with
@@ -1350,6 +1780,57 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
       const answer = await ask(OTHER_STAFF, "why was the dispatch rollout paused?")
       expect(answer.found).toBe(false)
     })
+  })
+})
+
+// THE BUG, STAGING, 12 SEP 2026. The owner asked for "the latest jourfix",
+// `ask_knowledge` answered with `records: [{ sourceId: "01M27H…", title:
+// "🧭 Jourfix" }]`, and when he confirmed which one he meant the assistant
+// handed that SAME sourceId to `get_meeting_transcript` — which reads the
+// `meetings` table by primary key and answered "That meeting doesn't exist.",
+// true of the knowledge-source id and false of the meeting it mirrors.
+//
+// `records` is a router-level hint (`deriveRoute`'s covers, §3 in this file's
+// own header) built from `sourceTitles`, which read back only `id` and
+// `title` — nothing that told a caller the id it was holding named a SOURCE,
+// in a different id space from the meeting/ticket/process id every other
+// door on this id takes. `citations` and `passages` never had this hole:
+// `toPassage` already carries `recordPath` (one hop past the source, via the
+// exact same `recordPath()` function `sourceTitles` now calls too), so a
+// citation was always resolvable and a `records` entry never was.
+//
+// THE FIX IS THE SAME SEAM, not a second one: `sourceTitles` now reads
+// `origin_table`/`origin_row_id`/`compartment` off the row it already fetches
+// and resolves them through `recordPath()` — the identical function and the
+// identical inputs `toPassage` uses — so a `records` row and a `citations`
+// row for the same source can never disagree about where it points.
+describe("`records` carries a real path back to what it mirrors, not just a source id", () => {
+  const guard: MemberGuard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  it("a source that mirrors a meeting resolves through the SAME recordPath a citation would get", async () => {
+    const meetingId = "01MEETINGJOURFIXWXWXWXWXWX"
+    const sourceId = "01SOURCEJOURFIXWXWXWXWXWXW"
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, title, summary, body,
+         body_bytes, team_visible, created_at, creator_name)
+       VALUES ('${sourceId}', 'meeting', 'meetings', '${meetingId}', 'agency', 'Jourfix zzqoxdrix meeting',
+         'A weekly zzqoxdrix jourfix catch-up.', 'A weekly zzqoxdrix jourfix catch-up with the whole team.',
+         40, 1, '2026-09-01', 'kwapso');`
+    )
+    // Real indexing (chunks + the record-level cover vector `deriveRoute`
+    // searches) — a hand-written vector row would prove the resolver, not the
+    // pipeline that fed it the wrong shape on staging.
+    await indexSource(env(IDS.staffUser), {} as never, guard, sourceId)
+
+    const answer = await ask(IDS.staffUser, "what happens at the weekly zzqoxdrix jourfix?")
+    const record = (answer.records ?? []).find((r) => r.sourceId === sourceId)
+    expect(record, `records carried: ${JSON.stringify(answer.records)}`).toBeTruthy()
+    // THE MUTATION THIS PROVES: a `records` entry with no `recordPath`, or one
+    // built from the SOURCE's own id, is exactly the shape that sent
+    // `get_meeting_transcript` hunting for a meeting named "01SOURCE…" and got
+    // told it does not exist. This must resolve to the MEETING's own id.
+    expect(record?.recordPath).toBe(`meetings/${meetingId}`)
+    expect(record?.recordPath).not.toBe(`meetings/${sourceId}`)
   })
 })
 
@@ -1919,19 +2400,29 @@ describe("an envelope does not take a slot from something that says more", () =>
   // padded" below.
 })
 
-// ── A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE ────────────────
+// ── A VIDEO LINK IS READ, NOT REFUSED — BUILD-5, 11 SEP 2026 ────────────────
 //
-// Every unreadable thing that ever reached this knowledge base failed the same
-// way: accepted, stored, quietly never read, and the person never told. 131
-// files of logo artwork got in that way; every PDF scored 0.000 on letter-shaped
-// tokens that way; `image/*` has been opaque since the beginning that way.
+// The owner ruled on 27 Aug 2026 that a video link with nothing pasted beside
+// it was REFUSED — "we don't open the page for you" — because every
+// unreadable thing that ever reached this base before that got in by being
+// silently accepted: 131 files of logo artwork, every PDF at 0.000
+// letter-shaped tokens, `image/*` opaque since the beginning.
 //
-// The owner ruled on 27 Aug 2026 that a video link is REFUSED instead, and that
-// the refusal carries the fix: paste the transcript and the source is welcome.
-// The form says so while somebody is typing; this is the door, which is what
-// holds when the request comes from the assistant, from MCP, or from a screen
-// that has drifted.
-describe("a video link is refused unless its transcript comes with it", () => {
+// He reversed himself, deliberately, on 11 Sep 2026: "For YouTube, Loom,
+// Tella, and any other video URLs where we can extract a transcription...
+// Let's build it." A video link with nothing pasted is now ACCEPTED and READ
+// through the one declared reader table (R42, source-readers.ts) — real words
+// become the body, and where there are none, the SAME honest-refusal sentence
+// becomes the body instead of a 400, so "paste it yourself" is text already
+// sitting in the box rather than a toast that vanished. An ordinary,
+// non-video link with nothing pasted is still refused exactly as before —
+// nothing here is built to fetch it.
+describe("a video link is read, and a plain link still needs its material pasted", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
   const video = (body?: string) =>
     call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Bergman cutover walkthrough",
@@ -1939,20 +2430,47 @@ describe("a video link is refused unless its transcript comes with it", () => {
       ...(body ? { body } : {}),
     })
 
-  it("refuses it, and says what would fix it", async () => {
+  it("finds a real transcript and stores it as the body — never a 400 for having nothing pasted", async () => {
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      if (url.includes("type=list"))
+        return new Response('<transcript_list><track lang_code="en"/></transcript_list>', { status: 200 })
+      return new Response(
+        "<transcript><text>Marta walked the cutover to the first Monday of April.</text></transcript>",
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
     const res = await video()
-    expect(res.status).toBe(400)
-    const out = (await res.json()) as { error: string; message: string }
-    expect(out.error).toBe("video_needs_transcript")
-    expect(out.message, "the refusal must carry the remedy, not just the no").toMatch(/transcript/i)
+    expect(res.status).toBe(200)
+    // Real words are the MATERIAL, chunked and searchable like any other
+    // source — asserted on the index rather than on an answer, same reasoning
+    // as the pasted-transcript test below.
+    const row = db()
+      .prepare(
+        `SELECT chunk_count AS n, body AS b FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
+      )
+      .get("Bergman cutover walkthrough") as { n: number; b: string } | undefined
+    expect(row?.b, "the caption text must be the body").toMatch(/first Monday of April/)
+    expect(row?.n, "a real transcript is chunked, not merely stored").toBeGreaterThan(0)
+    // THE LOADING UX'S OWN CONTRACT (kb_review builds the screen on web/; this
+    // is the door's half). "done — read N words of YouTube captions", off one
+    // synchronous call, no streaming.
+    const out = (await res.json()) as { read: { provider: string; kind: string; words: number } | null; refusedBecause: string | null }
+    expect(out.read).toEqual({ provider: "YouTube", kind: "captions", words: 10 })
+    expect(out.refusedBecause, "a real read is never ALSO a refusal").toBeNull()
   })
 
-  it("and stores NOTHING — a refused source is not a row that answers nothing", async () => {
-    await video()
-    const rows = db()
-      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
-      .get("Bergman cutover walkthrough") as { n: number }
-    expect(rows.n).toBe(0)
+  it("finds nothing, and the honest note becomes the visible, editable body — still never a 400", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<transcript_list></transcript_list>", { status: 200 })) as unknown as typeof fetch
+    const res = await video()
+    expect(res.status).toBe(200)
+    const row = db()
+      .prepare(`SELECT body AS b FROM knowledge_sources WHERE title = ?`)
+      .get("Bergman cutover walkthrough") as { b: string } | undefined
+    expect(row?.b, "the remedy sits in the box, not in a sentence that vanished").toMatch(/transcript/i)
+    const out = (await res.json()) as { read: unknown; refusedBecause: string | null }
+    expect(out.read, "nothing was read — never a guessed provider/kind").toBeNull()
+    expect(out.refusedBecause, "the same sentence that became the body, also in its own field").toMatch(/transcript/i)
   })
 
   it("accepts it the moment the transcript is pasted, and indexes what was said", async () => {
@@ -1960,46 +2478,76 @@ describe("a video link is refused unless its transcript comes with it", () => {
       "Marta walked the cutover: the invoice run moves to the first Monday of April and Ana sends the supplier list."
     )
     expect(res.status).toBe(200)
-    // The transcript is the MATERIAL, not a note beside the link — so it is
-    // chunked and searchable like any other source. Asserted on the index rather
-    // than on an answer: what a stand-in embedding model ranks is a different
-    // subject, and this one is about the row existing with its words in it.
+    // The pasted transcript is the MATERIAL, not a note beside the link — so it
+    // is chunked and searchable like any other source. Asserted on the index
+    // rather than on an answer: what a stand-in embedding model ranks is a
+    // different subject, and this one is about the row existing with its
+    // words in it.
     const row = db()
       .prepare(
         `SELECT chunk_count AS n FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
       )
       .get("Bergman cutover walkthrough") as { n: number } | undefined
     expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
+    // Material already came WITH the request — createSource never touches
+    // extractLink, so both fields are null exactly as on an ordinary note.
+    const out = (await res.json()) as { read: unknown; refusedBecause: unknown }
+    expect(out.read).toBeNull()
+    expect(out.refusedBecause).toBeNull()
   })
 
-  // THE GATE IS THE EMPTY BODY, NOT THE HOST — and this is the case that moved
-  // it. The owner pasted a Tella recording behind his OWN domain,
-  // `content.kwapso.com/video/…`, which walked past all fifteen hostnames and
-  // became a source with a title, a link and no body: the exact shape the rule
-  // exists to prevent, produced by the rule meant to prevent it.
-  it("refuses ANY link with nothing to read, including one no list could name", async () => {
+  // THE GATE WAS THE EMPTY BODY, NOT THE HOST — and this is the case that
+  // moved the original rule, then moved it again, then (12 Sep 2026) turned
+  // out to hold the real thing rather than a title standing in for it. The
+  // owner's own Tella recording behind his own domain,
+  // `content.kwapso.com/video/…`, walked past every hostname on the old
+  // list; it is resolved by the page's own oEmbed discovery tag
+  // (source-readers.ts, `resolveLinkType`), and READ from the same page's
+  // embedded `transcriptionWords` payload — not the oEmbed title, which this
+  // table no longer treats as a successful read at all.
+  it("a Tella recording behind the owner's own domain is read in full, discovered by oEmbed and read from its own embedded transcript", async () => {
+    const TELLA_PAGE =
+      '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=x" title="A recording" type="application/json+oembed"/></head>' +
+      '<body><script>self.__next_f.push([1,"...\\"transcriptionWords\\":[' +
+      '{\\"end_\\":1,\\"start\\":0,\\"text\\":\\"Testing\\",\\"hidden\\":false,\\"index\\":0},' +
+      '{\\"end_\\":2,\\"start\\":1,\\"text\\":\\"application\\",\\"hidden\\":false,\\"index\\":1},' +
+      '{\\"end_\\":3,\\"start\\":2,\\"text\\":\\"loading\\",\\"hidden\\":false,\\"index\\":2},' +
+      '{\\"end_\\":4,\\"start\\":3,\\"text\\":\\"speed.\\",\\"hidden\\":false,\\"index\\":3}' +
+      ']...\\"duration\\":1000}"])</script></body></html>'
+    globalThis.fetch = vi.fn(async () => new Response(TELLA_PAGE, { status: 200 })) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Tella 1",
       sourceUrl: "https://content.kwapso.com/video/testing-application-loading-speed-cbfo",
     })
-    expect(res.status).toBe(400)
-    const rows = db().prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?").get("Tella 1") as {
-      n: number
-    }
-    expect(rows.n, "and stores nothing — a row that looks filed and holds nothing is the defect").toBe(0)
+    expect(res.status).toBe(200)
+    const row = db().prepare("SELECT body AS b FROM knowledge_sources WHERE title = ?").get("Tella 1") as
+      | { b: string }
+      | undefined
+    expect(row?.b, "the real transcript is the body, not a four-word title").toBe(
+      "Testing application loading speed."
+    )
+    // "transcript", never "description" — a real transcript came through,
+    // and the loading UX must say so, not undersell it as best-effort.
+    const out = (await res.json()) as { read: { provider: string; kind: string; words: number } | null }
+    expect(out.read).toEqual({ provider: "Tella", kind: "transcript", words: 4 })
   })
 
-  it("and an ordinary link with nothing to read is refused too, in different words", async () => {
+  it("and an ordinary, non-video link with nothing to read is still refused, in different words", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called — a non-video link is refused before extraction is ever tried")
+    }) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "The dispatch runbook",
       sourceUrl: "https://docs.example.com/runbook",
     })
     expect(res.status).toBe(400)
     const out = (await res.json()) as { error: string; message: string }
-    // The DETECTOR still runs — it just chooses the sentence now rather than the
-    // outcome. A person who pasted a document link is not told we cannot watch it.
     expect(out.error).toBe("link_needs_material")
     expect(out.message).not.toMatch(/watch a video/i)
+    const rows = db()
+      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
+      .get("The dispatch runbook") as { n: number }
+    expect(rows.n, "a refused source is not a row that answers nothing").toBe(0)
   })
 
   it("and a link is welcome the moment there is something to read beside it", async () => {
@@ -2009,14 +2557,33 @@ describe("a video link is refused unless its transcript comes with it", () => {
       body: "The runbook says to check the session cookie before restarting the dispatch worker.",
     })
     expect(res.status).toBe(200)
+    // An ordinary note (pasted material, no extraction attempted) carries
+    // neither field — the loading UX has nothing to show and nothing to
+    // explain, because nothing here was ever read on the caller's behalf.
+    const out = (await res.json()) as { read: unknown; refusedBecause: unknown }
+    expect(out.read).toBeNull()
+    expect(out.refusedBecause).toBeNull()
   })
 
-  it("a direct link to an .mp4 is refused too, wherever it is hosted", async () => {
+  // No host, no `/video/` path segment — resolveLinkType never even fetches —
+  // so this is the "recognised as a video, no reader for it yet" honest note,
+  // accepted and kept exactly like the no-caption-track case above.
+  it("a direct link to an .mp4 is accepted too, with the honest note as its body", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called — no host and no /video/ path segment to discover")
+    }) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Standup recording",
       sourceUrl: "https://files.bergman.example/standup-2026-03-04.mp4",
     })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    const row = db().prepare("SELECT body AS b FROM knowledge_sources WHERE title = ?").get("Standup recording") as
+      | { b: string }
+      | undefined
+    expect(row?.b, "kept as a source either way, never silently dropped").toMatch(/can't read this link/i)
+    const out = (await res.json()) as { read: unknown; refusedBecause: string | null }
+    expect(out.read, "no reader for a host we don't even recognise").toBeNull()
+    expect(out.refusedBecause).toMatch(/can't read this link/i)
   })
 })
 
@@ -2250,5 +2817,55 @@ describe("a short answer is widened from the passages it already has", () => {
     })
     const answer = await ask(IDS.staffUser, "Who owns the supplier list during the cutover window?")
     expect(titles(answer)).not.toContain("Private cutover note")
+  })
+})
+
+// shared_with (0073's tenth Vectorize label) — written truthfully now on every
+// path that knows the answer, the owner's ruling, 12 Sep 2026: "keep it for
+// everything." NOTHING READS THIS AS A FENCE (readerClause is ownerClause AND
+// appClause, full stop — see IngestRow.sharedWith's own header), so these are
+// mutation proofs of the WRITE, never of who may read what.
+describe("shared_with is written truthfully on the typed upload path (createSource/updateSource)", () => {
+  const rowSharedWith = (id: string) =>
+    (db().prepare("SELECT shared_with AS s FROM knowledge_sources WHERE id = ?").get(id) as { s: string }).s
+
+  it("a note marked private writes 'private' — the SAME boolean that sets owner_user_id", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "My own scratch note",
+      body: "Not for anyone else yet.",
+      visibility: "private",
+    })
+    expect(rowSharedWith(id)).toBe("private")
+  })
+
+  it("an ordinary note (no visibility sent) writes 'agency'", async () => {
+    const id = await addSource(IDS.staffUser, {
+      title: "An ordinary team note",
+      body: "Everyone on the module can read this.",
+    })
+    expect(rowSharedWith(id)).toBe("agency")
+  })
+
+  it("editing an existing note's privacy moves shared_with with it — the seventh path, beyond the six named", async () => {
+    const id = await addSource(IDS.staffUser, { title: "Starts ordinary", body: "…" })
+    expect(rowSharedWith(id), "created without visibility: 'agency'").toBe("agency")
+
+    const toPrivate = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "private",
+    })
+    expect(toPrivate.status, await toPrivate.text()).toBe(200)
+    expect(rowSharedWith(id), "toggled private on EDIT, not just on create").toBe("private")
+
+    const backToTeam = await call(IDS.staffUser, "POST /api/content/knowledge/update", {
+      id,
+      title: "Starts ordinary",
+      visibility: "team",
+    })
+    expect(backToTeam.status).toBe(200)
+    expect(rowSharedWith(id), "and back — shared_with is re-decided on every edit, not stuck at CREATE time").toBe(
+      "agency"
+    )
   })
 })

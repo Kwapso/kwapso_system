@@ -21,6 +21,7 @@
 // still throws, because that is a token dying mid-loop, which somebody must be
 // told about rather than have silently turn forty files into empty strings.
 
+import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import { describe, expect, it, vi } from "vitest"
 
 import { driveFileText } from "../src/lib/google-api"
@@ -122,8 +123,30 @@ describe("driveFileText — one file's refusal is not the folder's", () => {
     expect(await driveFileText(env, "tok", "picture")).toBe("")
   })
 
-  it("caps one file's text so a 400-page document is not a worker's memory budget", async () => {
+  // THE CAP IS THE ROW'S NOW, AND THIS TEST MOVED WITH IT — see
+  // one-ceiling-and-it-speaks.test.ts for the whole account. In short: this used
+  // to pin 100_000, which is fifteen times below what a row can hold, so
+  // `capToRow` — the one cut in this app that TELLS somebody it happened — was
+  // handed a pre-truncated document every time and always answered "nothing was
+  // cut". Ten live sources on staging were sitting at ~99,996 characters ending
+  // mid-word with no note on the row. A smaller number here is not a safer
+  // number; it is a silent one.
+  //
+  // The memory sentence this test was named for still holds and is still what is
+  // being checked: the read STREAMS and stops, so a 4 MB export never lands in a
+  // worker whole. That is the property. 250_000 characters is now simply a file
+  // that FITS, which is the honest outcome for a 400-page document, so the case
+  // is re-pointed at one that genuinely does not.
+  it("streams and stops at the ceiling rather than pulling a whole export into memory", async () => {
+    const body = "x".repeat(DOCUMENT_LIMIT_BYTES + 250_000)
+    stubGoogle({ mimeType: "text/plain", download: { status: 200, body } })
+    const read = await driveFileText(env, "tok", "huge")
+    expect(read.length).toBe(DOCUMENT_LIMIT_BYTES)
+    expect(read.length, "the whole export must never be held").toBeLessThan(body.length)
+  })
+
+  it("a 400-page document now arrives WHOLE, because a row can hold it", async () => {
     stubGoogle({ mimeType: "text/plain", download: { status: 200, body: "x".repeat(250_000) } })
-    expect((await driveFileText(env, "tok", "huge")).length).toBe(100_000)
+    expect((await driveFileText(env, "tok", "big")).length).toBe(250_000)
   })
 })

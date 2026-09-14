@@ -67,19 +67,34 @@
 // what the old interpolation cost and why the fence moved with it.
 
 import { automationOff } from "@shared/workers/automations"
-import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { mendMojibake } from "@shared/workers/mojibake"
-import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService, type GoogleShelf } from "@shared/types"
+import {
+  GOOGLE_NAMED_SERVICES,
+  GOOGLE_SCOPED_SERVICES,
+  GOOGLE_SERVICES,
+  type GoogleItem,
+  type GoogleService,
+  type GoogleShelf,
+} from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, knownChatPeople, listConnections, listNamedSources } from "./google"
 import { calendarEventIdInText, chatMessages, googlePresence, isConnectionLost, type ChatMessage, type ProbableService } from "./google-api"
 import { chatThreadItem, chatThreads, hydrateText, readGoogleMaterial, tokenOrNull } from "./google-read"
 import { BACKFILL_SLICE_DAYS, BACKFILL_YEARS_BACK } from "./meetings"
-import { execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
+import {
+  accountCompartment,
+  accountsNamedIn,
+  AGENCY_COMPARTMENT,
+  execKnowledgeScript,
+  indexSource,
+  teamVisibleRecomputeSql,
+} from "./knowledge"
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { brand } from "@shared/brand"
 import {
   INGEST_SOURCES_PER_TICK,
@@ -257,9 +272,33 @@ function afterCursor(rows: IngestRow[], cursor: { at: string; id: string } | nul
   return rows.filter((r) => r.sortAt > cursor.at || (r.sortAt === cursor.at && r.originRowId > cursor.id))
 }
 
-/** The fence and the filing, off one item. Two lines, in one place, because they
- * are the two things this whole module is for. */
-function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: string | null; accounts: string[] } {
+/** The fence, the filing, and the SHARING LABEL, off one item — three lines, in
+ * one place, because they are what this whole module reduces a raw Google item
+ * to. `sharedWith` (0073's tenth Vectorize label) is written truthfully here so
+ * it is written truthfully everywhere: the owner's ruling, 12 Sep 2026 — "keep
+ * it for everything" — after a census found NOTHING reads it as a fence
+ * (`readerClause` is `ownerClause AND appClause`, full stop), so writing it
+ * correctly cannot change who reads what; it only makes an inert column honest.
+ *
+ * TWO RULES, NOT ONE, because the two service PAIRS answer a different question:
+ *   • `GOOGLE_NAMED_SERVICES` (Drive, Chat) — sharing is the ACT. Nothing is
+ *     reachable until a person hands a folder or a space over, and what they
+ *     hand over carries its own `shelf` (declared at share time). `shelf` IS
+ *     the answer: 'private' names the sharer's own choice to keep it to
+ *     themselves, and there is no `accountId` reading to fall back on.
+ *   • `GOOGLE_SCOPED_SERVICES` (Gmail, Calendar) — there is no shelf to
+ *     declare, because there is nothing to hand over: connecting Gmail reaches
+ *     the whole mailbox (`shelf` is hardcoded 'private' for the OWNER fence
+ *     above, a structural fact about mail, never a choice about SHARING). So
+ *     `shared_with` asks the other question these two CAN answer: does this
+ *     thread or event concern a named client, or is it the agency's own —
+ *     exactly the `accountId` the address/attendee match already resolved. */
+function fencing(item: GoogleItem): {
+  ownerUserId: string | null
+  accountId: string | null
+  accounts: string[]
+  sharedWith: "private" | "agency_client" | "agency"
+} {
   return {
     // 'team' means NOBODY owns it — which is what a null owner means to every
     // read in lib/knowledge.ts. 'private' names the person whose connection it
@@ -271,6 +310,13 @@ function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: str
     // the migration calls the singular column "right for a mirrored record",
     // and the same reasoning holds for a source with only ever one account).
     accounts: item.accounts ?? [],
+    sharedWith: (GOOGLE_NAMED_SERVICES as readonly string[]).includes(item.service)
+      ? item.shelf === "private"
+        ? "private"
+        : "agency"
+      : item.accountId
+        ? "agency_client"
+        : "agency",
   }
 }
 
@@ -690,24 +736,43 @@ export function risingBackfillWindow(now: Date, state: BackfillState): { from: s
 }
 
 /** MOVE THE RISING WALK ON, honestly — mirrors `meetings.ts`'s own
- * `advanceBackfill` exactly: a truncated read (ascending) has covered
+ * `advanceBackfill` exactly: an incomplete read (ascending) has covered
  * `[window.from, lastEntryAt]`, so the next call resumes there rather than
- * at `window.to`; a truncated read whose last entry starts no later than
+ * at `window.to`; an incomplete read whose last entry starts no later than
  * `window.from` (a pile of simultaneous entries) advances anyway rather
  * than stalling for ever, same degenerate case, same answer. Reaching `now`
  * returns `{done:true}` instead of a timestamp `now` would immediately be
  * behind on the very next call — see the header on `BACKFILL_DONE` for why a
- * moving `now` cannot be allowed to undo that once it is reached. */
-function advanceRisingBackfill(
+ * moving `now` cannot be allowed to undo that once it is reached.
+ *
+ * `incomplete`, NOT `truncated` (renamed, 12 Sep 2026 fix — see `slice`'s own
+ * header on the field this reads). The parameter used to be Google's own
+ * truncation flag alone, which asks only "did GOOGLE stop before its own page
+ * ceiling" — a window that Google answered in full but the ingest's own
+ * per-tick cap (`limit`, far below Google's ceiling) still could not fully
+ * FILE read as "complete" and this function advanced past it, silently,
+ * every time. The caller now passes the wider signal; nothing in the
+ * function's own logic needed to change once it is telling the truth. */
+export function advanceRisingBackfill(
   now: Date,
   window: { from: string; to: string },
-  truncated: boolean,
+  incomplete: boolean,
   lastEntryAt: string | null
 ): BackfillState {
   let next = window.to
-  if (truncated) {
+  if (incomplete) {
     const at = Date.parse(lastEntryAt ?? "")
-    if (Number.isFinite(at) && at > Date.parse(window.from)) next = new Date(at).toISOString()
+    // A TRUSTED BOUNDARY is the only thing that earns partial credit (12 Sep
+    // 2026 fix's own reasoning). `lastEntryAt` reads null exactly when
+    // `incomplete` is true AND nothing survived to be filed at all — Google
+    // handed back more than this tick's cap could hold, and every one of
+    // them still fell out before a `sortAt` reached `boundary` (this file's
+    // own doc on `backfillRows`' `boundary`). Falling through to `window.to`
+    // there is the SAME bug the 12 Sep fix closed wearing a different coat:
+    // it credits the window as covered when the tick filed nothing from it.
+    // So an untrustworthy boundary means STAY — resume at `window.from`, the
+    // exact window this tick already held, and let the next tick try again.
+    next = Number.isFinite(at) && at > Date.parse(window.from) ? new Date(at).toISOString() : window.from
   }
   return Date.parse(next) >= now.getTime() ? { done: true } : { done: false, through: next }
 }
@@ -730,20 +795,36 @@ function fallingBackfillWindow(now: Date, state: BackfillState): { from: string;
 }
 
 /** MOVE THE FALLING WALK ON — the mirror image of `advanceRisingBackfill`:
- * the read starts at `window.to` (newest-first), so a truncated read has
+ * the read starts at `window.to` (newest-first), so an incomplete read has
  * covered `[firstEntryAt, window.to]` and the next call resumes at
  * `firstEntryAt` rather than at `window.from`. Reaching the floor returns
- * `{done:true}` for the same reason the rising walk does at `now`. */
-function advanceFallingBackfill(
+ * `{done:true}` for the same reason the rising walk does at `now`.
+ *
+ * `incomplete`, NOT `truncated` — see `advanceRisingBackfill`'s own header for
+ * the 12 Sep 2026 fix this mirrors: Google's own page ceiling and the ingest's
+ * per-tick filing cap are two different ceilings, and only the wider of the
+ * two answers "was this window actually covered". This is the direction that
+ * carried the fix's whole cost on real staging: gmail's `messages.list` has no
+ * ordering and always returns newest-first, so gmail has no live/forward read
+ * that could ever walk backward and quietly recover what a falling tick
+ * skipped — every window this advanced past on the old, narrower signal was
+ * gone for good. */
+export function advanceFallingBackfill(
   now: Date,
   window: { from: string; to: string },
-  truncated: boolean,
+  incomplete: boolean,
   firstEntryAt: string | null
 ): BackfillState {
   let next = window.from
-  if (truncated) {
+  if (incomplete) {
     const at = Date.parse(firstEntryAt ?? "")
-    if (Number.isFinite(at) && at < Date.parse(window.to)) next = new Date(at).toISOString()
+    // THE MIRROR OF `advanceRisingBackfill`'s SAME GUARD — see its own header
+    // for the full reasoning. `firstEntryAt` reads null exactly when this
+    // tick's cap bit hard enough that nothing survived to be filed, and
+    // falling through to `window.from` here is the 12 Sep 2026 bug again:
+    // crediting an uncovered window as covered. An untrustworthy boundary
+    // means STAY — resume at `window.to`, the same window, next tick.
+    next = Number.isFinite(at) && at < Date.parse(window.to) ? new Date(at).toISOString() : window.to
   }
   const floor = new Date(now.getTime() - BACKFILL_YEARS_BACK * 365 * 24 * 60 * 60 * 1000)
   return Date.parse(next) <= floor.getTime() ? { done: true } : { done: false, through: next }
@@ -891,6 +972,209 @@ async function writeChatSpaceBackfillError(
   )
 }
 
+/** WHICH ACCOUNT EACH OF THE CALLER'S NAMED CHAT SPACES FILES TO — declared,
+ * or the space's own NAME resolved the SAME WAY A QUESTION IS (a-names,
+ * 12 Sep 2026). Measured before this was built: of the team's real named
+ * chat spaces, exactly the ones already safe to narrow on resolve today (a
+ * rare, multi-syllable single token, or a declared ALLOW) and no others —
+ * "HOGO" stays agency until somebody declares it safe, the same way "green"
+ * and "demo" did before them, because a one-word client name said constantly
+ * in its own material is over `ACCOUNT_TOKEN_MAX_CHUNKS` like any other
+ * ordinary word. That is the rarity gate working, not a gap this reopens.
+ *
+ * NEVER A SECOND MATCHER. This calls `accountsNamedIn` — the exact function a
+ * question is resolved through — so kb_CD's DENY, the rarity ceiling, and
+ * the multi-company refusal all apply unchanged, for free. A space naming
+ * two clients resolves to neither, the same sentence a question naming two
+ * clients gets.
+ *
+ * A DECLARED `accountId` (`listNamedSources`'s own field — a human's filing
+ * decision, made when they shared the space) is NEVER second-guessed by a
+ * name match; skipping the lookup for it is a cost guard, not the
+ * correctness one (a declared value always wins wherever this map is read).
+ *
+ * ONE FUNCTION, TWO CALLERS (fix/kb-chat-backfill, 12 Sep 2026): the live
+ * sweep's chat kind, below, and `refileChatSources`'s backfill. A live
+ * thread and an already-filed one can never disagree about what a space
+ * means, because there is exactly one place that decides it. */
+/** A MATCH THAT NAMES A PERSON, NOT A COMPANY, REDIRECTED OR REFUSED
+ * (defect found in review, 12 Sep 2026, live staging dry run: "Hannah
+ * Thallinger" and "Paras Maroo" — direct-message spaces named after a
+ * person — resolved 489 sources onto the PERSON'S OWN account_type =
+ * 'individual' row). This is the exact mistake a-names' own contact design
+ * already refused once: nothing in the base is ever filed under a person's
+ * own individual-account id, which is why a contact's `knowledge_names` row
+ * carries the LINKED COMPANY's id as `ref_id`, never the contact's own —
+ * `accountsNamedIn` returning an individual id at all means either a stale
+ * index (seeded before that fix) or some other row this function was never
+ * meant to trust blindly. Checked here rather than assumed away, so a
+ * one-on-one with a CLIENT's contact still resolves to that client's own
+ * material — a DM with Hannah about HOGO business is plausibly HOGO's — and
+ * a one-on-one with a COLLEAGUE resolves to nobody, the same as it always
+ * did: a colleague has no company of their own and agency material has no
+ * business being filed under one person's name. */
+async function accountBehindMatch(cfg: D1Rest, guard: MemberGuard, matchedId: string): Promise<string | null> {
+  const [account] = await d1Query<{ account_type: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT account_type FROM accounts WHERE id = ? LIMIT 1",
+    [matchedId]
+  )
+  if (!account || account.account_type !== "individual") return matchedId
+  const links = await d1Query<{ account_id: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT DISTINCT account_id FROM account_links WHERE person_account_id = ? AND deactivated_at IS NULL",
+    [matchedId]
+  )
+  // Exactly one company, the same ambiguity rule as everywhere else in this
+  // module: a colleague (no link at all) or a person linked to more than one
+  // company resolves to neither, never a guess.
+  return links.length === 1 ? links[0].account_id : null
+}
+
+export async function resolveChatSpaceAccounts(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<Map<string, string | null>> {
+  // ONE SPACE, POSSIBLY SEVERAL ROWS (defect found in review, 12 Sep 2026,
+  // live staging dry run): `google_sources` carries one row per time a
+  // person named or re-named a space, so 37 real rows on staging name only
+  // 11 distinct spaces. Resolving per ROW meant the same conversation could
+  // be visited — and, since two rows for one space can carry DIFFERENT
+  // names, RESOLVED — more than once, non-deterministically, whichever row
+  // the loop happened to reach last. Grouped by `externalId` (Google's own
+  // space id, the only thing that is genuinely one-per-space) so every row
+  // sharing one space gets the exact same answer.
+  const spaces = await listNamedSources(cfg, guard, "chat")
+  const byExternalId = new Map<string, (typeof spaces)[number][]>()
+  for (const space of spaces) byExternalId.set(space.externalId, [...(byExternalId.get(space.externalId) ?? []), space])
+
+  const resolved = new Map<string, string | null>()
+  for (const rows of byExternalId.values()) {
+    // THE LIVE ROW WINS, on the same argument a declared filing already wins
+    // over a name match: a row Google still lists is this person's CURRENT
+    // naming of the space, and a deactivated duplicate is history. Among
+    // ties (more than one live row, or none), the most recently created row
+    // is the closest thing to "what Google calls it now".
+    const authoritative = [...rows].sort((a, b) =>
+      a.active !== b.active ? (a.active ? -1 : 1) : b.createdAt.localeCompare(a.createdAt)
+    )[0]
+    let accountId: string | null = authoritative.accountId
+    if (!accountId) {
+      const matches = await accountsNamedIn(cfg, guard, authoritative.name)
+      accountId = matches.length === 1 ? await accountBehindMatch(cfg, guard, matches[0].id) : null
+    }
+    for (const row of rows) resolved.set(row.id, accountId)
+  }
+  return resolved
+}
+
+/** BRING THE BACK-CATALOGUE IN LINE WITH WHAT THE SWEEP DECIDES TODAY
+ * (fix/kb-chat-backfill, 12 Sep 2026).
+ *
+ * THE GAP THIS CLOSES: `resolveChatSpaceAccounts` (above) only ever runs
+ * inside a chat THREAD's own read — so a space's filing only ever moves when
+ * that thread is re-read, and a windowed kind does not re-read its whole
+ * back-catalogue (`googleIngestKinds`'s own chat kind comment: a rewind only
+ * fires on a tick that finds nothing new, and a space with a steady trickle
+ * never has one). Measured live on staging: 32 of 407 moved across two real
+ * sweeps, whole spaces named after a client sitting untouched since the day
+ * before — correct code, asked about the wrong rows.
+ *
+ * ONE RESOLUTION, NOT A SECOND ONE. This calls `resolveChatSpaceAccounts` —
+ * the exact function the live sweep calls — and does nothing else to decide
+ * an account. Every clause that function already carries (declared always
+ * wins, the rarity gate, kb_CD's DENY, the multi-company refusal) is
+ * inherited, not re-implemented.
+ *
+ * `account_id` AND `compartment` MOVE TOGETHER, on `knowledge_sources` AND
+ * on `knowledge_chunks` — the denormalised copy retrieval actually reads
+ * (`knowledge.ts`'s own comment on `updateSource`: "the chunks and the
+ * vectors carry the compartment too... or the index would answer for a
+ * client whose material this no longer is"). No embedding call: the WORDS
+ * have not changed, only who they are filed under, so this is two UPDATEs
+ * per space that needs one, never a re-index.
+ *
+ * IDEMPOTENT BY CONSTRUCTION, not by a guard bolted on: every row's OLD
+ * value is read back before anything is written, and only a row whose
+ * account_id or compartment actually DIFFERS from today's fresh resolution
+ * is touched at all. A second run recomputes the same resolution (unless a
+ * space was renamed or a flag changed since) and finds nothing left to
+ * change — `moved` is the proof, not an assumption: it counts real rows
+ * that were wrong before this ran.
+ *
+ * `dryRun` computes and counts everything above and writes nothing — the
+ * seam this repo's own scripts use to show a diff before anyone approves
+ * one (`scripts/wipe-knowledge.mjs`'s own pattern). A SCRIPT calls this,
+ * never a door: this repairs data that predates a fix already shipped, not
+ * an ongoing job the app needs to run on its own — the shape
+ * `scripts/knowledge-backfill.mjs` already is for exactly this reason, and
+ * a permanent HTTP door onto "rewrite whatever a matcher currently says"
+ * is machinery this fix does not need once the back-catalogue is caught up. */
+export async function refileChatSources(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  opts: { dryRun?: boolean } = {}
+): Promise<{
+  moved: number
+  byAccount: Record<string, number>
+  toAgency: number
+  moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[]
+}> {
+  // DISTINCT SPACES, NOT ROWS (defect found in review, 12 Sep 2026, live
+  // staging dry run): `google_sources` carries one row per time a space was
+  // named or renamed, so 37 real rows on staging name 11 distinct spaces.
+  // Processing per ROW visited (and moved, and counted) the same
+  // conversation once per duplicate — 741 × ~4 ≈ the 2,985 the dry run
+  // actually reported. `resolveChatSpaceAccounts` already resolves per
+  // DISTINCT `externalId` (its own header says why); this walks the same
+  // distinct set, once each, using whichever row's externalId this loop
+  // reaches first as the lookup key — the resolution behind it is identical
+  // for every row sharing that id, so it does not matter which one.
+  const spaces = await listNamedSources(cfg, guard, "chat")
+  const resolved = await resolveChatSpaceAccounts(cfg, guard)
+  const distinct = new Map<string, (typeof spaces)[number]>()
+  for (const space of spaces) if (!distinct.has(space.externalId)) distinct.set(space.externalId, space)
+  const byAccount: Record<string, number> = {}
+  const moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[] = []
+  let toAgency = 0
+  for (const space of distinct.values()) {
+    const accountId = resolved.get(space.id) ?? null
+    const compartment = accountId ? accountCompartment(accountId) : AGENCY_COMPARTMENT
+    const current = await d1Query<{ id: string; account_id: string | null; compartment: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: bounded by one named space's own conversations, not a team-wide
+      // scan — the thread id this space's own external id prefixes.
+      `SELECT id, account_id, compartment FROM knowledge_sources
+        WHERE origin_table = 'google_chat' AND origin_row_id LIKE ? ESCAPE '\\'`,
+      [`${likeLiteral(space.externalId)}/%`]
+    )
+    const toChange = current.filter((r) => r.account_id !== accountId || r.compartment !== compartment)
+    if (!toChange.length) continue
+    for (const r of toChange) moves.push({ sourceId: r.id, fromAccountId: r.account_id, toAccountId: accountId })
+    if (accountId) byAccount[accountId] = (byAccount[accountId] ?? 0) + toChange.length
+    else toAgency += toChange.length
+    if (opts.dryRun) continue
+    const ids = toChange.map((r) => sqlString(r.id)).join(", ")
+    const now = new Date().toISOString()
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_sources SET account_id = ?, compartment = ?, updated_at = ? WHERE id IN (${ids})`,
+      [accountId, compartment, now]
+    )
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_chunks SET compartment = ? WHERE source_id IN (${ids})`,
+      [compartment]
+    )
+  }
+  return { moved: moves.length, byAccount, toAgency, moves }
+}
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -1030,13 +1314,31 @@ export function googleIngestKinds(
      * backward rather than watching the live one. Present ⇒ `readGoogleMaterial`
      * is bounded to it, `afterCursor` is skipped entirely (the window itself is
      * the bound; the forward cursor's position is irrelevant to material it has
-     * already passed by, ahead or behind), and `truncated` is handed back so the
+     * already passed by, ahead or behind), and `incomplete` is handed back so the
      * caller can advance the backfill honestly instead of guessing from the row
      * count alone. NOT recorded into `seen` — that map answers "what does
      * Google currently hold", and a bounded historical slice is a different,
      * much narrower question. */
-    window?: { from: string; to: string }
-  ): Promise<{ rows: IngestRow[]; truncated: boolean }> => {
+    window?: { from: string; to: string },
+    /** WHICH END OF THE WINDOW GETS FILED FIRST when the ingest's own cap bites
+     * — part of the same 12 Sep 2026 fix as `incomplete` below, and load-bearing
+     * in a way `incomplete` alone is not. `ordered` is ALWAYS ascending
+     * (oldest-first); a RISING walk wants exactly that — file the oldest-in-
+     * window first, resume from the newest FILED item, and the next window
+     * picks up right after it, moving correctly toward `now`. A FALLING walk
+     * is the mirror image and taking the same oldest-first slice is backward
+     * for it: it would file the FAR edge of the window (nearest the floor)
+     * first and leave the NEAR edge (nearest `window.to`, i.e. nearest the
+     * live boundary this walk is adjacent to) unfiled — and the watermark
+     * would then resume even FARTHER back, abandoning that near edge for
+     * good, on every tick a window's real volume exceeds `limit`. `true` here
+     * takes the NEWEST slice of the window instead (still ascending inside
+     * it, so `boundary[0]` stays meaningful), so the watermark only ever
+     * resumes at the edge of ground actually covered. `false`/absent for
+     * every other caller — the ordinary forward reads and the rising walk —
+     * whose existing oldest-first behaviour was always correct. */
+    fallingWindow = false
+  ): Promise<{ rows: IngestRow[]; incomplete: boolean }> => {
     const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
     const { items, truncated } = await readGoogleMaterial(env, cfg, guard, {
       services: [service],
@@ -1050,14 +1352,43 @@ export function googleIngestKinds(
     // "Google no longer has this" from "the cursor has already passed it".
     if (seen && !window) seen.set(service, new Map(items.map((i) => [i.externalId, i.shelf])))
     const ordered = inCursorOrder(toRows(items))
-    const wanted = (window ? ordered : afterCursor(ordered, cursor)).slice(0, limit)
+    // THE CANDIDATE POOL, BEFORE THE INGEST'S OWN CAP CUTS IT — kept apart from
+    // `wanted` so the cut can be MEASURED, not merely applied. This is the fix
+    // (backfill watermark undercounting, 12 Sep 2026): `truncated` above answers
+    // ONE question — did GOOGLE stop handing back items before ITS OWN page
+    // ceiling (`GMAIL_SWEEP_PAGES`/`CALENDAR_MAX_PAGES` × `GOOGLE_PAGE_SIZE`,
+    // ~200-250)? It says NOTHING about whether this tick actually FILED
+    // everything Google did hand back — `wanted` below is separately capped at
+    // `limit` (`INGEST_SOURCES_PER_TICK`, 25), far below Google's own ceiling.
+    // So a window holding, say, 60 real items read as "not truncated" (60 < 200)
+    // while only the first 25 were ever filed — and both `advanceFallingBackfill`
+    // and `advanceRisingBackfill` read "not truncated" as "this window is fully
+    // covered, move the watermark past it" (their own comments said "advance by
+    // what was ACTUALLY READ" — read, not FILED, is exactly the word that hid
+    // this). The remaining 35 were never filed and the watermark had already
+    // moved past the ground they sat on, so no later tick would ever revisit
+    // them: permanent, silent loss with the sweep reporting success throughout.
+    // Measured on real staging, 12 Sep 2026: gmail's history stopped 5 weeks
+    // back and calendar's own mirror (`event`) stopped 1 month back, both
+    // declaring themselves caught up, while the owner's real Google history
+    // goes back years.
+    const pool = window ? ordered : afterCursor(ordered, cursor)
+    // FALLING TAKES THE NEWEST SLICE, ASCENDING WITHIN IT — see `fallingWindow`'s
+    // own header above for why the direction has to differ here.
+    const wanted = fallingWindow ? pool.slice(Math.max(0, pool.length - limit)) : pool.slice(0, limit)
+    // NEITHER HALF ALONE IS ENOUGH: a window can be short of Google's own
+    // ceiling and still short of what this tick could file (the case above), or
+    // it can genuinely hit Google's ceiling with room still left under `limit`
+    // (a dense window handed back exactly `limit` items and Google says there
+    // was more). Either way the caller must not credit the window as covered.
+    const incomplete = truncated || pool.length > wanted.length
     // THE FOLD RIDES THE SAME EXIT `mended` DOES, and for the same reason: a
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
     const fold = (r: IngestRow) =>
       settledEvent(statedEvent(service, folded(service, mended(r), targets)), targets)
-    if (!hydrate || wanted.length === 0) return { rows: wanted.map(fold), truncated }
+    if (!hydrate || wanted.length === 0) return { rows: wanted.map(fold), incomplete }
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
@@ -1071,7 +1402,7 @@ export function googleIngestKinds(
       wanted.map((r) => byId.get(r.originRowId)).filter((i): i is GoogleItem => Boolean(i))
     )
     const textById = new Map(full.map((i) => [rowId(i), i.text]))
-    return { rows: wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body })), truncated }
+    return { rows: wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body })), incomplete }
   }
 
   /** ONE KIND'S BACKWARD WALK, folded into its regular forward read — the
@@ -1079,12 +1410,14 @@ export function googleIngestKinds(
    * `backfilled_through`, compute this tick's slice, read it through the
    * SAME `slice()` every regular read uses (same fold, same fencing, same
    * mojibake mend — a fifth backfilled kind gets all of that for free), and
-   * advance the watermark by what was ACTUALLY read, never by what was asked
-   * for. Merged with the forward rows by `originRowId` — an item both windows
-   * happen to see this tick is upserted once, not filed twice (the fold's own
-   * `ON CONFLICT`, R68, already makes a double-upsert harmless; this is
-   * simply not doing it twice on purpose). Returns `[]` and touches Google
-   * not at all once the walk is done — `risingBackfillWindow`/
+   * advance the watermark by what was ACTUALLY FILED, never by what was asked
+   * for or merely READ. ("Actually read" is the word this comment used to say,
+   * and it is exactly the gap the 12 Sep 2026 fix closed — see `incomplete`'s
+   * own header on `slice`.) Merged with the forward rows by `originRowId` — an
+   * item both windows happen to see this tick is upserted once, not filed
+   * twice (the fold's own `ON CONFLICT`, R68, already makes a double-upsert
+   * harmless; this is simply not doing it twice on purpose). Returns `[]` and
+   * touches Google not at all once the walk is done — `risingBackfillWindow`/
    * `fallingBackfillWindow` returning `null` is the whole of that. */
   const backfillRows = async (
     service: "calendar" | "gmail",
@@ -1098,11 +1431,32 @@ export function googleIngestKinds(
     const state = await backfilledThrough(cfg, guard, service, stateKey)
     const window = rising ? risingBackfillWindow(now, state) : fallingBackfillWindow(now, state)
     if (!window) return []
-    const { rows, truncated } = await slice(service, null, limit, toRows, hydrate, window)
+    const { rows, incomplete } = await slice(service, null, limit, toRows, hydrate, window, !rising)
     const boundary = rows.map((r) => r.sortAt).filter(Boolean).sort()
+    const edge = rising ? boundary[boundary.length - 1] : boundary[0]
+    // THE SILENCE THIS CLOSES (12 Sep 2026, round two). `incomplete` says
+    // Google handed back more than this tick could file; `edge` reads
+    // undefined exactly when NONE of it survived to a usable `sortAt` — the
+    // same gap that let the ORIGINAL watermark-undercount hide for months
+    // under a green build with nothing in error_logs to find it by.
+    // advanceRisingBackfill/advanceFallingBackfill now REFUSE to advance past
+    // this window when that happens (see their own headers), which stops the
+    // data loss — it does not explain WHY nothing was filed, and the tick
+    // will retry the identical window every fifteen minutes until it does.
+    // That retry is silent everywhere except here; `recordWorkerError`'s own
+    // per-hour ceiling is what keeps a stuck window from flooding the table.
+    if (incomplete && edge === undefined)
+      await recordWorkerError(
+        env.DB,
+        "content",
+        `knowledge/backfill-stalled (${stateKey})`,
+        new Error(
+          `The ${service} backfill read material for ${window.from} .. ${window.to} but filed none of it with a usable date, so the watermark is staying put and retrying the same window rather than advancing past ground it never covered.`
+        )
+      )
     const next = rising
-      ? advanceRisingBackfill(now, window, truncated, boundary[boundary.length - 1] ?? null)
-      : advanceFallingBackfill(now, window, truncated, boundary[0] ?? null)
+      ? advanceRisingBackfill(now, window, incomplete, boundary[boundary.length - 1] ?? null)
+      : advanceFallingBackfill(now, window, incomplete, boundary[0] ?? null)
     await writeBackfillThrough(cfg, guard, stateKey, next)
     return rows
   }
@@ -1421,7 +1775,21 @@ export function googleIngestKinds(
       // folding itself lives in google-read's `chatThreads`, beside the reader
       // that knows what a message is — so by the time an item reaches here it IS
       // a conversation, and this lane has nothing left to group.
-      read: async (_cfg, _guard, cursor, limit) => {
+      read: async (cfg, guard, cursor, limit) => {
+        // THE SPACE'S OWN NAME, RESOLVED THE SAME WAY A QUESTION IS — see
+        // `resolveChatSpaceAccounts`'s own header for the whole argument
+        // (rarity gate, DENY, ambiguity, all inherited from `accountsNamedIn`
+        // unchanged). RE-DECIDED EVERY TICK, off the space's CURRENT name —
+        // what makes a wrong resolution correct itself is the generic
+        // engine's own unconditional `account_id = excluded.account_id` on
+        // every upsert (already shipped, untouched here); this only ever
+        // changes what value that write gets.
+        //
+        // THE SAME FUNCTION THE BACKFILL CALLS (fix/kb-chat-backfill, 12 Sep
+        // 2026, `refileChatSources`) — one resolution, two callers, so a live
+        // thread and an already-filed one can never disagree about what a
+        // space means.
+        const spaceAccountId = await resolveChatSpaceAccounts(cfg, guard)
         const toRows = (items: GoogleItem[]) =>
           items.map((item) => ({
             // The THREAD is the row, so the thread's own id is the key. A new
@@ -1506,6 +1874,14 @@ export function googleIngestKinds(
             // is what separates the two.
             retired: item.appOnly === true,
             ...fencing(item),
+            // THE FALLBACK, NEVER A SECOND DECISION. `fencing(item)` above
+            // already set `accountId` to whatever this space's OWN row
+            // declares (`item.accountId` = `space.accountId`) — that stays
+            // exactly as it was and is never touched. Only when nothing was
+            // ever declared (`item.accountId` null) does the name match this
+            // read resolved up front get a turn, and only for THIS space
+            // (`item.sourceId` is the space's own id, set by `chatThreadItem`).
+            accountId: item.accountId ?? spaceAccountId.get(item.sourceId ?? "") ?? null,
           }))
         // THE LIVE READ (unbounded, newest per space) plus CHAT'S OWN
         // per-space rising walk (`chatBackfillRows`, migration 0082) — two
