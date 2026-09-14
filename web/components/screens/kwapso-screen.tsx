@@ -145,9 +145,10 @@ export function KwapsoScreen({
             <div className="flex flex-col gap-4">
               <OverviewList
                 items={[
-                  // No "—" fallback: `undefined` lets `OverviewList`'s
-                  // `emptyValueLabel={null}` drop the row (W2 — an unset
-                  // fact is dropped, not dashed).
+                  // No "—" fallback: `undefined` lets `OverviewList` filter
+                  // the row out entirely (W2 — an unset fact is dropped,
+                  // label and all, not dashed and not left as an empty
+                  // value beside its own label).
                   { label: t("Legal name"), value: team.legalName || undefined },
                   { label: t("Legal address"), value: team.legalAddress || undefined },
                   { label: t("Legal numbers"), value: team.legalNumbers || undefined },
