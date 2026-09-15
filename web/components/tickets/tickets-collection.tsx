@@ -165,7 +165,7 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
-import { OPEN_TAB_STATUSES, ticketTypeKeptForMigration } from "@shared/types"
+import { OPEN_TAB_STATUSES } from "@shared/types"
 import type { Account, AppRow, HelpTicket } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 import { TriageChips } from "@/components/tickets/triage-chips"
@@ -432,15 +432,18 @@ export function ticketFacets({
     // AND THE RETIRED KIND IS SUBTRACTED AGAIN HERE. `helpTypeOptions` already
     // excludes it (use-screen-data.ts), the door already refuses to answer about
     // it and already refuses to create one — this is the fourth fence and it is
-    // deliberate, exactly as `help-detail.tsx`'s own type picker filters a list
-    // that was already filtered. The cost is one call; the failure it prevents
-    // is a filter offering a word whose rows the door has excluded from both the
-    // list AND its count, which reads as an empty collection rather than as an
-    // impossible question.
+    // A SECOND SUBTRACTION OF THE RETIRED KIND STOOD ON THIS LIST — deliberate
+    // belt-and-braces over a list that was already filtered, because a facet
+    // offering a word whose rows the door had excluded reads as an empty
+    // collection rather than as an impossible question. It went on 15 Sep 2026
+    // with the kind (`shared/ticket-types.ts`): every word the team's vocabulary
+    // now holds is a word the door will answer about.
     helpType: tabFacets.helpType
-      ? orderTicketTypes(helpTypeOptions)
-          .filter((v) => !ticketTypeKeptForMigration(v))
-          .map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
+      ? orderTicketTypes(helpTypeOptions).map((v) => ({
+          value: v,
+          label: v,
+          mark: <Swatch colour={ticketTypeColour(v)} />,
+        }))
       : [],
     // STATUS — the CLOSED, server-owned vocabulary, sliced to exactly what this
     // tab can contain, and never taken off the page. `helpTabFacets` hands back
@@ -598,17 +601,16 @@ export function triageFacets(
      while this was the only Type menu on the screen; the list tabs' toolbar has
      one now, and two Type menus in two different orders on one screen is the
      kind of drift the client has twice told us to stop.
-     AND THE RETIRED KIND IS SUBTRACTED, though it cannot be here: `needsTriage`
-     already excludes it at the door, so this is a second fence over an empty
-     set. It is written anyway because the test that proves this menu never
-     offers that word should be able to prove it of THIS function rather than of
-     a door two workers away — and because the day somebody widens the triage
-     door, the fence is already standing. */
+     A SECOND FENCE AGAINST THE RETIRED KIND stood here over an empty set, and
+     went with the kind on 15 Sep 2026 (`shared/ticket-types.ts`). These options
+     are built from the WORDS ON THE CARDS, so a ticket filed years ago under a
+     word the vocabulary no longer holds still gets its own entry here — which is
+     the right answer for a menu whose job is to narrow the rows in front of
+     somebody, and the same ruling `orderTicketTypes` makes about a word its
+     order has never heard of. */
   const types = orderTicketTypes([
     ...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v))),
-  ])
-    .filter((v) => !ticketTypeKeptForMigration(v))
-    .map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
+  ]).map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
   // BY ID, LABELLED BY NAME. A Map rather than a Set of ids plus a second
   // lookup: one pass, and an app whose rows disagree about its name (they
   // cannot — the name comes from one subselect) would still produce one option.
@@ -799,11 +801,12 @@ export function narrowTriage(
  * field and for this very reason: a rule that hard-matched the seeded spelling
  * would stop firing the day somebody typed "Issues".
  *
- * ANYTHING ELSE FALLS BACK TO "Accept" AND ASKS FOR NOBODY, which covers the
- * retiring "Requirements" and "General", a word a team typed itself, and a
- * ticket with no type at all. The same shape `type-colours.ts` keeps for the
- * same vocabulary: the four the client named are answered, and the fifth word
- * gets the neutral rather than being special-cased or refused. */
+ * ANYTHING ELSE FALLS BACK TO "Accept" AND ASKS FOR NOBODY, which covers a word
+ * this app no longer has a kind for ("General", or one a team typed before the
+ * group was locked at four on 15 Sep 2026) and a ticket with no type at all. The
+ * same shape `type-colours.ts` keeps for the same vocabulary: the four are
+ * answered, and anything else gets the neutral rather than being special-cased
+ * or refused. */
 export function triageAct(
   helpType: string | null | undefined,
   t: (english: string) => string

@@ -66,7 +66,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content, tenancy } from "@/lib/api"
-import { appModulesKey, appsKey, listFetch } from "@/lib/live-resources"
+import { appModulesKey, appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
@@ -79,7 +79,8 @@ import { RecordPicker } from "@/components/records/record-picker"
 // word its map has never heard of, which is that constant's real job.
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import { appStageMark } from "@shared/app-stages"
-import { ticketTypeKeptForMigration } from "@shared/types"
+import { isFeedbackTicketType, isValidationSprintType } from "@shared/ticket-types"
+import { sprintIsRunning } from "@shared/sprint-state"
 import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useLanguage } from "@shared/web/language"
@@ -398,6 +399,44 @@ export function HelpFormDialog({
   // form was opened from, or the one being picked.
   const chosenAppId = fixedApp?.id ?? (values.appId === NONE ? null : values.appId)
   const appModules = (modulesQ.data ?? []).filter((m) => m.active && m.appId === chosenAppId)
+  /** IS A VALIDATION SPRINT RUNNING ON THE APP THIS TICKET IS ABOUT?
+   *
+   * THE RULING, 15 Sep 2026: Feedback may only be raised while a Validation
+   * sprint is running for the ticket's app. `createTicket` and `updateTicket`
+   * enforce it (`refuseFeedbackOutsideValidation`, workers/content/src/lib/
+   * help.ts); this is the picker standing down in front of the door, so nobody
+   * is offered a chip whose save would 400.
+   *
+   * THE WHOLE TEAM'S SPRINTS, NOT A READ BY APP, and that is one fewer door
+   * rather than a shortcut: `sprintsKey` is the cache every sprint screen and
+   * every sprint badge in the app already shares (R15's live registry keeps it
+   * patched), it is a BOUNDED list by construction — an agency runs tens — and
+   * this dialog is usually opened from a screen that has already filled it. A
+   * new endpoint, or a second key on the same door, would be a real second
+   * request for rows that are already here (R56).
+   *
+   * THE PREDICATE IS THE DOOR'S OWN — `sprintIsRunning` (shared/sprint-state.ts),
+   * which the sprints board also reads, so the chip appears exactly when the save
+   * would succeed. */
+  const sprintsQ = useCached(teamId && open ? sprintsKey(teamId) : null, () =>
+    listFetch.sprints(teamId as string)
+  )
+  /** THE TICKET THAT IS ALREADY FEEDBACK KEEPS ITS CHIP, whatever the sprint is
+   * doing now. The door draws exactly this line — it refuses a MOVE INTO
+   * Feedback and never a row already in it — because a rule about what may be
+   * RAISED must not become a rule about history: a feedback ticket opened to fix
+   * a typo, a fortnight after its Validation sprint wrapped, would otherwise show
+   * three chips none of which is pressed and a Submit that refuses to save the
+   * word already on the record. */
+  const alreadyFeedback = isFeedbackTicketType(initial?.helpType)
+  const validationRunning = React.useMemo(
+    () =>
+      Boolean(chosenAppId) &&
+      (sprintsQ.data ?? []).some(
+        (s) => s.appId === chosenAppId && isValidationSprintType(s.sprintType) && sprintIsRunning(s)
+      ),
+    [sprintsQ.data, chosenAppId]
+  )
   // Only demanded once there is something to demand — see `moduleField`.
   const moduleRequired = Boolean(chosenAppId) && appModules.length > 0
   const moduleMissing = moduleRequired && values.moduleId === NONE
@@ -440,31 +479,35 @@ export function HelpFormDialog({
          failed to load, and the word beside the dot is what actually carries
          the meaning for a reader who cannot tell poppy from forest.
 
-     RETIRED WORDS ARE SUBTRACTED, not special-cased. `ticketTypeKeptForMigration`
-     is the one predicate that knows which words are being retired and still sit
-     on old rows ("Requirements", "General"); every other screen that offers this
-     vocabulary already filters through it, and a chip line that offered a word
-     the rest of the app has stopped showing would be the one place a retired
-     type could be freshly assigned. */
+     FEEDBACK IS WITHHELD UNTIL ITS CONDITION HOLDS — the owner's ruling, 15 Sep
+     2026: it may only be raised while a Validation sprint is running on the
+     ticket's app. `validationRunning` above answers that against the app CHOSEN
+     IN THIS FORM, so picking the app makes the chip appear and changing it can
+     take it away again — which is the honest behaviour, because the door asks
+     the same question about the same app.
+     A SUBTRACTION OF RETIRED WORDS stood here until the same day, filtering
+     "Requirements" out of the line. The kind was deleted outright and migration
+     0093 took the row, so there is nothing left to subtract and the team's four
+     live words are the line. */
   const typeChoices = React.useMemo(() => {
-    const live = helpTypeOptions.filter((v) => !ticketTypeKeptForMigration(v))
+    const live = helpTypeOptions.filter((v) => !isFeedbackTicketType(v) || validationRunning || alreadyFeedback)
     /* AND THE TICKET'S OWN WORD, WHEN THE LIST NO LONGER HAS IT. Only on an
-     * EDIT, and only when it is genuinely missing — a ticket filed last March as
-     * "Requirements", or under a type somebody has since switched off on the
-     * Choices screen. Without this the row would draw five chips none of which
+     * EDIT, and only when it is genuinely missing — a ticket filed years ago
+     * under a word the vocabulary no longer holds, or one somebody has since
+     * switched off on the Choices screen. Without this the row would draw four
+     * chips none of which
      * is pressed, which reads as "this ticket has no type" about a ticket that
      * plainly does; the value would survive a save (nothing here clears it) and
      * the SCREEN would still have lied about it, which is the worse half.
      *
      * It is the same ruling `orderTicketTypes` makes one file over about a word
-     * its order has never heard of, and the same one migration 0034 made about
-     * "Bug" and "Feedback": deactivate the row, never orphan the record that
-     * already says it. It is added for THIS ticket only — a create never sees a
-     * retired word, so nothing new can be filed under one. */
+     * its order has never heard of: never orphan the record that already says
+     * it. It is added for THIS ticket only — a create never sees a retired word,
+     * so nothing new can be filed under one. */
     const held = initial?.helpType?.trim()
     const missing = !!held && !live.some((v) => v.trim().toLowerCase() === held.toLowerCase())
     return orderTicketTypes(missing ? [...live, held as string] : live)
-  }, [helpTypeOptions, initial?.helpType])
+  }, [helpTypeOptions, initial?.helpType, validationRunning, alreadyFeedback])
   /** The chips, and there is no longer a "no type" one at the end of them.
    *
    * WHAT USED TO BE HERE, kept because the ruling that removed it only makes
@@ -516,9 +559,9 @@ export function HelpFormDialog({
    * `optionalText` leaves the stored null exactly as it found it), the field
    * shows no required marker, and Submit works. Setting a type is offered and
    * never demanded, which is the same shape `moduleField` already uses one field
-   * up and the same shape `ticketTypeKeptForMigration` uses for a retired word:
-   * never orphan the record that already says something, and never make the
-   * screen lie about a record that says nothing.
+   * up, and the same shape `alreadyFeedback` uses one memo above: never orphan
+   * the record that already says something, and never make the screen lie about
+   * a record that says nothing.
    *
    * It is narrow on purpose. It reads `initial`, which is the ticket AS OPENED,
    * so it cannot leak into a create (there is no `initial`), and it does not

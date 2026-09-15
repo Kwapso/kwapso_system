@@ -74,13 +74,23 @@ import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
+import { sprintState, todayKey, type SprintState } from "@shared/sprint-state"
 
 /* --------------------------- where a sprint is up to ---------------------- */
 
-/** THE THREE STATES, DERIVED. A sprint has no status column, on purpose: the
- * table records two MOMENTS instead — the one it was completed at, and the one
- * it was switched off at — and everything else is arithmetic against today. */
-type SprintState = "running" | "upcoming" | "wrapped"
+/** THE THREE STATES AND THE ARITHMETIC THAT DERIVES THEM MOVED TO
+ * `shared/sprint-state.ts` ON 15 SEP 2026, and the reason is a DOOR.
+ *
+ * `createTicket` now has to ask the same question — Feedback may only be raised
+ * while a Validation sprint is running on the ticket's app (the owner's ruling
+ * that day) — and the refusal is at the door, because the MCP tools, the
+ * importer and the portal's own dialog reach it with no picker. Two expressions
+ * of "is this sprint running", one in a browser and one in a worker, is how a
+ * screen comes to offer what the door refuses. So there is one, and this screen
+ * imports it like everybody else.
+ *
+ * WHAT STAYED HERE: the words. `STATE_HEADING` and `STATE_MARK` below are what a
+ * person READS, which is this screen's business and not a shared predicate's. */
 
 /** Running FIRST, deliberately. The whole point of this view is that what is
  * live right now is the first thing on the screen, before anything that has not
@@ -107,7 +117,7 @@ const STATE_HEADING: Record<SprintState, string> = {
  * One control that works (the mark) and one that quietly breaks the other (the
  * rename), on the same row, is not a setting — it is a tripwire.
  *
- * A SPRINT'S STATE IS DERIVED (`sprintState`, above): the table has no status
+ * A SPRINT'S STATE IS DERIVED (`sprintState`, shared/sprint-state.ts): the table has no status
  * column at all, so there was never anything for that vocabulary to store. It
  * supplied a display word nothing read and a glyph read by this one expression.
  * With the glyph here, `Sprint status` stores nothing and is read by nothing —
@@ -130,36 +140,6 @@ const STATE_MARK: Record<SprintState, string> = {
   running: "RN",
   upcoming: "CU",
   wrapped: "WR",
-}
-
-/** Today, as the day it is where the READER is sitting, in the shape a stored
- * date column already has. Lexical order on YYYY-MM-DD is chronological order,
- * which is why the comparison below is a string compare rather than a parse —
- * and it is the same slice the month grid keys its squares on, so the grouping
- * and the calendar can never disagree about which day today is. */
-function todayKey(): string {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-}
-
-function sprintState(s: Sprint, today: string): SprintState {
-  // WRAPPED is TWO endings, which is why it is not called "completed": a sprint
-  // somebody switched off was cancelled, and it is over too. An overview that
-  // quietly dropped those would show fewer sprints than the badge above it
-  // counts, so they are here and their own row says which ending it was.
-  if (s.completedAt || !s.active) return "wrapped"
-  const starts = s.startsOn ? s.startsOn.slice(0, 10) : ""
-  // RUNNING is a start day that has arrived, on a sprint nobody has closed. An
-  // end date in the past does NOT move it out: work that overran is still the
-  // work in front of the team, and a late sprint quietly leaving the screen is
-  // the exact thing this view exists to stop.
-  if (starts && starts <= today) return "running"
-  // Everything else has not begun — including a sprint nobody has dated yet,
-  // which is a block that has been agreed and not scheduled. It is still coming,
-  // so it sits with the rest of what is coming rather than in a fourth pile
-  // nobody asked for.
-  return "upcoming"
 }
 
 /* ------------------------------ kinds and marks --------------------------- */

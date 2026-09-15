@@ -147,6 +147,7 @@ import { ModuleAutomations } from "@/components/screens/module-automations"
 import { SettingsChoicesPanel } from "@/components/screens/settings-choices-panel"
 import { MeetingTypesPanel } from "@/components/team/internal-screens"
 import type { Can, Right } from "@/lib/perms"
+import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import { ticketTypeColour } from "@/lib/type-colours"
 import { usePermissions } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -414,9 +415,22 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // the join key: `shared/selectable-homes.ts` records that this group's
         // words are STORED on `help.help_type` and `help.raised_as_type`, which
         // is why renaming one is a rewrite and not a relabel.
-        types: ["Ticket type"],
+        types: [TICKET_TYPE_GROUP],
         title: "Ticket types",
-        create: true,
+        // THE ONE VOCABULARY THAT CANNOT GROW, 15 Sep 2026. The owner's ruling —
+        // a ticket is an Issue, a Question, an Extra or a piece of Feedback, and
+        // "Remove all other options" — is enforced at the door
+        // (`createSelectable` refuses a fifth with a `locked_group` 400), and
+        // this is the screen standing down in front of it. A control that can
+        // only ever be refused should not be a control; `create: false` is the
+        // flag this screen already had for exactly that case, and the comment
+        // beside `moduleOptions` (settings-choices-panel.tsx) was written
+        // anticipating it.
+        //
+        // RENAMING IS UNTOUCHED. Every one of the four is still editable in
+        // place, which is the whole distinction `shared/ticket-types.ts` draws:
+        // the lock is about a fifth ROW, never about the wording.
+        create: false,
         // THE COLOUR, WHICH IS WHAT MAKES THIS SECTION A WALL OF CHIPS — the
         // one map the whole app reads a ticket type's colour from, handed in
         // rather than re-derived (`ModuleSettingsSection.colour` above).

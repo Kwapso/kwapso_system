@@ -504,11 +504,11 @@ export function TriageQueue({
 
   /** THE TEAM'S OWN TICKET TYPES, each with the colour the client ruled for it
    * — one map, `lib/type-colours.ts`, read by this row and by anything that
-   * draws a type after it. A word that map does not know (the retiring
-   * "Requirements" and "General", or one a team typed itself) gets the neutral
-   * rather than being left off: the vocabulary is the TEAM'S, and a picker that
-   * offered only the four the client named would be this screen quietly
-   * deciding what a ticket may be. */
+   * draws a type after it. A word that map does not know — "General" on an
+   * imported ticket, or one a team typed before the group was locked at four on
+   * 15 Sep 2026 — gets the neutral rather than being left off: these options are
+   * built from what the ROWS say, and a picker that offered only the four would
+   * be this screen quietly hiding a card it is showing. */
   const typeOptions: PickerOption[] = helpTypeOptions.map((v) => ({
     value: v,
     label: v,

@@ -742,13 +742,18 @@ describe("R55 — a stored reference is what the formula makes", () => {
             "pass the two assertions above and be a broken door rather than a fence"
         ).toEqual(["H_CLASH"])
 
-        // 2 · WHAT THE MODULE NO LONGER ANSWERS ABOUT AT ALL, which has no escape
-        // even for a caller who names it. A requirements ticket has LEFT the
-        // tickets collection everywhere a person is answered; an alias must not
-        // be a way back in.
-        db.exec(`UPDATE help SET help_type = 'Requirements' WHERE id = 'H_CLASH';`)
-        expect(ask(db, found)).toEqual([])
-        expect(ask(db, [{ field: "ref", op: "eq", value: "T0101" }])).toEqual([])
+        // 2 · WHAT THE MODULE NO LONGER ANSWERS ABOUT AT ALL stood here, and
+        // went on 15 Sep 2026 with the thing it was about. A requirements ticket
+        // had LEFT the tickets collection everywhere a person was answered, and
+        // this asserted that an alias was not a way back in — the `withheld`
+        // clause has no escape, even for a caller who names it.
+        //
+        // The owner deleted that kind of ticket outright
+        // (`shared/ticket-types.ts`), so `QUERY_MODULES.tickets` carries no
+        // `withheld` clause and there is nothing for an alias to get around.
+        // R55's own subject — that an old number reaches no row a live one would
+        // not — is fully proved by the fence assertions above it; this was the
+        // second, and its clause is what left.
       })
 
       it("a table the backfill left alone is not searched as though it had a history", () => {

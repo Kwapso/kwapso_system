@@ -1,6 +1,10 @@
 // THE COLOUR A TICKET TYPE IS KNOWN BY — one map, read by every screen that
 // draws a type, and the sibling of `type-marks.ts` next door.
 //
+// THE WORDS THEMSELVES ARE NOT DECIDED HERE. `TICKET_TYPES`
+// (shared/ticket-types.ts) is the one list of the four, and this file supplies
+// what that list cannot: a colour, and the order the client reads them in.
+//
 // WHY IT IS A MAP IN CODE AND THE GLYPH IS NOT. `type-marks.ts` refuses to hold
 // a table on purpose: a mark lives on the `selectable_data` row beside the word
 // it marks, so a team renames a type or picks a new two-letter code on the
@@ -18,7 +22,10 @@
 // ── THE RULING, AND HOW IT IS SPELT (R32) ───────────────────────────────────
 //
 // The client named her own brand colours: Issue is poppy, Question is orange,
-// Request is lavender, Extra is sky. Those four ARE tokens — `--kw-poppy`,
+// Request is lavender, Extra is sky. REQUEST WAS FOLDED INTO EXTRA ON 15 SEP
+// 2026 and FEEDBACK took its place — and its colour, lavender, because a slot
+// falling vacant in a four-colour set is the one moment a fifth colour would
+// have had to be invented. Those four ARE tokens — `--kw-poppy`,
 // `--kw-orange`, `--kw-lavender`, `--kw-sky` — and writing them here would pass
 // R32's grep, which forbids a hex literal and a Tailwind ramp and nothing else.
 // It would still be the wrong spelling, for two reasons the kit states itself:
@@ -42,7 +49,7 @@
 //
 //     --chart-1  var(--kw-sky)        #89BCE6   Extra
 //     --chart-3  var(--kw-poppy)      #E94A32   Issue      (lifts on dark)
-//     --chart-4  var(--kw-lavender)   #B1A3CF   Request
+//     --chart-4  var(--kw-lavender)   #B1A3CF   Feedback   (was Request's)
 //     --chart-5  var(--kw-orange)     #F7953E   Question
 //
 // `--chart-2` (forest) is the one series member with no ticket type, which is
@@ -52,7 +59,7 @@
 //
 // THE ONE COUPLING THIS BUYS, said out loud rather than discovered later:
 // `tokens.css` flags a future chart re-tune as likely, and a re-tune that moved
-// `--chart-4` off lavender would move Request's dot with it. `process-map.tsx`
+// `--chart-4` off lavender would move Feedback's dot with it. `process-map.tsx`
 // already writes the mirror-image note about the same risk (it takes `--info`
 // rather than `--chart-1` for "this step is new", because that mark is a STATUS
 // and a status has its own token). A ticket type is not a status and has no
@@ -63,15 +70,15 @@
 //
 // ── AND THE FIFTH COLOUR, WHICH IS NOT ONE ──────────────────────────────────
 //
-// "Requirements" and "General" are being retired — but they are values in the
-// team's OWN `Ticket type` list, and a ticket raised last March still carries
-// one. Deleting them from the code would be deleting the word off a record that
-// already says it (the same ruling migration 0034 made for "Bug" and "Feedback":
-// deactivate the row, never orphan the history). So they are not enumerated here
-// at all and they are not special-cased: ANY word this map does not know — the
-// two retiring ones, a word a team typed itself, a ticket with no type — reads
-// the neutral, and the WORD beside the dot carries the meaning on its own. That
-// is `type-marks.ts`'s own third condition, in colour.
+// The four words are now the ONLY four (`shared/ticket-types.ts`, the owner's
+// ruling of 15 Sep 2026), and migration 0093 carried every team to them — so a
+// word this map does not know is no longer a vocabulary row anywhere. It is
+// still possible on a RECORD: a ticket raised last March under "General", a word
+// a team typed before the lock, a ticket with no type at all. None of those is
+// enumerated here and none is special-cased — they read the neutral, and the
+// WORD beside the dot carries the meaning on its own. That is `type-marks.ts`'s
+// own third condition, in colour, and it is why deleting a vocabulary row can
+// never orphan the history that already says the word.
 //
 // ── WHY THE DOT IS NEVER ALONE ──────────────────────────────────────────────
 //
@@ -84,6 +91,8 @@
 // TYPE'S OWN WORD beside the dot. A dot on its own would be a colour nobody can
 // read, four times over.
 
+import { TICKET_TYPES, ticketTypeKey } from "@shared/ticket-types"
+
 /** The token a ticket type's dot is filled with, keyed by the seeded word in
  * lower case so a team that capitalises differently still lands on its colour.
  *
@@ -92,11 +101,11 @@
  * can all read (`relationship-map.tsx` already holds `var(--chart-1)` in exactly
  * this shape for exactly that reason), and a class would tie the answer to one
  * of the three. */
-const TYPE_COLOUR: Record<string, string> = {
+const TYPE_COLOUR: Record<TicketTypeKey, string> = {
   issue: "var(--chart-3)",
   question: "var(--chart-5)",
-  request: "var(--chart-4)",
   extra: "var(--chart-1)",
+  feedback: "var(--chart-4)",
 }
 
 /** The neutral — a word this map does not know, and a ticket with no type at
@@ -114,7 +123,7 @@ export const NEUTRAL_TYPE_COLOUR = "var(--ink-tertiary)"
  * answer rather than an absence. */
 export function ticketTypeColour(value: string | null | undefined): string {
   if (!value) return NEUTRAL_TYPE_COLOUR
-  return TYPE_COLOUR[value.trim().toLowerCase()] ?? NEUTRAL_TYPE_COLOUR
+  return TYPE_COLOUR[ticketTypeKey(value) as TicketTypeKey] ?? NEUTRAL_TYPE_COLOUR
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -126,38 +135,46 @@ export function ticketTypeColour(value: string | null | undefined): string {
    which app. Also put it in this order in the open work, and also put it in
    this order in how long a ticket takes to close."
 
+   REQUEST LEFT THE VOCABULARY ON 15 SEP 2026, folded into Extra, and FEEDBACK
+   took the fourth place. Her sentence is unchanged in the only way that matters
+   — issue leads, question follows, and the two kinds that are somebody asking
+   for MORE come after the two that are somebody STUCK.
+
    It is not alphabetical, it is not by count, and it is not the order the door
    happened to return — it is the order she reads her own work in, and a chart
    whose columns reorder themselves as the numbers move is a chart nobody can
-   compare week to week. Three of the four seeded words are already ordered
-   differently by the seed itself (`Question` leads there), so the vocabulary's
-   own order could not be it either.
+   compare week to week.
 
-   WHY IT LIVES HERE, BESIDE THE COLOURS, AND NOT IN THE DASHBOARD. Every panel
-   that draws a type also draws its colour, so a fifth type added tomorrow is
-   ONE decision in ONE file — a line in `TYPE_COLOUR` and a line here — rather
-   than a colour here and an order in whichever screen happened to need one
-   first. The dashboard's five panels, its legend and its trend all sort
-   through this, so they cannot come to disagree.
+   IT IS NO LONGER A LIST TYPED HERE, and that is the 15 Sep change worth
+   noticing. The seed planted one order, this file declared another, and keeping
+   two hand-written lists of the same four words in step was nobody's job — which
+   is how a five-word vocabulary came to ship under a four-column dashboard on
+   6 Sep. `TICKET_TYPES` (shared/ticket-types.ts) is the one list now: the seed
+   plants it, migration 0093 carries every existing team to it, the door refuses
+   a fifth, and this derives her order from it by position.
 
-   KEYED ON THE SAME IDENTITY THE COLOUR IS. `trim().toLowerCase()`, exactly as
-   `ticketTypeColour` below matches, because the vocabulary is the team's own
-   editable `Ticket type` list — a team that capitalises differently, or types a
-   trailing space, still lands on both its colour and its place. The two must
-   agree by construction: an order keyed one way and a colour keyed another
-   would put a word in the first column wearing the neutral grey.
+   KEYED ON THE SAME IDENTITY THE COLOUR IS — `ticketTypeKey`, the product's one
+   "is this word that word" test, which `ticketTypeColour` above also uses.
+   The two must agree by construction: an order keyed one way and a colour keyed
+   another would put a word in the first column wearing the neutral grey.
 
    AND A WORD THIS LIST HAS NEVER HEARD STILL RENDERS. It sorts to the END, in
-   the order it arrived in — the retiring "Requirements" and "General", a word a
-   team typed itself, a kind that only exists on imported tickets. It is the
-   same ruling `ticketTypeColour` makes one function down (an unknown word gets
+   the order it arrived in — a ticket raised years ago under a word the
+   vocabulary no longer holds, a kind that only exists on imported tickets. It is
+   the same ruling `ticketTypeColour` makes one function up (an unknown word gets
    the neutral rather than being special-cased or refused) and the same one the
    dashboard's own `types` memo makes (a kind that only exists on historical
    tickets is APPENDED rather than dropped, because a bar it owns would
    otherwise vanish from a chart whose total still counts it). A type that
    disappeared from a chart because nobody had ranked it is exactly the silent
    subtraction this whole screen is built to avoid. */
-const TYPE_ORDER = ["issue", "question", "request", "extra"] as const
+const TYPE_ORDER = TICKET_TYPES.map((t) => ticketTypeKey(t.value))
+
+/** The key of one of the four, so `TYPE_COLOUR` is total over them by
+ * construction: adding a word to `TICKET_TYPES` without giving it a colour does
+ * not compile, which is the cheapest possible version of the check that would
+ * otherwise have to be written. */
+type TicketTypeKey = ReturnType<typeof ticketTypeKey>
 
 /** Where a ticket type sits in the client's fixed order — 0-based, and the
  * length of the list (i.e. after all four) for a word the order has never
@@ -165,7 +182,7 @@ const TYPE_ORDER = ["issue", "question", "request", "extra"] as const
  * sorting on this can add nothing and subtract nothing. */
 function ticketTypeRank(value: string | null | undefined): number {
   if (!value) return TYPE_ORDER.length
-  const at = (TYPE_ORDER as readonly string[]).indexOf(value.trim().toLowerCase())
+  const at = TYPE_ORDER.indexOf(ticketTypeKey(value))
   return at === -1 ? TYPE_ORDER.length : at
 }
 

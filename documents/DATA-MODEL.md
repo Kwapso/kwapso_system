@@ -633,6 +633,52 @@ active." Two independent fixes, one migration:
   was deactivated — unconditionally, because a door call is always a person
   acting on one row they chose, never a bulk sweep.
 
+**A ticket is one of FOUR kinds, and every other option deleted (team migration
+`0093`, 2026-09-15).** The owner's ruling, verbatim: *"Remove all other options.
+Just get rid of them, delete them completely. From staging and production."* The
+four are Issue, Question, Extra and Feedback, and they live in ONE place —
+`TICKET_TYPES` in `shared/ticket-types.ts` — read by the seed, by this migration,
+by the door that locks the group and by `web/lib/type-colours.ts`, which derives
+the client's fixed reading order from it rather than restating it.
+
+- **A HARD DELETE, and it is the exception this ledger otherwise never makes.**
+  `0026` retires a duplicate, `0034` retires a word — both deactivate, because a
+  retired row still explains a historical ticket that says the word. The owner
+  was told that and ruled for deletion twice in one sentence. What makes it safe
+  rather than merely obeyed is that `help.help_type` stores the WORD and not a
+  foreign key: deleting the vocabulary row cannot orphan a ticket, and a ticket
+  still carrying a retired word reads the neutral colour and sorts to the end of
+  the order (`ticketTypeColour`'s own ruling), exactly as it always did.
+- **Request folds into Extra, on BOTH columns.** `help.help_type` AND
+  `help.raised_as_type`, derived from `VOCABULARY_HOMES` rather than typed into
+  the migration — the same argument `shared/selectable-homes.ts` makes about a
+  rename: a SPELLING changing is not a recategorisation anybody performed, and
+  carrying only `help_type` would have manufactured 961 of them on staging in the
+  one chart that reports them. Matched the way every vocabulary word in this app
+  is matched (trimmed, lower-cased, one trailing "s" tolerated), because the
+  column holds a team's own word.
+- **Requirements went as a word AND as code.** The kept-but-never-shown
+  machinery — `TICKET_TYPE_KEPT_FOR_MIGRATION` and its four readers, the list
+  clause, the write refusal, the `query_records` exclusion — was eighty lines
+  protecting ZERO rows, counted read-only across every ready team before a line
+  was changed. `shared/types.ts` carries the full account where the code used to
+  be.
+- **Feedback comes back, with a condition.** It was retired by `0034`; `0093`
+  re-plants or reactivates it. `createTicket` and `updateTicket` refuse it unless
+  a **Validation sprint is running on the ticket's app** — the predicate is
+  `sprintIsRunning` (`shared/sprint-state.ts`), which the sprints board reads
+  too, so the screen and the door cannot disagree about "running" (an overrun
+  still counts; a cancelled block does not). It refuses a MOVE INTO the kind and
+  never a row already in it.
+- **The group is LOCKED at four.** `createSelectable` refuses a fifth `Ticket
+  type` with a `locked_group` 400, and the Choices screen stands its add button
+  down for that group (`create: false`). **Renaming is untouched** — a team may
+  call an Extra whatever it calls an Extra, and `updateSelectable` carries every
+  record with it.
+- **Idempotent, genuinely.** Every statement moves zero rows on a second pass,
+  including the normalising `UPDATE`, whose guard uses `IS NOT` rather than `<>`
+  so a NULL mark really does compare.
+
 ### help + help_threads. KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
 
 **This is the Tickets module.** There is no help section and there is no second
@@ -658,7 +704,11 @@ database and the wire say stays `help`.** The two names meet in exactly one seam
 `MODULE_PERMISSION` in `web/lib/screens.ts` (`tickets: "help"`), and
 `web/test/nav.test.ts` fails if it is removed. Do not "finish the rename".
 
-`help` (parent ticket): audit + `help_type` (selectable), `description`,
+`help` (parent ticket): audit + `help_type` (selectable, and since team
+migration `0093` one of exactly FOUR — Issue, Question, Extra, Feedback, the
+list being `TICKET_TYPES` in `shared/ticket-types.ts`; Feedback is refused at
+the door outside a running Validation sprint), `raised_as_type` (what it
+ARRIVED as, written once at the INSERT and never updated), `description`,
 `screen_recording_link`, the source screen/record capture, `status` on a FIXED
 lifecycle, `resolved`, `resolved_on`, `resolver_id/email/name`.
 `help_threads` (messages): audit + `help_id` (the parent ticket),

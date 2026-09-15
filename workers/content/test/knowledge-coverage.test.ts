@@ -920,7 +920,20 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts carries it). Same reason
   // as v2 and the same shape: an account already indexed goes on saying the old
   // number, out loud, to somebody looking at a screen that disagrees.
-  account: { version: 3, digest: "25e874faac53268c" },
+  // RE-PINNED 15 Sep 2026 AT THE SAME VERSION, and the version staying at 3 is
+  // the point. The two ticket sentences lost their clause: the kind it
+  // subtracted was DELETED outright by the owner's ruling that day
+  // (`shared/ticket-types.ts`), so the reader is the plain `COUNT(*)` and the
+  // plain rollup again. THE WORDS CANNOT HAVE MOVED — the clause was excluding
+  // ZERO rows when it was removed, counted read-only across every ready team on
+  // staging before a line was changed (no ticket on either team carried that
+  // kind, on either column) — so every account already indexed says exactly what
+  // it would say after a bump. A bump would re-READ every account on the estate
+  // to write back the sentence already there. This is the same repair the `task`
+  // note and the meeting reader's v5 note describe: the digest moves, the
+  // version does not, and the reason is written down where the next reader
+  // meets the failure.
+  account: { version: 3, digest: "737313be220deca8" },
   contact: { version: 1, digest: "83d7be3dfb3fd58b" },
   app: { version: 1, digest: "4cc1a834e6b82312" },
   process: { version: 1, digest: "908921c603bedcd9" },
@@ -1066,6 +1079,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // is unchanged — which is the evidence rather than the claim — so no other
 // textVersion moves, and bumping one here would re-read every row of every kind
 // to fix nothing.
+// 15 Sep 2026: THE SAME IMPORT LINE, REMOVED. The kind it tested for was deleted
+// outright by the owner's ruling that day (`shared/ticket-types.ts`), so
+// `ticketTypeKeptForMigrationExcludedSql` no longer exists and the import at the
+// top of the file went with it — outside the kinds table, so it lands here. The
+// only reader that called it is `account`, re-pinned above AT v3 with the
+// measurement that makes a bump wrong: the clause was excluding zero rows, so
+// the sentence an indexed account holds is byte-identical either way. Every
+// other per-kind digest is unchanged, which is the evidence rather than the
+// claim.
 // 7 Sep 2026: THE RULER MOVED, NOT THE FILE. `stripComments`
 // (shared/rules/source-scan.ts) stopped being two regexes and became a real
 // tokeniser, and it now leaves a block comment's NEWLINES behind instead of
@@ -1161,7 +1183,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // so this fired correctly; no word any kind SAYS changed (that repair is
 // `person`'s own textVersion bump, in READER_DIGESTS above), so no other
 // textVersion moved.
-const SHARED_DIGEST = "8a2e7515891e2073"
+const SHARED_DIGEST = "cbe20c64c650ec57"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
