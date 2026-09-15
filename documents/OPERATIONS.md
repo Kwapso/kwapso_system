@@ -751,6 +751,25 @@ both environments, 600 requests per caller per worker per minute
   placeholder lives instead). Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
   pulled with `scripts/sync-design.mjs`, then the import is swapped and the placeholder
   deleted here — never built by hand under `shared/ui/`, which turns the build red.
+- **One-off data passes live in `scripts/data/`**, never in `team-schema.ts` —
+  the same division `scripts/reset-all.mjs`, `scripts/backfill-ticket-raisers.mjs`
+  and `scripts/backfill-refs-2026-09-01.mjs` draw for the same reason: a one-time
+  correction to existing ROWS is not a schema change, so it does not belong in the
+  migration ledger. `scripts/data/2026-09-15-story-reclass.json` +
+  `scripts/data/reclassify-stories.mjs` is the current one: the client's 15 Sep
+  2026 ruling on story TYPES (Data · Tech · Bug · Feature · Change, first match
+  wins) and CATEGORY (Client-requested · Internal), applied by hand to every one
+  of the 340 existing stories on the Kwapso team's staging database (335
+  classified with a one-line reason each citing the signal word/verb; 5 left
+  genuinely ambiguous rather than guessed). The script is read-only until
+  `--apply`: it refuses to write a single row until `stories.category` (the
+  schema lane's own migration, applied separately) exists on the target
+  database, checked live with `PRAGMA table_info(stories)`. Re-run on
+  production once that migration has shipped there too:
+  `node scripts/data/reclassify-stories.mjs --apply --env production --db <team-db> --yes-production`.
+  `--dry-run` (the default with no `--apply`) touches nothing live and needs no
+  credentials — it just prints the planned `UPDATE` statements off the JSON
+  file on disk.
 
 ## Custom domains, the agreed naming (decided 2026-08-08)
 

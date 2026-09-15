@@ -65,7 +65,9 @@ beforeEach(() => {
     SELECT '${IDS.adminRole}_' || m.module, '${IDS.adminRole}', m.module, 1, 1, 1, 1
       FROM (SELECT 'commercials' AS module UNION ALL SELECT 'work'
             UNION ALL SELECT 'knowledge' UNION ALL SELECT 'meetings'
-            UNION ALL SELECT 'todos' UNION ALL SELECT 'deliverables'
+            -- RENAMED todos -> inputs 15 Sep 2026 (team migration 0095) --
+            -- the todos QUERY_MODULES entity gates on inputs now.
+            UNION ALL SELECT 'inputs' UNION ALL SELECT 'deliverables'
             UNION ALL SELECT 'selectable_data') m;
   `)
 })

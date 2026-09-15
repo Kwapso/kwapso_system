@@ -119,7 +119,10 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // (a wave is a package of them) and the tenancy door, because that is the
     // worker that owns the table.
     { key: "waves-account", module: "work", resource: "waves", door: "tenancy" },
-    { key: "todos-account", module: "todos", resource: "todos", door: "content" },
+    // MODULE RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095) —
+    // the resource and the door are unchanged, only the permission box a
+    // caller needs to read the badge.
+    { key: "todos-account", module: "inputs", resource: "todos", door: "content" },
     // A PERSON's three. `tickets-account` and `meetings-account` are read on the
     // contact screen; a company's screen never draws them, and priming a sidecar
     // nobody reads costs one number in a payload.

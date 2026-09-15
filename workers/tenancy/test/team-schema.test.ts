@@ -45,6 +45,13 @@ describe("buildTeamSeed", () => {
     for (const row of viewerRows) {
       if (row.includes("'agent'")) expect(row).toContain("1, 1, 0, 0")
       else if (row.includes("'all_tasks'")) expect(row).toContain("0, 0, 0, 0")
+      // EVERYONE ELSE'S STORIES — `all_tasks`'s own shape, one module along
+      // (client ruling, 15 Sep 2026: the Stories tab strip's "Everyone's"
+      // tab). Off by default for the same reason.
+      else if (row.includes("'all_stories'")) expect(row).toContain("0, 0, 0, 0")
+      // EVERYONE ELSE'S INPUTS — the third of the three, same shape,
+      // same reason (the Inputs screen, 15 Sep 2026).
+      else if (row.includes("'all_inputs'")) expect(row).toContain("0, 0, 0, 0")
       else expect(row).toContain("1, 0, 0, 0")
     }
   })
@@ -204,11 +211,19 @@ describe("team schema", () => {
       // `work` decides whether you reach the tasks screen, this decides whether
       // the list is the whole team's or your own. Off for every role but Admin.
       "all_tasks",
+      // EVERYONE ELSE'S STORIES — `all_tasks`'s own shape, one module along
+      // (client ruling, 15 Sep 2026: the Stories tab strip's "Everyone's"
+      // tab). Off for every role but Admin, the same reason.
+      "all_stories",
       // TO-DOS are the exception in this list: the one module a CLIENT login is
       // meant to hold rights on, because a to-do is aimed at them and they
       // complete it themselves. That is why it is not four more rights on
-      // `work`, which no client holds at all.
-      "todos",
+      // `work`, which no client holds at all. RENAMED FROM `todos` 15 Sep
+      // 2026 (team migration 0095) — the Inputs screen's own permission box.
+      "inputs",
+      // EVERYONE ELSE'S INPUTS — `all_tasks`/`all_stories`'s own shape, a
+      // third time. Off for every role but Admin, the same reason.
+      "all_inputs",
       "meetings",
       // THE AGENCY'S OWN HOUSEKEEPING — the three modules carrying the legacy
       // tables that describe how the agency runs ITSELF rather than what it does

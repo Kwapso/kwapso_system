@@ -27,21 +27,23 @@ import * as React from "react"
 import { cn } from "@shared/ui/lib/utils"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
-import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
-import { List, ChartBarHorizontal } from "@shared/ui/foundations/icons"
+import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { RecordMark } from "@shared/web/record-mark"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
-import { TOOLBAR_SEARCH_SLOT } from "@/components/deep-link/screen-bits"
+import { NO_SORT_VIEW_VALUES, TOOLBAR_SEARCH_SLOT } from "@/components/deep-link/screen-bits"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
 
-/** LIST, or the Gantt-drawn TIMELINE (waves-screen.tsx's `waveTimelineWindow`).
- * List is the first-run default — D7-5's "table-first" rule, spelled for a
- * collection whose default body is a plain list rather than a table. */
-export type WaveView = "list" | "timeline"
+/** THE THREE BODIES the client's 2026-09-15 ruling ("i choose t3") named:
+ * Timeline (T3 — one bar per wave, segmented by its sprints), Calendar
+ * (waves and sprints on the month grid) and List (`RecordTable`, R80 shape).
+ * WHICH OF THE THREE A TAB OFFERS is the caller's question, not this file's
+ * — Active offers Timeline/Calendar, All offers all three — so `WaveFinder`
+ * takes the live `views` array rather than hard-coding it (below). */
+export type WaveView = "timeline" | "calendar" | "list"
 
 /** What a wave can be ordered by. The words are the SCREEN's, not the column's. */
 export type WaveOrder = "name" | "runs" | "sprints" | "client" | "newest"
@@ -131,6 +133,7 @@ export function WaveFinder({
   /** Omit the client filter where the list is already one client's. */
   showClientFilter = true,
   resultCount,
+  views,
   view,
   onViewChange,
   period,
@@ -141,11 +144,14 @@ export function WaveFinder({
   clients: Account[]
   showClientFilter?: boolean
   resultCount?: number
-  /** LIST/TIMELINE — CH19's third toolbar zone ("search, then filters, then
-   * view switcher, then actions pinned right", CH27.13), the kit's own
-   * `ViewSwitch`. Waves offers exactly two and no more, so it is always drawn
-   * here rather than made conditional — `ViewSwitch` itself renders nothing
-   * for fewer than two (view-switch.tsx's own state 7). */
+  /** THE BODIES THIS TAB OFFERS — CH19's third toolbar zone ("search, then
+   * filters, then view switcher, then actions pinned right", CH27.13), the
+   * kit's own `ViewSwitch`. Active hands over two (`views`.length === 2);
+   * All hands over three. `ViewSwitch` itself renders nothing for fewer than
+   * two (view-switch.tsx's own state 7), so a tab that ever offered one body
+   * would draw no switch at all rather than a caller having to remember to
+   * withhold it. */
+  views?: CollectionViewOption[]
   view?: WaveView
   onViewChange?: (view: WaveView) => void
   /** CH27.26's `‹ 6 months ›` — override 28 puts the stepper "between the
@@ -333,28 +339,35 @@ export function WaveFinder({
               the filter pill". See `filter-bar.tsx`'s own header for the full
               account. */}
           {filterPill}
-          <SortControl
-            options={[
-              { value: "newest", label: t("Newest first") },
-              { value: "name", label: t("Name") },
-              { value: "client", label: t("Account") },
-              { value: "runs", label: t("When it runs") },
-              { value: "sprints", label: t("Sprints inside it") },
-            ]}
-            value={query.sortBy}
-            onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-            direction={query.dir}
-            onDirectionChange={(dir) => onChange({ ...query, dir })}
-            label={t("Sort by")}
-            hideLabel
-          />
-          {period}
-          {view && onViewChange ? (
-            <ViewSwitch
-              views={[
-                { value: "list", label: t("List"), icon: <List size={16} /> },
-                { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+          {/* R78 — CALENDAR VIEWS CARRY NO SORT, extended to Timeline
+              (2026-09-15: "the timeline is time-ordered too"). `<ToolbarRow>`
+              suppresses its own `<SortControl>` centrally off
+              `NO_SORT_VIEW_VALUES` (screen-bits.tsx); this file is a
+              registered hand-copy of that row (`TOOLBAR_CONTROL_OWNERS`,
+              R53) and makes the identical promise itself, off the same set,
+              rather than a second copy of the three-value list. Sort stays
+              on List — a flat, orderable body, unlike a time-axis grid. */}
+          {view && NO_SORT_VIEW_VALUES.has(view) ? null : (
+            <SortControl
+              options={[
+                { value: "newest", label: t("Newest first") },
+                { value: "name", label: t("Name") },
+                { value: "client", label: t("Account") },
+                { value: "runs", label: t("When it runs") },
+                { value: "sprints", label: t("Sprints inside it") },
               ]}
+              value={query.sortBy}
+              onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+              direction={query.dir}
+              onDirectionChange={(dir) => onChange({ ...query, dir })}
+              label={t("Sort by")}
+              hideLabel
+            />
+          )}
+          {period}
+          {views && views.length > 1 && view && onViewChange ? (
+            <ViewSwitch
+              views={views}
               value={view}
               onValueChange={(v) => onViewChange(v as WaveView)}
               label={t("View")}

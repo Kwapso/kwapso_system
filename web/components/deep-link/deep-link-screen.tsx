@@ -55,7 +55,7 @@ import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
-import type { TaskView } from "@/lib/live-resources"
+import type { TaskView, StoryView, InputView } from "@/lib/live-resources"
 import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
@@ -168,6 +168,18 @@ export function DeepLinkScreen() {
   // defaulting to it would land a cold screen on a pile nothing points at.
   const [taskView, setTaskView] = React.useState<TaskView>("overdue")
 
+  // WHICH TAB OF THE BACKLOG THE STORIES SCREEN SHOWS — `taskView`'s own
+  // reason, one collection along: the list pages, so a client-side sieve for
+  // "the ones due now" would answer among the newest fifty. "now" — the tab
+  // strip's own first tab (client ruling, 15 Sep 2026) — the same shape
+  // `taskView`'s default takes for its own first tab.
+  const [storyView, setStoryView] = React.useState<StoryView>("now")
+
+  // WHICH OF THE INPUTS SCREEN'S THREE TABS SHOWS — `taskView`'s own reason,
+  // a second collection along (Task C, 15 Sep 2026). "waiting" is the strip's
+  // own first tab (the coordinator's I1 design, adopted whole).
+  const [inputView, setInputView] = React.useState<InputView>("waiting")
+
   // WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture of
   // the whole base (R53's `view` slot on that screen's toolbar). Declared beside
   // `taskView` and for the same reason: the picture is a DOOR of its own, so the
@@ -192,10 +204,12 @@ export function DeepLinkScreen() {
     brandQ,
     purposesQ,
     storiesQ,
+    storiesViewQ,
     sprintsQ,
     appsQ,
     tasksOpenQ,
     tasksAllQ,
+    inputsQ,
     workLogsQ,
     meetingsQ,
     brandCategoryOptions,
@@ -210,6 +224,8 @@ export function DeepLinkScreen() {
     module,
     recordId,
     taskView,
+    storyView,
+    inputView,
     knowledgeView,
     // The records this one was opened INSIDE. Their lists back the breadcrumb's
     // labels, so a nested address that does not ask for them shows the word
@@ -930,7 +946,7 @@ export function DeepLinkScreen() {
             noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, knowledgeShapeQ, companiesQ, totals,
             brandQ, purposesQ, internalActivity,
-            storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
+            storiesQ, storiesViewQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, inputsQ, workLogsQ, meetingsQ,
             inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, myUserId, query,
@@ -938,7 +954,7 @@ export function DeepLinkScreen() {
             // ticket types (CHECKLIST 5.1) — the same list the ticket form's
             // picker reads, so the words agree wherever they appear.
             helpTypeOptions,
-            taskView, setTaskView, knowledgeView, setKnowledgeView, t, lang,
+            taskView, setTaskView, storyView, setStoryView, inputView, setInputView, knowledgeView, setKnowledgeView, t, lang,
           })}
           </RememberedScreen>
           </div>

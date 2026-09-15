@@ -68,7 +68,7 @@ async function addStory(title: string): Promise<string> {
     // A kind and an answer about processes are both required now (CHECKLIST 6.2
     // and 6.5). Neither is what these cases are about; they are the ordinary
     // answers so the fixture reads as an ordinary story.
-    storyType: "Fix",
+    storyType: "Feature",
     changesNoStep: true,
   })
   expect(res.status).toBe(200)

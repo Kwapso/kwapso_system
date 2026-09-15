@@ -36,7 +36,7 @@
 
 import { countStoryAttachments } from "./story-attachments"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
-import { countCollectionWith, reportedTotal } from "@shared/workers/count"
+import { boundedInner, countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -45,7 +45,8 @@ import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
-import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
+import { STORY_STATUSES, type Sprint, type Story, type StoryStatus, type StoryViewName } from "@shared/types"
+import { requireActiveSelectableValue } from "./vocabulary"
 
 import type { Env } from "../env"
 import { teamMemberNames } from "./notify"
@@ -59,6 +60,13 @@ import {
 import { inOrder } from "@shared/workers/parallel"
 
 export { STORY_STATUSES, type StoryStatus }
+
+/** Today, as the date half of an ISO moment — the same UTC boundary
+ * `workers/content/src/lib/tasks.ts`'s own `todayIso` cuts the Overdue/Planned
+ * split on, for the identical reason: a worker has no reader's clock. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 type StoryRow = {
   id: string
@@ -84,6 +92,7 @@ type StoryRow = {
   closed_at: string | null
   closing_note: string | null
   story_type: string | null
+  category: string
   review_note: string | null
   review_file_url: string | null
   review_file_name: string | null
@@ -101,7 +110,7 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
-  s.story_type, s.review_note, s.review_file_url, s.review_file_name,
+  s.story_type, s.category, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -184,6 +193,11 @@ function toStory(r: StoryRow): Story {
     closedAt: r.closed_at,
     closingNote: r.closing_note,
     storyType: r.story_type,
+    // A ROW BACK-FILLED BY MIGRATION SHOULD NEVER BE NULL (team migration 0093),
+    // but the safe direction is the same one `status` above already takes: a
+    // value the code does not recognise reads as the DEFAULT rather than as
+    // `null as string`, which would be a lie against the type.
+    category: r.category || "Client-requested",
     reviewNote: r.review_note,
     reviewFileUrl: r.review_file_url,
     reviewFileName: r.review_file_name,
@@ -239,8 +253,23 @@ export type StoryFilter = {
    * answers "this app's work among the newest fifty" and looks like an answer. */
   appId?: string
   assigneeId?: string
-  /** "open" hides done stories — the everyday view of a backlog. */
-  view?: "open" | "all"
+  /** "open" (the default) hides done stories with no other narrowing — the
+   * door's fail-safe fallback, unchanged. "all" narrows nothing at all —
+   * unchanged too, and still what `record-counts.ts`'s cross-link badges ask
+   * for. `now`/`planned`/`backlog`/`completed` are the Stories tabs (client
+   * ruling, 15 Sep 2026 — `STORY_VIEWS`, shared/types.ts, carries the whole
+   * account): each is narrowed to `assigneeId` at the DOOR
+   * (`workers/content/src/routes/stories.ts`'s own `MINE_VIEWS`), never here —
+   * this file answers whichever question it is asked, the same split
+   * `workers/content/src/lib/tasks.ts` draws between `viewClause` and the
+   * route's own narrowing. */
+  view?: StoryViewName
+  /** THE 2026-09-15 "MINE" NARROWING, `tasks.ts`'s own `includeUnassigned`
+   * ported verbatim: a story with no `assignee_id` rides along on every MINE
+   * tab, because a backlog this old carries plenty of history nobody has ever
+   * claimed. ONLY meaningful alongside `assigneeId` — the route sets both
+   * together, exactly as the tasks route does. */
+  includeUnassigned?: boolean
   /** THE SEARCH BOX, answered here rather than in the browser. The backlog pages
    * (R14), so a search that filtered the loaded page would answer "among the
    * newest fifty" while the badge above counted 3,677 — the same defect this
@@ -249,10 +278,82 @@ export type StoryFilter = {
   q?: string
 }
 
+/** WHEN THIS PIECE OF WORK IS ACTUALLY DUE — the sprint's own end date where
+ * there is a sprint, the story's own (legacy) date where there is not. The
+ * exact question `Story.sprintEndsOn` already answers for a screen; written
+ * again here as a raw subquery because a WHERE clause cannot reference a
+ * SELECT-list alias. */
+function storyDueDateSql(): string {
+  return "COALESCE((SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id), s.due_on)"
+}
+
+/** OVERDUE — a due date in the past. ONE `?` (today), read left to right
+ * wherever this is spliced in; `storyWhere`/`countStoryViews` push `todayIso()`
+ * at the matching position. Status is asked SEPARATELY by every caller (the
+ * "Now"/"Planned" split both need `status <> 'done'` as their own top-level
+ * term), so it is not folded in here. */
+function storyOverdueSql(): string {
+  const due = storyDueDateSql()
+  return `(${due} IS NOT NULL AND ${due} < ?)`
+}
+
+/** THE SPRINT IS RUNNING RIGHT NOW — `sprintState(sprint) === "running"`
+ * (`web/components/work/sprints-screen.tsx`), read the same way from SQL: not
+ * completed, not deactivated, and its start day has arrived. An end date in
+ * the past does NOT move a sprint out of "running" (that file's own header),
+ * so this asks nothing about `ends_on` — a late sprint is still the block in
+ * front of the team, which is exactly why "Now" also catches it through
+ * `storyOverdueSql` on the OTHER side of its OR. ONE `?` (today). */
+function storySprintRunningSql(): string {
+  return `(s.sprint_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM sprints sp WHERE sp.id = s.sprint_id
+      AND sp.completed_at IS NULL AND sp.deactivated_at IS NULL
+      AND sp.starts_on IS NOT NULL AND sp.starts_on <= ?
+  ))`
+}
+
+/** NO SPRINT, OR ONE THAT HAS NOT STARTED — `sprintState(sprint) ===
+ * "upcoming"` (or no sprint at all), the same source. "Planned" is the future,
+ * not yet claimed by a running block — the artifact's own words. ONE `?`
+ * (today). */
+function storySprintUpcomingOrNoneSql(): string {
+  return `(s.sprint_id IS NULL OR EXISTS (
+    SELECT 1 FROM sprints sp WHERE sp.id = s.sprint_id
+      AND sp.completed_at IS NULL AND sp.deactivated_at IS NULL
+      AND (sp.starts_on IS NULL OR sp.starts_on > ?)
+  ))`
+}
+
+/** THE FIVE TAB PREDICATES, and the two untouched legacy views beside them —
+ * `tasks.ts`'s own `viewClause`, one collection along. Returns the WHERE
+ * fragment (or null for "no narrowing at all") plus how many `todayIso()`
+ * params it consumes, IN THE ORDER they appear in the fragment's text —
+ * `storyWhere`/`countStoryViews` both rely on that order. */
+function storyViewSql(view: StoryViewName): { sql: string | null; todayCount: number } {
+  if (view === "all" || view === "backlog") return { sql: null, todayCount: 0 }
+  if (view === "now")
+    return {
+      sql: `s.status <> 'done' AND (${storyOverdueSql()} OR ${storySprintRunningSql()})`,
+      todayCount: 2,
+    }
+  if (view === "planned")
+    return {
+      sql: `s.status <> 'done' AND NOT ${storyOverdueSql()} AND ${storySprintUpcomingOrNoneSql()}`,
+      todayCount: 2,
+    }
+  if (view === "completed") return { sql: "s.status = 'done'", todayCount: 0 }
+  // "open" — the original default, unchanged: hide done, narrow nothing else.
+  return { sql: "s.status <> 'done'", todayCount: 0 }
+}
+
 function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
   const parts: string[] = []
   const params: string[] = []
-  if (filter.view !== "all") parts.push("s.status <> 'done'")
+  const view = storyViewSql(filter.view ?? "open")
+  if (view.sql) {
+    parts.push(view.sql)
+    for (let i = 0; i < view.todayCount; i++) params.push(todayIso())
+  }
   if (filter.status) {
     parts.push("s.status = ?")
     params.push(filter.status)
@@ -270,7 +371,11 @@ function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
     params.push(filter.appId)
   }
   if (filter.assigneeId) {
-    parts.push("s.assignee_id = ?")
+    // THE OR-NULL FORM — see `includeUnassigned`'s own doc — scoped to this one
+    // clause: a row still has to pass the view's own predicate above (an
+    // unclaimed OPEN story on Completed is still someone else's closed work,
+    // never this caller's).
+    parts.push(filter.includeUnassigned ? "(s.assignee_id = ? OR s.assignee_id IS NULL)" : "s.assignee_id = ?")
     params.push(filter.assigneeId)
   }
   if (filter.q) {
@@ -342,6 +447,74 @@ export async function countStories(
   return { total: reportedTotal(row?.total ?? 0), mineTotal: reportedTotal(row?.mine ?? 0) }
 }
 
+/** EVERY TAB'S BADGE, IN ONE READ — `workers/content/src/lib/tasks.ts`'s own
+ * `countTasks`, ported for the Stories strip (R16: an exact server `COUNT(*)`
+ * per tab, five questions about the same rows rather than five round trips).
+ * `assigneeId`/`includeUnassigned` are whatever the CALLER narrowed to — the
+ * route passes the same "mine" narrowing it applied to whichever tab was
+ * actually asked for, so a badge read while a MINE tab is open is itself
+ * narrowed exactly as `tasks.ts`'s own note on this shape already explains
+ * (converges to the true team-wide number the moment "Everyone's" is
+ * actually opened). */
+export type StoryViewCounts = {
+  /** THE EVERYDAY BACKLOG'S OWN BADGE, carried on every response regardless of
+   * which tab was asked for — `tasks.ts`'s own `openTotal`, so
+   * `totalKey("stories", …)` (read by every non-tab consumer: the module
+   * settings gear, the app/sprint/ticket cross-links) stays fresh no matter
+   * which of the five tabs a screen happens to be showing. */
+  open: number
+  now: number
+  planned: number
+  backlog: number
+  completed: number
+  all: number
+}
+
+export async function countStoryViews(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: { assigneeId?: string; includeUnassigned?: boolean }
+): Promise<StoryViewCounts> {
+  const clauses: string[] = []
+  const innerParams: string[] = []
+  if (filter.assigneeId) {
+    clauses.push(filter.includeUnassigned ? "(s.assignee_id = ? OR s.assignee_id IS NULL)" : "s.assignee_id = ?")
+    innerParams.push(filter.assigneeId)
+  }
+  const today = todayIso()
+  // FOUR "TODAY" PARAMS, in the order the four fragments appear in the SELECT
+  // list below — `now_n` reads it twice (overdue, then sprint-running),
+  // `planned_n` reads it twice more (overdue, then sprint-upcoming-or-none).
+  const params = [today, today, today, today, ...innerParams]
+  const rows = await d1Query<Record<string, number>>(
+    cfg,
+    guard.databaseId,
+    `SELECT
+       SUM(CASE WHEN s.status <> 'done' THEN 1 ELSE 0 END) AS open_n,
+       SUM(CASE WHEN s.status <> 'done' AND (${storyOverdueSql()} OR ${storySprintRunningSql()}) THEN 1 ELSE 0 END) AS now_n,
+       SUM(CASE WHEN s.status <> 'done' AND NOT ${storyOverdueSql()} AND ${storySprintUpcomingOrNoneSql()} THEN 1 ELSE 0 END) AS planned_n,
+       COUNT(*) AS backlog_n,
+       SUM(CASE WHEN s.status = 'done' THEN 1 ELSE 0 END) AS completed_n,
+       COUNT(*) AS all_n
+     FROM ${boundedInner(
+       `SELECT s.status, s.due_on, s.sprint_id, s.assignee_id FROM stories s${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""}`
+     )} s`,
+    params
+  )
+  const r = rows[0] ?? {}
+  // SUM over no rows is NULL, not 0 — a brand-new team's screen would
+  // otherwise badge every tab with nothing at all (`tasks.ts`'s own note).
+  const n = (key: string) => reportedTotal(Number(r[key] ?? 0))
+  return {
+    open: n("open_n"),
+    now: n("now_n"),
+    planned: n("planned_n"),
+    backlog: n("backlog_n"),
+    completed: n("completed_n"),
+    all: n("all_n"),
+  }
+}
+
 /** One story by id, or null. */
 export async function getStory(cfg: D1Rest, guard: MemberGuard, id: string): Promise<Story | null> {
   const rows = await d1Query<StoryRow>(
@@ -386,9 +559,25 @@ export type StoryInput = {
   startsOn?: unknown
   dueOn?: unknown
   accountId?: unknown
-  /** Fix / Feature / Change — REQUIRED (CHECKLIST 6.2), and drawn from the team's
-   * own `Story type` dropdown values so it stays theirs to rename. */
+  /** Data / Tech / Bug / Feature / Change — REQUIRED (CHECKLIST 6.2, client
+   * ruling 15 Sep 2026), drawn from the team's own `Story type` dropdown
+   * values so the WORDS stay theirs to rename — but the LIST is closed: the
+   * value has to be a currently ACTIVE row in that group, which is what keeps
+   * a deactivated "Fix" from being creatable again the moment somebody edits
+   * the vocabulary label back to it. */
   storyType?: unknown
+  /** Client-requested / Internal — the client's same ruling. REQUIRED on an
+   * edit, exactly like `storyType` (this door replaces every field it reads,
+   * never leaves one untouched — `updateTask`'s own doc, `workers/content/src/
+   * lib/tasks.ts`, carries the reason: an absent field meaning "leave it" is
+   * how an agent turn once wiped three columns nobody mentioned). On a
+   * CREATE, blank defaults to 'Client-requested' (`createStory`, below) —
+   * the one field this door fills in rather than refuses, because the form
+   * always has a pill pre-selected and a machine caller that says nothing
+   * about where the work came from almost always means the ordinary case.
+   * Validated the same way `storyType` is — an active row in "Story
+   * category", never a free string. */
+  category?: unknown
 }
 
 /** WHICH MAPS — proved to be live processes in the caller's own team database,
@@ -654,10 +843,15 @@ export async function createStory(
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
   const dueOn = optionalText(input.dueOn, "Due date", TEXT_LIMITS.short) ?? null
   const changesNoStep = input.changesNoStep === true
-  // REQUIRED (CHECKLIST 6.2). Not checked against the team's list: the words are
-  // theirs to rename on the Dropdown values screen, and a door that validated
-  // against today's three would refuse a fourth the moment somebody added one.
+  // REQUIRED (CHECKLIST 6.2). The WORDS stay the team's to rename on the
+  // Dropdown values screen — the list is checked below, in the wave, not
+  // against a hardcoded five, so a sixth type added there is offered the
+  // moment it exists rather than refused until this file is edited too.
   const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
+  // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — blank defaults to
+  // the ordinary case rather than refusing (`StoryInput.category`'s own doc,
+  // above says why this one field gets a default and `storyType` does not).
+  const category = optionalText(input.category, "Category", TEXT_LIMITS.short) ?? "Client-requested"
 
   // ONE WAVE, NOT SIX TRIPS (shared/workers/parallel.ts). Every one of these
   // reads only the INPUT — not each other — so the six `await`s were sequential
@@ -667,11 +861,16 @@ export async function createStory(
   // still refused with the client's message, exactly as it was.
   //
   // 6.6 — the work goes to somebody who is on this app, or nowhere. That check
-  // returns nothing and throws; riding the wave does not change either.
-  const [accountId, processIds, , assignee, reviewer, rank] = await inOrder([
+  // returns nothing and throws; riding the wave does not change either. The two
+  // vocabulary checks are the same shape: a read that only ever throws or
+  // returns nothing, so riding the wave costs nothing and buys back two more
+  // round trips than the create door had before this pass.
+  const [accountId, processIds, , , , assignee, reviewer, rank] = await inOrder([
     resolveAccount(cfg, guard, named, ticketId, appId),
     resolveProcesses(cfg, guard, input.processIds, changesNoStep),
     refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person"),
+    requireActiveSelectableValue(cfg, guard, "Story type", storyType, "Story type"),
+    requireActiveSelectableValue(cfg, guard, "Story category", category, "Category"),
     assigneeId ? memberOrThrow(env, guard, assigneeId, "Assignee") : Promise.resolve(null),
     reviewerId ? memberOrThrow(env, guard, reviewerId, "Reviewer") : Promise.resolve(null),
     topRank(cfg, guard),
@@ -695,9 +894,9 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, story_type, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, category, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await setProcesses(cfg, guard, actor, id, processIds)
 
@@ -735,6 +934,9 @@ export async function updateStory(
   const dueOn = optionalText(input.dueOn, "Due date", TEXT_LIMITS.short) ?? null
   const changesNoStep = input.changesNoStep === true
   const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
+  // REQUIRED on an edit, unlike the create door — see `StoryInput.category`'s
+  // own doc for why the two doors treat a blank differently.
+  const category = requireText(input.category, "Category", TEXT_LIMITS.short)
 
   // The account is re-derived rather than carried: re-pointing a story at another
   // ticket moves the work to that client's books, and the margin has to follow it.
@@ -746,6 +948,8 @@ export async function updateStory(
   // another system and handing it to somebody who is not on that system is one
   // refusal rather than two edits that each looked fine.
   await refuseOffAppAssignee(cfg, guard, appId ?? before.app_id, assigneeId ?? null, "That person")
+  await requireActiveSelectableValue(cfg, guard, "Story type", storyType, "Story type")
+  await requireActiveSelectableValue(cfg, guard, "Story category", category, "Category")
   const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
   const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
 
@@ -754,7 +958,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, story_type = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -770,6 +974,7 @@ export async function updateStory(
       changesNoStep ? 1 : 0,
       sprintId,
       storyType,
+      category,
       assignee?.id ?? null,
       assignee?.name ?? null,
       reviewer?.id ?? null,
@@ -789,6 +994,7 @@ export async function updateStory(
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
     { label: "Type", from: before.story_type, to: storyType },
+    { label: "Category", from: before.category, to: category },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },

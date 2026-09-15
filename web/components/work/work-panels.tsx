@@ -435,10 +435,11 @@ export function StoriesPanel({
       // THE ONE REAL FACET this narrower view can offer without a second
       // fetch: the four stages every story moves through, the same words
       // `STORY_STATUS_LABEL` renders on the row. `assigneeId`/`sprintId` are
-      // door filters too (COLLECTION_FILTERS.stories), but both need an
-      // OPTIONS list — the team's members, the app's sprints — this panel is
-      // not handed, and a facet with nowhere to get its options from is the
-      // useless dropdown `translatedFacets` itself refuses to draw.
+      // door filters too (`StoryFilter`, workers/content/src/lib/stories.ts),
+      // but both need an OPTIONS list — the team's members, the app's
+      // sprints — this panel is not handed, and a facet with nowhere to get
+      // its options from is the useless dropdown `translatedFacets` itself
+      // refuses to draw.
       facets={[
         {
           field: "status",

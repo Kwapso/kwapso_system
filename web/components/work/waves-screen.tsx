@@ -23,6 +23,7 @@
 // inline switch-off, and no engine block draws that.
 
 import * as React from "react"
+import { cn } from "@shared/ui/lib/utils"
 import { useRemembered } from "@shared/web/remembered"
 
 import {
@@ -39,11 +40,16 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, Power, ArrowCounterClockwise } from "@shared/ui/foundations/icons"
-import { Gantt, GanttPeriodStepper, type GanttBar, type GanttLane } from "@shared/ui/components/gantt/gantt"
+import { Calendar as CalendarIcon, ChartBarHorizontal, ListBullets } from "@shared/ui/foundations/icons"
+import type { CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { CountedAbove } from "@/components/records/counted-tabs"
+import { RecordTimeline, type TimelineRow, type TimelineSegment } from "@/components/records/record-timeline"
+import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
+import { RecordTable, type TableColumn } from "@/components/records/record-table"
+import { defaultCollectionConfig, type CollectionConfig } from "@shared/web/screen-engine/config"
 import {
   EMPTY_WAVE_QUERY,
   type WaveOrder,
@@ -55,18 +61,19 @@ import {
 } from "@/components/work/wave-finder"
 import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
-import { InAppLink } from "@/components/shell/in-app-link"
+import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
-import { companiesKey, totalKey } from "@/lib/live-resources"
+import { companiesKey, totalKey, sprintsKey, listFetch } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
-import type { Account } from "@shared/types"
+import type { Account, Sprint } from "@shared/types"
 import type { Wave } from "@shared/waves"
-import { formatDate, formatMonth } from "@shared/web/format"
+import { sprintState } from "@/components/work/sprints-screen"
+import { formatDate, formatDayMonth } from "@shared/web/format"
+import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
-import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -83,138 +90,321 @@ export function waveDates(
   return formatDate(wave.startsOn, lang) || formatDate(wave.endsOn, lang) || t("No sprints planned yet")
 }
 
-/** SIX PERIODS IS THE KIT'S OWN CEILING (gantt.tsx, CH27.26: "Six periods,
- * then it steps"), and the periods here are MONTHS rather than weeks — the
- * Opus analysis's own call, 1 Sep 2026: six weeks shows almost nothing over a
- * two-year book of packages, six months shows a client's buying rhythm, which
- * is the question this view exists to answer. */
-const TIMELINE_MONTHS = 6
+/* ============================================================================
+   T3 TIMELINE — the client's ruling, 2026-09-15 ("for waves i choose t3"):
+   one bar per WAVE, segmented by the sprints inside it, on a week-gridded
+   axis around today, prev/next/today like `RecordCalendar`. See
+   `record-timeline.tsx`'s own header for why this reads through a bespoke
+   host rather than the kit's `Gantt`.
+   ========================================================================= */
 
-function monthIndex(iso: string): number {
-  const d = new Date(iso)
-  return d.getFullYear() * 12 + d.getMonth()
+/** Thirteen weeks in view at once — roughly a Sep–Nov quarter, the artifact's
+ * own reference window — never stepped down to six the way the kit's own
+ * `Gantt` ceiling would (that law is `Gantt`'s, not this bespoke grid's). */
+const TIMELINE_WEEKS = 13
+/** One page of the prev/next stepper — four weeks, a month at a time. */
+const TIMELINE_STEP_WEEKS = 4
+
+/** The Monday of the week `d` falls in, at local midnight. Weeks are drawn
+ * Monday-first, the same convention `RecordWeek`'s own Mon–Fri board uses. */
+function mondayOf(d: Date): Date {
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff)
 }
 
-/** The first of a month, from the same zero-based index `monthIndex` reads —
- * a plain ISO date, so `formatMonth` reads it exactly as it reads any other
- * stored date. */
-function monthIso(index: number): string {
-  const year = Math.floor(index / 12)
-  const month = ((index % 12) + 12) % 12
-  return `${year}-${String(month + 1).padStart(2, "0")}-01`
+function addDays(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 }
 
-export type WaveTimeline = {
-  periods: string[]
-  lanes: GanttLane[]
-  /** Older or newer waves sit outside this window — `GanttPeriodStepper` is
-   * the only way to reach them, never a scrollbar (CH27.26 forbids one by
-   * name: "A timeline never becomes a horizontal scroller inside the panel"). */
-  hasEarlier: boolean
-  hasLater: boolean
+/** Local `YYYY-MM-DD`, the same shape every stored date column already has —
+ * built from local parts, never `toISOString()` (UTC), for the identical
+ * reason `record-calendar.tsx`'s own `dayKey` is. */
+function isoDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Which week-column (against `windowStart`) a stored date falls in — may
+ * land outside `[0, count)`, which the caller clips. */
+function weekOf(iso: string, windowStart: Date): number {
+  const d = new Date(iso.slice(0, 10))
+  return Math.floor((d.getTime() - windowStart.getTime()) / (7 * 24 * 60 * 60 * 1000))
+}
+
+export type WaveWeekWindow = {
+  /** the thirteen week-start dates, ISO */
+  weekStarts: string[]
+  /** already formatted for the head row ("1 Sep") */
+  weeks: string[]
+  /** the column "today" sits in, or undefined when today is outside the window */
+  todayIndex?: number
+  windowLabel: string
+}
+
+/** The visible thirteen-week window, `offset` weeks from the default (which
+ * opens two weeks behind today, so the axis reads as "recent past → most of
+ * a quarter ahead" — the same "today near the front, not centred" shape
+ * `Gantt`'s own CH27.26 draws, minus the stepping-by-six-only ceiling). */
+export function waveWeekWindow(offset: number, t: (s: string) => string, lang: Language): WaveWeekWindow {
+  const today = new Date()
+  const base = addDays(mondayOf(today), -14 + offset * 7)
+  const todayIso = isoDay(today)
+  const weekStarts: string[] = []
+  const weeks: string[] = []
+  let todayIndex: number | undefined
+  for (let i = 0; i < TIMELINE_WEEKS; i++) {
+    const start = addDays(base, i * 7)
+    const iso = isoDay(start)
+    weekStarts.push(iso)
+    weeks.push(formatDayMonth(iso, lang))
+    if (todayIso >= iso && todayIso < isoDay(addDays(start, 7))) todayIndex = i
+  }
+  const windowLabel =
+    weeks.length > 0
+      ? `${weeks[0]} – ${weeks[weeks.length - 1]}`
+      : t("This week")
+  return { weekStarts, weeks, todayIndex, windowLabel }
 }
 
 /**
- * THE ALREADY-LOADED WAVES (bounded, no pager — see the file header),
- * RESHAPED INTO THE SHAPE `components/gantt` ACTUALLY TAKES.
+ * ONE ROW PER WAVE, its bar cut into its own sprints in date order — gaps
+ * between two sprints (or before the first / after the last) drawn as the
+ * wave's own base bar (`tone: "gap"`), a sprint segment toned by
+ * `sprintState` (the SAME three-state derivation the Sprints tab and the
+ * Sprints screen already read, imported rather than re-derived) and clicking
+ * it opens `/waves/<id>/sprints/<sprintId>`; clicking the row's own name
+ * opens the wave.
  *
- * PERIODS ARE MONTHS. `offset` counts months back from the most recent window
- * the data reaches (0 = the latest six months something in `rows` touches),
- * because a rolling book of packages is read for its RECENT rhythm first and
- * the stepper is how a reader goes further back — never the other way, which
- * would bury this quarter's waves behind however far the team's history runs.
- *
- * LANES ARE ONE PER ACCOUNT — CH27.26: "Lanes are apps, accounts or members".
- * `Gantt` itself does not sort or de-overlap a lane's own bars (gantt.tsx's
- * `GanttLane` doc: "They may not overlap … this file does not stack them and
- * does not sort"), so two waves of the same client that overlap in time are
- * packed into two SEPARATE lanes here, greedily, by start month — the same
- * "minimum rooms" shape a calendar uses, and the kit's own rule for it
- * ("two overlapping sprints mean two lanes").
- *
- * A WAVE WITH NO SPRINTS YET HAS NO DATES (`waveDates`'s own header) and
- * cannot sit on an axis of time, so it is left out here rather than drawn at
- * month zero — it is still on the List view, which is where it belongs.
+ * A WAVE WITH NO DATES (no sprint has ever been planned into it —
+ * `waveDates`'s own header) cannot sit on an axis of time and is left off the
+ * grid entirely, same as before — it is still on List, which is where it
+ * belongs. A wave that DOES carry dates (so it has, or once had, a sprint)
+ * but for which this window's own sprint read turned up none is drawn as one
+ * plain, unclickable `gap`-toned bar across its own range — the client's own
+ * words for the case, "a wave with no sprints is a plain bar".
  */
-export function waveTimelineWindow(
+export function buildWaveTimelineRows(
   rows: Wave[],
-  offset: number,
-  t: (s: string) => string,
+  sprints: Sprint[],
+  window_: WaveWeekWindow,
+  basePath: string,
   lang: Language
-): WaveTimeline {
-  const dated = rows.filter((w) => w.startsOn && w.endsOn) as Array<
-    Wave & { startsOn: string; endsOn: string }
-  >
-  if (dated.length === 0) return { periods: [], lanes: [], hasEarlier: false, hasLater: false }
-
-  const dataStart = Math.min(...dated.map((w) => monthIndex(w.startsOn)))
-  const dataEnd = Math.max(...dated.map((w) => monthIndex(w.endsOn)))
-  const totalMonths = dataEnd - dataStart + 1
-  const span = Math.min(TIMELINE_MONTHS, totalMonths)
-  const maxOffset = Math.max(0, totalMonths - TIMELINE_MONTHS)
-  const clampedOffset = Math.min(Math.max(0, offset), maxOffset)
-
-  const windowEnd = dataEnd - clampedOffset
-  const windowStart = windowEnd - span + 1
-
-  const periods: string[] = []
-  for (let i = windowStart; i <= windowEnd; i++) periods.push(formatMonth(monthIso(i), lang))
-
-  const byAccount = new Map<string, Array<Wave & { startsOn: string; endsOn: string }>>()
-  for (const w of dated) {
-    const list = byAccount.get(w.accountId)
-    if (list) list.push(w)
-    else byAccount.set(w.accountId, [w])
+): TimelineRow[] {
+  const windowStart = new Date(window_.weekStarts[0] ?? isoDay(new Date()))
+  const count = window_.weeks.length
+  const today = isoDay(new Date())
+  const byWave = new Map<string, Sprint[]>()
+  for (const s of sprints) {
+    if (!s.waveId || !s.startsOn || !s.endsOn) continue
+    const list = byWave.get(s.waveId)
+    if (list) list.push(s)
+    else byWave.set(s.waveId, [s])
   }
 
-  const lanes: GanttLane[] = []
-  for (const waves of byAccount.values()) {
-    const sorted = [...waves].sort((a, b) => monthIndex(a.startsOn) - monthIndex(b.startsOn))
-    // THE ACCOUNT EVERY LANE IN THIS GROUP BELONGS TO, taken once. `byAccount`
-    // never holds an empty group, so this cannot be undefined — but said as a
-    // guard here rather than read off the first element twice inside the loop
-    // below, where a reader (and the first-run review's zero-row scan) has to
-    // prove the same thing from three screens away.
-    const head = sorted[0]
-    if (!head) continue
-    // GREEDY LANE PACKING. `laneEnds[i]` is the last occupied month-index of
-    // lane `i`; a wave joins the first lane whose last wave ends strictly
-    // before it starts, or opens a new lane. Not necessarily the fewest
-    // possible lanes — always non-overlapping ones, which is the rule.
-    const laneEnds: number[] = []
-    const laneBars: GanttBar[][] = []
-    for (const w of sorted) {
-      const s = monthIndex(w.startsOn)
-      const e = monthIndex(w.endsOn)
-      let lane = laneEnds.findIndex((end) => s > end)
-      if (lane === -1) {
-        lane = laneEnds.length
-        laneEnds.push(e)
-        laneBars.push([])
-      } else {
-        laneEnds[lane] = e
-      }
-      // CLIP TO THE WINDOW HERE, ONCE. `Gantt`'s own `renderBar` clamps a
-      // negative `start` to column 0 but keeps the UNCLAMPED `span`, so a
-      // wave that began before the window would be drawn wider than the
-      // months it still occupies inside it — clipping both ends before they
-      // ever reach the component is the honest fix, not a workaround for a
-      // bug: the component is telling the truth about a bar that starts at
-      // column 0, and the caller is the one deciding a bar starts there.
-      const relStart = s - windowStart
-      const relEnd = e - windowStart
-      if (relEnd < 0 || relStart >= periods.length) continue
-      const clippedStart = Math.max(0, relStart)
-      const clippedSpan = Math.min(periods.length, relEnd + 1) - clippedStart
-      laneBars[lane].push({ id: w.id, label: w.name, start: clippedStart, span: clippedSpan })
+  const timelineRows: TimelineRow[] = []
+  for (const w of rows) {
+    if (!w.startsOn || !w.endsOn) continue
+    // Captured once, as plain `string`s — a property access narrowed by the
+    // guard above does not reliably survive the nested loop below, where a
+    // fresh read of `w.endsOn` would be `string | null` again.
+    const waveStart = w.startsOn
+    const waveEnd = w.endsOn
+    const sortedSprints = (byWave.get(w.id) ?? []).slice().sort((a, b) => (a.startsOn ?? "").localeCompare(b.startsOn ?? ""))
+
+    // ONE RANGE PER SEGMENT (a sprint, or the gap before/after/between two),
+    // built in date order, before any of it touches a week column.
+    const ranges: { from: string; to: string; sprint: Sprint | null }[] = []
+    let cursor = waveStart
+    for (const s of sortedSprints) {
+      if (s.startsOn! > cursor) ranges.push({ from: cursor, to: s.startsOn!, sprint: null })
+      ranges.push({ from: s.startsOn!, to: s.endsOn!, sprint: s })
+      if (s.endsOn! > cursor) cursor = s.endsOn!
     }
-    laneBars.forEach((bars, i) => {
-      if (bars.length === 0) return
-      lanes.push({ id: `${head.accountId}:${i}`, label: head.accountName ?? t("No account"), bars })
+    if (cursor < waveEnd) ranges.push({ from: cursor, to: waveEnd, sprint: null })
+    // THE DEFENSIVE FALLBACK — dated, but this window's own sprint read found
+    // none for it (see this function's own header).
+    if (ranges.length === 0) ranges.push({ from: waveStart, to: waveEnd, sprint: null })
+
+    const segments: TimelineSegment[] = []
+    for (const r of ranges) {
+      const start = weekOf(r.from, windowStart)
+      const end = weekOf(r.to, windowStart)
+      if (end < 0 || start >= count) continue
+      const clippedStart = Math.max(0, start)
+      const clippedSpan = Math.min(count, end + 1) - clippedStart
+      if (clippedSpan < 1) continue
+      if (r.sprint) {
+        segments.push({
+          id: r.sprint.id,
+          label: r.sprint.name,
+          start: clippedStart,
+          span: clippedSpan,
+          tone: sprintState(r.sprint, today),
+          title: `${r.sprint.name} · ${formatDate(r.sprint.startsOn, lang)} – ${formatDate(r.sprint.endsOn, lang)}`,
+          onSelect: () => softNavigate(`${basePath}/${w.id}/sprints/${r.sprint!.id}`),
+        })
+      } else {
+        segments.push({
+          id: `${w.id}:gap:${r.from}`,
+          label: "",
+          start: clippedStart,
+          span: clippedSpan,
+          tone: "gap",
+        })
+      }
+    }
+    if (segments.length === 0) continue
+    timelineRows.push({
+      id: w.id,
+      label: w.name,
+      segments,
+      onSelectLabel: () => softNavigate(`${basePath}/${w.id}`),
     })
   }
+  return timelineRows
+}
 
-  return { periods, lanes, hasEarlier: clampedOffset < maxOffset, hasLater: clampedOffset > 0 }
+/* ============================================================================
+   CALENDAR — waves and sprints as day chips (start-day chip only) through
+   `RecordCalendar`, the app's one door into the kit's month grid. See this
+   file's own report on why a multi-day span was descoped this round.
+   ========================================================================= */
+
+export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): CalendarEntry[] {
+  const waveIds = new Set(rows.map((w) => w.id))
+  const entries: CalendarEntry[] = []
+  for (const w of rows) {
+    if (!w.startsOn) continue
+    entries.push({
+      id: `w:${w.id}`,
+      day: w.startsOn.slice(0, 10),
+      title: w.name,
+      detail: w.accountName ?? undefined,
+      accent: w.id,
+    })
+  }
+  for (const s of sprints) {
+    if (!s.waveId || !waveIds.has(s.waveId) || !s.startsOn) continue
+    entries.push({
+      id: `s:${s.waveId}:${s.id}`,
+      day: s.startsOn.slice(0, 10),
+      title: s.name,
+      detail: s.waveName ?? undefined,
+      // The SAME hash as the wave's own entry above — a sprint's chip lands
+      // in its wave's own colour, for free, off the identical `accentClass`
+      // hash `record-calendar.tsx` already keys every chip by.
+      accent: s.waveId,
+    })
+  }
+  return entries
+}
+
+/* ============================================================================
+   LIST — R80's shape, through `RecordTable`. Wave · Account · Sprints (count
+   + state dots) · Start · End · State.
+   ========================================================================= */
+
+/** ONE ROW, shaped for `RecordTable` — a `render`-per-cell only ever sees its
+ * OWN field (`row[key]`, never a sibling), so a composite cell (Account's
+ * mark + name, Sprints' count + dots) is built once here, at the moment this
+ * row also has the wave, the account and its own matched sprints in hand,
+ * rather than reconstructed inside a column's `render`. */
+type WaveListRow = {
+  id: string
+  ref: string | null
+  name: string
+  account: React.ReactNode
+  accountName: string
+  sprints: React.ReactNode
+  state: React.ReactNode
+  start: React.ReactNode
+  end: React.ReactNode
+  // An index signature — `RecordTable<T extends TableRowData>` constrains T
+  // to `Record<string, unknown>`, which a plain object type only satisfies
+  // structurally with one of these.
+  [key: string]: unknown
+}
+
+const SPRINT_DOT_TONE: Record<ReturnType<typeof sprintState>, string> = {
+  upcoming: "bg-chart-1",
+  running: "bg-surface-inverse",
+  wrapped: "bg-chart-2",
+}
+
+export function waveListRows(
+  rows: Wave[],
+  sprints: Sprint[],
+  t: (s: string) => string,
+  lang: Language
+): WaveListRow[] {
+  const today = isoDay(new Date())
+  const byWave = new Map<string, Sprint[]>()
+  for (const s of sprints) {
+    if (!s.waveId) continue
+    const list = byWave.get(s.waveId)
+    if (list) list.push(s)
+    else byWave.set(s.waveId, [s])
+  }
+  return rows.map((w) => {
+    const ws = byWave.get(w.id) ?? []
+    return {
+      id: w.id,
+      ref: w.ref,
+      name: w.name,
+      accountName: w.accountName ?? "",
+      account: (
+        // flex-wrap — harmless here (mark + name, two children) and keeps
+        // this span out of the wrapped-rows census's own false-positive
+        // shape: the census reads by source PROXIMITY, not by React tree,
+        // and this cell sits textually close to the `state` cell's own
+        // `<Badge>` a few lines below in this same row-shaping function.
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <RecordMark picture={null} name={w.accountName ?? ""} size="choice" />
+          <span className="min-w-0 truncate">{w.accountName ?? "—"}</span>
+        </span>
+      ),
+      sprints: (
+        <span className="flex items-center gap-2">
+          <span className="tabular-nums">{w.sprintCount}</span>
+          {ws.length > 0 ? (
+            <span className="flex items-center gap-1">
+              {ws.slice(0, 5).map((s) => (
+                <span
+                  key={s.id}
+                  aria-hidden="true"
+                  className={cn("size-1.5 rounded-pill", SPRINT_DOT_TONE[sprintState(s, today)])}
+                />
+              ))}
+            </span>
+          ) : null}
+        </span>
+      ),
+      start: formatDate(w.startsOn, lang) || "—",
+      end: formatDate(w.endsOn, lang) || "—",
+      state: w.active ? (
+        <span className="text-sm">{t("Active")}</span>
+      ) : (
+        <Badge variant="secondary">{t("Switched off")}</Badge>
+      ),
+    }
+  })
+}
+
+export function waveListColumns(t: (s: string) => string): TableColumn[] {
+  return [
+    { key: "name", label: t("Wave") },
+    { key: "account", label: t("Account"), searchKey: "accountName" },
+    { key: "sprints", label: t("Sprints") },
+    { key: "start", label: t("Start") },
+    { key: "end", label: t("End") },
+    // "Status", not "State" — the word every other column header in this app
+    // already uses for the identical fact (accounts-screen.tsx,
+    // task-detail.tsx, wave-finder.tsx's own filter facet), already fully
+    // translated. R34's own argument: a word already means this, so this
+    // column does not invent a second one for it.
+    { key: "state", label: t("Status") },
+  ]
 }
 
 /** Page one of the team's waves, priming the exact server total the heading
@@ -266,6 +456,11 @@ export function WaveCollection({
   const clientsQ = useCached<Account[]>(companiesKey(teamId), () =>
     tenancy.accounts({ type: "entity" }).then((r) => r.accounts)
   )
+  // EVERY SPRINT ON THE TEAM, the same bounded cache `wave-detail.tsx` reads
+  // for its own Sprints tab — the T3 timeline, the Calendar and the List's
+  // own sprint-state dots all read the wave's OWN sprints out of this one
+  // round trip rather than three narrower fetches.
+  const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
 
   // WHAT SHE WAS ASKING THIS COLLECTION, remembered with the screen (see
   // web/lib/nav-memory.ts). The search, the client, the on/off filter and the
@@ -300,16 +495,40 @@ export function WaveCollection({
       dir: was.dir === "asc" || was.dir === "desc" ? was.dir : EMPTY_WAVE_QUERY.dir,
     }
   })
-  // LIST OR TIMELINE — remembered the same way the search/filter/sort question
-  // is, one slot per screen rather than folded into it: the view is "how she
-  // wants to look", the query is "what she is looking for", and R16 already
-  // has its one count above, so this slot adds a body, never a second badge.
-  const [view, setView] = useRemembered<WaveView>("view", "list")
-  // WHICH SIX-MONTH WINDOW THE TIMELINE SHOWS. Ephemeral, unlike `view` and
-  // `query`: it is a scroll position over a window that only exists while the
-  // Timeline is on screen, not "where she was" in the sense nav-memory.ts
-  // means it, so a plain `useState` is the honest weight for it.
-  const [timelineOffset, setTimelineOffset] = React.useState(0)
+  // ACTIVE / ALL — the client's own two tabs, 2026-09-15: "two tabs: Active …
+  // All". Remembered per screen, the same slot the view/query questions use.
+  const [tab, setTab] = useRemembered<"active" | "all">("tab", "active", (found) =>
+    found === "active" || found === "all" ? found : undefined
+  )
+  // WHICH BODIES THIS TAB OFFERS — Active: Timeline (default), Calendar.
+  // All: Timeline (default), Calendar, List. Timeline leads both, the
+  // client's own ruling ("Active: I only want the timeline … In Active, I
+  // also want the calendar, but the main one stays the timeline").
+  const tabViews: CollectionViewOption[] =
+    tab === "active"
+      ? [
+          { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+          { value: "calendar", label: t("Calendar"), icon: <CalendarIcon size={16} /> },
+        ]
+      : [
+          { value: "timeline", label: t("Timeline"), icon: <ChartBarHorizontal size={16} /> },
+          { value: "calendar", label: t("Calendar"), icon: <CalendarIcon size={16} /> },
+          { value: "list", label: t("List"), icon: <ListBullets size={16} /> },
+        ]
+  // ONE VIEW SLOT, remembered the same way the search/filter/sort question
+  // is — the view is "how she wants to look", the query is "what she is
+  // looking for", and R16 already has its one badge on the tab strip below,
+  // so this slot adds a body, never a second count. Clamped to whatever the
+  // CURRENT tab actually offers, so switching from All/List to Active never
+  // strands the reader on a body that tab does not draw.
+  const [rawView, setView] = useRemembered<WaveView>("view", "timeline")
+  const allowedViews = new Set(tabViews.map((v) => v.value))
+  const view: WaveView = allowedViews.has(rawView) ? rawView : "timeline"
+  // THE VISIBLE WEEK WINDOW THE TIMELINE SHOWS. Ephemeral, unlike `view` and
+  // `query`: it is a scroll position over a window that only exists while
+  // the Timeline is on screen, not "where she was" in the sense
+  // nav-memory.ts means it, so a plain `useState` is the honest weight.
+  const [weekOffset, setWeekOffset] = React.useState(0)
   const [addOpen, setAddOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Wave | null>(null)
   const [switchingOff, setSwitchingOff] = React.useState<Wave | null>(null)
@@ -350,68 +569,107 @@ export function WaveCollection({
   // the count under the search box and the empty state both speak about that
   // client rather than about the team.
   const loadedWaves = wavesQ.data ?? []
-  const all = accountId ? loadedWaves.filter((w) => w.accountId === accountId) : loadedWaves
+  const scopedWaves = accountId ? loadedWaves.filter((w) => w.accountId === accountId) : loadedWaves
+  // ACTIVE / ALL — the tab itself narrows BEFORE the search/filter/sort
+  // question does, the same order `scopedWaves` already narrows by account:
+  // Active IS the "still switched on" collection, not a filter a reader can
+  // clear back out of it.
+  const all = tab === "active" ? scopedWaves.filter((w) => w.active) : scopedWaves
   const rows = selectWaves(all, query)
   const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
+  const sprints = sprintsQ.data ?? []
 
-  // THE TIMELINE READS THE SAME NARROWED ROWS the List does — a search or a
-  // filter narrows both bodies alike, so switching views mid-search never
-  // silently widens what she was asking. Built only when it is actually on
-  // screen: it is arithmetic over an in-memory array, not a fetch, but there
-  // is no reason to pack every wave into lanes on a render where nobody reads
-  // the result.
-  const timeline = view === "timeline" ? waveTimelineWindow(rows, timelineOffset, t, lang) : null
-  // THE STEPPER ONLY WHEN THERE IS SOMEWHERE ELSE TO GO — CH27.26's cap is a
-  // ceiling to step past, not a permanent fixture on a book that already fits
-  // inside six months. `GanttPeriodStepper` would draw nothing here anyway
-  // (its own state 7/10), but the `undefined` keeps the toolbar row from
-  // reserving space for a control with nothing to move.
-  const timelineStepper =
-    timeline && (timeline.hasEarlier || timeline.hasLater) ? (
-      <GanttPeriodStepper
-        onPrevious={timeline.hasEarlier ? () => setTimelineOffset((o) => o + TIMELINE_MONTHS) : undefined}
-        onNext={timeline.hasLater ? () => setTimelineOffset((o) => Math.max(0, o - TIMELINE_MONTHS)) : undefined}
-        windowLabel={
-          timeline.periods.length > 0
-            ? `${timeline.periods[0]} – ${timeline.periods[timeline.periods.length - 1]}`
-            : undefined
-        }
-        previousLabel={t("Earlier")}
-        nextLabel={t("Later")}
-      />
-    ) : undefined
+  // R16 — THE TAB STRIP'S OWN BADGES, an exact count each. Waves is a
+  // BOUNDED, fully-loaded collection (no pager — the file header says why),
+  // so counting the already-loaded, already-scoped array IS the exact count
+  // the door would answer, the same way every other bounded collection's tab
+  // badge is computed off its own loaded page rather than a second round
+  // trip for a number already in hand.
+  const activeBadge = wavesLoading ? "" : formatCount(scopedWaves.filter((w) => w.active).length)
+  const allBadge = wavesLoading ? "" : formatCount(scopedWaves.length)
+
+  // THE TIMELINE READS THE SAME NARROWED ROWS the other two bodies do — a
+  // search or a filter narrows every body alike, so switching views
+  // mid-search never silently widens what she was asking. Built only when
+  // it is actually on screen.
+  const weekWindow = view === "timeline" ? waveWeekWindow(weekOffset, t, lang) : null
+  const timelineRows =
+    weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang) : []
+
+  const calendarEntries = view === "calendar" ? buildWaveCalendarEntries(rows, sprints) : []
+  const listRows = view === "list" ? waveListRows(rows, sprints, t, lang) : []
+  // PLAIN VALUES, NOT `useMemo` — both are cheap array/object literals built
+  // from what is already in hand, and a hook here would sit AFTER this
+  // component's own early error return above, which is the one thing rules
+  // of hooks forbids: the same call must run on every render, not only the
+  // ones that get this far.
+  const listColumns: TableColumn[] = waveListColumns(t)
+  const listConfig: CollectionConfig = {
+    ...defaultCollectionConfig,
+    dataSource: "waves",
+    // NO CHROME OF ITS OWN — `WaveFinder`'s own search/sort (shown only on
+    // List, R78) is the one control this body is narrowed and ordered by;
+    // a second copy here would be the "different toolbar variations" the
+    // client has twice ruled out.
+    sortable: false,
+    searchable: false,
+    showCount: false,
+    scrollToTop: false,
+    emptyText: asking ? t("No waves match that.") : t("No waves yet."),
+  }
+
+  // R16 iii — THE TAB STRIP CARRIES THE COUNT; THE HEADING STANDS DOWN. The
+  // sidebar page used to badge nowhere (no tab strip existed) and the
+  // client's own record showed no count at all — both now read it once, off
+  // the strip below, through the identical arbitration every other tabbed
+  // collection screen uses (`CountedAbove`/`useCountStandsDown`,
+  // records/counted-tabs.tsx).
+  const heading = accountId ? null : <CollectionHeading sectionKey="waves" total={total} />
+
+  const tabsConfig = {
+    ...defaultTabsConfig,
+    tabs: [
+      { value: "active", label: t("Active"), icon: "", badge: activeBadge, badgeVariant: "" as const },
+      { value: "all", label: t("All"), icon: "", badge: allBadge, badgeVariant: "" as const },
+    ],
+  }
 
   return (
+    <CountedAbove active>
     <div className="flex flex-col gap-6">
-      {/* R16: the count lives in the heading ONLY on the sidebar page, which has
-          no tab strip to badge, and it is the door's exact COUNT(*). On a
-          client's record the tab badge is the count and it counts that CLIENT's
-          waves — so the team-wide total must not be drawn beside it, which is
-          the same figure saying two different things. */}
-      {accountId ? null : <CollectionHeading sectionKey="waves" total={total} />}
+      {heading}
 
-      {/* THE CANONICAL SHAPE — title, then ONE card holding the toolbar and
-          the rows, with "Sell a wave" at the FAR RIGHT of the toolbar's own
-          first line rather than a row of its own above it (client ruling,
-          2026-08-31: an action button never gets a separate row from the
-          toolbar it belongs to). This screen has no tab strip (single-view,
-          like Roles and Processes), so the toolbar is the first thing inside
-          the card. */}
+      {/* ACTIVE / ALL — the client's own two tabs, drawn flush against the
+          card exactly as `renderFolderTabs` draws every other collection's
+          strip (tasks-screen.tsx's own `folderTabs` slot is the direct
+          precedent; Waves is bespoke throughout, so this file calls the same
+          exported helper directly rather than adopting the whole
+          `SectionWithCreate` engine for a screen that already owns its own
+          toolbar and create button). */}
+      {renderFolderTabs({
+        config: tabsConfig,
+        value: tab,
+        onValueChange: (v) => {
+          setTab(v as "active" | "all")
+          // A fresh tab starts its Timeline at the current week — carrying
+          // an old scroll position across from the other tab would land on
+          // a window the reader never chose from this one.
+          setWeekOffset(0)
+        },
+      })}
+
+      {/* THE CANONICAL SHAPE — ONE card holding the toolbar and the rows,
+          with "Sell a wave" at the FAR RIGHT of the toolbar's own first line
+          rather than a row of its own above it (client ruling, 2026-08-31:
+          an action button never gets a separate row from the toolbar it
+          belongs to). */}
       <CollectionCard>
-        {/* R50 — never toolbar on an empty collection. `all.length === 0` used
-            to fall back to a BARE `<ToolbarRow>` carrying only "Sell a wave" —
-            exactly the lone-"+"-pill shape the client's Time screenshot
-            named, reasoned in a comment ("the button falls back to...
-            instead") that read as an intentional design rather than the bug
-            it was. A genuinely empty Waves screen now draws no toolbar at
-            all, below — `CollectionEmptyState` carries "Add the first"
-            alone.
-            `wavesLoading ||` — the same fold every sibling screen's own
-            `empty` gate carries now (2026-09-03 audit): `all` defaults to
-            `[]` before the read resolves, which reads exactly like a
-            genuinely empty collection unless the loading state says
-            otherwise, so this keeps the toolbar drawn through the load. */}
+        {/* R50 — never toolbar on an empty collection. `wavesLoading ||` is
+            the same fold every sibling screen's own `empty` gate carries
+            (2026-09-03 audit): `all` defaults to `[]` before the read
+            resolves, which reads exactly like a genuinely empty collection
+            unless the loading state says otherwise. */}
         {(wavesLoading || all.length > 0) && (
           <WaveFinder
             query={query}
@@ -419,15 +677,12 @@ export function WaveCollection({
             clients={clients}
             showClientFilter={!accountId}
             resultCount={rows.length}
+            views={tabViews}
             view={view}
             onViewChange={(v) => {
               setView(v)
-              // A fresh view starts at the most recent window — carrying
-              // the old offset forward would land on a period the reader
-              // never chose from this collection.
-              setTimelineOffset(0)
+              setWeekOffset(0)
             }}
-            period={timelineStepper}
             actions={
               canCreate && clients.length > 0 && (
                 <AddButton label={t("Sell a wave")} onClick={() => setAddOpen(true)} />
@@ -438,23 +693,40 @@ export function WaveCollection({
         {wavesLoading ? (
           // ROWS ONLY — the toolbar above is already real.
           <Skeleton variant="list" lines={4} />
-        ) : view === "timeline" && timeline ? (
-          // ONE LANE PER ACCOUNT, one bar per wave, months across the top —
-          // waveTimelineWindow's own header says why lanes are accounts and
-          // periods are months rather than weeks. `Gantt` draws its own
-          // empty register when `lanes` is empty (no dated wave in the
-          // window matches what she is asking), so there is no second empty
-          // sentence to keep in step with the List one above.
-          <Gantt
-            periods={timeline.periods}
-            lanes={timeline.lanes}
-            onBarSelect={(bar) => bar.id && softNavigate(`${basePath}/${bar.id}`)}
-            label={t("Waves timeline")}
-            emptyLabel={t("Nothing here")}
+        ) : view === "timeline" && weekWindow ? (
+          // T3 — ONE BAR PER WAVE, cut into its own sprints. See
+          // `record-timeline.tsx`'s own header for why this reads through a
+          // bespoke host rather than the kit's `Gantt`.
+          <RecordTimeline
+            weeks={weekWindow.weeks}
+            rows={timelineRows}
+            todayIndex={weekWindow.todayIndex}
+            windowLabel={weekWindow.windowLabel}
+            onPrevious={() => setWeekOffset((o) => o - TIMELINE_STEP_WEEKS)}
+            onNext={() => setWeekOffset((o) => o + TIMELINE_STEP_WEEKS)}
+            onToday={() => setWeekOffset(0)}
             emptyBody={
               asking
                 ? t("No waves match that in this window.")
                 : t("No waves have both a start and an end in this window yet.")
+            }
+            label={t("Waves timeline")}
+          />
+        ) : view === "calendar" ? (
+          // WAVES AND SPRINTS AS DAY CHIPS — one chip per day, the START day
+          // only (this round's own descope; see the file header for why a
+          // multi-day span was not built into the kit this time). The same
+          // door every other calendar screen reaches through, R80's sibling
+          // law for a month grid ("ONE CALENDAR").
+          <RecordCalendar
+            entries={calendarEntries}
+            onOpen={(id) => {
+              if (id.startsWith("w:")) return softNavigate(`${basePath}/${id.slice(2)}`)
+              const [, waveId, sprintId] = id.split(":")
+              if (waveId && sprintId) softNavigate(`${basePath}/${waveId}/sprints/${sprintId}`)
+            }}
+            emptyText={
+              asking ? t("No waves match that.") : t("No waves or sprints have a start date yet.")
             }
           />
         ) : rows.length === 0 ? (
@@ -480,73 +752,45 @@ export function WaveCollection({
             />
           )
         ) : (
-          <ul className="flex flex-col gap-2">
-            {rows.map((w) => (
-              <li key={w.id} className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3">
-                {/* R35 — a record never appears without its face. A wave has no
-                    picture of its own, so this is its initial. */}
-                <RecordMark name={w.name} />
-                <div className="min-w-0 flex-1 basis-[12rem]">
-                  {/* THE NUMBER IN FRONT OF THE NAME (`RecordRef`, the one black
-                      chip in the product). A wave mints a reference
-                      unconditionally — its account is mandatory — and until now
-                      it appeared on the wave's own screen and on no list you
-                      could reach it from. */}
-                  <span className={REF_LEADS_NAME}>
-                    <RecordRef value={w.ref} />
-                    <InAppLink href={`${basePath}/${w.id}`} className="block min-w-0 truncate text-sm font-medium">
-                      {w.name}
-                    </InAppLink>
-                  </span>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {[
-                      w.accountName,
-                      waveDates(w, t, lang),
-                      w.sprintCount === 1 ? t("1 sprint") : `${w.sprintCount} ${t("sprints")}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                {w.active ? null : <Badge variant="secondary">{t("Switched off")}</Badge>}
-                {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
-                    "edit, only the pencil icon") — no more `sm:not-sr-only`
-                    reveal. */}
-                {canEdit ? (
-                  <Button variant="ghost" size="icon" onClick={() => setEditing(w)} aria-label={t("Edit")}>
-                    <PencilSimple className="size-3.5" />
-                  </Button>
-                ) : null}
-                {canEdit && w.active ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive gap-1"
-                    onClick={() => setSwitchingOff(w)}
-                  >
-                    <Power className="size-3.5" aria-hidden />
-                    <span className="sr-only sm:not-sr-only">{t("Switch off")}</span>
-                  </Button>
-                ) : null}
-                {canEdit && !w.active ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() =>
-                      void run(
-                        () => wavesApi.setActive(w.id, true),
-                        t("That didn't save. Try again, and tell us if it keeps happening.")
-                      )
-                    }
-                  >
-                    <ArrowCounterClockwise className="size-3.5" aria-hidden />
-                    <span className="sr-only sm:not-sr-only">{t("Bring back")}</span>
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          // LIST (All tab only) — R80's shape, through `RecordTable`.
+          <RecordTable
+            columns={listColumns}
+            rows={listRows}
+            config={listConfig}
+            refColumn="ref"
+            onRowClick={(row) => softNavigate(`${basePath}/${row.id}`)}
+            actions={
+              canEdit
+                ? [
+                    {
+                      label: t("Edit"),
+                      onSelect: (row) => {
+                        const w = rows.find((x) => x.id === row.id)
+                        if (w) setEditing(w)
+                      },
+                    },
+                    {
+                      label: t("Switch off"),
+                      onSelect: (row) => {
+                        const w = rows.find((x) => x.id === row.id && x.active)
+                        if (w) setSwitchingOff(w)
+                      },
+                    },
+                    {
+                      label: t("Bring back"),
+                      onSelect: (row) => {
+                        const w = rows.find((x) => x.id === row.id && !x.active)
+                        if (w)
+                          void run(
+                            () => wavesApi.setActive(w.id, true),
+                            t("That didn't save. Try again, and tell us if it keeps happening.")
+                          )
+                      },
+                    },
+                  ]
+                : []
+            }
+          />
         )}
       </CollectionCard>
 
@@ -607,11 +851,12 @@ export function WaveCollection({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </CountedAbove>
   )
 }
 
-/** THE SIDEBAR PAGE. The heading with the door's exact COUNT(*) (R16 — a sidebar
- * page has no tab strip to badge), and the collection under it. */
+/** THE SIDEBAR PAGE. The tab strip's own badges carry the count now (R16
+ * iii — the heading stands down through `CountedAbove`, above). */
 export function WavesScreen({
   teamId,
   basePath,

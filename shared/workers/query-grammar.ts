@@ -482,6 +482,21 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     summary: "The backlog — one piece of work, inside the sprint it was sold in.",
     labelColumn: "title",
     defaultSort: "createdAt",
+    // `tasks`'s own `narrow`, one collection along (client ruling, 15 Sep
+    // 2026 — the Stories tab strip's "Now"/"Planned"/"Backlog"/"Completed"
+    // narrow to the caller's own name unconditionally, "Everyone's" lifts
+    // it): GET /api/content/stories narrows by `all_stories:read` exactly
+    // the same shape `getTasks` already narrows by `all_tasks:read`.
+    narrow: {
+      right: ["all_stories", "read"],
+      column: "assignee_id",
+      value: { self: true },
+      reason:
+        "GET /api/content/stories replaces whatever assignee was asked for with the caller's " +
+        "own user id on the four MINE tabs, and on Everyone's too when the caller lacks " +
+        "`all_stories:read` (getStories, routes/stories.ts) — narrowed rather than refused, " +
+        "the same shape `all_tasks:read` already takes on the tasks door.",
+    },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
@@ -489,6 +504,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: STORY_STATUSES },
       { name: "storyType", column: "story_type", type: "text" },
+      { name: "category", column: "category", type: "text" },
       { name: "assigneeId", column: "assignee_id", type: "id" },
       { name: "assigneeName", column: "assignee_name", type: "text" },
       { name: "reviewerId", column: "reviewer_id", type: "id" },
@@ -656,7 +672,9 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
   },
   todos: {
     table: "todos",
-    module: "todos",
+    // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095) — the
+    // table this entity queries is unchanged, only the permission box.
+    module: "inputs",
     summary: "What we are waiting on a client for.",
     labelColumn: "title",
     defaultSort: "createdAt",

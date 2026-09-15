@@ -1177,14 +1177,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_story",
     summary:
-      "Write down one piece of work. `title` and `storyType` are required, and so is ONE of `processIds` or `changesNoStep` — the door refuses without one.",
+      "Write down one piece of work. `title`, `storyType` and one of `processIds`/`changesNoStep` are required; `category` defaults to Client-requested.",
     detail:
-      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Fix, Feature, Change as seeded). `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket. `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it.",
+      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Internal (Kwapso-initiated upkeep) — leave it off for the ordinary case. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket. `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
       {
         title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
-        processIds: { type: "array" }, storyType: S,
+        processIds: { type: "array" }, storyType: S, category: S,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["title", "storyType"]
@@ -1196,6 +1196,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({
       title: str(i, "title"),
       storyType: str(i, "storyType"),
+      category: opt(i, "category"),
       detail: opt(i, "detail"),
       ticketId: opt(i, "ticketId"),
       sprintId: opt(i, "sprintId"),
@@ -1215,22 +1216,23 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_story",
     summary:
-      "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and one of `processIds`/`changesNoStep` still required. `processIds` replaces the set.",
+      "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and `category` are all required here, `processIds` replaces the set.",
     detail:
-      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it.",
+      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Internal) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
       {
         id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
-        processIds: { type: "array" }, storyType: S,
+        processIds: { type: "array" }, storyType: S, category: S,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
-      ["id", "title", "storyType"]
+      ["id", "title", "storyType", "category"]
     ),
     buildBody: (i) => ({
       id: str(i, "id"),
       title: str(i, "title"),
       storyType: str(i, "storyType"),
+      category: str(i, "category"),
       detail: opt(i, "detail"),
       ticketId: opt(i, "ticketId"),
       sprintId: opt(i, "sprintId"),
@@ -1534,14 +1536,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_todos",
     summary:
-      "Things we are waiting on a CLIENT for (our own admin is list_tasks). `view` is 'open' or 'done'; a `cursor` belongs to the view it was minted in.",
+      "Things we are waiting on a CLIENT for (our own admin is list_tasks). `view` also takes 'waiting'/'overdue'/'received'; `sort`, `accountManagerId` are new.",
     detail:
-      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the `dueOn` date, `completedAt` and `completedByName` if it has come back, and `fileName` + `fileUrl` for the document they sent with it. `view` is 'open' by default — the ones still outstanding; pass 'done' for the ones that have come back, which are the only ones that can be carrying a file, because completing a to-do is what attaches it. `accountId` narrows to one client. `q` searches the title and detail. Pass `id` to fetch just that one. Every answer carries `openTotal`, `doneTotal` and `allTotal` whichever view you asked for, so a count never has to be derived from the rows. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A cursor belongs to the view it was minted in: the two views are ordered by different columns, so one minted in 'open' is refused by 'done'.",
+      "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks — the Inputs screen's own rows, \"inputs\" being the client's word for this door (the table, the API path and this tool's own name all stay `todos`). Each carries the reference the client quotes, the `dueOn` date, `completedAt` and `completedByName` if it has come back, and `fileName` + `fileUrl` for the document they sent with it. `view` is 'open' by default — the ones still outstanding. 'done' is the ones that have come back, the only ones that can be carrying a file, because completing a to-do is what attaches it. 'waiting' and 'overdue' split the open pile by due date (overdue is past its date and still open; waiting is every other open one), and 'received' is the identical pile 'done' answers, under the Inputs screen's own tab word — the three arrived 15 Sep 2026 with that screen. `accountId` narrows to one client; `accountManagerId` narrows to the accounts one account manager looks after (also new, the Inputs screen's second facet). `q` searches the title and detail. `sort` orders the page: 'due' (the default for 'open'/'waiting'/'overdue'), 'completed' (the default for 'done'/'received') or 'waiting' (oldest raised first) — and `dir` ('asc' or 'desc') flips it. Pass `id` to fetch just that one. Every answer carries `openTotal`, `doneTotal`, `allTotal`, `waitingTotal`, `overdueTotal` and `receivedTotal` whichever view you asked for, so a count never has to be derived from the rows. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A cursor is minted for one `sort`; ask again with a different one, or a `view` whose default sort differs, and start over with no cursor.",
     binding: "CONTENT", method: "GET", path: "/api/content/todos",
-    schema: obj({ accountId: S, view: S, q: S, id: S, cursor: S }),
+    schema: obj({ accountId: S, accountManagerId: S, view: S, q: S, id: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["accountId", "view", "q", "id", "cursor"])
+      for (const k of ["accountId", "accountManagerId", "view", "q", "id", "sort", "dir", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

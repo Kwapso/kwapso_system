@@ -104,7 +104,7 @@ describe("R78 — calendar views carry no sort", () => {
     expect(sortControl(), "a row with no `view` prop has nothing to suppress on").toBeTruthy()
   })
 
-  it.each(["calendar", "week", "agenda"])(
+  it.each(["calendar", "week", "agenda", "timeline"])(
     'draws NO sort control when the active view is "%s", even though `sort` was passed',
     (value) => {
       renderRow(viewSlot(value))
@@ -149,7 +149,10 @@ describe("R78 — calendar views carry no sort", () => {
   // as of this law's own writing (2026-09-15) — this census is what keeps that
   // true rather than a sentence nobody re-checks.
   it("no-sort-in-calendar-views: every other sort/view-owning file honours the same rule, or says why not", () => {
-    const CALENDAR_SHAPED = /value:\s*["'](calendar|week|agenda)["']/
+    // Widened 2026-09-15 alongside `NO_SORT_VIEW_VALUES` itself (screen-bits.tsx):
+    // Timeline is time-ordered the same way a calendar/week/agenda is, so a
+    // TOOLBAR_CONTROL_OWNERS file offering one must make the same promise.
+    const CALENDAR_SHAPED = /value:\s*["'](calendar|week|agenda|timeline)["']/
     const SORT_TAG = /<SortControl[\s/>]/
 
     const offenders: string[] = []

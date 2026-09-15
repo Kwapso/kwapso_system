@@ -79,8 +79,14 @@ import type { Language } from "@shared/i18n"
 
 /** THE THREE STATES, DERIVED. A sprint has no status column, on purpose: the
  * table records two MOMENTS instead — the one it was completed at, and the one
- * it was switched off at — and everything else is arithmetic against today. */
-type SprintState = "running" | "upcoming" | "wrapped"
+ * it was switched off at — and everything else is arithmetic against today.
+ *
+ * EXPORTED (2026-09-15, the Waves T3 timeline) — `web/components/records/
+ * record-timeline.tsx` tones a wave's own sprint-segments by the identical
+ * three states rather than re-deriving them: the seam every other reader of a
+ * sprint's state already goes through (`work-panels.tsx`, `type-marks.ts`),
+ * never a second copy of the running/upcoming/wrapped arithmetic. */
+export type SprintState = "running" | "upcoming" | "wrapped"
 
 /** Running FIRST, deliberately. The whole point of this view is that what is
  * live right now is the first thing on the screen, before anything that has not
@@ -143,7 +149,7 @@ function todayKey(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-function sprintState(s: Sprint, today: string): SprintState {
+export function sprintState(s: Sprint, today: string): SprintState {
   // WRAPPED is TWO endings, which is why it is not called "completed": a sprint
   // somebody switched off was cancelled, and it is over too. An overview that
   // quietly dropped those would show fewer sprints than the badge above it

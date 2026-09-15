@@ -18,84 +18,64 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import {
-  ScreenRenderer,
-  type ScreenActionContext,
-  type ScreenIntent,
-} from "@shared/web/screen-engine/screen-renderer"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import { Kanban, type KanbanColumn, type KanbanMove } from "@shared/ui/components/kanban/kanban"
+import { ListBullets, Kanban as KanbanGlyph, CalendarDots } from "@shared/ui/foundations/icons"
+import type { ScreenActionContext, ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import {
+  CollectionEmptyState,
+  CollectionCreateActionProvider,
+} from "@shared/web/screen-engine/collection-frame"
+import { type CollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
+import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
+import { CountedAbove } from "@/components/records/counted-tabs"
+import type { CalendarEntry } from "@/components/records/record-calendar"
+import { RecordWeek } from "@/components/records/record-week"
+import { RecordTable, visibleActions, type TableColumn } from "@/components/records/record-table"
+import {
+  SectionWithCreate,
+  AddButton,
+  ToolbarRow,
+  type ToolbarViewSlot,
+} from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/records/load-more"
-import { PagedFind } from "@/components/records/paged-find"
-import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { translatedFacets } from "@/lib/collection-filters"
-import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-form-dialog"
 import { StartTimerStrip } from "@/components/work/time-panel"
 import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { useSessionUserId } from "@/lib/use-active-team"
-import { appsKey, helpKey, listFetch, processesKey, sprintsKey, storiesKey } from "@/lib/live-resources"
-import { withDataDrivenCollection } from "@/lib/screens"
-import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
-import { formatDate } from "@shared/web/format"
+import { usePermissions } from "@/lib/perms"
+import {
+  appsKey,
+  helpKey,
+  listFetch,
+  processesKey,
+  sprintsKey,
+  storiesKey,
+  type StoryView,
+} from "@/lib/live-resources"
+import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
+import { formatCount } from "@shared/web/format-count"
+import { storyStatusDotTone } from "@shared/status-tones"
+import { STORY_STATUSES, type AppRow, type HelpTicket, type ProcessSummary, type SelectableValue, type Sprint, type Story, type StoryStatus, type TeamMember } from "@shared/types"
 import { useAfterPaint } from "@shared/web/after-paint"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
-import type { Language } from "@shared/i18n"
+import { useRemembered } from "@shared/web/remembered"
 import { assignableMembers } from "@/lib/members"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { RecordMark } from "@shared/web/record-mark"
 import { richTextPlain } from "@shared/web/rich-text"
-
-/** One story, as a row. The summary line is a stand-up sentence: where it is,
- * who has it, when it is due, and which request it answers.
- *
- * `marks` is the STORY TYPE's glyph, keyed by the word the row stores (the same
- * lookup the tickets collection makes, `web/lib/type-marks.ts`). Tickets got
- * this and stories did not, which is why one collection led with a mark and the
- * one beside it led with nothing. */
-function shapeStories(stories: Story[], lang: Language, marks?: Map<string, string>) {
-  return {
-    rows: stories.map((s) => ({
-      id: s.id,
-      // THE GLYPH THE ROW IS KNOWN BY (recipe `leading`). A NODE, not a string —
-      // the slot renders whatever the column holds. A story whose type has no
-      // mark falls back to the type's first letter rather than an empty box.
-      mark: <RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? "?"} />,
-      // The title alone (K1 / CHECKLIST 11.9) — the NAME is a plain string, and
-      // has to stay one: the collection frame searches and orders on this exact
-      // value.
-      name: s.title,
-      // THE NUMBER, DRAWN AS THE BLACK CHIP IN FRONT OF THE NAME by the engine
-      // (the recipe's `reference` column). This row used to carry no reference
-      // at all, on the reasoning that it "leads the eyebrow on the story's own
-      // screen, where it belongs (D4)" — true of a Reference COLUMN, which is
-      // the thing D4 actually cut, and not of the chip: the client's September
-      // ruling is "put the ID before the title to the left, with the usual
-      // black chip design", and a list you cannot quote a number off is a list
-      // you have to open a record to talk about.
-      ref: s.ref,
-      // Three facts: where it is, who has it, when it is due. The sprint and the
-      // ticket it answers are cross-links on the record, not row noise.
-      detail:
-        [
-          STORY_STATUS_LABEL[s.status],
-          // R54: a story is agency work; the assignee is one of ours.
-          staffNameFromSnapshot(s.assigneeName) || "unassigned",
-          s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
-    })),
-  }
-}
 
 /** WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the sprints it could sit in, the
  * apps it could be on, the open requests it could answer, and the people it
@@ -144,6 +124,11 @@ export function useStoryFormOptions(teamId: string) {
         name: s.name,
         appId: s.appId,
         mark: sprintMark(s),
+        // THE STORIES TAB STRIP'S SPRINT COLUMN reads this for its own quiet
+        // second line (the wave a sprint was sold inside) — no new read, the
+        // sprints list this screen already loads for the create dialog
+        // already carries it.
+        waveName: s.waveName,
       })),
     apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     appNames: new Map((appsQ.data ?? []).map((a) => [a.id, a.name])),
@@ -162,6 +147,13 @@ export function useStoryFormOptions(teamId: string) {
     processNames: new Map((processesQ.data ?? []).map((p) => [p.id, p.name])),
     storyTypes: (selectableQ.data ?? [])
       .filter((v) => v.type === "Story type" && v.active)
+      .map((v) => v.value),
+    // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — the team's own
+    // `Story category` dropdown values, the same "read from the live
+    // vocabulary, never hardcode the word" shape `storyTypes` above already
+    // takes.
+    categories: (selectableQ.data ?? [])
+      .filter((v) => v.type === "Story category" && v.active)
       .map((v) => v.value),
     // The dropdown rows themselves, so a screen can read a type's MARK as well
     // as its word (UI-RULEBOOK G2). The words above stay because a picker wants
@@ -203,6 +195,7 @@ export async function createStoryFrom(
     const made = await contentApi.createStory({
       title: values.title,
       storyType: values.storyType,
+      category: values.category,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
@@ -223,11 +216,184 @@ export async function createStoryFrom(
   }
 }
 
+/* ── THE STORIES TAB STRIP, ADDED 2026-09-15 ─────────────────────────────────
+ *
+ * Ported from Tasks (`web/components/work/tasks-screen.tsx`, redesigned the
+ * same day) — the client's ruling: "for stories, we need to recreate a bit of
+ * tasks. Stories are inside sprints, so I would need different tabs where you
+ * can see: overdue or the ones you have to do now, the ones that are active,
+ * and for you only / the planned ones that are not in any active sprint and
+ * are somewhere in the future / all / the completed ones / everyone's. Think
+ * about this and make me a proposal." — then, on the design proposal that
+ * produced, one change: "I agree with all you suggested — except use Backlog
+ * instead of All." documents/UI-RULEBOOK.md carries the K entry with the date.
+ *
+ * FIVE TABS, FOUR OF THEM "MINE" UNCONDITIONALLY. `now`/`planned`/`backlog`/
+ * `completed` narrow to the caller's own name AT THE DOOR
+ * (`workers/content/src/routes/stories.ts`'s own `MINE_VIEWS`), the identical
+ * shape Tasks' three MINE tabs take — including a story with no assignee at
+ * all riding along (`includeUnassigned`), because this backlog is old enough
+ * to carry plenty of unclaimed history. `all` is Everyone's, gated on
+ * `all_stories:read` (a new module, seeded exactly like `all_tasks`).
+ *
+ * EACH TAB OFFERS ITS OWN VIEWS (R53): Now is Board by status (default) + List;
+ * Planned is List (default) + Board by sprint + Week by due date; Backlog is
+ * List (default) + Board by status; Completed is List only; Everyone's is
+ * List (default) + Board by status.
+ *
+ * THE SPRINT COLUMN, on every List view, carries the sprint's own name and the
+ * wave it was sold inside as a quiet second line — `Story.sprintName` and the
+ * wave name resolved off the sprints this screen's own form options already
+ * load, no new field on `Story` itself. A story with no sprint reads "No
+ * sprint", never a blank cell.
+ */
+
+/** ONE STORY'S OWN TWO-COLOUR SHAPE — mark, ref chip, title — shared by every
+ * view that shows a story as a single node (the List's Story column, and the
+ * Board's card title row). `marks` is the Story type's glyph (R35, the same
+ * lookup `web/lib/type-marks.ts` gives the tickets collection). */
+function storyLead(s: Story, marks?: Map<string, string>): React.ReactNode {
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      <RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? "?"} />
+      {s.ref && (
+        <Badge variant="secondary" className="font-mono shrink-0">
+          {s.ref}
+        </Badge>
+      )}
+      <span className="truncate">{s.title}</span>
+    </span>
+  )
+}
+
+/** THE CATEGORY CHIP (client ruling, 15 Sep 2026) — a small, quiet badge
+ * beside the type mark, on every row and every card. Client-requested /
+ * Internal, whatever the team has renamed either to. */
+function categoryChip(s: Story): React.ReactNode {
+  return (
+    <Badge variant="secondary">{s.category}</Badge>
+  )
+}
+
+/** THE SPRINT COLUMN'S TWO LINES — the sprint's own name, and the wave it was
+ * sold inside underneath it, muted. `waveNames` resolves the second line off
+ * the sprints this screen's own form options already load
+ * (`useStoryFormOptions`'s `sprintsQ`) — no new read, no new field on `Story`.
+ * "No sprint" reads as a plain, quiet line, never a blank cell. */
+function sprintCell(s: Story, waveNames: Map<string, string | null>): React.ReactNode {
+  if (!s.sprintId || !s.sprintName)
+    return <span className="text-muted-foreground text-sm italic">—</span>
+  const wave = waveNames.get(s.sprintId)
+  return (
+    <span className="flex flex-col">
+      <span className="text-sm font-medium">{s.sprintName}</span>
+      {wave && <span className="text-muted-foreground text-xs">{wave}</span>}
+    </span>
+  )
+}
+
+/** ONE STORY, SHAPED FOR EVERY VIEW AT ONCE — the List's own row (every column
+ * any tab needs is here; each tab's own `TableColumn[]` just picks a subset),
+ * and the raw fields the Board and Week read straight off `Story` instead
+ * (status, sprint dates, assignee) because neither of those needs the
+ * formatted, translated cell. TAKES ROWS ALREADY IN ORDER — this shapes, it
+ * does not sort (R53: one order, decided at the toolbar). */
+function shapeStories(
+  stories: Story[],
+  waveNames: Map<string, string | null>,
+  marks?: Map<string, string>
+) {
+  return {
+    rows: stories.map((s) => ({
+      id: s.id,
+      name: storyLead(s, marks),
+      category: categoryChip(s),
+      status: STORY_STATUS_LABEL[s.status],
+      sprint: sprintCell(s, waveNames),
+      assignee: staffNameFromSnapshot(s.assigneeName) || "Nobody yet",
+    })),
+  }
+}
+
+/** THE FOUR COLUMN SETS — one per tab shape, `tasks.ts`'s own reasoning
+ * (`TASK_COLUMNS`/`COMPLETED_COLUMNS`/`EVERYONE_COLUMNS`): a column that reads
+ * the same fact down every row of the tab it sits on is furniture. Now,
+ * Planned and Backlog are all "mine" and status-mixed, so Status stays; it is
+ * dropped on Completed (every row already `done`) and Assignee only appears
+ * on Everyone's, the one tab that is not already narrowed to the caller. */
+const MINE_COLUMNS = [
+  field("name", "Story"),
+  field("category", "Category"),
+  field("status", "Status"),
+  field("sprint", "Sprint"),
+]
+const COMPLETED_COLUMNS = [field("name", "Story"), field("category", "Category"), field("sprint", "Sprint")]
+const EVERYONE_COLUMNS = [
+  field("name", "Story"),
+  field("assignee", "Who has it"),
+  field("category", "Category"),
+  field("status", "Status"),
+  field("sprint", "Sprint"),
+]
+
+/** THE TOOLBAR'S OWN SORT VOCABULARY (R53) — the drag order every story
+ * already carries (`Story.rank`, the same field the door's own default
+ * ordering reads) and Deadline, the sprint's own end date where there is a
+ * sprint and the story's legacy date where there is not
+ * (`Story.sprintEndsOn`). */
+function storySortOptions(t: (s: string) => string): SortOption[] {
+  return [
+    { value: "rank", label: t("Order"), defaultDir: "asc" },
+    { value: "deadline", label: t("Deadline"), defaultDir: "asc" },
+  ]
+}
+
+const NO_DEADLINE_SENTINEL = "9999-99-99"
+
+function compareStories(a: Story, b: Story, sortField: "rank" | "deadline", dir: "asc" | "desc"): number {
+  const key = (s: Story) =>
+    sortField === "rank" ? (s.rank ?? s.id) : (s.sprintEndsOn ?? s.dueOn ?? NO_DEADLINE_SENTINEL)
+  const av = key(a)
+  const bv = key(b)
+  const primary = av < bv ? -1 : av > bv ? 1 : 0
+  return dir === "asc" ? primary : -primary
+}
+
+/** THE FOUR "MINE" TABS, in the client's own order — Now first, the artifact's
+ * own recommendation. Written as data so the strip, the fetch key and the
+ * badge cannot fall out of step. */
+const STORY_TABS: { value: StoryView; label: string; icon: string }[] = [
+  { value: "now", label: "Now", icon: "warning" },
+  { value: "planned", label: "Planned", icon: "clipboard-text" },
+  // "Backlog", NOT "All" — the client's own correction over the design
+  // proposal's recommendation, 15 Sep 2026 (documents/UI-RULEBOOK.md K entry).
+  { value: "backlog", label: "Backlog", icon: "stack" },
+  { value: "completed", label: "Completed", icon: "check" },
+]
+/** THE FIFTH TAB — the door's team-wide `all` view, shown only to a reader who
+ * holds `all_stories:read` (`seesEveryones`, below). Kept out of `STORY_TABS`
+ * itself for `tasks.ts`'s own reason: whether it appears is a permission
+ * question this component answers once, not a flag every consumer of
+ * `STORY_TABS` would have to filter for itself. */
+const EVERYONE_TAB: { value: StoryView; label: string; icon: string } = {
+  value: "all",
+  label: "Everyone's",
+  icon: "users-three",
+}
+
+type NowSubView = "board" | "table"
+type PlannedSubView = "table" | "board" | "week"
+type BacklogSubView = "table" | "board"
+type EveryoneSubView = "table" | "board"
+
 export function StoriesScreen({
   teamId,
   recipe,
   rights,
   total,
+  counts,
+  view,
+  onViewChange,
   canCreate,
   onImport,
   onAction,
@@ -236,35 +402,165 @@ export function StoriesScreen({
   teamId: string
   recipe: ScreenRecipe
   rights: ScreenRights
-  /** the exact server total (R16) — never the loaded page's length */
+  /** the exact server total of the everyday backlog (R16) — never the loaded
+   * page's length. Unaffected by which of the five tabs is showing. */
   total: number | undefined
+  /** the other four tabs' exact totals (R16), out of the SAME read that
+   * fetched whichever tab is showing (`tasks.ts`'s own note on this shape). */
+  counts: {
+    now: number | undefined
+    planned: number | undefined
+    backlog: number | undefined
+    completed: number | undefined
+    all: number | undefined
+  }
+  /** which tab is showing — a SERVER view, owned by the host so the reads can
+   * key off it (see useScreenData). */
+  view: StoryView
+  onViewChange: (v: StoryView) => void
   canCreate: boolean
   /** THE CONTEXTUAL "IMPORT CSV" JUMP, the same shape the brand library and
-   * meeting purposes already take (internal-screens.tsx's own `onImport`).
-   *
-   * `stories` has been a declared import target since the importer shipped —
-   * gated, tested, planned and written through this module's own create door —
-   * and it appeared in NO file under `web/` or `web-portal/`, so the only way
-   * to reach it was to type the URL. A capability with no button in front of it
-   * is a capability the customer does not have. */
+   * meeting purposes already take (internal-screens.tsx's own `onImport`). */
   onImport?: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   // THE SIGNED-IN USER, preselected as the assignee on a new story (client
   // ruling, 15 Sep 2026 — see `StoryFormDialog`'s own `defaultAssigneeId`).
   const myUserId = useSessionUserId()
-  // Page one of the backlog, its next cursor parked in the sidecar <LoadMore>
-  // reads (R14). The same fetcher primes the exact `total:` sidecar (R16).
-  const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
+  // WHOSE LIST THIS IS. The DOOR decides — a caller without `all_stories:read`
+  // is narrowed to their own name on every "mine" tab, and every count above
+  // comes back narrowed with it (`tasks.ts`'s own `seesEveryones`, identical
+  // shape).
+  const seesEveryones = usePermissions(teamId).can("all_stories", "read")
+  const storyTabs = seesEveryones ? [...STORY_TABS, EVERYONE_TAB] : STORY_TABS
+  // WHO MAY DRAG A CARD TO A NEW STATUS — the board's own write is
+  // `setStoryStatus`, the same door the review/close flow uses, so the same
+  // right gates both.
+  const canEditStories = usePermissions(teamId).can("work", "update")
+
+  const storiesQ = useCached<Story[]>(storiesKey(teamId, view), () => listFetch.stories(teamId, view))
   const options = useStoryFormOptions(teamId)
   // THE STORY TYPE'S GLYPH, keyed by the word the row stores. The vocabulary is
   // already in hand — `useStoryFormOptions` reads the same `selectable:` cache
   // the Dropdown values screen writes — so this costs no extra request, and an
   // emoji changed on that screen reaches these rows the moment it lands.
   const storyMarks = markMap(options.selectableValues, MARK_GROUP.story)
+  // THE SPRINT COLUMN'S SECOND LINE — the wave each sprint was sold inside,
+  // read off the sprints this screen already loads for the create dialog
+  // (`useStoryFormOptions`'s own `sprintsQ`, which carries `waveName`). No new
+  // field on `Story`, no new read.
+  const waveNames = React.useMemo(
+    () => new Map(options.sprints.map((sp) => [sp.id, sp.waveName ?? null])),
+    [options.sprints]
+  )
   const [storyOpen, setStoryOpen] = React.useState(false)
+
+  // EACH MULTI-VIEW TAB REMEMBERS ITS OWN SUB-VIEW (`useRemembered`, the same
+  // seam `tasks-screen.tsx` reads for its own three). Now opens on Board —
+  // the artifact's own recommendation, the "what is on fire" read.
+  const [nowView, setNowView] = useRemembered<NowSubView>(
+    "story-now-view",
+    "board",
+    (r) => (r === "board" || r === "table" ? r : undefined)
+  )
+  const [plannedView, setPlannedView] = useRemembered<PlannedSubView>(
+    "story-planned-view",
+    "table",
+    (r) => (r === "table" || r === "board" || r === "week" ? r : undefined)
+  )
+  const [backlogView, setBacklogView] = useRemembered<BacklogSubView>(
+    "story-backlog-view",
+    "table",
+    (r) => (r === "table" || r === "board" ? r : undefined)
+  )
+  const [everyoneView, setEveryoneView] = useRemembered<EveryoneSubView>(
+    "story-everyone-view",
+    "table",
+    (r) => (r === "table" || r === "board" ? r : undefined)
+  )
+  const subView: NowSubView | PlannedSubView | "table" =
+    view === "now"
+      ? nowView
+      : view === "planned"
+        ? plannedView
+        : view === "backlog"
+          ? backlogView
+          : view === "all"
+            ? everyoneView
+            : "table"
+
+  // THE TOOLBAR'S OWN SEARCH AND SORT — bounded, in the browser, over
+  // whichever tab's page is loaded (`tasks-screen.tsx`'s own shape: the door
+  // pages a huge collection down to one tab's worth of rows, and this narrows
+  // that page once for every view underneath it).
+  const [query, setQuery] = React.useState("")
+  const [sortField, setSortField] = React.useState<"rank" | "deadline">("rank")
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
+  // THE STORIES SCREEN'S OWN FACET — Category, the client's 15 Sep 2026 ruling.
+  // One facet, in the browser, over whichever tab's page is loaded, the same
+  // shape `tasks-screen.tsx`'s own Priority/Department pair takes.
+  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
+
+  // A new story belongs in several piles and only one of them is on screen.
+  function invalidateEveryStoryView() {
+    for (const v of ["now", "planned", "backlog", "completed", "all"] as const) invalidate(storiesKey(teamId, v))
+  }
+
+  // THE BOARD'S OWN WRITE — dropping a card on a new status column moves the
+  // story along its lifecycle through the same door the review/close flow
+  // uses. Gated on `work:update`; refused silently (no drag) otherwise via
+  // `onMove={canEditStories ? moveStatus : undefined}` below.
+  async function moveStatus(move: KanbanMove) {
+    const toStatus = move.toColumnId as StoryStatus
+    const current = (storiesQ.data ?? []).find((r) => r.id === move.cardId)
+    if (!current || current.status === toStatus) return
+    try {
+      await contentApi.setStoryStatus(current.id, toStatus)
+      for (const v of ["now", "planned", "backlog", "completed", "all"] as const) invalidate(storiesKey(teamId, v))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that value."))
+    }
+  }
+
+  const storiesLoading = storiesQ.data === undefined
+  const rawRows = storiesQ.data ?? []
+
+  const needle = query.trim().toLowerCase()
+  let filteredRows = needle
+    ? rawRows.filter((r) => r.title.toLowerCase().includes(needle) || (r.ref ?? "").toLowerCase().includes(needle))
+    : rawRows
+  if (facetValues.category) filteredRows = filteredRows.filter((r) => r.category === facetValues.category)
+
+  // CALLED UNCONDITIONALLY, ABOVE EVERY EARLY RETURN — `apps-screen.tsx`/
+  // `collection-frame.tsx`'s own discipline for `useFilterBar`. Options come
+  // off the team's OWN live `Story category` vocabulary (`options.categories`,
+  // the same source the form's two pills read), never the rows on screen —
+  // a category with no CURRENT story still offers to filter by it, no
+  // different from any other closed-vocabulary facet in the app.
+  const facets: FilterFacet[] = [
+    {
+      field: "category",
+      label: t("Category"),
+      control: "select",
+      options: options.categories.map((c) => ({ value: c, label: c })),
+    },
+  ]
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets,
+    values: facetValues,
+    data: rawRows,
+    onChange: (fld, value) =>
+      setFacetValues((prev) => {
+        const next = { ...prev }
+        if (value === "") delete next[fld]
+        else next[fld] = value
+        return next
+      }),
+    onClearFacets: () => setFacetValues({}),
+    resultCount: filteredRows.length,
+  })
 
   if (storiesQ.error)
     return (
@@ -279,160 +575,264 @@ export function StoriesScreen({
         }
       />
     )
-  // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
-  // their entire toolbar while loading"): unmounted the heading and the
-  // whole PagedFind toolbar along with the rows. Fixed the shared way —
-  // see processes-screen.tsx's identical note.
-  const storiesLoading = storiesQ.data === undefined
-  const loaded = storiesQ.data ?? []
+
+  const badges: Record<StoryView, string> = {
+    open: "",
+    now: formatCount(counts.now),
+    planned: formatCount(counts.planned),
+    backlog: formatCount(counts.backlog),
+    completed: formatCount(counts.completed),
+    all: formatCount(counts.all),
+  }
+
+  const sortedRows = [...filteredRows].sort((a, b) => compareStories(a, b, sortField, sortDir))
+  const data = shapeStories(sortedRows, waveNames, storyMarks)
+  const columns = view === "completed" ? COMPLETED_COLUMNS : view === "all" ? EVERYONE_COLUMNS : MINE_COLUMNS
+  const tableRecipeBase = withDataDrivenCollection(
+    { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
+    data.rows
+  )
+  const tableRecipe: ScreenRecipe = tableRecipeBase.collection
+    ? {
+        ...tableRecipeBase,
+        collection: { ...tableRecipeBase.collection, searchable: false, userFilter: false, sortable: false, showCount: false },
+      }
+    : tableRecipeBase
+  const tableColumns: TableColumn[] = tableRecipe.fields.map((f) => ({ key: f.column, label: f.field.label }))
+
+  // THE BOARD — BY STATUS (Now, Backlog, Everyone's). `STORY_STATUSES` is the
+  // fixed lifecycle the code trusts, never the team-editable "Story status"
+  // labels — the same distinction `STORY_STATUS_LABEL` already draws.
+  const boardCard = (s: Story) => ({
+    id: s.id,
+    title: s.title,
+    // THE SPRINT, ABOVE THE TITLE (R65/K16) — the artifact's own words for
+    // the Now board: "the sprint as a chip above the title instead of owning
+    // the grouping".
+    badges: (
+      <Badge variant="secondary" size="pill" className={s.sprintName ? undefined : "opacity-55 italic"}>
+        {s.sprintName ?? t("No sprint")}
+      </Badge>
+    ),
+    // NO REFERENCE HERE — a reference belongs in the one black chip in FRONT
+    // of a name (`storyLead`, the List view's own Story cell), never glued
+    // into a plain-text description as a joined string (R "one-black-chip").
+    // The card's title already carries the story's own words; this line is
+    // its one other fact.
+    description: s.category || undefined,
+  })
+  const statusBoardColumns: KanbanColumn[] = STORY_STATUSES.map((status) => ({
+    id: status,
+    title: STORY_STATUS_LABEL[status],
+    dot: storyStatusDotTone(status),
+    cards: filteredRows.filter((s) => s.status === status).map(boardCard),
+  }))
+
+  // THE BOARD — BY SPRINT (Planned only). Columns are the sprints actually
+  // present on this page, plus "No sprint" last — dynamic, unlike the fixed
+  // status board, so a column only ever appears when a real story is in it.
+  // READ-ONLY: dragging a card here would mean reassigning the story's sprint,
+  // a different write than the status move above, and out of this pass.
+  const sprintGroups = new Map<string, { name: string; cards: Story[] }>()
+  for (const s of filteredRows) {
+    const key = s.sprintId ?? "__none__"
+    const group = sprintGroups.get(key) ?? { name: s.sprintName ?? t("No sprint"), cards: [] }
+    group.cards.push(s)
+    sprintGroups.set(key, group)
+  }
+  const sprintBoardColumns: KanbanColumn[] = [...sprintGroups.entries()].map(([id, g]) => ({
+    id,
+    title: g.name,
+    cards: g.cards.map(boardCard),
+  }))
+
+  // THE WEEK (Planned only) — the dated slice, due date the sprint's own end
+  // date where there is one, the story's legacy date otherwise.
+  const weekEntries: CalendarEntry[] = filteredRows
+    .filter((s) => s.sprintEndsOn || s.dueOn)
+    .map((s) => ({
+      id: s.id,
+      day: ((s.sprintEndsOn ?? s.dueOn) as string).slice(0, 10),
+      title: s.title,
+      dotTone: storyStatusDotTone(s.status),
+      detail: s.sprintName ?? undefined,
+    }))
+  const hasDueDated = rawRows.some((s) => s.sprintEndsOn || s.dueOn)
+
+  const tableViewOption = { value: "table", label: t("List"), icon: <ListBullets className="size-4" /> }
+  const boardViewOption = { value: "board", label: t("Board"), icon: <KanbanGlyph className="size-4" /> }
+  const weekViewOption = { value: "week", label: t("Week"), icon: <CalendarDots className="size-4" /> }
+  const viewSlot: ToolbarViewSlot =
+    view === "now"
+      ? {
+          views: [boardViewOption, tableViewOption],
+          value: nowView,
+          onValueChange: (v) => setNowView(v === "table" ? "table" : "board"),
+        }
+      : view === "planned"
+        ? {
+            views: [tableViewOption, boardViewOption, weekViewOption],
+            value: plannedView,
+            onValueChange: (v) => setPlannedView(v === "board" ? "board" : v === "week" ? "week" : "table"),
+          }
+        : view === "backlog"
+          ? {
+              views: [tableViewOption, boardViewOption],
+              value: backlogView,
+              onValueChange: (v) => setBacklogView(v === "board" ? "board" : "table"),
+            }
+          : view === "all"
+            ? {
+                views: [tableViewOption, boardViewOption],
+                value: everyoneView,
+                onValueChange: (v) => setEveryoneView(v === "board" ? "board" : "table"),
+              }
+            : { views: [tableViewOption], value: "table", onValueChange: () => {} }
+
+  const rawEmpty = subView === "week" ? !hasDueDated : rawRows.length === 0
+  const toolbarEmpty = !storiesLoading && rawEmpty
+
+  const toolbar = (
+    <ToolbarRow
+      empty={toolbarEmpty}
+      search={
+        (storiesLoading || !rawEmpty) && (
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
+            placeholder={t("Search work…")}
+            className="w-full"
+          />
+        )
+      }
+      filters={(storiesLoading || !rawEmpty) && filterPill}
+      toolbarPanel={(storiesLoading || !rawEmpty) && filterPanel}
+      sort={
+        (storiesLoading || !rawEmpty) && {
+          options: storySortOptions(t),
+          value: sortField,
+          onValueChange: (v) => {
+            const next = v === "deadline" ? "deadline" : "rank"
+            setSortField(next)
+            setSortDir("asc")
+          },
+          direction: sortDir,
+          onDirectionChange: setSortDir,
+        }
+      }
+      view={(storiesLoading || !rawEmpty) && viewSlot}
+      actions={canCreate && <AddButton label={t("New story")} onClick={() => setStoryOpen(true)} />}
+    />
+  )
+
+  const body = storiesLoading ? (
+    <Skeleton variant="list" lines={4} />
+  ) : rawEmpty ? (
+    <CollectionEmptyState
+      title={subView === "week" ? t("No stories with a due date yet.") : t("Nothing on this list yet.")}
+      onCreate={canCreate ? () => setStoryOpen(true) : undefined}
+    />
+  ) : filteredRows.length === 0 ? (
+    <CollectionEmptyState filtered title={t("Nothing on this list yet.")} />
+  ) : subView === "board" ? (
+    <Kanban
+      columnWidth="max(18rem, calc((100% - 3 * var(--space-2h)) / 4))"
+      columns={view === "planned" ? sprintBoardColumns : statusBoardColumns}
+      onMove={view !== "planned" && canEditStories ? moveStatus : undefined}
+      onCardSelect={(card) => onIntent({ kind: "open", module: "stories", id: card.id })}
+      label={t("Stories by status")}
+      emptyColumns="bare"
+    />
+  ) : subView === "week" ? (
+    <RecordWeek
+      entries={weekEntries}
+      onSelect={(entry) => onIntent({ kind: "open", module: "stories", id: entry.id })}
+    />
+  ) : (
+    <CollectionCreateActionProvider action={null}>
+      <RecordTable
+        columns={tableColumns}
+        rows={data.rows}
+        config={tableRecipe.collection as CollectionConfig}
+        actions={visibleActions(tableRecipe, rights, onAction)}
+        onRowClick={(row) => onIntent({ kind: "open", module: "stories", id: String(row.id) })}
+        useKitPanel
+      />
+    </CollectionCreateActionProvider>
+  )
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* R16: the count lives in the heading (a sidebar page has no tab strip to
-          badge), and it is the door's exact COUNT(*) — never the loaded page's
-          length, which on a paged list is just "50" for ever. */}
-      {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the story types, which
-          are stored on `stories.story_type` and so belong here. The heading's
-          `action` slot and not the toolbar: R50 draws no toolbar over an empty
-          collection, which is the moment somebody goes looking for the words. */}
-      <CollectionHeading sectionKey="stories" total={total} action={<ModuleSettingsGear teamId={teamId} segment="stories" />} />
+    <CountedAbove active={(total ?? 0) > 0 || Object.values(counts).some((n) => (n ?? 0) > 0)}>
+      <div className="flex flex-col gap-6">
+        {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the story types and
+            categories, both stored on `stories` and so belong here. */}
+        <CollectionHeading sectionKey="stories" total={total} action={<ModuleSettingsGear teamId={teamId} segment="stories" />} />
 
-      {/* R14's other half: 3,677 stories arrived from the previous system on day
-          one, so a search box filtering the loaded page would answer "among the
-          newest fifty" — the same objection this file already makes about
-          narrowing the backlog by app in the browser. The door answers it. */}
-      <PagedFind<Story>
-        listKey={storiesKey(teamId)}
-        placeholder={t("Search work…")}
-        matches={{
-          none: t("No stories match"),
-          one: t("1 story matches"),
-          many: t("{count} stories match"),
-        }}
-        sorts={translatedSorts("stories", t)}
-        defaultSort={COLLECTION_SORTS.stories.defaultSort}
-        // R50 — the resting backlog's own row count, before any find: the
-        // same `loaded` array the recipe engine's own `SectionWithCreate`
-        // below already reads to shape its rows.
-        restingEmpty={loaded.length === 0}
-        // 2026-09-03 audit — see processes-screen.tsx's identical note.
-        restingLoading={storiesLoading}
-        // FOUR FILTERS, all of them the DOOR's. They were the frame's until
-        // 18 Aug 2026, which is the objection this file already makes two
-        // comments up about narrowing the backlog by app in the browser — made
-        // about the search box, and true of the filter bar underneath it the
-        // whole time. Note the NAMES: the door takes ids (`appId`, `sprintId`,
-        // `assigneeId`) where the frame's facets took the shaped row's words.
-        facets={translatedFacets("stories", t, {
-          assigneeId: options.members.map((m) => ({ value: m.id, label: m.name })),
-          // WHICH APP EACH SPRINT BELONGS TO rides on the option (client
-          // ruling, 2026-09-09 — `COLLECTION_FILTERS.stories`' own `sprintId`
-          // carries it, `useFilterBar` acts on it): pick an app, and the Sprint
-          // control offers that app's sprints and nothing else. `Sprint.appId`
-          // straight through — the column the door itself joins an app's name
-          // through — never a second idea of which sprints are whose. A sprint
-          // sold on its own carries `null` and is offered under every app, for
-          // the reason `FacetOption.within` argues in full: an option owned by
-          // nobody belongs to everybody, and hiding it would make real stories
-          // unreachable from this control.
-          sprintId: options.sprints.map((sp) => ({
-            value: sp.id,
-            label: sp.name,
-            within: sp.appId,
-          })),
-          appId: options.apps.map((a) => ({ value: a.id, label: a.name })),
-        })}
-        fetchPage={(query, cursor) =>
-          contentApi
-            .stories({
-              // `view: "all"` while FINDING, and only while finding: somebody
-              // looking for a story by name, or asking for the done ones by
-              // status, is as likely to want the finished one, and the everyday
-              // backlog hides those. It sits here rather than in `fixed` because
-              // `fixed` makes a find active — the resting screen would land in a
-              // `find:` cache key the live registry does not patch (R15), showing
-              // finished work nobody asked for.
-              view: "all",
-              // …then the whole question, spread over it. `listQuery` forwards
-              // every key, so a filter cannot be lost on the way to the door.
-              ...query,
-              cursor,
-            })
-            .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
-        }
-      >
-        {(found) => {
-          const rows = found.active ? found.rows : storiesLoading ? null : loaded
-          if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeStories(rows, lang, storyMarks)
-          // R62 — the SENTENCE is no longer handed down as an `emptyText`
-          // override: the frame draws both zeros from one register now and
-          // picks the words off `narrowedOutside` below, so a search that
-          // matched nothing says "Nothing matched." and offers no "Add the
-          // first" instead of claiming the backlog is empty.
-          const listRecipe = withDataDrivenCollection(recipe, data.rows)
-          return (
-            <>
-              <SectionWithCreate
-                show={canCreate}
-                label={t("New story")}
-                icon="plus"
-                secondary={
-                  onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined
-                }
-                // R50 — see internal-screens.tsx's identical note: the toolbar
-                // draws nothing over an empty backlog, and the act reaches the
-                // reader through the empty body's own "Import a list" instead.
-                empty={data.rows.length === 0}
-                onCreate={() => setStoryOpen(true)}
-                useKitPanel
-              >
-                <ScreenRenderer
-                  recipe={listRecipe}
-                  data={data}
-                  rights={rights}
-                  onAction={onAction}
-                  onIntent={onIntent}
-                  useKitPanel
-                  /* R62 — the door above owns the search, so the frame cannot
-                     see the narrowing from inside. */
-                  narrowedOutside={found.active}
-                />
-              </SectionWithCreate>
-
-              {/* R14: the backlog only grows and a done story is never deleted, so it pages. */}
+        <SectionWithCreate
+          show={canCreate}
+          label={t("New story")}
+          icon="plus"
+          onCreate={() => setStoryOpen(true)}
+          secondary={onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined}
+          folderTabs={{
+            config: {
+              ...defaultTabsConfig,
+              tabs: storyTabs.map((tab) => ({
+                value: tab.value,
+                label: t(tab.label),
+                icon: tab.icon,
+                badge: badges[tab.value],
+                badgeVariant: "" as const,
+              })),
+            },
+            value: view,
+            onValueChange: (v) => onViewChange(v as StoryView),
+          }}
+          useKitPanel={false}
+        >
+          <div className="flex flex-col">
+            {toolbar}
+            {body}
+            {!storiesLoading && !rawEmpty && filteredRows.length > 0 && (
               <LoadMore
-                listKey={found.listKey ?? storiesKey(teamId)}
+                listKey={storiesKey(teamId, view)}
                 label={t("Load more work")}
-                fetchPage={found.fetchPage}
+                fetchPage={(cursor) =>
+                  contentApi.stories({ view, cursor }).then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
+                }
               />
-            </>
-          )
-        }}
-      </PagedFind>
+            )}
+          </div>
+        </SectionWithCreate>
 
-      {/* THE ONE CLICK, beside the work it is against (BUILD-1 §5) — and the
-          Monday morning question, which has to be answerable wherever you are.
-          The TIMESHEET is no longer here: a list of everything ever logged, at
-          the foot of the backlog, is where logged time went to hide. It has a
-          page of its own now (/time), which is the link in the rail above. */}
-      <StartTimerStrip teamId={teamId} canCreate={canCreate} />
+        {/* THE ONE CLICK, beside the work it is against (BUILD-1 §5). */}
+        <StartTimerStrip teamId={teamId} canCreate={canCreate} />
 
-      <StoryFormDialog
-        teamId={teamId}
-        open={storyOpen}
-        onOpenChange={setStoryOpen}
-        sprints={options.sprints}
-        apps={options.apps}
-        tickets={options.tickets}
-        members={options.members}
-        appStaff={options.appStaff}
-        processes={options.processes}
-        storyTypes={options.storyTypes}
-        draftKey={`story:add:${teamId}`}
-        defaultAssigneeId={myUserId ?? ""}
-        onSubmit={(v) => createStoryFrom(teamId, v, t)}
-      />
-    </div>
+        <StoryFormDialog
+          teamId={teamId}
+          open={storyOpen}
+          onOpenChange={setStoryOpen}
+          sprints={options.sprints}
+          apps={options.apps}
+          tickets={options.tickets}
+          members={options.members}
+          appStaff={options.appStaff}
+          processes={options.processes}
+          storyTypes={options.storyTypes}
+          categories={options.categories}
+          draftKey={`story:add:${teamId}`}
+          defaultAssigneeId={myUserId ?? ""}
+          onSubmit={async (v) => {
+            // R41: the concise-arrow census reads this exact shape — a NAMED
+            // return value, awaited straight from the maker, handed back so
+            // the dialog can hang a picked-but-unattached file on it.
+            const createdId = await createStoryFrom(teamId, v, t)
+            invalidateEveryStoryView()
+            return createdId
+          }}
+        />
+      </div>
+    </CountedAbove>
   )
 }

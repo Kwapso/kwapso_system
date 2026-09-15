@@ -186,11 +186,17 @@ export function buildSpineDb(): DatabaseSync {
   // activity door's module gate. Without it the help burglary below would be
   // refused by the gate and pass while the fence was wide open — a green test
   // asserting the wrong thing.
-  // `todos` is the one module on this list a REAL Client role is meant to hold:
-  // a to-do is aimed at the client and they complete it themselves. So the
-  // burglar holding it is not a worst case at all — it is the ordinary case, and
-  // what stops them reading Bergman's homework is the account fence rather than
-  // a refusal.
+  // `inputs` (RENAMED FROM `todos` 15 Sep 2026, team migration 0095 — see
+  // shared/team-modules.ts) is the one module on this list a REAL Client
+  // role is meant to hold: a to-do is aimed at the client and they complete
+  // it themselves. So the burglar holding it is not a worst case at all —
+  // it is the ordinary case, and what stops them reading Bergman's homework
+  // is the account fence rather than a refusal.
+  // `all_inputs` (the Inputs screen, 15 Sep 2026) is here for `all_tasks`'s
+  // own two reasons, one module along: the ordinary case for the staff
+  // caller (a role missing it would narrow the Inputs door's own tests to
+  // the accounts it manages) and the worst case for the burglar (the
+  // widest sight of every account's inputs a role can be given).
   // `contacts` is on the list for the burglar's sake, most of all: the address
   // book is now its own module, and a burglar refused by their ROLE would prove
   // nothing about whether the FENCE holds. Holding it is the worst case, which
@@ -230,7 +236,16 @@ export function buildSpineDb(): DatabaseSync {
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
               UNION ALL SELECT 'work' UNION ALL SELECT 'all_tasks'
-              UNION ALL SELECT 'todos' UNION ALL SELECT 'deliverables'
+              -- all_stories (client ruling, 15 Sep 2026 -- the Stories tab
+              -- strip's Everyone's tab) is here for all_tasks's own two
+              -- reasons, one collection along: the ordinary case for the
+              -- staff caller (a role missing it would narrow the stories
+              -- door's own view tests to one person's backlog) and the
+              -- worst case for the burglar (the widest sight of the backlog
+              -- a role can be given, so a refusal proved with it held is
+              -- proved by the door).
+              UNION ALL SELECT 'all_stories'
+              UNION ALL SELECT 'inputs' UNION ALL SELECT 'all_inputs' UNION ALL SELECT 'deliverables'
               -- AND the agent module, because one tenancy door now spends the AI
               -- allowance (reading a call into a proposed process map) and gates
               -- on it before it does. Without it the leak suite's POSITIVE

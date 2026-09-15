@@ -41,7 +41,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { invalidate } from "@shared/web/store"
 import { softNavigate } from "@/lib/nav"
-import type { TaskView } from "@/lib/live-resources"
+import type { InputView, StoryView, TaskView } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapePurposeDetail,
@@ -70,7 +70,7 @@ export type ModuleContentCtx = Pick<
   ScreenData,
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "knowledgeShapeQ" | "companiesQ" | "totals" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
-  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
+  | "storiesQ" | "storiesViewQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "inputsQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
   // DERIVED from them (CHECKLIST 5.1), so it has to travel with the bundle —
   // the host already reads them for the ticket form's own picker.
@@ -102,6 +102,14 @@ export type ModuleContentCtx = Pick<
   myUserId: string | null
   query: ScreenQuery
   taskView: TaskView
+  /** Which tab of the backlog the Stories screen is showing — `taskView`'s own
+   * reason, one collection along. */
+  storyView: StoryView
+  setStoryView: (v: StoryView) => void
+  /** Which of the Inputs screen's three tabs is showing (Task C, 15 Sep
+   * 2026) — `taskView`'s own reason, a second collection along. */
+  inputView: InputView
+  setInputView: (v: InputView) => void
   /** Which body the knowledge collection is showing — its list, or the picture
    * of the whole base. The `view` slot on that screen's toolbar (R53). */
   knowledgeView: string

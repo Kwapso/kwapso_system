@@ -45,6 +45,7 @@ import type {
   MeetingPurpose,
   StaffProfile,
   StoryAttachment,
+  StoryViewName,
   TicketStageHistory,
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
@@ -149,8 +150,12 @@ export type StoryQuery = {
    * a sprint, so this is the one narrowing every story answers to. */
   appId?: string
   assigneeId?: string
-  /** "all" includes finished work; the default backlog view hides it. */
-  view?: "open" | "all"
+  /** "open" (the default) hides finished work with no other narrowing; "all"
+   * narrows nothing at all. The Stories tab strip's own words — `now` /
+   * `planned` / `backlog` / `completed` — are the server VIEWS
+   * `StoriesScreen` reads for its own tabs (`StoryViewName`,
+   * shared/types.ts); each narrows to the caller's own name at the door. */
+  view?: StoryViewName
   /** the screen's search box — the reference, the title and the detail, matched
    * by the DOOR (the backlog pages, so a browser could only search page one). */
   q?: string
@@ -164,6 +169,10 @@ export type StoryWrite = {
   sprintId?: string
   appId?: string
   processId?: string
+  /** Client-requested / Internal — client ruling, 15 Sep 2026. Required on the
+   * wire (the form always has a pill selected); the CREATE door itself still
+   * defaults a blank to 'Client-requested' for a machine caller that omits it. */
+  category: string
   /** EVERY map this work touches (CHECKLIST 6.5) — sent WHOLE, because the set
    * replaces the one the story carries. An empty list is only accepted when
    * `changesNoStep` is ticked: "no process" is Aurora's explicit CHOICE, not a
@@ -371,6 +380,25 @@ export type TicketDashboard = {
    * nothing closed sits in none of them: "every array is empty" is a fact about
    * which groupings exclude nulls today, not about whether anything matched. */
   matched: number
+}
+
+/** THE TO-DO DOOR'S OWN SIDECAR — every number `todoPage`
+ * (workers/content/src/routes/todos.ts) hands back beside whichever page was
+ * asked for, whichever of the three doors answered (list/raise/cancel). Six
+ * since 15 Sep 2026: `open`/`done` are the panel's own two piles
+ * (work-panels.tsx's `TodosPanel`, unchanged); `waiting`/`overdue`/`received`
+ * are the Inputs screen's three tab badges — `received` rides beside `done`
+ * rather than replacing it, because completing a to-do is one act however
+ * the screen that asked for the list spells its tab (`TodoCounts`'s own doc,
+ * lib/todos.ts). */
+type TodoPageSidecar = {
+  todos: Todo[]
+  openTotal: number
+  doneTotal: number
+  allTotal: number
+  waitingTotal: number
+  overdueTotal: number
+  receivedTotal: number
 }
 
 export const content = {
@@ -595,14 +623,30 @@ export const content = {
   /* --------------------------- the work engine ----------------------------- */
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total`/`mineTotal` are the exact server counts, taken
-   * over the SAME filter the page came from. */
+   * over the SAME filter the page came from. The five `*Total` fields are
+   * EVERY Stories tab's badge, in the same read (`tasks()`'s own
+   * `TaskListResponse`, one collection along) — present whichever view was
+   * asked for, so a screen with a five-tab strip never has to guess a
+   * neighbouring tab's count from the rows in front of it. */
   stories: (
     /** ONE flat object, spread straight into the query string (`listQuery`), so a
      * narrowing cannot be lost on the way to the door. It used to arrive as
      * `{ filter, order }` and be copied field by field into a URLSearchParams —
      * which is the shape that silently drops the field nobody remembered. */
     opts: StoryQuery & { sort?: string; dir?: string; cursor?: string | null } = {}
-  ) => api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(`/api/content/stories${listQuery(opts)}`),
+  ) =>
+    api<
+      PagedResponse<{
+        stories: Story[]
+        mineTotal: number
+        openTotal?: number
+        nowTotal?: number
+        plannedTotal?: number
+        backlogTotal?: number
+        completedTotal?: number
+        everyoneTotal?: number
+      }>
+    >(`/api/content/stories${listQuery(opts)}`),
   storyOne: (id: string) =>
     api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
   /** `createdId` is the story this call just made — the create door hands it
@@ -753,17 +797,26 @@ export const content = {
   todos: (
     opts: {
       accountId?: string
+      /** THE INPUTS SCREEN'S OWN SECOND FACET (Task C, 15 Sep 2026) — the
+       * account's own manager (`account_manager_user_id`), not a to-do
+       * field. */
+      accountManagerId?: string
       view?: TodoViewName
       /** the nested panel's own search box, answered by the DOOR — the done
        * pile pages and grows forever, so a browser could only ever search the
-       * page it had loaded. `total` counts this same question. */
+       * page it had loaded. `total` counts this same question. The Inputs
+       * screen's own search box (2026-09-15) rides the same question. */
       q?: string
+      /** THE INPUTS SCREEN'S OWN TOOLBAR SORT — `due` (the panel's own
+       * default) or `waiting` ("longest waiting", `TODO_SORTS`,
+       * workers/content/src/lib/todos.ts). Unset lands on the view's own
+       * default, exactly as every other sorted door in this app does. */
+      sort?: string
+      dir?: string
       cursor?: string
     } = {}
   ) =>
-    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
-      `/api/content/todos${listQuery({ ...opts })}`
-    ),
+    api<PagedResponse<TodoPageSidecar>>(`/api/content/todos${listQuery({ ...opts })}`),
   /** ONE to-do, asked of the DOOR (R38). It used to fetch the whole list with
    * `?view=all` and `.find()` the row out of it — harmless only while the list
    * was capped and nothing drew a single to-do, and a silent "that no longer
@@ -771,10 +824,7 @@ export const content = {
   todoOne: (id: string) =>
     api<{ todos: Todo[] }>(`/api/content/todos?id=${enc(id)}`).then((r) => r.todos[0] ?? null),
   raiseTodo: (input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }) =>
-    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
-      "/api/content/todos",
-      post(input)
-    ),
+    api<PagedResponse<TodoPageSidecar>>("/api/content/todos", post(input)),
   /** The client's own act — mark it done, and attach the one file they were asked
    * for. `fileDataUrl` is a base64 data URL; the door caps and parses it. */
   completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
@@ -783,10 +833,7 @@ export const content = {
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
   cancelTodo: (id: string) =>
-    api<PagedResponse<{ todos: Todo[]; openTotal: number; doneTotal: number; allTotal: number }>>(
-      "/api/content/todos/cancel",
-      post({ id })
-    ),
+    api<PagedResponse<TodoPageSidecar>>("/api/content/todos/cancel", post({ id })),
   /** Our own admin, in one of six views. Every view's count comes back whichever
    * one was asked for (R16) — the badge on a tab you are not looking at cannot be
    * derived from the rows on the one you are. `total` is the count over what was

@@ -904,6 +904,7 @@ export function AppDetailScreen({
         appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
+        categories={options.categories}
         draftKey={`story:add:app:${appId}`}
         defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {

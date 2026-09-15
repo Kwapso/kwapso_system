@@ -88,7 +88,7 @@ describe("a page of stories leaves the words of the work behind", () => {
   it("does not send `detail` in a page, and does send everything a row draws", async () => {
     const made = await call("POST /api/content/stories", {
       title: "Make the dispatch board responsive",
-      storyType: "Fix",
+      storyType: "Feature",
       detail: WORDS,
       changesNoStep: true,
     })
@@ -108,7 +108,7 @@ describe("a page of stories leaves the words of the work behind", () => {
   it("sends it whole when one story is asked for by id", async () => {
     const made = await call("POST /api/content/stories", {
       title: "Make the dispatch board responsive",
-      storyType: "Fix",
+      storyType: "Feature",
       detail: WORDS,
       changesNoStep: true,
     })
@@ -124,7 +124,7 @@ describe("a page of stories leaves the words of the work behind", () => {
   it("still searches the words it does not send", async () => {
     await call("POST /api/content/stories", {
       title: "Make the dispatch board responsive",
-      storyType: "Fix",
+      storyType: "Feature",
       detail: WORDS,
       changesNoStep: true,
     })

@@ -240,12 +240,26 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // were retired by DEACTIVATING the row, which is right for a word nobody is
   // coming back for. These rows are being kept for a migration, so the fifth
   // word simply stops being seeded and everything already written stays true.
-  // THE THREE KINDS OF WORK (CHECKLIST 2.2), same shape and same reason. They
-  // reached existing teams through migration 0028 and were never in the seed, so
-  // a brand-new team's story form offered an empty picker.
-  { type: "Story type", value: "Fix", mark: "FX" },
+  // THE FIVE KINDS OF WORK (client ruling, 15 Sep 2026 — team migration 0093's
+  // own header carries it verbatim): Data · Tech · Bug · Feature · Change,
+  // replacing the old three. Feature and Change reached existing teams through
+  // migration 0028 and are unchanged here; Data/Tech/Bug are new, each with the
+  // same two-letter-code mark shape 0034 already set for the three they
+  // replace (never a pictograph, R66). Fix is NOT seeded for a newborn team —
+  // migration 0093 deactivates it for teams that already hold it, and a team
+  // born after that migration has no reason to be handed a word the client
+  // just retired.
+  { type: "Story type", value: "Data", mark: "DA" },
+  { type: "Story type", value: "Tech", mark: "TC" },
+  { type: "Story type", value: "Bug", mark: "BG" },
   { type: "Story type", value: "Feature", mark: "FT" },
   { type: "Story type", value: "Change", mark: "CH" },
+  // THE NEW FIELD BESIDE IT, same ruling: where a story came from. Protected,
+  // like every other closed vocabulary a required field reads from (Ticket
+  // status, Story status) — a team may reword either word, never switch it
+  // off, because `stories.category` is never blank (team migration 0093).
+  { type: "Story category", value: "Client-requested" },
+  { type: "Story category", value: "Internal" },
   // Display-only labels for the five built-in states. The status the code trusts
   // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
   // on screen, and renaming one can never move a ticket.
@@ -364,7 +378,11 @@ export function buildTeamSeed(
     // everything. A Viewer without it still sees their own tasks — the door
     // narrows, it does not refuse.
     const [vr, vc, ve, vd] =
-      module === "agent" ? [1, 1, 0, 0] : module === "all_tasks" ? [0, 0, 0, 0] : [1, 0, 0, 0]
+      module === "agent"
+        ? [1, 1, 0, 0]
+        : module === "all_tasks" || module === "all_stories" || module === "all_inputs"
+          ? [0, 0, 0, 0]
+          : [1, 0, 0, 0]
     statements.push(
       `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(adminRoleId)}, ${sqlString(module)}, 1, 1, 1, 1);`,
       `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(viewerRoleId)}, ${sqlString(module)}, ${vr}, ${vc}, ${ve}, ${vd});`

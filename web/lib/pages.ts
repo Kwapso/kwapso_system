@@ -193,6 +193,16 @@ export type TeamSection = {
     // account's own record, because the question is always about one client.
     | "accounts"
     | "contacts"
+    // INPUTS — the Accounts group's third destination (Task C, 15 Sep 2026,
+    // client ruling verbatim: "I would like to see this in the third
+    // section of the accounts section on the sidebar"). What we are waiting
+    // on a client for, pulled off the Tasks screen it never belonged on
+    // (that screen's own header: "The whole 'waiting on clients': remove it
+    // from tasks... we will put this somewhere else") and given the sidebar
+    // spot its own screen. The permission module is `inputs` (renamed from
+    // `todos`, team migration 0095) and the segment IS the module, like
+    // Contacts.
+    | "inputs"
     | "tickets"
     | "knowledge"
     | "processes"
@@ -399,6 +409,14 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // the old Companies/Contacts/All strip badged (`accounts-individual`),
   // primed by the one `listFetch.accounts` read either page already makes.
   { key: "contacts", title: "Contacts", module: "contacts", segment: "contacts", placement: "sidebar", countCacheKey: "accounts-individual", group: "accounts" },
+  // INPUTS — third in the Accounts group, the client's own placement
+  // ("the third section of the accounts section on the sidebar"). Same
+  // module as the permission box the door now gates on (`inputs`, renamed
+  // from `todos` 15 Sep 2026) — the segment IS the module, like Contacts.
+  // `countCacheKey` names the resource the screen's own `<CollectionHeading
+  // sectionKey="inputs">` primes (see web/components/accounts/inputs-screen.tsx),
+  // the same shape Tasks' own `tasks` key takes.
+  { key: "inputs", title: "Inputs", module: "inputs", segment: "inputs", placement: "sidebar", countCacheKey: "inputs", group: "accounts" },
   // THE WORK ENGINE'S OWN ADMIN, first in My work per the client's explicit
   // list ("My work: today, tasks, meetings" — Home/"today" is `NAV`'s
   // standalone entry, not repeated here; see the note on `NavGroup`).
@@ -586,6 +604,13 @@ export const CONCEPT_ICON = {
   // is what distinguishes it from every other list in the rail.
   meetings: "chat",
   todos: "clipboard-text",
+  // THE INPUTS SIDEBAR PAGE — same concept, same glyph as the panel's own
+  // `todos` entry above (a to-do IS an input; the module renamed, the mark
+  // did not). Distinct from every other CONCEPT_ICON key, and distinct from
+  // Tickets' own `tray` in SECTION_ICONS (app-shell.tsx), which an earlier
+  // design pass proposed reusing for this before the rail's own
+  // one-glyph-per-concept rule ruled it out.
+  inputs: "clipboard-text",
   // TIME — the section, the story tab and the running clock in the header are
   // ONE concept wearing one icon (UI-CONVENTIONS §4), which is why this is `time`
   // and not `timer`: the key has to match the section key the rail looks it up

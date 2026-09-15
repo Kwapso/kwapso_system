@@ -130,6 +130,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // `contacts` module the account-scoped tab it replaced already checked. The
   // segment IS the module, like Accounts.
   contacts: "contacts",
+  // Inputs — the Accounts group's third page (Task C, 15 Sep 2026). The
+  // segment IS the module, like Contacts; the module was `todos` until the
+  // same day (team migration 0095 carries every role's grants across).
+  inputs: "inputs",
   // Process maps: the segment IS the module. `commercials` is a second gate ON
   // these screens as well (the rate card on an account), because what a client is
   // charged is a bigger decision than how long a step takes.
@@ -763,6 +767,33 @@ const tasksListRecipe: ScreenRecipe = {
   ], { icon: "tasks" }),
 }
 
+/** WHAT WE ARE WAITING ON A CLIENT FOR — the Inputs screen (Task C, 15 Sep
+ * 2026). A GROWING collection (R14), the same reason the panel this screen
+ * sits beside was always paged: the done pile — Received here — is kept
+ * for ever, because completing an input is the one act that can attach the
+ * document a client sent. `InputsScreen` (web/components/accounts/
+ * inputs-screen.tsx) is host-composed like `tasksListRecipe`'s own screen —
+ * this recipe exists only so `resolveRecipe("inputs.list", …)` resolves at
+ * all (`collection-content.tsx`'s guard: no recipe, no screen) and to carry
+ * the module gate; every field the screen actually draws is built by hand
+ * through `<PagedFind>`, which owns its own search/facets/sort/tabs and
+ * turns this recipe's own copies off the same way `tasksListRecipe`'s
+ * screen does. */
+const inputsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "inputs" },
+  gate: { module: "inputs", right: "read" },
+  fields: [field("name", "Input"), field("detail", "Details")],
+  leading: "mark",
+  actions: [],
+  collection: listCollection("Nothing outstanding with a client.", "Search inputs…", [], {
+    paged: true,
+    icon: "inputs",
+  }),
+}
+
 /* -------------------- the agency's own housekeeping ----------------------- */
 
 /** THE FOUR RECORD SCREENS, AS RECIPES. Each of these details is the record's
@@ -943,6 +974,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "sprints.list": sprintsListRecipe,
   "apps.list": appsListRecipe,
   "tasks.list": tasksListRecipe,
+  "inputs.list": inputsListRecipe,
   // The meetings list. Its DETAIL has no recipe: two of its three tabs are prose
   // somebody wrote (the agenda, and the notes afterwards) and its header carries
   // the one button in this module that reaches outside the app — see

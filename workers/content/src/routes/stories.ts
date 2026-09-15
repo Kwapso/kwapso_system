@@ -34,12 +34,14 @@ import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
+import { hasRight } from "@shared/workers/gating"
 import { gated, gatedBody } from "@shared/workers/route"
-import { STORY_STATUSES, type StoryStatus } from "@shared/types"
+import { STORY_STATUSES, STORY_VIEWS, type StoryStatus, type StoryViewName } from "@shared/types"
 import {
   storyOrThrow,
   countSprints,
   countStories,
+  countStoryViews,
   createSprint,
   createStory,
   getStory,
@@ -64,6 +66,7 @@ import type { Env } from "../env"
  * validation seam at the boundary, where the boundary actually is. */
 function storyFilterFrom(url: URL): StoryFilter {
   const status = queryText(url.searchParams.get("status"), "Status")
+  const asked = queryText(url.searchParams.get("view"), "View")
   return {
     status: (STORY_STATUSES as readonly string[]).includes(status ?? "")
       ? (status as StoryStatus)
@@ -75,15 +78,23 @@ function storyFilterFrom(url: URL): StoryFilter {
     // The screen's search box. It rides the same filter object as everything
     // else here, so the page and its count are asked the one question.
     q: queryText(url.searchParams.get("q"), "Search"),
-    // Anything but the exact word "all" means the everyday backlog — a fail-safe
-    // default, because the everyday list is where a mistyped parameter should land.
-    view: queryText(url.searchParams.get("view"), "View") === "all" ? "all" : "open",
+    // Anything but a real view name means the everyday backlog — a fail-safe
+    // default, because the everyday list is where a mistyped parameter should
+    // land (`tasks.ts`'s own `taskFilterFrom`, the same shape).
+    view: (STORY_VIEWS as readonly string[]).includes(asked ?? "") ? (asked as StoryViewName) : "open",
   }
 }
 
 /** EVERY story response is a PAGE (R14) — including the one a mutation returns,
  * so a screen re-priming from a write still learns where page two starts. One
- * seam: rows + the exact totals + hasMore + the opaque cursor. */
+ * seam: rows + the exact totals + hasMore + the opaque cursor.
+ *
+ * `viewCounts`, when asked for, carries every Stories-tab badge in the SAME
+ * read (R16 — `tasks.ts`'s own `taskPage`, one collection along): the badge on
+ * a tab you are not looking at cannot be counted from the rows in front of
+ * you. Omitted on the two callers that never draw a tab strip (the by-id
+ * lookup, the two mutations) — additive, so every existing reader of this
+ * response is unaffected. */
 async function storyPage(
   cfg: Parameters<typeof listStories>[0],
   guard: Parameters<typeof listStories>[1],
@@ -100,7 +111,8 @@ async function storyPage(
    *
    * So the id rides beside the page. Additive: every existing caller reads
    * `stories` exactly as before. */
-  createdId?: string
+  createdId?: string,
+  viewCounts?: Awaited<ReturnType<typeof countStoryViews>>
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
     listStories(cfg, guard, filter, cursor, ordering),
@@ -109,17 +121,48 @@ async function storyPage(
   return pagedJson(
     "stories",
     { ...page, total: counts.total },
-    createdId ? { mineTotal: counts.mineTotal, createdId } : { mineTotal: counts.mineTotal }
+    {
+      mineTotal: counts.mineTotal,
+      ...(createdId ? { createdId } : {}),
+      ...(viewCounts
+        ? {
+            openTotal: viewCounts.open,
+            nowTotal: viewCounts.now,
+            plannedTotal: viewCounts.planned,
+            backlogTotal: viewCounts.backlog,
+            completedTotal: viewCounts.completed,
+            everyoneTotal: viewCounts.all,
+          }
+        : {}),
+    }
   )
 }
 
-/** GET /api/content/stories — the backlog (?id=<storyId> → just that one). */
+/** GET /api/content/stories — the backlog (?id=<storyId> → just that one).
+ *
+ * WHOSE STORIES COME BACK IS A PERMISSION, narrowed per view (`tasks.ts`'s own
+ * `getTasks`, the identical shape one module along): `work:read` opens the
+ * screen; `all_stories:read` decides whether `all` (the "Everyone's" tab) is
+ * the whole team's backlog or narrows to the caller's own — the four MINE
+ * tabs (`now`/`planned`/`backlog`/`completed`) narrow to the caller's own name
+ * UNCONDITIONALLY, right or no right, the client's own words about Tasks
+ * carried over verbatim ("On overdue tasks, it's only mine"). "Mine" includes
+ * a story with NO assignee at all (`includeUnassigned`) — this backlog is old
+ * enough that plenty of it was never claimed by anybody, the same reasoning
+ * `tasks.ts`'s own header gives in full. */
 export async function getStories(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   const id = queryText(url.searchParams.get("id"), "Id")
   const filter = storyFilterFrom(url)
+  const everyones = await hasRight(cfg, guard, "all_stories", "read")
+  const MINE_VIEWS: readonly StoryViewName[] = ["now", "planned", "backlog", "completed"]
+  const isMineView = MINE_VIEWS.includes(filter.view ?? "open")
+  const narrowed =
+    isMineView || !everyones
+      ? { ...filter, assigneeId: guard.userId, includeUnassigned: isMineView }
+      : filter
   // One story by id is a LOOKUP, not a page — answer it directly rather than
   // filtering a page (which could legitimately not contain it once paged), and
   // ignore the view: opening a DONE story by id has to work.
@@ -132,19 +175,25 @@ export async function getStories(request: Request, env: Env): Promise<Response> 
       { mineTotal: counts.mineTotal }
     )
   }
+  const viewCounts = await countStoryViews(cfg, guard, {
+    assigneeId: narrowed.assigneeId,
+    includeUnassigned: narrowed.includeUnassigned,
+  })
   // WHAT ORDER — asked of the door, because the backlog PAGES (R14) and the
   // 3,677 rows arriving from the previous system are all behind the cursor.
   return storyPage(
     cfg,
     guard,
-    filter,
+    narrowed,
     queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
     resolveOrdering(
       STORY_SORTS,
       "rank",
       queryText(url.searchParams.get("sort"), "Sort"),
       queryText(url.searchParams.get("dir"), "Direction")
-    )
+    ),
+    undefined,
+    viewCounts
   )
 }
 
@@ -154,6 +203,10 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   await refusePortalCaller(cfg, guard)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
+  // Blank is legal here — `createStory` defaults it to 'Client-requested' —
+  // so `optionalText`, not `requireText`; the boundary still checks the
+  // POSITION even though the field may be absent (R20).
+  optionalText(body.category, "Category", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { id, accountId } = await createStory(env, cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "stories", id, "add", accountId ?? undefined)
@@ -176,6 +229,7 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
+  requireText(body.category, "Category", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { accountId } = await updateStory(env, cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)

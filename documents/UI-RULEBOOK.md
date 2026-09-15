@@ -39,7 +39,7 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
 - [3. Detail screens](#3-detail-screens) (D1 to D13)
-- [4. Collections](#4-collections) (K1 to K23)
+- [4. Collections](#4-collections) (K1 to K27)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
 - [7. Typography](#7-typography) (T1 to T8)
@@ -1789,6 +1789,324 @@ derive a Gallery-default rule from, but `appsListRecipe` (`web/lib/screens.ts`) 
 so a census built against `recipe.display` would fail on the very screen this entry is
 about. Recorded here for the next reader rather than checked, until a real registry of
 host-composed screens exists to check against instead.
+
+---
+
+### K24: Waves — Active/All tabs, T3's segmented timeline, day-chip calendar, and a real list
+
+**The rule.** The Waves main screen carries two tabs, **Active** and **All**
+(the client's ruling, 15 Sep 2026, on top of the earlier "sprints go inside
+waves" ruling K21 already carries): *"For Waves main screen, we need a
+timeline… two tabs: Active: I only want the timeline. All: I want a
+timeline, calendar, and list. In Active, I also want the calendar, but the
+main one stays the timeline."* Both tabs badge their own exact count (R16 —
+`formatCount` over the already-loaded, bounded collection, never a second
+round trip for a number already in hand) through the same
+`renderFolderTabs`/`CountedAbove` arbitration every other tabbed collection
+screen uses. Active offers Timeline (default) and Calendar; All offers
+Timeline (default), Calendar and List. The toolbar's slot order is
+untouched (R53: search → filters → sort → view → actions) — only the sort
+slot's own presence changes: it is withdrawn on Timeline and Calendar and
+shown only on List, R78's own law, amended the same day to add `"timeline"`
+to `NO_SORT_VIEW_VALUES` (`web/components/deep-link/screen-bits.tsx`) —
+*"the timeline is time-ordered too."* `web/components/work/wave-finder.tsx`
+(a registered `TOOLBAR_CONTROL_OWNERS` hand-copy of `<ToolbarRow>`, since it
+predates that row's own `period`/`view` slots) reads the same set directly.
+
+**T3 — one bar per wave, cut into its own sprints.** *"I choose T3"*, over
+three drawn variations (nested rows; the wave as a swimlane; the wave as one
+bar segmented by its sprints) — T3 is the segmented-bar reading. Each dated
+wave is one row on a week-gridded time axis; its bar is sliced into its own
+sprints, IN DATE ORDER, each segment toned by `sprintState` (`upcoming` ·
+`running` · `wrapped` — the same three-state derivation the Sprints tab
+already reads, exported from `sprints-screen.tsx` rather than re-derived),
+labelled with the sprint's own name, and a gap between two sprints (or
+before the first / after the last) draws as the wave's own quiet base bar.
+A wave with dates but no sprint row this window could find for it (the
+defensive edge case, never the ordinary one — a wave's dates ARE derived
+from its sprints) draws as one plain, unclickable base-toned bar across its
+own range — *"a wave with no sprints is a plain bar."* Today is marked;
+prev/next/today controls sit above the grid, `RecordCalendar`'s own shape;
+clicking a segment opens `/waves/<id>/sprints/<sprintId>`; clicking the row's
+own name opens the wave; on a phone the whole grid scrolls horizontally with
+CSS scroll-snap (the artifact's own pick) rather than losing the grid.
+
+**Why a bespoke host (`web/components/records/record-timeline.tsx`) and not
+the kit's `Gantt` (CH27.26).** `Gantt` genuinely supports several
+non-overlapping bars in one lane, which technically covers "one wave, several
+sprint segments" — but three of its own laws are load-bearing and none of
+them is this ruling's shape: SIX PERIODS IS A CEILING, NOT A HINT (this
+screen wants the whole visible window in view, never stepped six at a
+time); THE STEPPER IS THE ONLY WAY TO MOVE, and below 720 the grid is
+REPLACED by one row per lane (this ruling asks for prev/next/today on every
+width, and a phone that scrolls the grid itself with snap, never a
+fallback that drops it); and FIVE FIXED TONES WITH NO NEUTRAL ONE (a gap
+segment has no accent to wear, and giving `Gantt` a sixth tone is a kit
+change outside this round's authorised scope — the Calendar's span
+primitive below, not the Gantt). Reusing `Gantt` here would mean the
+timeline is either honest about its own axis and silently breaks the kit's
+stated law, or bent to fit a shape the client did not ask for — so this is a
+second, bespoke, HOST-COMPOSED component instead, built only from the kit's
+own primitives (`Button`, its icons, its colour tokens: `bg-chart-1`,
+`bg-chart-2`, `bg-surface-inverse`, the hairline shadow tokens, never a
+`border` property), the same category CLAUDE.md already names for
+`roles-matrix.tsx`. R39 stays intact — nothing here imports a UI package the
+kit does not already carry — and `waves-screen.tsx` is this component's only
+caller, the same "one host" pattern the ONE CALENDAR law already keeps for
+`record-calendar.tsx`.
+
+**Calendar — shipped simpler, said plainly.** Waves and sprints draw as day
+chips through `RecordCalendar`, the app's one door into the kit's month
+grid (the ONE CALENDAR law) — **one chip per day, the START day only**, not
+the multi-day span this brief also sketched (`CalendarEvent.spanId`/
+`spanPosition` on the kit's `calendar-view.tsx`, a `record-calendar.tsx`
+mapping for a multi-day `CalendarEntry.endDay`, a kit tag and a sync). That
+kit change is real, useful, and NOT built this round: a wave's own chip and
+its sprints' chips share one colour (the same `accentClass` hash keyed off
+the wave's id, for free), a sprint's chip carries its wave's name as the
+detail line, and clicking either opens the record — but a wave or a sprint
+that runs three weeks shows only its first day on the grid rather than the
+bar it actually is. Flagged rather than built, per this brief's own escape
+hatch ("if that is more than a day's work, ship the calendar with one chip
+per day and say so plainly") — the honest state to leave for the next
+reader, not a silent gap.
+
+**List — R80's shape, All tab only.** Wave (ref + name) · Account (`RecordMark`,
+the same choice-sized mark the account picker already draws) · Sprints (the
+exact count, plus up to five small state-toned dots for the sprints inside
+it) · Start · End · State (the wave's own active/switched-off, `Badge`).
+Through `RecordTable`, which by R80 draws exactly one shape now (flush, no
+second banded card) — its own chrome stays off (`searchable`/`sortable`/
+`showCount: false` in the `CollectionConfig` handed to it) because
+`WaveFinder`'s own search and sort, shown only on this view, already answer
+those questions once; a second copy would be the "different toolbar
+variations" the client has twice ruled out.
+
+**Law.** [R16](../RULES.md), [R53](../RULES.md), [R78](../RULES.md)
+(`no-sort-in-calendar-views`, amended this same day — see its own entry,
+[K20](#k20-calendar-views-carry-no-sort)), [R80](../RULES.md)
+(`rows-are-a-list`). The T3 timeline's own shape, the Calendar's
+one-chip-per-day descope and the tab split are recorded here for the next
+reader rather than independently checked — the same "not a law" footing
+[K18](#k18-a-record-with-a-face-defaults-to-the-gallery-the-list-is-the-alternate-view)/[K23](#k23-apps-gallery-and-board-by-stage-never-tiles-or-a-table)
+stand on, until a registry of host-composed screens exists to hold a bespoke
+component's own shape to something checked rather than read.
+
+### K25: Inputs — the third Accounts tab, three server views, no Mine tab
+
+**The rule.** What we are waiting on a client for gets its own sidebar page,
+third in the Accounts group beside Accounts and Contacts — the client's own
+ruling, 15 Sep 2026, verbatim: *"Do you remember that we already decided on
+the naming for the 'tasks' that we assigned to customers? I would like to
+see this in the third section of the accounts section on the sidebar. Find
+this name and make me a proposal for how the main screen could look."* The
+name was not a new decision — `shared/glossary.ts`'s `todo` entry has read
+`{ term: "Input", … }` since 31 Aug 2026 — and the screen is the home the
+client asked for when Tasks' own K19 redesign removed the "waiting on
+clients" panel from that screen outright: *"This is a completely different
+module, and we will put this somewhere else, but remove it from tasks."*
+This is somewhere else.
+
+Shown three directions for the main screen (a plain list; grouped by
+account with the account manager's own worklist reading; a board by
+nudge-state), she chose the first, in her own words: *"the view that I want
+is the first one you suggested, I1: just a list… I like the column that
+flags how long we are waiting. Also, show the account and add a filter for
+account."*
+
+**Three tabs, three SERVER views (R14/R16), no Mine tab.** Waiting (open,
+not yet due or carrying no due date at all) · Overdue (open, past its due
+date) · Received (done, under the word this screen's tab reads it by — the
+identical pile the account/contact panel's own `TodosPanel` still calls
+Done, untouched). `TODO_VIEWS` (`shared/types.ts`) carries all five names
+now; the door's own `todoViewClause`
+(`workers/content/src/lib/todos.ts`) is the one place the split is decided,
+so the list and its three badges can never disagree about which row is in
+which pile. NO FOURTH TAB for "mine": an input is owed *by* a client *to*
+us, so nobody on staff owns one the way they own a task, and a caller-name
+column would have nowhere honest to point. What Tasks' own `all_tasks:read`
+decides about a task, `all_inputs:read` decides about an input — without
+it, a reader sees only the accounts they themselves manage
+(`account_manager_user_id`), narrowed at the door
+(`getTodos`), never refused.
+
+**The row, R80's shape.** Input (the title) · Account (a real face, R35 —
+logo mark + name, the same `<RecordMark picture={…} name={…}/>` pairing
+every other list in the app draws for its own Account cell) · Contact (who
+completed it, R54 — blank until it has, because a to-do carries no
+"addressed to" field before that) · Due · Waiting (days since the input was
+raised, `Badge` toned quiet under a week, `warning` past it, `destructive`
+on the Overdue tab; blank on Received) · Received on (the Received tab's
+own eighth-column shape, blank on the other two — the identical furniture
+reasoning K19's own `closed`/Everyone's column already carries one module
+along). Through `<PagedFind>` + `<RecordTable>`, the same pairing
+`contacts-screen.tsx` draws: search (R14, door-side — Received keeps every
+completed input for ever, so a browser search over a loaded page would
+answer about the wrong fifty), a facet on Account (the client's own words,
+door-side, `accountId`), and the toolbar's own sort (R53) offering Due and
+Waiting longest (`TODO_SORTS.waiting`, oldest raised first). "+" is the
+existing ask-a-client dialog (`todo-form-dialog.tsx`); the row's own act is
+Mark received, the panel's existing `completeTodo` door, offered wherever
+completing it would move the row (never on Received itself — R17).
+
+**Two things the design pass drew that the door cannot answer today, said
+here rather than faked on screen.** No "Last nudge" column and no "Nudge"
+row action: `Todo` (`shared/types.ts`) carries no reminder/nudge timestamp
+at all, and neither `workers/content/src/routes/todos.ts` nor the portal's
+own to-do surface has a resend-reminder door — a real gap, not an
+oversight, the same honesty this file's own K24 entry keeps about the
+Waves calendar's multi-day span. And the Account MANAGER facet the I1 mock
+also drew is left out for a cheaper reason: this screen has no full
+accounts list loaded to build real options from, and a `Todo` row carries
+no manager id or name of its own to derive one cheaply the way the Account
+facet does (off the rows already on screen, `apps-screen.tsx`'s own idiom).
+The door already supports narrowing by it (`accountManagerId`,
+`TodoFilter`) — it is what `all_inputs:read`'s own narrowing is built out
+of — so the facet is one array entry the day this screen also carries a
+company list.
+
+**The permission rename.** The module gating every to-do door was `todos`
+since the base's earliest days; this screen renamed it to `inputs`
+(team migration `0095_todos_permission_renamed_inputs`,
+`shared/team-modules.ts`) — the label had already read "Inputs" since
+31 Aug 2026, so the box was the last place still carrying the old word.
+Every existing role's grants move with it, untouched (an owner who had
+handed a Client role `todos: read + update` now reads `inputs: read +
+update` on the exact same role row). `all_inputs` is new, off for every
+role but the locked Admin, the identical shape `all_tasks`/`all_stories`
+already take.
+
+**Law.** [R14](../RULES.md), [R16](../RULES.md), [R36](../RULES.md)
+(`offered-rights` — `inputs`/`all_inputs` join the matrix), [R53](../RULES.md),
+[R54](../RULES.md), [R80](../RULES.md) (`rows-are-a-list`). The two
+omissions above are recorded here for the next reader rather than a
+registry entry, the same footing K24's own Calendar descope stands on.
+
+---
+
+### K26: Story type is five words, not three, and a story now says where it came from
+
+**The rule.** The client's ruling, 15 Sep 2026, verbatim: *"story TYPE changes from
+{Fix, Feature, Change} to exactly Data · Tech · Bug · Feature · Change"* — Data is
+changing values inside records, Tech is under-the-hood and invisible to users, Bug
+is something that should work being broken, missing or wrong, Feature is a
+brand-new capability, and Change is the default, modifying something that already
+works (copy or email wording is Change; there is no "Content" type). *"And a new
+field, Category: Client-requested (default, traces to a client ticket or ask) or
+Internal (Kwapso-initiated upkeep)."* And, closing the door on a third dimension
+before anybody asked for one: *"Do NOT assign any priority or urgency. Stories do
+not have that."*
+
+**The vocabulary, added never swapped.** Team migration `0093_story_type_and_category`
+(`workers/tenancy/src/team-schema/migrations.ts`) inserts Data/Tech/Bug as new
+PROTECTED `Story type` rows (`is_default = 1`, [R76](../RULES.md)'s own word for
+the state) beside the Feature/Change rows migration 0028 already planted, and
+DEACTIVATES Fix rather than deleting it — every story that still names it keeps
+reading correctly until a separate reclassification lane rewrites them; the door
+(`requireActiveSelectableValue`, `workers/content/src/lib/vocabulary.ts`) now
+refuses `storyType` on create or update unless it names a currently ACTIVE row,
+which is what makes "Fix no longer creatable" true structurally rather than by
+convention. A new group, "Story category", is seeded the same protected way with
+Client-requested and Internal. `shared/selectable-homes.ts` carries the new
+group's home (`{ table: "stories", column: "category" }`) so the vocabulary
+census (R-whatever governs it) knows where its words are stored.
+
+**The form.** Type keeps the control it already drew (`RecordPicker`,
+`story-form-dialog.tsx`) — the vocabulary underneath it changed, the control did
+not, because the words are the team's to rename on the Choices screen exactly as
+they were before. Category is new: a two-pill row (`ToggleGroup`/
+`ToggleGroupItem`, the kit's own segmented control — "two to four options that
+change how the same data is drawn," and Client-requested/Internal is exactly
+that shape) defaulting to Client-requested, wrapped in a `shape="group"` `Field`
+so the required ring boxes the whole pair rather than one pill
+([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)'s
+own discipline about a control the Field clones onto). Never hardcoded English:
+`categories` is a prop threaded from the live `Story category` vocabulary the
+same way `storyTypes` already is, at all five `<StoryFormDialog>` call sites.
+
+**The row and the record.** A story's List row and Board card both carry the
+type mark and a small Category chip ([K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title)'s
+own idiom, a quiet secondary badge rather than a second colour). The record
+screen shows both Type and Category on its overview, side by side, the same
+list the client's ruling put them in. No priority anywhere on a story, in either
+place — the ruling's own last sentence, held to by absence rather than a field
+nobody draws.
+
+**Law.** [R20](../RULES.md) (the door checks the position, never trusts the
+body), [R76](../RULES.md) (`protected-is-active`), [R35](../RULES.md).
+
+### K27: Stories — five tabs ported from Tasks, Backlog instead of All
+
+**The rule.** The client's ruling, 15 Sep 2026, verbatim: *"For stories, we need
+to recreate a bit of tasks. Stories are inside sprints, so I would need
+different tabs where you can see: overdue or the ones you have to do now, the
+ones that are active, and for you only / the planned ones that are not in any
+active sprint and are somewhere in the future / all / the completed ones /
+everyone's. Think about this and make me a proposal."* Shown a design proposal
+built on that brief, she answered with one change over its own recommendation:
+*"I agree with all you suggested — except use Backlog instead of All."*
+
+**Five tabs, four of them mine unconditionally.** `STORY_TABS`/`EVERYONE_TAB`
+(`web/components/work/stories-screen.tsx`) draws **Now · Planned · Backlog ·
+Completed · Everyone's** — five SERVER views ([R14](../RULES.md)/[R16](../RULES.md),
+`StoryViewName` in `shared/types.ts`), the identical shape
+[K19](#k19-tasks--three-tabs-of-your-own-and-a-fourth-for-everyones) already
+drew for Tasks one collection over. Now/Planned/Backlog/Completed narrow to
+the caller's own name at the door UNCONDITIONALLY (`MINE_VIEWS`,
+`workers/content/src/routes/stories.ts`), including a story with no assignee
+at all riding along (`includeUnassigned`) — this backlog is old enough that
+plenty of it was never claimed by anybody. Everyone's is the fifth tab, last
+in the strip, shown only when the caller holds a NEW right, `all_stories:read`
+— seeded exactly like `all_tasks:read` (team migration `0094_everyones_stories`,
+`shared/team-modules.ts`), off for every role but the locked Admin.
+
+**The predicates.** Now is mine, not done, and either overdue (the sprint's own
+end date where there is a sprint, the story's legacy due date where there is
+not) or its sprint is RUNNING right now (`sprintState`'s own reading, ported to
+SQL — a late sprint stays "running," which is why Now catches it on the other
+side of its OR too). Planned is mine, not done, not overdue, and its sprint
+either has not started or it has none at all — the future, not yet claimed by a
+running block. Backlog is mine, any state — the file's own old comment already
+called this the backlog, and the client's correction landed on the same word
+for the tab itself. Completed is mine and done. Everyone's narrows nothing at
+all.
+
+**The views, per tab** ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)):
+Now offers Board by status (default) + List; Planned offers List (default) +
+Board by sprint + Week by due date; Backlog offers List (default) + Board by
+status; Completed offers List only; Everyone's offers List (default) + Board by
+status. The List view's Sprint column carries the sprint's own name and the
+wave it was sold inside as a quiet second line, reading off the sprints this
+screen's own create-dialog options already load — no new field on `Story`. A
+story with no sprint reads "No sprint," never a blank cell. The Board's status
+columns carry `storyStatusDotTone` in the header, the same coloured-dot seam
+Tasks' own priority board already reads from `shared/status-tones.ts`; dropping
+a card writes through `setStoryStatus`, gated on `work:update`. The Board by
+sprint (Planned only) is READ-ONLY — dragging a card there would mean
+reassigning the story's sprint, a different write than a status move, and out
+of this pass; its columns are the sprints actually present on the loaded page,
+plus "No sprint" last, never the fixed four-column status shape. Week carries
+no sort control ([K20](#k20-calendar-views-carry-no-sort)).
+
+**The list, R80's shape.** `<RecordTable>` draws the bare shape unconditionally
+now ([K22](#k22-rows-are-a-list-never-a-banded-table)), so Stories' own List
+never asks for the retired banded frame. Columns per tab: Story (the type mark,
+the reference in its own black chip, the title), Category, Status, Sprint — and
+Everyone's alone keeps Assignee, second, right after Story, the one tab not
+already narrowed to the caller's own name ([K19](#k19-tasks--three-tabs-of-your-own-and-a-fourth-for-everyones)'s
+own reasoning for the identical column, one module along). Search and sort
+(Order — the drag-rank every story already carries — and Deadline) run over
+whichever tab's loaded page is showing, in the toolbar, never a per-column
+header click. No door-side facets any more: the flat backlog's old
+`COLLECTION_FILTERS.stories`/`<PagedFind>` pairing is retired with the screen
+that used it, the narrowing question now belongs to `StoryView` itself.
+
+**Law.** [R14](../RULES.md), [R16](../RULES.md), [R19](../RULES.md) (`stories`
+gains a `narrow` declaration on `all_stories:read` — `shared/workers/query-grammar.ts`
+— the identical shape `tasks` already carries for `all_tasks:read`),
+[R20](../RULES.md), [R36](../RULES.md) (`offered-rights` — `all_stories` joins
+the matrix), [R53](../RULES.md), [R78](../RULES.md) (`no-sort-in-calendar-views`
+— Week), [R80](../RULES.md) (`rows-are-a-list`).
 
 ---
 
@@ -3964,14 +4282,14 @@ tab renders named "Assistant."
 
 ## Rule index
 
-**141 rules.**
+**145 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
 | 2. Page layout and width | L1 to L11 (11) |
 | 3. Detail screens | D1 to D14 (14) |
-| 4. Collections | K1 to K23 (23) |
+| 4. Collections | K1 to K27 (27) |
 | 5. Buttons and actions | B1 to B14 (14) |
 | 6. Forms and dialogs | F1 to F11 (11) |
 | 7. Typography | T1 to T8 (8) |

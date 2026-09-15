@@ -90,7 +90,7 @@ async function ticket(description: string): Promise<string> {
 async function story(title: string, extra: Record<string, unknown> = {}): Promise<string> {
   await call(IDS.staffUser, "POST /api/content/stories", {
     title,
-    storyType: "Fix",
+    storyType: "Feature",
     changesNoStep: true,
     appId: "APP_ONE",
     ...extra,
@@ -132,7 +132,8 @@ describe("scheduled happens by itself", () => {
     await call(IDS.staffUser, "POST /api/content/stories/update", {
       id: s,
       title: "To be booked",
-      storyType: "Fix",
+      storyType: "Feature",
+      category: "Client-requested",
       changesNoStep: true,
       ticketId: id,
       sprintId: "SPR_ONE",

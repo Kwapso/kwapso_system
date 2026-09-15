@@ -18,8 +18,19 @@ import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { resolveOrdering } from "@shared/workers/sorting"
 import { ANY_FILE_TYPE, dataUrlBytes, parseUploadDataUrl, storedContentType, teamMediaKey } from "@shared/workers/image"
-import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, getTodo, listTodos, todoOrThrow } from "../lib/todos"
+import {
+  cancelTodo,
+  clientSprints,
+  completeTodo,
+  countTodos,
+  createTodo,
+  getTodo,
+  listTodos,
+  todoOrThrow,
+  TODO_SORTS,
+} from "../lib/todos"
 import { countTasks, createTask, getTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
 import { TASK_VIEWS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
@@ -47,19 +58,30 @@ const MAX_TODO_FILE_BYTES = 10 * 1024 * 1024
  * never be asked different questions (R16) and the machine surface has one thing
  * to mirror (R19).
  *
- * `view` is matched against the two the app knows through the shared list, which
- * is a positional allow-list check (R20) and not a cast: anything else — the
- * retired `all` included — falls back to the open pile rather than reaching SQL.
- */
-function todoFilterFrom(url: URL): { accountId?: string; view: TodoViewName; q?: string } {
+ * `view` is matched against the five the app knows through the shared list,
+ * which is a positional allow-list check (R20) and not a cast: anything else —
+ * the retired `all` included — falls back to the open pile rather than
+ * reaching SQL.
+ *
+ * `accountManagerId` ARRIVED 15 SEP 2026 — the Inputs screen's own second
+ * facet (client ruling, "add a filter for account", widened by the
+ * coordinator's own I1 mock, "Account manager"). */
+function todoFilterFrom(url: URL): {
+  accountId?: string
+  accountManagerId?: string
+  view: TodoViewName
+  q?: string
+} {
   const asked = queryText(url.searchParams.get("view"), "View")
   return {
     accountId: queryText(url.searchParams.get("accountId"), "Client"),
+    accountManagerId: queryText(url.searchParams.get("accountManagerId"), "Account manager"),
     view: (TODO_VIEWS as readonly string[]).includes(asked ?? "") ? (asked as TodoViewName) : "open",
     // THE NESTED PANEL'S OWN SEARCH BOX (work-panels.tsx's `TodosPanel`) — a
     // to-do has no top-level list screen of its own, but it is paged (R14) like
     // one, and a toolbar with no way to narrow forty outstanding requests was
-    // the gap the rest of the work engine had already closed.
+    // the gap the rest of the work engine had already closed. The Inputs
+    // screen's own search box (2026-09-15) rides the same question.
     q: queryText(url.searchParams.get("q"), "Search"),
   }
 }
@@ -74,22 +96,37 @@ function todoFilterFrom(url: URL): { accountId?: string; view: TodoViewName; q?:
  * Used by all three to-do doors. A door that built this literal by hand would be
  * a door that can ship half the contract — R14 says so, and the check reads this
  * whole file for a hand-built `json(` carrying `todos`. */
+/** WHICH OF `TodoCounts`' SIX NUMBERS A VIEW'S OWN `total` READS — one
+ * switch, read by both call sites below (the page and the by-id lookup) so
+ * they cannot answer the question differently. */
+function todoViewTotal(counts: Awaited<ReturnType<typeof countTodos>>, view: TodoViewName): number {
+  if (view === "done" || view === "received") return counts.done
+  if (view === "overdue") return counts.overdue
+  if (view === "waiting") return counts.waiting
+  return counts.open
+}
+
 async function todoPage(
   cfg: Parameters<typeof listTodos>[0],
   guard: Parameters<typeof listTodos>[1],
   scope: AccountScope,
-  filter: { accountId?: string; view: TodoViewName; q?: string },
-  cursor: string | null
+  filter: { accountId?: string; accountManagerId?: string; view: TodoViewName; q?: string },
+  cursor: string | null,
+  // THE CALLER'S OWN ORDERING — the Inputs screen's toolbar sort, settled at
+  // the door (`getTodos`, below) and passed down; every other caller (the
+  // panel's three doors) leaves it unset and lands on the view's own default.
+  ordering?: Parameters<typeof listTodos>[5]
 ): Promise<Response> {
   // THREE READS, never two — a search changes what `total` means without ever
   // being allowed to move the sidecars a tab badge reads (R16: a search box
   // narrows what THIS answer describes, not the collection those badges count).
   // `filteredCounts` is skipped entirely when there is nothing to search for, so
   // the unsearched screen still pays for exactly the one extra read it always did.
+  const countFilter = { accountId: filter.accountId, accountManagerId: filter.accountManagerId }
   const [page, unfiltered, filtered] = await Promise.all([
-    listTodos(cfg, guard, scope, filter, cursor),
-    countTodos(cfg, guard, scope, { accountId: filter.accountId }),
-    filter.q ? countTodos(cfg, guard, scope, { accountId: filter.accountId, q: filter.q }) : null,
+    listTodos(cfg, guard, scope, filter, cursor, ordering),
+    countTodos(cfg, guard, scope, countFilter),
+    filter.q ? countTodos(cfg, guard, scope, { ...countFilter, q: filter.q }) : null,
   ])
   const totals = filtered ?? unfiltered
   return pagedJson(
@@ -99,13 +136,22 @@ async function todoPage(
       // THE SAME QUESTION THE ROWS ANSWER — exact, over this view AND this
       // search, so a `<PagedFind>` toolbar's own "N match" line is never the
       // unsearched pile wearing a search result's clothes.
-      total: filter.view === "done" ? totals.done : totals.open,
+      total: todoViewTotal(totals, filter.view),
       hasMore: page.hasMore,
       nextCursor: page.nextCursor,
     },
     // THE TAB BADGES' OWN NUMBERS — always the whole pile, whatever is typed in
-    // the search box above them.
-    { openTotal: unfiltered.open, doneTotal: unfiltered.done, allTotal: unfiltered.all }
+    // the search box above them. THREE MORE, 15 SEP 2026, for the Inputs
+    // screen's own three tabs — see `TodoCounts`' own doc for why `received`
+    // rides beside `done` rather than replacing it.
+    {
+      openTotal: unfiltered.open,
+      doneTotal: unfiltered.done,
+      allTotal: unfiltered.all,
+      waitingTotal: unfiltered.waiting,
+      overdueTotal: unfiltered.overdue,
+      receivedTotal: unfiltered.received,
+    }
   )
 }
 
@@ -114,12 +160,40 @@ async function todoPage(
  * Fenced: a client login sees their company's, staff see everyone's (?accountId
  * narrows to one client). `?view=done` is the completed pile — which is the only
  * pile that can be carrying a file, because completing one is what attaches it.
- * `?id=` is one to-do by id. */
+ * `?id=` is one to-do by id.
+ *
+ * `inputs:read` is the gate — renamed from `todos:read` 15 SEP 2026 (Task C,
+ * `documents/UI-RULEBOOK.md` K entry) when the Inputs screen gave this door a
+ * top-level home beside the panel it already had. The TABLE, the resource
+ * name every `publishChange`/cache key names, and the ref kind are all still
+ * `todos` — only the permission box changed, R36's "no door without a box"
+ * read the other way: a door that changed which box it needs.
+ *
+ * `all_inputs:read` decides the THREE NEW VIEWS (waiting/overdue/received —
+ * the Inputs screen's own tabs) ONLY: without it, those three narrow to the
+ * accounts the caller themselves manages (`account_manager_user_id`), the
+ * same shape `all_tasks:read` narrows Overdue/Planned/Completed by
+ * (workers/content/src/routes/todos.ts's own `getTasks`, above). `open`/
+ * `done` — the account/contact record's own `TodosPanel` — are UNCHANGED:
+ * that panel already carries its own fence (one specific account, or none
+ * for staff who hold `todos`'s old unconditional read), and widening it here
+ * would be a second, disagreeing answer to "whose to-dos is this". */
 export async function getTodos(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "todos", "read")
+  const { cfg, guard } = await gated(request, env, "inputs", "read")
   const scope = await callerScope(cfg, guard)
   const url = new URL(request.url)
-  const filter = todoFilterFrom(url)
+  let filter = todoFilterFrom(url)
+  // THE INPUTS SCREEN'S OWN THREE TABS, NARROWED WITHOUT THE RIGHT — see this
+  // function's own header. Applied as an AND with whatever `accountId` was
+  // already asked for, never a REPLACEMENT of it: a caller without the right
+  // who names a specific account they do not manage gets an honest empty
+  // page rather than someone else's rows.
+  if (
+    (filter.view === "waiting" || filter.view === "overdue" || filter.view === "received") &&
+    !(await hasRight(cfg, guard, "all_inputs", "read"))
+  ) {
+    filter = { ...filter, accountManagerId: guard.userId }
+  }
   const id = queryText(url.searchParams.get("id"), "Id")
   // One to-do by id is a LOOKUP, not a page — answered directly rather than
   // filtered out of a page that could legitimately not contain it (R38). It
@@ -128,23 +202,47 @@ export async function getTodos(request: Request, env: Env): Promise<Response> {
   if (id) {
     const [one, counts] = await Promise.all([
       getTodo(cfg, guard, scope, id),
-      countTodos(cfg, guard, scope, { accountId: filter.accountId }),
+      countTodos(cfg, guard, scope, { accountId: filter.accountId, accountManagerId: filter.accountManagerId }),
     ])
     return pagedJson(
       "todos",
       {
         rows: one ? [one] : [],
-        total: filter.view === "done" ? counts.done : counts.open,
+        total: todoViewTotal(counts, filter.view),
         hasMore: false,
         nextCursor: null,
       },
-      { openTotal: counts.open, doneTotal: counts.done, allTotal: counts.all }
+      {
+        openTotal: counts.open,
+        doneTotal: counts.done,
+        allTotal: counts.all,
+        waitingTotal: counts.waiting,
+        overdueTotal: counts.overdue,
+        receivedTotal: counts.received,
+      }
     )
   }
-  return todoPage(cfg, guard, scope, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  // THE CALLER'S OWN ORDERING — the Inputs screen's toolbar sort (`sort`/`dir`
+  // query params), resolved against `TODO_SORTS` here rather than inside the
+  // lib (the same split `stories.ts`'s own `getStories` keeps): an unknown
+  // sort name is a clean 400 at the door, before any SQL is built.
+  const ordering = resolveOrdering(
+    TODO_SORTS,
+    filter.view === "done" || filter.view === "received" ? "completed" : "due",
+    queryText(url.searchParams.get("sort"), "Sort"),
+    queryText(url.searchParams.get("dir"), "Direction")
+  )
+  return todoPage(
+    cfg,
+    guard,
+    scope,
+    filter,
+    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+    ordering
+  )
 }
 
-/** POST /api/content/todos — ask a client for something (todos:create).
+/** POST /api/content/todos — ask a client for something (inputs:create).
  *
  * STAFF ONLY. A client writing themselves a to-do would be a note, and notes go
  * on the ticket where we can see them.
@@ -159,7 +257,7 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
     detail?: unknown
     dueOn?: unknown
     ticketId?: unknown
-  }>(request, env, "todos", "create")
+  }>(request, env, "inputs", "create")
   const scope = await refusePortalCaller(cfg, guard)
   const created = await createTodo(cfg, guard, actor, {
     accountId: requireText(body.accountId, "Client", TEXT_LIMITS.short),
@@ -176,7 +274,7 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   return todoPage(cfg, guard, scope, { view: "open" }, null)
 }
 
-/** POST /api/content/todos/complete — the client's own act (todos:EDIT).
+/** POST /api/content/todos/complete — the client's own act (inputs:update).
  *
  * They may attach one file while they are at it, which is the other half of
  * SCOPE ch.06's "complete a to-do and upload a file against it". The file is
@@ -190,7 +288,7 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
     id?: unknown
     fileDataUrl?: unknown
     fileName?: unknown
-  }>(request, env, "todos", "update")
+  }>(request, env, "inputs", "update")
   // The fence decides whose to-do this is BEFORE anything is written — 404, never
   // 403, so "not yours" never confirms the to-do exists.
   const scope = await callerScope(cfg, guard)
@@ -232,11 +330,11 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
   return json({ todo })
 }
 
-/** POST /api/content/todos/cancel — we stopped needing it (todos:delete). Staff
+/** POST /api/content/todos/cancel — we stopped needing it (inputs:delete). Staff
  * only, and nothing is deleted: the row leaves the client's list and the decision
  * stays on it. */
 export async function postCancelTodo(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "todos", "delete")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "inputs", "delete")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "To-do", TEXT_LIMITS.short)
   const { moved, accountId } = await cancelTodo(cfg, guard, actor, id)

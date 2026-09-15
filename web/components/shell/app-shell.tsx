@@ -49,7 +49,7 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree, ClipboardText } from "@shared/ui/foundations/icons"
 // `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
 import { Waves } from "@shared/ui/foundations/icons"
@@ -160,6 +160,11 @@ const SECTION_ICONS: Record<string, typeof House> = {
   // — "contact" → "profile-circle" → AddressBook) — one concept, one icon,
   // whether the rail draws it as a component or a screen draws it by name.
   contacts: AddressBook,
+  // Same glyph CONCEPT_ICON.inputs resolves to — one concept, one icon,
+  // whether the rail draws it as a component or a screen draws it by name.
+  // NOT `Tray`: Tickets already holds it, and this map's own header rule is
+  // one distinct icon per concept.
+  inputs: ClipboardText,
   tickets: Tray,
   knowledge: HardDrives,
   processes: GitFork,

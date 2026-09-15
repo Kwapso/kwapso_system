@@ -46,7 +46,13 @@ const SEARCHABLE = Object.entries(GROWING_COLLECTIONS).filter(([, c]) => c.listR
 
 describe("paged-search (R14, the search half): a paged list searches the whole collection", () => {
   it("finds the collections to check (a blind scan reports all clear exactly like a passing one)", () => {
-    expect(SEARCHABLE.length).toBeGreaterThanOrEqual(6)
+    // 5, not 6, since 15 Sep 2026: `stories` left GROWING_COLLECTIONS' own
+    // `listRecipe` field the same day `tasks` already had none — the Stories
+    // tab strip's toolbar searches the browser's own loaded page
+    // (`tasks-screen.tsx`'s shape), never a door-side `q` through a
+    // `<PagedFind>`, so this census's own population genuinely shrank by one
+    // rather than going blind.
+    expect(SEARCHABLE.length).toBeGreaterThanOrEqual(5)
   })
 
   for (const [name, c] of SEARCHABLE) {

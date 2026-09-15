@@ -1531,30 +1531,54 @@ describe("R55: a filter that finds the new number finds the OLD one", () => {
     ])
   })
 
-  it("TRIPWIRE: no renumbered module is fenced by a SECOND right — the day one is, prove it here", () => {
-    // The alias reaches the caller in two places and both are fenced the same
-    // way: the PREDICATE inherits `readWhere`'s brackets (proved by the withheld
-    // and put-away cases above), and the `unmatched` LOOKUP carries `fenceOn`,
-    // the one function all three lookups in the engine share — qualified with the
-    // table alias because that statement joins.
-    //
-    // That second fence cannot be exercised today, and saying so is better than
-    // implying otherwise: `narrow` exists on exactly two modules (`accounts` and
-    // `tasks`) and neither of them has a renumbered field. So this asserts the
-    // fact the gap rests on. When a renumbered module gains a second switch —
-    // or a narrowed module gains a reference — this goes red, and the honest
-    // answer is a behavioural test that a caller outside the fence is not told
-    // that a row exists just because it once had another number.
-    const both = Object.entries(QUERY_MODULES).filter(
-      ([, mod]) => mod.narrow && mod.fields.some((f) => f.renumbered)
-    )
-    expect(
-      both.map(([name]) => name),
-      "a module is now BOTH renumbered and narrowed by a second right. The alias lookup in " +
-        "findUnmatched fences through fenceOn(fenceFor, mod, 'm.') — prove behaviourally that a " +
-        "caller outside that fence gets `unmatched` for a retired number, exactly as they do for " +
-        "the live one, then replace this tripwire with that test."
-    ).toEqual([])
+  // THE TRIPWIRE THIS REPLACES asserted that `narrow` existed on exactly two
+  // modules (`accounts`, `tasks`) and neither had a renumbered field — so the
+  // second fence on `findUnmatched`'s alias lookup had never been exercised.
+  // `stories` (`shared/workers/query-grammar.ts`) gained `narrow` on
+  // 15 Sep 2026 (the Stories tab strip's "Everyone's" tab, `all_stories:read`)
+  // and it already carried `renumbered: true` on `ref` (BERG-S0188-style
+  // numbers) — the first module to combine both. Reading `fenceOn(fenceFor,
+  // mod, "m.")` at the alias JOIN shows it is unconditional, not special-cased
+  // per module, so the combination was already safe; these two tests are the
+  // behavioural proof the tripwire asked for, live and by a retired number.
+  describe("a renumbered module that is ALSO narrowed by a second right (stories)", () => {
+    beforeEach(() => {
+      db().exec(`
+        INSERT INTO stories (id, ref, title, status, assignee_id, created_at)
+          VALUES ('ST_THEIRS', 'S0042', 'Not mine', 'open', '${IDS.burglarUser}', '2026-05-01T00:00:00.000Z');
+        ${RETIRED("stories", "OLD-S0009", "ST_THEIRS", "S0042")}
+      `)
+    })
+
+    it("without all_stories:read, neither the live number nor the retired one reaches a caller narrowed to their own", async () => {
+      db().exec(
+        `UPDATE role_permissions SET can_read = 0 WHERE role_id = '${IDS.adminRole}' AND module = 'all_stories';`
+      )
+      const live = await ask(
+        q({ module: "stories", where: [{ field: "ref", op: "eq", value: "S0042" }], countOnly: true })
+      )
+      expect(live.body.total, "somebody else's story reached a caller narrowed to their own").toBe(0)
+
+      const old = await ask(
+        q({ module: "stories", where: [{ field: "ref", op: "eq", value: "OLD-S0009" }], countOnly: true })
+      )
+      expect(old.body.total).toBe(0)
+      expect(
+        old.body.unmatched,
+        "the alias must not become a way to learn a row exists outside what this caller may see"
+      ).toEqual([{ field: "ref", values: ["OLD-S0009"] }])
+    })
+
+    it("WITH all_stories:read the same two lookups find the story, live and by its old number (the positive control)", async () => {
+      const live = await ask(
+        q({ module: "stories", where: [{ field: "ref", op: "eq", value: "S0042" }], countOnly: true })
+      )
+      expect(live.body.total).toBe(1)
+      const old = await ask(
+        q({ module: "stories", where: [{ field: "ref", op: "eq", value: "OLD-S0009" }], countOnly: true })
+      )
+      expect(old.body.total, "the alias resolves to the live row once nothing is fenced").toBe(1)
+    })
   })
 
   it("describe_module says the field has a past, so a caller knows to try the number they were given", async () => {

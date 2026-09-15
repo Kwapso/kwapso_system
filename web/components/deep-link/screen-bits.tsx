@@ -553,14 +553,23 @@ export type ToolbarViewSlot = {
  * ENFORCED CENTRALLY, in the one row that already builds both controls
  * (R53) — never at a call site, which is what "make this a law" asks for
  * over "fix the three screens that have it today": a screen may still PASS a
- * `sort` config alongside a calendar/week/agenda `view` (its other bodies —
- * Table, Board — genuinely want one), and this row is what decides, every
- * render, whether the control it already owns actually draws. No call site
- * can opt back in by continuing to hand over `sort` once its `view.value`
- * lands on one of these three; the three are typed once, here, so the
- * question "which views are calendars" has one answer for `<ToolbarRow>` and
- * for its own test census. */
-export const NO_SORT_VIEW_VALUES: ReadonlySet<string> = new Set(["calendar", "week", "agenda"])
+ * `sort` config alongside a calendar/week/agenda/timeline `view` (its other
+ * bodies — Table, Board, List — genuinely want one), and this row is what
+ * decides, every render, whether the control it already owns actually
+ * draws. No call site can opt back in by continuing to hand over `sort`
+ * once its `view.value` lands on one of these four; the four are typed
+ * once, here, so the question "which views carry no order of their own"
+ * has one answer for `<ToolbarRow>` and for its own test census.
+ *
+ * AMENDED 2026-09-15 — TIMELINE JOINS THE SET. The Waves T3 ruling ("for
+ * waves i choose t3") reads a time axis exactly the way a calendar/week/
+ * agenda does: the axis IS the order, so a sort control beside it is the
+ * identical dead UI this law was written to stop, drawn as bars instead of
+ * squares. `web/components/work/wave-finder.tsx` (a `TOOLBAR_CONTROL_OWNERS`
+ * hand-copy of this row, not a `<ToolbarRow>` call site) reads this same set
+ * to suppress its own `<SortControl>` on Timeline and Calendar alike, rather
+ * than re-typing the list a second time. */
+export const NO_SORT_VIEW_VALUES: ReadonlySet<string> = new Set(["calendar", "week", "agenda", "timeline"])
 
 /** A BOUNDED COLLECTION'S OWN TOOLBAR ROW — the one shape a call site reaches
  * for below a `folderTabs` strip, still inside the card, whenever its tab body
@@ -742,12 +751,13 @@ export function ToolbarRow({
    * "have the rows arrived" expression `search` beside it is gated on.
    *
    * R78'S OWN EXCEPTION, on top of the default above: when `view`'s active
-   * value is calendar, week or agenda (`NO_SORT_VIEW_VALUES`, above), this
-   * row draws no sort control at all EVEN IF `sort` is given — a calendar's
-   * date axis already fixes the order, so the control would offer a choice
-   * that does nothing. The suppression lives here, not at the call site, so
-   * a screen cannot forget it by continuing to pass `sort` once its view
-   * lands on one of those three. */
+   * value is calendar, week, agenda or timeline (`NO_SORT_VIEW_VALUES`,
+   * above), this row draws no sort control at all EVEN IF `sort` is given —
+   * a calendar's date axis, or a timeline's time axis, already fixes the
+   * order, so the control would offer a choice that does nothing. The
+   * suppression lives here, not at the call site, so a screen cannot forget
+   * it by continuing to pass `sort` once its view lands on one of those
+   * four. */
   sort?: ToolbarSortSlot | false | null
   /** THE VIEW SWITCH — after `sort` and before the pinned-right `actions`,
    * and a CONFIG for the same reason `sort` is. Omitted wherever a screen

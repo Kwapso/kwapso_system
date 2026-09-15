@@ -697,7 +697,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R78",
     dimension: "ui",
-    law: "CALENDAR VIEWS CARRY NO SORT. The client's ruling, 2026-09-15, over the week design: \"Never put the sort in calendar components. Make this a law. Makes no sense.\" A reader looking at a month grid, a week board (Mon–Fri plus the folded weekend, `RecordWeek`) or a day-by-day agenda is not choosing an ORDER — the calendar frame (the date axis) already fixes one — so a sort control beside it offers a choice that does nothing, the identical \"dead UI\" argument `TOOLBAR_SORT_EXEMPT`'s own header already makes screen by screen (`sprints-screen.tsx#SprintsScreen`'s own entry there, among others) for a month grid or a queue. This turns that argument into a LAW rather than leaving it as N separate exemptions: \"calendar view, no sort\" is a fact about the SHAPE, not a decision each screen re-makes. ENFORCED CENTRALLY, at the one seam that already builds both controls (R53) — `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) draws no `<SortControl>` at all, regardless of what its `sort` prop is given, the moment its `view` slot's ACTIVE value (`view.value`, never the list of bodies a screen offers) is `\"calendar\"`, `\"week\"` or `\"agenda\"` (`NO_SORT_VIEW_VALUES`, the same file). No call site can opt back in by continuing to pass `sort` once its view lands on one of those three — the suppression lives in the row, not at eighteen call sites, which is the same move R53 itself made for the control's placement. A static census, `no-sort-in-calendar-views`, holds every OTHER file that independently builds a `<SortControl>`/`<ViewSwitch>` pair (R53's own `TOOLBAR_CONTROL_OWNERS` — the row is not the only file the kit lets draw these two controls) to the identical rule: a views array offering `calendar`/`week`/`agenda` there must suppress its own sort control on that view too, or the file is named in `NO_SORT_VIEW_EXEMPT` with the reason it is safe not to.",
+    law: "CALENDAR VIEWS CARRY NO SORT. The client's ruling, 2026-09-15, over the week design: \"Never put the sort in calendar components. Make this a law. Makes no sense.\" A reader looking at a month grid, a week board (Mon–Fri plus the folded weekend, `RecordWeek`) or a day-by-day agenda is not choosing an ORDER — the calendar frame (the date axis) already fixes one — so a sort control beside it offers a choice that does nothing, the identical \"dead UI\" argument `TOOLBAR_SORT_EXEMPT`'s own header already makes screen by screen (`sprints-screen.tsx#SprintsScreen`'s own entry there, among others) for a month grid or a queue. This turns that argument into a LAW rather than leaving it as N separate exemptions: \"calendar view, no sort\" is a fact about the SHAPE, not a decision each screen re-makes. ENFORCED CENTRALLY, at the one seam that already builds both controls (R53) — `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) draws no `<SortControl>` at all, regardless of what its `sort` prop is given, the moment its `view` slot's ACTIVE value (`view.value`, never the list of bodies a screen offers) is `\"calendar\"`, `\"week\"`, `\"agenda\"` or `\"timeline\"` (`NO_SORT_VIEW_VALUES`, the same file). No call site can opt back in by continuing to pass `sort` once its view lands on one of those four — the suppression lives in the row, not at eighteen call sites, which is the same move R53 itself made for the control's placement. A static census, `no-sort-in-calendar-views`, holds every OTHER file that independently builds a `<SortControl>`/`<ViewSwitch>` pair (R53's own `TOOLBAR_CONTROL_OWNERS` — the row is not the only file the kit lets draw these two controls) to the identical rule: a views array offering `calendar`/`week`/`agenda`/`timeline` there must suppress its own sort control on that view too, or the file is named in `NO_SORT_VIEW_EXEMPT` with the reason it is safe not to. AMENDED 2026-09-15, THE SAME DAY, FOR THE WAVES T3 RULING (\"for waves i choose t3\"): a time axis is time-ordered the identical way a date axis is, so `NO_SORT_VIEW_VALUES` gained `\"timeline\"` alongside the original three rather than Waves re-arguing the case as a fourth `TOOLBAR_SORT_EXEMPT` line. `web/components/work/wave-finder.tsx` (already a `TOOLBAR_CONTROL_OWNERS` hand-copy of this row, R53) reads the widened set directly to suppress its own sort control on Timeline and Calendar, keeping sort on List, where the rows genuinely have an order to offer.",
     checkId: "no-sort-in-calendar-views",
     status: "enforced",
   },
@@ -921,6 +921,10 @@ export const CORPUS_EXEMPT: Record<string, string> = {
   // ── NOTHING TO FILE: A SWITCH, A SHEET, OR A NUMBER ───────────────────────
   all_tasks:
     "NOT A RECORD TYPE. Read the row as a sentence: 'this role may see everyone's tasks'. It is a switch over a SIGHT, and the tasks themselves are already in the corpus as the `task` kind — so there is nothing here to file that is not filed, and a source saying 'this role can see everyone's tasks' would be a permission fact wearing a passage's clothes.",
+  all_stories:
+    "`all_tasks`'s own shape, one module along (client ruling, 15 Sep 2026, the Stories tab strip's Everyone's tab). Read the row as a sentence: 'this role may see everyone's stories'. It is a switch over a SIGHT, and the stories themselves are already in the corpus as the `story` kind — so there is nothing here to file that is not filed, and a source saying 'this role can see everyone's stories' would be a permission fact wearing a passage's clothes.",
+  all_inputs:
+    "`all_tasks`'s own shape, one module along (the Inputs screen, 15 Sep 2026). Read the row as a sentence: 'this role may see everyone's inputs'. It is a switch over a SIGHT, and the inputs themselves are already in the corpus as the `todo` kind — so there is nothing here to file that is not filed, and a source saying 'this role can see everyone's inputs' would be a permission fact wearing a passage's clothes.",
   member_roles:
     "A PERMISSION SHEET, AND IT MUST NEVER BE STALE. What each role may do is answered live by `get_role_permissions` and by `query_records` on `roles`, straight off the matrix. A corpus copy would be a second account of who can do what, written once and then wrong the next time somebody ticks a box — and of everything in this app, the permission matrix is the document where a confident, out-of-date answer does the most harm.",
   knowledge:
@@ -1641,6 +1645,8 @@ export const TRANSLATION_CEILING: Record<string, number> = {
  * own directory name (`components/<name>` or `foundations/<name>`), the same
  * id `computeReachability` produces. */
 export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
+  "components/gantt":
+    "unreached as of 2026-09-15, and by a deletion this time: Waves' own Timeline (`waves-screen.tsx`) was its only caller, and the client's T3 ruling that day (\"for waves i choose t3\") replaced it with a bespoke, host-composed grid (`web/components/records/record-timeline.tsx`) instead — the kit's own CH27.26 laws for this component (a six-period ceiling with a stepper, the grid dropped for one row per lane below 720, five fixed tones with no neutral one) are load-bearing for the composition they were written for and do not fit a continuous week window with prev/next/today and phone scroll-snap, and giving `Gantt` a sixth, neutral tone for a wave's own gap segment is a kit change outside this round's authorised scope. Reaches back the day a screen genuinely wants CH27.26's own shape (a lane per app/account/member, six periods, a stepper) rather than this one.",
   "components/visibility":
     "unreached as of 2026-09-03, and by a deletion rather than a gap: its `useIsVisible` had exactly one caller in the app, `web/components/condensed-title.tsx`, which watched a screen's real title and swapped in a smaller sticky stand-in once it scrolled away. The client removed that bar outright (\"when I scroll down, the whole compressed title is useless, so remove that\"), so nothing in either front door now asks \"is this element on screen right now\" — every other scroll-dependent surface in the app is plain `position: sticky` (the record and collection tab strips, the shell's breadcrumb bar), which needs no observer at all. The day a screen genuinely needs to know what is in view again, this is the part to reach for rather than a second IntersectionObserver.",
   "components/heatmap":
@@ -1694,8 +1700,6 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "documented and deliberate: web/components/assistant/agent-host.tsx names copilot-overlay in its own comment, explaining that only the launcher's PLACEMENT was reused (it has to clear the phone's bottom nav bar, which the kit's own corner-pinned launcher does not account for) — the panel was rebuilt because agent-panel.tsx needs RunSteps and citation pills the kit's overlay does not model.",
   "components/detail-view":
     "a documented architecture choice, not an oversight: UI-CONVENTIONS.md §2b rules that bespoke `*-detail.tsx` screens are host-composed from TabsView + ActivityFeed + DescriptionList + Card precisely because each carries a control the screen engine (and this generic template) has no block for.",
-  "components/toggle-group":
-    "unreached as of 2026-09-15, and by a deletion rather than a gap: its one caller, web/components/records/record-calendar.tsx's month/agenda switch, was removed on the client's own ruling — \"Agenda is a different component than month. Inside the calendar, the whole month agenda: disable that. When I mean calendar, I mean the month view.\" `RecordCalendar` is a month grid only now, on every device, so nothing in the app switches between two readings of the same period any more. The day a screen needs a real segmented either/or control again, this is the part to reach for rather than two buttons whose variant flips (R3).",
 }
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
@@ -1787,6 +1791,16 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["field-label", "property"],
     via: ["translateFields(columns, t)", "t(tab.label)"],
     why: "a screen that composes its OWN table columns and its own six-tab strip. The columns are spread onto the recipe after `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` is that same rule called at the place they are spread in; the tab labels are read through `t` where the strip is built.",
+  },
+  "web/components/work/stories-screen.tsx": {
+    kinds: ["field-label", "property"],
+    via: ["translateFields(columns, t)", "t(tab.label)"],
+    why: "`tasks-screen.tsx`'s own pattern, ported for the Stories tab strip (client ruling, 15 Sep 2026): the List view's own table columns (`MINE_COLUMNS`/`COMPLETED_COLUMNS`/`EVERYONE_COLUMNS`) are spread onto the recipe AFTER `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` at the point they are spread in is the one place they can ask. The five tab labels (`STORY_TABS`/`EVERYONE_TAB`) are read through `t` where the folder-tab strip is built, the same call site tasks-screen.tsx's own tabs use.",
+  },
+  "web/components/accounts/inputs-screen.tsx": {
+    kinds: ["field-label", "property"],
+    via: ["translateFields(INPUT_COLUMNS, t)", "t(tab.label)"],
+    why: "`tasks-screen.tsx`'s own pattern, ported a second time for the Inputs screen (Task C, 15 Sep 2026): INPUT_COLUMNS is spread onto the recipe inside `<PagedFind>`'s own render, after `resolveRecipe` has already run, so `translateRecipe` never sees it — `translateFields` at the point it is spread in is the one place it can ask. The three tab labels (`INPUT_TABS`) are read through `t` where the folder-tab strip is built, the same call site tasks-screen.tsx's own tabs use.",
   },
   "web/components/accounts/contacts-screen.tsx": {
     kinds: ["field-label"],
@@ -2152,6 +2166,8 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
     "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx (the same file as accounts.list, a second call site), which always renders a SearchInput.",
   "contacts.list":
     "paged (R14) — its search box is the host's own <PagedFind> in contacts-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
+  "inputs.list":
+    "paged (R14) — its search box is the host's own <PagedFind> in web/components/accounts/inputs-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
   "meetings.list":
     "paged (R14) — its search box is the host's own <PagedFind> in meetings-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
   "processes.list":
@@ -2226,6 +2242,8 @@ export const TWO_READS_ONE_DOOR: Record<string, string> = {
     "the sub-tab that is OPEN and the WAITING column on the Open board are two questions, and only one of them is ever live at a time. `facetQ` reads whichever stage tab a person has picked; `waitingQ` is null-keyed unless `facet === OPEN && openView === \"board\"`, and its `help-facet:all:waiting` key is the same one the Waiting TAB rests on, so the board column and that tab are one read between them rather than two. Collapsing them would mean the board's Waiting column counted page one of the open list instead of the door's own total (R14/R16), which is the arithmetic the column exists to show. Named on 8 Sep 2026, when main's R56 met feat/ui-ux's ticket board — neither branch could see this, because the law and the screen landed on opposite sides of the merge.",
   "web/lib/use-screen-data.ts::useScreenData::listFetch.tasks":
     "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
+  "web/lib/use-screen-data.ts::useScreenData::listFetch.stories":
+    "`listFetch.tasks`'s own shape, one collection along (client ruling, 15 Sep 2026, the Stories tab strip): `storiesQ` is the untouched, everyday backlog (`storiesKey(teamId)`, still read by breadcrumbs, cross-links and the module settings gear exactly as before this pass); `storiesViewQ` is whichever of the five tabs (`now`/`planned`/`backlog`/`completed`/`all`) the Stories screen is actually showing (`storiesKey(teamId, storyView)`). A story moving from Now to Completed leaves one list and joins another the same way a ticked task does, so collapsing the two reads would reintroduce the identical R38 failure `listFetch.tasks`'s own line names.",
 }
 
 /** R72 — THE FILES THAT STILL DRAW A SUBTITLE UNDER A HEADING, and the reason
@@ -2718,11 +2736,18 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
   all_tasks:
     "not a table — the module is a SWITCH over whose tasks a list answers about (4.9). The rows themselves are `tasks`, which the work engine's own target already imports; giving this module a second target would be two ways to load one table, and the second one would be the one nobody keeps in step. The same shape as `contacts`, one spine along.",
+  all_stories:
+    "not a table — the module is a SWITCH over whose stories a list answers about (client ruling, 15 Sep 2026, the Stories tab strip's Everyone's tab). The rows themselves are `stories`, which the work engine's own target already imports; giving this module a second target would be two ways to load one table, and the second one would be the one nobody keeps in step. The same shape as `all_tasks`, one spine along.",
+  all_inputs:
+    "not a table — the module is a SWITCH over whose accounts' inputs a list answers about (the Inputs screen, 15 Sep 2026). The rows themselves are `todos`, and `todos`/`inputs` is ITS OWN exemption below (a to-do is a request that emails a client, never a bulk write). Giving this module a target of its own would be two ways to load one table, the same shape as `all_tasks`, one spine along.",
   knowledge:
     "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
   processes:
     "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
-  todos:
+  // KEYED `inputs` SINCE 15 SEP 2026 — the permission module renamed from
+  // `todos` (team migration 0095, shared/team-modules.ts); the reasoning
+  // below is unchanged, only the box it is filed under.
+  inputs:
     "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
   staff_profiles:
     "the table names a PERSON — by their member id, which is the one thing a spreadsheet cannot supply. A CSV column of names or email addresses would have to be resolved to members, and resolving it wrongly files somebody's personality profile against the wrong colleague. That is the same reason team_members is exempt, arriving from the other direction: a file cannot say who somebody is. A profile is written on the member's own page, where the question never comes up. A second table used to sit here, `staff_certificates`, exempt for the identical reason — the certificate module was killed whole on 14 Sep 2026 and dropped by team migration 0090.",
@@ -3195,7 +3220,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // TO-DO is aimed at a client and is the one module in this build a client login
   // is meant to hold — so it gates on its own.
   tasks: "work",
-  todos: "todos",
+  // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095). The TABLE
+  // (this map's own key) is unchanged; the permission box a reader of this
+  // history needs moved with the door.
+  todos: "inputs",
   // The rota is about TICKETS — whose week it is to read them — so its history
   // gates with the module the tickets themselves do.
   triage_duty: "help",
@@ -3416,7 +3444,13 @@ export const GROWING_COLLECTIONS: Record<
     fn: "listStories",
     routes: "workers/content/src/routes/stories.ts",
     rowsKey: "stories",
-    listRecipe: "stories.list",
+    // NO `listRecipe` ANY MORE, 15 Sep 2026 — `tasks`'s own shape, two rows up:
+    // the Stories tab strip replaced the generic `<PagedFind>` + `ScreenRenderer`
+    // list with a `tasks-screen.tsx`-style toolbar (search/sort run over
+    // whichever tab's loaded page is showing, never a door-side facet dialled
+    // in), so this collection no longer renders through the recipe-engine's
+    // generic list screen at all — `listRecipe`'s own doc says that field marks
+    // exactly that rendering path, and Stories left it the same day Tasks did.
     webKey: "storiesKey(",
     pagerFile: "components/work/stories-screen.tsx",
     pagerKey: "storiesKey(",
@@ -4552,6 +4586,7 @@ export const NO_RECORD_BEHIND_IT: Record<string, string> = {
   import: "the CSV importer — a workflow, not a collection. Nothing under it has an id.",
   brand: "brand assets open in a panel on the section itself rather than at an address of their own.",
   purposes: "meeting purposes are edited in place on their section, like dropdown values.",
+  inputs: "a to-do has no detail screen of its own (TodosPanel's own header, work-panels.tsx) — it opens the ticket it was raised on, if any, never a record at its own address. The Inputs screen (Task C, 15 Sep 2026) is a bare list for exactly this reason.",
 }
 
 // ── assignable-members ──────────────────────────────────────────────────────

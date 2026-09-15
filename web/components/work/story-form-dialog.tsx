@@ -35,6 +35,7 @@ import { LinkSimple, Paperclip, X } from "@shared/ui/foundations/icons"
 import { Button } from "@shared/ui/components/button/button"
 import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
@@ -69,8 +70,12 @@ export type StoryFormValues = {
   appId: string
   ticketId: string
   assigneeId: string
-  /** Fix / Feature / Change — required (CHECKLIST 6.2). */
+  /** Data / Tech / Bug / Feature / Change — required (CHECKLIST 6.2, client
+   * ruling 15 Sep 2026). */
   storyType: string
+  /** Client-requested / Internal (the same ruling) — required, defaults to
+   * Client-requested. */
+  category: string
   /** Every map this work touches (CHECKLIST 6.5). */
   processIds: string[]
   /** …or the explicit statement that it touches none. Aurora's ruling: it has to
@@ -110,6 +115,16 @@ const typeField = {
   label: "Type",
   required: true,
   helpText: "Editable on the Choices screen.",
+}
+/** WHERE THIS WORK CAME FROM — client ruling, 15 Sep 2026. Always answered
+ * (defaults to Client-requested), so `required` here reads as "always has a
+ * value" rather than "must be chosen" — the same sense `typeField` already
+ * carries for a control that can never sit empty. */
+const categoryField = {
+  ...defaultFieldConfig,
+  label: "Category",
+  required: true,
+  helpText: "Traces to a client ask, or our own upkeep. Editable on the Choices screen.",
 }
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 const sprintField = {
@@ -151,6 +166,7 @@ export function StoryFormDialog({
   appStaff,
   processes,
   storyTypes,
+  categories,
   typeMarks,
   storyId,
   initial,
@@ -202,6 +218,14 @@ export function StoryFormDialog({
   processes: { id: string; name: string; appId: string | null }[]
   /** The team's own `Story type` dropdown values (6.2). */
   storyTypes: string[]
+  /** The team's own `Story category` dropdown values — Client-requested and
+   * Internal as seeded, editable like every other vocabulary here (never a
+   * hardcoded word, the same reason `storyTypes` is a prop and not a
+   * constant). Drawn as a two-pill row rather than a picker: unlike Type
+   * this is a genuinely SHORT, closed choice, and the kit's own segmented
+   * control (`ToggleGroup`/`ToggleGroupItem`) is built for exactly "two to
+   * four options that change how the same data is drawn." */
+  categories: string[]
   /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
    * because the words come from the door and the marks come from the team's
    * own vocabulary cache — two reads the screen already holds, and joining
@@ -244,6 +268,7 @@ export function StoryFormDialog({
       ticketId: "",
       assigneeId: defaultAssigneeId ?? "",
       storyType: "",
+      category: "Client-requested",
       processIds: [],
       changesNoStep: false,
     },
@@ -395,6 +420,7 @@ export function StoryFormDialog({
         ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
         assigneeId: values.assigneeId,
         storyType: values.storyType,
+        category: values.category,
         processIds: values.changesNoStep ? [] : values.processIds,
         changesNoStep: values.changesNoStep,
       })
@@ -521,6 +547,28 @@ export function StoryFormDialog({
           emptyText={t("Nothing matched.")}
           disabled={busy}
         />
+      </Field>
+      <Field config={categoryField} shape="group" htmlFor="story-category" className={fieldSpacing}>
+        <ToggleGroup
+          id="story-category"
+          type="single"
+          value={values.category}
+          onValueChange={(v) => {
+            // Radix's own contract: re-pressing the active segment reports an
+            // empty string rather than leaving it selected. A required field
+            // with a default is never genuinely empty, so that press is a
+            // no-op instead of a value the door would refuse.
+            if (v) setValues((s) => ({ ...s, category: v }))
+          }}
+          disabled={busy}
+          aria-label={t("Category")}
+        >
+          {categories.map((c) => (
+            <ToggleGroupItem key={c} value={c} disabled={busy}>
+              {c}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </Field>
       <Field config={detailField} htmlFor="story-detail" className={fieldSpacing}>
         <Notes

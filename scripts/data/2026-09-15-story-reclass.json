@@ -1,0 +1,3017 @@
+[
+  {
+    "id": "01KZXDK3C3RQJMTEZ6R6NW2SE5",
+    "ref": "B0001",
+    "title": "Delete customers",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Client asks to move/secure an existing delete button — modifying an existing control, not new capability (signal: move/secure a button)."
+  },
+  {
+    "id": "01KZXDK55QY534X6E8JSPVT1P3",
+    "ref": "B0035",
+    "title": "Notifications to awards@196plus.com",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated notification email to a specific address — signal: new email."
+  },
+  {
+    "id": "01KZXDK79E2HYFH1WYZNGKKW0N",
+    "ref": "B0036",
+    "title": "Upload files via website faulty link",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Upload produces a faulty format and an error message — signal: faulty, error message."
+  },
+  {
+    "id": "01KZXDK9NWXAQB9KX3WX27BQHT",
+    "ref": "B0037",
+    "title": "Integration with Webflow to publish the team directly in the app as CMS collection items.",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Webflow CMS integration — signal: new integration."
+  },
+  {
+    "id": "01KZXDKBVBMV3E0X0B19HSKC5G",
+    "ref": null,
+    "title": "Create a new rental",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds missing fields and a quick-access button to the existing create-rental form — signal: add a field, add a button."
+  },
+  {
+    "id": "01KZXDKDPKA18XBCW6X95YFS8R",
+    "ref": "B0038",
+    "title": "Clients self-manage their own answer options per company",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Clients gain a new self-service capability to manage per-company option lists — did not exist before."
+  },
+  {
+    "id": "01KZXDKFYR4T8BFZVAKCGPCK1X",
+    "ref": "B0039",
+    "title": "Email to Employee",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated email to the employee after protocol completion — signal: new email."
+  },
+  {
+    "id": "01KZXDKJ5DB49GYG9V4C36RTY8",
+    "ref": "B0040",
+    "title": "Work permit not blocking for Live / placement",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Removes an existing validation block from the placement workflow while keeping the hint — modifies existing behavior."
+  },
+  {
+    "id": "01KZXDKMHPRW63593P55C9SM9A",
+    "ref": "B0041",
+    "title": "Edit & Delete Artikel on Auftrag",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Adds edit and delete actions for Artikel that did not exist before — signal: new action (delete), matches the delete-action example."
+  },
+  {
+    "id": "01KZXDKPMXJJZCX5NPKBZVGEHZ",
+    "ref": "B0002",
+    "title": "Detail Screen with players",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "A new detail screen for players — signal: new screen."
+  },
+  {
+    "id": "01KZXDKRS5FM3EVHYRF0W94TYS",
+    "ref": "B0042",
+    "title": "Reorder processes",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Reorders existing status sections into a new order — signal: reorder."
+  },
+  {
+    "id": "01KZXDKTTP0K5VJNBGCQ0Y5406",
+    "ref": "B0043",
+    "title": "Change documents",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Replaces the content of existing document templates with updated versions — rewrite of existing copy."
+  },
+  {
+    "id": "01KZXDKX3JNH4933YH24N9NHHB",
+    "ref": "B0044",
+    "title": "Filtern Verträge",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds filtering to the existing Verträge screen — signal: filter."
+  },
+  {
+    "id": "01KZXDKZD2CT4B8MJSC0HBRMRY",
+    "ref": "B0045",
+    "title": "New task: Neuantrag anlegen",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a new task type/entry to the existing Tasks vocabulary — addition to existing list."
+  },
+  {
+    "id": "01KZXDM24S4GSQFEP1R366KJQQ",
+    "ref": null,
+    "title": "Record activity",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds out the activity-log entries across many existing fleet actions — new tracking capability, no prior activity feed."
+  },
+  {
+    "id": "01KZXDM41DW9YVA200X8XKQXQ5",
+    "ref": null,
+    "title": "No expenses shown december (cybernex)",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "An added invoice does not show up — signal: does not show up."
+  },
+  {
+    "id": "01KZXDM7WN8PME9N7F4FEMTRDQ",
+    "ref": "B0046",
+    "title": "Auswahllisten",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New choice-list management screen under Settings — early module build."
+  },
+  {
+    "id": "01KZXDM9YF20G7KB0JX74DWF7Q",
+    "ref": "B0047",
+    "title": "Proof of performance",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"proof of performance\" module/screen — early module build."
+  },
+  {
+    "id": "01KZXDMCDKHNWSYXNQR9KBD0RC",
+    "ref": "B0003",
+    "title": "Feedback from Students",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New end-of-course student feedback capability — signal: new template/capability."
+  },
+  {
+    "id": "01KZXDMENNN9BE0Y28W6PJB8N1",
+    "ref": "B0048",
+    "title": "Lead Follow Up",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New lead follow-up capability in the Sales Pipeline — signal: new workflow."
+  },
+  {
+    "id": "01KZXDMH46CFG5TDCP3BWAHZAH",
+    "ref": "B0004",
+    "title": "Damage reports",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New damage-reports module — early module build."
+  },
+  {
+    "id": "01KZXDMK98RVY9DGWNR6GF23GJ",
+    "ref": null,
+    "title": "Create new roles for the Junta",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds new roles (Vicepresident, Admin, omni admin) to the existing role system — addition to existing vocabulary."
+  },
+  {
+    "id": "01KZXDMN412F2EZAKJAM2S5X84",
+    "ref": "B0049",
+    "title": "Damage at the customer",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A manually created damage report is saved but does not appear in the main menu — signal: does not appear."
+  },
+  {
+    "id": "01KZXDMQ5V0TDWXXY5M7TTTGN6",
+    "ref": "B0050",
+    "title": "In Jury Voting Design award Voting options Orginality & award whorthiness merging",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Merges two existing voting options (Originality & Award-Worthiness) into one — modifies existing options."
+  },
+  {
+    "id": "01KZXDMSFRAF70P7XP67FE5X6P",
+    "ref": "B0005",
+    "title": "Action table",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Action Plan\" table/screen — early module build."
+  },
+  {
+    "id": "01KZXDMVSB5B2BFTGBPC2AGE6S",
+    "ref": "B0051",
+    "title": "Show loading modal when publishing in website",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a loading modal to an existing publish action — UI addition to existing flow."
+  },
+  {
+    "id": "01KZXDMY0FQH5J0JYSGDD8XHCF",
+    "ref": null,
+    "title": "Handover / Return protocol",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds missing fields (Reifen, Anmerkung, etc.) to the existing handover/return form — signal: missing fields to add."
+  },
+  {
+    "id": "01KZXDMZYYPEEMCHBRZCZ0VT4V",
+    "ref": "B0052",
+    "title": "Client selects which fields to collect",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New per-client self-service capability to enable/disable which fields are collected — did not exist before."
+  },
+  {
+    "id": "01KZXDN2DYSVCM0TJMQ3TBP7ZS",
+    "ref": "B0053",
+    "title": "Return Protocol Form (Admin App, In-Person Signature)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New admin-app return-protocol screen with in-person signature and PDF generation — signal: new screen/workflow."
+  },
+  {
+    "id": "01KZXDN4FTB18CS4WVXEC9GM2V",
+    "ref": "B0054",
+    "title": "reminder Placement-end to set post-placement outcome",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New scheduled reminder workflow prompting confirmation of post-placement outcome — signal: new automated action."
+  },
+  {
+    "id": "01KZXDN6SXQTP9606GZSYJJQ7V",
+    "ref": "B0055",
+    "title": "Aufträge Filters",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds more filter options (Customer, Calendar Week) to the existing Aufträge list — signal: filter."
+  },
+  {
+    "id": "01KZXDN9EVQT5XBHGQEC62EV6P",
+    "ref": "B0056",
+    "title": "Training Confirmation Lifecycle",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New training confirmation lifecycle (auto-cancel, pending confirmation, trainer decision) — new workflow."
+  },
+  {
+    "id": "01KZXDNBQRKR39FRN5FKW9VAC5",
+    "ref": "B0057",
+    "title": "Signature size",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Increases the pixel size of an existing signature image — cosmetic tweak to existing feature."
+  },
+  {
+    "id": "01KZXDNDWE5M11KV68QJJ1SDS8",
+    "ref": "B0058",
+    "title": "Add hint on onboarding Sucess Page",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a hint/copy block to an existing onboarding success page — copy addition."
+  },
+  {
+    "id": "01KZXDNFTYG5DE6KVR7ZS6YD9V",
+    "ref": "B0059",
+    "title": "Neue Felder bei Verträge",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds new fields to the existing Verträge module — signal: new fields (add a field)."
+  },
+  {
+    "id": "01KZXDNHZHWJ1ZBYQGGG7A5V9F",
+    "ref": "B0060",
+    "title": "Manual Kündigungsurgenz",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "A manual flag/field on existing Verträge cancellation handling — modifies existing record."
+  },
+  {
+    "id": "01KZXDNMCS2G26VMY3PQR6TM8H",
+    "ref": null,
+    "title": "Kilometerstand-Erinnerung",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New daily automated mileage-check and reminder-email workflow — signal: new automated action."
+  },
+  {
+    "id": "01KZXDNP7N2NAXEAVG22WBNA2Z",
+    "ref": null,
+    "title": "Slack channel that creates content inspo from messages",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Internal",
+    "reason": "A proposed new Slack-to-content-ideas integration with no tied client account — internal tooling idea, signal: new integration."
+  },
+  {
+    "id": "01KZXDNQYN56AKPX3F14DHD5Z2",
+    "ref": null,
+    "title": "Create Agency App for Re-Green",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Stands up a brand-new client app for account Re-Green — the largest possible new capability."
+  },
+  {
+    "id": "01KZXDNT01VPVNZ9SMZYB34NNK",
+    "ref": "B0061",
+    "title": "Display the sales total per month in the dashboard.",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a new revenue number/graphic to the existing dashboard — addition to an existing screen (signal: add)."
+  },
+  {
+    "id": "01KZXDNW9A5XQR5VWTGFWQPDQ5",
+    "ref": "B0006",
+    "title": "Accident report email",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated incident-report email to S4You office — signal: new email."
+  },
+  {
+    "id": "01KZXDNYHQ9FAX7QWXF01F5VZ4",
+    "ref": "B0007",
+    "title": "Automated forwarding",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated certificate-forwarding emails to participants/customer/Linda — signal: new email."
+  },
+  {
+    "id": "01KZXDP0PARWTG6WJSJ70VR6D9",
+    "ref": "B0062",
+    "title": "cal integration",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New calendar integration for the Sales Pipeline — signal: new integration."
+  },
+  {
+    "id": "01KZXDP2ZTZP1JGH4NZ8Z082G7",
+    "ref": "B0063",
+    "title": "Delete appointment",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a delete-appointment button to an existing screen — signal: add a button."
+  },
+  {
+    "id": "01KZXDP54R4VWP27RPT4K5SVHV",
+    "ref": "B0064",
+    "title": "make the applicant list in admin tool 40 lines long",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the length of an existing applicant list from its current size to 40 lines — modifies existing list."
+  },
+  {
+    "id": "01KZXDP7C6GEZ8P48GJX5RHGJN",
+    "ref": "B0008",
+    "title": "Incoming candidates automatic reply",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automatic reply email to incoming candidates — signal: new email."
+  },
+  {
+    "id": "01KZXDP9HGJAX91PC50FWA982R",
+    "ref": "B0065",
+    "title": "Show loading modal when publishing/updating in website",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a loading modal to an existing publish/update action — same as #27, UI addition."
+  },
+  {
+    "id": "01KZXDPBPM7A7AM2J4AC76DFD0",
+    "ref": null,
+    "title": "Manage Fahrer within App",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Extends the existing driver-creation flow (already used for Extern/Unternehmen) to also cover Mitarbeiter — iterates an existing feature."
+  },
+  {
+    "id": "01KZXDPDQCARK0TXB0SKCQMTBT",
+    "ref": "B0066",
+    "title": "Extra fields shown on step 2 of the activation page",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a predefined set of optional fields to an existing activation-page step — signal: add fields."
+  },
+  {
+    "id": "01KZXDPFZ15W7H18RMYZWY08AT",
+    "ref": "B0067",
+    "title": "Email to Accounting",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated email notifying Accounting on handover completion — signal: new email."
+  },
+  {
+    "id": "01KZXDPJ0SRR1CZ7T633CQG73Y",
+    "ref": "B0068",
+    "title": "Remove post-placement outcome from placement creation — default to pool",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Removes an existing field from the placement-creation screen and sets a default — signal: remove a field."
+  },
+  {
+    "id": "01KZXDPM3XWVZN36158DBKP7RP",
+    "ref": "B0069",
+    "title": "Problems Deadline",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an optional deadline field to the existing Problems record — signal: add a field."
+  },
+  {
+    "id": "01KZXDPP8PSAZ1CDN9QT5QF0A5",
+    "ref": "B0070",
+    "title": "Change to Big Tables",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the display format of existing training tables to \"Big Tables\" — modifies existing screen."
+  },
+  {
+    "id": "01KZXDPRB1FPD49KM70AG101X5",
+    "ref": "B0071",
+    "title": "Archive customer",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New archive action for customers, distinct from delete, with reactivation — signal: new action."
+  },
+  {
+    "id": "01KZXDPTNB7ZANPS3ZYQXSF91M",
+    "ref": "B0072",
+    "title": "Add hint in Onboarding",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a hint/copy block to existing onboarding registration pages — copy addition."
+  },
+  {
+    "id": "01KZXDPWZ5KEVZFSHVCG64C975",
+    "ref": "B0073",
+    "title": "Schaden melden",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New damage-report submission with an automated email to Schadeservice — signal: new workflow/email."
+  },
+  {
+    "id": "01KZXDPZ33XWP2MBYFBS3JVPXJ",
+    "ref": "B0074",
+    "title": "Activity log",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New activity-log capability for the Bestand module — matches the activity-log pattern (#15)."
+  },
+  {
+    "id": "01KZXDQ14V5F5K1HB4PC9Y9RR4",
+    "ref": null,
+    "title": "Kilometerstand manuell erfasse",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New manual mileage-logging capability with history on the vehicle — did not exist before."
+  },
+  {
+    "id": "01KZXDQ5ANDGGJMMXNNBBPKSGQ",
+    "ref": "B0075",
+    "title": "Improve create deal workflow",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Improves the existing \"create deal\" workflow to allow inline company/contact creation — iterates existing feature."
+  },
+  {
+    "id": "01KZXDQ7G85FCP85VS9304133N",
+    "ref": "B0009",
+    "title": "Profile",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"My Profile\" screen, early module build."
+  },
+  {
+    "id": "01KZXDQ9QKYMB0F35M4AA9CHRF",
+    "ref": "B0010",
+    "title": "Welcome page,Course overview,Adjust",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds/removes fields (Number of students, Instructor, Total UE; removes UE Theory/Practical) on an existing course overview — signal: add/remove fields."
+  },
+  {
+    "id": "01KZXDQBX4BZRD24KWXC6Y780C",
+    "ref": "B0076",
+    "title": "Interactions Tracker",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New interactions tracker (phone, email, notes) for Sales Pipeline — new capability."
+  },
+  {
+    "id": "01KZXDQE7MQ29AJ6J595G9038R",
+    "ref": "B0077",
+    "title": "Change view in a task",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Swaps the displayed field in an existing task screenshot preview (policy number → cancellation date) — modifies existing display."
+  },
+  {
+    "id": "01KZXDQGB74HA6J53VT08GY8GC",
+    "ref": "B0078",
+    "title": "make a delete button for admins",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a delete-admins button — signal: add a button."
+  },
+  {
+    "id": "01KZXDQJPFJ1C36VT57HXGK26G",
+    "ref": "B0011",
+    "title": "Add Erklärung",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an explanation field/copy to the existing LMRA module — copy/field addition."
+  },
+  {
+    "id": "01KZXDQMVCG2T91Z36AXNE7GR6",
+    "ref": "B0079",
+    "title": "Show loading modal when publishing/updating in website",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a loading modal to an existing publish/update action (Events) — same UI-addition pattern as #27/#48."
+  },
+  {
+    "id": "01KZXDQQGXVWR4S27N47Q0X8NQ",
+    "ref": null,
+    "title": "Add “Werbewert” (advertising value) field for fixed rentals",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a new \"Werbewert\" number field to existing fixed-rental records — signal: add a field."
+  },
+  {
+    "id": "01KZXDQSE40V3NZCM6BV2Z3R0W",
+    "ref": "B0080",
+    "title": "Option to leave on-site vouchers Activated",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an activate-only vs auto-redeem option to the existing on-site order flow — adds a config option."
+  },
+  {
+    "id": "01KZXDQW2HZC3706K9AAKYW74E",
+    "ref": "B0081",
+    "title": "On Signature: Email Employee",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated email to the employee once signing is complete — signal: new email."
+  },
+  {
+    "id": "01KZXDQYBDWHH0G190SMTTYHYP",
+    "ref": "B0082",
+    "title": "Position Creation — Filter Company Selector to Assigned Companies Only",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Salespeople see all companies instead of only assigned ones, breaking an established visibility rule — signal: breaks the established model."
+  },
+  {
+    "id": "01KZXDR0Q97S53R7VY88XX86M4",
+    "ref": "B0083",
+    "title": "Delete Users",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New permanent-delete action for users — signal: new action, matches the delete-action example."
+  },
+  {
+    "id": "01KZXDR2TD0M4CFRD92T4A47R4",
+    "ref": "B0084",
+    "title": "Training Detail Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New training detail screen with lifecycle management — signal: new screen."
+  },
+  {
+    "id": "01KZXDR6BAD93RBCBGVAX0F7JT",
+    "ref": "B0085",
+    "title": "Plans",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Plans\" module/screen for Kunden — early module build."
+  },
+  {
+    "id": "01KZXDR8KW2TGBA72Q0X7GCGR0",
+    "ref": "B0086",
+    "title": "Replace the subscription hint text",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Replaces existing subscription hint text with new wording — rewrite of existing copy."
+  },
+  {
+    "id": "01KZXDRAZ37YY06XD5CWKRFZAJ",
+    "ref": "B0087",
+    "title": "Kunde benachrichtigen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"notify customer\" checkbox and accompanying automated email — signal: new email/capability."
+  },
+  {
+    "id": "01KZXDRD3FNY7SPZV6T1NVSQSB",
+    "ref": "B0088",
+    "title": "Activity log",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New activity-log capability for Schadensfälle — matches the activity-log pattern."
+  },
+  {
+    "id": "01KZXDRFB630VHB8PE45DTT2MV",
+    "ref": null,
+    "title": "Schadens-Dokumente",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New documents section on the Schaden record (generated + uploaded documents) — new capability."
+  },
+  {
+    "id": "01KZXDRH3358PT5Z4Z5S2NAWDR",
+    "ref": null,
+    "title": "Track Lost reasons",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a new \"Lost reason\" choice field to existing lead/deal records — signal: add a field."
+  },
+  {
+    "id": "01KZXDRJRZFKNCSVSRSH5G37ED",
+    "ref": "B0089",
+    "title": "Input customer/prospect must be entered in LOOOM CRM and then synced to sevdesk",
+    "oldType": null,
+    "type": "Tech",
+    "category": "Client-requested",
+    "reason": "Client asks for an automated sync between LOOOM CRM and sevdesk to remove double entry — signal: migrate/automate between platforms."
+  },
+  {
+    "id": "01KZXDRN2E1ZJWPJY1V1VT77VC",
+    "ref": "B0012",
+    "title": "Email Campaign to employees to inform",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New informational email campaign to employees about new app functions — signal: new email."
+  },
+  {
+    "id": "01KZXDRQ8QJ6NC6J9GV80XJH33",
+    "ref": "B0013",
+    "title": "Import course materials",
+    "oldType": null,
+    "type": "Data",
+    "category": "Client-requested",
+    "reason": "Import existing course materials into the app — signal: import."
+  },
+  {
+    "id": "01KZXDRSTTW5SRD98B1ACF7EE6",
+    "ref": "B0090",
+    "title": "Audit Questions",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds priority/estimate-price fields to existing Audit Questions — signal: add fields."
+  },
+  {
+    "id": "01KZXDRW4HGHTTTGW5TJZJA78S",
+    "ref": "B0091",
+    "title": "Free text field in contract overview",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes an existing list-view field from \"insurance\" to free text — modifies existing field."
+  },
+  {
+    "id": "01KZXDRY9Q19RP5129TBH8MX4Q",
+    "ref": "B0092",
+    "title": "Everywhere there are images at the top, can one be inserted here too, otherwise it’s not consistent? And preferably with a logo without a year in the middle as on the submit page.",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a consistent header image/logo styling across existing pages — cosmetic consistency change."
+  },
+  {
+    "id": "01KZXDS0BP7HBPVC8NWMZVJHH0",
+    "ref": "B0014",
+    "title": "Verwendung E-Mail",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Verwendung\" email capability — early module build, matches the \"Email to X\" pattern."
+  },
+  {
+    "id": "01KZXDS2DCQ3QC85EA50G08FMP",
+    "ref": "B0093",
+    "title": "Event Ownership (responsible trainers)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New responsible-trainers property gating participant visibility on events — new access-control capability."
+  },
+  {
+    "id": "01KZXDS4K6QPXYGR23XYCSMBMZ",
+    "ref": null,
+    "title": "Change email trigger to branch by rental type",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing post-submit email's branch logic from employee type to rental type — modifies existing logic."
+  },
+  {
+    "id": "01KZXDS6G0D89DEJYMDHDPH9MC",
+    "ref": "B0094",
+    "title": "Filter clients by season",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a Season filter to the existing Clients list — signal: filter."
+  },
+  {
+    "id": "01KZXDS8SD8V4WMQ73YS4HFRBV",
+    "ref": "B0095",
+    "title": "Signature collection",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New asynchronous employee signature-collection workflow — new capability."
+  },
+  {
+    "id": "01KZXDSAZNHATDDK0Z8810Q8AT",
+    "ref": "B0096",
+    "title": "Matching Detail Screen - Align Compared Parameters",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Parameters in the matching detail screen don't align row-for-row across columns, making comparison unreliable — signal: should sit (currently doesn't)."
+  },
+  {
+    "id": "01KZXDSD4JQC3270VTKD2DDJAS",
+    "ref": "B0097",
+    "title": "Country in Auswahlliste",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds Country to an existing choice list on Kunden — signal: add a value/field."
+  },
+  {
+    "id": "01KZXDSFAJZTK3NYHZANGYXYWT",
+    "ref": "B0098",
+    "title": "Training Main Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New training main-page listing a trainer's own trainings — signal: new screen."
+  },
+  {
+    "id": "01KZXDSHT2YXEDTPKC6G07YSTR",
+    "ref": "B0099",
+    "title": "AI Summary",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New AI-summary capability for Dokumente — new capability."
+  },
+  {
+    "id": "01KZXDSM6FM344MYECEZYH9CAE",
+    "ref": "B0100",
+    "title": "Update Legal texts",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Updates the business address across existing legal-text locations — rewrite of existing copy."
+  },
+  {
+    "id": "01KZXDSQ5YQAV1VHX0N4DFZNPP",
+    "ref": "B0101",
+    "title": "Schadens Form",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds visibility and extra fields (Bilder, Dokumente, etc.) to the existing Schadens form — signal: add fields."
+  },
+  {
+    "id": "01KZXDSSY9KK8N311CJET2CQPN",
+    "ref": "B0102",
+    "title": "Activity log",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New activity-log capability for Verträge — matches the activity-log pattern."
+  },
+  {
+    "id": "01KZXDSW5PQKRA2QP3Y4FTPGMF",
+    "ref": null,
+    "title": "Verwendung Dokumente",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New documents section on Verwendung (handover/return docs) — new capability, matches #79."
+  },
+  {
+    "id": "01KZXDSXY6CKJ0WX4M3ECE3XQX",
+    "ref": null,
+    "title": "Required Customer by Quick task",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A \"required customer\" field is wrongly required and its list is incorrectly scoped — signal: it should not be required / wrong list."
+  },
+  {
+    "id": "01KZXDSZPX1RD8X41W00MH2JBA",
+    "ref": "B0103",
+    "title": "Select Projekt Contact Person from Company COntacts",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a contact-person selector to the existing project create/edit screen — signal: add a field."
+  },
+  {
+    "id": "01KZXDT1VCQHTK4CB3ZRY72GE1",
+    "ref": "B0015",
+    "title": "Guide",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Guide\" feature alongside Autodetails/Anspruch — early module build."
+  },
+  {
+    "id": "01KZXDT3Y9CY43KVFC8J7V7JPJ",
+    "ref": "B0016",
+    "title": "Training center",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Training center\" module — early module build."
+  },
+  {
+    "id": "01KZXDT65J8HAF2WGD1B9Q5F59",
+    "ref": "B0104",
+    "title": "Deadline approaching (7 days) → Notification",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New 7-day-deadline notification for Projekte — signal: new notification."
+  },
+  {
+    "id": "01KZXDT8CF2PJR61KYMF3BEE8H",
+    "ref": "B0105",
+    "title": "Consultation appointment",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a selectable appointment-location option to the existing confirmation email — signal: add an option/field."
+  },
+  {
+    "id": "01KZXDTAGKRZ8F8DMRZMARJ1BC",
+    "ref": "B0106",
+    "title": "missing the option 'Other'. When that is clicked, a field should pop up in which one can insert text.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "An \"Other\" option with a free-text field is missing from an existing choice control — signal: missing."
+  },
+  {
+    "id": "01KZXDTCPXJE6B3RMYFKZBRKJD",
+    "ref": "B0017",
+    "title": "Videos Güterverkehr",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New video content section for the Website — new capability."
+  },
+  {
+    "id": "01KZXDTF229JRTCFSRRZADHA7B",
+    "ref": "B0107",
+    "title": "Remove Academy email from confirmation workflow",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Removes the Academy recipient from an existing confirmation-email workflow — signal: remove a recipient."
+  },
+  {
+    "id": "01KZXDTH4QF9WX3FX7J46TT93Y",
+    "ref": null,
+    "title": "Filter and sort rentals",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds filter/sort by rental type to the existing rentals list — signal: filter, sort."
+  },
+  {
+    "id": "01KZXDTK5NH3K95ZBMQWXBZX3C",
+    "ref": "B0108",
+    "title": "Assign orders by Admin dates; keep vouchers on Vaccination dates",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing order-matching logic to use Admin dates while keeping vouchers on Vaccination dates — modifies existing logic."
+  },
+  {
+    "id": "01KZXDTNDT9GFTAMDQVY0FWHM1",
+    "ref": "B0109",
+    "title": "Notify Employee: Pending Signature",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated \"pending signature\" email to the employee — signal: new email."
+  },
+  {
+    "id": "01KZXDTQQPEG5NVHV1B67D5CN1",
+    "ref": "B0110",
+    "title": "No Auto-Creation Skills",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing CV-import AI step so it stops auto-creating Skills records — modifies existing behavior."
+  },
+  {
+    "id": "01KZXDTT2CF781XJDZT403AVDF",
+    "ref": "B0111",
+    "title": "Record Einsatze automatically for each Geplant Auftrage",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automatic Einsatz-record creation for each planned Auftrag — new automated capability."
+  },
+  {
+    "id": "01KZXDTWGBX9RPQ8WVEG9Y3JH4",
+    "ref": "B0112",
+    "title": "Approval & Publish Workflow",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New approval/publish workflow differentiating Creators and Publishers — new capability."
+  },
+  {
+    "id": "01KZXDTYQESZ5KNF7KTSSMW04F",
+    "ref": "B0113",
+    "title": "Welcome (Quick Access)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New minimal post-login \"Quick Access\" screen with nav tiles and badges — new screen."
+  },
+  {
+    "id": "01KZXDV0YVRXPB558MBAAKQ3CK",
+    "ref": "B0114",
+    "title": "Activate App",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Activate App\" welcome screen — new screen."
+  },
+  {
+    "id": "01KZXDV320GDQ94ZBA8B36AHA8",
+    "ref": "B0115",
+    "title": "Export all data as CSV",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New full-data CSV export capability including documents — new capability."
+  },
+  {
+    "id": "01KZXDV526JDT6ECYGPNHJBV5B",
+    "ref": "B0116",
+    "title": "Kalender in der app",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New in-app calendar module — new capability."
+  },
+  {
+    "id": "01KZXDV7ZC1BSEX5VQ21YMP695",
+    "ref": null,
+    "title": "Mitarbeiter Dokumente",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New employee-level documents section — new capability, matches #79/#99."
+  },
+  {
+    "id": "01KZXDVA04AK2SG8Q773S4E4ET",
+    "ref": null,
+    "title": "Projection and Fixed Numbers",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Reworks and relabels existing projected/fixed expense and income numbers and adds a whole-year figure — modifies an existing screen's numbers."
+  },
+  {
+    "id": "01KZXDVBGXB8CGRZ3M2RCARS8S",
+    "ref": "B0117",
+    "title": "Ai-Summary",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New AI-summary capability for Kundeninteraktionen — matches #95."
+  },
+  {
+    "id": "01KZXDVD7505ZGHFCEBT2Z3THD",
+    "ref": "B0018",
+    "title": "Report damage",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New capability to create and review damage claims (Ansprüche) — new capability."
+  },
+  {
+    "id": "01KZXDVET5N7N7J44JQEP5SQCC",
+    "ref": "B0118",
+    "title": "Type of company",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a company-type classification field (Blei, Kunde, Partner, Lieferant) — signal: add a field."
+  },
+  {
+    "id": "01KZXDVGS13FM35DVZG72YX2KR",
+    "ref": "B0119",
+    "title": "By document - make the title not required. (because application is application, policy is policy)",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Makes an existing document title field optional instead of required — relaxes existing validation."
+  },
+  {
+    "id": "01KZXDVJCRV1A5JD8NBRSVW54P",
+    "ref": "B0120",
+    "title": "Description of location is not marked as mandatory* but does not let me proceed until I have filled it in -> please add *",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A field is not marked mandatory but still blocks progress until filled — signal: inconsistent/wrong validation behavior."
+  },
+  {
+    "id": "01KZXDVM6XNYW88XFJNB1T65QJ",
+    "ref": "B0019",
+    "title": "Leads Güterverkehr",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New leads module for Güterverkehr — early module build."
+  },
+  {
+    "id": "01KZXDVPB2P4R8EZ8YQ04PNW8Y",
+    "ref": "B0121",
+    "title": "CSV Export: Marketing-Opted Players",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New CSV export of marketing-opted players — new export capability."
+  },
+  {
+    "id": "01KZXDVR4RYHQPYFQDTX35W191",
+    "ref": null,
+    "title": "Send rejection email to renter when claim is rejected",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated rejection email to the renter when a claim is rejected — signal: new email."
+  },
+  {
+    "id": "01KZXDVSQB6HD32Z6GKJJ7JVC0",
+    "ref": "B0122",
+    "title": "Add Admin and Vaccination date ranges to Season",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds two date-range fields to the existing Season record — signal: add fields."
+  },
+  {
+    "id": "01KZXDVVEAJXGEM3S53G0YQ0SQ",
+    "ref": "B0123",
+    "title": "Handover Protocol (Admin App)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New admin-app handover-protocol screen/workflow — new screen."
+  },
+  {
+    "id": "01KZXDVX3YRSTKKX67EV75897S",
+    "ref": "B0124",
+    "title": "Testing all workflows for clearing candidate values",
+    "oldType": null,
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "QA task to test candidate-clearing workflows end to end — invisible-to-users verification work."
+  },
+  {
+    "id": "01KZXDVYPJ5X2DN9FH4D993N7F",
+    "ref": "B0125",
+    "title": "Anfragedokumente — Trupp Visibility Toggle",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New per-document Trupp-visibility toggle, hidden by default — new capability."
+  },
+  {
+    "id": "01KZXDW0ARQ8MYXN79V47X0PYJ",
+    "ref": "B0126",
+    "title": "Edit Trainer Profile",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New trainer self-service profile editing that syncs to the Office App — new capability."
+  },
+  {
+    "id": "01KZXDW231JDNXG1230RBPGFVT",
+    "ref": "B0127",
+    "title": "Category Manager",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Category Manager admin screen for contract-type taxonomy — new screen."
+  },
+  {
+    "id": "01KZXDW5KBB8XDF7MD4NDYCHND",
+    "ref": "B0129",
+    "title": "For new customers, please also ask for the IBAN",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an IBAN field to the existing new-customer form — signal: add a field."
+  },
+  {
+    "id": "01KZXDW7BE77BTC9TARPQ11G7G",
+    "ref": "B0130",
+    "title": "Vollmacht Missing Footer",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Footer fields (email, tel, gisa) are empty on the Vollmacht document — signal: empty/missing."
+  },
+  {
+    "id": "01KZXDW9K0WSR1R3R1X024RKT9",
+    "ref": null,
+    "title": "Fahrzeug Dokumente",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New vehicle-level documents section — new capability, matches #79/#99/#119."
+  },
+  {
+    "id": "01KZXDWB3QD8N5QPPPA79YC6AZ",
+    "ref": null,
+    "title": "Add button for content does not work",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "The add-content button cannot be clicked on any page — signal: does not work."
+  },
+  {
+    "id": "01KZXDWCFQVMAYM6K19JJ7RBTK",
+    "ref": "B0131",
+    "title": "Import existing licenses from Excel",
+    "oldType": null,
+    "type": "Data",
+    "category": "Client-requested",
+    "reason": "Import existing licenses from Excel into the app — signal: import."
+  },
+  {
+    "id": "01KZXDWE8T54XQT8C1XP2ADMAM",
+    "ref": "B0020",
+    "title": "Auto Details",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Hides certain existing data fields on Auto Details — signal: hide/remove fields."
+  },
+  {
+    "id": "01KZXDWFWGZ5K6M4MGQMYQY4G3",
+    "ref": "B0132",
+    "title": "Creating external requriements / Todoslist for customer",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New client-requirements/to-do tab with templated checklist — new capability."
+  },
+  {
+    "id": "01KZXDWHK8V5X7TP39X9386EKS",
+    "ref": "B0133",
+    "title": "Filter tasks by insurance",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a filter by insurer to the existing tasks screen — signal: filter."
+  },
+  {
+    "id": "01KZXDWKA3EQMXHV2428NE9872",
+    "ref": "B0134",
+    "title": "Logo without year",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Swaps an existing logo asset for one without the year — cosmetic asset change."
+  },
+  {
+    "id": "01KZXDWN0JPDRR5244XEW4X53G",
+    "ref": "B0021",
+    "title": "Landingpage Güterverkehr",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New landing page for Güterverkehr — new capability."
+  },
+  {
+    "id": "01KZXDWPVTMVF29XJNZZXX2ZHW",
+    "ref": "B0135",
+    "title": "Show loading modal when publishing in website",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a loading modal to an existing publish action (Team) — same pattern as #27/#48/#68."
+  },
+  {
+    "id": "01KZXDWRJAQKXG218PE0GWK2X9",
+    "ref": null,
+    "title": "Driver’s license upload in handover protocol",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a mandatory driver's-license photo upload to the existing handover protocol — signal: add a field/requirement."
+  },
+  {
+    "id": "01KZXDWT35DG64MRFT470JSVSD",
+    "ref": "B0136",
+    "title": "Add vaccination validity dates to the email",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds vaccination validity dates to an existing confirmation email — signal: add data to existing email."
+  },
+  {
+    "id": "01KZXDWVZ17A20Y1CMJEETX8X5",
+    "ref": "B0137",
+    "title": "Damage Status Lifecycle",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New multi-status damage lifecycle with timestamps and hints — new workflow."
+  },
+  {
+    "id": "01KZXDWXNZYD6EYPZ99MTDGQR7",
+    "ref": "B0138",
+    "title": "Inform Glide support",
+    "oldType": null,
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Raises a support ticket with vendor Glide about broken search — signal: raise a vendor support ticket."
+  },
+  {
+    "id": "01KZXDWZ9CJAK3YYG23WHH0NC3",
+    "ref": "B0139",
+    "title": "Auftrag Creation via PDF Upload & Extraction",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New PDF-upload-and-extraction capability for creating Aufträge — new capability."
+  },
+  {
+    "id": "01KZXDX0ZBKD182VW6W88AK2WY",
+    "ref": "B0140",
+    "title": "Document Main Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New document main-page listing a trainer's assigned documents — new screen."
+  },
+  {
+    "id": "01KZXDX2K3DGP4NFTHG9Z1PDVK",
+    "ref": "B0141",
+    "title": "Customers Metrics and Analytics",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New customer KPI/analytics dashboard — new capability."
+  },
+  {
+    "id": "01KZXDX4AYWHHXG7Z3ZJVRMJNV",
+    "ref": "B0142",
+    "title": "Process detail view",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New process detail-view screen — new screen."
+  },
+  {
+    "id": "01KZXDX5WCVPJV1J7GP1N84A1F",
+    "ref": "B0143",
+    "title": "For new customers, please do not set email as a mandatory field",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Makes the email field optional instead of mandatory for new customers — relaxes existing validation."
+  },
+  {
+    "id": "01KZXDX7G4ZJEYNZRM5CKGQ2AR",
+    "ref": "B0144",
+    "title": "Power of attorney not submitted as a document.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A submitted power-of-attorney document is saved but doesn't appear anywhere — signal: does not appear."
+  },
+  {
+    "id": "01KZXDX945600QSVX6X0ZCKZC6",
+    "ref": null,
+    "title": "Leasing-Erinnerung",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New daily lease-expiry check with an automated reminder email — signal: new automated action."
+  },
+  {
+    "id": "01KZXDXAF12KMB2540Q90ZN9YZ",
+    "ref": null,
+    "title": "Create and Track Sales Campaigns",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Campaigns\" section for planning/tracking sales campaigns — new module."
+  },
+  {
+    "id": "01KZXDXBSPAWPBE1ZRP581YQGS",
+    "ref": "B0145",
+    "title": "Related customer interactions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New comment-style customer-interactions log for Projekte — new capability."
+  },
+  {
+    "id": "01KZXDXDNQJ7KZHMH6Z0K28443",
+    "ref": "B0146",
+    "title": "Relate a task to an unternehmen (status lead)",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a relation from tasks to an Unternehmen — signal: add a relation/field."
+  },
+  {
+    "id": "01KZXDXFCGSRKNA62KDHVW351C",
+    "ref": "B0147",
+    "title": "Introduction of customer numbers",
+    "oldType": null,
+    "type": "Data",
+    "category": "Client-requested",
+    "reason": "Assigns customer numbers to existing customers retrospectively — signal: assign/backfill retrospectively."
+  },
+  {
+    "id": "01KZXDXGZFH6V5615B692K9X76",
+    "ref": "B0148",
+    "title": "Can you display the category here again, otherwise the numbers cannot be properly assessed.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Category is no longer displayed, making numbers hard to assess — signal: display it again (regression)."
+  },
+  {
+    "id": "01KZXDXJNT44S023YT7N6GB2ZF",
+    "ref": "B0022",
+    "title": "Q2 Email kampaign mitabeiter - brevo",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Q2 email campaign to employees via Brevo — matches the \"Email campaign\" pattern (#82)."
+  },
+  {
+    "id": "01KZXDXM82604JN7EJ34A39GN7",
+    "ref": "B0149",
+    "title": "Adjust partner tags",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adjusts and expands the existing partner-tag vocabulary — signal: add tags/values."
+  },
+  {
+    "id": "01KZXDXNZ12QJT5HFKFWEQ60EF",
+    "ref": null,
+    "title": "Status \"Vermietet\" Logic",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Cars remain stuck on status \"vermietet\" with no active rental, blocking an end date — signal: wrong status."
+  },
+  {
+    "id": "01KZXDXQJJ5TYQR32M0DFDHP4J",
+    "ref": "B0150",
+    "title": "Dedicated partner-referred clients screen + filter",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New dedicated screen listing partner-referred clients with a filter — new screen."
+  },
+  {
+    "id": "01KZXDXSAY58TW7F98S8X0JCJX",
+    "ref": "B0151",
+    "title": "“Schaden melden” Insurance Workflow",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New one-click damage-release email workflow to the insurance broker — new workflow."
+  },
+  {
+    "id": "01KZXDXV6DQSXEFM9K5Q39EY3R",
+    "ref": "B0152",
+    "title": "Delete groups",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New delete-groups action; no delete function currently exists — signal: currently no delete function (new action)."
+  },
+  {
+    "id": "01KZXDXX496Q90RF3NGP95NQCW",
+    "ref": "B0153",
+    "title": "Parallel Execution & Actual Time Tracking",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New parallel-execution and actual-time-tracking capability for Trupps — new capability."
+  },
+  {
+    "id": "01KZXDXZ5GXPX6JM7C65W5JGRE",
+    "ref": "B0154",
+    "title": "Confirmation Feature",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New document-confirmation requirement with acknowledgement tracking — new capability."
+  },
+  {
+    "id": "01KZXDY0ZSCAJ86A8N1FKGH304",
+    "ref": "B0155",
+    "title": "Cases List",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New case-queue list screen with columns, filters, search, sort — new screen."
+  },
+  {
+    "id": "01KZXDY2M33HW3TEP4Z4HK4Q39",
+    "ref": "B0156",
+    "title": "Processes List",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New processes list screen — new screen."
+  },
+  {
+    "id": "01KZXDY4Q27NPV95DWQ8TYF5PZ",
+    "ref": "B0157",
+    "title": "How can I specify a second owner in the company? Many GmbHs have multiple managing directors or KG or OG have multiple partners.",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New capability to record a second company owner — did not exist before."
+  },
+  {
+    "id": "01KZXDY69CYSN593Q35THNEXHS",
+    "ref": "B0158",
+    "title": "Consultation protocol dynamic intermediary",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a dynamic footer to an existing consultation protocol document, mirroring the PoA footer — signal: add to existing document."
+  },
+  {
+    "id": "01KZXDY80N9DG5V3747NT0VR3B",
+    "ref": null,
+    "title": "Schaden abschließen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Schaden-closing status transition — part of the damage-workflow build."
+  },
+  {
+    "id": "01KZXDY9K8VSBQHA9RBVPW2D5F",
+    "ref": null,
+    "title": "List view of Last Contacted in Order",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"last contacted\" list view tied to interaction tracking — new capability."
+  },
+  {
+    "id": "01KZXDYAYE3HM3GTF4ADH69EZ4",
+    "ref": "B0159",
+    "title": "Related customer interactions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New comment-style customer-interactions log for Unternehmen — matches #159."
+  },
+  {
+    "id": "01KZXDYCPQ861SCV4QJ0EW4DTT",
+    "ref": "B0160",
+    "title": "Kanban Card Information",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds company/value/last-interaction info to existing Kanban cards — signal: add fields to existing view."
+  },
+  {
+    "id": "01KZXDYEC0NN3664P4S5Y5AYQP",
+    "ref": "B0161",
+    "title": "Delete documents within a customer (passport & co)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New delete action for customer documents — signal: new action."
+  },
+  {
+    "id": "01KZXDYFZ7ZR1PCRT2MEK246BX",
+    "ref": "B0162",
+    "title": "Please make VAT mandatory",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Makes VAT mandatory on an existing form — changes existing validation."
+  },
+  {
+    "id": "01KZXDYHSEJ0N90HKFNPDEK09H",
+    "ref": "B0023",
+    "title": "Streckenkenntnisse Modul",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New route-knowledge module digitizing an existing spreadsheet — new capability."
+  },
+  {
+    "id": "01KZXDYKDPX1QME86VYG001BMT",
+    "ref": "B0163",
+    "title": "Extend contracts",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a price field and a contract-type dropdown to existing contracts — signal: add fields."
+  },
+  {
+    "id": "01KZXDYMYZG49KE9ZENY3M29SZ",
+    "ref": null,
+    "title": "Soritierung der Schäden",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Sorts existing Schäden oldest-open-first, filtered by status — signal: sort, filter."
+  },
+  {
+    "id": "01KZXDYPKAHMQQKHCQABBA9YRC",
+    "ref": "B0164",
+    "title": "PPA minimum handling + field rename",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Removes/prefills the minimum-activations field and renames the max-vouchers field — signal: remove a field, rename a field."
+  },
+  {
+    "id": "01KZXDYR4S0ZTKGVP945NT6SK8",
+    "ref": "B0165",
+    "title": "Documents",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New categorized documents capability for damage cases — new capability."
+  },
+  {
+    "id": "01KZXDYSQS0SSANR6DDYRKMNYV",
+    "ref": "B0166",
+    "title": "Admin edit and delete for choice list items",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New full CRUD (edit/delete) for choice-list items; admins currently cannot — signal: currently cannot (new action)."
+  },
+  {
+    "id": "01KZXDYVC6SPB90G6S9PCPAWBC",
+    "ref": "B0167",
+    "title": "Same-Day Time Slots & Order Sequencing",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New same-day time-slot scheduling and order sequencing — new capability."
+  },
+  {
+    "id": "01KZXDYXCKYEHZRSCE5BS97WJE",
+    "ref": "B0168",
+    "title": "Resource Detail Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New resource detail screen with confirmation button — new screen."
+  },
+  {
+    "id": "01KZXDYZ4X8NFJSES09YY4313E",
+    "ref": "B0169",
+    "title": "Create Case",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Create Case\" screen with validation and submit behavior — new screen."
+  },
+  {
+    "id": "01KZXDZ18K9ZGY12JHPXNDHA1P",
+    "ref": "B0170",
+    "title": "Alert Banners",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New alert-banner capability on the home screen — new capability."
+  },
+  {
+    "id": "01KZXDZ2ZSKN1BHV7ATENGY81S",
+    "ref": "B0171",
+    "title": "How can I add a second company to the customer? Some of my clients have multiple GmbHs.",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New capability to add a second company to a customer — did not exist before."
+  },
+  {
+    "id": "01KZXDZ4N6MTJ7H8P2DNTVX8SX",
+    "ref": "B0172",
+    "title": "Auskunftsvollmacht - Vorname doppelt",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "First name gets double-filled and also leaks into the last-name field — signal: wrong field mapping."
+  },
+  {
+    "id": "01KZXDZ6QASYJV6K7Z5K6DKKFR",
+    "ref": null,
+    "title": "Schadennummer hinzufügen",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a Schadennummer field to the existing claim record — signal: add a field."
+  },
+  {
+    "id": "01KZXDZ85E03MG49YTDPVK0HDE",
+    "ref": null,
+    "title": "Contracts: Reminder Contract Duration End",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated contract-expiry reminder email — signal: new email."
+  },
+  {
+    "id": "01KZXDZ9MPEN9EWGQE6BXJP9QA",
+    "ref": "B0173",
+    "title": "Data fields",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New data model/screen for Kundeninteraktionen (date, type, remark, author) — new module build."
+  },
+  {
+    "id": "01KZXDZBGYS4X8B1NSE877N85F",
+    "ref": "B0174",
+    "title": "Visual Sales Pipeline Board",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Kanban-style sales-pipeline board with customizable stages — new capability."
+  },
+  {
+    "id": "01KZXDZD2HDJKHJFEHBT5A1YEK",
+    "ref": "B0175",
+    "title": "Expand insurer record to include more storage options",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds storage fields (brokerage, commissions, IBANs) to the existing insurer record — signal: add fields."
+  },
+  {
+    "id": "01KZXDZETCCE0BBQ8HNWFNR4BS",
+    "ref": "B0176",
+    "title": "In the upload function, a comment should be added that the upload may take a moment, as I clicked further too quickly and many photos were missing. Or better yet, highlight the upload in color.",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a hint/highlight to the existing upload function — UI addition."
+  },
+  {
+    "id": "01KZXDZGM1S6VSWX4X9266MEBP",
+    "ref": "B0024",
+    "title": "Q1 Email Kampaign Mitarbeiter - BRevo",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Q1 email campaign to employees via Brevo — matches the \"Email campaign\" pattern."
+  },
+  {
+    "id": "01KZXDZJ912RRQ54QTG3PF5A02",
+    "ref": "B0177",
+    "title": "Add partner status",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds partner-status values and filtered tabs — signal: add values/tabs."
+  },
+  {
+    "id": "01KZXDZKZS8MSWEW89QJDTHQAF",
+    "ref": null,
+    "title": "Help screen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Help screen under Settings — new screen."
+  },
+  {
+    "id": "01KZXDZNP0HEDX6FA9C26FSGGY",
+    "ref": "B0178",
+    "title": "Set and enforce permitted order types per partner",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New per-partner order-type permission setting that filters the order form — new capability."
+  },
+  {
+    "id": "01KZXDZQAF72N76VVNPN3Q6XQW",
+    "ref": "B0179",
+    "title": "Damage Management (Admin Screens)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New full admin damage-management screens — new screens."
+  },
+  {
+    "id": "01KZXDZS78QA859H8A42PXK3EY",
+    "ref": "B0180",
+    "title": "Reopen a closed position",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New reopen-a-closed-position action — signal: add ability (new action)."
+  },
+  {
+    "id": "01KZXDZTW9QE04TAFE2PVZY3PS",
+    "ref": "B0181",
+    "title": "Auftrag Date Range — Single-Day vs Multi-Da",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New single-day vs multi-day scheduling capability for Aufträge — new capability."
+  },
+  {
+    "id": "01KZXDZWG0AA21YGPAV5TA0202",
+    "ref": "B0182",
+    "title": "Resource Main Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New resource main-page overview — new screen."
+  },
+  {
+    "id": "01KZXDZY6R34B4VJ7NN0CG2KE4",
+    "ref": "B0183",
+    "title": "Case Overview (tab)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New case-overview tab with header/summary/quick actions — new tab."
+  },
+  {
+    "id": "01KZXE007JRGKYSKG6GHSMWAW1",
+    "ref": "B0184",
+    "title": "Localization",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New localization (DE/ES/EN) for the Startseite screen — new capability."
+  },
+  {
+    "id": "01KZXE01TVBNHVSJMVA34Q1GMS",
+    "ref": "B0185",
+    "title": "Please add the following types of insurance: PV systems insurance, bicycle insurance, and hearing aid insurance",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds new insurance-type values to an existing vocabulary — signal: add values."
+  },
+  {
+    "id": "01KZXE03TWWRKPFC0YHZE7BD9M",
+    "ref": "B0186",
+    "title": "Vorlage Vollmacht Telefonnummer und SV",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds phone/SV fields to an existing Vollmacht template for two people — signal: add fields."
+  },
+  {
+    "id": "01KZXE05EB5KYSJCDF2DHGRZPV",
+    "ref": null,
+    "title": "Fremdschaden",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Fremdschaden workflow branch with third-party insurance handling and email — part of damage-workflow build."
+  },
+  {
+    "id": "01KZXE06V447RP4Q9KB5DR7GPX",
+    "ref": null,
+    "title": "Changing Order of Tickets (Rquests) like in customer portal",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds reordering of existing tickets/requests — signal: reorder."
+  },
+  {
+    "id": "01KZXE089XBZ2GNH6PC15AQE78",
+    "ref": "B0187",
+    "title": "Company Information",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New company-information screen for Looom — new screen, early module build."
+  },
+  {
+    "id": "01KZXE09Y62TK39ZA5HGK4P686",
+    "ref": "B0188",
+    "title": "Contact profile",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New contact-profile screen for CRM — new screen, early module build."
+  },
+  {
+    "id": "01KZXE0BG0QB24N3TFDPHAQZA8",
+    "ref": "B0189",
+    "title": "Status anzeigen bei Vertrag innerhalb einer Aufgabe statt Nummer",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Swaps the displayed field within an existing task from number to status — modifies existing display, matches #65."
+  },
+  {
+    "id": "01KZXE0D3SV82KGBA6XJ0MP611",
+    "ref": "B0190",
+    "title": "If nothing is entered in Construction costs, the field will not be displayed in the Review. It would be good if it were visible, as it would then be clear that the information is missing, even if it…",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "An entered-but-empty field silently disappears from the Review instead of showing as missing — signal: should be visible (currently isn't)."
+  },
+  {
+    "id": "01KZXE0GFVG3F4RK4JYMTD3CJ5",
+    "ref": "B0191",
+    "title": "Dashboard",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Trainings dashboard — new screen."
+  },
+  {
+    "id": "01KZXE0JE8SXZ60DKF4S0JRWRC",
+    "ref": null,
+    "title": "Data Review Screen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Fleet data-review screen — new screen."
+  },
+  {
+    "id": "01KZXE0KWYBCTGERCZ6DHG57T4",
+    "ref": "B0192",
+    "title": "Create partner orders from the admin app",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New admin-created partner orders capability — new capability."
+  },
+  {
+    "id": "01KZXE0NHARG7QDBJN7XHT2G7Z",
+    "ref": "B0193",
+    "title": "“Damage Submitted” Email (to Fleet Manager)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated \"Damage Submitted\" email to the fleet manager — signal: new email."
+  },
+  {
+    "id": "01KZXE0Q5PT1NSPXCJCHJ9YX0T",
+    "ref": "B0194",
+    "title": "“Geschlossen” tab",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Geschlossen\" tab; currently no dedicated view exists — signal: currently there is no (new capability)."
+  },
+  {
+    "id": "01KZXE0RQ2R0KZYEMRH3J4F33M",
+    "ref": "B0195",
+    "title": "Extra Foto für Produkte (Abholung",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an extra photo field to existing Produkt records — signal: add a field."
+  },
+  {
+    "id": "01KZXE0TAAQ955B5J37V36MSN8",
+    "ref": "B0196",
+    "title": "Project Detail Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New project detail screen with sharing — new screen."
+  },
+  {
+    "id": "01KZXE0W3T5E0X1H7NBCMY2H8E",
+    "ref": "B0197",
+    "title": "Status Controls",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New status set (New/In progress/Resolved/Archived) for Vorgänge — new module build."
+  },
+  {
+    "id": "01KZXE0XTJV83DX18GZ1QN4V6M",
+    "ref": "B0198",
+    "title": "Personal Details Form edit",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New customer self-service profile-edit form — new capability."
+  },
+  {
+    "id": "01KZXE0ZQFCAB6GWQ9Z4SXJ706",
+    "ref": "B0199",
+    "title": "Job title (Dr., Mag, ...) is already there, but unfortunately not the job (painter, civil servant, ...)",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a missing \"profession\" field alongside the existing job-title field — signal: add a field."
+  },
+  {
+    "id": "01KZXE11MZ9PJ3JC6T2MFW3A4H",
+    "ref": "B0200",
+    "title": "Wrong stornodatum",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "An incorrect Stornodatum value — signal: wrong."
+  },
+  {
+    "id": "01KZXE13CCSHV4MZZJAXZ652WD",
+    "ref": null,
+    "title": "Mit Versicherung (Own Insurance Path)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"mit Versicherung\" workflow branch with insurance selection and email — part of damage-workflow build."
+  },
+  {
+    "id": "01KZXE14XVNQGH6JR6DC0NRKSY",
+    "ref": null,
+    "title": "Issues from email",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New email-to-issue creation capability with auto-reply — new capability."
+  },
+  {
+    "id": "01KZXE16D2KKGCYAB75Q984C7M",
+    "ref": "B0201",
+    "title": "Data fields",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New data fields for a Lizenz module (types, URL, dates, amount) — new module build."
+  },
+  {
+    "id": "01KZXE185GWJP5KVX2N1XFHNS1",
+    "ref": "B0202",
+    "title": "Company profile",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New company-profile screen — new screen, early module build."
+  },
+  {
+    "id": "01KZXE1A0S2H22JBHMQ9HCT7JB",
+    "ref": "B0203",
+    "title": "Revise tasks",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Removes a filter, adds buttons, and adds a filter to existing tasks screens — signal: remove/add filter, add buttons."
+  },
+  {
+    "id": "01KZXE1BTR9Y2YMYMDNNWSGMJH",
+    "ref": "B0204",
+    "title": "Here are the different views in the input screen and in the review. The heading 'Restaurants concept' is missing at the bottom of the review, otherwise it's not clear.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A section heading is missing at the bottom of the Review screen — signal: missing."
+  },
+  {
+    "id": "01KZXE1FDXJC0Z450X7YPNPC5Z",
+    "ref": "B0205",
+    "title": "Players in Standort",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Players in Standort\" capability — new module build."
+  },
+  {
+    "id": "01KZXE1H42D30HXWA133HD46WH",
+    "ref": null,
+    "title": "Mietart Sachbezug, halber Sachbezug fehlt",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Two existing Mietart options (Sachbezug, halber Sachbezug) are missing/gone — signal: fehlt (missing)."
+  },
+  {
+    "id": "01KZXE1JPDHGCAMMJ5CSNAS52F",
+    "ref": "B0206",
+    "title": "Send Stripe order confirmation to the purchaser only",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the recipient logic of an existing Stripe confirmation email to the purchaser only — modifies existing logic."
+  },
+  {
+    "id": "01KZXE1MRZMSFVP9PXQ4806X9P",
+    "ref": "B0207",
+    "title": "Damage Report Form",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New link-based damage-report form with email-gated access — new capability, module build."
+  },
+  {
+    "id": "01KZXE1PGS90GMJ92NTYQWQW1H",
+    "ref": "B0208",
+    "title": "Accommodation field on Positions",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an Accommodation boolean field to existing Positions — signal: add a field."
+  },
+  {
+    "id": "01KZXE1R41RZ0858WRMGS9N860",
+    "ref": "B0209",
+    "title": "In-Field Role Permissions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New in-Field role-permission rules for Trupp Leiter — new capability."
+  },
+  {
+    "id": "01KZXE1TFTG28RP69JYE0WG6Y3",
+    "ref": "B0210",
+    "title": "Project Main Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New project main-page listing a trainer's projects — new screen."
+  },
+  {
+    "id": "01KZXE1W4Z2TGWCY8GKTMBGQDK",
+    "ref": "B0211",
+    "title": "Case Documents (tab)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New case-documents tab with attach/upload/manage — new tab."
+  },
+  {
+    "id": "01KZXE1Y3VCFYWFGKW0A4C1BWT",
+    "ref": "B0212",
+    "title": "Profile Info",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New customer profile read-view screen — new screen."
+  },
+  {
+    "id": "01KZXE1ZR23R9CTB5TZNFE490A",
+    "ref": "B0213",
+    "title": "new contract - price issue",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A new contract's price does not appear on the customer side — signal: does not appear."
+  },
+  {
+    "id": "01KZXE21H4EFPRC0FAGG1C2GCR",
+    "ref": "B0214",
+    "title": "GISA Vollmacht individualiseren",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds per-broker fields (GISA number, private email/phone) to an existing Vollmacht template — signal: add fields."
+  },
+  {
+    "id": "01KZXE23DW8FKKZPVP9E5E5GGW",
+    "ref": null,
+    "title": "Ohne Versicherung",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"ohne Versicherung\" no-action workflow branch — part of damage-workflow build."
+  },
+  {
+    "id": "01KZXE2502E4MR7MDCR4A5QFNA",
+    "ref": null,
+    "title": "Supplier Database",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a \"supplier\" tag/classification to existing companies — signal: add a tag."
+  },
+  {
+    "id": "01KZXE26BEZ4GERPE42ZP3P5YD",
+    "ref": "B0215",
+    "title": "Customer interactions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New comment-style customer-interactions capability for Deals — matches #159/#177."
+  },
+  {
+    "id": "01KZXE284CVGMV6GRNGW9MY9Q8",
+    "ref": "B0216",
+    "title": "Automatic Email notification to customer",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated closing-email to the client from the issue owner's account — signal: new email."
+  },
+  {
+    "id": "01KZXE29RBVVBDS0H016AF1AZ9",
+    "ref": "B0217",
+    "title": "Overview of damages also within the contracts",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Surfaces claim history within an existing contract screen — signal: add a related view."
+  },
+  {
+    "id": "01KZXE2BG1AD5FZR0SWGB93WKN",
+    "ref": "B0218",
+    "title": "When you click on Edit and edit the application again, you have to click on the x at the top to exit. However, you don't know if the changes are saved, this should be explained textually somewhere…",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "It's unclear whether edits were saved when exiting an edit screen — signal: ambiguous/undefined save feedback."
+  },
+  {
+    "id": "01KZXE2D28CM5TW1C4CHT35R8Q",
+    "ref": "B0027",
+    "title": "New main navigation tab 'Incidents'",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New \"Incidents\" navigation tab with Dashboard/Accidents sub-tabs — signal: new tab."
+  },
+  {
+    "id": "01KZXE2ENHNZT7P0ZQYRAWXGVY",
+    "ref": "B0219",
+    "title": "Automatic Event Registratin Closure when Max. Players reached",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automatic event-registration closure at max capacity — new automation."
+  },
+  {
+    "id": "01KZXE2GC5710Y57NXCJ6WM7N8",
+    "ref": null,
+    "title": "Unable to complete return protocol.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "No button appears to complete a fully-filled-out return protocol — signal: unable to complete, no button."
+  },
+  {
+    "id": "01KZXE2HXTGR55FA2E87MBQ8F6",
+    "ref": "B0220",
+    "title": "Match on Registration Number + Postcode",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing client-matching logic to require both registration number and postcode — modifies existing logic."
+  },
+  {
+    "id": "01KZXE2KJSJQPBFKESNPJVXSY3",
+    "ref": "B0221",
+    "title": "User Permissions & Roles",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New user permissions and roles capability — new capability, module build."
+  },
+  {
+    "id": "01KZXE2N37GS7V872MS8AT3NFP",
+    "ref": "B0222",
+    "title": "Change Rules Verteilung",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing sales-person assignment rules — signal: change the rules."
+  },
+  {
+    "id": "01KZXE2PP9D892PS9Z1J2N6R6X",
+    "ref": "B0223",
+    "title": "Default Vehicle Assignment for Trupp Leader",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New default-vehicle assignment capability for Trupp Leaders — new capability."
+  },
+  {
+    "id": "01KZXE2R861KC8XH8XR42Y1P0Y",
+    "ref": "B0028",
+    "title": "Training Approved / Rejected",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New approve/reject notification to the trainer — signal: new notification."
+  },
+  {
+    "id": "01KZXE2T2GVKQKXHNJW724PG8F",
+    "ref": "B0224",
+    "title": "Case Notes",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New internal case-notes timeline (add/edit/delete) — new capability."
+  },
+  {
+    "id": "01KZXE2VYGDADEM0JBWK8FD0AZ",
+    "ref": "B0225",
+    "title": "Language and Translation Settings",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New language/translation preference capability for customers — new capability, matches #208."
+  },
+  {
+    "id": "01KZXE2XPS51N58X806ZMMHZH3",
+    "ref": "B0226",
+    "title": "status to active for all contracts if there is nothing",
+    "oldType": null,
+    "type": "Data",
+    "category": "Client-requested",
+    "reason": "Sets existing contracts with a blank status to active — signal: backfill/default existing records' values."
+  },
+  {
+    "id": "01KZXE2ZDA2XHGJZKZPDS302DX",
+    "ref": "B0227",
+    "title": "Matching nur mit Email",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Restricts the existing customer-matching logic to email only — modifies existing logic."
+  },
+  {
+    "id": "01KZXE311C57JYFM0PYWVAJ489",
+    "ref": null,
+    "title": "Schaden prüfen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New three-path damage classification workflow — part of damage-workflow build."
+  },
+  {
+    "id": "01KZXE32PK42DPJNQ6GVWWTG71",
+    "ref": null,
+    "title": "Automation Won",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automation to create a customer and archive the lead — new automated capability."
+  },
+  {
+    "id": "01KZXE342MERYATJ7BPX9JFFNN",
+    "ref": "B0228",
+    "title": "Qualification questions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New qualification-questions capability — new module build."
+  },
+  {
+    "id": "01KZXE35Z8525JNEP0JJTEC7RR",
+    "ref": "B0229",
+    "title": "Issue Detail page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New issue detail screen with notes, uploads, linked tasks — new screen."
+  },
+  {
+    "id": "01KZXE37KSJY7QX64W8EAJT65A",
+    "ref": "B0230",
+    "title": "Send power of attorney when contact details are changed.",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Extends an existing contact-change trigger (currently only fires for X) to also send a new PoA — broadens existing behavior."
+  },
+  {
+    "id": "01KZXE39AC4XW5EJBC9KM191J2",
+    "ref": "B0231",
+    "title": "Everything that was black and bold in the input mask must also be displayed in the review. Otherwise, the entered data floats around without context.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Data entered in the input mask is not shown consistently in the Review, losing context — signal: floats without context (inconsistent display)."
+  },
+  {
+    "id": "01KZXE3AYS0DXN9TCFP9P9AC5S",
+    "ref": "B0232",
+    "title": "Lead soundproofing",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New lead-soundproofing display/management capability — new module build."
+  },
+  {
+    "id": "01KZXE3CKCCYMKVKTGDEQ2P8TC",
+    "ref": "B0029",
+    "title": "Display Registered Players for Events(in Website) in App",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New capability to show website event registrations inside the app — new capability."
+  },
+  {
+    "id": "01KZXE3E78D5RDY5WJP5MKKWGD",
+    "ref": null,
+    "title": "Mustermann does not appear as an option.",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A registered external person does not appear as an option in new rentals — signal: does not show."
+  },
+  {
+    "id": "01KZXE3FS7F8XHQNHNGXDCX5N8",
+    "ref": "B0233",
+    "title": "Partner PPA Orders",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Pay-Per-Activation partner order type — new capability."
+  },
+  {
+    "id": "01KZXE3HDM1X8TA19F9PQJE9VT",
+    "ref": "B0234",
+    "title": "App Branding",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Restyles the existing app in ONTIME's corporate branding — signal: recolour/rebrand existing app."
+  },
+  {
+    "id": "01KZXE3KAHJP6VF7T1HVJFZJ4W",
+    "ref": "B0235",
+    "title": "Urgent flag for positions",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds an urgent checkbox/highlight to existing Positions — signal: add a field."
+  },
+  {
+    "id": "01KZXE3N363Z3DMGNPZ5R4SJE6",
+    "ref": "B0236",
+    "title": "Auto-assign Vehicle when Trupp Leader is selected",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New auto-assign-vehicle automation tied to Trupp Leader selection — new automation."
+  },
+  {
+    "id": "01KZXE3PV0QN20QD0TA4MM1FC1",
+    "ref": "B0030",
+    "title": "New Task Assigned",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New task-assignment notification — signal: new notification."
+  },
+  {
+    "id": "01KZXE3RGSXPAB7HGDY39MHYJ4",
+    "ref": "B0237",
+    "title": "Case Correspondence",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New case-correspondence thread capability — new capability."
+  },
+  {
+    "id": "01KZXE3TBBHKGA0X5902NNXPKR",
+    "ref": "B0238",
+    "title": "Subscriptions and Payments",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New subscriptions-and-payments overview screen — new screen."
+  },
+  {
+    "id": "01KZXE3W6VK267R2MKJ0F7SA73",
+    "ref": "B0239",
+    "title": "Automatic reminder when damage is recorded",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated 14-day damage-check reminder task — signal: new automated action."
+  },
+  {
+    "id": "01KZXE3XZKMGPKXDYC3HR8YK4Q",
+    "ref": "B0240",
+    "title": "Show Schadensfälle",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Surfaces related Schadensfälle within the existing Insurance screen — signal: add a related view."
+  },
+  {
+    "id": "01KZXE3ZMJC0B8T4W29FXKVZJZ",
+    "ref": null,
+    "title": "Schaden erstellen",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Schaden-creation capability from three entry points — part of damage-workflow build."
+  },
+  {
+    "id": "01KZXE414W2BSZ5KFGP1879PF1",
+    "ref": null,
+    "title": "AI Workflow: Data Entry Lead",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New AI workflow that screens inbound leads by email and creates/updates records — new capability."
+  },
+  {
+    "id": "01KZXE42GP4KPVSV3H1HYFPSQ7",
+    "ref": "B0241",
+    "title": "Data fields",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New deal data fields (stages, price, probability, owner) — new module build."
+  },
+  {
+    "id": "01KZXE446X55Y9H3S4DYTMGBJZ",
+    "ref": "B0242",
+    "title": "Automatic Issue number",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automatic issue-numbering capability — new automation."
+  },
+  {
+    "id": "01KZXE45W8XR699F9RD9K52RGK",
+    "ref": "B0243",
+    "title": "Automatisierte Email an alle betroffenen Versicherungen wenn Kontaktdaten sich ändern",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated email to all affected insurers on contact-detail changes — signal: new email."
+  },
+  {
+    "id": "01KZXE47NHMHYDXMVDTH65GWY9",
+    "ref": "B0244",
+    "title": "Adopt selection according to Word",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Aligns an existing selection list to match a reference Word document — modifies existing selection."
+  },
+  {
+    "id": "01KZXE497GX4HZ164JWS8KAXKZ",
+    "ref": "B0245",
+    "title": "Damage number is not displayed",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "A submitted damage number is not displayed in the Office App — signal: not displayed."
+  },
+  {
+    "id": "01KZXE4AWB65ZZ8NNDZ9NRDRKZ",
+    "ref": "B0031",
+    "title": "Overview & Detail page for Players that signed up to trainings/events",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New overview/detail screens for players signed up to trainings/events — new screens."
+  },
+  {
+    "id": "01KZXE4CGS6A2603DW1VF1QY38",
+    "ref": null,
+    "title": "Add footers with audit log",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds audit-log footers to existing Fleet screens — UI addition referencing existing audit capability."
+  },
+  {
+    "id": "01KZXE4DZERFAS3JJYHSNCFPWS",
+    "ref": "B0246",
+    "title": "Partner Prepaid Orders",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New partner prepaid-order capability with reservation drawdown — new capability."
+  },
+  {
+    "id": "01KZXE4G4A0CHYHMKZDSX0A5G9",
+    "ref": "B0247",
+    "title": "Usage Expiration Reminder (Pool Cars)",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New pool-car usage-expiration reminder email — signal: new automated action."
+  },
+  {
+    "id": "01KZXE4HYW3AT79SN2DYQQZZ6K",
+    "ref": "B0248",
+    "title": "Reorder workflow steps for perceived speed",
+    "oldType": null,
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Reorders backend workflow steps to improve perceived speed — signal: performance."
+  },
+  {
+    "id": "01KZXE4M2ZDXH0485Y6FQ2RHP5",
+    "ref": "B0249",
+    "title": "Photo Documentation Download",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Clicking \"Photo Document\" downloads the file instead of displaying it — signal: wrong behavior (downloads instead of displays)."
+  },
+  {
+    "id": "01KZXE4P0MZM987TMRG79M8D3Z",
+    "ref": "B0032",
+    "title": "Create Task",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New trainer-created task capability appearing in a dedicated Office App section — new capability."
+  },
+  {
+    "id": "01KZXE4QRSFV12RHHW6JR2N28E",
+    "ref": "B0250",
+    "title": "Team Directory",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Team Directory screen — new screen."
+  },
+  {
+    "id": "01KZXE4SHTSSN6CHSTJP7RMQPW",
+    "ref": "B0251",
+    "title": "Automatic email confirmation",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automatic email confirmation after onboarding submission — signal: new email."
+  },
+  {
+    "id": "01KZXE4V4TTR6GDMX3QREGRR0B",
+    "ref": "B0252",
+    "title": "Customize the contract list view",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Standardizes which columns appear in every contract list across the app — signal: columns."
+  },
+  {
+    "id": "01KZXE4WS4X6HMZ5YSK0MWB37V",
+    "ref": "B0253",
+    "title": "Request new power of attorney.",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Rewrites existing button copy and adjusts its visibility rule by customer status — rewrite of copy + existing rule."
+  },
+  {
+    "id": "01KZXE4YF016XPCKCCE40GFJ3J",
+    "ref": null,
+    "title": "CRUD Screens",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New CRUD screens for Mitarbeiter — new screens, module build."
+  },
+  {
+    "id": "01KZXE4ZVMCCR7SFDFQQNV8BJM",
+    "ref": null,
+    "title": "Events",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New marketing-events tracking capability — new module build."
+  },
+  {
+    "id": "01KZXE51ASK1MPJRXVGGTNZ2JV",
+    "ref": "B0254",
+    "title": "General contact information",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New general contact-information screen — new screen, module build."
+  },
+  {
+    "id": "01KZXE52X1GG2C6JZQ5BTRP6EQ",
+    "ref": "B0255",
+    "title": "One-Click Project Setup with Templates",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New one-click templated project-setup capability — new capability."
+  },
+  {
+    "id": "01KZXE54PTPABTY4C6J3400XY9",
+    "ref": "B0256",
+    "title": "Filter tasks",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Adds a responsibility filter to the existing tasks screen — signal: filter."
+  },
+  {
+    "id": "01KZXE56E2P4RS04V3JKXHHN7D",
+    "ref": "B0257",
+    "title": "Change Login Background",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Changes the existing login background image — cosmetic asset change."
+  },
+  {
+    "id": "01KZXE584XP2987RW7FHQK0W4H",
+    "ref": "B0258",
+    "title": "Add Carglass",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New Carglass integration — signal: new integration."
+  },
+  {
+    "id": "01KZXE59S91JJ12FNR9RAHEMGR",
+    "ref": "B0033",
+    "title": "Improve Navigation",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Improves the existing Trainings navigation — modifies existing screen."
+  },
+  {
+    "id": "01KZXE5BGB5377NT8B1DVS74RZ",
+    "ref": null,
+    "title": "PDF contracts",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated contract-PDF generation after handover — new capability."
+  },
+  {
+    "id": "01KZXE5D41X7ZGW906ZJX1TWK3",
+    "ref": "B0259",
+    "title": "Reservation Invoice",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New reservation-invoice generation capability — new capability."
+  },
+  {
+    "id": "01KZXE5EQBWYWMKJQ2Z1DTZXFM",
+    "ref": "B0260",
+    "title": "Documents",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New auto-filed documents capability at the Verwendung level — new capability, matches #79/#99/#119/#138."
+  },
+  {
+    "id": "01KZXE5G9S34P65V464SMSBNFK",
+    "ref": "B0261",
+    "title": "Manually close a position",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New manual position-close action for unfilled positions — signal: new action."
+  },
+  {
+    "id": "01KZXE5HRRZ630PZF6S9QP0H0N",
+    "ref": "B0262",
+    "title": "Fotos not stored",
+    "oldType": null,
+    "type": "Bug",
+    "category": "Client-requested",
+    "reason": "Uploaded images are not saved or shown — signal: did not save/show."
+  },
+  {
+    "id": "01KZXE5KD2RNKZCQSVQ49X6PBE",
+    "ref": "B0034",
+    "title": "Task Detail Page",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New task detail screen — new screen."
+  },
+  {
+    "id": "01KZXE5N1XWJ4FG6V5TMV57NS4",
+    "ref": "B0263",
+    "title": "Member Detail & Permissions",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New member detail/permissions screen — new screen, module build."
+  },
+  {
+    "id": "01KZXE5PQGWX5K8S3H0S1G9JPZ",
+    "ref": "B0264",
+    "title": "Digital Power of Attorney PDF generation",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New digital PoA PDF generation from a captured signature — new capability."
+  },
+  {
+    "id": "01KZXE5RAR5K1GJTMAYERTAGM8",
+    "ref": "B0265",
+    "title": "Spouse assignment",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New auto-link-spouse capability when one registers the other — new capability."
+  },
+  {
+    "id": "01KZXE5T25M3FMW82AQPVHKCPH",
+    "ref": "B0266",
+    "title": "Verwirrende Bezeichnung in Menüführung",
+    "oldType": null,
+    "type": "Change",
+    "category": "Client-requested",
+    "reason": "Renames confusing existing menu labels — signal: rename."
+  },
+  {
+    "id": "01KZXE5VQS50RPQ21SYEGNYA3Y",
+    "ref": null,
+    "title": "Reminder – Usage Ending",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New automated usage-ending reminder email — signal: new email."
+  },
+  {
+    "id": "01KZXE5X4W05PS8NM6R6G1K8B5",
+    "ref": null,
+    "title": "Tracking Interactions with Customer",
+    "oldType": null,
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "New easy communication-tracking capability for customer relationships (calls, emails) — new capability, porting an existing idea to a new account."
+  },
+  {
+    "id": "01KZZN6FM71JM8RY8R7RMNP63S",
+    "ref": "B0267",
+    "title": "Lane check",
+    "oldType": "Fix",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "An empty, in-progress placeholder story used to check the lane/pipeline itself, not client work."
+  },
+  {
+    "id": "01M00DS42P795N18F77VR0032N",
+    "ref": "B0268",
+    "title": "Test story - please ignore",
+    "oldType": null,
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Explicit test placeholder: \"Created to test story creation.\""
+  },
+  {
+    "id": "01M086CZ4E5PD12TXBNNSF8YK5",
+    "ref": "B0269",
+    "title": "PROOFSTORY1786981545",
+    "oldType": "Fix",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Explicit test placeholder with no content (\"PROOFSTORY...\")."
+  },
+  {
+    "id": "01M0B2MNJV2P3FFYYDKBVTWW1Y",
+    "ref": "B0270",
+    "title": "Verification story - export check (safe to delete)",
+    "oldType": "Feature",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Explicit test placeholder: \"Verification story - export check (safe to delete).\""
+  },
+  {
+    "id": "01M0C7WZ6ZWQ2SSWM8JZ43TYTV",
+    "ref": "B0271",
+    "title": "test",
+    "oldType": "Feature",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Explicit test placeholder (\"test\")."
+  },
+  {
+    "id": "01M0C8QQVMQPVNYQ8NQ5ZYP95D",
+    "ref": "B0272",
+    "title": "test",
+    "oldType": "Feature",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Explicit test placeholder (\"test\", HTML markup only)."
+  },
+  {
+    "id": "01M0YHZZ8BNADAHKVA25YA5ZAT",
+    "ref": "B0273",
+    "title": "Sign-in page — layout, logo, and theme options",
+    "oldType": "Fix",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Redesigns the existing Kwapso System sign-in page's layout, logo, and theme switcher per the design reference — modifies an existing screen."
+  },
+  {
+    "id": "01M1B6SC4F94QFHG368JXSYC9A",
+    "ref": "B0274",
+    "title": "Screen width — inconsistent across screens",
+    "oldType": "Fix",
+    "type": "Bug",
+    "category": "Internal",
+    "reason": "Screens render at inconsistent widths against the design reference and should inherit one shell width — signal: inconsistent, drift, fix."
+  },
+  {
+    "id": "01M1B6X0ZKES4MPW1A1JTFZ2GM",
+    "ref": "B0275",
+    "title": "Tabs — wrong style on detail screens",
+    "oldType": "Fix",
+    "type": "Bug",
+    "category": "Internal",
+    "reason": "Detail-screen tabs wrongly use the folder-tab style that belongs only to main screens — signal: wrong style."
+  },
+  {
+    "id": "01M20AZTC7ZVGKKWGCRVZ4ZK2D",
+    "ref": "B0276",
+    "title": "Gather raw product, inventory, attribute, and location data",
+    "oldType": "Implementation",
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Gathers raw product/inventory/attribute/location data to prepare a not-yet-built ERP schema — structural prep work, no live records yet."
+  },
+  {
+    "id": "01M20B125VVM8XTWHHCAAFSS3A",
+    "ref": "B0277",
+    "title": "Normalize data and finalize schema",
+    "oldType": "Implementation",
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Normalizes data and finalizes the database schema for the new ERP — signal: schema (structure, not record values)."
+  },
+  {
+    "id": "01M20B2T9683JAVDMZX1GNGJR5",
+    "ref": "B0278",
+    "title": "Build out complete UI UX kit",
+    "oldType": "Implementation",
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Builds the foundational UI/UX kit before any screens are built against it — under-the-hood construction."
+  },
+  {
+    "id": "01M20K49ZNBW7DAEY52CWMDNPD",
+    "ref": "B0279",
+    "title": "Set up Kwapso base_one foundation for Platinum ERP",
+    "oldType": "Implementation",
+    "type": "Tech",
+    "category": "Internal",
+    "reason": "Stands up the zero-dependency Kwapso base_one foundation for the new ERP — signal: foundation work."
+  },
+  {
+    "id": "01M20MQZ0M4XJB26KY14E9ZSEV",
+    "ref": "B0280",
+    "title": "Build Attributes module (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Attributes module (database, workflows, screens) for the Platinum ERP — signal: new module."
+  },
+  {
+    "id": "01M20MQZ323PDVW7M2KWQQN3MH",
+    "ref": "B0281",
+    "title": "Build Inventory Transfers, Dispatches, and Receipts (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Inventory Transfers/Dispatches/Receipts module — signal: new module."
+  },
+  {
+    "id": "01M20MQZ6CCP9MBP0AQM9THK14",
+    "ref": "B0282",
+    "title": "Build Locations module (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Locations module — signal: new module."
+  },
+  {
+    "id": "01M20MQZ8FE10M14S22C3JTDGF",
+    "ref": "B0283",
+    "title": "Build Inventory module, Inventory Activity, and Allocations Activity (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Inventory/Inventory Activity/Allocations Activity module — signal: new module."
+  },
+  {
+    "id": "01M20MQZG25SN6ES1K9C8WYT2D",
+    "ref": "B0284",
+    "title": "Build Products module (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Products module, the first in the ERP build order — signal: new module."
+  },
+  {
+    "id": "01M20MR0VVBGYND412KNNJRH5Q",
+    "ref": "B0285",
+    "title": "Build Product Attributes table (database, workflows, screens)",
+    "oldType": "Implementation",
+    "type": "Feature",
+    "category": "Client-requested",
+    "reason": "Builds the brand-new Product Attributes table/module — signal: new module."
+  },
+  {
+    "id": "01M2K07V62B61Q85CV2XAQEGEJ",
+    "ref": "B0286",
+    "title": "Reduce ticket types",
+    "oldType": "Change",
+    "type": "Change",
+    "category": "Internal",
+    "reason": "Restricts the Kwapso System's own ticket types down to four — modifies existing vocabulary on the product itself."
+  }
+]

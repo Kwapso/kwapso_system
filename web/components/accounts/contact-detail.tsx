@@ -131,8 +131,9 @@ export function ContactDetailScreen({
   const canSeeLogins = can("portal_users", "read")
   const canGrant = can("portal_users", "create")
   const canRevoke = can("portal_users", "delete")
-  const canSeeTodos = can("todos", "read")
-  const canCancelTodo = can("todos", "delete")
+  // MODULE RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095).
+  const canSeeTodos = can("inputs", "read")
+  const canCancelTodo = can("inputs", "delete")
   const canSeeTickets = can("help", "read")
   const canSeeMeetings = can("meetings", "read")
 

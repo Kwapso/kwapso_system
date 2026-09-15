@@ -24,12 +24,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { primeCache } from "@shared/web/store"
 import { RememberedScreen } from "@shared/web/remembered"
-import { appsKey, meetingsKey, meetingsMonthKey, sprintsKey, tasksKey, totalKey } from "@/lib/live-resources"
+import { appsKey, meetingsKey, meetingsMonthKey, sprintsKey, storiesKey, tasksKey, totalKey } from "@/lib/live-resources"
 import { BASE_RECIPES } from "@/lib/screens"
 import { MeetingsScreen } from "@/components/meetings/meetings-screen"
 import { SprintsScreen } from "@/components/work/sprints-screen"
 import { TasksScreen } from "@/components/work/tasks-screen"
-import type { Meeting, Sprint, Task } from "@shared/types"
+import { StoriesScreen } from "@/components/work/stories-screen"
+import type { Meeting, Sprint, Story, Task } from "@shared/types"
 
 // The screens mount their create dialogs, which reach the router; every cached
 // read revalidates on mount and must be answered with the same rows it was
@@ -40,7 +41,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 const { door, asked } = vi.hoisted(() => ({
-  door: { sprints: [] as unknown[], tasks: [] as unknown[], meetings: [] as unknown[] },
+  door: { sprints: [] as unknown[], tasks: [] as unknown[], meetings: [] as unknown[], stories: [] as unknown[] },
   /* WHAT THE MEETINGS DOOR WAS ACTUALLY ASKED, in call order. The Mine tab's
      whole claim is that its rows and its badge are the DOOR's answer to a
      question the browser cannot ask (attendance lives in a JSON mirror column),
@@ -65,6 +66,25 @@ vi.mock("@/lib/api", () => ({
       dueTodayDone: 0,
     }),
     todos: async () => ({ todos: [], total: 0 }),
+    stories: async (opts: Record<string, unknown> = {}) => {
+      asked.push({ ...opts })
+      return {
+        stories: door.stories,
+        total: door.stories.length,
+        totalCapped: false,
+        hasMore: false,
+        nextCursor: null,
+        mineTotal: door.stories.length,
+        openTotal: door.stories.length,
+        nowTotal: door.stories.length,
+        plannedTotal: door.stories.length,
+        backlogTotal: door.stories.length,
+        completedTotal: door.stories.length,
+        everyoneTotal: door.stories.length,
+      }
+    },
+    createStory: async () => ({ stories: [], createdId: "new" }),
+    setStoryStatus: async () => ({ stories: [] }),
     meetings: async (opts: Record<string, unknown> = {}) => {
       asked.push({ ...opts })
       return { meetings: door.meetings, total: door.meetings.length, weekTotal: door.meetings.length, nextCursor: null }
@@ -418,5 +438,120 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
     await screen.findByRole("tab", { name: /This week/ })
     expect(asked.some((q) => q.view === "mine-week")).toBe(true)
     expect(asked.some((q) => q.view === "week")).toBe(false)
+  })
+})
+
+/* ----------------------------------- stories --------------------------------
+ * THE STORIES TAB STRIP, added 15 Sep 2026 — `tasks-screen.tsx`'s own cold-tab
+ * coverage, one collection along. Now/Planned/Backlog/Completed/Everyone's,
+ * five SERVER views, and — since Everyone's needs `all_stories:read`, which
+ * this cold team's empty permission sheet never holds — only the four MINE
+ * tabs are reachable here. */
+
+const ONE_STORY = {
+  id: "st1",
+  ref: "B0001",
+  title: "Move dispatch onto the driver app",
+  detail: null,
+  status: "open",
+  ticketId: null,
+  ticketRef: null,
+  sprintId: null,
+  sprintName: null,
+  appId: null,
+  processId: null,
+  stepKey: null,
+  changesNoStep: true,
+  processIds: [],
+  assigneeId: "u1",
+  assigneeName: "Bea",
+  reviewerId: null,
+  reviewerName: null,
+  startsOn: null,
+  dueOn: null,
+  sprintEndsOn: null,
+  closedAt: null,
+  closingNote: null,
+  storyType: "Feature",
+  category: "Client-requested",
+  reviewNote: null,
+  reviewFileUrl: null,
+  reviewFileName: null,
+  rank: "a0",
+  accountId: null,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: null,
+  createdByName: null,
+  editedByName: null,
+} as Story
+
+function renderStories(stories: Story[], view: "now" | "planned" | "backlog" | "completed" = "now") {
+  const teamId = coldTeam()
+  door.stories = stories
+  primeCache(storiesKey(teamId, view), stories)
+  primeCache(storiesKey(teamId, "open"), stories)
+  return render(
+    <StoriesScreen
+      teamId={teamId}
+      recipe={BASE_RECIPES["stories.list"]}
+      rights={{ work: { read: true, create: true, update: true } } as never}
+      total={stories.length}
+      counts={{
+        now: stories.length,
+        planned: stories.length,
+        backlog: stories.length,
+        completed: stories.length,
+        all: stories.length,
+      }}
+      view={view}
+      onViewChange={() => {}}
+      canCreate
+      onAction={() => {}}
+      onIntent={() => {}}
+    />
+  )
+}
+
+describe("Stories — the tab strip on a team with nothing in it, and the canary beside it", () => {
+  it("Now names the first act on a team with no stories", async () => {
+    renderStories([])
+    expect(await screen.findByText("Nothing on this list yet.")).toBeTruthy()
+    expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
+  })
+
+  it("draws Now · Planned · Backlog · Completed, and no Everyone's tab without the right", async () => {
+    renderStories([])
+    expect(await screen.findByRole("tab", { name: /Now/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Planned/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Backlog/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Completed/ })).toBeTruthy()
+    expect(screen.queryByRole("tab", { name: /Everyone's/ })).toBeNull()
+  })
+
+  it("CANARY: one story draws that story, and no empty register", async () => {
+    renderStories([ONE_STORY])
+    expect((await screen.findAllByText(/Move dispatch onto the driver app/)).length).toBeGreaterThan(0)
+    expect(screen.queryByText("Nothing on this list yet.")).toBeNull()
+    expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
+  })
+
+  it("switching tabs asks the DOOR for that view — Backlog is its own question, never a client-side filter", async () => {
+    // `view` is a CONTROLLED prop here (the host, `deep-link-screen.tsx`, owns
+    // the state and re-renders with the tab a person picked) — this suite has
+    // no host, so it proves the same shape the host's own re-render would: a
+    // fresh `view="backlog"` asks the door for exactly that view, never a
+    // client-side sieve over the "now" rows already on screen.
+    asked.length = 0
+    renderStories([ONE_STORY], "backlog")
+    expect((await screen.findAllByText(/Move dispatch onto the driver app/)).length).toBeGreaterThan(0)
+    expect(asked.some((q) => q.view === "backlog")).toBe(true)
+    expect(asked.some((q) => q.view === "now")).toBe(false)
+  })
+
+  it("Completed offers List only — no Board, no Week", async () => {
+    renderStories([ONE_STORY], "completed")
+    await screen.findByText(/Move dispatch onto the driver app/)
+    expect(screen.queryByRole("radio", { name: /Board/ })).toBeNull()
+    expect(screen.queryByRole("radio", { name: /Week/ })).toBeNull()
   })
 })

@@ -88,7 +88,7 @@ function seedProcess(): string {
  * that are about the refusals pass their own. */
 async function addStory(body: Record<string, unknown>): Promise<string> {
   const res = await call(IDS.staffUser, "POST /api/content/stories", {
-    storyType: "Fix",
+    storyType: "Feature",
     changesNoStep: true,
     ...body,
   })
@@ -170,12 +170,95 @@ describe("a story is what WE do", () => {
   it("refuses a made-up ticket rather than writing a story pointing at nothing", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Answer a request that does not exist",
-      storyType: "Fix",
+      storyType: "Feature",
       changesNoStep: true,
       ticketId: "01NOTATICKET",
     })
     expect(res.status).toBe(400)
     expect(db().prepare(`SELECT COUNT(*) AS n FROM stories`).get()).toEqual({ n: 0 })
+  })
+})
+
+// WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0093):
+// Client-requested / Internal, and the story TYPE list closed to Data / Tech /
+// Bug / Feature / Change the same day, Fix deactivated rather than deleted.
+describe("category, and a closed story type", () => {
+  it("defaults category to Client-requested when none is sent", async () => {
+    const id = await addStory({ title: "Say nothing about where this came from" })
+    expect(storyRow(id).category).toBe("Client-requested")
+  })
+
+  it("keeps the category actually sent", async () => {
+    const id = await addStory({ title: "Our own upkeep", category: "Internal" })
+    expect(storyRow(id).category).toBe("Internal")
+  })
+
+  it("refuses a category that names no active vocabulary row", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/stories", {
+      title: "A category nobody has ever heard of",
+      storyType: "Feature",
+      category: "Moonshot",
+      changesNoStep: true,
+    })
+    expect(res.status).toBe(400)
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("A category nobody has ever heard of")).toEqual({ n: 0 })
+  })
+
+  it("refuses `Fix` — deactivated by team migration 0093, no longer creatable", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/stories", {
+      title: "Try the retired type",
+      storyType: "Fix",
+      changesNoStep: true,
+    })
+    expect(res.status).toBe(400)
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("Try the retired type")).toEqual({ n: 0 })
+  })
+
+  it("accepts every one of the five active types", async () => {
+    for (const storyType of ["Data", "Tech", "Bug", "Feature", "Change"]) {
+      const id = await addStory({ title: `Type check: ${storyType}`, storyType })
+      expect(storyRow(id).story_type).toBe(storyType)
+    }
+  })
+
+  it("update requires category — the door replaces every field it reads, never leaves one untouched", async () => {
+    const id = await addStory({ title: "Edit me" })
+    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
+      id,
+      title: "Edit me",
+      storyType: "Feature",
+      changesNoStep: true,
+      // category deliberately omitted
+    })
+    expect(res.status).toBe(400)
+    // Untouched: the create door's own default survives the refused edit.
+    expect(storyRow(id).category).toBe("Client-requested")
+  })
+
+  it("update refuses a category that names no active vocabulary row, and keeps the old value", async () => {
+    const id = await addStory({ title: "Edit me too", category: "Client-requested" })
+    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
+      id,
+      title: "Edit me too",
+      storyType: "Feature",
+      changesNoStep: true,
+      category: "Moonshot",
+    })
+    expect(res.status).toBe(400)
+    expect(storyRow(id).category).toBe("Client-requested")
+  })
+
+  it("update carries a real category change through", async () => {
+    const id = await addStory({ title: "Turns out this was our own idea", category: "Client-requested" })
+    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
+      id,
+      title: "Turns out this was our own idea",
+      storyType: "Feature",
+      changesNoStep: true,
+      category: "Internal",
+    })
+    expect(res.status).toBe(200)
+    expect(storyRow(id).category).toBe("Internal")
   })
 })
 
@@ -452,7 +535,7 @@ describe("a client login cannot reach the work engine at all", () => {
     expect(read.status).toBe(403)
     const write = await call(IDS.clientUser, "POST /api/content/stories", {
       title: "Not yours to write",
-      storyType: "Fix",
+      storyType: "Feature",
       changesNoStep: true,
     })
     expect(write.status).toBe(403)

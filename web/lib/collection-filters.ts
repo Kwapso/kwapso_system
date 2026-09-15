@@ -298,47 +298,18 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     { field: "appId", label: "App" },
     { field: "archived", label: "Archived", options: YES_NO },
   ],
-  stories: [
-    // The four stages a piece of work moves through — the same words
-    // STORY_STATUS_LABEL renders on the rows, because a filter and a row saying
-    // the same thing differently is two vocabularies for one fact.
-    {
-      field: "status",
-      label: "Status",
-      options: [
-        { value: "open", label: "Open" },
-        { value: "in_progress", label: "In progress" },
-        { value: "in_review", label: "In review" },
-        { value: "done", label: "Done" },
-      ],
-    },
-    { field: "assigneeId", label: "Who has it" },
-    // APP BEFORE SPRINT, which is a change of ORDER as well as of behaviour and
-    // is worth saying out loud: this array is what `translatedFacets` walks, so
-    // it is the order the panel reads in, and Sprint sat above the App it hangs
-    // off until 2026-09-09. A control that cannot be used until the one BELOW it
-    // is answered is a panel read bottom-up. The ticket form settled the same
-    // question for the same pair of ideas — "it is still the order the data
-    // depends in … so answering downward never asks a question that has no
-    // answer yet" — and this is that sentence applied to a filter row.
-    { field: "appId", label: "App" },
-    // A SPRINT BELONGS TO AN APP, so the Sprint control hangs off the App one —
-    // the same ruling as the tickets toolbar above, on the OTHER ownership edge
-    // this app's filter rows actually contain (`sprints.app_id`, carried on the
-    // row as `Sprint.appId`; `stories.ts`' own reads resolve an app's name
-    // through it). Before this, picking an app and then a sprint of a different
-    // app was an offered pair that returns nothing — the client's exact
-    // complaint, one screen along, which is what "and so on" asks us to find.
-    //
-    // "Choose an app first." is the ticket form's sentence for the same shape
-    // one level down (its Module row, which belongs to an app the same way this
-    // belongs to one), already catalogued and already answered.
-    {
-      field: "sprintId",
-      label: "Sprint",
-      dependsOn: { field: "appId", emptyText: "Choose an app first." },
-    },
-  ],
+  // THE "stories" ENTRY THAT STOOD HERE IS GONE, 15 Sep 2026 — deleted along
+  // with the door-side `<PagedFind>` it excused rather than left to rot the
+  // moment the screen that used it changed shape. The Stories tab strip
+  // (client ruling, the same date) replaced the flat, door-filtered backlog
+  // with five SERVER views (`StoryView`) and a `tasks-screen.tsx`-style
+  // toolbar whose search/sort work over whichever tab's loaded page is
+  // showing — so there is no `<PagedFind listKey={storiesKey(...)}>` left to
+  // wire these facets to, and an unwired door filter is exactly the defect
+  // `facets-ask-the-door` (web/test/rules.test.ts) exists to catch. The
+  // per-tab narrowing (assignee, status split by tab) is the DOOR's now,
+  // built into `StoryView` itself rather than offered as a facet a reader
+  // dials in.
   workLogs: [
     // WHO LOGGED IT — a facet over rows, filled in from the team's own staff
     // (useAssignableMembers already excludes a client login: R21 refuses one at

@@ -26,7 +26,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
-import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import type { Todo, TodoViewName } from "@shared/types"
 
 import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
@@ -46,6 +46,10 @@ type TodoRow = {
   cancelled_at: string | null
   account_id: string
   account_name: string | null
+  /** THE ACCOUNT'S OWN LOGO (R35) — see `Todo.accountLogoUrl`'s own doc,
+   * shared/types.ts. Arrived 15 Sep 2026 with the Inputs screen; the same
+   * join `tasks.ts`'s own `TASK_COLS` already reads. */
+  account_logo_url: string | null
   ticket_id: string | null
   created_at: string
 }
@@ -57,7 +61,8 @@ const TODO_COLS = `t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.c
   -- and this is the only thing that can tell the screen which it is holding.
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = t.completer_id) AS completer_is_client,
   t.file_url, t.file_name, t.cancelled_at, t.account_id, t.ticket_id, t.created_at,
-  (SELECT a.name FROM accounts a WHERE a.id = t.account_id) AS account_name`
+  (SELECT a.name FROM accounts a WHERE a.id = t.account_id) AS account_name,
+  (SELECT a.logo_url FROM accounts a WHERE a.id = t.account_id) AS account_logo_url`
 
 function toTodo(r: TodoRow): Todo {
   return {
@@ -78,6 +83,7 @@ function toTodo(r: TodoRow): Todo {
     cancelled: r.cancelled_at != null,
     accountId: r.account_id,
     accountName: r.account_name,
+    accountLogoUrl: r.account_logo_url,
     ticketId: r.ticket_id,
     createdAt: r.created_at,
   }
@@ -125,15 +131,66 @@ export const TODO_SORTS: SortMenu<Todo> = {
     key: (todo) => todo.dueOn ?? "9999-12-31",
   },
   completed: { expr: "t.completed_at", dir: "desc", key: (todo) => todo.completedAt },
+  // WAITING LONGEST — the Inputs screen's own second toolbar sort (client
+  // ruling, 15 Sep 2026, "the column that flags how long we are waiting" plus
+  // the coordinator's own I1 mock, "Days waiting"). Orders by when the request
+  // was RAISED, oldest first, never by when it is due — the two questions a
+  // to-do can be read by, and this is the one `due` cannot answer.
+  waiting: { expr: "t.created_at", dir: "asc", key: (todo) => todo.createdAt },
 }
 
-/** The ordering a view is read in. One place, so the list, the keyset predicate
- * and the minted cursor cannot disagree about which of the two this is. */
-function orderingFor(view: TodoViewName) {
-  return resolveOrdering(TODO_SORTS, view === "done" ? "completed" : "due", undefined, undefined)
+/** THE DEFAULT ORDERING FOR A VIEW — one place, so the list, the keyset
+ * predicate and the minted cursor cannot disagree about which of the three
+ * this is. `received` reads the SAME ordering `done` always has (newest
+ * completion first); the caller may still ask for a different one (the
+ * Inputs screen's own toolbar sort) — this is only what a bare `?view=`
+ * lands on unasked, exactly the shape `resolveOrdering`'s own `fallback`
+ * argument is for (see `workers/content/src/routes/stories.ts` for the same
+ * pattern: the ROUTE resolves the caller's `sort`/`dir` against this
+ * fallback and hands the settled `Ordering` down, never the view alone). */
+function defaultOrderingName(view: TodoViewName): string {
+  return view === "done" || view === "received" ? "completed" : "due"
 }
 
-type TodoFilter = { accountId?: string; view?: TodoViewName; q?: string }
+type TodoFilter = {
+  accountId?: string
+  /** THE ACCOUNT'S OWN MANAGER — the Inputs screen's second facet, and the
+   * fence `all_inputs:read` narrows to when a caller does not hold it (own
+   * accounts only, `account_manager_user_id`). A join rather than a second
+   * table: the manager is a fact about the ACCOUNT, so a to-do never carries
+   * one of its own. */
+  accountManagerId?: string
+  view?: TodoViewName
+  q?: string
+}
+
+/** TODAY, as the date half of an ISO moment — the boundary `overdue`/`waiting`
+ * are cut on. Same UTC reasoning `workers/content/src/lib/tasks.ts`'s own
+ * `todayIso` carries: a worker has no reader's clock, and the honest string
+ * comparison ('2026-08-17T00:00:00Z' < '2026-08-17' is false) is what makes
+ * `due_on < ?` exact against the stored ISO moment. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** WHAT EACH OF THE FIVE VIEWS ASKS FOR, as a WHERE fragment — written once so
+ * the list and the counts beside it can never be asked different questions
+ * (R16), the same shape `tasks.ts`'s own `viewClause` takes.
+ *
+ * `waiting` and `overdue` PARTITION the open pile by due date — every open
+ * row lands in exactly one of the two, whether or not it has a date at all
+ * (an undated one is never overdue). `received` reads the identical
+ * predicate `done` always has; it is a second WORD for the same pile, not a
+ * third one, because completing a to-do is one act however the screen that
+ * asked for the list spells its tab. */
+function todoViewClause(view: TodoViewName): { sql: string; dated: boolean } {
+  if (view === "done" || view === "received") return { sql: "t.completed_at IS NOT NULL", dated: false }
+  if (view === "overdue")
+    return { sql: "t.completed_at IS NULL AND t.due_on IS NOT NULL AND t.due_on < ?", dated: true }
+  if (view === "waiting")
+    return { sql: "t.completed_at IS NULL AND (t.due_on IS NULL OR t.due_on >= ?)", dated: true }
+  return { sql: "t.completed_at IS NULL", dated: false } // "open"
+}
 
 /** The SAME search clause `whereFor` and `countTodos` both fold in — a to-do has
  * no backlog-sized table of its own to page a search over, but it is nested
@@ -157,12 +214,19 @@ function todoSearchClause(q: string | undefined): { sql: string | null; params: 
  * exact count" but a count of the SAME collection the list showed. */
 function whereFor(scope: AccountScope, filter: TodoFilter): { sql: string; params: string[] } {
   const fence = todoFence(scope)
-  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : [])]
-  const params: string[] = [...fence.params]
-  clauses.push(filter.view === "done" ? "t.completed_at IS NOT NULL" : "t.completed_at IS NULL")
+  const view = todoViewClause(filter.view ?? "open")
+  const clauses = ["t.cancelled_at IS NULL", ...(fence.sql ? [fence.sql] : []), view.sql]
+  const params: string[] = [...fence.params, ...(view.dated ? [todayIso()] : [])]
   if (filter.accountId) {
     clauses.push("t.account_id = ?")
     params.push(filter.accountId)
+  }
+  // THE ACCOUNT'S OWN MANAGER — an EXISTS over `accounts` rather than a JOIN,
+  // so a to-do's own SELECT list never has to carry a second table's columns
+  // for the one narrow question this filter asks.
+  if (filter.accountManagerId) {
+    clauses.push("EXISTS (SELECT 1 FROM accounts a WHERE a.id = t.account_id AND a.account_manager_user_id = ?)")
+    params.push(filter.accountManagerId)
   }
   const search = todoSearchClause(filter.q)
   if (search.sql) {
@@ -186,11 +250,17 @@ export async function listTodos(
   guard: MemberGuard,
   scope: AccountScope,
   filter: TodoFilter,
-  cursor: string | null
+  cursor: string | null,
+  // THE CALLER'S OWN ORDERING (the Inputs screen's toolbar sort), settled
+  // against `TODO_SORTS` at the ROUTE (`resolveOrdering`, the same shape
+  // `stories.ts`'s own `listStories` takes) — defaulted here so the panel's
+  // call site (work-panels.tsx, through `getTodos`, which always resolves
+  // one before calling down) and any other caller that names none still
+  // lands on the view's own default order.
+  ordering: Ordering<Todo> = resolveOrdering(TODO_SORTS, defaultOrderingName(filter.view ?? "open"), undefined, undefined)
 ): Promise<Page<Todo>> {
   const base = whereFor(scope, filter)
   // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
-  const ordering = orderingFor(filter.view ?? "open")
   const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir, "t.id")
   const rows = await d1Query<TodoRow>(
     cfg,
@@ -214,8 +284,21 @@ export async function listTodos(
  *
  * BOUNDED (R16 amended): counted exactly to TOTAL_COUNT_CAP, then "at least".
  * `open` and `done` are DISPLAY tallies riding beside the display count, which is
- * the only thing a SUM over a bounded set may ever be. */
-export type TodoCounts = { open: number; done: number; all: number }
+ * the only thing a SUM over a bounded set may ever be.
+ *
+ * THREE MORE, 15 SEP 2026 — the Inputs screen's own tab badges. `waiting` and
+ * `overdue` split `open` by due date; `received` IS `done` under its tab's own
+ * word (`todoViewClause`'s own note says why it is not a fourth pile). Kept as
+ * their own fields rather than an alias so a reader of `todoPage`'s sidecar
+ * never has to know the two are the same number by construction. */
+export type TodoCounts = {
+  open: number
+  done: number
+  all: number
+  waiting: number
+  overdue: number
+  received: number
+}
 
 export async function countTodos(
   cfg: D1Rest,
@@ -227,8 +310,9 @@ export async function countTodos(
    * Called WITH it (the paged panel's own search total), it counts the SAME
    * question `listTodos` is answering, over both piles at once — a search
    * asked while the Open tab is open still knows the Done pile's match, cheaply,
-   * from the one query. */
-  filter: { accountId?: string; q?: string }
+   * from the one query. `accountManagerId` is the Inputs screen's own fence —
+   * see `TodoFilter`'s own doc on why it is a join and not a second table. */
+  filter: { accountId?: string; accountManagerId?: string; q?: string }
 ): Promise<TodoCounts> {
   // The list's own WHERE minus the pile — the counts have to see both.
   const fence = todoFence(scope)
@@ -238,21 +322,33 @@ export async function countTodos(
     clauses.push("t.account_id = ?")
     params.push(filter.accountId)
   }
+  if (filter.accountManagerId) {
+    clauses.push("EXISTS (SELECT 1 FROM accounts a WHERE a.id = t.account_id AND a.account_manager_user_id = ?)")
+    params.push(filter.accountManagerId)
+  }
   const search = todoSearchClause(filter.q)
   if (search.sql) {
     clauses.push(search.sql)
     params.push(...search.params)
   }
-  const row = await countCollectionWith<{ all_n: number; open_n: number | null }>(
+  // ONE `?` AHEAD OF EVERYTHING ELSE — the SELECT list's own `is_overdue` sits
+  // textually before the WHERE clause's params, so `todayIso()` binds first
+  // (D1 binds positionally, in the order a `?` appears in the string).
+  const row = await countCollectionWith<{ all_n: number; open_n: number | null; overdue_n: number | null }>(
     cfg,
     guard.databaseId,
-    `SELECT (t.completed_at IS NULL) AS is_open FROM todos t WHERE ${clauses.join(" AND ")}`,
-    `COUNT(*) AS all_n, SUM(is_open) AS open_n`,
-    params
+    `SELECT (t.completed_at IS NULL) AS is_open,
+            (t.completed_at IS NULL AND t.due_on IS NOT NULL AND t.due_on < ?) AS is_overdue
+       FROM todos t WHERE ${clauses.join(" AND ")}`,
+    `COUNT(*) AS all_n, SUM(is_open) AS open_n, SUM(is_overdue) AS overdue_n`,
+    [todayIso(), ...params]
   )
   const all = reportedTotal(row?.all_n ?? 0)
   const open = reportedTotal(row?.open_n ?? 0)
-  return { open, done: Math.max(0, all - open), all }
+  const overdue = reportedTotal(row?.overdue_n ?? 0)
+  const done = Math.max(0, all - open)
+  const waiting = Math.max(0, open - overdue)
+  return { open, done, all, waiting, overdue, received: done }
 }
 
 /** One to-do the caller may see, by id — a LOOKUP, never a find over a page.

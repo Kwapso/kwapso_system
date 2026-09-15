@@ -2081,12 +2081,49 @@ export type Story = {
    * DRAFT resolution — a draft, never a sent message. */
   closingNote: string | null
   rank: string | null
+  /** WHERE THIS WORK CAME FROM — client ruling, 15 Sep 2026: Client-requested
+   * (traces to a client ticket or ask, the DEFAULT) or Internal
+   * (Kwapso-initiated upkeep). "Do NOT assign any priority or urgency. Stories
+   * do not have that" — the same ruling, which is why this is the only new
+   * field the door accepted. Editable on the Dropdown values screen like
+   * `storyType`, and — unlike it — never null: team migration 0093 back-fills
+   * every story that existed before the column did, and the door defaults a
+   * new one to 'Client-requested' when nothing is sent. */
+  category: string
   accountId: string | null
   createdAt: string
   updatedAt: string | null
   createdByName: string | null
   editedByName: string | null
 }
+
+/** THE STORIES SCREEN'S OWN TAB STRIP, ported from Tasks (`TASK_VIEWS`, above)
+ * the same evening — the client's ruling, 15 Sep 2026: "for stories, we need
+ * to recreate a bit of tasks... different tabs where you can see: overdue or
+ * the ones you have to do now, the ones that are active, and for you only /
+ * the planned ones that are not in any active sprint and are somewhere in the
+ * future / all / the completed ones / everyone's" — then, on the design
+ * proposal it produced, one change: "I agree with all you suggested — except
+ * use Backlog instead of All" (documents/UI-RULEBOOK.md, K entry, same date).
+ *
+ * SERVER views, `TASK_VIEWS`'s own reason: the backlog PAGES (R14, 3,677
+ * stories arrived from the previous system on day one), so sieving a loaded
+ * page for the overdue ones would show "the overdue among the newest fifty"
+ * under a badge counting all of them (R16).
+ *
+ * `open` and `all` are UNCHANGED, kept exactly as they always answered —
+ * `open` hides done stories with no other narrowing (the door's fail-safe
+ * default for anything malformed or missing), `all` narrows nothing at all
+ * and is what `record-counts.ts`'s per-record badges and the ticket/app/
+ * sprint cross-links already ask for. Neither is "mine". FOUR NEW WORDS
+ * ADDED beside them, never swapping either: `now`/`planned`/`backlog`/
+ * `completed` are each narrowed to the caller's own name UNCONDITIONALLY at
+ * the door (`MINE_VIEWS`, workers/content/src/routes/stories.ts) — the same
+ * shape Tasks' own three MINE tabs take, "mine" including a story with no
+ * assignee at all the way Tasks' does (`includeUnassigned`), because a client
+ * database this old has plenty of history nobody has ever claimed. */
+export const STORY_VIEWS = ["open", "now", "planned", "backlog", "completed", "all"] as const
+export type StoryViewName = (typeof STORY_VIEWS)[number]
 
 /** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price. It
  * used to be the revenue half of the agency's margin, which was retired with the
@@ -2211,6 +2248,12 @@ export type Todo = {
   cancelled: boolean
   accountId: string
   accountName: string | null
+  /** THE ACCOUNT'S OWN LOGO (R35) — the Inputs screen's own Account cell
+   * (client ruling, 2026-09-15: "show the account", read beside the same
+   * `accountLogoUrl`/`appLogoUrl` ruling `Task` carries one collection
+   * along). `null` draws the account's own initial, same as everywhere
+   * else `RecordMark` renders one. */
+  accountLogoUrl: string | null
   ticketId: string | null
   createdAt: string
 }
@@ -2226,8 +2269,21 @@ export type Todo = {
  * `all` USED TO BE THE SECOND WORD and is retired rather than renamed: the two
  * views sort by different columns, so "everything, in one order" is a question
  * with no honest keyset answer. A caller asking for the retired word gets the
- * open list, which is what it got before `all` existed. */
-export const TODO_VIEWS = ["open", "done"] as const
+ * open list, which is what it got before `all` existed.
+ *
+ * THREE MORE ARRIVED 15 SEP 2026 — the Inputs screen (Task C, documents/
+ * UI-RULEBOOK.md K entry), the client's own three words for the sidebar
+ * page's tab strip: "Waiting" (open, not yet due or with no due date at
+ * all), "Overdue" (open, past its due date) and "Received" (done — the same
+ * pile `done` already named, under the word the new screen's tab reads).
+ * `open`/`done` are UNCHANGED and keep answering exactly what they always
+ * have — the account/contact record's own `TodosPanel` (work-panels.tsx)
+ * still asks for those two and nothing else. The three new words are a
+ * FINER READ of the same two piles (`waiting` + `overdue` partition `open`
+ * by due date; `received` IS `done`), never a third table and never a
+ * third ordering scheme of their own — see `workers/content/src/lib/
+ * todos.ts`'s `todoViewClause`. */
+export const TODO_VIEWS = ["open", "done", "waiting", "overdue", "received"] as const
 export type TodoViewName = (typeof TODO_VIEWS)[number]
 
 /** KWAPSO'S OWN INTERNAL ADMIN. Nobody outside the agency ever sees one. Work

@@ -155,6 +155,7 @@ export function StoryDetailScreen({
       id: storyId,
       title: values.title,
       storyType: values.storyType,
+      category: values.category,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
@@ -213,6 +214,9 @@ export function StoryDetailScreen({
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
     { label: t("Type"), value: story.storyType || "—" },
+    // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — beside Type,
+    // the same overview list, so both halves of the ruling read together.
+    { label: t("Category"), value: story.category },
     { label: t("Reference"), value: story.ref || "—" },
     // R54: a story is agency work, so the assignee is one of ours.
     { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
@@ -478,6 +482,7 @@ export function StoryDetailScreen({
         appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
+        categories={options.categories}
         storyId={story.id}
         initial={{
           title: story.title,
@@ -487,6 +492,7 @@ export function StoryDetailScreen({
           ticketId: story.ticketId ?? "",
           assigneeId: story.assigneeId ?? "",
           storyType: story.storyType ?? "",
+          category: story.category,
           processIds: story.processIds,
           changesNoStep: story.changesNoStep,
         }}

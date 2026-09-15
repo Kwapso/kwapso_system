@@ -12,13 +12,14 @@
 // tickets / accounts / team-meta load only on their own module.
 
 import { content, tenancy } from "@/lib/api"
-import type { TaskView } from "@/lib/live-resources"
+import type { InputView, StoryView, TaskView } from "@/lib/live-resources"
 import {
   accountsKey,
   appsKey,
   brandAssetsKey,
   companiesKey,
   helpKey,
+  inputsKey,
   knowledgeKey,
   knowledgeShapeKey,
   listFetch,
@@ -57,6 +58,12 @@ export type ScreenDataInput = {
   /** which pile of our own admin the Tasks screen is showing — a SERVER view,
    * for the same reason (R14/R16). */
   taskView?: TaskView
+  /** which tab of the backlog the Stories screen is showing — `taskView`'s own
+   * reason, one collection along. */
+  storyView?: StoryView
+  /** which of the Inputs screen's three tabs is showing (Task C, 15 Sep
+   * 2026) — `taskView`'s own reason, a second collection along. */
+  inputView?: InputView
   /** WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture
    * of the whole base. Declared up here for `taskView`'s own reason: the shape
    * is a DOOR, not a sieve over rows already loaded, so which body is on screen
@@ -84,6 +91,8 @@ export function useScreenData({
   module,
   recordId,
   taskView = "open",
+  storyView = "now",
+  inputView = "waiting",
   knowledgeView = "list",
   ancestorModules = [],
 }: ScreenDataInput) {
@@ -206,6 +215,18 @@ export function useScreenData({
   const storiesQ = useCached(enabled && onScreen("stories") ? storiesKey(teamId as string) : null, () =>
     listFetch.stories(teamId as string)
   )
+  // THE STORIES SCREEN'S OWN TAB — `tasksOpenQ`/`tasksAllQ`'s own split, one
+  // collection along: `storiesQ` above stays the untouched, unnarrowed
+  // everyday backlog (breadcrumbs, cross-links, the module settings gear all
+  // read it exactly as before this pass); this is whichever of the five tabs
+  // (`now`/`planned`/`backlog`/`completed`/`all`) the screen is actually
+  // showing, fetched only while Stories is the module on screen. `open` never
+  // reaches this key — the strip has no tab pointing at it any more — so it is
+  // typed narrower than `StoryView` at the call site rather than widened here.
+  const storiesViewQ = useCached(
+    enabled && module === "stories" ? storiesKey(teamId as string, storyView) : null,
+    () => listFetch.stories(teamId as string, storyView)
+  )
   const sprintsQ = useCached(enabled && onScreen("sprints") ? sprintsKey(teamId as string) : null, () =>
     listFetch.sprints(teamId as string)
   )
@@ -235,6 +256,17 @@ export function useScreenData({
       ? tasksKey(teamId as string, "all")
       : null,
     () => listFetch.tasks(teamId as string, "all")
+  )
+  // THE INPUTS SCREEN (Task C, 15 Sep 2026) — what we are waiting on a
+  // client for, on its own sidebar page now. Loaded only on its own
+  // section, like every other collection here; whichever of the three tabs
+  // (Waiting/Overdue/Received) is open is fetched by the SCREEN, on its own
+  // view's key, and every other tab's count comes back with it (R16) —
+  // `listFetch.inputs`'s own doc says why. A to-do has no detail screen of
+  // its own, so there is no by-id fallback to mirror `tasksAllQ`'s.
+  const inputsQ = useCached(
+    enabled && onScreen("inputs") ? inputsKey(teamId as string, inputView) : null,
+    () => listFetch.inputs(teamId as string, inputView)
   )
   // TIME. Loaded only on its own section, like the four above it. R14: PAGED —
   // 2,940 rows arrived from two years of the previous system and every piece of
@@ -299,6 +331,16 @@ export function useScreenData({
     // the worker publishes as a resource — so the shell's ±1 bump on an add
     // lands on the sidecar the heading actually reads.
     stories: useCachedValue<number>(enabled ? totalKey("stories", teamId as string) : null),
+    // THE STORIES TAB STRIP'S FIVE BADGES (client ruling, 15 Sep 2026) —
+    // `tasks*` below's own shape, one collection along: every number exact,
+    // primed by whichever tab's fetch landed (R16).
+    storiesNow: useCachedValue<number>(enabled ? totalKey("stories-now", teamId as string) : null),
+    storiesPlanned: useCachedValue<number>(enabled ? totalKey("stories-planned", teamId as string) : null),
+    storiesBacklog: useCachedValue<number>(enabled ? totalKey("stories-backlog", teamId as string) : null),
+    storiesCompleted: useCachedValue<number>(
+      enabled ? totalKey("stories-completed", teamId as string) : null
+    ),
+    storiesEveryone: useCachedValue<number>(enabled ? totalKey("stories-all", teamId as string) : null),
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
     // OUR OWN ADMIN, seven views and one progress pair — every number exact,
@@ -313,6 +355,14 @@ export function useScreenData({
     tasksCompleted: useCachedValue<number>(enabled ? totalKey("tasks-completed", teamId as string) : null),
     tasksCalendar: useCachedValue<number>(enabled ? totalKey("tasks-calendar", teamId as string) : null),
     tasksDueToday: useCachedValue<number>(enabled ? totalKey("tasks-due-today", teamId as string) : null),
+    // THE INPUTS SCREEN'S THREE TAB BADGES (Task C, 15 Sep 2026) — exact,
+    // primed by whichever tab's fetch landed (R16), the same shape the
+    // Stories tab strip's five take above. Prefixed `todos-`, not `inputs-`
+    // — the cache key names the RESOURCE the door publishes pings about
+    // (still `todos`, unrenamed), never the permission module.
+    inputsWaiting: useCachedValue<number>(enabled ? totalKey("todos-waiting", teamId as string) : null),
+    inputsOverdue: useCachedValue<number>(enabled ? totalKey("todos-overdue", teamId as string) : null),
+    inputsReceived: useCachedValue<number>(enabled ? totalKey("todos-received", teamId as string) : null),
     tasksDueTodayDone: useCachedValue<number>(
       enabled ? totalKey("tasks-due-today-done", teamId as string) : null
     ),
@@ -384,10 +434,12 @@ export function useScreenData({
     knowledgeShapeQ,
     companiesQ,
     storiesQ,
+    storiesViewQ,
     sprintsQ,
     appsQ,
     tasksOpenQ,
     tasksAllQ,
+    inputsQ,
     workLogsQ,
     meetingsQ,
     membersQ,

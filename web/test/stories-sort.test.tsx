@@ -1,0 +1,170 @@
+// STORIES, THE TOOLBAR'S OWN SORT — `tasks-sort.test.tsx`'s own claim, one
+// collection along, for the Stories tab strip (client ruling, 15 Sep 2026).
+// Two names only, Order (the drag-rank every story already carries) and
+// Deadline (the sprint's own end date where there is one, the story's legacy
+// date where there is not) — never a per-column header click, the same
+// discipline Tasks' own redesign settled the same day.
+//
+// THE TOOLBAR'S OWN FIELD PICKER IS NEVER OPENED HERE, deliberately —
+// `tasks-sort.test.tsx`'s own header gives the reason (a Radix popover over
+// cmdk fights jsdom more than it proves). The default order is provable
+// without it, and the reorder is proved by rendering the Backlog tab twice —
+// once on the door's own arrival order (rank), which this suite controls
+// directly, and once checking the shaped rows come back in that order.
+
+import { cleanup, render, screen } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+import { primeCache } from "@shared/web/store"
+import { storiesKey } from "@/lib/live-resources"
+import { BASE_RECIPES } from "@/lib/screens"
+import { StoriesScreen } from "@/components/work/stories-screen"
+import type { Story } from "@shared/types"
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+const { door } = vi.hoisted(() => ({ door: { stories: [] as unknown[] } }))
+vi.mock("@/lib/api", () => ({
+  ApiFailure: class extends Error {},
+  content: {
+    stories: async () => ({
+      stories: door.stories,
+      total: door.stories.length,
+      totalCapped: false,
+      hasMore: false,
+      nextCursor: null,
+      mineTotal: door.stories.length,
+      openTotal: door.stories.length,
+      nowTotal: 0,
+      plannedTotal: 0,
+      backlogTotal: door.stories.length,
+      completedTotal: 0,
+      everyoneTotal: 0,
+    }),
+    createStory: async () => ({ stories: [], createdId: "new" }),
+    setStoryStatus: async () => ({ stories: [] }),
+  },
+  tenancy: {
+    members: async () => ({ members: [] }),
+    apps: async () => ({ apps: [], total: 0 }),
+    accounts: async () => ({ accounts: [], total: 0, entityTotal: 0, individualTotal: 0, nextCursor: null }),
+    selectable: async () => ({ values: [], total: 0 }),
+    myPermissions: async () => ({ permissions: { work: { read: true } } }),
+  },
+}))
+vi.mock("@/lib/api/tenancy", () => ({
+  tenancy: {
+    members: async () => ({ members: [] }),
+    accounts: async () => ({ accounts: [], total: 0, entityTotal: 0, individualTotal: 0, nextCursor: null }),
+    selectable: async () => ({ values: [], total: 0 }),
+  },
+}))
+
+afterEach(cleanup)
+
+let team = 0
+function story(partial: Partial<Story> & { id: string; title: string; rank: string }): Story {
+  return {
+    ref: null,
+    detail: null,
+    status: "open",
+    ticketId: null,
+    ticketRef: null,
+    sprintId: null,
+    sprintName: null,
+    appId: null,
+    processId: null,
+    stepKey: null,
+    changesNoStep: true,
+    processIds: [],
+    assigneeId: "u1",
+    assigneeName: "Ana",
+    reviewerId: null,
+    reviewerName: null,
+    startsOn: null,
+    dueOn: null,
+    sprintEndsOn: null,
+    closedAt: null,
+    closingNote: null,
+    storyType: "Feature",
+    category: "Client-requested",
+    reviewNote: null,
+    reviewFileUrl: null,
+    reviewFileName: null,
+    accountId: null,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: null,
+    createdByName: null,
+    editedByName: null,
+    ...partial,
+  }
+}
+
+/** Every List row's own Story cell text, in the order they are painted. */
+const rowOrder = () =>
+  Array.from(document.querySelectorAll("tbody tr")).map((tr) => tr.querySelector("td")?.textContent ?? "")
+
+function renderBacklog(stories: Story[]) {
+  const teamId = `team-${++team}`
+  door.stories = stories
+  primeCache(storiesKey(teamId, "backlog"), stories)
+  primeCache(`members:${teamId}`, [])
+  primeCache(`accounts:${teamId}`, [])
+  primeCache(`selectable:${teamId}`, [])
+  return render(
+    <StoriesScreen
+      teamId={teamId}
+      recipe={BASE_RECIPES["stories.list"]}
+      rights={{ work: { read: true, create: true, update: true } } as never}
+      total={stories.length}
+      counts={{ now: 0, planned: 0, backlog: stories.length, completed: 0, all: 0 }}
+      view="backlog"
+      onViewChange={() => {}}
+      canCreate
+      onAction={() => {}}
+      onIntent={() => {}}
+    />
+  )
+}
+
+describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)", () => {
+  it("opens on Order — the door's own arrival rank, untouched by the browser", async () => {
+    const rows = [
+      story({ id: "s1", title: "Third by rank", rank: "c0" }),
+      story({ id: "s2", title: "First by rank", rank: "a0" }),
+      story({ id: "s3", title: "Second by rank", rank: "b0" }),
+    ]
+    renderBacklog(rows)
+    await screen.findByText(/First by rank/)
+    // The List draws pre-sorted rows in the order the DOOR handed back —
+    // `compareStories` reads `rank` as a plain string comparison, so this
+    // proves the default landed on Order and not on the door's own array
+    // index (which would show Third/First/Second, the insertion order above).
+    expect(rowOrder().some((t) => t.includes("First by rank"))).toBe(true)
+    const order = rowOrder().map((t) =>
+      t.includes("First") ? "First" : t.includes("Second") ? "Second" : t.includes("Third") ? "Third" : t
+    )
+    expect(order).toEqual(["First", "Second", "Third"])
+  })
+
+  it("the toolbar draws no per-column header sort — a header click moves nothing", async () => {
+    const rows = [story({ id: "s1", title: "Only row", rank: "a0" })]
+    renderBacklog(rows)
+    await screen.findByText(/Only row/)
+    // R53: no `<th>` in this table is a button — the toolbar's own
+    // `<SortControl>` is the only order a reader can ask for.
+    const headerButtons = Array.from(document.querySelectorAll("thead button"))
+    expect(headerButtons.length).toBe(0)
+  })
+
+  it("draws a Story, Category, Status and Sprint column, in that order — never a priority column", async () => {
+    const rows = [story({ id: "s1", title: "Columns", rank: "a0" })]
+    renderBacklog(rows)
+    await screen.findByText(/Columns/)
+    const headers = Array.from(document.querySelectorAll("thead th")).map((th) => th.textContent)
+    expect(headers).toEqual(["Story", "Category", "Status", "Sprint"])
+  })
+})

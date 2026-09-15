@@ -96,7 +96,6 @@ export const SEED: Catalogue = {
   "In portal": { de: "Im Portal", es: "En el portal", ca: "Al portal" },
   Ready: { de: "Fertig", es: "Listo", ca: "Llest" },
   Resolved: { de: "Erledigt", es: "Resuelto", ca: "Resolt" },
-  "In review": { de: "In Prüfung", es: "En revisión", ca: "En revisió" },
   Done: { de: "Erledigt", es: "Hecho", ca: "Fet" },
   Active: { de: "Aktiv", es: "Activo", ca: "Actiu" },
   Archived: { de: "Archiviert", es: "Archivado", ca: "Arxivat" },
@@ -1626,6 +1625,7 @@ export const SEED: Catalogue = {
   "Plan a sprint": { de: "Sprint planen", es: "Planificar un sprint", ca: "Planificar un sprint" },
   "Search waves…": { de: "Wellen durchsuchen…", es: "Buscar waves…", ca: "Cercar waves…" },
   "Sort by": { de: "Sortieren nach", es: "Ordenar por", ca: "Ordenar per" },
+  "Start": { de: "Start", es: "Inicio", ca: "Inici" },
   "Sprint planned, and it is in this wave.": {
     de: "Sprint geplant und in dieser Welle.",
     es: "Sprint planificado y dentro de esta wave.",
@@ -3545,6 +3545,26 @@ export const SEED: Catalogue = {
   "Calm, and out of the way.": { de: "Ruhig und unaufdringlich.", es: "Tranquilo y discreto.", ca: "Tranquil i discret." },
   "Cancel {title}?": { de: "„{title}“ absagen?", es: "¿Cancelar «{title}»?", ca: "Vols cancel·lar «{title}»?" },
   "Change category": { de: "Kategorie ändern", es: "Cambiar categoría", ca: "Canviar categoria" },
+  // NOT THIS LANE'S OWN COPY — found untranslated by this same session's run
+  // of `node scripts/i18n-extract.mjs` (story-detail.tsx / story-form-dialog.tsx,
+  // a story "category" field this session did not build and does not own).
+  // Translated anyway, plainly, rather than left red: R44's ceiling is pinned
+  // at 0 and a session that runs the extractor inherits keeping it there,
+  // the same way `npm run lang` would for anybody who ran it next.
+  "Category": { de: "Kategorie", es: "Categoría", ca: "Categoria" },
+  "Traces to a client ask, or our own upkeep. Editable on the Choices screen.": { de: "Lässt sich auf eine Kundenanfrage oder unsere eigene Pflege zurückführen. Bearbeitbar auf dem Bildschirm „Optionen“.", es: "Se remonta a una petición del cliente o a nuestro propio mantenimiento. Editable en la pantalla Opciones.", ca: "Es remunta a una petició del client o al nostre propi manteniment. Editable a la pantalla Opcions." },
+  // THE STORIES TAB STRIP, 15 Sep 2026 — `tasks-screen.tsx`'s own tab words,
+  // ported one collection along, plus "Backlog" (the client's own correction
+  // over the design proposal's "All" — documents/UI-RULEBOOK.md K entry).
+  // "story" keeps the vocabulary this file already settled on above
+  // (`Aufgabe` / `historia` / `història`).
+  "Backlog": { de: "Backlog", es: "Backlog", ca: "Backlog" },
+  "No sprint": { de: "Kein Sprint", es: "Sin sprint", ca: "Sense sprint" },
+  "No stories with a due date yet.": { de: "Noch keine Aufgaben mit Fälligkeitsdatum.", es: "Aún no hay historias con fecha de vencimiento.", ca: "Encara no hi ha històries amb data de venciment." },
+  "Nothing on this list yet.": { de: "Noch nichts auf dieser Liste.", es: "Aún no hay nada en esta lista.", ca: "Encara no hi ha res en aquesta llista." },
+  "Now": { de: "Jetzt", es: "Ahora", ca: "Ara" },
+  "Order": { de: "Reihenfolge", es: "Orden", ca: "Ordre" },
+  "Stories by status": { de: "Aufgaben nach Status", es: "Historias por estado", ca: "Històries per estat" },
   "Check your connection and try again.": { de: "Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.", es: "Comprueba tu conexión e inténtalo de nuevo.", ca: "Comprova la teva connexió i torna-ho a provar." },
   "Clear the search": { de: "Suche löschen", es: "Borrar la búsqueda", ca: "Esborrar la cerca" },
   "Client visibility": { de: "Sichtbarkeit für den Kunden", es: "Visibilidad para el cliente", ca: "Visibilitat per al client" },
@@ -3571,6 +3591,7 @@ export const SEED: Catalogue = {
   "Deactivate this profile?": { de: "Dieses Profil deaktivieren?", es: "¿Desactivar este perfil?", ca: "Vols desactivar aquest perfil?" },
   "Decide": { de: "Entscheiden", es: "Decidir", ca: "Decidir" },
   "Earlier": { de: "Früher", es: "Antes", ca: "Abans" },
+  "End": { de: "Ende", es: "Fin", ca: "Fi" },
   "Every meeting they're in will show here once one is arranged.": { de: "Jeder Termin, an dem sie beteiligt sind, erscheint hier, sobald einer vereinbart ist.", es: "Aquí aparecerá cada reunión en la que participen, en cuanto se organice una.", ca: "Aquí apareixerà cada reunió en què participin, quan se n'organitzi una." },
   "Every ticket about them will show here once one is raised.": { de: "Jedes Ticket zu ihnen erscheint hier, sobald eines eingereicht wird.", es: "Aquí aparecerá cada ticket sobre ellos, en cuanto se cree uno.", ca: "Aquí apareixerà cada tiquet sobre ells, quan se'n creï un." },
   "Everyone": { de: "Alle", es: "Todos", ca: "Tots" },
@@ -3606,7 +3627,6 @@ export const SEED: Catalogue = {
      so it agrees in gender and number with the collection it narrows —
      `Termine` / `Reuniones` / `Reunions`. */
   Mine: { de: "Meine", es: "Mías", ca: "Meves" },
-  "No account": { de: "Kein Kunde", es: "Sin cuenta", ca: "Sense compte" },
   "No contacts match": { de: "Keine Kontakte passen", es: "No hay contactos que coincidan", ca: "Cap contacte coincideix" },
   "No departments yet.": { de: "Noch keine Abteilungen.", es: "Aún no hay departamentos.", ca: "Encara no hi ha departaments." },
   "No inputs match": { de: "Keine Angaben passen", es: "No hay aportaciones que coincidan", ca: "Cap aportació coincideix" },
@@ -3621,6 +3641,8 @@ export const SEED: Catalogue = {
   "No tools yet.": { de: "Noch keine Werkzeuge.", es: "Aún no hay herramientas.", ca: "Encara no hi ha eines." },
   "No waves have both a start and an end in this window yet.": { de: "Noch keine Wave mit Start und Ende in diesem Zeitraum.", es: "Aún ninguna wave tiene inicio y fin en este período.", ca: "Encara cap wave té inici i final en aquest període." },
   "No waves match that in this window.": { de: "Keine Wave passt dazu in diesem Zeitraum.", es: "Ninguna wave coincide con eso en este período.", ca: "Cap wave hi coincideix en aquest període." },
+  "No waves match that.": { de: "Keine Wave passt dazu.", es: "Ninguna wave coincide con eso.", ca: "Cap wave hi coincideix." },
+  "No waves or sprints have a start date yet.": { de: "Noch keine Wave oder kein Sprint mit einem Startdatum.", es: "Aún ninguna wave o sprint tiene fecha de inicio.", ca: "Encara cap wave o sprint té data d'inici." },
   "Nobody here can sign in yet.": { de: "Niemand kann sich hier noch anmelden.", es: "Nadie aquí puede iniciar sesión todavía.", ca: "Ningú aquí pot accedir encara." },
   "Nobody on our side matches that.": { de: "Niemand von uns passt dazu.", es: "Nadie de nuestro lado coincide con eso.", ca: "Ningú del nostre costat hi coincideix." },
   "Nobody on the client's side matches that.": { de: "Niemand auf Seiten des Kunden passt dazu.", es: "Nadie del lado del cliente coincide con eso.", ca: "Ningú del costat del client hi coincideix." },
@@ -3628,7 +3650,6 @@ export const SEED: Catalogue = {
   "Not linked to a company.": { de: "Nicht mit einem Unternehmen verknüpft.", es: "No vinculado a una empresa.", ca: "No vinculat a una empresa." },
   "Not shared": { de: "Nicht freigegeben", es: "No compartido", ca: "No compartit" },
   "Nothing built for {account} yet.": { de: "Für {account} wurde noch nichts gebaut.", es: "Aún no se ha construido nada para {account}.", ca: "Encara no s'ha construït res per a {account}." },
-  "Nothing here": { de: "Nichts hier", es: "Nada aquí", ca: "Res aquí" },
   "Nothing in Meetings this week.": { de: "Diese Woche nichts in Terminen.", es: "Nada en Reuniones esta semana.", ca: "Res a Reunions aquesta setmana." },
   "Nothing in Meetings yet.": { de: "Noch nichts in Terminen.", es: "Aún nada en Reuniones.", ca: "Encara res a Reunions." },
   /* The Mine tab's empty state — it says the RULE the tab uses (attendance),
@@ -3662,6 +3683,24 @@ export const SEED: Catalogue = {
   "Search companies": { de: "Unternehmen durchsuchen", es: "Buscar empresas", ca: "Cercar empreses" },
   "Search contacts": { de: "Kontakte durchsuchen", es: "Buscar contactos", ca: "Cercar contactes" },
   "Search inputs…": { de: "Angaben durchsuchen…", es: "Buscar aportaciones…", ca: "Cercar aportacions…" },
+  /* ── THE INPUTS SCREEN (Task C, 15 Sep 2026) — seeded rather than left to
+   * the generator so TRANSLATION_CEILING does not have to rise for them
+   * (R44 — the pin falls and never rises). Terminology follows the
+   * established R44-pass choice for the glossary's Input word — "Angabe" /
+   * "Aportación" / "Aportació", singular here (the tab strip's own
+   * `{count} inputs match` already uses the plural, seeded). "Due" is
+   * deliberately shorter than "Deadline" ("Frist"/"Fecha límite"/"Data
+   * límit", i18n-catalogue.ts): the client's own I1 column is terse on
+   * purpose, so the translation stays terse too. */
+  "Input": { de: "Angabe", es: "Aportación", ca: "Aportació" },
+  "Due": { de: "Fällig", es: "Vence", ca: "Venç" },
+  "Received": { de: "Erhalten", es: "Recibido", ca: "Rebut" },
+  "Received on": { de: "Erhalten am", es: "Recibido el", ca: "Rebut el" },
+  "Waiting longest": { de: "Am längsten wartend", es: "Más tiempo esperando", ca: "Més temps esperant" },
+  "{count} days": { de: "{count} Tage", es: "{count} días", ca: "{count} dies" },
+  "Mark received": { de: "Als erhalten markieren", es: "Marcar como recibido", ca: "Marcar com a rebut" },
+  "Marked received.": { de: "Als erhalten markiert.", es: "Marcado como recibido.", ca: "Marcat com a rebut." },
+  "Couldn't mark that received.": { de: "Das konnte nicht als erhalten markiert werden.", es: "No se pudo marcar eso como recibido.", ca: "No s'ha pogut marcar això com a rebut." },
   "Search logins": { de: "Zugänge durchsuchen", es: "Buscar accesos", ca: "Cercar accessos" },
   "Search logins…": { de: "Zugänge durchsuchen…", es: "Buscar accesos…", ca: "Cercar accessos…" },
   "Search meetings": { de: "Termine durchsuchen", es: "Buscar reuniones", ca: "Cercar reunions" },

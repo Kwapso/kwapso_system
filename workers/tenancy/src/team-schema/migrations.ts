@@ -6581,6 +6581,160 @@ UPDATE meeting_purposes
    AND name NOT IN (${MEETING_TYPES.map((t) => sqlString(t.name)).join(", ")});
 `,
   },
+  {
+    // ── STORY TYPE, RULED AGAIN, AND A NEW FIELD BESIDE IT — client ruling,
+    // 15 Sep 2026, verbatim: "story TYPE changes from {Fix, Feature, Change} to
+    // exactly Data · Tech · Bug · Feature · Change" (Data = changing values
+    // inside records; Tech = under-the-hood, invisible to users; Bug =
+    // something that should work is broken/missing/wrong; Feature =
+    // brand-new capability; Change = default, modifying something that
+    // already works — copy/email wording is Change, there is no "Content"
+    // type). AND A NEW FIELD, Category: Client-requested (default, traces to
+    // a client ticket or ask) or Internal (Kwapso-initiated upkeep). "Do NOT
+    // assign any priority or urgency. Stories do not have that."
+    //
+    // ADDED, NEVER SWAPPED — this ledger's usual shape for a vocabulary (0028,
+    // 0034): Data, Tech and Bug are new PROTECTED rows (`is_default = 1`, the
+    // column the app reads as "Protected" — unchanged since 2026-09-10, see
+    // `protected-is-active`); Feature and Change already exist (0028) and are
+    // untouched. Fix is DEACTIVATED, never deleted: the reclassification lane
+    // rewrites the stories that still name it on its own schedule, and
+    // deleting the word out from under them first would leave every one with
+    // no mark and no tab — `shared/selectable-homes.ts`'s own opening
+    // paragraph, one word along. Marks follow the same two-letter-code shape
+    // 0034's own header argues for (never a pictograph, R66): DA / TC / BG.
+    //
+    // A NEW GROUP, "Story category", with the same PROTECTED shape as every
+    // other closed, code-relied-on vocabulary here (Ticket status, Story
+    // status): a team may reword either value on its own Dropdown values
+    // screen, but may not switch either off, because `category` is read as a
+    // REQUIRED field from this migration onward (defaulted on every create)
+    // and a vocabulary with zero live rows would leave a required field with
+    // nothing to pick.
+    //
+    // THE COLUMN ITSELF, back-filled rather than left nullable. Unlike
+    // `story_type` (0028's own header: "a column that refused to describe
+    // them would be a column that lied about what is in the table") there is
+    // exactly one honest default for a column that did not exist yesterday,
+    // so every existing row is stamped 'Client-requested' rather than shipped
+    // with a hole the way story_type was. `WHERE category IS NULL` makes the
+    // back-fill idempotent on a re-run and safe beside a row a concurrent
+    // write may already have stamped.
+    version: "0093_story_type_and_category",
+    sql: `
+ALTER TABLE stories ADD COLUMN category TEXT;
+UPDATE stories SET category = 'Client-requested' WHERE category IS NULL;
+
+${[
+  { value: "Data", mark: "DA" },
+  { value: "Tech", mark: "TC" },
+  { value: "Bug", mark: "BG" },
+]
+  .map(
+    (t) => `INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Story type', ${sqlString(t.value)}, 1, ${sqlString(t.mark)}, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Story type' AND s.value = ${sqlString(t.value)});`
+  )
+  .join("\n")}
+
+UPDATE selectable_data SET deactivated_at = datetime('now'), deactivator_name = 'System'
+ WHERE type = 'Story type' AND value = 'Fix' AND deactivated_at IS NULL;
+
+${["Client-requested", "Internal"]
+  .map(
+    (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Story category', ${sqlString(v)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Story category' AND s.value = ${sqlString(v)});`
+  )
+  .join("\n")}
+`,
+  },
+  {
+    // EVERYONE ELSE'S STORIES — the Stories tabs redesign's "Everyone's" tab
+    // (documents/UI-RULEBOOK.md, K entry dated 15 Sep 2026) needs a right to
+    // gate on, the same shape 0033 gave `all_tasks` for the identical
+    // question about a different module: "may this role see everyone's
+    // stories, or only their own". `work` already decides whether a role
+    // reaches the Stories screen at all; this decides whether the backlog it
+    // sees is the whole team's or its own. `is_default` is 1 on the locked
+    // Admin role alone, so it doubles as the grant: Admin gains it in full,
+    // every other role gains nothing, 0033's own shape exactly — `can_update`
+    // here rather than 0033's `can_edit` because 0086 renamed the column
+    // between the two, and this migration runs after that rename. New teams
+    // don't reach this migration for their OWN rows: `TEAM_MODULES`
+    // (shared/team-modules.ts) carries `all_stories` now, so
+    // `buildTeamSeed`'s loop over every module already writes them, off, the
+    // same way it always has for `all_tasks`.
+    version: "0094_everyones_stories",
+    sql: `
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'all_stories', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'all_stories'
+ );
+`,
+  },
+  {
+    // THE INPUTS SCREEN (Task C, 15 Sep 2026 — documents/UI-RULEBOOK.md K
+    // entry) gave the client's own to-do screen a top-level sidebar home,
+    // and R36 ("no door without a box") is read here the other way round: a
+    // door that RENAMED which box it needs. The permission module was
+    // `todos`; every door on `workers/content/src/routes/todos.ts` now gates
+    // on `inputs` (shared/team-modules.ts carries the new key). The TABLE is
+    // untouched — still `todos`, still the ref kind, still the cache-key
+    // prefix and the activity `relatedTable` — only the string in
+    // `role_permissions.module` moves.
+    //
+    // TWO STATEMENTS, ONE HONEST MIGRATION. The first RENAMES what every
+    // existing role already held: whatever a role's four boxes said under
+    // `todos` — an owner who had granted `todos: read + update` to a Client
+    // role keeps exactly that, now spelled `inputs: read + update` — a role
+    // that never touched the module keeps its zeros. Nothing is re-decided,
+    // which is the whole point of a rename rather than a fresh seed: an
+    // UPDATE, not a DELETE-then-INSERT, so a role's own row id (and its own
+    // created_at) survive the move too. Idempotent by construction — the
+    // second run's WHERE matches nothing, because nothing is left wearing
+    // the old name.
+    //
+    // The second is 0094's own shape, one switch along: `all_inputs`, off
+    // for everyone but the locked Admin role (`is_default`), because
+    // `all_tasks`/`all_stories` already established that "may see everyone
+    // else's" defaults OFF except for the role that starts holding
+    // everything. New teams don't reach this migration for their OWN rows —
+    // `TEAM_MODULES` carries both `inputs` and `all_inputs` now, so
+    // `buildTeamSeed`'s loop over every module already writes them for a
+    // team created after this ships.
+    //
+    // THE THIRD IS A SAFETY NET, NOT A DECISION — `todos` has been a module
+    // since long before this file's own history splits into "back-filled"
+    // and "shipped with 0001" (team-schema.test.ts's own `FROM_THE_FIRST_SCHEMA`
+    // ratchet), so every role on every existing team should already carry a
+    // `todos` row for the first statement to rename. This is what closes the
+    // gap if that is ever wrong for a role this migration cannot see coming
+    // (a role built by hand, outside `buildTeamSeed`) — `r.is_default` for
+    // all four rights, the identical shape the second statement takes, so an
+    // ordinary role is never over-granted by a line that exists only to
+    // cover a role that should already have had the row.
+    version: "0095_todos_permission_renamed_inputs",
+    sql: `
+UPDATE role_permissions SET module = 'inputs' WHERE module = 'todos';
+
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'inputs', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'inputs'
+ );
+
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'all_inputs', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'all_inputs'
+ );
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

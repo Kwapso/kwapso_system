@@ -888,14 +888,26 @@ describe("RULES — the laws of the base", () => {
       offenders,
       `use <RecordCalendar> — the kit's calendar/agenda need the host's wiring to open a record (UI-GAPS #22): ${offenders.join(", ")}`
     ).toEqual([])
-    // iv · and every screen that shows one wires it to the engine's open intent.
+    // iv · and every screen that shows one wires it to the engine's open intent
+    // — OR, for a host-composed screen whose calendar mixes two DIFFERENT
+    // record shapes on one grid (Waves, 2026-09-15: a wave's own chip and a
+    // sprint's nested one, `/waves/<id>/sprints/<sprintId>`), proves its own
+    // `onOpen` body actually calls `softNavigate` — a single
+    // `onIntent({kind:"open", module, id})` cannot express a nested route that
+    // is not the engine's module dispatch at all, so the alternative is a
+    // second, narrower proof (the click really navigates) rather than an
+    // unchecked escape hatch.
     const wired = componentFiles().filter((f) => read(f).includes("<RecordCalendar"))
     expect(wired.length, "no screen renders the calendar — this check has gone blind").toBeGreaterThan(2)
-    for (const f of wired)
+    for (const f of wired) {
+      const src = read(f)
+      const engineWired = /onOpen=\{\(id\) => onIntent\(\{ kind: "open"/.test(src)
+      const hostWired = /onOpen=\{\(id\) => \{[\s\S]{0,400}?softNavigate\(/.test(src)
       expect(
-        /onOpen=\{\(id\) => onIntent\(\{ kind: "open"/.test(read(f)),
-        `${f} shows a calendar whose records go nowhere — pass onOpen through onIntent`
+        engineWired || hostWired,
+        `${f} shows a calendar whose records go nowhere — pass onOpen through onIntent, or (a host-composed screen with mixed record shapes) call softNavigate from onOpen`
       ).toBe(true)
+    }
   })
 
   // A RECORD DETAIL MAY NOT LOOK ITS RECORD UP IN A PAGE.

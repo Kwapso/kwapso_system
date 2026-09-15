@@ -422,6 +422,7 @@ export function SprintDetailScreen({
         appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
+        categories={options.categories}
         draftKey={`story:add:sprint:${sprintId}`}
         defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {

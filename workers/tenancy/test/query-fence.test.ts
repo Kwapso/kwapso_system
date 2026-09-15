@@ -596,6 +596,8 @@ const NOT_A_ROW_FENCE: Record<string, string> = {
     "the account DETAIL door withholds the nested `portalUsers` array, a field of one record — the query grammar declares no portal-user field at all, so there is nothing here to narrow",
   "knowledge_sources:google:read":
     "the knowledge SYNC-STATUS door adds the Google connection's state beside the counts; it withholds an extra, not a row",
+  "todos:all_inputs:read":
+    "an HONEST GAP, not a clean fit — unlike `all_tasks`/`all_stories`, `all_inputs:read` genuinely DOES narrow which rows come back (getTodos, workers/content/src/routes/todos.ts, narrows to the accounts the caller manages), but `narrow.column` names a plain column on the module's own aliased row and `account_manager_user_id` sits on `accounts`, one JOIN away — there is no todos.account_manager_user_id for the generic engine to compare. Widening `narrow` to a joined predicate is a real fix and is not this one; until then, a caller without `all_inputs:read` who reaches `query_records` on `todos` sees every account's, where the Inputs screen would have shown only their own — written down rather than silently passed.",
 }
 
 describe("the second-switch pins are still real", () => {

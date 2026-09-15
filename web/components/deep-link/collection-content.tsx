@@ -41,6 +41,7 @@ import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
 import { AccountsScreen } from "@/components/accounts/accounts-screen"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
+import { InputsScreen } from "@/components/accounts/inputs-screen"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
@@ -77,6 +78,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     onAction,
     onIntent,
     sectionPath,
+    inputsQ,
+    inputView,
+    setInputView,
+    lang,
   } = ctx
 
   // TIME — the one collection with NO recipe, so it is answered before the
@@ -159,6 +164,15 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         recipe={recipe}
         rights={rights}
         total={totals.stories}
+        counts={{
+          now: totals.storiesNow,
+          planned: totals.storiesPlanned,
+          backlog: totals.storiesBacklog,
+          completed: totals.storiesCompleted,
+          all: totals.storiesEveryone,
+        }}
+        view={ctx.storyView}
+        onViewChange={ctx.setStoryView}
         canCreate={can("work", "create")}
         onImport={() =>
           openInNewTab(`/t/${teamId}/import/stories`, `${t("Import")} · ${IMPORT_TARGET_LABEL.stories}`)
@@ -344,6 +358,35 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         onAction={onAction}
         onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "inputs") {
+    // WHAT WE ARE WAITING ON A CLIENT FOR — the Inputs screen (Task C, 15
+    // Sep 2026, documents/UI-RULEBOOK.md K entry). Its own file, the same
+    // reason Contacts and Accounts are: `use-screen-data.ts` already loads
+    // `inputsQ` on this section alone (cache-first + row-level live), and
+    // this is only the wiring.
+    if (inputsQ.error) return <LoadError what="the inputs" />
+    return (
+      <InputsScreen
+        teamId={teamId as string}
+        t={t}
+        lang={lang}
+        recipe={recipe}
+        inputsQ={inputsQ}
+        total={
+          inputView === "received"
+            ? totals.inputsReceived
+            : inputView === "overdue"
+              ? totals.inputsOverdue
+              : totals.inputsWaiting
+        }
+        counts={{ waiting: totals.inputsWaiting, overdue: totals.inputsOverdue, received: totals.inputsReceived }}
+        view={inputView}
+        onViewChange={setInputView}
+        canCreate={can("inputs", "create")}
+        canUpdate={can("inputs", "update")}
       />
     )
   }

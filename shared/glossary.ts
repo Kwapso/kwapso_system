@@ -99,6 +99,21 @@ export const GLOSSARY = {
   // a task is our own admin. Keeping those four apart in the words is what keeps
   // them apart on the screens.
   story: { term: "Story", def: "One piece of work we do. It carries who's doing it and by when, and lives in a sprint." },
+  // THE FIVE STORY TYPES, AND THE TWO CATEGORIES BESIDE THEM — the client's
+  // ruling, 15 Sep 2026, in her own words (team migration 0093 carries the
+  // ruling verbatim; this is the short form for the dictionary). Type answers
+  // "what kind of work is this"; Category answers "where did it come from" —
+  // two different questions, so two separate entries rather than one dropdown
+  // folded into the other. "Do NOT assign any priority or urgency. Stories do
+  // not have that" — the same ruling, which is why neither entry below is a
+  // priority wearing a different name.
+  storyTypeData: { term: "Data", def: "A story type: changing values inside records, not the software around them." },
+  storyTypeTech: { term: "Tech", def: "A story type: work under the hood, invisible to the people using the system." },
+  storyTypeBug: { term: "Bug", def: "A story type: something that should work is broken, missing or wrong." },
+  storyTypeFeature: { term: "Feature", def: "A story type: a brand-new capability that did not exist before." },
+  storyTypeChange: { term: "Change", def: "A story type, and the default: modifying something that already works — copy and email wording included." },
+  storyCategoryClientRequested: { term: "Client-requested", def: "A story's category, and the default: it traces back to a client ticket or ask." },
+  storyCategoryInternal: { term: "Internal", def: "A story's category: work Kwapso started on its own, not asked for by a client." },
   todo: { term: "Input", def: "Something we need from a client. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
   sprint: { term: "Sprint", def: "A block of delivery work sold to one account, with a start, an end and a price." },

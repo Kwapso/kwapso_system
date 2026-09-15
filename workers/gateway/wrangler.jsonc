@@ -45,7 +45,7 @@
       "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
       "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-      "/brand/*", "/purposes/*", "/contacts/*",
+      "/brand/*", "/purposes/*", "/contacts/*", "/inputs/*",
       "/settings/*"
     ]
   },
@@ -96,7 +96,7 @@
           "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
           "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-          "/brand/*", "/purposes/*", "/contacts/*",
+          "/brand/*", "/purposes/*", "/contacts/*", "/inputs/*",
           "/settings/*"
         ]
       },

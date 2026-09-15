@@ -97,7 +97,7 @@ describe("a story is what lets a request move on", () => {
     const sprintId = await aSprint()
     await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Unrelated work",
-      storyType: "Fix",
+      storyType: "Feature",
       sprintId,
       changesNoStep: true,
     })
@@ -114,7 +114,7 @@ describe("a story is what lets a request move on", () => {
     // 5.4 asked for ("a status is a fact, not a button").
     const res = await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Make the board responsive",
-      storyType: "Fix",
+      storyType: "Feature",
       ticketId,
       sprintId,
       changesNoStep: true,
@@ -128,7 +128,7 @@ describe("a story is what lets a request move on", () => {
     const sprintId = await aSprint()
     await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Make the board responsive",
-      storyType: "Fix",
+      storyType: "Feature",
       ticketId,
       sprintId,
       changesNoStep: true,
@@ -154,7 +154,7 @@ describe("a story is what lets a request move on", () => {
 
     const res = await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Work this person may not book",
-      storyType: "Fix",
+      storyType: "Feature",
       ticketId,
       sprintId,
       changesNoStep: true,
@@ -171,7 +171,7 @@ describe("a story is what lets a request move on", () => {
     const write = () =>
       call(IDS.staffUser, "POST /api/content/stories", {
         title: "More of the same work",
-        storyType: "Fix",
+        storyType: "Feature",
         ticketId,
         sprintId,
         changesNoStep: true,

@@ -47,7 +47,31 @@ export const TEAM_MODULES = [
   // module on the tall sheet), and Aurora's ruling was that this particular
   // question must be configurable rather than settled once for everybody.
   "all_tasks",
-  "todos",
+  // EVERYONE ELSE'S STORIES — `all_tasks`'s own shape, one module along. The
+  // Stories tabs redesign (client ruling, 15 Sep 2026) added an "Everyone's"
+  // tab the same way Tasks already has one, so it needs the same kind of
+  // switch: `work` already decides whether a role reaches the Stories screen
+  // at all, this decides whether the backlog it sees is the whole team's or
+  // its own. Migration 0094 seeds it for every team that already exists.
+  "all_stories",
+  // RENAMED FROM `todos` 15 SEP 2026 (Task C, the Inputs screen — documents/
+  // UI-RULEBOOK.md K entry). The TABLE is still `todos`, the ref kind is
+  // still `todos`, and every cache key/activity relatedTable still says
+  // `todos` — only the PERMISSION BOX changes name, to the word the glossary
+  // and the label below have used since 31 Aug 2026. Team migration 0095
+  // carries every role's existing `todos` grants over to this key untouched
+  // (R36: a rename must not silently reset what a role already held).
+  "inputs",
+  // EVERYONE ELSE'S INPUTS — `all_tasks`/`all_stories`'s own shape, a third
+  // time. An input is owed BY a client TO us, so nobody on staff "owns" one
+  // the way they own a task or a story (the Inputs screen's own I1 design
+  // note: "no Mine tab — an input is owed by a client to us"); what this
+  // switch decides instead is whether the screen's three tabs (Waiting/
+  // Overdue/Received) show every account's, or only the accounts THIS
+  // caller themselves manages (`account_manager_user_id`). Without it, a
+  // person sees their own accounts' inputs only — narrowed, never refused,
+  // the same shape `all_tasks:read` narrows Overdue/Planned/Completed by.
+  "all_inputs",
   // MEETINGS — its own switch, because a meeting's NOTES are the thing being
   // permissioned. The taxonomy of why we meet lives under `delivery`; what was
   // said in the room is a different question to ask a role about.
@@ -157,12 +181,30 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // and `agent`: the module IS the switch, and creating or editing a task is
   // still `work`'s decision.
   all_tasks: "Everyone's tasks",
+  // Read the row as a sentence, `all_tasks`'s own: "this role may see
+  // everyone's stories". Without it the Stories screen still works — it
+  // shows the backlog assigned to you, Now/Planned/Backlog/Completed
+  // included — and every count above those four tabs counts the same
+  // narrowed question. Only `read` is meaningful here, like `all_tasks`:
+  // creating or editing a story is still `work`'s decision.
+  all_stories: "Everyone's stories",
   // TO-DOS — the one part of the work engine a client login can WRITE to, which
   // is exactly why it is its own module and not four more rights on `work`. A
   // contact completes theirs and uploads a file against it from the portal
   // (SCOPE ch.06, one of the six things a contact can do), so an owner grants
-  // `todos: read + update` to their Client role and grants nothing else.
-  todos: "Inputs",
+  // `inputs: read + update` to their Client role and grants nothing else. THE
+  // KEY WAS `todos` UNTIL 15 SEP 2026 — the label already read "Inputs" (31
+  // Aug 2026, the client's own follow-up naming the glossary term); the box
+  // itself carried the old word for two weeks after the word it decides had
+  // already changed. Team migration 0095 is the rename.
+  inputs: "Inputs",
+  // EVERYONE ELSE'S INPUTS — read the row as a sentence, `all_tasks`'s own:
+  // "this role may see every account's inputs, not only the ones they
+  // manage." Without it the Inputs screen still works — it narrows to the
+  // caller's own managed accounts — and only `read` is meaningful here, like
+  // `all_tasks`/`all_stories`: creating, completing or withdrawing an input
+  // is still `inputs`'s own decision.
+  all_inputs: "Everyone's inputs",
   // MEETINGS. A record of a conversation — when it was, why we met, what was on
   // the agenda and what was decided. AGENCY material: the notes are ours, taken
   // for us, and often about the client rather than for them, so every door on it
@@ -303,6 +345,15 @@ export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHT
   // A switch over a SIGHT, not over a record: "may this role see everyone's
   // tasks, or only their own". Creating and editing a task is `work`'s call.
   all_tasks: ["read"],
+  // A switch over a SIGHT, not over a record — `all_tasks`'s own reasoning,
+  // one module along: "may this role see everyone's stories, or only their
+  // own". Creating and editing a story is still `work`'s call.
+  all_stories: ["read"],
+  // A switch over a SIGHT, not over a record — the third of the three
+  // "everyone else's" rows. "May this role see every account's inputs, or
+  // only the ones it manages." Asking for/completing/withdrawing an input is
+  // still `inputs`'s own call.
+  all_inputs: ["read"],
   // READ-ONLY SINCE 10 SEP 2026, and it is the client's two rulings that made it
   // so. `commercials` had three rate cards behind it and now has none: the
   // agency's own two went with the internal rates ("kill the whole internal rates

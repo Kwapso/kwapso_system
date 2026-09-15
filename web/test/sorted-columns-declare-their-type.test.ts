@@ -134,6 +134,34 @@ const DOOR_ORDERED: Record<string, string> = {
     "line up — `COMPLETED_COLUMNS`' own extra field, formatted the same way, " +
     "sorted nowhere in the browser for the same reason."
   ),
+  start: (
+    "Waves' own List (web/components/work/waves-screen.tsx, waveListColumns). " +
+    "The identical `deadline` shape: `WaveFinder`'s own toolbar `<SortControl>` " +
+    "(\"When it runs\") is the one control this bounded, browser-held collection " +
+    "is ordered by, and `waveListColumns` gives none of its six columns a " +
+    "`sort` key — `record-table.tsx`'s `ordered()` returns the rows untouched " +
+    "with no header to click. The cell is real (`formatDate`) and the column " +
+    "is real, but neither the door nor the browser ever compares it."
+  ),
+  end: (
+    "Waves' own List, the identical reasoning `start` carries one line up — " +
+    "the same `waveListColumns`, the same missing `sort` key, the same " +
+    "toolbar-owned order."
+  ),
+  due: (
+    "Inputs (web/components/accounts/inputs-screen.tsx). The identical " +
+    "`deadline`/`start` shape: the screen's `<PagedFind>` passes " +
+    "`order={found.order}` to `<RecordTable>`, and INPUT_COLUMNS gives none " +
+    "of its six columns a `sort` key — `record-table.tsx`'s `ordered()` " +
+    "returns the rows untouched with no header to click. The order is the " +
+    "toolbar's own Due/Waiting-longest `<SortControl>` (`inputSortOptions`), " +
+    "asked of the door, never compared in the browser."
+  ),
+  receivedOn: (
+    "Inputs, the identical reasoning `due` carries one line up — the same " +
+    "INPUT_COLUMNS, the same missing `sort` key, the same toolbar-owned, " +
+    "door-side order."
+  ),
 }
 
 /** Every `key: value` line in a file where the value calls a formatter. */
@@ -223,6 +251,13 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // adds column keys and no offenders, which is the shape a new table
       // should have.
       "web/components/accounts/contacts-screen.tsx",
+      // The Inputs screen (Task C, 15 Sep 2026) — the same PagedFind +
+      // RecordTable pairing Contacts draws one line up. It DOES carry two
+      // formatted cells (Due, Received on), both DOOR_ORDERED below: the
+      // toolbar's own Due/Waiting-longest `<SortControl>` is what orders
+      // it, through `order={found.order}` — no column carries a `sort` key,
+      // so `record-table.tsx`'s own `ordered()` returns the rows untouched.
+      "web/components/accounts/inputs-screen.tsx",
       // Meetings drew a `RecordTable` here too, 2026-09-15 (AM) — gone the
       // same evening (client ruling: "replace the view table for list"), so
       // this file is out of the net again and `when`/`time` came out of
@@ -245,7 +280,19 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // Choices and Automations, NO formatted cell: Name, Department and
       // Status are all words or nodes, never a date or a number.
       "web/components/team/internal-screens.tsx",
+      // The Stories tab strip's own List view, 15 Sep 2026 — `tasks-screen.tsx`'s
+      // own shape, one collection along. NO formatted cell: Story, Category,
+      // Status, Sprint and Who has it are all words or nodes, never a date or
+      // a number — sorting (Order/Deadline) lives in the toolbar's own
+      // `<SortControl>`, never a column header.
+      "web/components/work/stories-screen.tsx",
       "web/components/work/tasks-screen.tsx",
+      // Waves' own List, All tab only, 2026-09-15 ("for waves i choose t3" —
+      // the same ruling that put a timeline and a calendar on the other two
+      // views). Two formatted cells, Start and End, both `DOOR_ORDERED`
+      // above for the identical reason `deadline` is: the toolbar's own
+      // `<SortControl>` owns the order, and no column carries a `sort` key.
+      "web/components/work/waves-screen.tsx",
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)
     expect(cells.size, "no formatted cells were found in any shaper").toBeGreaterThan(3)

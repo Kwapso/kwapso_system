@@ -145,14 +145,16 @@ describe("the sidebar sequence the client fixed", () => {
     expect(composeLikeTheShell().named[1]).toEqual(["waves", "apps", "stories"])
   })
 
-  it("puts Accounts third, both pages the client named", () => {
+  it("puts Accounts third, all three pages the client named", () => {
     // "accounts: accounts, contacts" — Contacts had no first-class page to
     // point a rail entry at when this suite first named the gap (it was a tab
     // on the account record, gated by its own `contacts` right); the client
     // later answered the flag explicitly ("contacts as a real sidebar page,
     // also remove the tab from inside accounts", 31 Aug 2026), so both of the
-    // client's own words now name a real page.
-    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts"])
+    // client's own words now name a real page. INPUTS joined 15 Sep 2026
+    // (Task C — "I would like to see this in the third section of the
+    // accounts section on the sidebar"), third in the group, after both.
+    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts", "inputs"])
   })
 
   it("has exactly three named sections — Kwapso is not a fourth", () => {

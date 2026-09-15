@@ -1212,6 +1212,7 @@ export function HelpDetailScreen({
         appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
+        categories={options.categories}
         draftKey={`story:add:ticket:${helpId}`}
         defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {

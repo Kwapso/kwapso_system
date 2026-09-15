@@ -21,9 +21,11 @@ import { COLLECTION_SORTS } from "@/lib/collection-sorts"
 import {
   HELP_STATUSES,
   OPEN_TAB_STATUSES,
+  STORY_VIEWS,
   TASK_VIEWS,
   type HelpStatus,
   type Meeting,
+  type StoryViewName,
   type TaskViewName,
 } from "@shared/types"
 import { RECORD_CHILDREN } from "@shared/record-counts"
@@ -216,15 +218,31 @@ export const listFetch = {
   // R14: stories are PAGED — the backlog only grows, and the 3,677 rows arriving
   // from the previous system are there on day one. Page one lands in the cache,
   // its next cursor in the sidecar <LoadMore> reads.
-  stories: (teamId: string) =>
-    contentApi.stories().then((r) => {
+  //
+  // EVERY TAB'S BADGE COMES BACK FROM ANY VIEW'S FETCH (`tasks()`'s own note,
+  // one collection along) — the five Stories tabs, plus the untouched
+  // `openTotal` sidecar every non-tab consumer already reads. `total` stays
+  // the count over what was LISTED (whichever view this call asked for).
+  stories: (teamId: string, view: StoryViewName = "open") =>
+    contentApi.stories({ view }).then((r) => {
       // The total prefix is `stories`, which is also the RESOURCE name the
       // worker publishes — that is what lets the shell's ±1 bump on an add/remove
       // land on the sidecar this screen reads. It used to be `work`, so a
       // colleague adding a story moved a badge nobody was looking at.
-      primeCache(totalKey("stories", teamId), r.total)
+      //
+      // FROM `openTotal`, NEVER FROM `total` — `total` is whichever view THIS
+      // call asked for, and priming the everyday badge from a narrowed tab's
+      // own count would leave every OTHER screen reading `totalKey("stories",
+      // …)` showing that tab's number (`tasks.ts`'s own note on `openTotal`
+      // vs. `total`, carried over verbatim).
+      primeCache(totalKey("stories", teamId), r.openTotal ?? r.total)
       primeCache(totalKey("stories-mine", teamId), r.mineTotal)
-      primeCache(cursorKey(storiesKey(teamId)), r.nextCursor)
+      primeCache(totalKey("stories-now", teamId), r.nowTotal ?? 0)
+      primeCache(totalKey("stories-planned", teamId), r.plannedTotal ?? 0)
+      primeCache(totalKey("stories-backlog", teamId), r.backlogTotal ?? 0)
+      primeCache(totalKey("stories-completed", teamId), r.completedTotal ?? 0)
+      primeCache(totalKey("stories-all", teamId), r.everyoneTotal ?? 0)
+      primeCache(cursorKey(storiesKey(teamId, view)), r.nextCursor)
       return r.stories
     }),
   // R14: time is PAGED — 2,940 rows arrived from two years of the previous
@@ -247,6 +265,26 @@ export const listFetch = {
       primeCache(totalKey("todos", teamId), r.openTotal)
       primeCache(totalKey("todos-done", teamId), r.doneTotal)
       primeCache(cursorKey(todosKey(teamId)), r.nextCursor)
+      return r.todos
+    }),
+  // THE INPUTS SCREEN (Task C, 15 Sep 2026) — the SAME door, asked for one of
+  // its three NEW views. Every count on the door's sidecar rides EVERY answer
+  // (R16), the same shape `tasks` below takes: whichever tab's fetch lands,
+  // all three badges (plus the panel's own open/done pair) come back primed.
+  // `?accountId`/`?accountManagerId`/`q`/`sort`/`dir` are NOT sent here — this
+  // is the screen's own cold-start / resting read, and the door narrows a
+  // caller without `all_inputs:read` to their own managed accounts on its
+  // own (`getTodos`, workers/content/src/routes/todos.ts). The screen's
+  // search/facet/sort toolbar asks the door directly through `<PagedFind>`,
+  // which keeps its OWN cache key per question — see inputs-screen.tsx.
+  inputs: (teamId: string, view: InputView = "waiting") =>
+    contentApi.todos({ view }).then((r) => {
+      primeCache(totalKey("todos", teamId), r.openTotal)
+      primeCache(totalKey("todos-done", teamId), r.doneTotal)
+      primeCache(totalKey("todos-waiting", teamId), r.waitingTotal)
+      primeCache(totalKey("todos-overdue", teamId), r.overdueTotal)
+      primeCache(totalKey("todos-received", teamId), r.receivedTotal)
+      primeCache(cursorKey(inputsKey(teamId, view)), r.nextCursor)
       return r.todos
     }),
   // EVERY count comes back from ANY view's fetch (R16), because the badge on a
@@ -387,11 +425,16 @@ export const listFetch = {
 }
 
 
-/** The backlog's cache key (the paged stories list) and the sprint list beside
- * it. Two keys, because they are two collections with two different R14 answers:
- * one pages, one is capped. */
-export function storiesKey(teamId: string): string {
-  return `stories:${teamId}`
+/** WHICH TAB OF THE BACKLOG A KEY NAMES — `tasksKey`'s own shape, one
+ * collection along (`StoryViewName`, shared/types.ts, is the wire word for
+ * each). `open` is the everyday, unnarrowed backlog and keeps the bare key it
+ * has always had, so every listener, sidecar, prewarm and cross-link that
+ * names `stories:<team>` still lands on the same list it always did — the
+ * Stories tab strip's five tabs (`now`/`planned`/`backlog`/`completed`/`all`)
+ * are ADDITIONAL keys, never a replacement for it. */
+export type StoryView = StoryViewName
+export function storiesKey(teamId: string, view: StoryView = "open"): string {
+  return view === "open" ? `stories:${teamId}` : `stories-${view}:${teamId}`
 }
 export function sprintsKey(teamId: string): string {
   return `sprints:${teamId}`
@@ -426,6 +469,16 @@ export const TODO_SLICE_PREFIX = "todos-"
 /** The DONE pile, team-wide. Inside the family above, so a ping drops it. */
 export function todosDoneKey(teamId: string): string {
   return `${TODO_SLICE_PREFIX}done:${teamId}`
+}
+
+/** THE INPUTS SCREEN'S OWN THREE TABS (Task C, 15 Sep 2026) — Waiting,
+ * Overdue, Received. Inside the SAME `TODO_SLICE_PREFIX` family every other
+ * view of this table already lives in, so the existing `todos`
+ * TEAM_RESOURCES row-level listener (below) already drops these three on
+ * any ping — no second resource, no second entry in that map. */
+export type InputView = "waiting" | "overdue" | "received"
+export function inputsKey(teamId: string, view: InputView): string {
+  return `${TODO_SLICE_PREFIX}${view}:${teamId}`
 }
 /** Which pile of our own admin a screen is showing. A SERVER view, not a client
  * filter: the list is capped (R14), so sieving the loaded rows for the done ones
@@ -1697,10 +1750,10 @@ export const TEAM_RESOURCES: Record<
   // record that move with it: the story's own history, and the SPRINT list,
   // whose per-sprint "3 of 8 done" counts are computed from exactly these rows.
   stories: {
-    key: (t) => storiesKey(t),
+    key: (t) => storiesKey(t, "open"),
     idField: "id",
     fetchOne: (id) => contentApi.storyOne(id),
-    fetchList: (t) => listFetch.stories(t),
+    fetchList: (t) => listFetch.stories(t, "open"),
     // …and the Stories badge on whichever app, sprint or ticket is open (R15).
     //
     // AND THE STORY'S OWN SCREEN. `story-detail.tsx` does not read its row out of
@@ -1713,9 +1766,18 @@ export const TEAM_RESOURCES: Record<
     // `knowledge` had this right (`knowledge:one:<id>` is in its own deps) and
     // this did not, which is why the census beside R15 now reads every
     // `<module>:one:` key a component holds and demands it appear here.
+    //
+    // THE STORIES TAB STRIP'S OTHER FOUR VIEWS ARE DROPPED, NEVER ROW-PATCHED —
+    // `tasks.ts`'s own reasoning, one collection along: a story moving to Done
+    // leaves the Now/Planned tab it was on and joins Completed, so "patch the
+    // row in place" has no honest answer for a row that changed which list it
+    // belongs to. `STORY_VIEWS.filter(v => v !== "open")` derives the list
+    // rather than hand-naming it, so a tab that gains a view is covered by
+    // construction (R15).
     deps: (t, id) => [
       `activity:record:stories:${id}`,
       `story:one:${id}`,
+      ...STORY_VIEWS.filter((v) => v !== "open").map((v) => storiesKey(t, v)),
       // …AND WHAT THE STORY SHOWS FOR ITSELF. Every attachment write publishes
       // `stories` (the door has no resource of its own — an attachment is part
       // of the story, not a thing beside it), so this is where the Files and
