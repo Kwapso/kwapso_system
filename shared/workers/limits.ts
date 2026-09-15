@@ -274,6 +274,27 @@ export const KNOWLEDGE_SHAPE_ANCHORS = 200
  * Past that a sweep stops being a sweep and becomes a migration. */
 export const GMAIL_SWEEP_PAGES = 4
 
+/** HOW FAR BEHIND THE LIVE CURSOR THE GMAIL QUERY ITSELF REACHES.
+ *
+ * `spend_review`, 15 Sep 2026: the LIVE 15-minute sweep asked Gmail for the
+ * whole mailbox every tick and only narrowed AFTER the fetch, in
+ * `afterCursor` — never as a Gmail `after:` term the way the knowledge
+ * backfill (migration 0082) already does. Steady state, nothing new: ~204 of
+ * ~229 possible calls still ran every tick (list + headers; only hydrate was
+ * skipped), ~58,752 Gmail API calls a day at zero new mail across three
+ * connected mailboxes — the documented, live cause of the `google_busy` 403s
+ * (`workers/content/src/lib/google-api.ts:240`).
+ *
+ * The fix asks Gmail for `after:<cursor - this buffer>`, in seconds, exactly
+ * the epoch-second form the backfill's own `request.from` already builds
+ * (`readGoogleMaterial`'s gmail branch). `afterCursor` still runs, unchanged,
+ * on whatever comes back — this constant narrows what GOOGLE bothers to hand
+ * back, it is never itself the boundary. The buffer exists because the
+ * cursor's `sortAt` and Gmail's own internal date are two clocks, not one;
+ * a day of slack costs nothing (a quiet mailbox still skips years of history)
+ * and protects against a message landing right on the line. */
+export const GMAIL_LIVE_SINCE_BUFFER_MS = 24 * 60 * 60 * 1000
+
 /* ---- How far into somebody's Drive a share actually reaches ---------------- */
 
 /** HOW MANY LISTING CALLS ONE DRIVE WALK MAY SPEND.

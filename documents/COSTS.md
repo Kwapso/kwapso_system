@@ -1,5 +1,22 @@
 # COSTS.md — what this app costs to run
 
+**THE AGENT'S ENGINE ALSO CHANGED, ON 14 SEP 2026, AND THIS FILE HAD NOT
+CAUGHT UP UNTIL `spend_review` CAUGHT IT ON 15 SEP.** `AGENT_MODEL` reverted
+from `@cf/moonshotai/kimi-k2.6` back to `@cf/openai/gpt-oss-120b` in both
+spenders — `workers/data-ops/wrangler.jsonc`, `workers/tenancy/wrangler.jsonc`,
+and `DEFAULT_AGENT_MODEL` all moved together (`17e1e69e`): kimi could not
+finish a four-step question inside the turn, measured on staging against a
+real five-part ticket question — 109s on one step, still composing at +210s —
+against gpt-oss-120b's 6.9s on the identical replayed context. This is a
+DIFFERENT change from the reader-model note directly below (that one is
+`READER_TEXT_MODEL`, the knowledge-base reader, and is still correct as
+written — the two models serve different callers and moved on different
+dates for different reasons). §1 and §2's agent-reply figures below were
+still priced against kimi for one day; corrected here, same method, same
+STAGE ONE token counts, gpt-oss-120b's own already-published rate.
+**Re-check this file whenever `AGENT_MODEL` moves again** — that is what
+slipped this time.
+
 **THE READER'S MODEL AND ITS TRIGGER BOTH CHANGED ON 11 SEP 2026, AND THE
 SECOND ONE MATTERS MORE THAN THE FIRST.** Everything below about the reader's
 per-call cost was priced against `@cf/moonshotai/kimi-k2.6`. It is no longer
@@ -121,7 +138,7 @@ Nine, and there is no tenth. Each one names the feature behind it and where it i
 
 | # | surface | what it is for | where it is called | included / free |
 |---|---|---|---|---|
-| 1 | **Workers AI — the assistant** | every agent turn (`@cf/moonshotai/kimi-k2.6`) | `model.ts` (`env.AI.run`), through `selectModel` | 10,000 neurons/day per account |
+| 1 | **Workers AI — the assistant** | every agent turn (`@cf/openai/gpt-oss-120b`, reverted to on 14 Sep 2026 from `kimi-k2.6` — see the note at the top of this file) | `model.ts` (`env.AI.run`), through `selectModel` | 10,000 neurons/day per account |
 | 2 | **Workers AI — knowledge answers + inline text** | R23's composed answer, summaries (`llama-4-scout`) | `shared/workers/model-text.ts` | same pool |
 | 3 | **Workers AI — embeddings** | one vector per knowledge chunk (`bge-m3`) | `knowledge.ts` `embed()` | same pool |
 | 4 | **Vectorize** | the account-wide knowledge index (R26) | `knowledge-vectors.ts` upsert/query/delete | 50M queried + 10M stored dims/month |
@@ -143,8 +160,8 @@ down is the one that surprises somebody.
 | surface | price | source | read |
 |---|---|---|---|
 | Workers AI, over the free tier | $0.011 / 1,000 neurons; **10,000 neurons/day free** | developers.cloudflare.com/workers-ai/platform/pricing | 2026-09-05 |
-| `@cf/moonshotai/kimi-k2.6` | $0.950 / M in · $4.000 / M out (86,364 / 363,636 neurons per M) | same | 2026-09-05 |
-| `@cf/openai/gpt-oss-120b` (prior engine) | $0.350 / M in · $0.750 / M out (31,818 / 68,182) | same | 2026-09-05 |
+| `@cf/moonshotai/kimi-k2.6` (prior agent engine, 28 Aug – 14 Sep 2026) | $0.950 / M in · $4.000 / M out (86,364 / 363,636 neurons per M) | same | 2026-09-05 |
+| `@cf/openai/gpt-oss-120b` (current agent engine, reverted to on 14 Sep 2026) | $0.350 / M in · $0.750 / M out (31,818 / 68,182) | same | 2026-09-05 |
 | `@cf/meta/llama-4-scout-17b-16e-instruct` | $0.270 / M in · $0.850 / M out (24,545 / 77,273) | same | 2026-09-05 |
 | `@cf/baai/bge-m3` (embeddings) | $0.012 / M in (1,075 neurons per M) | same | 2026-09-05 |
 | Vectorize | $0.01 / M queried dims (50M/mo incl.) · $0.05 / 100M stored dims (10M incl.) | developers.cloudflare.com/vectorize/platform/pricing | 2026-09-05 |
@@ -236,14 +253,17 @@ before anyone has metered it.
 ### One agent reply — **after the split**, at published rates
 
 Not yet measured, and it cannot be until the split deploys and somebody uses it. Same
-arithmetic, same rate card, the one input that changed:
+arithmetic, same rate card, the one input that changed. **Priced against
+`gpt-oss-120b`, the current agent engine as of 14 Sep 2026** ($0.350/M in ·
+$0.750/M out) — this replaces the kimi-priced figures this file carried for
+one day; see the note at the top of the file:
 
 ```
-one step             10,691 × $0.950/M = $0.010156   +  400 × $4.000/M = $0.001600  = $0.011756
+one step             10,691 × $0.350/M = $0.003742   +  400 × $0.750/M = $0.000300  = $0.004042
 
-typical 3-step turn  in  (3 × 10,691) + 523×(1+2)     =  33,642 tok × $0.950/M = $0.031960
-                     out  3 × 400                     =   1,200 tok × $4.000/M = $0.004800
-                                                                          TURN  = $0.0368
+typical 3-step turn  in  (3 × 10,691) + 523×(1+2)     =  33,642 tok × $0.350/M = $0.011775
+                     out  3 × 400                     =   1,200 tok × $0.750/M = $0.000900
+                                                                          TURN  = $0.012675
 ```
 
 **Worst case, from the code's own ceiling.** `MAX_STEPS = 12` (`agent.ts`), each step
@@ -251,18 +271,22 @@ re-sending stage one, with tool results accumulating at `RESULT_CHARS = 2000`
 characters (≈523 tokens) apiece:
 
 ```
-input   12 × 10,691 = 128,292  + 523 × (1+…+11) = 34,518  → 162,810 tok × $0.950/M = $0.1547
-output  12 ×    400 =   4,800                                         tok × $4.000/M = $0.0192
-                                                           WORST TURN  =  $0.174
+input   12 × 10,691 = 128,292  + 523 × (1+…+11) = 34,518  → 162,810 tok × $0.350/M = $0.056984
+output  12 ×    400 =   4,800                                         tok × $0.750/M = $0.003600
+                                                           WORST TURN  =  $0.0606
 ```
 
 A turn that needs a deferred tool spends one extra step fetching it, which is included in
 the step count above rather than added to it.
 
-**The assistant is still the most expensive action in the system by two orders of
-magnitude.** What changed is the share that is preamble: it was roughly 90% of a short
-turn and is now roughly 70%, because the floor is the system prompt (6,662 tokens) plus
-the core tools, and neither of those is per-question waste.
+**The assistant is still the most expensive action in the system, though the gap
+narrowed sharply on 2026-09-15** (see the note at the top of the file): a typical turn
+(`$0.012675`) is now roughly equal to one import (`$0.0116`) and about 32× a signup
+email (`$0.0004`) — not the "two orders of magnitude" this line claimed while priced
+against `kimi-k2.6`, which was closer to true against signup (~92×) but was never true
+against an import. What has NOT changed is the share that is preamble: it was roughly
+90% of a short turn and is now roughly 70%, because the floor is the system prompt
+(6,662 tokens) plus the core tools, and neither of those is per-question waste.
 
 ### One signup
 
@@ -360,9 +384,11 @@ composed answer (ANSWER_MAX_TOKENS = 900):
 reading the shortlist
 and writing the answer are two separate model calls whichever door reaches them —
 charging one for both would be under-metering, the exact hole this cost file exists to
-close. Still **6.9× cheaper than an agent turn** even at the most expensive shape
-(`$0.0053` vs `$0.0368`), which is what the two-model design intended and remains true
-with the reader's real (not estimated) cost.
+close. Still **2.4× cheaper than an agent turn** even at the most expensive shape
+(`$0.0053` vs `$0.012675` — corrected 2026-09-15 against the agent's current engine,
+see the note at the top of the file; it was `$0.0368` and 6.9× for one day while this
+file still priced the agent against the wrong engine), which is what the two-model
+design intended and remains true with the reader's real (not estimated) cost.
 
 ### With the planner — ESTIMATED, not measured, and not yet built
 
@@ -389,9 +415,10 @@ topic, one search; only a genuinely multi-hop or ambiguous question needs more t
 branch. **If the fast path holds, the planner's real-world cost is closer to 0% of
 questions paying the third unit than 100%**, and the $0.0063 figure above is a CEILING
 a caller almost never actually pays — the same shape `MAX_STEPS`'s worst-case agent-turn
-figure ($0.174) already is against the typical one ($0.0368). Re-measure this the day
-the planner ships and the heuristic's real hit rate is known; until then, treat the
-ceiling as the number to budget against and the typical case as unknown.
+figure ($0.0606, corrected 2026-09-15 — see the note at the top of the file) already is
+against the typical one ($0.012675). Re-measure this the day the planner ships and the
+heuristic's real hit rate is known; until then, treat the ceiling as the number to budget
+against and the typical case as unknown.
 
 **A MONTHLY PROJECTION, at the same 20,000-questions/month estimate §2's tenant table
 already uses, three ways:**
@@ -417,11 +444,15 @@ set — flagged here so the decision is made with the arithmetic in view rather 
 found later in a bill.
 
 **Still cheaper than an agent turn at every shape, though the margin is no longer
-one number.** Against the typical 3-step turn (`$0.0368`): retrieval alone is ~1,840×
-cheaper, `compose` alone is ~20× cheaper, `read` alone is ~10.5× cheaper, and the most
-expensive shape — `read` AND `compose` together — is still **6.9× cheaper** (`$0.0053`
-vs `$0.0368`), or **5.8×** even at the planner's own estimated ceiling (`$0.0063`). The
-two-model design's core saving holds throughout; what has changed is that "a knowledge
+one number — and it shrank on 2026-09-15, not because retrieval got more expensive but
+because the agent turn it's being measured against did not need pricing against
+kimi-k2.6 any more (see the note at the top of the file).** Against the typical 3-step
+turn (`$0.012675`): retrieval alone is ~634× cheaper, `compose` alone is ~7.0× cheaper,
+`read` alone is ~3.6× cheaper, and the most expensive shape — `read` AND `compose`
+together — is still **2.4× cheaper** (`$0.0053` vs `$0.012675`), or **2.0×** even at the
+planner's own estimated ceiling (`$0.0063`). The margin against the *worst-case* agent
+turn ($0.0606) is correspondingly wider than against the typical one. The two-model
+design's core saving holds throughout; what has changed is that "a knowledge
 question" is no longer one number, it is four (five once the planner ships), and the
 caller's own query parameters pick which one applies.
 
@@ -432,14 +463,20 @@ measurement): 1,000 signups, 500 imports, 20,000 assistant replies per month.
 
 | line | arithmetic | per month |
 |---|---|---|
-| assistant replies | 20,000 × $0.0368 | **$736** |
-| …if every reply hit `MAX_STEPS` | 20,000 × $0.1740 | $3,480 |
+| assistant replies | 20,000 × $0.012675 | **$253.50** |
+| …if every reply hit `MAX_STEPS` | 20,000 × $0.0606 | $1,212 |
 | imports | 500 × $0.0116 | $5.80 |
 | signup emails | 1,000 × $0.0004 | $0.40 |
 | knowledge questions (say 20,000) — TODAY'S SHAPE, `compose=1` as the norm | 20,000 × $0.0018 | $36 |
 | plan base | — | $5 |
 | everything else (requests, D1, R2, DO) | inside the included allowances at today's volume — see §4 | $0 |
-| | | **≈ $783/month** |
+| | | **≈ $301/month** |
+
+**Corrected 2026-09-15.** This table priced `@cf/moonshotai/kimi-k2.6` at
+**$783/month** for a full extra day after the agent's own engine had reverted
+to `gpt-oss-120b` (14 Sep 2026) — the assistant-replies row is the one that
+moved, from $736 to $253.50, because it is 94% of the bill. See the note at
+the top of the file.
 
 **The knowledge-questions row is one of four possible numbers, not one** — see "With
 the planner" above for the full table (retrieval-only $0.40/mo up to $120/mo if every
@@ -447,13 +484,15 @@ question paid for the reader, the writer AND the planner's ceiling). $36 is kept
 headline because it is today's actual shape (`compose=1`, no `read` or `plan` default
 turned on anywhere yet); the day a default changes, this row changes with it.
 
-**One line is 94% of the bill** — it was 98% and $2,235/month on the pre-split preamble.
-Any cost work that is not about the assistant is still rounding, but the preamble is no
-longer the obvious next thing to cut: at 10,691 tokens a step, 6,662 of them are the
-system prompt, which is the capability brief the assistant needs to know what the app can
-do. The next real lever is FEWER STEPS, not a smaller preamble.
+**One line is 84% of the bill** — it was 98% and $2,235/month on the pre-split preamble,
+then 94% and $736/month for one day on the post-split figure this file priced against
+the wrong engine (corrected above, 2026-09-15). Any cost work that is not about the
+assistant is still rounding, but the preamble is no longer the obvious next thing to cut:
+at 10,691 tokens a step, 6,662 of them are the system prompt, which is the capability
+brief the assistant needs to know what the app can do. The next real lever is FEWER
+STEPS, not a smaller preamble.
 
-**None of this is metered yet.** The split is not deployed, so the $736 is a rate-card
+**None of this is metered yet.** The split is not deployed, so the $253.50 is a rate-card
 projection standing where a measured $2,186 used to be. It becomes a measurement the
 first time `scripts/ai-spend.mjs` is run over a window after the deploy.
 
@@ -498,21 +537,34 @@ Per person, per tick, `gmailSearch()` (`google-api.ts:1264`):
 ```
 list     up to GMAIL_SWEEP_PAGES (4) × GOOGLE_PAGE_SIZE (50)  = 200 message ids   (4 calls)
 headers  one messages.get(format=metadata) per id, 10 at a time via allSettled    (≤200 calls)
-                                    — the cursor is applied AFTER this, in knowledge-google.ts's
-                                      slice(), never as a filter Gmail is asked to honour —
+                                    — the cursor USED TO be applied only AFTER this, in
+                                      knowledge-google.ts's slice(); fixed 2026-09-15, see below —
 hydrate  one messages.get(format=full) per id the cursor kept, ≤ INGEST_SOURCES_PER_TICK (25)
                                                                                    (≤25 calls)
 ```
 
 Worst case (a mailbox with 200+ brand-new messages): ~229 calls. **Steady state, a
-perfectly quiet mailbox with nothing new: ~204 calls** — only the hydrate step is
-skipped, because the cursor cannot narrow anything until the list and the headers have
-already been paid for. At today's real connection count (3 mailboxes,
-`GOOGLE_SWEEP_PEOPLE_PER_TICK` caps at 5) × 96 ticks/day:
+perfectly quiet mailbox with nothing new — the shape below is what this section priced
+until 2026-09-15, see the fix note that follows it:**
 
 ```
 3 × 204 × 96 ≈ 58,752 Gmail API calls/day, on a day when nothing new arrives at all
 ```
+
+**FIXED 2026-09-15 (`spend_review`).** The list and headers steps now carry
+`after:<cursor − GMAIL_LIVE_SINCE_BUFFER_MS>` as an ordinary Gmail query term
+(`slice()`'s new `liveSince` parameter, `knowledge-google.ts`, wired only for gmail's
+live read — drive, calendar and chat are untouched, and the backfill already had its
+own version of this), the same epoch-seconds `after:`/`before:` mechanism the backfill
+window already used. `afterCursor` still runs afterwards, unchanged, as the real
+boundary — the query term only narrows what GOOGLE bothers to hand back, with a
+24-hour buffer against the cursor's own timestamp so a message landing right on the
+line is never at risk. **On a genuinely quiet mailbox this cuts the steady-state ~204
+calls/tick toward whatever Gmail's `after:` itself costs to evaluate — a handful, not
+zero, because the list and header steps still run, just against a far smaller result
+set.** Not yet re-measured against live Gmail traffic; the worst-case shape above (a
+mailbox with 200+ genuinely new messages) is unchanged by this fix, because that case
+was never the problem.
 
 Read on the working tree, 2026-09-10, against `GMAIL_SWEEP_PAGES`, `GOOGLE_PAGE_SIZE`
 (`workers/content/src/lib/google-api.ts`) and `INGEST_SOURCES_PER_TICK`
@@ -810,4 +862,13 @@ Last full review: **2026-09-05**. Per-action figures re-measured: **2026-09-06**
 (`node scripts/measure-preamble.mjs`, no model call). §3's Google-autopilot row
 completed: **2026-09-10**, by `spend_review` — the ingestion-sweep half priced for
 the first time, against the working tree, no model call and no Google API call
-made to produce it.
+made to produce it. **§1 and §2's agent-engine pricing corrected: 2026-09-15**, by
+`spend_review` — `AGENT_MODEL` had reverted `kimi-k2.6` → `gpt-oss-120b` on
+2026-09-14 (`17e1e69e`) and this file had not caught up; no model call made to
+produce the correction, same STAGE ONE token counts re-priced against the
+engine's own already-published rate. **§3's Gmail live-sweep amplifier fixed:
+2026-09-15**, by `spend_review` — the live sweep now sends Gmail an `after:`
+query term derived from the cursor (`GMAIL_LIVE_SINCE_BUFFER_MS`,
+`shared/workers/limits.ts`), closing the gap this file documented on
+2026-09-10 between the backfill (already scoped) and the live tick (not).
+Not yet re-measured against live Gmail traffic.
