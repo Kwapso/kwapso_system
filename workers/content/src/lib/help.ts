@@ -91,6 +91,8 @@ type TicketRow = {
   account_id: string | null
   app_id: string | null
   app_name: string | null
+  /** R35, the App column's own face — see `toTicket`'s `appLogo`. */
+  app_logo: string | null
   module_id: string | null
   module_name: string | null
   module_mark: string | null
@@ -219,6 +221,9 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     // row that are THEIRS. The redaction above is about our side of the fence.
     appId: r.app_id,
     appName: r.app_name,
+    // R35 — the App column's face (client ruling 2026-09-15). Same read as
+    // `app_name`, resolved off the identical `apps` row (TICKET_COLS below).
+    appLogo: r.app_logo,
     raisedByContactId: r.raised_by_contact_id,
     raisedByContactName: r.raised_by_contact_name,
     validatedAt: r.validated_at,
@@ -264,6 +269,9 @@ const TICKET_COLS = `id, help_type, raised_as_type, description, screen_recordin
   ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
   (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
+  -- R35: the App column's own face (client ruling 2026-09-15), off the same
+  -- row app_name already reads — one correlated subselect, not a second one.
+  (SELECT ap.logo_url FROM apps ap WHERE ap.id = help.app_id) AS app_logo,
   -- R35: a module shown on a ticket carries its OWN face — the name AND the
   -- emoji beside it, on the same read as the row, so a list never renders a bare
   -- id and never pays a second round trip to find out what it is looking at.

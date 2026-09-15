@@ -69,6 +69,20 @@
    · Every user-facing string is a prop with a default, including the ones
      only a screen reader hears — which on this component is most of them.
    · No product vocabulary (commission §11). Columns, cards, moves.
+   · AN EMPTY COLUMN CAN GO BARE, 2026-09-15. The client's ruling, on the
+     tasks board view: "when empty, don't show anything at this stage." The
+     board default is unchanged — `EmptyRegister` inside every empty column,
+     which doubles as a pointer-findable drop target (see the register's own
+     note above) — but `emptyColumns="bare"` drops the box and the words for
+     every empty column on the board at once, leaving only an unstyled
+     drop zone at the SAME inset (`--space-8`/`--space-6`) so a pointer can
+     still find it and a keyboard move still lands there. The zone keeps an
+     `aria-label` (the same words `EmptyRegister` would have shown) because
+     "don't show anything" is a ruling about the EYE, not about whether a
+     screen reader may find out the column is there and empty — the column
+     header already says its name, but not that it currently holds nothing.
+     One prop for the whole board, not per column: a board where one column
+     was bare and its neighbour drew a box would read as a bug, not a style.
 
    RENDERING CONTEXT
    `"use client"`. State for the card being carried, handlers made during
@@ -303,6 +317,17 @@ export interface KanbanProps extends Omit<React.ComponentPropsWithoutRef<"div">,
   /** The words when there are no columns at all. */
   emptyLabel?: string;
   /**
+   * How an empty COLUMN draws, board-wide. `"register"` (default, every
+   * existing caller unchanged) is `EmptyRegister` — the box and the words.
+   * `"bare"` (2026-09-15 ruling, "when empty, don't show anything at this
+   * stage") drops both: an unstyled zone at the same inset stands in, still
+   * a real drop target and still `aria-label`led with the same words, so
+   * the column can be found by a pointer or a screen reader — only the BOX
+   * is gone. Does not touch the BOARD's own empty state (no columns at
+   * all), which is a different register entirely.
+   */
+  emptyColumns?: "register" | "bare";
+  /**
    * What a screen reader hears as a card's role. The platform has no "card
    * you can move", so it is said in words — and it must be translatable.
    */
@@ -384,6 +409,10 @@ function textOf(node: React.ReactNode): string {
  *                      at the kit's full inset, which doubles as the drop
  *                      target for the first card. An empty BOARD — no columns
  *                      at all — gets `.kw-empty` in place of the board.
+ *                      `emptyColumns="bare"` (2026-09-15) drops the empty
+ *                      COLUMN'S box and words, keeping only an
+ *                      `aria-label`led drop zone; the empty BOARD register is
+ *                      unaffected.
  *  8. error          — `error`: `.kw-register`, the left-aligned panel card,
  *                      announced as an alert. A move that FAILS is the caller's
  *                      to report: the card returns to where it was (the caller
@@ -440,6 +469,7 @@ const Kanban = React.forwardRef<HTMLDivElement, KanbanProps>(
       label,
       emptyColumnLabel = "Nothing here",
       emptyLabel = "No columns yet",
+      emptyColumns = "register",
       cardRoleLabel = "Movable card",
       moveHintLabel = "Use the arrow keys to move this card between columns.",
       formatMoveAnnouncement,
@@ -580,6 +610,7 @@ const Kanban = React.forwardRef<HTMLDivElement, KanbanProps>(
         carrying={carrying}
         over={over}
         emptyColumnLabel={emptyColumnLabel}
+        emptyColumns={emptyColumns}
         cardRoleLabel={cardRoleLabel}
         moveHintLabel={moveHintLabel}
         onCardSelect={onCardSelect}
@@ -702,6 +733,7 @@ function Column({
   carrying,
   over,
   emptyColumnLabel,
+  emptyColumns,
   cardRoleLabel,
   moveHintLabel,
   onCardSelect,
@@ -720,6 +752,8 @@ function Column({
   carrying: string | null;
   over: string | null;
   emptyColumnLabel: string;
+  /** See `KanbanProps.emptyColumns` — `"register"` draws `EmptyRegister`, `"bare"` an unstyled `aria-label`led drop zone. */
+  emptyColumns: "register" | "bare";
   cardRoleLabel: string;
   moveHintLabel: string;
   onCardSelect?: (card: KanbanCard, column: KanbanColumn) => void;
@@ -841,9 +875,24 @@ function Column({
             </Card>
           ))
         ) : cards.length === 0 ? (
-          <EmptyRegister>
-            <span role="status">{column.emptyLabel ?? emptyColumnLabel}</span>
-          </EmptyRegister>
+          emptyColumns === "bare" ? (
+            // BARE — the client's "don't show anything at this stage": no
+            // box, no words on screen. Tall enough for a pointer to still
+            // find it (`EmptyRegister`'s own reasoning: "a 12-tall strip is
+            // not something a pointer can reliably find"), and the SAME
+            // words as its `aria-label` rather than a visible one, so the
+            // column's emptiness still reaches a screen reader.
+            <div
+              data-slot="kanban-empty"
+              role="group"
+              aria-label={column.emptyLabel ?? emptyColumnLabel}
+              className="min-h-[calc(var(--space-8)*2)]"
+            />
+          ) : (
+            <EmptyRegister>
+              <span role="status">{column.emptyLabel ?? emptyColumnLabel}</span>
+            </EmptyRegister>
+          )
         ) : (
           cards.map((card, index) => (
             <BoardCard

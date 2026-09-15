@@ -4,6 +4,7 @@ import type {
   HelpTicket,
   Invite,
   InviteAudit,
+  Meeting,
   TeamMember,
   TeamRole,
 } from "@shared/types"
@@ -15,9 +16,11 @@ import {
   INVITE_STATUS,
   shapeAccountsList,
   shapeActivity,
+  shapeContactsTable,
   shapeHelpList,
   shapeInviteDetail,
   shapeInvitesList,
+  shapeMeetingsList,
   shapeMembersList,
   shapeRolesList,
 } from "@/components/deep-link/shape"
@@ -101,6 +104,7 @@ const ticket: HelpTicket = {
   // so both are null here — which is the case the row shape has to survive.
   appId: null,
   appName: null,
+  appLogo: null,
   raisedByContactId: null,
   raisedByContactName: null,
   // Only a ticket that WAITED ever carries one, and this one never did.
@@ -460,6 +464,117 @@ describe("shapeAccountsList", () => {
     // Client ruling 2026-09-15: name is a React element with logo and text
     expect(rows?.[0].nameText).toBe("Old Co (archived)")
     expect(React.isValidElement(rows?.[0].name)).toBe(true)
+  })
+})
+
+describe("shapeContactsTable", () => {
+  // R35, client ruling 2026-09-15: "add the logos to account and app …
+  // identify everywhere else where it makes sense" — the Contacts table's
+  // own "Account" column (contacts-screen.tsx's `CONTACT_COLUMNS` reads
+  // `accountCell`). Pinned as a SEPARATE row key from `account`: that key
+  // stays plain text for `CollectionFrame`'s own free-text search
+  // (`searchKeys`), and a React node there would be "[object Object]".
+  it("gives the Account column its own face, and keeps `account` plain text for search", () => {
+    const rows = shapeContactsTable([
+      account({
+        id: "p1",
+        name: "Marta Ruiz",
+        accountType: "individual",
+        companyName: "Bergman Marine",
+        companyLogoUrl: "/media/bergman-marine.png",
+      }),
+    ]).rows
+    expect(rows?.[0].account, "search must never see a node").toBe("Bergman Marine")
+    expect(typeof rows?.[0].account).toBe("string")
+    expect(
+      React.isValidElement(rows?.[0].accountCell),
+      "the Account column must hold a node (mark + name), not a bare string"
+    ).toBe(true)
+  })
+
+  // AN UNLINKED CONTACT NAMES NO COMPANY — an ordinary absence (22 of 110 real
+  // contacts), not a record with no picture, so the cell draws the SAME em
+  // dash `account` already falls back to rather than an empty-name tile.
+  it("an unlinked contact draws the plain em dash, not an empty mark", () => {
+    const rows = shapeContactsTable([
+      account({ id: "p1", name: "Luis Vera", accountType: "individual" }),
+    ]).rows
+    expect(rows?.[0].account).toBe("—")
+    expect(rows?.[0].accountCell).toBe("—")
+  })
+})
+
+/* -------------------------------- meetings ------------------------------- */
+
+const meeting = (over: Partial<Meeting> & { id: string; title: string }): Meeting => ({
+  ref: null,
+  accountId: null,
+  accountName: null,
+  accountLogoUrl: null,
+  appId: null,
+  appName: null,
+  purposeId: null,
+  purposeName: null,
+  agenda: null,
+  notes: null,
+  location: null,
+  startsAt: "2026-09-10T09:00:00.000Z",
+  endsAt: null,
+  googleEventId: null,
+  googleEventUrl: null,
+  googleJoinUrl: null,
+  googleOrganizer: null,
+  googleStatus: null,
+  googleTimeZone: null,
+  googleRecurrence: null,
+  googleGuests: [],
+  googleAttachments: [],
+  googleSyncedAt: null,
+  fromCalendar: false,
+  transcriptFileId: null,
+  transcriptCapturedAt: null,
+  transcriptUrl: null,
+  transcriptFoundBy: null,
+  knowledgeIndexedAt: null,
+  recurringEventId: null,
+  active: true,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  creatorName: null,
+  updatedAt: null,
+  editorName: null,
+  ...over,
+})
+
+describe("shapeMeetingsList", () => {
+  // R35, client ruling 2026-09-15: "add the logos to account and app …
+  // identify everywhere else where it makes sense" — the meetings Table's own
+  // "Account" column (meetings-screen.tsx's TABLE_COLUMNS reads
+  // `accountCell`). Pinned as a SEPARATE row key from `client`: the calendar
+  // view reads `client` as `String(row.client ?? "")`
+  // (`MeetingsMonthCalendar`), and a React node there would print
+  // "[object Object]" — so `client` must stay plain text forever, and
+  // `accountCell` is the node that carries the logo.
+  it("gives the Table's Account column its own face, and keeps `client` plain text for the calendar", () => {
+    const rows = shapeMeetingsList(
+      [meeting({ id: "m1", title: "Kickoff", accountName: "Bergman S.A.", accountLogoUrl: "/media/bergman.png" })],
+      "en"
+    ).rows
+    expect(rows?.[0].client, "the calendar's own String() read must never see a node").toBe("Bergman S.A.")
+    expect(typeof rows?.[0].client).toBe("string")
+    expect(
+      React.isValidElement(rows?.[0].accountCell),
+      "the Table's Account column must hold a node (mark + name), not a bare string"
+    ).toBe(true)
+  })
+
+  // A RECORD WITH NO LOGO DRAWS THE INITIALS TILE, NEVER AN EM DASH (R35) — and
+  // an internal meeting (no account at all) is not an absent record, it is the
+  // agency's own meeting, so the mark falls back to "Ours" rather than to
+  // nothing, exactly as `client` already does.
+  it("an internal meeting (no account) still draws a face, labelled Ours", () => {
+    const rows = shapeMeetingsList([meeting({ id: "m1", title: "Standup" })], "en").rows
+    expect(rows?.[0].client).toBe("Ours")
+    expect(React.isValidElement(rows?.[0].accountCell)).toBe(true)
   })
 })
 

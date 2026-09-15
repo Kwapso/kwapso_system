@@ -1401,6 +1401,75 @@ chokepoint. So the FILTER DROPDOWN reads alphabetically ("Do it now" · "Importa
 "Urgent" · "Whenever") while the table column and the board columns both read the true
 4→1 order — an accepted, R75-driven consequence rather than a bug.
 
+**AMENDED 2026-09-15, SAME DAY, A FEW HOURS LATER — six more rulings over the freshly
+shipped strip.** Each is the client's own words.
+
+1. *"On the toolbar, there is an add button with a plus, but there is also one underneath.
+   There should only be one, and the correct one is in the toolbar."* The Table view's own
+   `<RecordTable useKitPanel>` read the AMBIENT create action `<SectionWithCreate onCreate={…}>`
+   publishes downward (`CollectionCreateActionProvider`,
+   `shared/web/screen-engine/collection-frame.tsx`) and drew its own icon-only button in its
+   ready-state toolbar even with every other kit-panel control switched off. Fixed the way
+   `apps-screen.tsx`'s own list body already had to be: the Table render is wrapped in
+   `<CollectionCreateActionProvider action={null}>`, so only the screen's own toolbar
+   `<AddButton>` remains.
+2. *"On overdue tasks, it's only mine, so make sure you filter it to me and remove the
+   column 'Who has it'."* Until this the door's `all_tasks:read` gate decided the narrowing
+   for EVERY view, so a caller who could see everyone's got everyone's on Overdue/Planned/
+   Completed too — the fourth tab bought that reader nothing the first three did not already
+   show. `getTasks` (`workers/content/src/routes/todos.ts`) now narrows those three views to
+   `assignee_id = caller` UNCONDITIONALLY (`MINE_VIEWS`); `all_tasks:read` decides only whether
+   `all` — the door's status-agnostic view, the Everyone's tab — comes back un-narrowed. "Who
+   has it" (Assignee) is dropped from `TASK_COLUMNS`/`COMPLETED_COLUMNS` for the identical
+   reason Status was already dropped: a column reading the same name (yours) down every row is
+   furniture. `EVERYONE_COLUMNS` keeps it, second, right after Task.
+3. *"also, add the logos to account and app."* The Account and App cells now draw
+   `<RecordMark picture={…} name={…} />` beside the word — the same node `shape.tsx`'s
+   `shapeAccountsList` draws for the Accounts table's own Name cell — fed by two fields the
+   door did not carry before this pass, `accountLogoUrl`/`appLogoUrl` (`shared/types.ts`'s
+   `Task`, joined in `workers/content/src/lib/tasks.ts`'s `TASK_COLS` off
+   `accounts.logo_url`/`apps.logo_url`).
+4. *"On tasks, on the list, add the sort to the toolbar and add sort by task priority and
+   deadline. That's it. Make sure you remove it from the headers."* / *"the default sort is
+   always by priority, so top priority on top, and after that, the deadline. I mean, within
+   the same priority."* Tasks was `TOOLBAR_SORT_EXEMPT` until this pass — the exemption argued
+   the Table view ordered by its own column headers, which R53 [K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)
+   otherwise requires a reasoned exemption to skip. The exemption is DELETED
+   (`shared/rules/registry.ts`) and so is the Table's own header-click sort: no `TableColumn`
+   carries a `sort` key any more, so a header renders as plain text and `record-table.tsx`'s
+   own `ordered()` is never reached (`if (!by) return rows`). ONE comparator now
+   (`compareTasks`, `tasks-screen.tsx`), computed over the raw `Task[]` before the row is
+   shaped: the toolbar's `<SortControl>` offers exactly Priority (default, descending — 4→1)
+   and Deadline (default, ascending — soonest first), and picking either lands on that field's
+   own default direction. TIES are fixed by the PRIMARY field and do not themselves flip with
+   the direction toggle: sorting by Priority breaks a tie by deadline ascending, undated last;
+   sorting by Deadline breaks a tie by priority descending (the app's own 4→1 scale) — the
+   mirror-image sentence the client gave for each.
+5. *"The whole 'waiting on clients': remove it from tasks. This is a completely different
+   module, and we will put this somewhere else, but remove it from tasks."* The to-do panel,
+   its two dialogs and its Open/Done counts are gone from the Tasks screen only — the door
+   (`workers/content/src/routes/todos.ts`), the lib (`workers/content/src/lib/todos.ts`), the
+   types (`shared/types.ts`'s `TODO_VIEWS`) and the cache key (`todosKey`) are untouched, and
+   `TodosPanel` still renders on an account's own record (`account-detail.tsx`) and a contact's
+   (`contact-detail.tsx`), each with its own raise/cancel controls — so the door keeps a
+   working front door and this was never its only one. Awaiting the new home the client named.
+6. *"on the board view for overdue, in the headers, I want to see the color of this priority,
+   and the sort inside should be by deadline. On the top, the earliest deadline."* / *"on the
+   tasks board view, when empty, don't show anything at this stage, but nothing on this
+   priority."* Applied to every tab that draws a board (Overdue/Planned/Everyone's). The kit's
+   own `KanbanColumn.dot` takes the identical tone union `PRIORITY_DOT_TONE` already resolves a
+   priority to, so the column head carries it directly; the cards inside are sorted deadline
+   ascending, undated last, FIXED — independent of whatever the toolbar's own Priority/Deadline
+   sort is set to, because the board's within-column order was never that control's question.
+   An empty column passes `emptyLabel: ""` so no placeholder sentence draws; the kit's own
+   `EmptyRegister` box (also the column's drop target) still occupies the space at rest, which
+   is as far as an app-side screen can take the ruling without a kit change — filed as a
+   finding rather than patched around `shared/ui/`.
+
+Rulings 2, 4 and 6 apply to Planned and Completed too, not only Overdue (Completed: table
+only, still mine, still no "Who has it"); Everyone's keeps the assignee column and reads the
+same sort/filters/logos as the three MINE tabs.
+
 ---
 
 ## 5. Buttons and actions
@@ -1560,6 +1629,22 @@ every calendar/agenda in the app is required to go through (`RecordCalendar` /
 
 Evidence: `web/components/meetings/meetings-screen.tsx` (the header block above
 `MeetingsScreen` carries her words verbatim and the whole redesign).
+
+**"Calendar" IS THE MONTH VIEW, ONLY — 2026-09-15, the same ruling, read further:**
+*"Agenda is a different component than month. Inside the calendar, the whole month
+agenda: disable that. When I mean calendar, I mean the month view."* `RecordCalendar`
+used to offer its OWN month/agenda switch (a `ToggleGroup` inside the component, on
+top of whichever view list above put "Calendar" on the tab) — a phone opened on that
+inner agenda by default. That inner switch is gone: `RecordCalendar` draws the month
+grid and nothing else, on every device, so picking "Calendar" from a `ToolbarViewSlot`
+above always lands on the grid. "Agenda" stays exactly what B7 already says it is — the
+kit's `Agenda`, reached through `RecordAgenda`, a genuinely different component reading
+a caller-narrowed set of entries day by day — never a mode the calendar itself switches
+into. `components/toggle-group` is consequently unreached and carries a
+`KIT_COMPONENT_EXEMPT` line (`shared/rules/registry.ts`) rather than a live adoption.
+
+Evidence: `web/components/records/record-calendar.tsx` (file header, "ONE WAY TO READ
+ONE MONTH").
 
 ### B8: action rows wrap and the group is pushed right with `ml-auto`
 
@@ -1814,25 +1899,18 @@ written beside it.
 
 **Law.** [R76](../RULES.md) (`protected-is-active`).
 
-### B14: every toolbar button is the filled icon circle
+### B14: a toolbar button is always a filled circle; the CREATE button is mango; the gear and every other icon button are beige
 
-**The rule.** *"The gear button in the toolbar in Settings Theme needs the background for
-the button to be the same everywhere. There cannot be a button in the toolbar without a
-circle around it."* — client, 15 Sep 2026, over a screenshot of Settings › Theme's gear
-sitting bare on the page ground. `AddButton` (`web/components/deep-link/screen-bits.tsx`) —
-the app's one create-button seam — already draws the filled dark circle: a bare
-`<Button size="icon">` with no `variant`, the library's own `default`. A toolbar's OTHER
-icon buttons must draw the identical variant, never a ghost/secondary one that measures as
-no fill at all against the bare page ground (`--btn-secondary-fill` resolves to `var(--card)`,
-which is `--background` in light — the 1.000 that shipped three times before this ruling).
-
-**Where it landed.** `ModuleSettingsGear` (`web/components/screens/module-settings-screen.tsx`)
-was the offender named in the screenshot — it drew `buttonVariants({ variant: "ghost", size:
-"icon" })`, the one shape B3's own reasoning about `AddButton` never got applied to, because
-it is a settings door rather than a create act. It now draws `buttonVariants({ size: "icon"
-})`, the library's bare default, matching every toolbar's own create circle. This is the ONE
-mounting: `ModuleSettingsGear` is placed on every module's own `CollectionHeading` action slot
-(R61), so fixing the one function fixes every toolbar it appears on at once.
+**The rule.** *"The settings gear should never be mango. Make it with a beige background."*
+— client, 15 Sep 2026, over a screenshot of Tasks' heading where the gear was drawn with the
+default mango fill. The CREATE button ("`+`" `AddButton`, `web/components/deep-link/screen-bits.tsx`)
+is the one mango control in a toolbar row (`buttonVariants({ size: "icon" })`, the library's
+bare `default`). The settings gear and every other toolbar icon button draw `variant:
+"secondary"` — the beige filled circle (`--btn-secondary-fill`), the same background the
+member page's pencil edit button uses. Every gear mount (module headings, Team toolbar) draws
+through this one function (`ModuleSettingsGear`,
+`web/components/screens/module-settings-screen.tsx`), so fixing the one function fixes every
+toolbar it appears on at once. Never two mango controls in one row.
 
 **Law.** Not yet a registry check (`TAB_STRIP_PIN_EXEMPT`'s own caution applies here too — a
 census over every icon-only `<Button>`/`buttonVariants` call in the app, keyed to whether it

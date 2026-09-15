@@ -317,8 +317,21 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
  * because a calendar is scanned by date — the title is what you read once you have
  * found the day. */
 export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenData {
+  // No hook to call `useLanguage()` with (a pure shaper, no React tree) — the
+  // same reason `shapeActivity`/`shapeAccountsList` above build `t` this way.
+  // Needed now because "Ours" (R35's accountCell fallback, below) is a real
+  // JSX child (R28/R33's `t(...)` census reads it), where the plain-text
+  // `client`/`detail` fallbacks two lines down are not — they were already
+  // untranslated before this pass and stay that way; this fixes only the node
+  // this pass adds.
+  const t = translator(lang)
   return {
-    rows: meetings.map((m) => ({
+    rows: meetings.map((m) => {
+      // THE ACCOUNT'S OWN NAME OR "OURS", ONCE — read by both the mark's
+      // accessible name and the visible text beside it, so the two can never
+      // say two different words about the same row.
+      const accountLabel = m.accountName ?? t("Ours")
+      return {
       id: m.id,
       // WHO IT WAS WITH, as a picture. A calendar scanned by date still wants to
       // say at a glance whose call it was (R35).
@@ -335,6 +348,21 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // (web/lib/collection-filters.ts) — so these are read by the table and by
       // nothing else. `purpose` went with the facet that was its only reader.
       client: m.accountName ?? "Ours",
+      // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15: "add
+      // the logos to account and app … identify everywhere else where it
+      // makes sense") — the Table's own "Account" column. A SEPARATE key from
+      // `client` above, deliberately: `client` is read as plain text by the
+      // calendar view's own detail line (`MeetingsMonthCalendar`, this file's
+      // header comment), and `String(<span>…</span>)` there would print
+      // "[object Object]". An internal meeting (no account) draws "Ours" as
+      // the mark's own name, the same fallback `client` already uses, so the
+      // initial tile reads "O" rather than a blank box.
+      accountCell: (
+        <span className="flex items-center gap-2">
+          <RecordMark picture={m.accountLogoUrl} name={accountLabel} />
+          <span className="min-w-0 truncate">{accountLabel}</span>
+        </span>
+      ),
       purpose: m.purposeName ?? "Not said",
       // WHETHER IT HAS HAPPENED, FROM THE CLOCK. There used to be a `held` status
       // on the row and this read it; a flag somebody had to remember to tick
@@ -368,7 +396,8 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // because `RecordRef` decides what an absent one looks like, and what it
       // looks like is nothing.
       ref: m.ref,
-    })),
+      }
+    }),
   }
 }
 
@@ -583,6 +612,25 @@ export function shapeContactsTable(contacts: Account[]): ScreenData {
       // sort would compare if this column ever gained one.
       name: a.active ? a.name : `${a.name} (archived)`,
       account: a.companyName ?? "—",
+      // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15:
+      // "add the logos to account and app … identify everywhere else where
+      // it makes sense") — this table's own "Account" column. A SEPARATE key
+      // from `account` above, deliberately: `account` is kept as the plain
+      // text `CollectionFrame`'s free-text search reads (this column's own
+      // `searchKeys`, contacts-screen.tsx), and a React node there would be
+      // "[object Object]". NO MARK AT ALL when there is no linked company —
+      // the same em dash `account` already falls back to, and the same
+      // absent-record treatment the ticket table's own App column gives an
+      // unset app: 22 of 110 contacts on the real team sit under no company,
+      // and that is an ordinary absence, not a record with no picture.
+      accountCell: a.companyName ? (
+        <span className="flex items-center gap-2">
+          <RecordMark picture={a.companyLogoUrl ?? null} name={a.companyName} />
+          <span className="min-w-0 truncate">{a.companyName}</span>
+        </span>
+      ) : (
+        "—"
+      ),
       role: a.relationship ?? "—",
     })),
   }

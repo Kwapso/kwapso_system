@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.85",
-  "sha": "cf395129a3a732cc6a7ece0d85756924e6da1099",
+  "tag": "v1.2.87",
+  "sha": "e8e4cdad2268b351e411900a40a80d9703ad3927",
   "syncedAt": "2026-09-15"
  },
- "generatedAt": "2026-09-15T07:35:37.181Z",
+ "generatedAt": "2026-09-15T11:01:36.372Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -14,7 +14,7 @@
   "cvaSites": 52,
   "variantGroups": 79,
   "variantOptions": 256,
-  "typedEnumProps": 42,
+  "typedEnumProps": 43,
   "typedBooleanProps": 317,
   "compositions": 47,
   "icons": 1512,
@@ -1436,7 +1436,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "dayCellVariants",
-     "line": 109,
+     "line": 130,
      "base": "flex min-w-0 flex-col gap-[var(--space-1h)] overflow-hidden rounded-[var(--radius)] px-[var(--space-2h)] py-2 text-start transition-colors duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
@@ -1482,7 +1482,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "eventChipVariants",
-     "line": 153,
+     "line": 174,
      "base": "block w-full truncate rounded-pill px-2 text-badge leading-[1.6] font-[var(--font-weight-medium)] text-start",
      "groups": [
       {
@@ -1526,9 +1526,7 @@
      },
      "compound": [],
      "unresolved": [],
-     "usedBy": [
-      "CalendarView"
-     ]
+     "usedBy": []
     }
    ],
    "typedProps": [
@@ -4790,6 +4788,16 @@
      "type": "KanbanProps",
      "variantsFrom": [],
      "props": [
+      {
+       "name": "emptyColumns",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "register",
+        "bare"
+       ],
+       "note": "How an empty COLUMN draws, board-wide. `\"register\"` (default, every existing caller unchanged) is `EmptyRegister` — the box and the words. `\"bare\"` (2026-09-15 ruling, \"when empty, don't show anything at this stage\") drops both: an unstyled zone at the same inset stands in, still a real drop target and still `aria-label`led with the same words, so the column can be found by a pointer or a screen reader — only the BOX is gone. Does not touch the BOARD's own empty state (no columns at all), which is a different register entirely."
+      },
       {
        "name": "loading",
        "optional": true,

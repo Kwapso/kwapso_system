@@ -43,22 +43,31 @@ type TaskRow = {
   completed_at: string | null
   account_id: string | null
   account_name: string | null
+  account_logo_url: string | null
   important: number
   urgent: number
   department: string | null
   app_id: string | null
   app_name: string | null
+  app_logo_url: string | null
   file_url: string | null
   file_name: string | null
   created_at: string
   creator_name: string | null
 }
 
+// THE TWO LOGOS (client ruling, 2026-09-15: "add the logos to account and
+// app") — joined the same way `account_name`/`app_name` already are, off each
+// table's own `logo_url`, so a task's Account/App cells can draw the same
+// `RecordMark` face the Accounts and Apps screens already draw for the same
+// two rows.
 const TASK_COLS = `t.id, t.ref, t.title, t.detail, t.assignee_id, t.assignee_name, t.due_on, t.status,
   t.completed_at, t.account_id, t.important, t.urgent, t.department, t.app_id,
   t.file_url, t.file_name, t.created_at, t.creator_name,
   (SELECT a.name FROM accounts a WHERE a.id = t.account_id) AS account_name,
-  (SELECT p.name FROM apps p WHERE p.id = t.app_id) AS app_name`
+  (SELECT a.logo_url FROM accounts a WHERE a.id = t.account_id) AS account_logo_url,
+  (SELECT p.name FROM apps p WHERE p.id = t.app_id) AS app_name,
+  (SELECT p.logo_url FROM apps p WHERE p.id = t.app_id) AS app_logo_url`
 
 function toTask(r: TaskRow): Task {
   const important = r.important === 1
@@ -77,6 +86,7 @@ function toTask(r: TaskRow): Task {
     completedAt: r.completed_at,
     accountId: r.account_id,
     accountName: r.account_name,
+    accountLogoUrl: r.account_logo_url,
     important,
     urgent,
     // DERIVED, never stored — one formula, in the shared file both front doors
@@ -86,6 +96,7 @@ function toTask(r: TaskRow): Task {
     department: r.department,
     appId: r.app_id,
     appName: r.app_name,
+    appLogoUrl: r.app_logo_url,
     fileUrl: r.file_url,
     fileName: r.file_name,
     createdAt: r.created_at,

@@ -119,7 +119,11 @@ describe("C4 — an action row reflows on a phone instead of clipping", () => {
     expect(
       actionGroups().length,
       "no `ml-auto` action group was found in either front door — the scan has gone blind"
-    ).toBeGreaterThanOrEqual(5)
+    ).toBeGreaterThanOrEqual(4) // 2026-09-15: lowered from 5. The calendar month controls
+    // in web/components/records/record-calendar.tsx (`ml-auto`-pushed "Today" button
+    // and navigation controls) were removed per client ruling to unify the row UI — the
+    // segmented toggle and the CaretLeft/CaretRight buttons replaced the previous `ml-auto`
+    // group with a `justify-between` row that reflows through flex-wrap on the parent.
   })
 
   it("every pushed action group can reflow — itself, or in the row around it", () => {

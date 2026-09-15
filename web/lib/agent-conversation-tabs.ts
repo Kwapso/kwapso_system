@@ -1,0 +1,225 @@
+"use client"
+
+// THE ASSISTANT'S OWN TAB STRIP — which conversations are open in the assistant
+// column, which one is being looked at, and the state behind the "+" that
+// starts a fresh one.
+//
+// ── THE CLIENT'S RULING, 15 SEP 2026, VERBATIM ──────────────────────────────
+//
+//   "I want that, all the time, there is a visible tab that has a plus button.
+//    That's how you create a new one. However, when you open it, use your
+//    design D so that every time you open a new conversation, it opens a scope
+//    picker first."
+//
+// (Design D lives in the artifact this feature was built from:
+// https://claude.ai/code/artifact/8d4b7c6e-639d-4776-a3d9-337ae7e957d5 —
+// "Section 1 · Your pick" is what is built here. `agent-scope-picker.tsx`
+// carries the picker's own wording, copied from it letter for letter.)
+//
+// ── WHY THIS IS NOT `workspace-tabs.ts` AGAIN ───────────────────────────────
+//
+// The main content strip's whole design rests on a background tab costing
+// "two strings and nothing else" (`workspace-tabs.ts`'s own words), because a
+// background RECORD tab holds no live state at all — it is just an address to
+// revisit. A conversation is the opposite shape: `use-agent-chat.tsx` holds
+// exactly ONE live thread at module level — one transcript, one `threadId`,
+// one set of source chips — and switching conversations REPLACES that one
+// thread rather than running a second one beside it, the identical swap the
+// history sheet already does through `openThread`. So this store holds only
+// what a background conversation tab can cost under that model: a stable id,
+// the real thread it points at (once one exists), its scope, and the label the
+// scope or the thread gave it. Nothing here streams and nothing here is
+// fetched ahead of being activated — the caller (`agent-panel.tsx`) is what
+// turns "this tab is now active" into an `openThread` / `newChat` call.
+//
+// A DRAFT HAS NO THREAD YET. Pressing "+" opens a tab with `scope: null` — the
+// picker is showing — and no `threadId`: the server only mints one once a
+// message is actually sent. `setAgentTabThread` is how the caller reports that
+// back once it happens.
+//
+// NOT PERSISTED, ON PURPOSE — matching `use-agent-chat.tsx`'s own module cells,
+// not `workspace-tabs.ts`'s `localStorage` mirror. A thread itself is never
+// lost — it is saved server-side and reachable again from the history sheet —
+// only the STRIP'S OWN memory of which ones happened to be open resets with
+// the page, same as the rest of the assistant's live state does.
+
+import * as React from "react"
+
+export type AgentTabScope = "record" | "knowledge" | "everything"
+
+export type AgentTab = {
+  /** A client-side id, stable for the tab's whole lifetime — never the thread
+   * id, because a draft has no thread yet and a tab must not change identity
+   * the moment its first message mints one. */
+  id: string
+  /** Set once the server has assigned a real thread — see the file header. */
+  threadId?: string
+  /** `null` while the picker is showing: a fresh "+" tab that has not chosen
+   * yet. Set exactly once, at the moment a picker row is pressed. */
+  scope: AgentTabScope | null
+  /** What the tab shows. The picked scope's own name — or the record's own
+   * name for "This record" — until a real thread title exists to replace it;
+   * see `pickAgentTabScope`. */
+  label: string
+  /** Captured the instant "This record" is chosen, because the reader may
+   * navigate elsewhere before they finish typing — a snapshot, the same
+   * reasoning `workspace-tabs.ts`'s own `OpenTab.label` gives for writing a
+   * background tab's name down rather than resolving it live. */
+  recordLabel?: string
+}
+
+/** How many conversation tabs may sit open at once, the "+" not counted — the
+ * same ceiling `workspace-tabs.ts` gives the record strip and for a related
+ * reason: this strip never folds while `onClose` is given (a tab set does not
+ * fold — `breadcrumb-folders.tsx`'s own rule), so past this it would only grow
+ * the strip's own horizontal scroll rather than hide anything. */
+export const MAX_AGENT_TABS = 8
+
+let tabs: AgentTab[] = []
+let activeId: string | null = null
+const subscribers = new Set<() => void>()
+function announce(): void {
+  for (const fn of subscribers) fn()
+}
+
+let nextId = 0
+const newTabId = () => `agent-tab-${++nextId}`
+
+const NOTHING: AgentTab[] = []
+
+/** Ensure at least one tab exists, representing whatever conversation is
+ * already live (a resumed thread, or a blank one) — called once the panel
+ * knows what it resumed. It is never a picker: only a tab opened through "+"
+ * asks the reader anything, which is what keeps today's resumed-thread
+ * behaviour byte for byte unless the reader presses "+" themselves. A no-op
+ * once a tab already exists, so a caller may call this on every render that
+ * has not yet seen one without needing its own guard. */
+// A NAMED CONSTANT, NOT A LITERAL INLINE BELOW — R33's own walker treats an
+// object literal carrying a `label` field as a translatable config row (the
+// same reading that lets a `FieldConfig` spread translate itself) and then
+// asks every OTHER string-literal property in that same object to sit inside
+// a `t(...)` call too. `scope` is not a sentence, it is this type's own
+// discriminant, so it is read off a typed constant here instead of written a
+// second time as a bare string beside `label`.
+const SEED_SCOPE: AgentTabScope = "everything"
+
+export function seedAgentTabs(threadId: string | undefined, label: string): void {
+  if (tabs.length > 0) return
+  const id = newTabId()
+  tabs = [{ id, threadId, scope: SEED_SCOPE, label }]
+  activeId = id
+  announce()
+}
+
+/** Press "+" — a fresh, scope-less tab, activated immediately so its picker
+ * shows. Returns the new tab's id. Evicts the tab that has sat least far
+ * forward in the strip (never the new one, never the one that was active)
+ * once the ceiling is crossed — a simpler rule than `workspace-tabs.ts`'s own
+ * recency ranking, defensible here because a conversation tab is opened far
+ * less often than a record one and the cost of guessing wrong is one extra
+ * click to reopen it from the history sheet, which still holds every
+ * thread. */
+export function openNewAgentTab(): string {
+  const id = newTabId()
+  // `label` STARTS EMPTY, ON PURPOSE — a draft tab's provisional word ("New")
+  // is user-facing text, and this store has no `t()` to say it with (it is
+  // plain state, imported by React and by nothing else). The strip itself
+  // supplies the translated placeholder for an empty label — see
+  // `agent-tab-strip.tsx`.
+  const draft: AgentTab = { id, scope: null, label: "" }
+  const wasActive = activeId
+  let next = [...tabs, draft]
+  if (next.length > MAX_AGENT_TABS) {
+    const victim = next.find((t) => t.id !== id && t.id !== wasActive)
+    if (victim) next = next.filter((t) => t.id !== victim.id)
+  }
+  tabs = next
+  activeId = id
+  announce()
+  return id
+}
+
+/** Switch which tab is being looked at — pure state. The caller
+ * (`agent-panel.tsx`) is what then loads that tab's thread or clears the panel
+ * for a fresh one; this store has no opinion about `use-agent-chat.tsx`. */
+export function activateAgentTab(id: string): void {
+  if (activeId === id) return
+  if (!tabs.some((t) => t.id === id)) return
+  activeId = id
+  announce()
+}
+
+/** A picker row was pressed: the scope is set once, and the label becomes the
+ * pick itself — the design artifact's own reading: "the tab's own label is the
+ * pick, not a fourth control... a record's name if she'd picked 'This
+ * record'." */
+export function pickAgentTabScope(id: string, scope: AgentTabScope, label: string, recordLabel?: string): void {
+  tabs = tabs.map((t) => (t.id === id ? { ...t, scope, label, recordLabel } : t))
+  announce()
+}
+
+/** The server minted a thread for a tab that had none — its first message
+ * landed, or a resume finished after the tab was already seeded. */
+export function setAgentTabThread(id: string, threadId: string): void {
+  tabs = tabs.map((t) => (t.id === id && t.threadId !== threadId ? { ...t, threadId } : t))
+  announce()
+}
+
+/** Close one tab. THE "+" IS NEVER PASSED HERE — it carries no id in this
+ * store at all; see `agent-tab-strip.tsx`'s own item, `closable: false`. The
+ * neighbour rule is `workspace-tabs.ts`'s own `closeTab`, read the same way
+ * off array position: `next[at]` is whichever tab has just shifted INTO the
+ * closed one's spot (its old right-hand neighbour), falling back to
+ * `next[at - 1]` (its old left-hand one) only once there is nothing left of
+ * that spot to shift into — the closed tab was the strip's own last one.
+ * `null` is returned once the strip is empty of real conversations, which is
+ * a real state here (just the "+" remains, exactly as the client asked: it
+ * is never itself closable and never requires a conversation to sit beside
+ * it). */
+export function closeAgentTab(id: string): string | null {
+  const at = tabs.findIndex((t) => t.id === id)
+  if (at < 0) return activeId
+  const wasActive = id === activeId
+  const next = tabs.slice(0, at).concat(tabs.slice(at + 1))
+  tabs = next
+  const landing = next.length === 0 ? null : wasActive ? (next[at] ?? next[at - 1]).id : activeId
+  activeId = landing
+  announce()
+  return landing
+}
+
+/** What the store is holding right now — for a caller that needs the fresh
+ * list synchronously right after a mutation (`closeAgentTab`'s own return is
+ * the LANDING id; the tab record itself is read back through here), and for a
+ * test proving the ceiling holds. */
+export function agentTabsSnapshot(): AgentTab[] {
+  return tabs
+}
+
+/** The open tabs, for the strip. Two hooks rather than one combined snapshot —
+ * `workspace-tabs.ts`'s own shape — because `useSyncExternalStore` compares
+ * snapshots by identity, and a fresh `{tabs, activeId}` object built on every
+ * call would never equal the last one it handed out. */
+export function useAgentTabs(): AgentTab[] {
+  return React.useSyncExternalStore(
+    (cb) => {
+      subscribers.add(cb)
+      return () => subscribers.delete(cb)
+    },
+    () => (tabs.length === 0 ? NOTHING : tabs),
+    () => NOTHING
+  )
+}
+
+/** Which tab is being looked at right now. `null` matches `useAgentTabs()`'s
+ * own empty state — the two are always either both real or both empty. */
+export function useActiveAgentTabId(): string | null {
+  return React.useSyncExternalStore(
+    (cb) => {
+      subscribers.add(cb)
+      return () => subscribers.delete(cb)
+    },
+    () => activeId,
+    () => null
+  )
+}

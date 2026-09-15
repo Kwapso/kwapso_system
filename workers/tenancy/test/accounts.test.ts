@@ -985,6 +985,27 @@ describe("a contact's row carries where she works and what she does there", () =
     expect(marta?.relationship).toBe("Operations")
   })
 
+  // R35, client ruling 2026-09-15: "add the logos to account and app …
+  // identify everywhere else where it makes sense" — the Contacts table's
+  // own "Account" column. Read off the SAME link `companyName` already is
+  // (one more field on `LINKED_COMPANY`, not a second subquery), so it is
+  // pinned right beside that test rather than in a suite of its own.
+  it("carries the linked company's own logo, off the same link as its name", async () => {
+    db().prepare("UPDATE accounts SET logo_url = ? WHERE id = ?").run("/media/bergman-marine.png", IDS.victimSecond)
+    const marta = await rowFor(IDS.victimPerson)
+    expect(marta?.companyName).toBe("Bergman Marine")
+    expect(marta?.companyLogoUrl).toBe("/media/bergman-marine.png")
+  })
+
+  // AN UNLINKED CONTACT NAMES NO COMPANY AND THEREFORE NO LOGO — the honest
+  // null `companyName` already answers with, not an empty string a screen
+  // could mistake for "the company has no picture".
+  it("an unlinked contact carries no company logo either", async () => {
+    const luis = await rowFor(IDS.victimContact)
+    expect(luis?.companyName).toBeNull()
+    expect(luis?.companyLogoUrl).toBeNull()
+  })
+
   it("the MAIN STAKEHOLDER link wins over the alphabet", async () => {
     db().prepare("UPDATE account_links SET is_main_stakeholder = 1 WHERE id = ?").run(IDS.victimLink)
     const marta = await rowFor(IDS.victimPerson)

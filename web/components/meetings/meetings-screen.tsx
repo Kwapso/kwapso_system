@@ -97,7 +97,14 @@ const TABLE_COLUMNS = [
   field("purpose", "Meeting type"),
   field("department", "Department"),
   field("attendees", "Attendees"),
-  field("client", "Account"),
+  // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15: "add the
+  // logos to account and app … identify everywhere else where it makes
+  // sense"). `accountCell`, NOT `client` — `shapeMeetingsList` keeps `client`
+  // as plain text because the calendar view's own detail line
+  // (`MeetingsMonthCalendar` above) reads it with `String(r.client ?? "")`,
+  // and a React node there would print "[object Object]". `accountCell` is
+  // the SAME fact, shaped as a node, for this column alone.
+  field("accountCell", "Account"),
 ]
 
 /** WHAT THE DOOR CALLS EACH OF THOSE COLUMNS.
@@ -117,7 +124,7 @@ const TABLE_COLUMNS = [
 const COLUMN_SORT: Record<string, string> = {
   name: "title",
   when: "when",
-  client: "client",
+  accountCell: "client",
 }
 
 /** …AND THE PAIRING IS CHECKED AGAINST THE MENU, not trusted. The meetings menu
@@ -138,6 +145,16 @@ const TABLE_COLUMN_HEADERS: TableColumn[] = TABLE_COLUMNS.map((f) => {
     label: f.field.label,
     sort: option?.value,
     defaultDir: option?.defaultDir,
+    // `accountCell` HOLDS A NODE (the mark + name span above), not plain
+    // text — `client` is the sibling row key `shapeMeetingsList` keeps as a
+    // string for exactly this: `CollectionFrame`'s free-text match reads
+    // `String(row[key])` (record-table.tsx's own `searchKey` doc), and a
+    // node there is `"[object Object]"`. Inert on this PAGED table today
+    // (the door owns the search, same as every other column here), and
+    // still declared for the reason `record-table.tsx` gives one column
+    // over: a column left unset is silently unsearchable the day this table
+    // stops being paged, rather than visibly correct now.
+    searchKey: f.column === "accountCell" ? "client" : undefined,
     // NO `sortType`/`sortKey` ON ANY OF THESE, and their absence is the
     // statement: every order this table can be put in is the DOOR's (the
     // `order={found.order}` at the render below). A browser-side comparison

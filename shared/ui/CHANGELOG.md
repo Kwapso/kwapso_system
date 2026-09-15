@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+### Added — `Kanban` gets `emptyColumns="bare"`, an empty column with no box and no words
+
+The client's ruling, 2026-09-15, on the tasks board view: *"when empty,
+don't show anything at this stage."* Every empty column has always drawn
+`EmptyRegister` — a box of tertiary-ink words, doubling as the drop target
+for the column's first card — and the ruling asks for that box GONE, not
+reworded.
+
+New prop, board-wide, default `"register"` (every existing caller draws
+exactly as before): `emptyColumns="bare"` swaps every empty column's
+`EmptyRegister` for an unstyled `<div role="group" aria-label>`, tall
+enough to stay a findable drop target for the same reason `EmptyRegister`
+itself gives — "a 12-tall strip is not something a pointer can reliably
+find" — so a screen reader can still learn the column is there and empty
+while nothing at all draws for a sighted reader. One prop for the whole
+board rather than per column: a board where one empty column drew a box and
+its neighbour did not would read as a bug, not a style. The empty BOARD
+register (no columns at all) is untouched — this is about a column, never
+the board.
+
+Demo: `demo/collections/i-l.tsx`'s `kanban` section gets a second "empty
+column" example next to the existing one, `emptyColumns="bare"` on the
+identical data, so the two read side by side.
+
+### Fixed — `CalendarView`'s compact (below `sm:`) dots open the day, and read `event.dot`
+
+The client's ruling, 2026-09-15: the calendar is the month grid, full stop,
+even on a phone — *"Agenda is a different component than month. Inside the
+calendar, the whole month agenda: disable that. When I mean calendar, I mean
+the month view."* That removed the one escape hatch a busy phone had, and
+left chapter 18's below-`sm:` dots exactly where CV-3 (the "+N more"
+more-line, v1.2.9) found the desktop chips before it: `aria-hidden`, no
+`onSelectEvent`/`onSelectMore` wiring, and nothing to tap — a phone reading
+the month grid could see that a day had records and could not open a single
+one.
+
+Three fixes, one file. **(1)** The dots now sit inside `CompactDaySummary`,
+a real `<button>` the moment the caller can open the day —
+`onSelectMore` preferred (the SAME handler the desktop more-line calls, so
+the day opens identically from either width, handed every event on that
+day), `onSelectDay` the fallback. Its accessible name is the day's own
+visible label plus the count, read off the button's ordinary subtree rather
+than a hand-assembled `aria-label` (`day.label` is a caller node; this file
+formats nothing, ruling 07) — a new `formatDaySummary` prop overrides the
+words, the same override `formatMoreEvents` already offers the desktop
+line. Where the cell is ALREADY a button (`onSelectDay`, `pickable`), a
+nested button would be invalid HTML, so the count instead rides the cell's
+own accessible name through a plain `sr-only` span. **(2)** Each dot reads
+`event.dot` (27.25's status colour) before falling back to `tone` — the
+same precedence `eventChipClass` already uses for the chip it stands in
+for below `sm:`; before this the dot read `tone` only, so a task's priority
+colour never reached the phone at all. **(3)** Capped at three dots
+(`MOBILE_MAX_DOTS`, independent of `maxEvents`, which caps the desktop chip
+column only) plus a small "+N" mark, matching chapter 18's small drawing.
+
+Demo: `demo/collections/a-ca.tsx`'s `calendar-view` section gets a new panel
+showing the compact control at the phone width switch, and 5 September's
+four events (two `dot`, two `tone`-only, one over the cap) exercise all
+three fixes on one cell.
+
 ### Added — `ScreenShell` gets `asideHandleOnOpen`, so a caller can drop the OPEN mid-edge close grab
 
 The client, 2026-09-15, verbatim, over a screenshot of the consuming app's

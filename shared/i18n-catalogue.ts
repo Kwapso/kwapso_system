@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 811 strings · 3 languages · 1386 of the entries below are hand-written seed.
+// 809 strings · 3 languages · 1437 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -355,7 +355,6 @@ export const CATALOGUE: Catalogue = {
   "Name for how it worked before": { de: "Name für die frühere Funktionsweise", es: "Nombre de cómo funcionaba antes", ca: "Nom de com funcionava abans" },
   "New access token": { de: "Neuer Zugriffscode", es: "Nuevo token de acceso", ca: "Nou token d'accés" },
   "New account": { de: "Neues Konto", es: "Nueva cuenta", ca: "Nou compte" },
-  "New chat": { de: "Neuer Chat", es: "Nuevo chat", ca: "Nova conversa" },
   "New dropdown value": { de: "Neuer Dropdown-Wert", es: "Nuevo valor de lista desplegable", ca: "Nou valor de desplegable" },
   "New email": { de: "Neue E-Mail", es: "Nuevo correo electrónico", ca: "Nou correu electrònic" },
   "New meeting": { de: "Neues Treffen", es: "Nueva reunión", ca: "Nova reunió" },
@@ -686,7 +685,6 @@ export const CATALOGUE: Catalogue = {
   "Value": { de: "Wert", es: "Valor", ca: "Valor" },
   "Version": { de: "Version", es: "Versión", ca: "Versió" },
   "Versions": { de: "Versionen", es: "Versiones", ca: "Versions" },
-  "Waiting on clients": { de: "Warten auf Kunden", es: "Esperando a los clientes", ca: "Esperant els clients" },
   "We can't reach your account": { de: "Wir können Ihr Konto nicht erreichen", es: "No podemos acceder a tu cuenta", ca: "No podem accedir al teu compte" },
   "We couldn't load any more. Try again in a moment.": { de: "Wir konnten nicht mehr laden. Versuchen Sie es in einem Moment erneut.", es: "No pudimos cargar más. Intenta de nuevo en un momento.", ca: "No hem pogut carregar més. Prova-ho en un moment." },
   "We couldn't sign you out. Check your connection and try again.": { de: "Wir konnten Sie nicht abmelden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.", es: "No pudimos cerrar tu sesión. Verifica tu conexión e intenta de nuevo.", ca: "No hem pogut tancar la sessió. Comprova la connexió i prova-ho de nou." },
