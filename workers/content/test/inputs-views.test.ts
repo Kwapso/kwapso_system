@@ -245,3 +245,54 @@ describe("all_inputs:read — whose accounts' inputs 'the inputs' means", () => 
     ])
   })
 })
+
+// THE PORTAL RIGHT IS `inputs`, NOT THE RETIRED `todos` — proved against a
+// REAL portal caller (`IDS.victimUser`, a `portal_users` row on the harness's
+// R_CLIENT role), the same shape SCOPE ch.06/07 describes: a client reads and
+// completes their own company's inputs, and nothing else.
+//
+// WHY THIS FILE EXISTS SEPARATELY FROM THE SMOKE. `scripts/smoke-portal.mjs`
+// caught this the hard way, 15 Sep 2026: its own `CLIENT_RIGHTS` fixture still
+// wrote a role's rights against the module named `todos`, which migration
+// 0096 (`workers/tenancy/src/team-schema/migrations.ts`) renamed to `inputs`
+// for every EXISTING team's EXISTING roles — so a role built fresh against
+// the OLD name landed on a module no door reads any more, and the door
+// answered exactly what an unheld right answers: 403, "your role is missing
+// the 'update' right on inputs" for the complete door and a flat 403 for the
+// read door, staff and portal alike, no different than a role that held
+// nothing at all. The smoke's own fix was renaming that one key to `inputs`;
+// this suite proves the mapping the smoke fixture had gotten wrong — the
+// worker side of it, so a future rename of this module is caught here even
+// when nobody happens to run the smoke.
+describe("the portal right is `inputs`, not the retired `todos` (migration 0096)", () => {
+  it("a portal caller holding inputs:read + inputs:update reads and completes their own company's input", async () => {
+    const id = await ask("Send the signed contract", IDS.victimAccount)
+    const list = await get(IDS.victimUser, "?view=open")
+    expect(list.todos.map((t) => t.id)).toContain(id)
+    const done = await call(IDS.victimUser, "POST /api/content/todos/complete", { id })
+    expect(done.status, `portal complete refused (${await done.clone().text()})`).toBe(200)
+  })
+
+  it("without inputs:update a portal caller is refused, named for the module a door actually reads", async () => {
+    db()
+      .prepare(`UPDATE role_permissions SET can_update = 0 WHERE role_id = ? AND module = 'inputs'`)
+      .run(IDS.clientRole)
+    const id = await ask("Send the W-9", IDS.victimAccount)
+    const res = await call(IDS.victimUser, "POST /api/content/todos/complete", { id })
+    expect(res.status).toBe(403)
+    const body = (await res.json()) as { error: string; message: string }
+    expect(body.message).toMatch(/inputs/)
+  })
+
+  it("without inputs:read a portal caller cannot even list their own company's inputs", async () => {
+    db().prepare(`UPDATE role_permissions SET can_read = 0 WHERE role_id = ? AND module = 'inputs'`).run(IDS.clientRole)
+    const res = await call(IDS.victimUser, "GET /api/content/todos")
+    expect(res.status).toBe(403)
+  })
+
+  it("holding inputs is not a pass to another company's input — the fence refuses it, not the right", async () => {
+    const id = await ask("Their own paperwork", IDS.burglarAccount)
+    const res = await call(IDS.victimUser, "POST /api/content/todos/complete", { id })
+    expect(res.status).toBe(404)
+  })
+})

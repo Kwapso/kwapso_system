@@ -388,7 +388,11 @@ const CLIENT_RIGHTS = {
   contacts: ["read"],
   portal_users: ["read"],
   help: ["read", "create", "update"],
-  todos: ["read", "update"],
+  // RENAMED FROM `todos` 15 Sep 2026 (team migration 0096, shared/team-modules.ts)
+  // — the Inputs screen's own permission box. The API path, the response
+  // field and the ref kind are all still `todos`; only the module a role's
+  // rights are written against moved.
+  inputs: ["read", "update"],
   deliverables: ["read"],
   processes: ["read", "create"],
   // The worst case, on purpose. See above.
