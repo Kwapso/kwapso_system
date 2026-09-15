@@ -80,7 +80,7 @@ beforeEach(() => {
   holder.db = buildSpineDb()
 })
 
-describe("the door gates on inputs:read now (renamed from todos:read, migration 0095)", () => {
+describe("the door gates on inputs:read now (renamed from todos:read, migration 0096)", () => {
   it("the admin role (which holds inputs via buildTeamSeed) reaches the door", async () => {
     const res = await call(IDS.staffUser, "GET /api/content/todos")
     expect(res.status).toBe(200)

@@ -200,7 +200,7 @@ export type TeamSection = {
     // (that screen's own header: "The whole 'waiting on clients': remove it
     // from tasks... we will put this somewhere else") and given the sidebar
     // spot its own screen. The permission module is `inputs` (renamed from
-    // `todos`, team migration 0095) and the segment IS the module, like
+    // `todos`, team migration 0096) and the segment IS the module, like
     // Contacts.
     | "inputs"
     | "tickets"

@@ -44,7 +44,7 @@
 
 import { APP_STAGES } from "../app-stages"
 import { DELIVERABLE_KINDS } from "../selectable-groups"
-import { HELP_STATUSES, RETIRED_HELP_STATUSES, STORY_STATUSES, ticketTypeKeptForMigrationExcludedSql } from "../types"
+import { HELP_STATUSES, RETIRED_HELP_STATUSES, STORY_STATUSES } from "../types"
 
 /** The comparisons a filter may make. `contains` is a case-insensitive substring
  * (and, on a reference field, a substring of the referenced record's NAME);
@@ -404,20 +404,16 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       reason:
         "the tickets door's own everyday list is `archived_at IS NULL` — a ticket that has been put away is still a record and is not on the list",
     },
-    // THE KIND THAT IS KEPT BUT NEVER SHOWN. The client's ruling of 6 Sep 2026
-    // is written up in full at `TICKET_TYPE_KEPT_FOR_MIGRATION` in
-    // `shared/types.ts`: the requirements rows stay in the database for a
-    // migration into another one, and stop being part of "the tickets"
-    // everywhere a person is answered. `list_help_tickets` and the whole Tickets
-    // screen already exclude them at their own door; without this line
-    // `query_records` would have gone on listing and COUNTING them, and its
-    // counts are what the assistant says out loud when somebody asks how many
-    // tickets there are.
-    withheld: {
-      sql: ticketTypeKeptForMigrationExcludedSql("t.help_type"),
-      reason:
-        "requirements tickets are kept for a migration into another database and are no longer part of the tickets collection anywhere a person is answered (shared/types.ts, TICKET_TYPE_KEPT_FOR_MIGRATION)",
-    },
+    // A `withheld` CLAUSE STOOD HERE UNTIL 15 SEP 2026 — the one thing in this
+    // registry that ever used it. It kept `query_records` from listing and
+    // COUNTING requirements tickets, which matters on this door above all
+    // others: its counts are what the assistant says out loud. The kind was
+    // deleted outright that day (the owner's ruling, quoted at
+    // `shared/ticket-types.ts`), so there is nothing left to withhold. The
+    // mechanism stays — `withheld` is still declared on `QueryModule` and still
+    // applied by `readWhere` — because the NEXT module to stop answering about
+    // some of its own rows needs exactly this and nothing else, and its value is
+    // that the clause cannot be escaped by a caller's own `OR`.
     fields: [
       ID,
       // `note` said "e.g. TIC-0000042" until 8 Sep 2026, which was the shape
@@ -672,7 +668,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
   },
   todos: {
     table: "todos",
-    // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095) — the
+    // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0096) — the
     // table this entity queries is unchanged, only the permission box.
     module: "inputs",
     summary: "What we are waiting on a client for.",

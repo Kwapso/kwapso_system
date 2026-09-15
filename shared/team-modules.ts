@@ -52,13 +52,13 @@ export const TEAM_MODULES = [
   // tab the same way Tasks already has one, so it needs the same kind of
   // switch: `work` already decides whether a role reaches the Stories screen
   // at all, this decides whether the backlog it sees is the whole team's or
-  // its own. Migration 0094 seeds it for every team that already exists.
+  // its own. Migration 0095 seeds it for every team that already exists.
   "all_stories",
   // RENAMED FROM `todos` 15 SEP 2026 (Task C, the Inputs screen — documents/
   // UI-RULEBOOK.md K entry). The TABLE is still `todos`, the ref kind is
   // still `todos`, and every cache key/activity relatedTable still says
   // `todos` — only the PERMISSION BOX changes name, to the word the glossary
-  // and the label below have used since 31 Aug 2026. Team migration 0095
+  // and the label below have used since 31 Aug 2026. Team migration 0096
   // carries every role's existing `todos` grants over to this key untouched
   // (R36: a rename must not silently reset what a role already held).
   "inputs",
@@ -196,7 +196,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // KEY WAS `todos` UNTIL 15 SEP 2026 — the label already read "Inputs" (31
   // Aug 2026, the client's own follow-up naming the glossary term); the box
   // itself carried the old word for two weeks after the word it decides had
-  // already changed. Team migration 0095 is the rename.
+  // already changed. Team migration 0096 is the rename.
   inputs: "Inputs",
   // EVERYONE ELSE'S INPUTS — read the row as a sentence, `all_tasks`'s own:
   // "this role may see every account's inputs, not only the ones they

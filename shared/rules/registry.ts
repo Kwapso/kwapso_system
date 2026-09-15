@@ -2745,7 +2745,7 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   processes:
     "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
   // KEYED `inputs` SINCE 15 SEP 2026 — the permission module renamed from
-  // `todos` (team migration 0095, shared/team-modules.ts); the reasoning
+  // `todos` (team migration 0096, shared/team-modules.ts); the reasoning
   // below is unchanged, only the box it is filed under.
   inputs:
     "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
@@ -3220,7 +3220,7 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // TO-DO is aimed at a client and is the one module in this build a client login
   // is meant to hold — so it gates on its own.
   tasks: "work",
-  // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095). The TABLE
+  // RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0096). The TABLE
   // (this map's own key) is unchanged; the permission box a reader of this
   // history needs moved with the door.
   todos: "inputs",

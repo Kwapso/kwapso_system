@@ -135,7 +135,7 @@ export const TOOL_GATES: Record<string, string> = {
   create_sprint: "work:create",
   update_sprint: "work:update",
   complete_sprint: "work:update",
-  // RENAMED `todos:*` → `inputs:*` 15 SEP 2026 (team migration 0095) —
+  // RENAMED `todos:*` → `inputs:*` 15 SEP 2026 (team migration 0096) —
   // the door's own gate moved (workers/content/src/routes/todos.ts), and
   // this hint is what `toMcpTool` publishes to outside developers.
   raise_todo: "inputs:create",

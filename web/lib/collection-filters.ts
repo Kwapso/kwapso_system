@@ -237,8 +237,9 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     // here: this is a per-team, editable vocabulary (`selectable_data`), not a
     // constant. It is filled in by the screen from `helpTypeOptions` — the one
     // list the create form, the dashboard's legend and this facet all read —
-    // which already subtracts the kind that is kept but never shown
-    // (`ticketTypeKeptForMigration`, shared/types.ts).
+    // (the one list the create form, the dashboard's legend and this facet all
+    // read), which since 15 Sep 2026 is simply the team's four live words —
+    // `shared/ticket-types.ts` carries the owner's ruling that there are four.
     { field: "helpType", label: "Type" },
     // A CLOSED VOCABULARY THAT STILL CANNOT BE SPELLED HERE, and it is the one
     // genuine exception to this file's own two-sources rule at the top. The

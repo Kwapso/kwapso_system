@@ -24,7 +24,9 @@
 // REQUEST: the door is asked for entities that are not archived, and the door
 // answers for the whole collection.
 
+import * as React from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { clearCache } from "@shared/web/store"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 /** What the accounts door was asked, captured. Hoisted so `vi.mock`'s factory —
@@ -39,6 +41,11 @@ const door = vi.hoisted(() => ({
    * `door.apps`'s reason — `beforeEach` puts it back to empty, which is what
    * every case that predates the avatar ruling expects. */
   links: [] as Record<string, unknown>[],
+  /** THE TEAM'S SPRINTS, for the Feedback chip's own condition (15 Sep 2026).
+   * A LET for `door.apps`'s reason — `beforeEach` puts it back to empty, which
+   * is what every case that predates the rule expects, and an empty list means
+   * no Validation sprint is running anywhere. */
+  sprints: [] as Record<string, unknown>[],
   accounts: vi.fn(async (_opts: Record<string, unknown> = {}) => ({
     accounts: [
       { id: "acct-bergman", name: "Bergman", code: "BERG", email: null, active: true, accountType: "entity" },
@@ -59,7 +66,14 @@ vi.mock("@/lib/live-resources", () => ({
   // …and the SECTIONS of that system, on the same terms: one bounded list
   // through the store, so the key has to exist here too.
   appModulesKey: (t: string) => `app-modules:${t}`,
-  listFetch: { apps: async () => door.apps },
+  // …AND THE TEAM'S SPRINTS, since 15 Sep 2026. The Feedback chip is withheld
+  // unless a Validation sprint is running on the chosen app (the owner's ruling;
+  // the door refuses it too — `refuseFeedbackOutsideValidation`), so the dialog
+  // reads the sprint list the whole app already shares. None of the cases in this
+  // file is about Feedback, so the list is empty and every assertion below sees
+  // exactly what it saw before.
+  sprintsKey: (t: string) => `sprints:${t}`,
+  listFetch: { apps: async () => door.apps, sprints: async () => door.sprints },
 }))
 
 // The client picker asks the accounts door; the contact picker asks the accounts
@@ -90,6 +104,14 @@ afterEach(cleanup)
 beforeEach(() => {
   door.apps = []
   door.links = []
+  door.sprints = []
+  // THE STORE IS MODULE STATE AND IT OUTLIVES A RENDER, exactly as the draft
+  // below does. Without this, a case that sets `door.sprints` primes
+  // `sprints:team-1` for every case after it — and the withhold cases would then
+  // pass because the cache was EMPTY rather than because the rule fired, which is
+  // the shape of a test that checks nothing. Found the honest way: a case asserting
+  // the chip IS offered failed while the identical one after it passed.
+  clearCache()
   // THE DRAFT IS SESSION STATE AND IT OUTLIVES A RENDER. Two cases below seed
   // one to reach "a create with a client already chosen" (see `seedDraft`), and
   // a draft left behind would silently give the NEXT case a client it never
@@ -220,7 +242,7 @@ const chipRow = (name: string) => screen.getByRole("group", { name })
 // — a row that merely stopped offering "none" while the door still accepted one
 // would be the screen and the record disagreeing silently.
 describe("a ticket has a type", () => {
-  it("offers no way to say it has none", () => {
+  it("offers no way to say it has none", async () => {
     render(
       <HelpFormDialog
         open
@@ -317,6 +339,125 @@ describe("a ticket has a type", () => {
 //
 // "make app not openable until client is selected, and whe it is horizontal
 // pills instead of dropdown."
+describe("feedback needs a validation sprint", () => {
+  /* THE OWNER'S RULING, 15 Sep 2026: Feedback may only be raised while a
+     Validation sprint is RUNNING for the ticket's app. `createTicket` refuses it
+     outright (`refuseFeedbackOutsideValidation`, and
+     workers/content/test/feedback-needs-a-validation-sprint.test.ts is where
+     that is proved) — this is the picker standing down in front of the door, so
+     nobody is offered a chip whose save would 400.
+
+     A CHIP THE DOOR WOULD REFUSE IS THE WHOLE FAULT. The row commits on the
+     click and Type is required, so a person pressing Feedback outside the
+     window would fill the form, press Submit, and be told no by a worker, with
+     no way to tell which of the five fields was wrong. */
+  const APP = { id: "app-1", name: "Padelbase", stage: "live", logoUrl: null, active: true }
+  const today = new Date()
+  const day = (n: number) =>
+    new Date(today.getTime() + n * 86_400_000).toISOString().slice(0, 10)
+
+  const sprint = (over: Record<string, unknown> = {}) => ({
+    id: "s-1",
+    appId: "app-1",
+    sprintType: "Validation",
+    startsOn: day(-3),
+    endsOn: day(11),
+    completedAt: null,
+    active: true,
+    ...over,
+  })
+
+  const show = (
+    helpTypeOptions: string[],
+    initial?: React.ComponentProps<typeof HelpFormDialog>["initial"]
+  ) =>
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={helpTypeOptions}
+        teamId="team-1"
+        fixedApp={{ id: "app-1", name: "Padelbase" }}
+        {...(initial ? { initial } : {})}
+      />
+    )
+
+  const typeWords = () =>
+    within(chipRow("Type"))
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent)
+
+  /** THE SPRINT LIST ARRIVES ASYNCHRONOUSLY, so every case here waits for the
+   * row to settle before reading it. A synchronous read would see the chips as
+   * they are drawn on the FIRST paint — before `useCached` has answered — which
+   * is "no sprint" for every case alike, and every withhold assertion would pass
+   * whatever the rule did. `Issue` is in every fixture below and never
+   * conditional, so it is the honest signal that the row has been drawn. */
+  const settled = async () => {
+    await waitFor(() => expect(typeWords()).toContain("Issue"))
+    return typeWords()
+  }
+
+  it("withholds the chip when no Validation sprint is running on the app", async () => {
+    door.apps = [APP]
+    door.sprints = [sprint({ completedAt: day(-1) })]
+    show(["Issue", "Question", "Extra", "Feedback"])
+    expect(await settled()).not.toContain("Feedback")
+    // …and the other three are untouched, which is what stops this reading as a
+    // broken picker rather than a withheld choice.
+    for (const word of ["Issue", "Question", "Extra"]) expect(typeWords()).toContain(word)
+  })
+
+  it("withholds it when the sprint is of another kind entirely", async () => {
+    door.apps = [APP]
+    door.sprints = [sprint({ sprintType: "Implementation" })]
+    show(["Issue", "Feedback"])
+    expect(await settled()).not.toContain("Feedback")
+  })
+
+  it("withholds it when the running Validation sprint is on ANOTHER app", async () => {
+    door.apps = [APP]
+    door.sprints = [sprint({ appId: "app-other" })]
+    show(["Issue", "Feedback"])
+    expect(await settled()).not.toContain("Feedback")
+  })
+
+  it("offers it while a Validation sprint is running", async () => {
+    door.apps = [APP]
+    door.sprints = [sprint()]
+    show(["Issue", "Question", "Extra", "Feedback"])
+    expect(await settled()).toContain("Feedback")
+  })
+
+  it("offers it on a sprint that has OVERRUN its end date", async () => {
+    // `sprintIsRunning` (shared/sprint-state.ts) — the SAME predicate the door
+    // asks — reads an end date in the past as still running. The screen and the
+    // door share it precisely so this case cannot come out differently on the
+    // two sides.
+    door.apps = [APP]
+    door.sprints = [sprint({ startsOn: day(-40), endsOn: day(-5) })]
+    show(["Issue", "Feedback"])
+    expect(await settled()).toContain("Feedback")
+  })
+
+  it("keeps the chip on a ticket that is ALREADY feedback, whatever the sprint is doing", async () => {
+    // The door refuses a MOVE into Feedback and never a row already in it, so a
+    // feedback ticket opened to fix a typo a fortnight after its sprint wrapped
+    // must still show its own word pressed. A row drawing three chips none of
+    // which is pressed reads as "this ticket has no type" about one that plainly
+    // does.
+    door.apps = [APP]
+    door.sprints = [sprint({ completedAt: day(-1) })]
+    show(["Issue", "Question", "Extra", "Feedback"], {
+      description: "The new screen is confusing",
+      helpType: "Feedback",
+      appId: "app-1",
+    })
+    expect(await settled()).toContain("Feedback")
+  })
+})
+
 describe("which app the ticket is about", () => {
   it("keeps its slot and says why it is empty until a client is named", async () => {
     // REAL APPS ON THE DOOR, deliberately: with an empty list the row would be

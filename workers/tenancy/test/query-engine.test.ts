@@ -1005,8 +1005,14 @@ describe("a filter value that names nothing comes back WITH the number", () => {
     // reads as "none" rather than "not a word we use". The vocabulary is theirs
     // and changes without a deploy, so it cannot be refused at the boundary the
     // way a fixed status can — it has to be answered honestly instead.
+    //
+    // "Bug" USED TO BE THE HALF THAT MATCHED — 0034 retired the row and left it
+    // there, so it was a word the vocabulary still knew. Migration 0093 deleted
+    // it outright with every other option (the owner's ruling, 15 Sep 2026), so
+    // it is now a word this team genuinely does not use, which is what this case
+    // is about. `Issue` takes its place as the half that resolves.
     const { body } = await ask(
-      q({ module: "tickets", where: [{ field: "helpType", op: "in", value: ["Bug", "Kerfuffle"] }], countOnly: true })
+      q({ module: "tickets", where: [{ field: "helpType", op: "in", value: ["Issue", "Kerfuffle"] }], countOnly: true })
     )
     expect(body.unmatched).toEqual([{ field: "helpType", values: ["Kerfuffle"] }])
   })
@@ -1459,20 +1465,22 @@ describe("R55: a filter that finds the new number finds the OLD one", () => {
 
   /* ------------------------- and it stays inside the fence ------------------ */
 
-  it("a row the module has STOPPED ANSWERING ABOUT is not reachable by its old number", async () => {
-    // `withheld` is the one subtraction with NO escape (query-grammar.ts): a
-    // requirements ticket is kept for a migration into another database and has
-    // LEFT the tickets collection everywhere a person is answered. The alias
-    // widens which rows answer the CALLER'S question; it must not widen which
-    // rows the module answers about at all. Both wrappers bracket the caller's
-    // clause before ANDing their own term on, which is what makes that true by
-    // construction rather than by remembering.
-    db().exec(`UPDATE help SET help_type = 'Requirements' WHERE id = 'T2';`)
-    const { body } = await ask(
-      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: OLD_OPEN }], countOnly: true })
-    )
-    expect(body.total, "an alias is not a way around the withheld clause").toBe(0)
-  })
+  // A CASE ABOUT `withheld` STOOD HERE and was deleted on 15 Sep 2026 with the
+  // thing it was about. It proved that a requirements ticket — kept for a
+  // migration into another database, and subtracted from the tickets collection
+  // everywhere a person was answered — could not be reached by an OLD reference
+  // through the alias lookup: the alias widens which rows answer the CALLER'S
+  // question, and must not widen which rows the module answers about at all.
+  //
+  // The owner deleted that kind of ticket outright (`shared/ticket-types.ts`),
+  // so `QUERY_MODULES.tickets` carries no `withheld` clause any more and there is
+  // nothing for an alias to get around. THE MECHANISM IS UNCHANGED — `withheld`
+  // is still declared on `QueryModule` and still applied by `readWhere`, still
+  // bracketing the caller's own clause before ANDing its term on — and the next
+  // module that stops answering about some of its rows should bring this case
+  // back with it, pointed at whatever it withholds. Deleted rather than left
+  // green against a clause that no longer exists, which would have been a test
+  // asserting nothing and reading as if it asserted the law.
 
   it("a PUT-AWAY row keeps its default: not on the list, and reachable when asked for", async () => {
     db().exec(`UPDATE help SET archived_at = '2026-08-20T00:00:00.000Z' WHERE id = 'T2';`)

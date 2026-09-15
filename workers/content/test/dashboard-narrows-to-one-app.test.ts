@@ -127,7 +127,7 @@ beforeEach(() => {
   // Two open (one of them unread and old enough to be past the triage line),
   // one recategorised on the way through triage, one closed recently.
   ticket({ id: "H_A1", app: IDS.victimApp, type: "Issue", raisedAs: "Issue", status: "new", created: recently(30) })
-  ticket({ id: "H_A2", app: IDS.victimApp, type: "Request", raisedAs: "Issue", status: "triaged", created: recently(10) })
+  ticket({ id: "H_A2", app: IDS.victimApp, type: "Extra", raisedAs: "Issue", status: "triaged", created: recently(10) })
   ticket({
     id: "H_A3",
     app: IDS.victimApp,
@@ -178,11 +178,11 @@ describe("the tickets dashboard narrows to one system", () => {
       "another system's tickets are in this app's pipeline"
     ).not.toContain("Question")
     // …and what IS there is exactly this app's own open work: one new Issue,
-    // one triaged Request, one in-progress Issue. The resolved one is not open.
+    // one triaged Extra, one in-progress Issue. The resolved one is not open.
     const at = (type: string, status: string) =>
       mine.openByTypeAndStatus.find((r) => r.helpType === type && r.status === status)?.n ?? 0
     expect(at("Issue", "new")).toBe(1)
-    expect(at("Request", "triaged")).toBe(1)
+    expect(at("Extra", "triaged")).toBe(1)
     expect(at("Issue", "in_progress")).toBe(1)
   })
 
@@ -208,11 +208,11 @@ describe("the tickets dashboard narrows to one system", () => {
       mine.raisedVsCurrent.some((r) => r.raisedAsType === "Question"),
       "the other system's tickets are in this app's matrix"
     ).toBe(false)
-    // Issue→Issue twice (the open one and the closed one) and Issue→Request once.
+    // Issue→Issue twice (the open one and the closed one) and Issue→Extra once.
     const cell = (from: string, to: string) =>
       mine.raisedVsCurrent.find((r) => r.raisedAsType === from && r.helpType === to)?.n ?? 0
     expect(cell("Issue", "Issue")).toBe(2)
-    expect(cell("Issue", "Request")).toBe(1)
+    expect(cell("Issue", "Extra")).toBe(1)
     // THE DENOMINATOR'S MISSING HALF NARROWS TOO. One unstamped row on this app,
     // none on the other — a count that ignored `appId` would report the team's,
     // which is a rate over a denominator quietly belonging to somebody else.
@@ -245,8 +245,8 @@ describe("the tickets dashboard narrows to one system", () => {
     // Both are parameters of the same door and both land in the same WHERE, so
     // asking two questions must answer the intersection. A handler that read the
     // last one written would pass every test above.
-    const both = await dashboard(`?appId=${IDS.victimApp}&helpType=Request`)
-    expect(both.openByTypeAndStatus.map((r) => r.helpType)).toEqual(["Request"])
+    const both = await dashboard(`?appId=${IDS.victimApp}&helpType=Extra`)
+    expect(both.openByTypeAndStatus.map((r) => r.helpType)).toEqual(["Extra"])
     expect(new Set(both.openByApp.map((r) => r.appId))).toEqual(new Set([IDS.victimApp]))
   })
 })

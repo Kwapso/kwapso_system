@@ -17,6 +17,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d
 import { ulid } from "@shared/workers/id"
 import type { SelectableValue } from "@shared/types"
 import { storedWordColumns } from "@shared/selectable-homes"
+import { TICKET_TYPE_GROUP, TICKET_TYPE_WORDS } from "@shared/ticket-types"
 import { GuardError, type MemberGuard } from "./permissions"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
@@ -233,6 +234,29 @@ export async function createSelectable(
   const m = mark?.trim() || null
   if (!t || !v)
     throw new GuardError(400, "invalid_input", "A dropdown value needs a type and a value.")
+
+  // THE ONE GROUP THAT IS CLOSED. The owner's ruling, 15 Sep 2026: a ticket is
+  // an Issue, a Question, an Extra or a piece of Feedback, and there is no fifth
+  // kind. `shared/ticket-types.ts` argues out why THIS vocabulary is a lock when
+  // every other one is a starting list — three things in the product (the
+  // colours, the client's reading order, and Feedback's own Validation-sprint
+  // rule) are keyed on these four words and cannot be keyed on an arbitrary one.
+  //
+  // AT THE DOOR, not on the Choices screen, for the reason every refusal in this
+  // codebase is at the door: the importer and the machine surface reach
+  // `createSelectable` with no form in front of them. The screen hides its own
+  // add button for this group as a courtesy; this is the rule.
+  //
+  // IT REFUSES AN ADDITION AND NEVER A WORDING. `updateSelectable` below is
+  // untouched: a team may rename an Extra to whatever it calls an Extra, and the
+  // rename carries every record with it. The same freedom the locked Admin role
+  // has over its own title.
+  if (t === TICKET_TYPE_GROUP)
+    throw new GuardError(
+      400,
+      "locked_group",
+      `${TICKET_TYPE_GROUP} is fixed at four: ${TICKET_TYPE_WORDS.join(", ")}. You can rename any of them, but you can't add a new one.`
+    )
 
   const dup = await d1Query<{ id: string }>(
     cfg,

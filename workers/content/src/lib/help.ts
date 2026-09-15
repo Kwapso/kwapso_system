@@ -27,13 +27,17 @@ import {
   CLOSURE_WINDOW_MONTHS,
   HELP_STATUSES,
   OPEN_HELP_STATUSES,
-  TICKET_TYPE_KEPT_FOR_MIGRATION,
-  ticketTypeKeptForMigration,
-  ticketTypeKeptForMigrationExcludedSql,
   type HelpMessage,
   type HelpStatus,
   type HelpTicket,
 } from "@shared/types"
+import { sprintIsRunning } from "@shared/sprint-state"
+import {
+  isFeedbackTicketType,
+  TICKET_TYPE_FEEDBACK,
+  VALIDATION_SPRINT_TYPE,
+  ticketTypeKey,
+} from "@shared/ticket-types"
 // EVERY DURATION ON THE DASHBOARD, FROM THE ONE PLACE THE RULE LIVES — Mon–Fri
 // only, the client's ruling of 6 Sep 2026. `workingDaysSql` is the SQL twin of
 // the `workingDaysBetween` the triage queue counts its cards with, proved equal
@@ -508,59 +512,98 @@ function typeClause(helpType: string | undefined): { sql: string; params: string
   return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
 }
 
-/** THE KIND THAT IS KEPT BUT NEVER SHOWN, subtracted here and nowhere else.
+/** FEEDBACK IS THE ONE KIND WITH A CONDITION ON IT, and this is the condition.
  *
- * The client's ruling of 6 Sep 2026 — keep the rows, stop displaying them —
- * written up in full beside the test itself (`shared/types.ts`,
- * `TICKET_TYPE_KEPT_FOR_MIGRATION`). These rows are being preserved for a
- * migration into another database. Do not "tidy them up".
+ * THE RULING, 15 Sep 2026: a ticket is one of exactly four kinds, and *Feedback
+ * may only be raised while a Validation sprint is running for the ticket's app*.
+ * A Validation sprint is the fortnight the stakeholders are actually sitting in
+ * front of the thing — "the stakeholders watch the walkthrough … we answer your
+ * questions, find what can still be improved, and write the tickets together"
+ * (`SPRINT_TYPE_CATALOGUE`). Outside that fortnight the same sentence is an
+ * Issue, a Question or an Extra, and filing it as feedback puts it in a pile
+ * nobody is reading.
  *
- * WHY IT IS A CLAUSE ON `ticketWhere` AND NOT A FILTER ON THE ROWS. Everything
- * that describes this collection to a person is a grouped `COUNT(*)` at this
- * same door — the sub-tab badges (`countTicketFacets`), the All/My totals
- * (`countTickets`) and every panel on the dashboard (`readTicketDashboard`).
- * Sieving the rows in the browser would have left all of those counting a
- * backlog the list can no longer show, which is R16's failure in its quietest
- * form: every number true, none of them about the rows on screen. One clause on
- * the one WHERE the page and its counts already share is the only shape that
- * cannot drift.
+ * AT THE DOOR, WHICH IS WHY THE PICKER IS NOT THE RULE. `help-form-dialog.tsx`
+ * withholds the chip for exactly this condition, and that is a courtesy: the MCP
+ * tools (`create_ticket` / `update_ticket`) and the agentic importer reach this
+ * function with no picker in front of them at all, and the portal has a dialog
+ * of its own. A rule a browser keeps is a rule three callers do not.
  *
- * IT IS NOT PART OF `ticketFence`, deliberately. The fence decides what a caller
- * MAY see and rides every read AND every write; this decides what the COLLECTION
- * is and rides only the list, its counts and its charts. Folded into the fence it
- * would have made a requirements ticket unreadable, unreplyable and
- * un-unarchivable — you cannot migrate a row you can no longer reach. */
-function keptForMigrationClause(): { sql: string; params: string[] } {
-  return { sql: ticketTypeKeptForMigrationExcludedSql("help_type"), params: [] }
-}
-
-/** …AND THE WRITE HALF, so no new one can be raised.
+ * IT REFUSES A MOVE *INTO* FEEDBACK, NEVER A ROW ALREADY IN IT — the same idiom
+ * the retired `refuseKeptForMigration` used, and for the same reason. `was` is
+ * the ticket's current word, so an ordinary edit to a feedback ticket (which
+ * posts its own unchanged type straight back) still saves after the sprint has
+ * wrapped. Freezing a record the week its sprint ends would be a rule about
+ * history rather than about what is being raised. On a create there is no `was`,
+ * so the condition is asked outright.
  *
- * REMOVING THE WORD FROM THE SEED ONLY HELPS A TEAM THAT DOES NOT EXIST YET.
- * Every team already running got the row from team migration 0034, it is still
- * ACTIVE, and the client's instruction was explicitly not to touch their
- * vocabulary — so their Dropdown values screen still lists it and their ticket
- * form's picker still offers it. That is a hole with a person-shaped edge: raise
- * one and it would vanish the instant it was saved, which reads as data loss
- * even though nothing is lost. Rather than deactivate a row she asked us to
- * leave alone, the DOOR refuses the value. A picker cannot be trusted to
- * withhold anything — the machine surface and the importer reach the same door
- * with no picker at all.
+ * AND A TICKET WITH NO APP CANNOT BE FEEDBACK. There is nothing for the sprint
+ * to be running ON — the agency's own housekeeping questions are about no system
+ * at all — so it is refused rather than waved through, which is the same answer
+ * `moduleForTicket` gives to a module named without an app.
  *
- * IT REFUSES A MOVE INTO THE KIND, NEVER A ROW ALREADY IN IT. `was` is the
- * ticket's current word, and an edit that leaves the type where it is passes.
- * That is the difference between hiding a collection and freezing a record: the
- * existing rows must stay editable and readable right up to the day they are
- * migrated, which is the whole reason they are still here. On a create there is
- * no `was`, so any spelling of the word is refused outright. */
-function refuseKeptForMigration(next: string | null, was: string | null): void {
-  if (!ticketTypeKeptForMigration(next)) return
-  if (ticketTypeKeptForMigration(was)) return
-  throw new GuardError(
-    400,
-    "retired_ticket_type",
-    `"${TICKET_TYPE_KEPT_FOR_MIGRATION}" isn't a kind of ticket any more. Pick another one.`
+ * THE PREDICATE IS THE SCREEN'S OWN. `sprintIsRunning` (shared/sprint-state.ts)
+ * moved out of `web/components/work/sprints-screen.tsx` on the day this was
+ * written, so the sprints board and this door cannot come to disagree about what
+ * "running" means — an overrun still counts, a cancelled block does not, and a
+ * sprint nobody has dated has not started. Two expressions of that, one in a
+ * browser and one in a worker, is how a screen comes to offer what the door
+ * refuses. */
+async function refuseFeedbackOutsideValidation(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null,
+  next: string | null,
+  was: string | null
+): Promise<void> {
+  if (!isFeedbackTicketType(next)) return
+  if (isFeedbackTicketType(was)) return
+  if (!appId)
+    throw new GuardError(
+      400,
+      "feedback_needs_validation",
+      `${TICKET_TYPE_FEEDBACK} is raised against an app, during its ${VALIDATION_SPRINT_TYPE} sprint. Choose the app, or pick another kind.`
+    )
+  // THE SPRINT TYPE IS MATCHED THE WAY EVERY OTHER VOCABULARY WORD IS —
+  // `ticketTypeKey`, trimmed and lower-cased with one trailing "s" tolerated —
+  // because `sprints.sprint_type` stores the team's OWN word
+  // (shared/selectable-homes.ts) and a rename carries the sprints with it.
+  //
+  // THE DATES COME BACK AND THE DECISION IS MADE IN TYPESCRIPT, deliberately.
+  // Expressing "running" as a WHERE clause would be a second definition of it,
+  // in a second language, three date comparisons long — and the screen would go
+  // on using the first one. `sprintIsRunning` is the definition; this query's
+  // only job is to hand it the rows.
+  //
+  // BOUNDED, and generously: a Validation sprint is a fortnight and an app has a
+  // handful over its life, so ten is far past any real answer and the cap is
+  // here because an unbounded read has no business on a write path.
+  const rows = await d1Query<{
+    completed_at: string | null
+    deactivated_at: string | null
+    starts_on: string | null
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT completed_at, deactivated_at, starts_on
+       FROM sprints
+      WHERE app_id = ? AND LOWER(TRIM(COALESCE(sprint_type, ''))) IN (?, ?)
+      LIMIT 10`,
+    [appId, ticketTypeKey(VALIDATION_SPRINT_TYPE), `${ticketTypeKey(VALIDATION_SPRINT_TYPE)}s`]
   )
+  const running = rows.some((r) =>
+    sprintIsRunning({
+      completedAt: r.completed_at,
+      active: r.deactivated_at == null,
+      startsOn: r.starts_on,
+    })
+  )
+  if (!running)
+    throw new GuardError(
+      400,
+      "feedback_needs_validation",
+      `${TICKET_TYPE_FEEDBACK} can only be raised while a ${VALIDATION_SPRINT_TYPE} sprint is running on this app. Pick another kind, or start the sprint first.`
+    )
 }
 
 /** WHICH STAGE(S) — A SET, NOT ONE WORD (client ruling, 2026-09-06).
@@ -732,10 +775,16 @@ function ticketWhere(
 ): { sql: string[]; params: string[] } {
   const fence = ticketFence(guard, scope, filter.tab)
   const parts = [
-    // FIRST, AND UNCONDITIONALLY — no facet turns it off, because "the tickets"
-    // no longer means these (see `keptForMigrationClause`). It sits with the
-    // filters rather than in the fence for the reason written there.
-    keptForMigrationClause(),
+    // A CLAUSE SUBTRACTING "THE KIND THAT IS KEPT BUT NEVER SHOWN" STOOD FIRST
+    // HERE UNTIL 15 SEP 2026. It hid requirements tickets from the list, its
+    // badges, its facets and the whole dashboard, for the client's ruling of
+    // 6 Sep ("keep the existing requirements … but do not display them"). The
+    // owner's ruling of 15 Sep replaced that one outright — four types, every
+    // other option deleted — and a count taken before the change found ZERO
+    // tickets of that kind on either staging team and no teams at all on
+    // production. So the clause is gone rather than re-pointed: there is
+    // nothing left for it to hide, and a filter that subtracts nothing is a
+    // filter every future reader has to work out the purpose of.
     accountClause(filter.accountId),
     appClause(filter.appId),
     moduleClause(filter.moduleId),
@@ -1819,9 +1868,14 @@ export async function createTicket(
     topRank(cfg, guard),
   ])
   const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
-  // NOTHING NEW ARRIVES AS THE KIND WE STOPPED SHOWING. There is no `was` on a
-  // create, so this is the flat refusal (see `refuseKeptForMigration`).
-  refuseKeptForMigration(helpType, null)
+  // FEEDBACK NEEDS A VALIDATION SPRINT RUNNING ON THE APP. There is no `was` on
+  // a create, so the condition is asked outright — see
+  // `refuseFeedbackOutsideValidation`. It runs AFTER the two waves because it
+  // needs the resolved `appId` (a body that named an app we do not have has
+  // already been refused by then, which is the right order: "that app isn't one
+  // of ours" is a better answer than "no sprint is running on it"), and BEFORE
+  // the reference is minted, so a refusal never burns a number nobody sees.
+  await refuseFeedbackOutsideValidation(cfg, guard, appId, helpType, null)
   const now = new Date().toISOString()
   // WHERE IT STARTS, AND IT IS THE SAME PLACE FOR EVERYTHING NOW.
   //
@@ -1953,15 +2007,11 @@ export async function updateTicket(
   // deliberate feature with a confirm panel, not a quiet field on an edit form.
   // A portal caller never reaches this: their own ticket already carries their
   // company, so the branch below is unreachable for them by construction.
-  // NOBODY RECATEGORISES A TICKET *INTO* THE KIND WE STOPPED SHOWING. Checked
-  // against what the row already says, so an ordinary edit to one of the
-  // preserved rows (which posts its own unchanged type straight back) still
-  // saves — see `refuseKeptForMigration`. Before the first write, so a refusal
-  // costs no round trips.
-  refuseKeptForMigration(
-    optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
-    before.help_type
-  )
+  // THE TYPE IS READ HERE AND CHECKED FURTHER DOWN, once the app it will be
+  // filed against is known. Read at this point anyway, so a malformed body is a
+  // 400 before any of the round trips below it — `optionalText` is the boundary
+  // (R20) and the boundary is the top of the function.
+  const nextType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
   const namedAccount =
     scope.kind === "portal" ? null : await accountForStaffTicket(cfg, guard, input.accountId)
   if (namedAccount && before.account_id && namedAccount !== before.account_id) {
@@ -1978,6 +2028,19 @@ export async function updateTicket(
   // had. Moving a ticket to another app and naming a section of the new one is a
   // single legitimate edit, and checking against `before.app_id` would refuse it
   // for the one reason that is not true.
+  // NOBODY RECATEGORISES A TICKET *INTO* FEEDBACK OUTSIDE A VALIDATION SPRINT.
+  // Checked against what the row already says, so an ordinary edit to a feedback
+  // ticket (which posts its own unchanged type straight back) still saves after
+  // the sprint has wrapped — see `refuseFeedbackOutsideValidation`.
+  //
+  // AFTER `appId`, NOT BEFORE, and that is the whole reason it is not up beside
+  // the lock check: the question is about the app the ticket WILL have. Moving a
+  // ticket to another app and marking it feedback in the same edit is one
+  // legitimate save, and asking about `before.app_id` would refuse it for the
+  // one reason that is not true — the identical argument `moduleForTicket` makes
+  // on the line above. Still before the first write, so a refusal changes
+  // nothing.
+  await refuseFeedbackOutsideValidation(cfg, guard, appId, nextType, before.help_type)
   const moduleId = (await moduleForTicket(cfg, guard, input.moduleId, appId)) ?? before.module_id
   const raisedBy =
     (await contactForTicket(cfg, guard, input.raisedByContactId, accountAfter)) ??
@@ -2020,7 +2083,10 @@ export async function updateTicket(
        account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?${lockSet}
      WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}${ownership} RETURNING id`,
     [
-      optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
+      // `nextType`, not a second `optionalText` read of the same field: the word
+      // this statement WRITES is provably the word the Feedback check above
+      // REFUSED on. Two reads would be two chances for them to differ.
+      nextType,
       description,
       optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null,
       optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null,
@@ -2446,16 +2512,11 @@ export async function bulkSetStatusByFilter(
   const authored = ticketFence(guard, scope, "all")
   const extra: string[] = authored.sql ? [authored.sql] : []
   const extraParams: (string | number)[] = [...authored.params]
-  // …AND THE KIND THAT IS KEPT BUT NEVER SHOWN IS NOT IN THE SET EITHER. This is
-  // the one WRITE that takes a FILTER rather than ids, so it is the one write
-  // that inherits the collection's own definition: a set-shaped job says "every
-  // ticket matching this", and these rows are no longer part of "the tickets".
-  // It is also the number a person APPROVES — the count above is what the
-  // confirm panel states — so leaving them in would have told somebody they were
-  // about to move more tickets than the list in front of them holds, and then
-  // quietly moved rows they cannot see. That is the same sentence R16 makes
-  // about a badge, made about a confirmation.
-  extra.push(keptForMigrationClause().sql)
+  // THE KEPT-BUT-NEVER-SHOWN CLAUSE RODE THIS SET-SHAPED WRITE TOO, so the
+  // number a person approved matched the list in front of them. It went with
+  // its collection on 15 Sep 2026 (see `ticketWhere`): there is no longer a
+  // kind of ticket the list withholds, so this write and the list it describes
+  // agree by construction rather than by a shared clause.
   if (filter.status) {
     extra.push("status = ?")
     extraParams.push(filter.status)

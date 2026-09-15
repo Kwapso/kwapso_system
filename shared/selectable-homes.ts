@@ -81,7 +81,7 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   },
   "Story type": { columns: [{ table: "stories", column: "story_type" }] },
   // WHERE A STORY CAME FROM — client ruling, 15 Sep 2026, team migration
-  // 0093: Client-requested (traces to a client ticket or ask) or Internal
+  // 0094: Client-requested (traces to a client ticket or ask) or Internal
   // (Kwapso-initiated upkeep). The word is stored on the record the same way
   // `story_type` is, for the same reason.
   "Story category": { columns: [{ table: "stories", column: "category" }] },

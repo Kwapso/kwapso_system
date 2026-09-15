@@ -167,7 +167,7 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // The only rows in the work engine a client writes to. They read their own
   // company's and complete one, with the file we asked for. Raising and
   // withdrawing are ours (`inputs:create` / `inputs:delete` — renamed from
-  // `todos:*` 15 Sep 2026, team migration 0095), and both refuse a portal
+  // `todos:*` 15 Sep 2026, team migration 0096), and both refuse a portal
   // caller at the door as well as being absent from this list.
   "GET /api/content/todos": "CONTENT",
   "POST /api/content/todos/complete": "CONTENT",

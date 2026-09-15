@@ -1967,7 +1967,7 @@ company list.
 
 **The permission rename.** The module gating every to-do door was `todos`
 since the base's earliest days; this screen renamed it to `inputs`
-(team migration `0095_todos_permission_renamed_inputs`,
+(team migration `0096_todos_permission_renamed_inputs`,
 `shared/team-modules.ts`) — the label had already read "Inputs" since
 31 Aug 2026, so the box was the last place still carrying the old word.
 Every existing role's grants move with it, untouched (an owner who had
@@ -1997,7 +1997,7 @@ Internal (Kwapso-initiated upkeep)."* And, closing the door on a third dimension
 before anybody asked for one: *"Do NOT assign any priority or urgency. Stories do
 not have that."*
 
-**The vocabulary, added never swapped.** Team migration `0093_story_type_and_category`
+**The vocabulary, added never swapped.** Team migration `0094_story_type_and_category`
 (`workers/tenancy/src/team-schema/migrations.ts`) inserts Data/Tech/Bug as new
 PROTECTED `Story type` rows (`is_default = 1`, [R76](../RULES.md)'s own word for
 the state) beside the Feature/Change rows migration 0028 already planted, and
@@ -2057,7 +2057,7 @@ the caller's own name at the door UNCONDITIONALLY (`MINE_VIEWS`,
 at all riding along (`includeUnassigned`) — this backlog is old enough that
 plenty of it was never claimed by anybody. Everyone's is the fifth tab, last
 in the strip, shown only when the caller holds a NEW right, `all_stories:read`
-— seeded exactly like `all_tasks:read` (team migration `0094_everyones_stories`,
+— seeded exactly like `all_tasks:read` (team migration `0095_everyones_stories`,
 `shared/team-modules.ts`), off for every role but the locked Admin.
 
 **The predicates.** Now is mine, not done, and either overdue (the sprint's own

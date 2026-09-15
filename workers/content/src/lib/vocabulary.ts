@@ -56,7 +56,7 @@ export async function ensureSelectableValue(
  * that simply doesn't exist yet; this one REFUSES, for the fields where the
  * team has ruled a CLOSED list rather than a free-typed one that grows itself.
  *
- * Story type and Story category are the first callers (team migration 0093,
+ * Story type and Story category are the first callers (team migration 0094,
  * the client's 15 Sep 2026 ruling): "Fix" is deactivated on purpose and this
  * is the door that makes it stop being creatable, without the vocabulary
  * itself needing to know which of its own callers enforce that and which

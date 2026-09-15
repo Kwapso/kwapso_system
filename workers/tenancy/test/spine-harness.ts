@@ -186,7 +186,7 @@ export function buildSpineDb(): DatabaseSync {
   // activity door's module gate. Without it the help burglary below would be
   // refused by the gate and pass while the fence was wide open — a green test
   // asserting the wrong thing.
-  // `inputs` (RENAMED FROM `todos` 15 Sep 2026, team migration 0095 — see
+  // `inputs` (RENAMED FROM `todos` 15 Sep 2026, team migration 0096 — see
   // shared/team-modules.ts) is the one module on this list a REAL Client
   // role is meant to hold: a to-do is aimed at the client and they complete
   // it themselves. So the burglar holding it is not a worst case at all —

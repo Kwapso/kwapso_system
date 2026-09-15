@@ -278,7 +278,7 @@ const CLIENT_ROLE = {
     // aimed at them: they read their company's and complete one, with the file we
     // asked for. `create` and `delete` are ours — asking for something emails
     // them, and withdrawing a request is our decision to stop needing it.
-    // RENAMED FROM `todos` 15 Sep 2026 (team migration 0095, shared/team-modules.ts) —
+    // RENAMED FROM `todos` 15 Sep 2026 (team migration 0096, shared/team-modules.ts) —
     // the Inputs screen's own permission box.
     inputs: { read: true, update: true },
     // READ ONLY, and it buys two different things. The portal's Deliverables

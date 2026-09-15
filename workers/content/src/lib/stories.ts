@@ -193,7 +193,7 @@ function toStory(r: StoryRow): Story {
     closedAt: r.closed_at,
     closingNote: r.closing_note,
     storyType: r.story_type,
-    // A ROW BACK-FILLED BY MIGRATION SHOULD NEVER BE NULL (team migration 0093),
+    // A ROW BACK-FILLED BY MIGRATION SHOULD NEVER BE NULL (team migration 0094),
     // but the safe direction is the same one `status` above already takes: a
     // value the code does not recognise reads as the DEFAULT rather than as
     // `null as string`, which would be a lie against the type.

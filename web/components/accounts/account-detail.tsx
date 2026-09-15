@@ -205,13 +205,13 @@ export function AccountDetailScreen({
   const canSeeWork = can("work", "read")
   // THE RIGHT ON THE CHILD, NEVER THE PARENT. Selling a block of work is
   // `work:create` and asking a client for something is `inputs:create`
-  // (renamed from `todos:create` 15 Sep 2026, team migration 0095) — the
+  // (renamed from `todos:create` 15 Sep 2026, team migration 0096) — the
   // rights the SPRINT door and the TO-DO door gate on. Standing on an account
   // record is not a right; `accounts:*` says nothing about whether a person may
   // put work on the backlog. The door decides either way (R10); these only
   // decide whether we draw a button that would come back a 403.
   const canWriteWork = can("work", "create")
-  // MODULE RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0095).
+  // MODULE RENAMED `todos` → `inputs` 15 SEP 2026 (team migration 0096).
   const canSeeTodos = can("inputs", "read")
   const canAskTodo = can("inputs", "create")
   const canCancelTodo = can("inputs", "delete")

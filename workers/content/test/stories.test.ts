@@ -179,7 +179,7 @@ describe("a story is what WE do", () => {
   })
 })
 
-// WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0093):
+// WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0094):
 // Client-requested / Internal, and the story TYPE list closed to Data / Tech /
 // Bug / Feature / Change the same day, Fix deactivated rather than deleted.
 describe("category, and a closed story type", () => {
@@ -204,7 +204,7 @@ describe("category, and a closed story type", () => {
     expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("A category nobody has ever heard of")).toEqual({ n: 0 })
   })
 
-  it("refuses `Fix` — deactivated by team migration 0093, no longer creatable", async () => {
+  it("refuses `Fix` — deactivated by team migration 0094, no longer creatable", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Try the retired type",
       storyType: "Fix",

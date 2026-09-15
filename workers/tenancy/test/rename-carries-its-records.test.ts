@@ -2,7 +2,7 @@
 //
 // The fault: a record stores its dropdown value as the WORD, so the spelling is
 // the only thing joining a record to its vocabulary. Renaming the row alone left
-// 107 tickets saying "Request" while the group had moved on — their tab gone,
+// 107 tickets saying "Extra" while the group had moved on — their tab gone,
 // their mark gone, a new tab beside them counting nothing.
 //
 // The asymmetry is what made it hard to see, and it is asserted here rather than
@@ -65,15 +65,15 @@ describe("renaming a value carries the records that stored it", () => {
 
   it("a ticket type: the vocabulary and all 3 tickets move together", () => {
     db().exec(`
-      INSERT INTO selectable_data (id, type, value, mark, created_at) VALUES ('V1','Ticket type','Request','💭','2026-01-01');
-      INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H1','T-1','a','Request','new','2026-01-01');
-      INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H2','T-2','b','Request','new','2026-01-01');
+      INSERT INTO selectable_data (id, type, value, mark, created_at) VALUES ('V1','Ticket type','Extra','EX','2026-01-01');
+      INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H1','T-1','a','Extra','new','2026-01-01');
+      INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H2','T-2','b','Extra','new','2026-01-01');
       INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H3','T-3','c','Issue','new','2026-01-01');
     `)
-    rename("Ticket type", "Request", "Ask")
+    rename("Ticket type", "Extra", "Ask")
 
     const moved = db().prepare("SELECT count(*) AS n FROM help WHERE help_type = 'Ask'").get() as { n: number }
-    const left = db().prepare("SELECT count(*) AS n FROM help WHERE help_type = 'Request'").get() as { n: number }
+    const left = db().prepare("SELECT count(*) AS n FROM help WHERE help_type = 'Extra'").get() as { n: number }
     expect(moved.n, "the tickets did not follow their own vocabulary").toBe(2)
     expect(left.n, "a ticket was left holding the old word").toBe(0)
     // AND NOTHING ELSE MOVED. A rewrite keyed on the word alone would be right

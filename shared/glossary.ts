@@ -100,7 +100,7 @@ export const GLOSSARY = {
   // them apart on the screens.
   story: { term: "Story", def: "One piece of work we do. It carries who's doing it and by when, and lives in a sprint." },
   // THE FIVE STORY TYPES, AND THE TWO CATEGORIES BESIDE THEM — the client's
-  // ruling, 15 Sep 2026, in her own words (team migration 0093 carries the
+  // ruling, 15 Sep 2026, in her own words (team migration 0094 carries the
   // ruling verbatim; this is the short form for the dictionary). Type answers
   // "what kind of work is this"; Category answers "where did it come from" —
   // two different questions, so two separate entries rather than one dropdown

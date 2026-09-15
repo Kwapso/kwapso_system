@@ -132,7 +132,7 @@ export const MODULE_PERMISSION: Record<string, string> = {
   contacts: "contacts",
   // Inputs — the Accounts group's third page (Task C, 15 Sep 2026). The
   // segment IS the module, like Contacts; the module was `todos` until the
-  // same day (team migration 0095 carries every role's grants across).
+  // same day (team migration 0096 carries every role's grants across).
   inputs: "inputs",
   // Process maps: the segment IS the module. `commercials` is a second gate ON
   // these screens as well (the rate card on an account), because what a client is

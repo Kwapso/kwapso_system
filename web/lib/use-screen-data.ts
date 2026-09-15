@@ -32,10 +32,10 @@ import {
   workLogsKey,
 } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import { ticketTypeKeptForMigration } from "@shared/types"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useCached, useCachedValue } from "@shared/web/store"
 import { useAfterPaint } from "@shared/web/after-paint"
+import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
  * enabled (on-team + signed-in), the active module and the record id in view. */
@@ -391,21 +391,19 @@ export function useScreenData({
   const departmentOptions = activeSelectable
     .filter((v) => v.type === SELECTABLE_GROUPS.department)
     .map((v) => v.value)
-  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. This one list is the whole
-  // tickets screen's idea of what kinds exist: the create form's picker, the
-  // toolbar's Kind facet, the sub-tab strip (CHECKLIST 5.1 derives it from these
-  // words) and the dashboard's legend and pipeline order all read it. The DOOR
-  // already refuses to answer about a requirements ticket and refuses to create
-  // one (`TICKET_TYPE_KEPT_FOR_MIGRATION`, shared/types.ts, carries the client's
-  // ruling in full) — subtracting it here is what stops the word itself
-  // appearing: an option nobody may pick, and a sub-tab that would badge nothing
-  // for ever because the door it counts through has already excluded its rows.
+  // THE WHOLE TICKETS SCREEN'S IDEA OF WHAT KINDS EXIST: the create form's
+  // picker, the toolbar's Kind facet, the sub-tab strip (CHECKLIST 5.1 derives
+  // it from these words) and the dashboard's legend and pipeline order all read
+  // this one list.
   //
-  // It is a filter on the TEAM'S OWN vocabulary and never an edit to it: every
-  // team already running still has the row, still sees it on the Dropdown values
-  // screen, and every ticket that carries the word still carries it.
+  // A SUBTRACTION STOOD HERE UNTIL 15 SEP 2026, keeping the retired
+  // "Requirements" word out of every one of those. The owner deleted that kind
+  // outright that day and migration 0093 took the row with it, so the team's own
+  // live vocabulary IS the four (`shared/ticket-types.ts`) and there is nothing
+  // to subtract. A filter that removes nothing is a filter the next reader has
+  // to work out the purpose of.
   const helpTypeOptions = activeSelectable
-    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
+    .filter((v) => v.type === TICKET_TYPE_GROUP)
     .map((v) => v.value)
 
   // THE `team` / `user` / `invite` FIXED-SCOPE ACTIVITY FEED USED TO LIVE HERE,

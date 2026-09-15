@@ -61,7 +61,7 @@ export type TimelineSegment = {
   /** how many week-columns it spans — the caller floors this at 1. */
   span: number
   /** upcoming/running/wrapped are a sprint's own three states
-   * (`sprintState`, work/sprints-screen.tsx); `gap` is the wave's own base
+   * (`sprintState`, shared/sprint-state.ts); `gap` is the wave's own base
    * bar between two sprints, or the whole bar for a wave this file could
    * not find a sprint row for. */
   tone: "upcoming" | "running" | "wrapped" | "gap"

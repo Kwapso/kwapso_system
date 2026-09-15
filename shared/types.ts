@@ -405,12 +405,20 @@ export type RetiredHelpStatus = (typeof RETIRED_HELP_STATUSES)[number]
  * HISTORY reads this; nothing that WRITES may. */
 export type HelpStatusEver = HelpStatus | RetiredHelpStatus
 
-/** THE KINDS THAT ARE SCOPED WORK — an extra, a request, a piece of feedback:
- * somebody asking for MORE, as against a question or an issue, which is somebody
- * stuck. Matched case-insensitively against the team's OWN editable `Ticket type`
+/** THE KINDS THAT ARE SCOPED WORK — an extra or a piece of feedback: somebody
+ * asking for MORE, as against a question or an issue, which is somebody stuck.
+ * Matched case-insensitively against the team's OWN editable `Ticket type`
  * vocabulary — the words are a team's to rename, and a rule that hard-matched
  * the seeded spelling would silently stop matching the day somebody typed
- * "Requests".
+ * "Extras".
+ *
+ * IT WAS THREE WORDS UNTIL 15 SEP 2026, and "request" left because the WORD did:
+ * the owner cut the vocabulary to four kinds that day and Request folded into
+ * Extra, so migration 0093 rewrote every ticket that said it. The SET this
+ * predicate describes is unchanged — the same tickets are scoped work, under one
+ * fewer name — which is why this is a deletion and not a re-scoping. "feedback"
+ * was already here, from the days it was a seeded word 0034 retired; it is a
+ * seeded word again.
  *
  * IT USED TO BE `ticketTypeWaitsForValidation`, AND THE RENAME IS THE POINT.
  * Until 7 Sep 2026 this predicate decided which kinds opened in
@@ -422,7 +430,7 @@ export type HelpStatusEver = HelpStatus | RetiredHelpStatus
  * work", web/components/tickets/tickets-dashboard.tsx). Keeping the old name over the
  * surviving half would have left an identifier promising a wait that no longer
  * happens. */
-const SCOPED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+const SCOPED_TICKET_TYPES = ["extra", "feedback"] as const
 
 /** Is a ticket of this kind scoped work — an ask for more, rather than somebody
  * stuck? */
@@ -433,94 +441,28 @@ export function isScopedTicketType(helpType: string | null | undefined): boolean
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * THE KIND OF TICKET THAT IS KEPT BUT NEVER SHOWN.
+ * "THE KIND OF TICKET THAT IS KEPT BUT NEVER SHOWN" STOOD HERE, and it is gone.
  *
- * READ THIS BEFORE YOU DELETE ANYTHING. The rows this hides are NOT orphans and
- * they are NOT waiting to be cleaned up. The client's ruling, 6 Sep 2026, in her
- * own words: *"keep the existing requirements (we will use that later) but do
- * not display them in tickets / i just want that you dont lose that data,
- * because later we're moving them to another database"*.
+ * `TICKET_TYPE_KEPT_FOR_MIGRATION`, `ticketTypeKeptForMigration` and
+ * `ticketTypeKeptForMigrationExcludedSql` were eighty lines of machinery for one
+ * word, "Requirements": a list clause, a write refusal, a query-grammar
+ * exclusion, two knowledge counts, the triage queue, a process count and five
+ * screens that filtered the word out of their pickers. All of it existed to
+ * honour the client's ruling of 6 Sep 2026 — keep the rows, stop displaying them
+ * — while the tickets were lifted into another database.
  *
- * So this is a HIDE, not a tombstone, and the distinction is the whole of the
- * design. Nothing is converted, nothing is deleted, no migration rewrites a
- * row's `help_type`, and the word stays translated in `shared/i18n-seed.ts`
- * because tickets on disk still carry it. A requirements ticket is a live row
- * with live data that a future migration will lift into another database; if it
- * had been converted to a Question or wiped, that migration would have nothing
- * to lift. Somebody reading this in six months should conclude "these were kept
- * deliberately", never "these were forgotten".
+ * THE OWNER REPLACED THAT RULING ON 15 SEP 2026: *"Remove all other options.
+ * Just get rid of them, delete them completely. From staging and production."*
+ * A ticket is one of exactly four kinds (`shared/ticket-types.ts`), and
+ * Requirements is not one of them — as a word, or as code.
  *
- * WHY IT IS ALSO NOT A TYPE ANY MORE. She ruled in August that "requirements is
- * not a type, kill that". It was never removed, and the cost of that showed up
- * on 6 Sep 2026 as a real defect: the tickets dashboard's open-work panel
- * hard-coded four columns while the vocabulary was five words long, so every
- * stage drew two rows. A vocabulary the product has retired but the seed still
- * plants is a fifth word every screen has to remember to allow for.
- *
- * WHERE IT IS ENFORCED — AT THE DOOR, and never in a browser:
- *   • `ticketWhere` (workers/content/src/lib/help.ts) puts the clause below on
- *     the ticket list, its `COUNT(*)` badges, the sub-tab facets and the whole
- *     dashboard, so the rows and every number describing them come off ONE
- *     WHERE. A client-side filter would have made the badges disagree with the
- *     rows, which is the exact failure R16 exists to prevent.
- *   • `needsTriage` (workers/content/src/lib/triage.ts) puts it on the queue AND
- *     on the queue's own count, for the same reason.
- *   • `createTicket` / `updateTicket` REFUSE the word, so no new one can be
- *     raised even on a team whose dropdown still offers it.
- * A ticket reached BY ID (`getTicket`, the detail screen, the machine surface)
- * is deliberately untouched: hidden from the collection, still readable on its
- * own — which is what "do not lose that data" requires.
+ * WHAT MADE THE DELETION SAFE RATHER THAN MERELY ORDERED, because "hide the
+ * rows" and "there are no rows" are different sentences and only one of them
+ * permits this: the tickets were COUNTED first, read-only, before a line was
+ * changed. Zero rows on either staging team, on `help_type` and on
+ * `raised_as_type` alike; production held no teams at all. The machinery was
+ * protecting nothing. Migration 0093 deletes the vocabulary row with the rest.
  * ═══════════════════════════════════════════════════════════════════════════ */
-
-/** The one place the word lives. A `Ticket type` dropdown VALUE, not an id —
- * `help.help_type` stores the team's own word (shared/selectable-homes.ts). */
-export const TICKET_TYPE_KEPT_FOR_MIGRATION = "Requirements"
-
-/** The spellings the test below accepts, lowercased. DERIVED from the word
- * above so the TypeScript predicate and the SQL clause cannot come to disagree
- * about what counts — the failure that would show as a row in the list with no
- * bar on the chart, or the other way round. */
-const KEPT_FOR_MIGRATION_SPELLINGS: readonly string[] = [
-  TICKET_TYPE_KEPT_FOR_MIGRATION.trim().toLowerCase().replace(/s$/, ""),
-  TICKET_TYPE_KEPT_FOR_MIGRATION.trim().toLowerCase(),
-]
-
-/** Is this the kind that is kept but never shown?
- *
- * THE SAME IDIOM AS `isScopedTicketType` ABOVE, on purpose and not by
- * coincidence: trim, lowercase, drop one trailing "s". `help_type` holds a
- * team's OWN editable word, so a rule that hard-matched the seeded spelling
- * would start showing these rows again the day somebody retyped the value as
- * "requirement" or "Requirements ". Two idioms for "is this word that word" in
- * one file would be one idiom too many. */
-export function ticketTypeKeptForMigration(helpType: string | null | undefined): boolean {
-  if (!helpType) return false
-  const word = helpType.trim().toLowerCase().replace(/s$/, "")
-  return KEPT_FOR_MIGRATION_SPELLINGS.includes(word)
-}
-
-/** The same test, as a SQL predicate that EXCLUDES those rows.
- *
- * `column` is written by the caller in its own source and never taken off a
- * request — the same condition `workingDaysSql` asks for.
- *
- * IT DOES NOT REACH FOR `sqlString`, and that is deliberate rather than lazy:
- * that seam lives in `shared/workers/d1-rest.ts`, which is worker-only code, and
- * this file is imported by both front doors' browser bundles. The values being
- * quoted are computed above from a string literal in THIS file, so the only
- * thing this interpolation can ever contain is a word this file shipped with —
- * the same argument `OPEN_STATUS_SQL` in lib/help.ts makes about the status
- * enum. The doubled-quote escape is kept anyway, so the day somebody changes
- * the word to one with an apostrophe in it nothing breaks quietly.
- *
- * `COALESCE` because a ticket with NO kind is not one of these: `NULL NOT IN
- * (…)` is NULL, which is not true, which would have silently swallowed every
- * untyped ticket in the app — including every one sitting in the triage queue
- * precisely BECAUSE nobody has given it a kind yet. */
-export function ticketTypeKeptForMigrationExcludedSql(column: string): string {
-  const list = KEPT_FOR_MIGRATION_SPELLINGS.map((w) => `'${w.replaceAll("'", "''")}'`).join(", ")
-  return `LOWER(TRIM(COALESCE(${column}, ''))) NOT IN (${list})`
-}
 
 /** The states a ticket is NOT yet finished in — "still ours to do something
  * about". Derived from the one list above rather than retyped, so a sixth state
@@ -2086,7 +2028,7 @@ export type Story = {
    * (Kwapso-initiated upkeep). "Do NOT assign any priority or urgency. Stories
    * do not have that" — the same ruling, which is why this is the only new
    * field the door accepted. Editable on the Dropdown values screen like
-   * `storyType`, and — unlike it — never null: team migration 0093 back-fills
+   * `storyType`, and — unlike it — never null: team migration 0094 back-fills
    * every story that existed before the column did, and the door defaults a
    * new one to 'Client-requested' when nothing is sent. */
   category: string
