@@ -128,8 +128,9 @@ export default function RootLayout({
        * THE FIX REBINDS THE CUSTOM PROPERTY INSTEAD OF MATCHING A CLASS —
        * badge.tsx's own documented escape hatch ("a caller rebinds
        * `--badge-quiet-fill` locally"), the same mechanism `IDENTITY_ROW`
-       * and `tickets-collection.tsx`'s own triage card already use for a
-       * LOCAL rebind. Setting it here, on `<body>`, is the APP-WIDE default
+       * and `triage-chips.tsx`'s own chip line already use for a
+       * LOCAL rebind (split out of `tickets-collection.tsx` in W3, 15 Sep 2026).
+       * Setting it here, on `<body>`, is the APP-WIDE default
        * the two of them override: `--badge-quiet-fill` inherits down through
        * every descendant, so `badge.tsx`'s `bg-[var(--badge-quiet-fill,…)]`
        * class reads `--surface-panel` everywhere except where a nearer

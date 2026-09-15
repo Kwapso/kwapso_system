@@ -155,6 +155,11 @@ import { useRemembered } from "@shared/web/remembered"
 import { formatCount } from "@shared/web/format-count"
 import { AUTOMATIONS } from "@shared/automations"
 import { TEAM_SECTIONS } from "@/lib/pages"
+import { useCached } from "@shared/web/store"
+import { purposesKey } from "@/lib/live-resources"
+import { content as contentApi, tenancy } from "@/lib/api"
+import type { MeetingPurpose, SelectableValue } from "@shared/types"
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 
 /** What every block on a module's settings page has, whatever it draws. */
 type ModuleSettingsSectionBase = {
@@ -914,8 +919,7 @@ export function ModuleSettingsScreen({
   )
 
   // R16 — THE NUMBER ON EACH TAB, exactly once, through the one `formatCount`
-  // seam. Client, 2026-09-14: "show the total count for Automations and for
-  // Choice Components categories, not for the amount of choices."
+  // seam.
   //
   //   · AUTOMATIONS — how many automations this module has: `AUTOMATIONS`
   //     (shared/automations.ts) is the one registry every automation ships
@@ -924,18 +928,70 @@ export function ModuleSettingsScreen({
   //     server total (there is no table of automations to COUNT(*) over —
   //     see that file's own header), so the exactness R16 asks for is free:
   //     the number IS the registry.
-  //   · CHOICES — how many GROUPS (categories), never how many values sit
-  //     inside them: `section.types` is the declared group list for each
-  //     visible vocabulary section, summed. Also a fact about `MODULE_SETTINGS`
-  //     itself rather than a query — a team can rename a value but cannot add
-  //     or remove a GROUP from a page, that is a code change to this table.
+  //
+  //   · CHOICES — RULED TWICE, ONE DAY APART, AND THE SECOND RULING WINS.
+  //     Client, 2026-09-14: "show the total count for Automations and for
+  //     Choice Components categories, not for the amount of choices." Client,
+  //     2026-09-15, on the Tickets page specifically, the badge reading 1
+  //     while the panel below it listed 15 values: "Even though I can see a
+  //     lot of active ticket choices, it still shows me the choices count as
+  //     1... Maybe we need to recheck how these tab counts are working
+  //     everywhere in the app and fix it." A census of every tab badge in
+  //     both front doors (~25 of them — threads, stories, time, attachments,
+  //     apps, waves, sprints, todos, members, modules, tickets, meetings,
+  //     portal users, the five on the tickets collection) found this one the
+  //     LONE exception to "the badge counts the rows the panel below it
+  //     lists". The inconsistency was the defect, not either day's
+  //     arithmetic — so this counts VALUES now, the same rule every other
+  //     tab in the app already follows, and the 14 Sep comment above stays
+  //     only as the record of what changed and why, not as a rule.
+  //
+  //     NOT A SECOND DOOR. `selectable:${teamId}` is the SAME cache key
+  //     `SettingsChoicesPanel` and `MeetingTypesPanel` already prime (R56 —
+  //     one door ask), read again here rather than fetched again. Both
+  //     `listSelectable` and `listMeetingPurposes` (workers/.../lib/
+  //     selectable.ts, delivery.ts) carry a real `LIMIT LIST_HARD_CAP` —
+  //     "R14 hard cap — never unbounded; move to real paging before this
+  //     bites" — so a loaded list's length is a CEILING, never a total, the
+  //     moment it comes back AT that cap. `settings-screen.tsx`'s own
+  //     general (unscoped) Choices tab already rules on this exact tradeoff
+  //     for the same data — `badge: ""`, because "a second count here would
+  //     be the same fact twice" through the kit panel's own live register —
+  //     so a module-scoped count reusing that same register is the
+  //     established pattern, not a new one. The one case that register
+  //     cannot cover is what THIS badge is for: a number BEFORE the panel
+  //     below it has mounted at all. `choiceValueCount` below is `undefined`
+  //     — `formatCount(undefined)` renders "", the same silence the general
+  //     tab ships — whenever the source it would count from is still
+  //     loading OR came back at the cap: a wrong number is worse than no
+  //     number (the same refusal R23 makes for an uncited answer and R42
+  //     makes for an unreadable file), and the day that cap is actually
+  //     reachable this badge goes quiet rather than lying about it.
   const automationsCount = AUTOMATIONS.filter((a) => a.segment === segment).length
-  // MEETING TYPES COUNT AS ONE GROUP — the same "how many GROUPS, never how
-  // many values" rule vocabulary sections follow, read onto the one kind
-  // that is not a `selectable_data` group: `meeting_purposes` is its own
-  // single taxonomy, not a list of `types`, so there is no list to sum.
-  const choiceGroupCount =
-    vocabularySections.reduce((n, s) => n + s.types.length, 0) + (meetingTypesSection ? 1 : 0)
+  const selectableQ = useCached<SelectableValue[]>(
+    vocabularySections.length > 0 && teamId ? `selectable:${teamId}` : null,
+    () => tenancy.selectable().then((r) => r.values)
+  )
+  const purposesQ = useCached<MeetingPurpose[]>(
+    meetingTypesSection && teamId ? purposesKey(teamId) : null,
+    () => contentApi.meetingPurposes().then((r) => r.purposes)
+  )
+  const choiceGroups = new Set(vocabularySections.flatMap((s) => s.types))
+  const selectableValueCount =
+    vocabularySections.length === 0
+      ? 0
+      : selectableQ.data === undefined || selectableQ.data.length >= LIST_HARD_CAP
+        ? undefined
+        : selectableQ.data.filter((v) => choiceGroups.has(v.type)).length
+  const meetingTypeValueCount = !meetingTypesSection
+    ? 0
+    : purposesQ.data === undefined || purposesQ.data.length >= LIST_HARD_CAP
+      ? undefined
+      : purposesQ.data.length
+  const choiceValueCount =
+    selectableValueCount === undefined || meetingTypeValueCount === undefined
+      ? undefined
+      : selectableValueCount + meetingTypeValueCount
 
   const tabs: TabItem[] = []
   if (automationsSection)
@@ -958,7 +1014,7 @@ export function ModuleSettingsScreen({
       value: "choices",
       label: t("Choices"),
       icon: "",
-      badge: formatCount(choiceGroupCount),
+      badge: formatCount(choiceValueCount),
       badgeVariant: "" as const,
     })
 

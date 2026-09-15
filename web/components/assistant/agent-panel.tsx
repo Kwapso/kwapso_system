@@ -719,17 +719,53 @@ export function AgentPanel({
           to switch between (see the `!canUse` branch below). One level below
           the kit's own single "Assistant" folder tab — see
           `agent-tab-strip.tsx` for why that tab cannot carry this strip
-          itself. */}
+          itself.
+
+          RE-BASED, BECAUSE THE KIT'S OWN ATTACHMENT MECHANIC ASSUMES WHAT
+          FOLLOWS THE OUTER TAB IS PAPER, NOT A SECOND STRIP OF TABS.
+          `screen-shell.tsx`'s "Assistant" tab pays
+          `margin-block-end: calc(var(--folder-tab-overlap) * -1)` — its own
+          comment: "the strip's feet land beneath the card's top edge" — so
+          the aside body underneath it (`screen-shell-aside-body`) is pulled
+          up 17.02px on purpose, to be ridden over by a card's rounded top
+          edge exactly the way the content column's own card is. This panel
+          IS that card everywhere else. Here the aside body's first child is
+          `AgentTabStrip` — a SECOND `BreadcrumbFolders`, which carries its
+          OWN unrelated negative block-start margin (4.5px, that component's
+          own focus-ring padding given back) and no card-like top surface to
+          absorb the outer 17.02px into. Both pulls stack, and the inner
+          strip's first tab renders under the outer tab's own painted area —
+          measured on staging: `document.elementFromPoint` at that corner
+          returns the OUTER tab, not the inner one. `mt-[var(--folder-tab-
+          overlap)]` cancels exactly the outer pull this wrapper is the
+          first thing to receive, pushing the inner strip back down clear of
+          it — the inner strip's OWN -4.5px stays untouched, since that one
+          is its own internal geometry, not this nesting's problem.
+
+          `min-w-0` FOR THE SAME REASON THE MARGIN IS NEEDED: PanelFrame's
+          `PANEL_QUIET_SCOPE` is a flex COLUMN (`flex flex-1 min-h-0
+          flex-col`), and a flex item's block-axis default is `min-width:
+          auto` — content, never the container, decides how narrow it may
+          get. `AgentTabStrip`'s own `overflow-x: auto` (inside
+          `BreadcrumbFolders`) only ever activates once something has
+          already forced the strip's own box down to the panel's width; measured on staging,
+          without it the strip renders at its full intrinsic width instead —
+          the "+" tab's own right edge sat 49px past the panel's own right
+          edge, 26.6px past the viewport itself. Same fix this file already
+          uses lower down for the same class of overflow (see `min-w-0` on
+          the header row below). */}
       {canUse && (
-        <AgentTabStrip
-          tabs={agentTabs}
-          activeId={activeAgentTabId}
-          historyActive={historyTabOpen}
-          onSelect={handleSelectAgentTab}
-          onClose={handleCloseAgentTab}
-          onNew={handleNewAgentTab}
-          onOpenHistory={openHistoryTab}
-        />
+        <div className="min-w-0 mt-[var(--folder-tab-overlap)]">
+          <AgentTabStrip
+            tabs={agentTabs}
+            activeId={activeAgentTabId}
+            historyActive={historyTabOpen}
+            onSelect={handleSelectAgentTab}
+            onClose={handleCloseAgentTab}
+            onNew={handleNewAgentTab}
+            onOpenHistory={openHistoryTab}
+          />
+        </div>
       )}
       <div className="flex shrink-0 flex-col gap-[var(--space-2h)] shadow-[var(--hairline-under)] px-4 pt-[var(--space-5)] pb-[var(--space-4h)]">
         {/* ITEM 1 (owner, 31 Aug 2026): "remove the x button on top right (i

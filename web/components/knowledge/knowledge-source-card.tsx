@@ -149,7 +149,7 @@ export function KnowledgeSourceCard({
         }
       }}
     >
-      <CardHeader className="flex-row flex-wrap items-center gap-3">
+      <CardHeader className="flex-row flex-wrap items-start gap-3">
         <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-[var(--radius)]">
           <Icon
             name={(KNOWLEDGE_KIND_ICON[source.kind] ?? "file") as IconName}
@@ -157,14 +157,60 @@ export function KnowledgeSourceCard({
             className="size-4"
           />
         </span>
-        {/* `flex-1`, not a fixed `basis-[12rem]` (192px): that basis capped
-            the title well under the card's real width (~360px), truncating
-            titles after ~14–18 characters on a card with plenty of room
-            left. The header stays a row (icon beside the title), so the
-            title still stays on ONE line — `truncate` here is that layout's
-            requirement, not a style choice — it just gets the room the card
-            actually has before it clips. */}
-        <CardTitle className="min-w-0 flex-1 truncate">
+        {/* WAS `truncate`, ONE LINE, ON PURPOSE — until the owner asked
+            otherwise. The comment this replaces said the row's single-line
+            shape was "that layout's requirement, not a style choice"; it
+            was a style choice, and the owner made a different one, 15 Sep
+            2026, verbatim: "the title of each knowledge base source is
+            getting cut off.. for all screen sizes.. wrap text or reduce
+            size." Real titles were clipping mid-word even at the card's
+            full ~360px width ("Assecuranz: Script for…",
+            "Accepted: Padelbase: Sync u…") — widening the basis in the
+            earlier fix bought more characters, not a different shape.
+
+            `line-clamp-2 break-words`, not an unbounded wrap: the same
+            pattern this app already uses for a title that can run long
+            (`shared/web/record-heading.tsx`'s `clampRecordHeading`,
+            `home-screen.tsx`'s team-name heading) — matched here rather
+            than minting a second one, though this card does not reuse
+            `clampRecordHeading` itself, since that helper's own header
+            scopes it to the two record-DETAIL heading call sites
+            specifically, not cards. An unbounded wrap would make every
+            card's height a function of its title length in a 3-up desktop
+            grid; two lines bounds it to two states instead. The native
+            `title` attribute is the same seam's other half — a name a
+            reader can still read in full, on hover or by a screen reader,
+            even clamped.
+
+            `items-start` on the header (was `items-center`): a header row
+            with a fixed-size icon beside a title that can now be two lines
+            needs the icon pinned to the top, not floating to the row's
+            vertical middle once the title is taller than it is.
+
+            UPDATED 15 Sep 2026, SAME DAY: two lines at `text-lg` (20.25px)
+            was measured on staging to still clip 16 of 50 real cards at
+            phone width — these are machine-generated calendar titles
+            ("Accepted: HOGO: Optimising the candidate CV upload workflow @
+            Tue Sep 1, 2026 7:15pm - 7:45pm (IST) (Alaap Kanchwala) (not in
+            use)", 130 characters) that no reasonable clamp fits whole; the
+            `title` attribute already carries the full text, so an ellipsis
+            staying visible is correct and expected, not a residual bug.
+            `text-base sm:text-lg` and `line-clamp-3 sm:line-clamp-2`: a
+            smaller step and a third line below the kit's `sm` breakpoint
+            (640px, the same threshold `CardGrid`'s own column ladder
+            already keys off, so "phone" here means the same thing it means
+            to the grid around it), unchanged at `sm` and above — desktop
+            measured 0 of 50 clipped before this change and nothing here
+            touches it. NO EXISTING PATTERN for responsive type size existed
+            anywhere in this app before this line; checked
+            documents/UI-RULEBOOK.md and the rest of web/ first, found
+            nothing to match, so this is a new one, kept to the smallest
+            shape (a variant prefix on the existing utilities, no new
+            component, no new token). */}
+        <CardTitle
+          className="min-w-0 flex-1 line-clamp-3 sm:line-clamp-2 text-base sm:text-lg break-words"
+          title={source.active ? source.title : t("{title} (not in use)", { title: source.title })}
+        >
           {source.active ? source.title : t("{title} (not in use)", { title: source.title })}
         </CardTitle>
       </CardHeader>
