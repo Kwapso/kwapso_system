@@ -177,6 +177,19 @@ credentials/
 # Scratch belongs in the lane worktree; this line is the seatbelt, not the rule.
 .scratch-*
 
+# MCP quality audit (2026-09-15) — the scripts under scripts/mcp-audit/ ship
+# (they're a reusable audit harness); their generated output is a snapshot of
+# the catalogue at the moment they ran and goes stale immediately, so it is
+# regenerated on demand rather than committed. A token secret must never be
+# committed either, though mint-token.mjs never writes one into this tree.
+scripts/mcp-audit/.token.secret
+scripts/mcp-audit/catalog-dump.json
+scripts/mcp-audit/scored-table.json
+scripts/mcp-audit/scored-table.csv
+scripts/mcp-audit/live-tools-list.json
+scripts/mcp-audit/live-initialize.json
+scripts/mcp-audit/branch-tools-list.json
+
 # The one-off bundle of deleted branches (14 Sep 2026). Not source; delete it
 # whenever the branches it holds stop being worth recovering.
 .archive/

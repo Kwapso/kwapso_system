@@ -1,0 +1,62 @@
+[
+  {
+    "id": "Q1",
+    "category": "simple read",
+    "question": "In this Kwapso team, what is the exact name of the app whose reference is A0009? Answer with just the app's name.",
+    "verified_answer": "Padelbase"
+  },
+  {
+    "id": "Q2",
+    "category": "filtered list",
+    "question": "Among tickets currently marked resolved that were created in August 2026, which client account has the most of them, and how many? Answer as \"<account name>, <count>\".",
+    "verified_answer": "196+, 17"
+  },
+  {
+    "id": "Q3",
+    "category": "paged read",
+    "question": "Order every ticket in this team by creation date, oldest first. What is the `ref` of the 75th ticket created? Answer with just the ref.",
+    "verified_answer": "T0714"
+  },
+  {
+    "id": "Q4",
+    "category": "knowledge",
+    "question": "One of Confia's tickets asks for a way to automatically route claim-related emails into the system. Once that feature is built, which tab in the client's app will show the imported email, its attachments, and an AI-generated summary? Answer with just the tab name (as the ticket names it).",
+    "verified_answer": "Kommunikation"
+  },
+  {
+    "id": "Q5",
+    "category": "chain",
+    "question": "Exactly two sprints in this team have a nonzero sold price. Both belong to the same client account. What is that account's `code` field? Answer with just the code.",
+    "verified_answer": "CONFIA"
+  },
+  {
+    "id": "Q6",
+    "category": "chain",
+    "question": "The closed story with reference B0191 is called \"Dashboard\". Which app is it part of? Answer with just the app's name.",
+    "verified_answer": "Padelbase"
+  },
+  {
+    "id": "Q7",
+    "category": "simple read",
+    "question": "Who is recorded as having created the account named \"Confia\", and on what calendar date (YYYY-MM-DD)? Answer as \"<name>, <date>\".",
+    "verified_answer": "Alaap K, 2026-08-13"
+  },
+  {
+    "id": "Q8",
+    "category": "chain",
+    "question": "Exactly one sprint in this team has the type \"Diagnostic\". Which client account does it belong to? Answer with just the account name.",
+    "verified_answer": "Ontime Logistics"
+  },
+  {
+    "id": "Q9",
+    "category": "filtered list",
+    "question": "In the \"Ticket type\" dropdown vocabulary, how many values are currently active, and how many are deactivated? Answer as \"<active> active, <deactivated> deactivated\".",
+    "verified_answer": "5 active, 10 deactivated"
+  },
+  {
+    "id": "Q10",
+    "category": "simple read",
+    "question": "How many child contact accounts does the account \"Confia\" have? Answer with just the number.",
+    "verified_answer": "4"
+  }
+]

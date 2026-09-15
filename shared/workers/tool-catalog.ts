@@ -637,6 +637,12 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "set_account_parent",
     summary:
       "Move an account under another one (by id), or send it back to the top by leaving `parentAccountId` out. A move that would close a loop is refused.",
+    // Added 15 Sep 2026 (mcp-quality audit) — this write had no `detail` at
+    // all despite being one of the two account-fence writes on this surface:
+    // it changes who a client can see, not just where a row sits, which the
+    // one-liner has no room to say.
+    detail:
+      "Moving an account changes what a client can SEE, not only where the row sits in the tree: a client-portal login's world is resolved from the account they stand in plus everything nested beneath it, so putting an account under another hands it — and everything already nested under IT — to whoever can already see the new parent, and taking it back out removes that visibility. That is why this always confirms, in both directions, whatever the caller's role. `parentAccountId` present moves the account under that id; leave it out (or send it empty) to clear the current parent and send the account back to the top level. A move that would place an account under its own descendant — closing a loop — is refused outright and nothing changes.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/parent",
     schema: obj({ id: S, parentAccountId: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id"), parentAccountId: opt(i, "parentAccountId") ?? null }),
@@ -1840,8 +1846,20 @@ export const SHARED_TOOLS: SharedTool[] = [
   // refuses them both with the same sentence.
   {
     name: "ask_knowledge",
+    // Reworded 15 Sep 2026 (mcp-quality audit): measured against a fresh model
+    // reading only the one-liners, the old wording ("Ask the knowledge base;
+    // `q` stands alone…") led with citation mechanics rather than what the
+    // tool actually searches, so a question about a ticket's own content was
+    // answered by paging list_help_tickets' `q` filter instead — on both
+    // Haiku and Sonnet, unprompted, every time. Leading with the concrete
+    // surfaces this reaches (tickets, meetings, mail, chat, articles) is what
+    // a one-liner needs to compete with a more familiar-sounding `q` filter
+    // elsewhere in the catalogue. Still required, verbatim, by two tests:
+    // knowledge-evidence.test.ts ("[[src:" + "never write a list of
+    // sources") and agent-parity.test.ts ("found" + "say so" + "from
+    // memory") — both read this same field, so both had to stay satisfied.
     summary:
-      "Ask the knowledge base; `q` stands alone. Mark claims [[src:…]] by `sourceId`; never write a list of sources. `found` false: say so, not from memory.",
+      "Search tickets, meetings, mail, chat, articles; `q` stands alone. Mark claims [[src:…]]; never write a list of sources. `found` false: say so, not from memory.",
     detail:
       "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. WRITE `q` SO IT STANDS ALONE: retrieval sees only that string, never the conversation around it, so resolve any pronoun, \"it\"/\"that\", or follow-up shorthand yourself before calling — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), never the two words as typed. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: answer from the passages, and mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports — the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` rides `records`, `citations` and `passages` alike — where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sourceId` NAMES THE KNOWLEDGE SOURCE, never the record it mirrors, and the two are different ids in different id spaces: never hand a `sourceId` to a tool that reads the record itself (`get_meeting_transcript` and its like) — take the segment after the last slash in `recordPath` for that, `sourceId` is not it. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice. `read` true asks a second model to re-read the shortlist before deciding what counts as evidence, which recovers a real answer a plain similarity score would have refused (a paraphrase, thin material) — it ALSO costs one assistant credit, separate from `compose`, so asking for both on one turn spends two; leave it off for the ordinary case, where the similarity floor alone decides.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
