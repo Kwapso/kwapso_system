@@ -95,6 +95,7 @@ import {
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { GMAIL_LIVE_SINCE_BUFFER_MS } from "@shared/workers/limits"
 import { brand } from "@shared/brand"
 import {
   INGEST_SOURCES_PER_TICK,
@@ -1337,13 +1338,20 @@ export function googleIngestKinds(
      * resumes at the edge of ground actually covered. `false`/absent for
      * every other caller — the ordinary forward reads and the rising walk —
      * whose existing oldest-first behaviour was always correct. */
-    fallingWindow = false
+    fallingWindow = false,
+    /** LIVE GMAIL ONLY — never set by any other kind, never set for a
+     * backfill call (which already has its own `window.from`). Narrows what
+     * GOOGLE is ASKED for; `afterCursor` below still runs unchanged and stays
+     * the real boundary, so a generous or even wrong value here costs extra
+     * calls, never a missed message. See GMAIL_LIVE_SINCE_BUFFER_MS's own
+     * header for the amplifier this closes. */
+    liveSince?: string
   ): Promise<{ rows: IngestRow[]; incomplete: boolean }> => {
     const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
     const { items, truncated } = await readGoogleMaterial(env, cfg, guard, {
       services: [service],
       gmailKnownIds,
-      from: window?.from,
+      from: window?.from ?? (service === "gmail" ? liveSince : undefined),
       to: window?.to,
     })
     // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
@@ -1599,7 +1607,17 @@ export function googleIngestKinds(
         // once is two independent rate-limit risks for one tick's read; this
         // walk has no deadline the way the live window does, so there is
         // nothing bought by racing them.
-        const { rows: forward } = await slice("gmail", cursor, limit, toRows, true)
+        //
+        // THE SAME "REAL CURSOR" CHECK gmailKnownIdsApply USES — a null or
+        // empty cursor means a first connection or a deliberate rewind, and
+        // both want to see everything Google holds, unbounded, same as
+        // before this change. Only an ESTABLISHED cursor buys the `after:`
+        // narrowing (GMAIL_LIVE_SINCE_BUFFER_MS's own header).
+        const liveSince =
+          cursor && cursor.at
+            ? new Date(Date.parse(cursor.at) - GMAIL_LIVE_SINCE_BUFFER_MS).toISOString()
+            : undefined
+        const { rows: forward } = await slice("gmail", cursor, limit, toRows, true, undefined, false, liveSince)
         const backfill = await backfillRows(
           "gmail",
           googleStateKey("gmail", guard.userId),

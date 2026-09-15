@@ -142,7 +142,7 @@ ritual in it names the rest:
 | a whole new module | [BUILD-A-MODULE.md](documents/BUILD-A-MODULE.md) (it lists its own prerequisites) |
 | anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](documents/MCP.md) → [AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md) |
 | a table, a column, or a migration | [DATA-MODEL.md](documents/DATA-MODEL.md) → [OPERATIONS.md](documents/OPERATIONS.md) |
-| a Law, or anything a Law names | [RULES.md](RULES.md) + `shared/rules/registry.ts` + its check, all three, or the build fails |
+| a Law, or anything a Law names | [RULES.md](RULES.md) + `shared/rules/registry.ts` + its check, all three, or the build fails. [RULES-INDEX.md](documents/RULES-INDEX.md) is the generated id → check-file map, useful for finding a law's test fast — regenerate it, never hand-edit it |
 | anything that spends money — a model call, an email, a cron, a stored file | [COSTS.md](documents/COSTS.md) → `shared/workers/pricing.ts` |
 
 Whatever the row, [EDGE-CASES.md](documents/EDGE-CASES.md) is the one to open when something

@@ -171,10 +171,14 @@ export type GoogleReadRequest = {
   /** CALENDAR AND GMAIL — the window to read. ISO moments; calendar passes
    * them straight through as `timeMin`/`timeMax`, gmail folds them into the
    * query as `after:`/`before:` (epoch seconds — see the gmail branch
-   * below). Absent for every caller but the knowledge backfill (migration
-   * 0082, knowledge-google.ts), which is the only one that ever sets them —
-   * every interactive read still asks for "whatever Google hands back with
-   * no bound", exactly as before. */
+   * below). Set by TWO callers and no more. The knowledge backfill (migration
+   * 0082, knowledge-google.ts) sets BOTH ends, for its historical window; and
+   * since 15 Sep 2026 the LIVE gmail sweep sets `from` ALONE, so Gmail is no
+   * longer asked for a whole mailbox on every fifteen-minute tick
+   * (`GMAIL_LIVE_SINCE_BUFFER_MS`). The live one NARROWS what Google bothers
+   * to hand back and is never itself the boundary — `afterCursor` still is.
+   * Every interactive read sets neither and still asks for "whatever Google
+   * hands back with no bound", exactly as before. */
   from?: string
   to?: string
   /** GMAIL ONLY — ids this lane has already filed, so their header is worth
@@ -731,8 +735,11 @@ export async function readGoogleMaterial(
       // `messages.list` has no `timeMin`/`timeMax` of its own — `before:`/
       // `after:` are ordinary query terms, epoch seconds, ANDed onto whatever
       // `request.search` already asked for exactly the way a second contact
-      // address would be. Absent for every caller but the backfill, which is
-      // the only one that ever sets `request.from`/`request.to` on a gmail read.
+      // address would be. TWO CALLERS reach this, not one: the backfill sets
+      // BOTH ends, and the LIVE sweep sets `from` alone (15 Sep 2026 —
+      // `GMAIL_LIVE_SINCE_BUFFER_MS`), which is why `before:` below can still
+      // be absent while `after:` is present. Every interactive read sets
+      // neither.
       const timeBound = [
         request.from ? `after:${Math.floor(Date.parse(request.from) / 1000)}` : "",
         request.to ? `before:${Math.floor(Date.parse(request.to) / 1000)}` : "",
