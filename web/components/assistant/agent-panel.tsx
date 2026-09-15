@@ -21,13 +21,12 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { CaretDown, Check, ClockCounterClockwise, X } from "@shared/ui/foundations/icons"
+import { CaretDown, Check, X } from "@shared/ui/foundations/icons"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@shared/ui/components/collapsible/collapsible"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { PopoverContent } from "@shared/ui/components/popover/popover"
 import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
 import { Toggle } from "@shared/ui/components/toggle/toggle"
@@ -38,7 +37,7 @@ import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 import { Title } from "@shared/ui/components/title/title"
 import { cn } from "@shared/ui/lib/utils"
 
-import { AgentHistoryDialog } from "@/components/assistant/agent-history-dialog"
+import { AgentHistoryTab } from "@/components/assistant/agent-history-tab"
 import { AgentScopePicker } from "@/components/assistant/agent-scope-picker"
 import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import { AssistantLimitNotice } from "@/components/assistant/assistant-limit-notice"
@@ -50,12 +49,15 @@ import {
   activateAgentTab,
   agentTabsSnapshot,
   closeAgentTab,
+  openAgentTabForThread,
+  openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
   seedAgentTabs,
   setAgentTabThread,
   useActiveAgentTabId,
   useAgentTabs,
+  useHistoryTabOpen,
   type AgentTabScope,
 } from "@/lib/agent-conversation-tabs"
 import { usePermissions } from "@/lib/perms"
@@ -421,7 +423,6 @@ export function AgentPanel({
 
   const chat = useAgentChat(teamId, open, canUse)
   const [usageOpen, setUsageOpen] = React.useState(false)
-  const [historyOpen, setHistoryOpen] = React.useState(false)
 
   /* ── THE TAB STRIP — the client's "+" ruling, 15 Sep 2026 ──────────────────
      web/lib/agent-conversation-tabs.ts carries the quote and the whole
@@ -431,6 +432,14 @@ export function AgentPanel({
   const agentTabs = useAgentTabs()
   const activeAgentTabId = useActiveAgentTabId()
   const activeAgentTab = agentTabs.find((tab) => tab.id === activeAgentTabId)
+  // THE PINNED CLOCK TAB'S OWN VIEW — a second, 15 Sep 2026 ruling, same day:
+  // "I like the history rail tab. Put it before the plus tab... when I click
+  // on one, it would open in a tab." Its launcher WAS this row's own
+  // "Past conversations" button, opening `agent-history-dialog.tsx` as a
+  // sheet — retired outright below, the tab strip's clock tab is now the one
+  // way to reach it (the same "one-mango" reasoning already retired the old
+  // "New chat" button beside "+").
+  const historyTabOpen = useHistoryTabOpen()
 
   // WHETHER "THIS RECORD" HAS SOMETHING TO POINT AT. `useActiveTabPath()` is
   // the same in-app address the main content trail tracks — reactive on every
@@ -472,7 +481,7 @@ export function AgentPanel({
 
   // Load whichever tab is now active into the one live chat — the swap model
   // `agent-conversation-tabs.ts`'s own header argues for. A tab with a real
-  // thread resumes it (identical to the history sheet's own `onPick`); a
+  // thread resumes it (identical to the history tab's own `onPick`, below); a
   // draft (no thread yet — still on the picker, or scoped but not sent to)
   // starts from a clean slate.
   function switchToAgentTab(tab: { threadId?: string } | undefined) {
@@ -490,6 +499,16 @@ export function AgentPanel({
   function handleNewAgentTab() {
     openNewAgentTab()
     chat.newChat()
+  }
+
+  // A HISTORY ROW WAS PICKED — the client's own words, "when I click on one,
+  // it would open in a tab": `openAgentTabForThread` brings the thread into
+  // the strip (activating it if a tab already points there, opening one if
+  // not) and closes History; `chat.openThread` is the identical resume call
+  // `agent-history-dialog.tsx`'s own `onPick` used to make.
+  function handlePickHistoryThread(threadId: string, topic: string) {
+    openAgentTabForThread(threadId, topic)
+    void chat.openThread(threadId)
   }
 
   function handleCloseAgentTab(id: string) {
@@ -705,9 +724,11 @@ export function AgentPanel({
         <AgentTabStrip
           tabs={agentTabs}
           activeId={activeAgentTabId}
+          historyActive={historyTabOpen}
           onSelect={handleSelectAgentTab}
           onClose={handleCloseAgentTab}
           onNew={handleNewAgentTab}
+          onOpenHistory={openHistoryTab}
         />
       )}
       <div className="flex shrink-0 flex-col gap-[var(--space-2h)] shadow-[var(--hairline-under)] px-4 pt-[var(--space-5)] pb-[var(--space-4h)]">
@@ -746,36 +767,16 @@ export function AgentPanel({
             screens) draws no tab above it — there is nothing beside it to
             align with — so its own heading is still the only place the name
             is said, exactly as it always was. */}
-        <Title
-          as="h2"
-          size="h4"
-          rule={false}
-          actions={
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={() => setHistoryOpen(true)}
-                    disabled={chat.busy}
-                    aria-label={t("Past conversations")}
-                  >
-                    <ClockCounterClockwise className="size-5" aria-hidden />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("Past conversations")}</TooltipContent>
-              </Tooltip>
-              {/* NO SEPARATE "NEW CHAT" BUTTON HERE ANY MORE — superseded by
-                  the tab strip's own "+" above (`AgentTabStrip`), which the
-                  client's own ruling makes the ONE way to start a fresh
-                  conversation: "that's how you create a new one." Two
-                  controls for the identical action is the same "one-mango"
-                  problem `agent-host.tsx` already argues against for the
-                  launcher. */}
-            </>
-          }
-        >
+        {/* NO ACTIONS IN THIS ROW ANY MORE. It held two buttons in turn and
+            both are gone the same way, to the tab strip above: "New chat"
+            first (ITEM 5's own comment on `Title`, below, still tells that
+            half), and now "Past conversations" — the pinned clock tab
+            (`AgentTabStrip`, the client's 15 Sep 2026 ruling: "I like the
+            history rail tab. Put it before the plus tab") is the ONE way to
+            reach `agent-history-tab.tsx` today, so a second button here
+            would be the identical "one-mango" duplicate `agent-host.tsx`
+            already argues against for the launcher. */}
+        <Title as="h2" size="h4" rule={false}>
           {docked ? <span className="sr-only">{t("Assistant")}</span> : t("Assistant")}
         </Title>
         {/* ITEM 6 — "remove the subtitle... for space purposes". Gone outright
@@ -842,7 +843,15 @@ export function AgentPanel({
         // `py-4` and `AssistantLimitNotice`'s own `mb-2`. (A third, the
         // staged-attachment row's `pb-2`, went with the upload.)
         <div className="agent-chat-host flex min-h-0 flex-1 flex-col px-4 pb-4">
-          {activeAgentTab?.scope === null ? (
+          {historyTabOpen ? (
+            // THE PINNED CLOCK TAB'S BODY — V2 from the artifact, grouped by
+            // last used (`agent-history-tab.tsx`'s own header carries the
+            // client's ruling in full). Same move as the scope picker just
+            // below: drawn INSIDE this tab body rather than as a dialog,
+            // replacing the ordinary transcript and composer entirely while
+            // it is the active tab.
+            <AgentHistoryTab open={historyTabOpen} busy={chat.busy} onPick={handlePickHistoryThread} />
+          ) : activeAgentTab?.scope === null ? (
             // THE SCOPE PICKER — a fresh "+" tab's first state, drawn INSIDE
             // this same tab body rather than as a dialog (Laws R59/R67; see
             // `agent-scope-picker.tsx`'s own header for the argument).
@@ -1306,14 +1315,12 @@ export function AgentPanel({
       )}
     </PanelFrame>
 
+      {/* NO SIBLING HISTORY DIALOG ANY MORE — `agent-history-dialog.tsx` is
+          retired outright, its one launcher (the removed "Past
+          conversations" button, above) and its whole surface both replaced
+          by the pinned clock tab's own body, rendered INSIDE `PanelFrame`
+          above rather than as a second overlay beside it. */}
       <AgentUsageDialog open={usageOpen} onOpenChange={setUsageOpen} summary={chat.usageSummary} />
-      <AgentHistoryDialog
-        open={historyOpen}
-        onOpenChange={setHistoryOpen}
-        busy={chat.busy}
-        currentThreadId={chat.threadId}
-        onPick={(id) => void chat.openThread(id)}
-      />
     </>
   )
 }

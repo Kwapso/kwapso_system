@@ -25,7 +25,7 @@
 // exactly ONE live thread at module level — one transcript, one `threadId`,
 // one set of source chips — and switching conversations REPLACES that one
 // thread rather than running a second one beside it, the identical swap the
-// history sheet already does through `openThread`. So this store holds only
+// history tab already does through `openThread`. So this store holds only
 // what a background conversation tab can cost under that model: a stable id,
 // the real thread it points at (once one exists), its scope, and the label the
 // scope or the thread gave it. Nothing here streams and nothing here is
@@ -39,7 +39,7 @@
 //
 // NOT PERSISTED, ON PURPOSE — matching `use-agent-chat.tsx`'s own module cells,
 // not `workspace-tabs.ts`'s `localStorage` mirror. A thread itself is never
-// lost — it is saved server-side and reachable again from the history sheet —
+// lost — it is saved server-side and reachable again from the history tab —
 // only the STRIP'S OWN memory of which ones happened to be open resets with
 // the page, same as the rest of the assistant's live state does.
 
@@ -77,6 +77,14 @@ export const MAX_AGENT_TABS = 8
 
 let tabs: AgentTab[] = []
 let activeId: string | null = null
+/** THE PINNED CLOCK TAB'S OWN VIEW — orthogonal to `tabs`/`activeId`, the same
+ * way "+" is: neither the clock tab nor "+" is a conversation, so neither is
+ * a row in this store's array (see `agent-tab-strip.tsx`'s own header for
+ * "+"'s half of that argument). `activeId` keeps pointing at whichever
+ * conversation tab the strip should return to — pressing the clock tab never
+ * moves it — so History can open and close without disturbing what the
+ * reader was looking at underneath it. */
+let historyOpen = false
 const subscribers = new Set<() => void>()
 function announce(): void {
   for (const fn of subscribers) fn()
@@ -111,13 +119,28 @@ export function seedAgentTabs(threadId: string | undefined, label: string): void
   announce()
 }
 
+/** Push a new tab onto the strip and make it active — the shared half of "+"
+ * (below) and a history row's own open (`openAgentTabForThread`), evicting
+ * past the ceiling exactly the same way for both: never the new tab, never
+ * the one that was active. */
+function pushTab(draft: AgentTab): void {
+  const wasActive = activeId
+  let next = [...tabs, draft]
+  if (next.length > MAX_AGENT_TABS) {
+    const victim = next.find((t) => t.id !== draft.id && t.id !== wasActive)
+    if (victim) next = next.filter((t) => t.id !== victim.id)
+  }
+  tabs = next
+  activeId = draft.id
+}
+
 /** Press "+" — a fresh, scope-less tab, activated immediately so its picker
  * shows. Returns the new tab's id. Evicts the tab that has sat least far
  * forward in the strip (never the new one, never the one that was active)
  * once the ceiling is crossed — a simpler rule than `workspace-tabs.ts`'s own
  * recency ranking, defensible here because a conversation tab is opened far
  * less often than a record one and the cost of guessing wrong is one extra
- * click to reopen it from the history sheet, which still holds every
+ * click to reopen it from the history tab, which still holds every
  * thread. */
 export function openNewAgentTab(): string {
   const id = newTabId()
@@ -126,15 +149,10 @@ export function openNewAgentTab(): string {
   // plain state, imported by React and by nothing else). The strip itself
   // supplies the translated placeholder for an empty label — see
   // `agent-tab-strip.tsx`.
-  const draft: AgentTab = { id, scope: null, label: "" }
-  const wasActive = activeId
-  let next = [...tabs, draft]
-  if (next.length > MAX_AGENT_TABS) {
-    const victim = next.find((t) => t.id !== id && t.id !== wasActive)
-    if (victim) next = next.filter((t) => t.id !== victim.id)
-  }
-  tabs = next
-  activeId = id
+  pushTab({ id, scope: null, label: "" })
+  // Pressing "+" is choosing a fresh conversation, which is never History —
+  // same reasoning as `activateAgentTab`, below.
+  historyOpen = false
   announce()
   return id
 }
@@ -143,9 +161,13 @@ export function openNewAgentTab(): string {
  * (`agent-panel.tsx`) is what then loads that tab's thread or clears the panel
  * for a fresh one; this store has no opinion about `use-agent-chat.tsx`. */
 export function activateAgentTab(id: string): void {
-  if (activeId === id) return
   if (!tabs.some((t) => t.id === id)) return
+  // Still worth announcing when the id itself hasn't moved: picking a
+  // conversation tab while History is showing must close History even
+  // though `activeId` doesn't change.
+  if (activeId === id && !historyOpen) return
   activeId = id
+  historyOpen = false
   announce()
 }
 
@@ -163,6 +185,52 @@ export function pickAgentTabScope(id: string, scope: AgentTabScope, label: strin
 export function setAgentTabThread(id: string, threadId: string): void {
   tabs = tabs.map((t) => (t.id === id && t.threadId !== threadId ? { ...t, threadId } : t))
   announce()
+}
+
+/** ── THE PINNED CLOCK TAB ─────────────────────────────────────────────────
+ * Client ruling, 15 Sep 2026, the same day as the header's own quote: "I
+ * like the history rail tab. Put it before the plus tab... when I click on
+ * one, it would open in a tab." `agent-tab-strip.tsx` draws it first, ahead
+ * of every conversation and "+"; `agent-history-tab.tsx` is its body — V2
+ * from the artifact, grouped by last used. */
+
+export function openHistoryTab(): void {
+  if (historyOpen) return
+  historyOpen = true
+  announce()
+}
+
+export function useHistoryTabOpen(): boolean {
+  return React.useSyncExternalStore(
+    (cb) => {
+      subscribers.add(cb)
+      return () => subscribers.delete(cb)
+    },
+    () => historyOpen,
+    () => false
+  )
+}
+
+/** A HISTORY ROW WAS PICKED: bring that thread into the strip as its own
+ * tab — activating it if a tab already points at this thread (the client's
+ * own words, "or activates it if already open"), opening one if not. Its
+ * `scope` is `SEED_SCOPE`, the same placeholder `seedAgentTabs` gives a
+ * resumed thread: a tab that already carries a `threadId` never reads its
+ * own `scope` again (`agent-panel.tsx`'s record-scope prefix only rides a
+ * tab's FIRST message, gated on `!tab.threadId`), so the value is exactly as
+ * inert here as it is there. Returns the tab's id, same as `openNewAgentTab`
+ * does, though today's one caller (`agent-panel.tsx`) has no use for it
+ * beyond the store already being in step. */
+export function openAgentTabForThread(threadId: string, label: string): string {
+  const existing = tabs.find((t) => t.threadId === threadId)
+  if (existing) {
+    activeId = existing.id
+  } else {
+    pushTab({ id: newTabId(), threadId, scope: SEED_SCOPE, label })
+  }
+  historyOpen = false
+  announce()
+  return activeId as string
 }
 
 /** Close one tab. THE "+" IS NEVER PASSED HERE — it carries no id in this

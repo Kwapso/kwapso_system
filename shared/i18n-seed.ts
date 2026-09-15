@@ -1519,7 +1519,6 @@ export const SEED: Catalogue = {
   "{count} waiting to be read, the oldest {days} days": { de: "{count} warten auf Bearbeitung, das älteste seit {days} Tagen", es: "{count} esperando ser leídos, el más antiguo desde hace {days} días", ca: "{count} esperant ser llegits, el més antic fa {days} dies"},
   "{created} added · {skipped} skipped · {failed} failed": { de: "{created} hinzugefügt · {skipped} übersprungen · {failed} fehlgeschlagen", es: "{created} añadidos · {skipped} omitidos · {failed} fallidos", ca: "{created} afegits · {skipped} omesos · {failed} fallits"},
   "{name} is on triage this week": { de: "{name} macht diese Woche die Triage", es: "{name} está de triaje esta semana", ca: "{name} fa el triatge aquesta setmana"},
-  "{title} · current": { de: "{title} · aktuell", es: "{title} · actual", ca: "{title} · actual"},
 
   /* ── THE TICKET STRIP'S NEW TABS AND THEIR TWO SECOND BODIES (2026-09-06) ──
      Thirteen sentences, hand-written here in all three languages in the same
@@ -1842,6 +1841,24 @@ export const SEED: Catalogue = {
     ca: "Les sis fonts, les pots desmarcar després",
   },
   "Open conversations": { de: "Offene Unterhaltungen", es: "Conversaciones abiertas", ca: "Converses obertes" },
+  /* The pinned clock tab and its own body (client ruling, 15 Sep 2026, same
+   * day — see web/lib/agent-conversation-tabs.ts and
+   * web/components/assistant/agent-history-tab.tsx). "Today" and "Earlier"
+   * were already seeded elsewhere in this file; these are the other two day
+   * buckets plus the tab's own label, search placeholder and row meta line. */
+  "History": { de: "Verlauf", es: "Historial", ca: "Historial" },
+  "Search conversations…": {
+    de: "Unterhaltungen durchsuchen…",
+    es: "Buscar conversaciones…",
+    ca: "Cerca converses…",
+  },
+  "Yesterday": { de: "Gestern", es: "Ayer", ca: "Ahir" },
+  "Last week": { de: "Letzte Woche", es: "La semana pasada", ca: "La setmana passada" },
+  "Created {created} · Last used {lastUsed}": {
+    de: "Erstellt {created} · Zuletzt verwendet {lastUsed}",
+    es: "Creado {created} · Usado por última vez {lastUsed}",
+    ca: "Creat {created} · Usat per última vegada {lastUsed}",
+  },
   "Asking a question needs the assistant": {
     de: "Um eine Frage zu stellen, benötigen Sie den Assistenten",
     es: "Para hacer una pregunta necesitas el asistente",

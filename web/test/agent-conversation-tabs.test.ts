@@ -13,12 +13,15 @@ import {
   agentTabsSnapshot,
   closeAgentTab,
   MAX_AGENT_TABS,
+  openAgentTabForThread,
+  openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
   seedAgentTabs,
   setAgentTabThread,
   useActiveAgentTabId,
   useAgentTabs,
+  useHistoryTabOpen,
 } from "@/lib/agent-conversation-tabs"
 
 // The store is module-level (see the file's own header for why — it mirrors
@@ -27,6 +30,12 @@ import {
 // there is, the same way a caller would.
 beforeEach(() => {
   for (const tab of agentTabsSnapshot()) closeAgentTab(tab.id)
+  // `historyOpen` has no direct "close" export — closing it is a SIDE EFFECT
+  // of picking a tab, by design (see `openHistoryTab`'s own header) — so it
+  // is driven back to false through the same door a caller would use: open a
+  // draft (which closes History as a side effect) and close it straight back
+  // out, restoring the empty-tabs invariant every other test here expects.
+  closeAgentTab(openNewAgentTab())
 })
 
 describe("seedAgentTabs", () => {
@@ -134,5 +143,92 @@ describe("useAgentTabs / useActiveAgentTabId", () => {
     })
     expect(activeResult.current).toBe(id)
     expect(tabsResult.current.map((t) => t.id)).toEqual([id])
+  })
+})
+
+// THE PINNED CLOCK TAB — client ruling, 15 Sep 2026, the same day as the
+// header's own quote: "I like the history rail tab. Put it before the plus
+// tab... when I click on one, it would open in a tab." It is not a
+// conversation (see `historyOpen`'s own comment in agent-conversation-
+// tabs.ts), so it is proven here as its own boolean rather than as a row in
+// `agentTabsSnapshot()`.
+describe("openHistoryTab / useHistoryTabOpen", () => {
+  it("flips the reactive flag on", () => {
+    const { result } = renderHook(() => useHistoryTabOpen())
+    expect(result.current).toBe(false)
+    act(() => {
+      openHistoryTab()
+    })
+    expect(result.current).toBe(true)
+  })
+
+  it("activating a conversation tab closes History — even one already active", () => {
+    let id = ""
+    act(() => {
+      id = openNewAgentTab()
+    })
+    const { result } = renderHook(() => useHistoryTabOpen())
+    act(() => {
+      openHistoryTab()
+    })
+    expect(result.current).toBe(true)
+    act(() => {
+      // Same id that was already `activeId` — the naive `if (activeId ===
+      // id) return` this used to be would have skipped closing History.
+      activateAgentTab(id)
+    })
+    expect(result.current).toBe(false)
+  })
+
+  it("pressing \"+\" closes History too", () => {
+    const { result } = renderHook(() => useHistoryTabOpen())
+    act(() => {
+      openHistoryTab()
+    })
+    act(() => {
+      openNewAgentTab()
+    })
+    expect(result.current).toBe(false)
+  })
+})
+
+describe("openAgentTabForThread — a history row was picked", () => {
+  it("opens a new tab carrying that thread, and activates it", () => {
+    let id = ""
+    act(() => {
+      id = openAgentTabForThread("srv-thread-9", "Beringer tickets")
+    })
+    const tab = agentTabsSnapshot().find((t) => t.id === id)
+    expect(tab?.threadId).toBe("srv-thread-9")
+    expect(tab?.label).toBe("Beringer tickets")
+  })
+
+  it("activates the EXISTING tab instead of opening a second one for the same thread — \"or activates it if already open\"", () => {
+    let first = ""
+    act(() => {
+      first = openAgentTabForThread("srv-thread-9", "Beringer tickets")
+    })
+    act(() => {
+      openNewAgentTab() // a distraction: a different tab is active now
+    })
+    let second = ""
+    act(() => {
+      second = openAgentTabForThread("srv-thread-9", "Beringer tickets")
+    })
+    expect(second).toBe(first)
+    expect(agentTabsSnapshot().filter((t) => t.threadId === "srv-thread-9")).toHaveLength(1)
+    const { result } = renderHook(() => useActiveAgentTabId())
+    expect(result.current).toBe(first)
+  })
+
+  it("closes History — the client's own words, \"it would open in a tab\"", () => {
+    const { result } = renderHook(() => useHistoryTabOpen())
+    act(() => {
+      openHistoryTab()
+    })
+    act(() => {
+      openAgentTabForThread("srv-thread-9", "Beringer tickets")
+    })
+    expect(result.current).toBe(false)
   })
 })

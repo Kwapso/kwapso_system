@@ -1,10 +1,12 @@
 "use client"
 
-// THE ASSISTANT'S OWN TAB STRIP — one folder tab per open conversation, plus
-// the "+" that is always last and never closes. Client ruling, 15 Sep 2026
-// (see web/lib/agent-conversation-tabs.ts for the quote in full and for why a
-// conversation tab is a different shape from `workspace-tabs.ts`'s record
-// ones).
+// THE ASSISTANT'S OWN TAB STRIP — a pinned clock tab that opens History,
+// FIRST; one folder tab per open conversation; the "+" that is always LAST
+// and never closes. Client ruling, 15 Sep 2026, said in two parts the same
+// day (see web/lib/agent-conversation-tabs.ts for both quotes in full and for
+// why a conversation tab is a different shape from `workspace-tabs.ts`'s
+// record ones): the "+" first, then "I like the history rail tab. Put it
+// before the plus tab."
 //
 // DRAWN WITH THE KIT'S OWN `BreadcrumbFolders` — the identical component the
 // main content trail uses (`web/components/shell/app-shell.tsx`), called
@@ -56,32 +58,63 @@
 
 import * as React from "react"
 
-import { Plus } from "@shared/ui/foundations/icons"
+import { ClockCounterClockwise, Plus } from "@shared/ui/foundations/icons"
 import { BreadcrumbFolders, type BreadcrumbFoldersItem } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
 
 import { useT } from "@shared/web/language"
 import type { AgentTab } from "@/lib/agent-conversation-tabs"
 
 const NEW_TAB_HREF = "#agent-tab:new"
+// A DIFFERENT HASH FAMILY FROM `TAB_HREF_PREFIX`, ON PURPOSE — the History
+// tab is not a conversation and carries no `id` in `agent-conversation-
+// tabs.ts` at all (same reasoning as "+", see that file's own header), so its
+// href must never collide with `#agent-tab:<id>` and be misread as a select
+// of a tab literally named "history".
+const HISTORY_TAB_HREF = "#agent-history"
 const TAB_HREF_PREFIX = "#agent-tab:"
 const tabHref = (id: string) => `${TAB_HREF_PREFIX}${id}`
 
 export function AgentTabStrip({
   tabs,
   activeId,
+  historyActive,
   onSelect,
   onClose,
   onNew,
+  onOpenHistory,
 }: {
   tabs: AgentTab[]
   activeId: string | null
+  /** Whether the pinned clock tab is the one showing right now — the same
+   * "which crumb is live" question `activeId` answers for a real
+   * conversation, asked of the one tab that isn't in `tabs` at all
+   * (`useHistoryTabOpen`, `web/lib/agent-conversation-tabs.ts`). */
+  historyActive: boolean
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onNew: () => void
+  /** Press the clock tab — opens `agent-history-tab.tsx` in place of the
+   * ordinary transcript, same shape as `onNew` opening the picker. */
+  onOpenHistory: () => void
 }) {
   const t = useT()
 
   const items: BreadcrumbFoldersItem[] = [
+    {
+      key: "history",
+      label: (
+        <>
+          <ClockCounterClockwise aria-hidden className="size-[var(--icon-button)]" />
+          <span className="sr-only">{t("History")}</span>
+        </>
+      ),
+      href: HISTORY_TAB_HREF,
+      // PINNED, LIKE "+" — the client's own ruling, 15 Sep 2026: "I like the
+      // history rail tab. Put it before the plus tab." First in the row,
+      // never closable, for the identical reason "+" is neither: it is not a
+      // conversation, so there is nothing here for a × to close.
+      closable: false,
+    },
     ...tabs.map(
       (tab): BreadcrumbFoldersItem => ({
         key: tab.id,
@@ -110,7 +143,13 @@ export function AgentTabStrip({
     },
   ]
 
-  const activeIndex = activeId ? tabs.findIndex((tab) => tab.id === activeId) : -1
+  // OFFSET BY ONE FOR THE PINNED HISTORY ITEM AT `items[0]`. `tabs` and
+  // `items` agree on every OTHER position (a conversation tab's index in
+  // `tabs` is its index in `items` minus one, the "+" always last), which is
+  // why `agent-panel.tsx` can keep handing this component the same `tabs`/
+  // `activeId` pair it always has.
+  const tabIndex = activeId ? tabs.findIndex((tab) => tab.id === activeId) : -1
+  const activeIndex = historyActive ? 0 : tabIndex >= 0 ? tabIndex + 1 : -1
 
   return (
     <BreadcrumbFolders
@@ -118,7 +157,7 @@ export function AgentTabStrip({
       label={t("Open conversations")}
       activeIndex={activeIndex}
       onClose={(item) => {
-        if (typeof item.key === "string" && item.key !== "new") onClose(item.key)
+        if (typeof item.key === "string" && item.key !== "new" && item.key !== "history") onClose(item.key)
       }}
       closeLabel={t("Close tab")}
       onClickCapture={(e: React.MouseEvent) => {
@@ -128,6 +167,10 @@ export function AgentTabStrip({
         const href = a.getAttribute("href")
         if (href === NEW_TAB_HREF) {
           onNew()
+          return
+        }
+        if (href === HISTORY_TAB_HREF) {
+          onOpenHistory()
           return
         }
         if (href?.startsWith(TAB_HREF_PREFIX)) onSelect(href.slice(TAB_HREF_PREFIX.length))

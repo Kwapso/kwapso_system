@@ -3497,7 +3497,13 @@ library, not a synthesised weight in the host.
 
 **Assistant conversations (2026-09-15):** A "+" tab is always visible in the assistant's tab
 strip and remains visible even when the assistant is closed. A new conversation opens on a
-scope picker first. **Status: ruled, not yet built.**
+scope picker first. A pinned clock tab sits ahead of "+", never closable, and opens the
+reader's own conversation history — search on top, grouped by last used (Today / Yesterday /
+Last week / Earlier), each row a topic plus its created and last-used dates; picking a row
+opens that conversation as a tab in the strip. **Status: built** (`web/lib/agent-conversation-
+tabs.ts`, `web/components/assistant/agent-tab-strip.tsx`, `agent-scope-picker.tsx`,
+`agent-history-tab.tsx`). The old `agent-history-dialog.tsx` sheet and its launcher button are
+retired — the pinned clock tab is now the one way to reach a past conversation.
 
 ---
 

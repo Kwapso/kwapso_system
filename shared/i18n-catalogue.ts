@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 809 strings · 3 languages · 1437 of the entries below are hand-written seed.
+// 806 strings · 3 languages · 1436 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -450,7 +450,6 @@ export const CATALOGUE: Catalogue = {
   "Parent account": { de: "Übergeordnetes Konto", es: "Cuenta principal", ca: "Compte principal" },
   "Part of these hours has no price on it yet.": { de: "Ein Teil dieser Stunden hat noch keinen Preis.", es: "Parte de estas horas no tiene precio aún.", ca: "Part d'aquestes hores no té preu encara." },
   "Particular files": { de: "bestimmte Dateien", es: "Archivos específicos", ca: "Fitxers particulars" },
-  "Past conversations": { de: "Frühere Gespräche", es: "Conversaciones anteriores", ca: "Converses passades" },
   "Past imports": { de: "Frühere Importe", es: "Importaciones anteriores", ca: "Importacions anteriors" },
   "Person": { de: "Person", es: "Persona", ca: "Persona" },
   "Personality type": { de: "Persönlichkeitstyp", es: "Tipo de personalidad", ca: "Tipus de personalitat" },
@@ -462,7 +461,6 @@ export const CATALOGUE: Catalogue = {
   "Pick someone to keep in the loop": { de: "Wählen Sie jemanden, der informiert bleiben soll", es: "Elige a alguien para mantenerlo informado", ca: "Tria algú per mantenir al corrent" },
   "Pick the app": { de: "App auswählen", es: "Elige la aplicación", ca: "Tria l'aplicació" },
   "Pick the person who's a contact of": { de: "Wählen Sie die Person, die ein Kontakt von", es: "Elige a la persona que es contacto de", ca: "Tria la persona que és un contacte de" },
-  "Pick up any chat where you left off, on any device.": { de: "Setzen Sie jeden Chat fort, wo Sie ihn unterbrochen haben, auf jedem Gerät.", es: "Reanuda cualquier chat donde lo dejaste, en cualquier dispositivo.", ca: "Repren qualsevol conversa on la vas deixar, en qualsevol dispositiu." },
   "Pick who's on duty": { de: "Wählen Sie, wer im Dienst ist", es: "Elige quién está de servicio", ca: "Tria qui està de guàrdia" },
   "Pinned to": { de: "Angeheftet an", es: "Fijado a", ca: "Fixat a" },
   "Point us at a page, a document or a recording, and give it a name we'll recognise.": { de: "Zeigen Sie auf eine Seite, ein Dokument oder eine Aufzeichnung und geben Sie ihm einen Namen, den wir wiedererkennen.", es: "Señálanos una página, un documento o una grabación, y dales un nombre que reconozcamos.", ca: "Indica'ns una pàgina, un document o una gravació, i dóna-li un nom que reconeixerem." },
@@ -776,7 +774,6 @@ export const CATALOGUE: Catalogue = {
   "Your Google connections are all one app at Google, so the others may need connecting again afterwards. The card will say which.": { de: "Ihre Google-Verbindungen sind bei Google alle eine App, daher müssen die anderen danach vielleicht erneut verbunden werden. Die Karte sagt, welche.", es: "Tus conexiones de Google son una sola app en Google, así que puede que después haya que volver a conectar las demás. La tarjeta dirá cuáles.", ca: "Les teves connexions de Google són una sola app a Google, així que després potser caldrà tornar a connectar les altres. La targeta dirà quines." },
   "Your account and teams": { de: "Ihr Konto und Ihre Teams", es: "Tu cuenta y equipos", ca: "El teu compte i els teus equips" },
   "Your company's tickets": { de: "Die Tickets deines Unternehmens", es: "Los tickets de tu empresa", ca: "Els tiquets de la teva empresa" },
-  "Your conversations": { de: "Deine Gespräche", es: "Tus conversaciones", ca: "Les teves converses" },
   "Your details": { de: "Deine Details", es: "Tus detalles", ca: "Els teus detalls" },
   "Your email": { de: "Deine E-Mail", es: "Tu correo electrónico", ca: "El teu correu electrònic" },
   "Your name and photo across the app.": { de: "Dein Name und Foto in der gesamten App.", es: "Tu nombre y foto en toda la aplicación.", ca: "El teu nom i foto a tota l'aplicació." },
