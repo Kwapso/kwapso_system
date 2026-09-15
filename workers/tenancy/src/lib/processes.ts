@@ -37,7 +37,6 @@ import {
   type SavingsView,
   type StepFigures,
 } from "@shared/workers/savings"
-import { ticketTypeKeptForMigrationExcludedSql } from "@shared/types"
 import type { AppModule, AppMoneyBack, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
@@ -923,22 +922,17 @@ export async function listAppModules(
     cfg,
     guard.databaseId,
     // OPEN TICKETS ON THIS SECTION, and it means the same "tickets" the Tickets
-    // screen means. The kind that is kept but never shown is subtracted here
-    // too — the client's ruling of 6 Sep 2026, written up in full at
-    // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts. This number is drawn
-    // beside a module's name on a list a person reads (and handed to the
-    // assistant by `list_app_modules`), so a count including rows that screen
-    // cannot show is R16's failure in its quietest form: the number is true and
-    // it is not about the tickets anybody can reach.
-    //
-    // It is its OWN `COUNT(*)` rather than a call into the tickets door, so the
-    // clause has to be said again here — which is exactly why the predicate is
-    // one shared function and not a string literal at each site.
+    // screen means. It used to need a clause to mean that: the kind that was
+    // kept but never shown had to be subtracted here too, because this number is
+    // drawn beside a module's name on a list a person reads (and handed to the
+    // assistant by `list_app_modules`), and a count including rows that screen
+    // cannot show is R16's failure in its quietest form. The owner deleted that
+    // kind outright on 15 Sep 2026 (`shared/ticket-types.ts` carries the
+    // ruling), so a plain `COUNT(*)` says what the clause used to have to say.
     `SELECT m.id, m.app_id, a.name AS app_name, m.account_id, m.name, m.mark, m.name_de,
             m.description, m.benefit, m.deactivated_at, m.created_at,
             (SELECT COUNT(*) FROM help h
-              WHERE h.module_id = m.id AND h.resolved = 0
-                AND ${ticketTypeKeptForMigrationExcludedSql("h.help_type")}) AS ticket_count
+              WHERE h.module_id = m.id AND h.resolved = 0) AS ticket_count
        FROM app_modules m JOIN apps a ON a.id = m.app_id${sql}
       ORDER BY m.name COLLATE NOCASE ASC LIMIT ${APP_MODULE_CAP}`,
     params

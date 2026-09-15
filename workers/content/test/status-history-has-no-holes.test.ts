@@ -112,16 +112,16 @@ describe("every move along the ladder leaves a row", () => {
     // The reader leans on this: `fromStatus === null` on the FIRST row is what
     // says the sequence is whole.
     //
-    // THIS CASE USED TO PROVE MORE THAN IT DOES. A Request was the kind that
+    // THIS CASE USED TO PROVE MORE THAN IT DOES. An Extra was the kind that
     // opened in `awaiting_validation` rather than `new`, so the assertion below
     // said the null `from` was carried on the OTHER birth stage too, not only
     // the ordinary one. The client retired that stage on 7 Sep 2026
     // (shared/types.ts, `HELP_STATUSES`) and every kind now opens in `new`, so
     // the fork this was guarding no longer exists. It is kept rather than
     // deleted because the sentence it makes is still the one the reader leans
-    // on, and a Request is still the kind most likely to be given a birth stage
+    // on, and an Extra is still the kind most likely to be given a birth stage
     // of its own by somebody re-reading CHECKLIST 5.13.
-    const id = await raise({ helpType: "Request" })
+    const id = await raise({ helpType: "Extra" })
     expect(rungs(id)[0]).toMatchObject({ from_status: null, to_status: "new" })
   })
 
@@ -142,7 +142,7 @@ describe("every move along the ladder leaves a row", () => {
   })
 
   /* "the client saying yes is a rung like any other" WAS HERE. It raised a
-   * Request (which opened in `awaiting_validation`), pressed
+   * Extra (which opened in `awaiting_validation`), pressed
    * `POST /api/content/help/validate`, and asserted the two rungs
    * `-→awaiting_validation` and `awaiting_validation→new`.
    *

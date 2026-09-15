@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
 import { sqlString } from "@shared/workers/d1-rest"
+import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import {
   buildTeamSeed,
   SPRINT_TYPE_CATALOGUE,
@@ -117,22 +118,32 @@ describe("a fresh team's dropdown values, after migrations AND seed", () => {
 // filters on all have to be the same strings. Derived on both ends — the seed from
 // the module, the readers off disk.
 describe("the ticket vocabulary is one name, everywhere it is written down", () => {
-  /** The `type` values the ticket screens filter selectable_data by. */
+  /** WHAT THE TICKET SCREENS FILTER `selectable_data` BY — a literal, or the one
+   * shared constant.
+   *
+   * THE FOUR PLACES BECAME TWO ON 15 SEP 2026, and that is the fix rather than a
+   * loosening. `TICKET_TYPE_GROUP` (shared/ticket-types.ts) is now the name the
+   * seed plants, the door locks, migration 0093 fences every statement on and
+   * both screens import — so a screen spelling it itself is the thing worth
+   * catching, not the thing to require. Both spellings are accepted and both
+   * resolve to a STRING below, so a screen reaching for some OTHER constant
+   * still fails here.
+   *
+   * THE PARAMETER'S NAME IS THE CALLER'S, not the law's. This read
+   * `/v\.type === "…"/`, hardcoding the lambda parameter both screens happen to
+   * call `v` — rename it to `value` in a filter callback, which changes nothing
+   * whatsoever, and the match goes undefined and the assertion below fails with
+   * "does not filter selectable_data by a type at all". */
   const filtered = ["web/lib/use-screen-data.ts", "web/components/tickets/help-detail.tsx"].map((f) => {
     const src = readFileSync(join(ROOT, f), "utf8")
-    // THE PARAMETER'S NAME IS THE CALLER'S, not the law's. This read
-    // `/v\.type === "…"/`, hardcoding the lambda parameter both screens happen
-    // to call `v` — rename it to `value` or `option` in a filter callback,
-    // which changes nothing whatsoever, and the match goes undefined and the
-    // assertion below fails with "does not filter selectable_data by a type at
-    // all". What the law needs is the TYPE STRING being compared against, from
-    // whatever the row is called at that call site.
-    return { file: f, match: src.match(/\b\w+\.type\s*===\s*"([^"]+)"/)?.[1] }
+    const literal = src.match(/\b\w+\.type\s*===\s*"([^"]+)"/)?.[1]
+    const viaConstant = /\b\w+\.type\s*===\s*TICKET_TYPE_GROUP\b/.test(src)
+    return { file: f, match: literal ?? (viaConstant ? TICKET_TYPE_GROUP : undefined) }
   })
 
   it("the seed's group names are the ones the screens filter on", () => {
     const seeded = new Set(DEFAULT_SELECTABLE.map((v) => v.type))
-    expect(seeded.has("Ticket type"), "the seed must ship a 'Ticket type' vocabulary").toBe(true)
+    expect(seeded.has(TICKET_TYPE_GROUP), "the seed must ship a 'Ticket type' vocabulary").toBe(true)
     for (const { file, match } of filtered) {
       expect(match, `${file} does not filter selectable_data by a type at all`).toBeDefined()
       expect(
@@ -468,7 +479,18 @@ describe("0026 — the 26 duplicates every older team is carrying", () => {
    * then an unguarded seed inserts the same words again. */
   function bornWithDuplicates(): DatabaseSync {
     const db = new DatabaseSync(":memory:")
-    for (const m of TEAM_MIGRATIONS) {
+    // THE LEDGER STOPS AT THE MIGRATION UNDER TEST, since 15 Sep 2026. This ran
+    // the WHOLE ledger, which was harmless while every later migration left
+    // `Ticket type` alone — and stopped being harmless when 0093 cut that group
+    // to four words and DELETED the rest, taking with it the retired duplicate
+    // this suite exists to find. 0026's own behaviour is what is asserted here,
+    // and a suite about one migration should not be able to fail because of
+    // another. Same captive-slice shape `migration-0088-pictograph-marks.test.ts`
+    // uses, and the `expect` is what makes a renumbering loud instead of silently
+    // testing an empty slice.
+    const upTo = TEAM_MIGRATIONS.findIndex((m) => m.version === "0026_retire_duplicate_dropdown_values")
+    expect(upTo, "0026 must still be in the ledger").toBeGreaterThan(0)
+    for (const m of TEAM_MIGRATIONS.slice(0, upTo + 1)) {
       if (m.version === "0026_retire_duplicate_dropdown_values") {
         // …the unguarded seed, one day later than the migration's own back-fill.
         db.exec(

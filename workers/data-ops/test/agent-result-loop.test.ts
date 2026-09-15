@@ -97,7 +97,7 @@ describe("…and then the SUMMARY grew, and the rows were what went", () => {
     hasMore: true,
     nextCursor: "eyJrIjoiMjAyNi0wOC0xM1QxMToxMDoxMC4xNzFaIn0",
     mineTotal: 314,
-    byType: { Extra: 227, Issue: 471, Question: 326, Request: 931, Requirements: 30 },
+    byType: { Extra: 1158, Issue: 471, Question: 326 },
     byStatus: { in_progress: 3, new: 440, resolved: 1597, triaged: 3, ready: 2 },
     byAccount: Array.from({ length: clients }, (_, i) => ({
       accountId: `01JACCOUNT${String(i).padStart(16, "0")}`,

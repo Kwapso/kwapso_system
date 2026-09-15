@@ -77,7 +77,6 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
-import { ticketTypeKeptForMigration } from "@shared/types"
 import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -85,6 +84,7 @@ import { RichText } from "@shared/web/rich-text-view"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { StakeholdersPanel } from "@/components/apps/stakeholders-panel"
 import { useConfirm } from "@shared/web/use-confirm"
+import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 
 export function AppDetailScreen({
   teamId,
@@ -183,15 +183,13 @@ export function AppDetailScreen({
   // dialog below AND by the Tickets tab's own Kind facet, so the two can never
   // offer two different lists of the same vocabulary.
   //
-  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. The same subtraction
-  // `use-screen-data.ts` makes on the top-level tickets screen, for the same
-  // reason and out of the same shared test — the client's ruling of 6 Sep 2026
-  // is written up in full beside it (`TICKET_TYPE_KEPT_FOR_MIGRATION`,
-  // shared/types.ts). Both call sites derive the list from the team's own
-  // vocabulary, so both had to subtract, or this tab would offer a kind the
-  // tickets screen does not and the door refuses.
+  // A SUBTRACTION OF "THE KIND THAT IS KEPT BUT NEVER SHOWN" STOOD HERE, matching
+  // the one `use-screen-data.ts` made on the top-level tickets screen, so this
+  // tab could not offer a kind that screen did not. Both went on 15 Sep 2026
+  // with the kind itself: the vocabulary is four words now and every one of them
+  // is offerable (`shared/ticket-types.ts`). The team's own live list, plain.
   const helpTypeOptions = (teamVocabulary.data ?? [])
-    .filter((v) => v.type === "Ticket type" && v.active && !ticketTypeKeptForMigration(v.value))
+    .filter((v) => v.type === TICKET_TYPE_GROUP && v.active)
     .map((v) => v.value)
 
   // The open tab is remembered per record for as long as this document

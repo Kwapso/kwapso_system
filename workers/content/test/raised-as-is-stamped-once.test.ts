@@ -21,8 +21,8 @@
 // a dropdown value re-spells the word on every record that stored it, because in
 // this app the WORD is the join key. shared/selectable-homes.ts declares
 // `raised_as_type` as a second home of `Ticket type` so a rename carries it, and
-// the last case here is why: without it, renaming "Request" to "Ask" would
-// manufacture a recategorisation on every historical request — which is the
+// the last case here is why: without it, renaming "Extra" to "Ask" would
+// manufacture a recategorisation on every historical extra — which is the
 // exact number the chart exists to report.
 
 import { readFileSync } from "node:fs"
@@ -148,13 +148,13 @@ describe("recategorising moves help_type and leaves the record of arrival alone"
     // The obvious wrong implementation — "remember the previous value" — passes
     // the case above and fails here, because it would answer "Issue".
     const id = await raise({ helpType: "Question", accountId: IDS.victimAccount })
-    for (const helpType of ["Issue", "Request"])
+    for (const helpType of ["Issue", "Extra"])
       await call(IDS.staffUser, "POST /api/content/help/update", {
         id,
         description: "The dispatch board will not load on a phone",
         helpType,
       })
-    expect(typesOf(id)).toEqual({ help_type: "Request", raised_as_type: "Question" })
+    expect(typesOf(id)).toEqual({ help_type: "Extra", raised_as_type: "Question" })
   })
 
   it("moving a ticket's STATUS does not touch it either", async () => {
@@ -225,18 +225,18 @@ describe("a rename is a re-spelling, not a recategorisation", () => {
     ])
   })
 
-  it("…so renaming Request to Ask leaves no ticket looking recategorised", () => {
+  it("…so renaming Extra to Ask leaves no ticket looking recategorised", () => {
     // The rename exactly as `updateSelectable` builds it (the tenancy suite
     // rename-carries-its-records.test.ts proves that shape); asserted here for
     // its effect on THIS column, which is the reason the second home exists.
     db().exec(`
       INSERT INTO help (id, description, help_type, raised_as_type, status, created_at)
-        VALUES ('H_R','a','Request','Request','new','2026-01-01');
+        VALUES ('H_R','a','Extra','Extra','new','2026-01-01');
       INSERT INTO help (id, description, help_type, raised_as_type, status, created_at)
-        VALUES ('H_M','b','Issue','Request','new','2026-01-01');
+        VALUES ('H_M','b','Issue','Extra','new','2026-01-01');
     `)
     for (const h of storedWordColumns("Ticket type"))
-      db().prepare(`UPDATE ${h.table} SET ${h.column} = ? WHERE ${h.column} = ?`).run("Ask", "Request")
+      db().prepare(`UPDATE ${h.table} SET ${h.column} = ? WHERE ${h.column} = ?`).run("Ask", "Extra")
 
     // The untouched ticket still reads as untouched…
     expect(typesOf("H_R"), "a rename manufactured a recategorisation").toEqual({
@@ -320,7 +320,7 @@ describe("the dashboard door only counts what it can stand behind", () => {
     seed({ id: "D1", helpType: "Issue", raisedAs: "Question", status: "new" })
     seed({ id: "D2", helpType: "Question", raisedAs: "Question", status: "new" })
     seed({ id: "D3", helpType: "Issue", raisedAs: null, status: "new" })
-    seed({ id: "D4", helpType: "Request", raisedAs: null, status: "new" })
+    seed({ id: "D4", helpType: "Extra", raisedAs: null, status: "new" })
 
     const { raisedVsCurrent, raisedAsNotRecorded } = await dashboard()
     const cells = raisedVsCurrent.filter((c) => c.raisedAsType === "Question")
@@ -427,12 +427,16 @@ describe("the dashboard door only counts what it can stand behind", () => {
     // worked; it is now the proof nothing threshold it. `n` still travels with
     // every row, which is the only thing standing between a thin month and a
     // misread one — the screen prints it in the month's hover readout.
+    // TWO KINDS, and they must stay two: the thick bucket and the thin one are
+    // the whole point of the case. The thick one was "Request" until 15 Sep 2026
+    // and is "Question" now, because Request is not a kind of ticket any more
+    // (`shared/ticket-types.ts`).
     const many = 8
     for (let i = 0; i < many; i++)
       seed({
         id: `T${i}`,
-        helpType: "Request",
-        raisedAs: "Request",
+        helpType: "Question",
+        raisedAs: "Question",
         status: "resolved",
         createdAt: raisedFor(3),
         resolvedAt: closedAt.toISOString(),
@@ -448,9 +452,9 @@ describe("the dashboard door only counts what it can stand behind", () => {
 
     const { closureTrend } = await dashboard()
     const month = closedAt.toISOString().slice(0, 7)
-    const requests = closureTrend.find((r) => r.helpType === "Request" && r.month === month)
-    expect(requests?.n).toBe(many)
-    expect(requests?.medianDays).toBeCloseTo(3, 6)
+    const thick = closureTrend.find((r) => r.helpType === "Question" && r.month === month)
+    expect(thick?.n).toBe(many)
+    expect(thick?.medianDays).toBeCloseTo(3, 6)
     const extras = closureTrend.find((r) => r.helpType === "Extra" && r.month === month)
     expect(
       extras,
@@ -555,13 +559,17 @@ describe("the dashboard door only counts what it can stand behind", () => {
   })
 
   it("the client ranking is per (client, kind) — which is what 'the most extras' asks", async () => {
+    // TWO KINDS ON ONE CLIENT, which is the whole question: two Extras and one
+    // Question under the same company must come back as two rows, not one tally
+    // of three. The second kind was "Request" until 15 Sep 2026, when it stopped
+    // being a kind of ticket (`shared/ticket-types.ts`).
     seed({ id: "K1", helpType: "Extra", raisedAs: "Extra", status: "new", accountId: IDS.victimAccount })
     seed({ id: "K2", helpType: "Extra", raisedAs: "Extra", status: "new", accountId: IDS.victimAccount })
-    seed({ id: "K3", helpType: "Request", raisedAs: "Request", status: "new", accountId: IDS.victimAccount })
+    seed({ id: "K3", helpType: "Question", raisedAs: "Question", status: "new", accountId: IDS.victimAccount })
 
     const rows = (await dashboard()).byAccountAndType.filter((r) => r.accountId === IDS.victimAccount)
     expect(rows.find((r) => r.helpType === "Extra")?.open).toBe(2)
-    expect(rows.find((r) => r.helpType === "Request")?.open).toBe(1)
+    expect(rows.find((r) => r.helpType === "Question")?.open).toBe(1)
   })
 
   it("open work by system KEEPS the tickets nobody said a system for", async () => {
@@ -578,16 +586,16 @@ describe("the dashboard door only counts what it can stand behind", () => {
 
   it("…and carries the KIND inside each system, which is what the bar is split by", async () => {
     // An app carrying fourteen tickets of which eight are issues is a quality
-    // problem in one app; an app carrying fourteen requests is a client
+    // problem in one app; an app carrying fourteen extras is a client
     // spending money. One tally per app cannot tell those apart, which is the
     // same argument the pipeline read is built on.
     seed({ id: "B1", helpType: "Issue", raisedAs: "Issue", status: "new", appId: IDS.victimApp })
     seed({ id: "B2", helpType: "Issue", raisedAs: "Issue", status: "new", appId: IDS.victimApp })
-    seed({ id: "B3", helpType: "Request", raisedAs: "Request", status: "new", appId: IDS.victimApp })
+    seed({ id: "B3", helpType: "Extra", raisedAs: "Extra", status: "new", appId: IDS.victimApp })
 
     const mine = (await dashboard()).openByApp.filter((r) => r.appId === IDS.victimApp)
     expect(mine.find((r) => r.helpType === "Issue")?.open).toBe(2)
-    expect(mine.find((r) => r.helpType === "Request")?.open).toBe(1)
+    expect(mine.find((r) => r.helpType === "Extra")?.open).toBe(1)
   })
 
   it("a client login is refused at the door (R21)", async () => {

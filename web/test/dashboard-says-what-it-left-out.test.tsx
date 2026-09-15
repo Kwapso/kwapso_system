@@ -55,7 +55,7 @@ import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
 
 afterEach(cleanup)
 
-const TYPES = ["Issue", "Question", "Request", "Extra"]
+const TYPES = ["Issue", "Question", "Extra", "Feedback"]
 
 const EMPTY: TicketDashboard = {
   openByTypeAndStatus: [],
@@ -81,38 +81,38 @@ const FULL: TicketDashboard = {
     { helpType: "Issue", status: "new", n: 9 },
     { helpType: "Issue", status: "triaged", n: 6 },
     { helpType: "Question", status: "new", n: 4 },
-    { helpType: "Request", status: "in_progress", n: 3 },
+    { helpType: "Feedback", status: "in_progress", n: 3 },
     { helpType: "Extra", status: "triaged", n: 7 },
   ],
   byAccountAndType: [
     { accountId: "a1", accountName: "Bergmann Group", helpType: "Extra", open: 4, total: 9 },
     { accountId: "a2", accountName: null, helpType: "Extra", open: 3, total: 5 },
-    { accountId: "a1", accountName: "Bergmann Group", helpType: "Request", open: 5, total: 11 },
+    { accountId: "a1", accountName: "Bergmann Group", helpType: "Feedback", open: 5, total: 11 },
   ],
   closureDays: [
     { helpType: "Issue", n: 118, minDays: 0, p25Days: 2, medianDays: 4, p75Days: 9, maxDays: 31 },
-    { helpType: "Request", n: 21, minDays: 3, p25Days: 9, medianDays: 18, p75Days: 34, maxDays: 96 },
+    { helpType: "Feedback", n: 21, minDays: 3, p25Days: 9, medianDays: 18, p75Days: 34, maxDays: 96 },
   ],
   closureTrend: [
     { helpType: "Issue", month: "2026-07", n: 40, medianDays: 5 },
     { helpType: "Issue", month: "2026-08", n: 38, medianDays: 4 },
     { helpType: "Issue", month: "2026-09", n: 41, medianDays: 3 },
-    { helpType: "Request", month: "2026-07", n: 12, medianDays: 18 },
-    // AUGUST IS MISSING FOR REQUEST, deliberately: the door dropped it under the
+    { helpType: "Feedback", month: "2026-07", n: 12, medianDays: 18 },
+    // AUGUST IS MISSING FOR FEEDBACK, deliberately: the door dropped it under the
     // floor, so the area has to break rather than dive to the baseline and claim
     // that month was instant.
-    { helpType: "Request", month: "2026-09", n: 11, medianDays: 15 },
+    { helpType: "Feedback", month: "2026-09", n: 11, medianDays: 15 },
   ],
   raisedVsCurrent: [
     { raisedAsType: "Issue", helpType: "Issue", n: 68 },
     { raisedAsType: "Issue", helpType: "Question", n: 39 },
-    { raisedAsType: "Issue", helpType: "Request", n: 34 },
-    { raisedAsType: "Question", helpType: "Request", n: 12 },
+    { raisedAsType: "Issue", helpType: "Feedback", n: 34 },
+    { raisedAsType: "Question", helpType: "Feedback", n: 12 },
   ],
   raisedAsNotRecorded: 788,
   openByApp: [
     { appId: "p1", appName: "Bergmann Portal", helpType: "Issue", open: 8, total: 20 },
-    { appId: "p1", appName: "Bergmann Portal", helpType: "Request", open: 3, total: 7 },
+    { appId: "p1", appName: "Bergmann Portal", helpType: "Feedback", open: 3, total: 7 },
     { appId: null, appName: null, helpType: "Issue", open: 2, total: 4 },
   ],
   unopenedPastLine: 7,
@@ -320,7 +320,7 @@ describe("the tickets dashboard says what it left out", () => {
     expect(screen.getByText(/7 past the three-day line/i)).toBeTruthy()
     // THE TREND BREAKS AT THE MONTH THE DOOR DROPPED, rather than joining
     // across it and claiming a wait nobody measured. Issue has three months in
-    // a row and draws one line; Request has July and September with August
+    // a row and draws one line; Feedback has July and September with August
     // missing, so it draws no line at all and two dots — which is the shape
     // that keeps it out of the plot's arithmetic while keeping it visible
     // beside its own name in the legend.
@@ -462,7 +462,7 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
     // The same subtraction the "Who has more" panel makes, made at the toolbar:
     // a control whose only meaningful setting is the one already in force is a
     // fact wearing a control's clothes. The Kind filter stays — a system's
-    // Issues and its Requests are a real question inside one app.
+    // Issues and its Extras are a real question inside one app.
     showForApp(FULL)
     expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
     expect(screen.queryByText("Account"), "an Account facet drew inside one app").toBeNull()
@@ -492,11 +492,18 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
 // The other three (the taller plot, the month rules, the retired caption) are
 // covered above or are pure geometry.
 
-/** The vocabulary as a team might really hold it: NOT in the client's order (the
- * seed's own order starts with Question), and FIVE words rather than four — the
- * base seeds Requirements alongside the four the client named. Both facts are
- * load-bearing below, and both are true of a real team today. */
-const SCRAMBLED = ["Question", "Extra", "Requirements", "Request", "Issue"]
+/** THE WORDS A SCREEN MIGHT REALLY BE HOLDING, and neither fact about them is
+ * incidental: NOT in the client's order, and FIVE words rather than four.
+ *
+ * The fifth is "General" — a word no team's vocabulary holds any more (the group
+ * was cut to four on 15 Sep 2026 and migration 0093 deleted the rest) and that
+ * plenty of imported tickets still SAY. That is exactly the case this panel has
+ * to survive: the screen's `types` is built from the vocabulary AND from the
+ * kinds the rows carry, so a bar the total still counts must not vanish because
+ * nobody ranked its word. The list used to lead with "Requirements", back when
+ * the seed really did plant a fifth; the shape of the test is unchanged and only
+ * the example word moved. */
+const SCRAMBLED = ["Question", "Extra", "General", "Feedback", "Issue"]
 
 function showWith(
   types: string[],
@@ -551,9 +558,9 @@ describe("the open work is one row per stage, with the kinds named on top", () =
     expect(heading.map((c) => c.textContent)).toEqual([
       "Issue",
       "Question",
-      "Request",
       "Extra",
-      "Requirements",
+      "Feedback",
+      "General",
     ])
   })
 })
@@ -738,7 +745,7 @@ describe("every graph reads the kinds in the client's one order", () => {
     // element rather than a grid this file drew, so the query names the part.
     const flow = document.querySelector('[data-slot="sankey"]') as HTMLElement
     expect(flow, "the flow is not drawn").toBeTruthy()
-    order(flow, ["Issue", "Question", "Request", "Extra"])
+    order(flow, ["Issue", "Question", "Extra", "Feedback"])
   })
 
   it("orders the per-system legend the same way", () => {
@@ -748,22 +755,22 @@ describe("every graph reads the kinds in the client's one order", () => {
     // fixture actually has open against a system appear in it; the legend draws
     // every kind, so reading the whole card is the honest scope.
     const panel = screen.getByText("Which app").closest('[data-slot="card"]') as HTMLElement
-    order(panel, ["Issue", "Question", "Request", "Extra", "Requirements"])
+    order(panel, ["Issue", "Question", "Extra", "Feedback", "General"])
   })
 
   it("keeps a kind the order has never heard of, after the four it has", () => {
-    // The retiring "Requirements", a word a team typed itself, a kind that only
-    // exists on imported tickets: it sorts to the END and still draws. A type
+    // A word a team typed itself, a kind that only exists on imported tickets:
+    // it sorts to the END and still draws. A type
     // that vanished from a chart because nobody had ranked it is exactly the
     // silent subtraction this whole screen exists to avoid.
     // The vocabulary leads with the unknown word AND the fixture's rows carry
     // three more kinds the vocabulary has dropped — both routes into `types`,
     // exercised at once. Every one of them still draws; the four the client
     // named lead, and the word nobody ranked is last rather than absent.
-    showWith(["Requirements", "Issue"])
+    showWith(["General", "Issue"])
     const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
     const heading = [...grid.children].slice(1, 6).map((c) => c.textContent)
-    expect(heading).toEqual(["Issue", "Question", "Request", "Extra", "Requirements"])
+    expect(heading).toEqual(["Issue", "Question", "Extra", "Feedback", "General"])
   })
 })
 
@@ -788,14 +795,14 @@ describe("the trend is as tall as the panel beside it, ruled by month, and answe
     // reader hears them whether or not the floating panel ever opens.
     showWith(TYPES)
     // 2026-09 has both kinds, in the client's order rather than the paint order
-    // (Request's median is the larger, so it is painted FIRST and read LAST).
+    // (Feedback's median is the larger, so it is painted FIRST and read LAST).
     expect(
       screen.getByRole("button", {
-        name: "2026-09 · Issue: 3 days, from 41 closed · Request: 15 days, from 11 closed",
+        name: "2026-09 · Issue: 3 days, from 41 closed · Feedback: 15 days, from 11 closed",
       })
     ).toBeTruthy()
     // AUGUST DROPPED REQUEST at the door, so August's card says nothing about
-    // Request rather than writing it as nought days — printing a zero here is
+    // Feedback rather than writing it as nought days — printing a zero here is
     // exactly the lie `CLOSURE_TREND_MIN_CLOSURES` exists to prevent.
     const august = screen.getByRole("button", { name: /^2026-08/ })
     expect(august.getAttribute("aria-label")).toBe("2026-08 · Issue: 4 days, from 38 closed")
@@ -826,7 +833,7 @@ describe("a name on a ranked chart goes to its record", () => {
   it("links a client's name to the account record, on every row that names them", () => {
     show(FULL)
     // ONE CLIENT, TWO ROWS. "Who has more" is a ranking PER KIND, so a client
-    // with open Extras and open Requests appears under both — which is the
+    // with open Extras and open Feedback appears under both — which is the
     // panel working, and it means the assertion has to be about all of them.
     // A link built per-row could differ per row; it must not.
     const links = screen.getAllByRole("link", {
@@ -878,7 +885,7 @@ describe("a bar on a ranked chart answers with its own figures", () => {
     // has closed twelve and on one that has closed nothing.
     expect(
       screen.getByRole("button", {
-        name: "Bergmann Portal · Issue: 8 open of 20 · Request: 3 open of 7",
+        name: "Bergmann Portal · Issue: 8 open of 20 · Feedback: 3 open of 7",
       }),
       "the per-system bar is not a focusable readout of its own segments"
     ).toBeTruthy()
@@ -890,7 +897,7 @@ describe("a bar on a ranked chart answers with its own figures", () => {
     // about the row it was opened from.
     expect(
       screen.getAllByRole("button", {
-        name: "Bergmann Group · Request: 5 open of 11 · Extra: 4 open of 9",
+        name: "Bergmann Group · Extra: 4 open of 9 · Feedback: 5 open of 11",
       }).length,
       "the per-client bar answers about one row instead of about the client"
     ).toBe(2)
@@ -906,7 +913,7 @@ describe("a bar on a ranked chart answers with its own figures", () => {
       "the name took the readout's job as well as its own"
     ).toBeNull()
     const bar = screen.getByRole("button", {
-      name: "Bergmann Portal · Issue: 8 open of 20 · Request: 3 open of 7",
+      name: "Bergmann Portal · Issue: 8 open of 20 · Feedback: 3 open of 7",
     })
     expect(bar.closest("a"), "the readout sits inside the link, so a press navigates").toBeNull()
   })

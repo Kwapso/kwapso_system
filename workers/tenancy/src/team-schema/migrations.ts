@@ -40,6 +40,8 @@ import {
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { storedWordColumns } from "@shared/selectable-homes"
+import { TICKET_TYPE_GROUP, TICKET_TYPES, ticketTypeKey } from "@shared/ticket-types"
 
 import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, MEETING_TYPES, SPRINT_TYPE_CATALOGUE } from "./seed"
 
@@ -295,6 +297,29 @@ const MEETING_TYPE_OLD_NAMES: Record<string, string[]> = {
  * canonical name always included, so a re-run (already renamed) still
  * matches. */
 const meetingTypeCandidates = (name: string): string[] => [name, ...(MEETING_TYPE_OLD_NAMES[name] ?? [])]
+
+/** THE WORD "REQUEST" FOLDS INTO, 15 Sep 2026 (migration 0093). Not spelled out
+ * again here: `TICKET_TYPES` (shared/ticket-types.ts) is where the four words
+ * live and Extra is the third of them, so the day one of the four is renamed in
+ * that file this migration cannot be left behind saying a word the app no longer
+ * has. */
+const EXTRA_TICKET_TYPE = TICKET_TYPES[2].value
+
+/** EVERY SPELLING OF ONE TICKET-TYPE WORD, AS A SQL LIST, matching the way
+ * `ticketTypeKey` (shared/ticket-types.ts) matches in TypeScript: trimmed,
+ * lower-cased, one trailing "s" tolerated.
+ *
+ * SQLite HAS NO "DROP ONE TRAILING S", which is why this is a list rather than an
+ * expression: a word and that word plus an "s" are the two strings that reduce to
+ * the same key, so comparing `LOWER(TRIM(col))` against both is the predicate's
+ * own test spelled the only way SQL can spell it. Generating it FROM that
+ * function is what stops the two drifting — a migration that recognised a
+ * different set of spellings from the door would leave rows behind that every
+ * screen afterwards treated as a fifth word. */
+function ticketTypeSpellingsSql(word: string): string {
+  const key = ticketTypeKey(word)
+  return [key, `${key}s`].map((s) => sqlString(s)).join(", ")
+}
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
@@ -6579,6 +6604,120 @@ UPDATE meeting_purposes
    SET deactivated_at = datetime('now'), deactivator_name = 'System'
  WHERE deactivated_at IS NULL
    AND name NOT IN (${MEETING_TYPES.map((t) => sqlString(t.name)).join(", ")});
+`,
+  },
+  {
+    // THE FOUR KINDS OF TICKET, AND A HARD DELETE OF EVERYTHING ELSE.
+    //
+    // THE RULING, 15 Sep 2026, the owner's own words, verbatim: *"Remove all
+    // other options. Just get rid of them, delete them completely. From staging
+    // and production."*
+    //
+    // A HARD DELETE IS NOT THIS LEDGER'S USUAL SHAPE AND IS DELIBERATE HERE.
+    // 0034 retired "Bug" and "Feedback" by DEACTIVATING their rows, because a
+    // deactivated row still explains a historical ticket that says the word. The
+    // owner was told that and ruled for deletion anyway, twice in one sentence
+    // ("get rid of them, delete them completely"), so the rows go. What makes
+    // that safe rather than merely obedient is the RECORDS: `help.help_type`
+    // stores the WORD, not a foreign key, so deleting the vocabulary row cannot
+    // orphan a ticket — and the only word any ticket actually held that is not
+    // one of the four is "Request", which this migration folds into "Extra"
+    // before it deletes anything. Measured read-only across every ready team on
+    // staging on 15 Sep 2026, before this was written: 961 Request, 473 Issue,
+    // 331 Question, 227 Extra, 60 with no type, and ZERO Requirements (on either
+    // team, on either column). Production held no teams at all.
+    //
+    // ── WHAT IT DOES, IN ORDER, AND WHY THAT ORDER ─────────────────────────
+    //
+    //   1 · REQUEST BECOMES EXTRA, on every column that stores a `Ticket type`
+    //       word. The columns are DERIVED from `VOCABULARY_HOMES`
+    //       (shared/selectable-homes.ts) rather than typed here, which is the
+    //       same source `updateSelectable`'s rename carries records with — so
+    //       `raised_as_type` is rewritten beside `help_type` for the reason that
+    //       file states at length: a SPELLING changing is not a recategorisation
+    //       anybody performed, and leaving the second column behind would
+    //       manufacture 961 of them in the one chart that reports them.
+    //   2 · EVERYTHING THAT IS NOT ONE OF THE FOUR IS DELETED — after step 1, so
+    //       the Request row is only removed once the tickets that said the word
+    //       no longer do.
+    //   3 · PER WORD: keep exactly one row, then make it protected and marked.
+    //       The survivor is chosen ACTIVE first, then protected, then oldest, so
+    //       a team whose vocabulary accumulated duplicates (Kwapso had fifteen
+    //       rows for eight words, two of them left behind by a lane test) keeps
+    //       the row its tickets have been reading.
+    //   4 · ANY OF THE FOUR THAT IS MISSING IS INSERTED. On 15 Sep 2026 that is
+    //       "Feedback" on both staging teams — retired by 0034 on one, never
+    //       present on the other.
+    //
+    // ── WHAT IS MATCHED, AND WHAT IS LEFT ALONE ────────────────────────────
+    //
+    // A row is recognised by its KEY — trimmed, lower-cased, one trailing "s"
+    // dropped — which is `ticketTypeKey` (shared/ticket-types.ts), the same test
+    // the door and the screens use. So "Issues", "issue " and "Issue" are one
+    // word here exactly as they are one word there.
+    //
+    // THE SURVIVOR KEEPS ITS OWN SPELLING. `is_default` and `mark` are set; the
+    // `value` is not touched, because renaming a ticket type is still allowed
+    // (`shared/ticket-types.ts` says why the LOCK is about a fifth ROW and never
+    // about the wording) and rewriting it here would also have to carry every
+    // record with it, which is `updateSelectable`'s job and not a migration's.
+    //
+    // THE COST, SAID OUT LOUD: a team that had renamed one of the four to a word
+    // this key test cannot recognise — "Zusatz" for Extra — would have that row
+    // deleted by step 2 and a fresh English one inserted by step 4, leaving its
+    // tickets saying a word with no vocabulary row. That is real, and it is why
+    // the counts above were taken before this was written rather than after: no
+    // team on either environment had renamed anything, so the cost today is
+    // zero. A team that had retyped a MARK loses that edit, which is the same
+    // price the sprint-state marks paid on 11 Sep 2026.
+    //
+    // IDEMPOTENT, and genuinely rather than by the ledger's protection. Every
+    // statement here moves zero rows on a second pass: both UPDATEs in step 1
+    // match a word that no longer exists, both DELETEs match nothing, the
+    // normalising UPDATE carries a predicate that is false once the row is
+    // already protected, active and correctly marked, and the INSERT is guarded
+    // `WHERE NOT EXISTS`. `_migrations` stops the second run; this would survive
+    // one.
+    version: "0093_ticket_types_cut_to_four",
+    sql: `
+${storedWordColumns(TICKET_TYPE_GROUP)
+  .map(
+    (h) => `
+-- 1 · REQUEST BECOMES EXTRA on ${h.table}.${h.column} (derived from VOCABULARY_HOMES).
+UPDATE ${h.table}
+   SET ${h.column} = ${sqlString(EXTRA_TICKET_TYPE)}
+ WHERE LOWER(TRIM(COALESCE(${h.column}, ''))) IN (${ticketTypeSpellingsSql("Request")});`
+  )
+  .join("")}
+
+-- 2 · EVERY OTHER WORD IN THE GROUP, GONE. The owner's ruling, above.
+DELETE FROM selectable_data
+ WHERE type = ${sqlString(TICKET_TYPE_GROUP)}
+   AND LOWER(TRIM(COALESCE(value, ''))) NOT IN (${TICKET_TYPES.map((t) => ticketTypeSpellingsSql(t.value)).join(", ")});
+${TICKET_TYPES.map((t) => {
+  const spellings = ticketTypeSpellingsSql(t.value)
+  const mine = `type = ${sqlString(TICKET_TYPE_GROUP)} AND LOWER(TRIM(COALESCE(value, ''))) IN (${spellings})`
+  // THE ONE ROW THAT SURVIVES: active first, then protected, then the oldest —
+  // a total order, so two runs on the same data would pick the same row.
+  const survivor = `SELECT id FROM selectable_data WHERE ${mine}
+      ORDER BY (deactivated_at IS NULL) DESC, is_default DESC, created_at ASC, id ASC LIMIT 1`
+  return `
+-- 3 · ${t.value}: one row, protected, marked ${t.mark}.
+DELETE FROM selectable_data
+ WHERE ${mine}
+   AND id <> (${survivor});
+
+UPDATE selectable_data
+   SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       is_default = 1, mark = ${sqlString(t.mark)}, updated_at = datetime('now')
+ WHERE ${mine}
+   AND (deactivated_at IS NOT NULL OR is_default <> 1 OR mark IS NOT ${sqlString(t.mark)});
+
+-- 4 · …and plant it if the team never had it.
+INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(TICKET_TYPE_GROUP)}, ${sqlString(t.value)}, 1, ${sqlString(t.mark)}, datetime('now'), 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data WHERE ${mine});`
+}).join("")}
 `,
   },
 ]

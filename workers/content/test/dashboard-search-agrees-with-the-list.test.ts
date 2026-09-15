@@ -160,7 +160,7 @@ beforeEach(() => {
   ticket({
     id: "H_Q2",
     description: "Can we add an invoice column to the list?",
-    type: "Request",
+    type: "Extra",
     raisedAs: "Issue",
     status: "triaged",
     app: IDS.victimApp,
@@ -247,7 +247,7 @@ describe("the tickets dashboard searches, and searches the same way the list doe
     const at = (type: string, status: string) =>
       found.openByTypeAndStatus.find((r) => r.helpType === type && r.status === status)?.n ?? 0
     expect(at("Issue", "new")).toBe(1)
-    expect(at("Request", "triaged")).toBe(1)
+    expect(at("Extra", "triaged")).toBe(1)
     expect(at("Issue", "in_progress")).toBe(1)
 
     // 2B — who has more. One client in this fixture, so the CHECK is the tally
@@ -262,7 +262,7 @@ describe("the tickets dashboard searches, and searches the same way the list doe
     expect(found.closureDays[0]?.n).toBe(1)
 
     // 5A — the matrix, and the denominator's missing half. Issue→Issue twice
-    // (the open one and the closed one), Issue→Request once, and exactly one
+    // (the open one and the closed one), Issue→Extra once, and exactly one
     // unstamped row. A count that ignored the term would report the fixture's.
     expect(
       found.raisedVsCurrent.some((r) => r.raisedAsType === "Question"),
@@ -271,7 +271,7 @@ describe("the tickets dashboard searches, and searches the same way the list doe
     const cell = (from: string, to: string) =>
       found.raisedVsCurrent.find((r) => r.raisedAsType === from && r.helpType === to)?.n ?? 0
     expect(cell("Issue", "Issue")).toBe(2)
-    expect(cell("Issue", "Request")).toBe(1)
+    expect(cell("Issue", "Extra")).toBe(1)
     expect(found.raisedAsNotRecorded).toBe(1)
 
     // 6A — the per-system bars, split by kind. Same subtraction, one panel over.
@@ -353,9 +353,9 @@ describe("the tickets dashboard searches, and searches the same way the list doe
     // All four are parameters of the same door landing in the same WHERE, so
     // asking two questions must answer the intersection. A handler that read
     // the last parameter written would pass every test above.
-    const both = await dashboard(`?q=${TERM}&helpType=Request`)
+    const both = await dashboard(`?q=${TERM}&helpType=Extra`)
     expect(both.matched).toBe(1)
-    expect(both.openByTypeAndStatus.map((r) => r.helpType)).toEqual(["Request"])
+    expect(both.openByTypeAndStatus.map((r) => r.helpType)).toEqual(["Extra"])
 
     const withApp = await dashboard(`?q=${TERM}&appId=${IDS.victimApp}`)
     expect(withApp.matched, "the app-scoped dashboard still searches").toBe(4)
@@ -364,33 +364,19 @@ describe("the tickets dashboard searches, and searches the same way the list doe
     expect(elsewhere.matched, "a system with none of these tickets must answer empty").toBe(0)
   })
 
-  it("REQUIREMENTS TICKETS STAY HIDDEN, term or no term", async () => {
-    // The kind kept for a migration is subtracted FIRST and unconditionally in
-    // `ticketWhere`, before any facet — but "unconditionally" is a property of
-    // one function, and a search that had grown its own WHERE would be exactly
-    // the place that subtraction stopped applying. So it is asserted here
-    // alongside the term rather than only in its own suite: a row nobody may
-    // see must not become visible because somebody typed its own words.
-    ticket({
-      id: "H_REQ",
-      description: "Invoice requirements for the migration",
-      type: "Requirements",
-      raisedAs: "Requirements",
-      status: "new",
-      app: IDS.victimApp,
-      created: recently(40),
-    })
+  // A CASE CALLED "REQUIREMENTS TICKETS STAY HIDDEN, TERM OR NO TERM" STOOD HERE
+  // and was deleted on 15 Sep 2026 with the thing it was about. It asserted that
+  // the kind kept for a migration — subtracted first and unconditionally in
+  // `ticketWhere` — could not be reached by SEARCHING for its own words, which
+  // was the sharp form of the claim: a search that had grown its own WHERE would
+  // be exactly the place that subtraction stopped applying.
+  //
+  // The owner deleted that kind of ticket outright (`shared/ticket-types.ts`),
+  // so `ticketWhere` carries no such clause and there is nothing left to hide.
+  // Deleted rather than re-pointed at a word nothing withholds, which would have
+  // been a green test asserting nothing while reading as if it asserted the law.
+  // WHAT THE SUITE STILL PROVES is the half that outlived it: the dashboard's
+  // search and the list's search are ONE expression, so a term that narrows one
+  // narrows the other by the same rows — every other case in this file.
 
-    const found = await dashboard(`?q=${TERM}`)
-    expect(found.matched, "a Requirements ticket was counted into a searched dashboard").toBe(4)
-    expect(found.raisedVsCurrent.map((r) => r.raisedAsType)).not.toContain("Requirements")
-    expect(found.openByTypeAndStatus.map((r) => r.helpType)).not.toContain("Requirements")
-    expect(found.openByApp.map((r) => r.helpType)).not.toContain("Requirements")
-    // …and the term does not reach it through the list either, which is the
-    // same sentence read from the other door.
-    expect(await listIds(`?q=${TERM}`)).not.toContain("H_REQ")
-    // Searching for the WORD ITSELF finds nothing, which is the sharper form of
-    // the same claim: the exclusion is not a filter the term can outrank.
-    expect((await dashboard("?q=requirements")).matched).toBe(0)
-  })
 })

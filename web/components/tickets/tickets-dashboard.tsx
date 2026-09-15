@@ -473,10 +473,11 @@ function Panel({
  * THEY WERE ONE BUG. This panel used to draw a stage as a LABEL LINE followed by
  * its own `grid sm:grid-cols-2 lg:grid-cols-4` of bars, with the legend written
  * once above the whole panel. That `4` was a constant, and the number of kinds
- * is not one: `Ticket type` is the team's OWN editable vocabulary and the base
- * SEEDS FIVE of them (Question, Issue, Request, Extra, Requirements —
- * `workers/tenancy/src/team-schema/seed.ts`), before the screen's own `types`
- * memo appends any further kind found only on historical tickets. Five cells in
+ * is not one: the base seeded FIVE words at the time (Question, Issue, Request,
+ * Extra and Requirements), before the screen's own `types` memo appended any
+ * further kind found only on historical tickets. The seed is four now
+ * (`TICKET_TYPES`, shared/ticket-types.ts, 15 Sep 2026) and the derivation below
+ * is what makes that a non-event rather than a second fix. Five cells in
  * a four-column grid is two rows, under every stage, for ever — and which
  * stages LOOKED doubled depended on whether the wrapped fifth cell held a bar or
  * just the em dash for zero, which is why it read as "some of them". The legend

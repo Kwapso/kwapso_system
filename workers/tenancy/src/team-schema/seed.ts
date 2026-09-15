@@ -18,6 +18,7 @@
 // runner (POST /api/tenancy/admin/migrate-teams) rolls it to every team.
 
 import { sqlString } from "@shared/workers/d1-rest"
+import { TICKET_TYPE_GROUP, TICKET_TYPES } from "@shared/ticket-types"
 import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
@@ -199,47 +200,38 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // standing keeps the six rows it was born with. Retiring those is a migration
   // and a decision about somebody's own data; `INTERNAL_VOCABULARY` above
   // carries the same paragraph for the `Company size` half.
-  // THE FIVE WORDS THE AGENCY ACTUALLY USES (CHECKLIST 2.1), each carrying the
-  // mark it is recognised by (11.8, UI-RULEBOOK G2). "Feedback" and "Bug" are
-  // gone from the starting vocabulary: Aurora retired them, and a "bug" is an
-  // Issue and "feedback" is a Request in the words of the people who file them.
-  // Existing teams keep their rows — migration 0034 DEACTIVATES those two rather
-  // than deleting them, so every historic ticket still reads correctly.
+  // THE FOUR KINDS OF TICKET, AND THEY ARE THE ONLY FOUR. The owner's ruling,
+  // 15 Sep 2026, verbatim: *"Remove all other options. Just get rid of them,
+  // delete them completely. From staging and production."*
   //
-  // THE GLYPH IS A TWO-LETTER CODE, not a pictograph — the client's ruling,
+  // NOT A LIST TYPED HERE. `TICKET_TYPES` (shared/ticket-types.ts) is the one
+  // place the four words and their marks live, and it is read by four things
+  // that used to disagree: this seed, migration 0093 (which carries every team
+  // already standing to the same four), the door that refuses a fifth
+  // (`createSelectable`), and `web/lib/type-colours.ts`, which derives the
+  // client's reading order from it. The seeded list and the chart order being
+  // two hand-kept lists is what let a five-word vocabulary ship under a
+  // four-column dashboard on 6 Sep 2026.
+  //
+  // WHAT LEFT. "Request" folded into "Extra" — 0093 rewrites both columns that
+  // stored the word — and "Requirements" is gone as a word AND as code: the
+  // kept-but-never-shown machinery it needed (`TICKET_TYPE_KEPT_FOR_MIGRATION`
+  // and the four readers of it) came out the same day, on a measurement that
+  // found zero tickets of that kind on either staging team. "Feedback" comes
+  // BACK, having been retired by 0034 — with a condition on it this time:
+  // `createTicket` refuses it unless a Validation sprint is running on the
+  // ticket's own app.
+  //
+  // THE MARK IS A SHORT CODE, never a pictograph — the client's ruling,
   // 2026-08-31: "i said no emojis. why are there still emojis? kill them!"
-  // Same substitution as 0034/0044 above; `optionalMark` refuses a pictograph
-  // going forward, and this is the seed side of the same ruling.
+  // `optionalMark` holds the door and R66 holds this seed, which the door cannot
+  // see.
   //
-  // It is still an EDITABLE list, not an enum: a team adds its own on the
-  // Dropdown values screen, and sets its own glyph beside each word there.
-  { type: "Ticket type", value: "Question", mark: "Q" },
-  { type: "Ticket type", value: "Issue", mark: "IS" },
-  { type: "Ticket type", value: "Request", mark: "RQ" },
-  { type: "Ticket type", value: "Extra" },
-  // "REQUIREMENTS" IS NOT PLANTED ANY MORE, and the row is not deleted anywhere
-  // either — those are two different sentences and both are the client's.
-  //
-  // She ruled in August that "requirements is not a type, kill that", and on
-  // 6 Sep 2026 said what to do with the tickets already filed as one: *"keep the
-  // existing requirements (we will use that later) but do not display them in
-  // tickets / i just want that you dont lose that data, because later we're
-  // moving them to another database"*. So the WORD leaves the starting
-  // vocabulary and the ROWS stay exactly as they are.
-  //
-  // THIS LINE ONLY REACHES A TEAM THAT DOES NOT EXIST YET. Every team already
-  // running got the row from migration 0034 and it is still there and still
-  // active — deliberately untouched, because deactivating it is a change to
-  // their data and she asked for none. What stops a person raising a new one on
-  // those teams is the DOOR (`refuseKeptForMigration` in
-  // workers/content/src/lib/help.ts), not this list; what stops the word showing
-  // up on their screens is `ticketTypeKeptForMigration` (shared/types.ts), which
-  // is where the whole ruling is written up.
-  //
-  // Note the shape here is NOT the one 0034 used on "Feedback" and "Bug": those
-  // were retired by DEACTIVATING the row, which is right for a word nobody is
-  // coming back for. These rows are being kept for a migration, so the fifth
-  // word simply stops being seeded and everything already written stays true.
+  // STILL RENAMEABLE, and that is not a hole in the lock: a team may call an
+  // Extra whatever it calls an Extra (`updateSelectable` carries every record
+  // with the rename), exactly as the locked Admin role may be retitled. What is
+  // refused is a FIFTH ROW.
+  ...TICKET_TYPES.map((t) => ({ type: TICKET_TYPE_GROUP, value: t.value, mark: t.mark as string })),
   // THE THREE KINDS OF WORK (CHECKLIST 2.2), same shape and same reason. They
   // reached existing teams through migration 0028 and were never in the seed, so
   // a brand-new team's story form offered an empty picker.

@@ -15,7 +15,6 @@ import {
 import {
   HELP_STATUSES,
   OPEN_TAB_STATUSES,
-  TICKET_TYPE_KEPT_FOR_MIGRATION,
   type HelpStatus,
 } from "@shared/types"
 import type { TriageWaiting } from "@/lib/api/content"
@@ -302,7 +301,7 @@ describe("which filters a ticket tab offers", () => {
         ],
         accounts: new Map(),
         apps,
-        helpTypeOptions: ["Question", "Issue", TICKET_TYPE_KEPT_FOR_MIGRATION],
+        helpTypeOptions: ["Question", "Issue", "Extra"],
       })
 
     for (const { name, token } of stripTabs()) {
@@ -341,66 +340,22 @@ describe("which filters a ticket tab offers", () => {
     expect(open.find((f) => f.field === "helpType")?.options?.map((o) => o.value)).toEqual([
       "Issue",
       "Question",
+      "Extra",
     ])
   })
 
-  it("never offers the kind that is kept but never shown", () => {
-    /* The client's ruling of 6 Sep 2026: requirements tickets are KEPT and never
-       displayed. The door excludes them from the list, from every COUNT(*) that
-       badges it and from the triage queue — so a filter offering the word would
-       narrow to an empty list under a count that had already subtracted those
-       rows, which reads as "this client has no tickets" rather than as a
-       question nothing can answer.
+  // A CASE CALLED "NEVER OFFERS THE KIND THAT IS KEPT BUT NEVER SHOWN" STOOD
+  // HERE and went on 15 Sep 2026 with the kind it named. It proved that BOTH
+  // Type menus on this screen — the list's and the triage queue's, built by two
+  // different functions — refused the word even when it arrived in their input,
+  // which was the point: the subtraction upstream in `use-screen-data.ts` was
+  // not what was being tested.
+  //
+  // The owner deleted that kind outright (`shared/ticket-types.ts`), the
+  // upstream subtraction went with it, and a menu now offers exactly the team's
+  // own live vocabulary. Deleted rather than re-pointed at a word nothing
+  // withholds, which would have been a green test asserting nothing.
 
-       BOTH MENUS, because there are two Type controls on this screen and they
-       are built by two functions. */
-    const listTypes = ticketFacets({
-      facet: "all",
-      t,
-      clients: [],
-      accounts: new Map(),
-      apps: [],
-      // The word arrives here even though `use-screen-data.ts` already
-      // subtracts it — that is the point: this proves the FACET refuses it, not
-      // that somebody upstream remembered to.
-      helpTypeOptions: ["Question", TICKET_TYPE_KEPT_FOR_MIGRATION, "Issue"],
-    }).find((f) => f.field === "helpType")
-    expect(listTypes?.options?.map((o) => o.value)).toEqual(["Issue", "Question"])
-
-    const row = (helpType: string | null): TriageWaiting =>
-      ({
-        id: `t-${helpType}`,
-        ref: null,
-        description: "",
-        createdAt: "",
-        days: 1,
-        missing: [],
-        helpType,
-        accountId: "acct-1",
-        accountName: "Bergman",
-        accountLogo: null,
-        appId: null,
-        appName: null,
-        appLogo: null,
-        moduleId: null,
-        moduleName: null,
-        moduleMark: null,
-        raisedByContactId: null,
-        raisedByContactName: null,
-        raisedByContactLogo: null,
-        titleDe: null,
-        titleEn: null,
-      }) as unknown as TriageWaiting
-    const queue = triageFacets(
-      [row("Question"), row(TICKET_TYPE_KEPT_FOR_MIGRATION), row("Issue")],
-      t,
-      []
-    )
-    expect(queue.find((f) => f.field === "helpType")?.options?.map((o) => o.value)).toEqual([
-      "Issue",
-      "Question",
-    ])
-  })
 
   it("gives the triage queue the client's three, and no Status", () => {
     // "On triage client up and type" — "up" is "app". Every row in the queue is

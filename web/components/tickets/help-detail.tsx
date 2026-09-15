@@ -49,7 +49,6 @@ import type {
   TeamMember,
 } from "@shared/types"
 // A VALUE, not a type — it must not ride the `import type` block above.
-import { ticketTypeKeptForMigration } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -90,6 +89,7 @@ import { useLanguage } from "@shared/web/language"
 import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
+import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 
 export function HelpDetailScreen({
   teamId,
@@ -264,22 +264,21 @@ export function HelpDetailScreen({
   const newestReply = replyRows[replyRows.length - 1]
   useFollowNewest(newestReply?.id ?? null, Boolean(myUserId) && newestReply?.authorId === myUserId)
 
-  // THE RETIRED KIND IS NOT OFFERED HERE EITHER — the last picker that could
-  // still put a ticket INTO it. Client, 2026-09-06: "keep the existing
-  // requirements (we will use that later) but do not display them in tickets."
-  //
-  // Existing rows keep their word and stay readable; what must not happen is a
-  // NEW one, or an existing ticket being MOVED into a kind the collection then
-  // hides — which from her side would look exactly like the ticket vanishing.
-  // The door refuses it as well (`refuseKeptForMigration`), so this is the
-  // second of two fences rather than the only one; the picker exists so a
-  // person is never offered a choice the door will reject.
+  // A SUBTRACTION OF THE RETIRED KIND STOOD HERE — the last picker that could
+  // still put a ticket INTO it, held shut for the client's ruling of 6 Sep 2026
+  // ("keep the existing requirements … but do not display them in tickets").
+  // THAT SUBTRACTION WENT ON 15 SEP 2026 with the kind it named: the vocabulary
+  // is four words and every one of them may be picked (`shared/ticket-types.ts`
+  // carries the owner's ruling). ONE kind still has a condition on it — Feedback
+  // needs a Validation sprint running on the ticket's app — and that is decided
+  // in the form dialog this list is handed to, against the app it knows about,
+  // rather than here where there is no app in view.
   //
   // It still does not filter `active`, deliberately: that is a separate
   // question about the team's own vocabulary, and narrowing this dialog for a
   // reason nobody asked for is how a screen quietly loses an option.
   const helpTypeOptions = (selectableQ.data ?? [])
-    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
+    .filter((v) => v.type === TICKET_TYPE_GROUP)
     .map((v) => v.value)
 
   // READ THIS CONVERSATION IN YOUR OWN LANGUAGE, if you ask. The whole screen's
