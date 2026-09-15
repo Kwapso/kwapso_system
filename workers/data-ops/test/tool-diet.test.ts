@@ -238,15 +238,24 @@ describe("the strict-superset bar: a folded door offers no derived view", () => 
    * Every assertion below is "no folded door has a view", which an extractor
    * that had quietly stopped matching would also satisfy, for ever, in silence.
    * So the extractor is aimed at the meetings door — no longer folded, and the
-   * one door in the estate known to carry four views — and required to see all
-   * four INCLUDING the one that broke the fold. A refactor that renames
+   * one door in the estate known to carry FIVE views as of 2026-09-15 (`mine-week`
+   * joined `all`/`mine`/`upcoming`/`week` on the client's own ruling that the
+   * meetings screen's "This week" tab is now always mine too — `tools.ts`'s own
+   * header says why that changes nothing about the fold) — and required to see
+   * all five INCLUDING the one that broke the fold. A refactor that renames
    * `whereFor`, moves the views out of it, or changes how a view is compared
    * fails HERE, loudly, instead of turning the rule above into a formality. */
   it("the extractor can still see a door's views (must not go blind)", () => {
     const meetings = SHARED_TOOLS.find((t) => t.name === "list_meetings")
     const door = meetings && DOORS.find((d) => d.method === meetings.method && d.path === meetings.path)
     expect(door, "list_meetings has no door in the census — re-point this oracle").toBeDefined()
-    expect(derivedViews(reachableLibBodies(door!)).sort()).toEqual(["all", "mine", "upcoming", "week"])
+    expect(derivedViews(reachableLibBodies(door!)).sort()).toEqual([
+      "all",
+      "mine",
+      "mine-week",
+      "upcoming",
+      "week",
+    ])
   })
 
   for (const { toolName, door } of folded) {

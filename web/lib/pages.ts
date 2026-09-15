@@ -483,11 +483,18 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // section and the page it lives on reads as two ideas. It keeps its count key:
   // the heading on the screen still badges the exact server total.
   { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "contextual", countCacheKey: "brand_assets" },
-  // Meeting purposes: its own segment, reached CONTEXTUALLY from a button on the
-  // Meetings screen. It is not a sidebar page because it is not a destination —
-  // it is the taxonomy behind one, and a nav rail that lists a page and the
-  // vocabulary behind it reads as two ideas.
-  { key: "purposes", title: "Meeting purposes", module: "delivery", segment: "purposes", placement: "contextual", countCacheKey: "purposes" },
+  // MEETING TYPES ("Meeting purposes" until 15 Sep 2026 — Task C, the
+  // client's ruling: "purpose is a choice component… maybe just 'type.'").
+  // The standalone screen this row named is retired from nav — its editor
+  // moved to Settings › Meetings › Choices (`module-settings-screen.tsx`'s
+  // `meetings` page, `MeetingTypesPanel`) — but the row stays, unremoved,
+  // because `sectionKey="purposes"` (`internal-screens.tsx`'s own
+  // `PurposesScreen`, still on disk though nothing links to it any more) and
+  // any other reader of this table by key would otherwise fall back to the
+  // raw key rather than a real title. Renamed rather than deleted, the same
+  // caution R58/GONE_ON_PURPOSE argues for a path — a row still legitimately
+  // read is not a row to remove.
+  { key: "purposes", title: "Meeting types", module: "delivery", segment: "purposes", placement: "contextual", countCacheKey: "purposes" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or dropdown values). Reached CONTEXTUALLY from an "Import CSV"
   // button on those pages (which land on /t/<team>/import/<tableKey>), never a tab.

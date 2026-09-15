@@ -239,7 +239,7 @@ import { UnsavedChangesDialog } from "@/components/shell/unsaved-changes-dialog"
 import { isDirty, markDirty } from "@/lib/unsaved-changes"
 
 import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
-import { TabsView } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 import { NoAccess, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { MembersGallery } from "@/components/team/members-gallery"
@@ -307,7 +307,8 @@ export function SettingsScreen({
   // `<ToolbarRow>` on this panel, so the second census sees it from here on.
   //
   // DECLARED HERE RATHER THAN IN THE PANEL, because the panel is a BRANCH of
-  // `renderPanel` — a render prop, called inside `TabsView`'s own render — and
+  // `renderPanel` — a plain function called beside the strip (R63, below: the
+  // strip and its panel are siblings now, not `TabsContent`) — and
   // a `useState` in one arm of a five-way dispatch is a hook whose position
   // moves with the open tab. The two containers this tab draws beside it
   // (`MembersGallery`, `RolesMatrix`) are components and hold their own; this
@@ -322,9 +323,13 @@ export function SettingsScreen({
 
   // ── THE UNSAVED-TAB GUARD ────────────────────────────────────────────────
   //
-  // `TabsView` renders through the kit's Radix `Tabs` with no `forceMount`
-  // (see its own header), so switching tabs UNMOUNTS whichever panel you are
-  // leaving. Appearance and Team › Roles now stage edits behind a pinned
+  // The strip and its panel are drawn as SIBLINGS now (R63 — see the render
+  // below, `renderFolderTabs` for the strip beside a plain `renderPanel(tab)`
+  // call for the content, the same split every collection screen already
+  // draws), so `renderPanel` is a plain function called for the CURRENT tab
+  // only — no `TabsContent`, no `forceMount` to opt out of — and switching
+  // tabs UNMOUNTS whichever panel you are leaving exactly as it always did.
+  // Appearance and Team › Roles now stage edits behind a pinned
   // Save/Discard bar (`shared/web/appearance-panel.tsx`, `roles-matrix.tsx`),
   // and an unmount throws that draft away with no Save, no Discard and no
   // warning — the opposite of what the bar is for.
@@ -574,11 +579,25 @@ export function SettingsScreen({
         </section>
       )}
 
-      <TabsView
-        config={tabsConfig}
-        value={tab}
-        onValueChange={handleTabChange}
-        renderPanel={(panel) => {
+      {/* THE STRIP AND ITS PANEL ARE SIBLINGS, DRAWN THROUGH THE SAME SEAM
+          EVERY OTHER MAIN SCREEN USES (R63/R77) — Settings is a main screen
+          (this file's own note above), so its strip pins on scroll exactly
+          like Accounts', Apps' and Tickets' do: through `renderFolderTabs`,
+          which is the one place `STICKY_FOLDER_TABS` is applied, never a
+          second class hand-rolled here. `TabsView`'s own `renderPanel` prop
+          wraps each panel in a Radix `TabsContent` inside the SAME `<Tabs>`
+          root as the tablist — fine for a record's inner strip
+          (`STICKY_TABS` scopes its sticky rule to `[role=tablist]` alone),
+          wrong here, because `STICKY_FOLDER_TABS` pins the whole `<Tabs>`
+          root and a root that also wraps the panel content would pin the
+          CONTENT along with the strip. So the panel is rendered as a plain
+          sibling instead, keyed on `tab` directly rather than on Radix's own
+          `value` — the same split `renderFolderTabs`'s own header describes
+          collection screens using it, and the panel's own `settings-screen.tsx`
+          note above. */}
+      <div className="flex w-full flex-col">
+        {renderFolderTabs({ config: tabsConfig, value: tab, onValueChange: handleTabChange })}
+        {(function renderPanel(panel: { value: string }): React.ReactNode {
           if (panel.value === "appearance") {
             // ONE CONTAINER, FOUR SECTIONS — client ruling, 2026-09-14, the
             // correction to the preview-led layout that shipped first: "What
@@ -1174,10 +1193,9 @@ export function SettingsScreen({
             // `title` is optional for exactly this call (see its own doc);
             // omitting it leaves `<ToolbarRow title>`'s `heading` unbuilt, so
             // the row draws no h2 here. Nothing else changes: this tab is
-            // the ONLY collection in its panel, and the panel is already
-            // named "Automations" for assistive tech through Radix's own
-            // tabpanel→tab `aria-labelledby` wiring, so there is no second
-            // name for an `sr-only` heading to add — unlike Team's stacked
+            // the ONLY collection in its panel, and the strip's own trigger
+            // ("Automations", read by the `<Tabs>` root `renderFolderTabs`
+            // draws) already names what is on screen — unlike Team's stacked
             // Members/Roles pair one tab over, which keeps one each because
             // nothing else on that panel tells the two collections apart.
             return (
@@ -1201,8 +1219,8 @@ export function SettingsScreen({
           }
 
           return null
-        }}
-      />
+        })({ value: tab })}
+      </div>
 
       {/* THE UNSAVED-TAB GUARD'S OWN DIALOG — R59: a yes/no warning is the one
           centred overlay, the kit's `AlertDialog`, never a `Sheet`. The

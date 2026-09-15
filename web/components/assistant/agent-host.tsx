@@ -21,8 +21,15 @@
 // are gated on, so JS and CSS can never disagree about which one is showing.
 //
 //   wide   → docked. The panel portals itself into the shell's column
-//            (web/lib/agent-dock.tsx) and the shell's own 3px EDGE HANDLE is
-//            what opens and closes it. No launcher is drawn at all.
+//            (web/lib/agent-dock.tsx). Shut, the shell's own EDGE HANDLE (its
+//            top-trailing-corner mango circle) is what opens it — the only
+//            control on the column while it renders nothing. Open, that
+//            handle's own mid-edge close grab is gone (client ruling,
+//            2026-09-15 — a second "close it" circle floating over the card,
+//            the app-shell.tsx `asideHandleOnOpen={false}` header has the
+//            whole account), and the column closes from its own folder tab
+//            instead — its × (`BreadcrumbFolders.onClose`, inside the kit's
+//            dock) or the tab body itself. No launcher is drawn at all.
 //   narrow → floating, anchored to a fixed screen point below (see the return).
 //            No visible launcher draws there any more (14 Sep 2026, see below) —
 //            the mobile header's own Sparkle toggle (app-shell.tsx) opens and

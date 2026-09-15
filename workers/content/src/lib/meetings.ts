@@ -254,7 +254,16 @@ export type MeetingFilter = {
    * "everything nobody has ticked", which is a different set the moment somebody
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
    * 'all' shows the lot, cancelled ones included; 'mine' is the meetings the
-   * CALLER was in the room for (client ruling, 2026-09-09 — see `caller`). */
+   * CALLER was in the room for (client ruling, 2026-09-09 — see `caller`).
+   * 'mine-week' is BOTH AT ONCE — the client's ruling, 2026-09-15: the
+   * meetings screen's own "This week" tab reads "the week I was in the room
+   * for", never the agency's whole week, on every body that tab can be read
+   * in (Agenda, Calendar or Table). `whereFor` below already treats `week` and
+   * `mine` as two independent clauses over one filter object, so this is one
+   * more named literal that turns both on rather than a new shape — see the
+   * clauses themselves for why it is not simply `{ view: "week", mine: true }`.
+   * Plain `week` stays exactly as it was: `routes/insights.ts`'s own dashboard
+   * tile asks for the agency's whole week and is a different screen. */
   view?: string
   /** WHO IS ASKING — the session's own user id and address, set by the door from
    * the guard and the actor and NEVER read off the query string.
@@ -332,7 +341,14 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // THIS WEEK — past AND upcoming (CHECKLIST 9.1). Monday to Sunday, so a
   // Friday afternoon still shows Monday's kickoff: "this week" means the week
   // somebody is IN, not the days that are left of it.
-  if (filter.view === "week") {
+  //
+  // `|| filter.view === "mine-week"` (2026-09-15) — the meetings screen's own
+  // "This week" tab folds Mine's own predicate in permanently now, so its
+  // combined view runs this SAME window clause and the attendance clause two
+  // blocks down together. Two `if`s sharing one extra literal rather than a
+  // third copy of the window math, because the window itself did not change —
+  // only which OTHER clauses ride beside it.
+  if (filter.view === "week" || filter.view === "mine-week") {
     const { from, to } = thisWeek()
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
@@ -453,7 +469,11 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // THE `q` SEARCH GETS NOTHING FROM IT EITHER, contrary to what stood here.
   // That search matches `%needle%`, unanchored on both ends, which cannot use
   // an index on a narrow `email` column any more than on this blob.
-  if (filter.view === "mine") {
+  // `|| filter.view === "mine-week"` (2026-09-15) — see the window clause
+  // above and `MeetingFilter.view`'s own note: the combined view runs both
+  // clauses over the SAME `filter.caller`, so a person whose "This week" tab
+  // is open never sees a row the "Mine" tab would refuse them either.
+  if (filter.view === "mine" || filter.view === "mine-week") {
     if (filter.caller) {
       where.push(
         `((m.google_attendees_json IS NOT NULL AND LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')

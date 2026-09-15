@@ -205,6 +205,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         counts={{
           all: totals.tasksAll,
           overdue: totals.tasksOverdue,
+          planned: totals.tasksPlanned,
           upcoming: totals.tasksUpcoming,
           completed: totals.tasksCompleted,
           calendar: totals.tasksCalendar,
@@ -232,7 +233,15 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         purposeCount={totals.purposes}
         canCreate={can("meetings", "create")}
         canReadPurposes={can("delivery", "read")}
-        onPurposes={() => go(`/t/${teamId}/purposes`)}
+        // REDIRECTED, 15 SEP 2026 — Task C: the standalone Purposes screen's
+        // nav entry moved to Settings › Meetings › Choices
+        // (module-settings-screen.tsx's `meetings` page, `MeetingTypesPanel`
+        // — see that file's own header). This button is meetings-screen.tsx's
+        // own ("Meeting types", its own lane already renamed the label); only
+        // the destination changes here, a one-line targeted edit in a shared
+        // deep-link file (see the Task C lane report for the full account —
+        // this is one of the two files named there, beside `web/lib/pages.ts`).
+        onPurposes={() => go(`/settings/meetings`)}
         onImport={() =>
           openInNewTab(`/t/${teamId}/import/meetings`, `${t("Import")} · ${IMPORT_TARGET_LABEL.meetings}`)
         }
@@ -269,7 +278,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
   if (module === "purposes") {
-    if (purposesQ.error) return <LoadError what="the meeting purposes" />
+    if (purposesQ.error) return <LoadError what="the meeting types" />
     if (purposesQ.data === undefined) return <Skeleton variant="list" lines={4} />
     return (
       <PurposesScreen

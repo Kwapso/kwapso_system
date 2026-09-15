@@ -308,20 +308,21 @@ async function taskPage(
   const view = filter.view ?? "open"
   // R14: rows + exact total + hasMore + an opaque cursor, through the ONE seam.
   // `total` is the count for the view being LISTED — the same number the badge
-  // above the list shows — while the eight below are the whole strip, which the
-  // rows on this page could never answer for the five views they are not.
+  // above the list shows — while the nine below are the whole strip, which the
+  // rows on this page could never answer for the eight views they are not.
   // WRITTEN OUT, NOT EXTRACTED — and the duplication with the by-id lookup
   // below is deliberate, so please do not tidy it away. R27 derives what a
   // response carries from the `json({…})` LITERALS in this file: it is the check
   // that stops a tool description promising a field the door does not answer
-  // with. Folding these eight into a shared `taskCountFields()` helper kept the
+  // with. Folding these nine into a shared `taskCountFields()` helper kept the
   // response byte-identical and made the fields invisible to that derivation, so
-  // `list_tasks`'s description — which names all eight — went red for describing
+  // `list_tasks`'s description — which names all nine — went red for describing
   // its own real contract. A law that reads the disk can only see what is on it.
   return pagedJson("tasks", { ...page, total: counts[view] }, {
     openTotal: counts.open,
     allTotal: counts.all,
     overdueTotal: counts.overdue,
+    plannedTotal: counts.planned,
     upcomingTotal: counts.upcoming,
     completedTotal: counts.completed,
     calendarTotal: counts.calendar,
@@ -335,10 +336,13 @@ async function taskPage(
 /** GET /api/content/tasks — our own admin (work:read). Refused to a client login:
  * a task is the agency's, and its list is a list of what we are behind on.
  *
- * `?view=` is how the other five piles are seen — overdue, upcoming, completed,
- * calendar, all. Two of the six shipped with the door and the screen sent
- * neither, so the app had one view of a six-view collection and no way to say so
- * — the tester's "cannot switch the view, I only see open ones".
+ * `?view=` is how the other seven piles are seen — overdue, planned, upcoming,
+ * completed, calendar, all. Two of them shipped with the door and the screen
+ * sent neither, so the app had one view of a seven-view collection and no way
+ * to say so — the tester's "cannot switch the view, I only see open ones".
+ * `planned` arrived 2026-09-15 with the redesigned tab strip; `upcoming` and
+ * `calendar` stayed (see `viewClause`'s own note) even though the strip no
+ * longer draws them as tabs of their own.
  *
  * WHOSE TASKS COME BACK IS NOW A PERMISSION (4.9). `work:read` opens the screen;
  * `all_tasks:read` decides whether the screen is the whole team's list or your
@@ -348,7 +352,7 @@ async function taskPage(
  * answer (yours), and a 403 on a list door teaches a screen to hide a tab
  * instead of showing the right rows.
  *
- * It rides the filter the door ALREADY parses, so the list, all eight counts and
+ * It rides the filter the door ALREADY parses, so the list, all nine counts and
  * the progress bar are narrowed by construction — they are all built from this
  * one object (see `taskPage`), and there is no second place to forget. */
 export async function getTasks(request: Request, env: Env): Promise<Response> {
@@ -374,7 +378,7 @@ export async function getTasks(request: Request, env: Env): Promise<Response> {
     // else's, rather than the door narrowing the list and leaving the direct
     // link open beside it.
     const mine = one && (everyones || one.assigneeId === guard.userId) ? one : null
-    // The same eight, spelled out again — see the note in `taskPage`.
+    // The same nine, spelled out again — see the note in `taskPage`.
     return pagedJson(
       "tasks",
       { rows: mine ? [mine] : [], total: counts[narrowed.view ?? "open"], hasMore: false, nextCursor: null },
@@ -382,6 +386,7 @@ export async function getTasks(request: Request, env: Env): Promise<Response> {
         openTotal: counts.open,
         allTotal: counts.all,
         overdueTotal: counts.overdue,
+        plannedTotal: counts.planned,
         upcomingTotal: counts.upcoming,
         completedTotal: counts.completed,
         calendarTotal: counts.calendar,

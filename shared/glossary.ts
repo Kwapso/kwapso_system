@@ -277,7 +277,13 @@ export const GLOSSARY = {
   // how we run ourselves. Every definition here says, or implies, the same thing
   // the code says at every door: this is ours, and a client never sees it.
   brandAsset: { term: "Brand asset", def: "One piece of our own brand material: a logo, a deck, a template." },
-  meetingPurpose: { term: "Meeting purpose", def: "Why we meet, and the department it belongs to." },
+  // RENAMED FROM "Meeting purpose", 15 Sep 2026 — the client's own ruling
+  // (Settings › Meetings › Choices): *"purpose is a choice component, so make
+  // sure you move it inside meetings, settings, choices. And maybe you find
+  // another word for 'purposes.' … Maybe just 'type.'"* The key changed with
+  // the word (no code read `GLOSSARY.meetingPurpose` by name — checked before
+  // renaming); the underlying table stays `meeting_purposes` (no migration).
+  meetingType: { term: "Meeting type", def: "What a meeting is about, and the department it belongs to. A choice, edited under Settings › Meetings › Choices." },
   meeting: { term: "Meeting", def: "A conversation we had or are about to have, with what we meant to cover and what was decided." },
   agenda: { term: "Agenda", def: "What we mean to cover in a meeting, written before it." },
   meetingNotes: { term: "Meeting notes", def: "What was said and decided in a meeting, written after it. Ours alone, a client never reads them." },

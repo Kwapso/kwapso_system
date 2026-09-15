@@ -1388,7 +1388,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Meetings we have had or will have. `view`: 'upcoming' (default), 'week', 'mine' (I was in the room) or 'all'. `transcript` 'yes' finds the few with words.",
     detail:
-      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, 'mine' for the meetings the person asking was IN THE ROOM for, or 'all' for the whole meetings list including cancelled ones. 'mine' is answered against the CALLER's own session — their address in the meeting's Google guest list, or, on a meeting with no guest list at all, the person who wrote it down. It is not a filter you can spell for somebody else: there is no way to ask whose meetings a colleague was in, and nothing you pass decides who 'mine' means. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `month` narrows to one calendar month as `YYYY-MM` (what a calendar asks for), and `q` searches the title, the agenda, the notes AND the guest list, so \"the call with Aparna\" is a search somebody can actually run. `transcript` is 'yes' for the meetings that have words on file and 'no' for the ones that do not: MOST MEETINGS HAVE NONE, so pass 'yes' before hunting for what was said, and read `transcriptCapturedAt` on a row to see it there too. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole meetings list rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, 'mine' for the meetings the person asking was IN THE ROOM for, or 'all' for the whole meetings list including cancelled ones. 'mine' is answered against the CALLER's own session — their address in the meeting's Google guest list, or, on a meeting with no guest list at all, the person who wrote it down. It is not a filter you can spell for somebody else: there is no way to ask whose meetings a colleague was in, and nothing you pass decides who 'mine' means. `accountId` narrows to one client, `appId` to one system, `purposeId` to one meeting type, `month` narrows to one calendar month as `YYYY-MM` (what a calendar asks for), and `q` searches the title, the agenda, the notes AND the guest list, so \"the call with Aparna\" is a search somebody can actually run. `transcript` is 'yes' for the meetings that have words on file and 'no' for the ones that do not: MOST MEETINGS HAVE NONE, so pass 'yes' before hunting for what was said, and read `transcriptCapturedAt` on a row to see it there too. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole meetings list rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
     schema: obj({ id: S, accountId: S, appId: S, purposeId: S, view: S, month: S, transcript: S, q: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
@@ -1407,7 +1407,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Put a meeting on the list. `title` and `startsAt` (a date AND time) required. This writes nothing to Google Calendar; " + brand.name + " only reads them.",
     detail:
-      "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: " + brand.name + " reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
+      "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is the meeting type, out of the meeting types list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: " + brand.name + " reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
       { title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
@@ -2713,28 +2713,28 @@ export const SHARED_TOOLS: SharedTool[] = [
 
   {
     name: "list_meeting_purposes",
-    summary: "Why the agency meets, and which department each purpose belongs to. Internal.",
+    summary: "Why the agency meets, and which department each type belongs to. Internal.",
     binding: "CONTENT", method: "GET", path: "/api/content/delivery/purposes",
     schema: obj({ id: S }),
     buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
-    agent: { write: false, summarize: () => "Read the meeting purposes" },
+    agent: { write: false, summarize: () => "Read the meeting types" },
   },
   {
     name: "create_meeting_purpose",
     summary:
-      "Add a meeting purpose (name required). `department` is picked-or-created as a dropdown value, which is why a purpose is a record and a department is not.",
+      "Add a meeting type (name required). `department` is picked-or-created as a dropdown value, which is why a type is a record and a department is not.",
     binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes",
     schema: obj({ name: S, department: S, description: S }, ["name"]),
     buildBody: (i) => meetingPurposeBody(i),
-    agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" meeting purpose` },
+    agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" meeting type` },
   },
   {
     name: "update_meeting_purpose",
-    summary: "Edit a meeting purpose (by id).",
+    summary: "Edit a meeting type (by id).",
     binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes/update",
     schema: obj({ id: S, name: S, department: S, description: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), ...meetingPurposeBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit meeting purpose ${str(i, "id")}` },
+    agent: { write: true, confirm: false, summarize: (i) => `Edit meeting type ${str(i, "id")}` },
   },
 
   {

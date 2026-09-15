@@ -31,6 +31,8 @@
 // second question — `departmentMark` answers null and `departmentAsks` answers
 // "nothing else", which is the honest reading of a word the code has never met.
 
+import type { DotTone } from "./app-stages"
+
 /** One of the five the agency already runs on: its name, its mark, its colour. */
 export type DepartmentStyle = {
   name: string
@@ -107,4 +109,26 @@ export const PRIORITY_LABEL: Record<1 | 2 | 3 | 4, string> = {
   2: "Urgent",
   3: "Important",
   4: "Do it now",
+}
+
+/** THE PRIORITY'S OWN COLOUR (2026-09-15, the client's ruling on the Tasks
+ * table: "Priority (has a color here)"). No chip anywhere in the app had ever
+ * coloured a task's priority before this — `shapeTasks` folded the plain word
+ * into a summary sentence, nothing else read it — so there was no existing
+ * colour to reuse (R32's own "reuse the chip the app already has" could not be
+ * followed literally; this is the FIRST one).
+ *
+ * REUSES THE SAME SIX DOT TONES `shared/status-tones.ts` READS A LIFECYCLE
+ * THROUGH (`Badge`'s own `DotTone`, `shared/app-stages.ts`) rather than
+ * inventing a seventh (R32: no colour outside the closed palette). Four
+ * escalating tones, the same four steps `PRIORITY_LABEL` already names:
+ * `archived` (quiet grey — nothing pressing), `review` (info blue — worth a
+ * look), `building` (charcoal — real weight), `blocked` (poppy red — the one
+ * that reads as urgent even across a room). Ordinal, not a status: it says
+ * nothing about a task's lifecycle, only how loud its priority chip reads. */
+export const PRIORITY_DOT_TONE: Record<1 | 2 | 3 | 4, DotTone> = {
+  1: "archived",
+  2: "review",
+  3: "building",
+  4: "blocked",
 }

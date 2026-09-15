@@ -132,13 +132,28 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
     // two exact server counts from one response rather than asking twice. The
     // week is worked out on the server, so the badge and the rows under it can
     // never mean two different weeks.
-    countMeetings(cfg, guard, { ...filter, view: "week" }),
+    //
+    // `view: "mine-week"` (not plain `"week"`), since 2026-09-15 — the "This
+    // week" tab this badges is always mine now (the header ruling this door's
+    // own screen carries), so the badge has to answer the SAME question the
+    // tab's own rows do or R16's "the two statements agree" promise breaks
+    // again in its quietest form, two true numbers about different weeks.
+    //
+    // STILL CHEAP ENOUGH TO RIDE EVERY RESPONSE, unlike plain `mine` below —
+    // reasoned, not yet measured the way `whereFor`'s own `mine` figures were:
+    // the week clause is a range on `idx_meetings_when`, ANDed with the
+    // attendance LIKE, and SQLite's own query planner is free to apply the
+    // indexed range first — so this reads at most a week's worth of rows
+    // rather than the whole table `mine` alone scans. Worth confirming with
+    // the same staging measurement `whereFor` already carries for `mine`, the
+    // day this count's cost is in question.
+    countMeetings(cfg, guard, { ...filter, view: "mine-week" }),
     // THERE IS NO `mineTotal` HERE, AND THAT IS A COST DECISION rather than an
-    // omission (client ruling, 2026-09-09 — the strip is now This week · Mine ·
-    // All). The week's count is a range scan on `idx_meetings_when`; the mine
-    // count is a LIKE over a JSON blob and therefore a FULL SCAN (lib/meetings.ts
-    // says why at length). Riding it on every meetings response would put that
-    // scan on every page of every list, every Load more and every search — for a
+    // omission (client ruling, 2026-09-09 — the strip is This week · Mine ·
+    // Everyone's, renamed 2026-09-15). The mine count (unwindowed) is a LIKE
+    // over a JSON blob and therefore a FULL SCAN (lib/meetings.ts says why at
+    // length). Riding it on every meetings response would put that scan on
+    // every page of every list, every Load more and every search — for a
     // badge one tab away. The Mine tab reads its OWN slice instead and the
     // `total` on that response IS the badge, which is the strictest reading of
     // R16 available: the door counted the same question it listed, in the same

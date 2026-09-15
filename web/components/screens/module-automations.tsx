@@ -30,16 +30,23 @@
 // Every row used to draw its own switch or its own Protected badge+reason
 // inline. The client asked for an EDIT SHEET instead — Name, Description,
 // Status — so that work moved to `AutomationEditSheet`
-// (automation-edit-sheet.tsx), reached through `FormShellDialog`/`FormShell`
-// like the app's other forms (R59: it slides in as the kit's `Sheet`). R70's
-// own requirement — the "Protected" mark can never render without the reason
-// beside it, from ONE guard — moved with it; that file carries R70's guarded
-// branches now, and `web/test/automations.test.ts` reads it there. THE ROW'S
-// OWN REASON STAYS REACHABLE (R70's text: "the mark and the reason render
-// from one guard", read alongside the client's "we can edit… status" —
-// visibility survives the redesign): a press on ANY row opens the sheet, so
-// a Protected row's reason is one press away, never hidden behind a second
-// control the table would otherwise need.
+// (automation-edit-sheet.tsx). R70's own requirement — the "Protected" mark
+// can never render without the reason beside it, from ONE guard — moved with
+// it, and `web/test/automations.test.ts` reads it there.
+//
+// ── AND THEN THE SHEET GREW A DETAIL FACE, 2026-09-15 ───────────────────────
+//
+// A row press used to open the edit form directly. The client's next ruling
+// changed that: *"When I click on Automation, it should open on the detail
+// page, so just the name, the description, the module, and the cheapest
+// status. On the top next to the header… put the button to edit, which
+// should then show the edit screen on the same slide in."* So the sheet is
+// now TWO faces sharing one open state — see `automation-edit-sheet.tsx`'s
+// own header for the split, the status chip's colour derivation
+// (`AUTOMATION_STATUS_VARIANT`, imported here for the table's own column
+// below), and why a Protected row's reason is now one press further than
+// R70's own text once promised (the file that owns that trade-off, not this
+// one).
 //
 // ── WHY IT IS A TABLE AND NOT A SECTION ANY MORE ────────────────────────────
 //
@@ -87,7 +94,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { tenancy } from "@/lib/api"
 import { RecordTable, type TableColumn, type TableRowData } from "@/components/records/record-table"
-import { AutomationEditSheet } from "@/components/screens/automation-edit-sheet"
+import { AutomationEditSheet, AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"
 import {
   AUTOMATIONS,
   automationOverride,
@@ -204,14 +211,22 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
       ),
       moduleText: moduleTitle(a.segment),
       moduleSegment: a.segment,
-      // THE SAME BADGE THE CHOICES TABLE DRAWS FOR ITS OWN STATUS COLUMN
-      // (deep-link/shape.tsx) — dimmed when Inactive, full ink otherwise —
-      // so the two settings tables that share a vocabulary share a look.
-      status: (
-        <Badge variant="secondary" className={status === "off" ? "opacity-60" : undefined}>
-          {statusWord}
-        </Badge>
-      ),
+      // A DIFFERENT FILL PER STATUS — client ruling, 2026-09-15: "make sure
+      // that each status has a different color because right now active and
+      // protected look the same." It used to be one `variant="secondary"`
+      // for all three, Inactive merely dimmed by an opacity class — which is
+      // exactly the fault: Active and Protected read as the identical quiet
+      // chip. `AUTOMATION_STATUS_VARIANT` (automation-edit-sheet.tsx, which
+      // this sheet's own detail head imports the same constant from) is the
+      // one derivation, kit Badge variants only (R32): `inverse` for
+      // Protected, `success` for Active, `outline` — the kit's one
+      // uncoloured variant — for Inactive, read as quiet rather than merely
+      // dimmed. NOT the Choices table's own badge (deep-link/shape.tsx,
+      // `variant="secondary"` for both of its states) — that screen is out
+      // of this ruling's scope (shape.tsx is read-only reference for this
+      // change) and carries the identical undifferentiated-badge fault this
+      // ruling fixes here; worth its own pass, not this one.
+      status: <Badge variant={AUTOMATION_STATUS_VARIANT[status]}>{statusWord}</Badge>,
       statusText: statusWord,
       statusState: status,
     }
@@ -323,9 +338,15 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
         // reaching a record's editor (contacts-screen.tsx, tasks-screen.tsx,
         // meetings-screen.tsx all open on a row press), read onto an
         // automation the only way it can be: there is no detail SCREEN for
-        // one to navigate to, so the press opens the editor directly rather
-        // than a page that does not exist. A Protected row opens the same
-        // way — its reason is one press away (R70).
+        // one to navigate to, so the press opens the panel directly rather
+        // than a page that does not exist. IT OPENS ON THE DETAIL FACE, NOT
+        // THE EDIT FORM — client ruling, 2026-09-15: "When I click on
+        // Automation, it should open on the detail page… put the button to
+        // edit, which should then show the edit screen on the same slide
+        // in." `AutomationEditSheet` (automation-edit-sheet.tsx) owns that
+        // split now; this file only decides WHICH row, same as before. A
+        // Protected row's reason (R70) is now one press further than it
+        // used to be — see that file's own header for why.
         onRowClick={(row) => setEditingKey(row.id as string)}
       />
       <AutomationEditSheet
@@ -337,6 +358,11 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
         automation={editing}
         settings={editing ? storedFor(editing.segment) : {}}
         mayChange={mayChange}
+        // ALREADY IN MEMORY (R56) — `moduleTitle` above is this same
+        // component's own lookup, read once per row when the table was
+        // shaped; the sheet knows nothing of `AutomationsScope` and is
+        // handed the answer rather than re-deriving it.
+        moduleTitle={editing ? moduleTitle(editing.segment) : ""}
       />
     </>
   )

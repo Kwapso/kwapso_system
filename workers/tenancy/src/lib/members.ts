@@ -53,7 +53,7 @@ export async function listMembers(
   scope: AccountScope
 ): Promise<TeamMember[]> {
   const members = await env.DB.prepare(
-    `SELECT tm.user_id, tm.role_id, tm.created_at,
+    `SELECT tm.user_id, tm.role_id, tm.created_at, tm.creator_name, tm.updated_at,
             u.email, u.first_name, u.last_name, u.image_url
      FROM team_members tm
      JOIN users u ON u.id = tm.user_id
@@ -65,6 +65,8 @@ export async function listMembers(
       user_id: string
       role_id: string
       created_at: string
+      creator_name: string | null
+      updated_at: string | null
       email: string
       first_name: string | null
       last_name: string | null
@@ -115,6 +117,8 @@ export async function listMembers(
       isAdmin: role?.is_default === 1,
       isClient: clientIds.has(m.user_id),
       joinedAt: m.created_at,
+      createdByName: m.creator_name,
+      updatedAt: m.updated_at,
     }
   })
 }

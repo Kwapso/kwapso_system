@@ -296,12 +296,12 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     path: "/api/content/delivery/purposes/active",
     idField: "id",
     gate: "delivery:delete",
-    noun: "meeting purpose",
+    noun: "meeting type",
     on: "Restore",
     off: "Archive",
     confirm: "off",
     summary:
-      "Archive a meeting purpose, or put it back, never deleted.",
+      "Archive a meeting type, or put it back, never deleted.",
   },
   staff_profile: {
     binding: "CONTENT",

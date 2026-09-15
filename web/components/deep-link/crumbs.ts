@@ -181,7 +181,10 @@ export const IMPORT_TARGET_LABEL: Record<string, string> = {
   stories: "Stories",
   meetings: "Meetings",
   brand_assets: "Brand library",
-  meeting_purposes: "Meeting purposes",
+  // RENAMED, 15 SEP 2026 (Task C) — "Meeting purposes" → "Meeting types".
+  // The table key (`meeting_purposes`) is unchanged, this is only the word
+  // beside "Import" on that target's own tab.
+  meeting_purposes: "Meeting types",
   member_roles: "Member roles",
 }
 

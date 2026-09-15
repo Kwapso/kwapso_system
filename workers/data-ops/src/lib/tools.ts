@@ -836,6 +836,13 @@ const AGENT_ONLY: AgentTool[] = [
  * catalogue below — a name in the stage-one index, not a definition on every
  * step — and `UNGATED_CEILING` moved 54 → 55 with the same reason.
  *
+ * ON 2026-09-15 THE DOOR GREW A FIFTH VIEW, `view=mine-week`, on the client's
+ * own ruling that the meetings screen's own "This week" tab is now always
+ * mine too. It changes nothing above: `mine-week` is the SAME identity
+ * predicate, ORed the same way, over the same two differently-shaped arms —
+ * a fifth instance of the two bullets already stated, not a new kind of
+ * problem the grammar might now be asked to solve.
+ *
  * Rot-checked by `workers/data-ops/test/tool-diet.test.ts`: every name here must
  * still be a shared GET tool, its module must still be one the grammar can be
  * asked about, its `q` must still reach only columns the grammar declares — and,

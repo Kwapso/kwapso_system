@@ -668,13 +668,29 @@ describe("RULES — the laws of the base", () => {
   // how a first entry gets made" — `onAddNote` is that unconditional fallback,
   // and it is the one thing `member-screen.tsx` never passed.
   //
+  // UPDATED 2026-09-15 — "the membership genuinely has no creator/editor" is no
+  // longer true. Client ruling, same day: "The footer on the member detail page
+  // is wrong. It's missing the two sections' design" — the Record column was
+  // simply never fed. It turns out `team_members` carries `creator_name`
+  // (who added the person — set once, at insert) and `updated_at` (touched by
+  // a role change) after all; there is no `editor_*` column the way `accounts`
+  // has one, so `member-screen.tsx`'s `audit` has no `editedByName`, only a
+  // bare `updatedAt` — `record-chrome.tsx`'s `recordAuditEntries` already
+  // renders that as a dateless-name "Last edited {when}" row, which is the
+  // honest reading of what the row actually knows. `member-screen.tsx` now
+  // passes BOTH `audit=` and `onAddNote=`, which is why it stays out of the
+  // `offenders` list below rather than needing a new exemption — this
+  // assertion is a derived OR, not a hand-kept registry, and a screen with
+  // more than the minimum it demands was never the failure mode it exists to
+  // catch.
+  //
   // So this runs over EVERY record detail the census catches, single-panel or
   // not — RECORD_TABS_SINGLE_PANEL exempts the TAB STRIP and nothing else, and
   // must never be read here. A record with real `audit` facts (createdBy/
-  // editedBy — true of every bespoke detail but a membership) has its
-  // unconditional fallback already; one without it must offer `onAddNote`
-  // instead, or its footer goes dark on the first day nothing has happened
-  // yet.
+  // editedBy — true of every bespoke detail, and now of a membership too, just
+  // without an `editedBy` name) has its unconditional fallback already; one
+  // without it must offer `onAddNote` instead, or its footer goes dark on the
+  // first day nothing has happened yet.
   it("record-detail-tabs: every record detail feeds the footer unconditionally — audit or a note door, never neither", () => {
     const offenders = recordDetailComponents()
       .filter((c) => !c.source.includes("audit=") && !c.source.includes("onAddNote="))
@@ -5289,6 +5305,7 @@ describe("RULES — the laws of the base", () => {
       "import-opens-a-tab", // R74: web/test/import-opens-a-tab.test.ts — every go()/softNavigate() targeting the import wizard must be openInNewTab() instead, plus Home's own named clause
       "alphabetical-options", // R75: web/test/alphabetical-options.test.ts — the filter-bar.tsx central-seam guard, the SelectItem/options() census over both front doors, and roles-matrix.tsx's own named clause
       "protected-is-active", // R76: workers/tenancy/test/selectable-protected-active.test.ts — both directions of the invariant, run against a real node:sqlite schema rather than a mocked d1Query
+      "tab-strips-pin", // R77: web/test/tab-strips-pin.test.ts — every <TabsView mount in web/ + web-portal/ reached through renderFolderTabs, carrying STICKY_FOLDER_TABS/STICKY_TABS on its own className, or named in TAB_STRIP_PIN_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

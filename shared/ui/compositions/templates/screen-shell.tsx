@@ -1118,6 +1118,30 @@ export interface ScreenShellProps
   asideOpenLabel?: string;
   asideCloseLabel?: string;
   /**
+   * WHETHER THE MID-EDGE HANDLE DRAWS WHILE THE COLUMN IS OPEN. Defaults
+   * `true` — the handle's own SHUT-branch corner draw is unaffected either
+   * way; this gates only the OPEN branch's `top-1/2` mid-edge close grab
+   * (see `EdgeHandle`'s call site below, "TWO DIFFERENT PLACES").
+   *
+   * A CALLER-LEVEL GATE, NOT A KIT-WIDE CHANGE OF MIND, because the two
+   * callers this shell has disagree. The consuming app's own ruling,
+   * 2026-09-15, verbatim, over a screenshot of the open assistant: *"remove
+   * the button with the emoji and the mango background that's vertically
+   * in the middle of the screen on the extreme right when I have the
+   * assistant opened. It has a function to close it. We don't need this.
+   * Keep the one on the top right when the assistant is closed, but the one
+   * in the middle when the assistant is open, remove it."* That app already
+   * draws its own close control on the assistant's folder tab (the ×
+   * `BreadcrumbFolders.onClose` spends, `web/components/shell/app-shell.tsx`
+   * — see that file for the a11y argument), so the mid-edge circle was a
+   * second way to do the one thing the tab already does, on a screen the
+   * client is looking straight at. A caller with no other close control on
+   * the open column — which is every OTHER consumer of this shell, and the
+   * reason the default stays `true` — would lose its only way back with
+   * nothing offered in trade, so this is opt-out, not a deletion.
+   */
+  asideHandleOnOpen?: boolean;
+  /**
    * ── THE NODE THAT STANDS ON THE ASSISTANT'S ROW, AT ITS LEADING SIDE.
    * CLIENT-ORDERED 2026-09-07, and the whole sentence is the specification:
    *
@@ -3185,6 +3209,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       onAsideOpenChange,
       asideOpenLabel = "Open the assistant",
       asideCloseLabel = "Close the assistant",
+      asideHandleOnOpen = true,
       asideLead,
       navGroups,
       navCurrent,
@@ -4976,109 +5001,118 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 </div>
               </div>
             </div>
-            <EdgeHandle
-              edge="aside"
-              open={isAsideOpen}
-              label={isAsideOpen ? asideCloseLabel : asideOpenLabel}
-              icon={<Sparkle aria-hidden="true" />}
-              onToggle={toggleAside}
-              /* TWO DIFFERENT PLACES, because it is answering two different
-                 questions. OPEN, it is a close control belonging to the
-                 column it sits against, so it stays where that column's own
-                 edge is — vertically centred, the mid-edge grab every other
-                 handle uses. SHUT, the column is gone and the button is the
-                 only way back to the assistant; the client looked for it in
-                 the screen's top-right corner and it was floating in the
-                 middle of the right edge instead. So when shut it takes the
-                 corner: one shell gutter down from the top, one in from the
-                 end, the same inset the content column pays, which is what
-                 makes it read as sitting in the page's corner rather than
-                 stuck to its side. */
-              /* `pointer-events-auto` TAKES THE EVENTS BACK from the dock's
-                 own `max-lg:pointer-events-none` (argued there). It is
-                 unconditional rather than `max-lg:`-scoped because it is a
-                 no-op above `lg` — the dock keeps events there and this
-                 element already inherits them — and one class that is always
-                 true beats two that have to agree. */
-              /* AND SHUT, BELOW `md`, IT IS NOT DRAWN AT ALL — ADDED
-                 2026-09-04 WITH THE PHONE'S TOP BAR, AND IT IS A COLLISION
-                 RATHER THAN A CHANGE OF MIND. The corner this handle takes
-                 when shut (`top-gutter` / `end-gutter`) measured at 380 on
-                 the build before this one at x 323.75, y 18.75, 37.5 square.
-                 The top bar's assistant button now stands in that same
-                 square of ground, and it is the SAME control — same
-                 `toggleAside`, same `asideOpenLabel` — so both drawn is one
-                 action wearing two buttons stacked on each other, which is
-                 the client's own "should only stay in" objection to the menu
-                 applied to the assistant.
+            {/* GATED, 2026-09-15 — see `asideHandleOnOpen` on the props
+               interface for the full ruling. Defaults `true` (this whole
+               element draws exactly as it always has); a caller that
+               already offers its own close control on the open column may
+               pass `false` to drop the OPEN branch only — the SHUT branch
+               is unconditional below because it is still every caller's
+               only way back into a column that draws nothing else. */}
+            {(asideHandleOnOpen || !isAsideOpen) && (
+              <EdgeHandle
+                edge="aside"
+                open={isAsideOpen}
+                label={isAsideOpen ? asideCloseLabel : asideOpenLabel}
+                icon={<Sparkle aria-hidden="true" />}
+                onToggle={toggleAside}
+                /* TWO DIFFERENT PLACES, because it is answering two different
+                   questions. OPEN, it is a close control belonging to the
+                   column it sits against, so it stays where that column's own
+                   edge is — vertically centred, the mid-edge grab every other
+                   handle uses. SHUT, the column is gone and the button is the
+                   only way back to the assistant; the client looked for it in
+                   the screen's top-right corner and it was floating in the
+                   middle of the right edge instead. So when shut it takes the
+                   corner: one shell gutter down from the top, one in from the
+                   end, the same inset the content column pays, which is what
+                   makes it read as sitting in the page's corner rather than
+                   stuck to its side. */
+                /* `pointer-events-auto` TAKES THE EVENTS BACK from the dock's
+                   own `max-lg:pointer-events-none` (argued there). It is
+                   unconditional rather than `max-lg:`-scoped because it is a
+                   no-op above `lg` — the dock keeps events there and this
+                   element already inherits them — and one class that is always
+                   true beats two that have to agree. */
+                /* AND SHUT, BELOW `md`, IT IS NOT DRAWN AT ALL — ADDED
+                   2026-09-04 WITH THE PHONE'S TOP BAR, AND IT IS A COLLISION
+                   RATHER THAN A CHANGE OF MIND. The corner this handle takes
+                   when shut (`top-gutter` / `end-gutter`) measured at 380 on
+                   the build before this one at x 323.75, y 18.75, 37.5 square.
+                   The top bar's assistant button now stands in that same
+                   square of ground, and it is the SAME control — same
+                   `toggleAside`, same `asideOpenLabel` — so both drawn is one
+                   action wearing two buttons stacked on each other, which is
+                   the client's own "should only stay in" objection to the menu
+                   applied to the assistant.
 
-                 `max-md:hidden` AND NOT A `hidden md:block` PAIR, so the
-                 cascade at `md` and above resolves to the identical
-                 unprefixed rules this handle has always had — desktop and
-                 tablet are not restored, they are never left. Same `max-`
-                 direction and same reasoning as the aside dock's own
-                 `max-lg:` block one level up.
+                   `max-md:hidden` AND NOT A `hidden md:block` PAIR, so the
+                   cascade at `md` and above resolves to the identical
+                   unprefixed rules this handle has always had — desktop and
+                   tablet are not restored, they are never left. Same `max-`
+                   direction and same reasoning as the aside dock's own
+                   `max-lg:` block one level up.
 
-                 IT IS ON THE SHUT BRANCH ONLY, WHICH IS THE NARROWEST
-                 SUPPRESSION THAT CLEARS THE COLLISION. Open, this handle is a
-                 mid-edge CLOSE grab (`top-1/2`) against a column that is
-                 already covering the top bar at 380, so it collides with
-                 nothing and it is a second way out of a panel that fills the
-                 phone. Removing a close affordance the client did not ask to
-                 remove is not this pass's business — and the assistant's
-                 own folder tab (its other close control) is still there
-                 beside it.
+                   IT IS ON THE SHUT BRANCH ONLY, WHICH IS THE NARROWEST
+                   SUPPRESSION THAT CLEARS THE COLLISION. Open, this handle is a
+                   mid-edge CLOSE grab (`top-1/2`) against a column that is
+                   already covering the top bar at 380, so it collides with
+                   nothing and it is a second way out of a panel that fills the
+                   phone. Removing a close affordance the client did not ask to
+                   remove is not this pass's business — and the assistant's
+                   own folder tab (its other close control) is still there
+                   beside it.
 
-                 `hidden` IS `display: none`, so the button is out of the tab
-                 order and out of the accessibility tree, not merely
-                 unpainted. Measured with the focus sweep, not with
-                 `checkVisibility`. */
-              /* AND OPEN, BELOW 45rem, IT IS NOT DRAWN EITHER — ADDED
-                 2026-09-04 WITH THE BOTTOM SHEET, AND IT IS THE SAME KIND OF
-                 COLLISION AS THE SHUT BRANCH'S, NOT A CHANGE OF MIND ABOUT
-                 CLOSE AFFORDANCES.
+                   `hidden` IS `display: none`, so the button is out of the tab
+                   order and out of the accessibility tree, not merely
+                   unpainted. Measured with the focus sweep, not with
+                   `checkVisibility`. */
+                /* AND OPEN, BELOW 45rem, IT IS NOT DRAWN EITHER — ADDED
+                   2026-09-04 WITH THE BOTTOM SHEET, AND IT IS THE SAME KIND OF
+                   COLLISION AS THE SHUT BRANCH'S, NOT A CHANGE OF MIND ABOUT
+                   CLOSE AFFORDANCES.
 
-                 THE BLOCK ABOVE ARGUES, CORRECTLY FOR THE SHAPE IT WAS
-                 WRITTEN AGAINST, that the OPEN handle collides with nothing:
-                 it was a mid-edge grab on the inline edge of a column that
-                 ran the full height of the window, which is what a mid-edge
-                 grab is for. The sheet has no inline edge. `top-1/2` at 380
-                 puts this circle at y 406 — 40% of the way DOWN the sheet's
-                 own face, floating over the conversation, pinned to nothing
-                 and grabbing nothing. Measured: the handle's centre lands
-                 inside `screen-shell-aside-body`, not on any edge of it.
+                   THE BLOCK ABOVE ARGUES, CORRECTLY FOR THE SHAPE IT WAS
+                   WRITTEN AGAINST, that the OPEN handle collides with nothing:
+                   it was a mid-edge grab on the inline edge of a column that
+                   ran the full height of the window, which is what a mid-edge
+                   grab is for. The sheet has no inline edge. `top-1/2` at 380
+                   puts this circle at y 406 — 40% of the way DOWN the sheet's
+                   own face, floating over the conversation, pinned to nothing
+                   and grabbing nothing. Measured: the handle's centre lands
+                   inside `screen-shell-aside-body`, not on any edge of it.
 
-                 THE ASSISTANT IS STILL CLOSABLE THREE WAYS DOWN HERE, WHICH
-                 IS WHY THIS IS A SUPPRESSION AND NOT A LOSS: the folder tab
-                 at the head of the sheet (`onCurrentActivate`, argued above),
-                 the top bar's own trigger — still on the keyboard's path,
-                 still announcing "Close the assistant" — and the scrim, which
-                 answers a tap anywhere in the 15% including the square of
-                 ground the trigger is painted on. That is one more than a
-                 desktop has.
+                   THE ASSISTANT IS STILL CLOSABLE THREE WAYS DOWN HERE, WHICH
+                   IS WHY THIS IS A SUPPRESSION AND NOT A LOSS: the folder tab
+                   at the head of the sheet (`onCurrentActivate`, argued above),
+                   the top bar's own trigger — still on the keyboard's path,
+                   still announcing "Close the assistant" — and the scrim, which
+                   answers a tap anywhere in the 15% including the square of
+                   ground the trigger is painted on. That is one more than a
+                   desktop has.
 
-                 `max-[45rem]:hidden` RATHER THAN `max-md:hidden`, WHICH IS
-                 THE ONE ASYMMETRY IN THIS TERNARY AND IS DELIBERATE. The two
-                 branches are answering two different questions: the SHUT
-                 handle stands down because the phone's TOP BAR took its
-                 corner, and the bars flip at `md`; this one stands down
-                 because the panel became a SHEET, and the sheet flips at
-                 45rem (see the dock's own block for why that boundary and not
-                 the other). Written with one breakpoint for tidiness, the
-                 720–768 band would either lose a close control it still has a
-                 use for or keep one that no longer points at an edge.
+                   `max-[45rem]:hidden` RATHER THAN `max-md:hidden`, WHICH IS
+                   THE ONE ASYMMETRY IN THIS TERNARY AND IS DELIBERATE. The two
+                   branches are answering two different questions: the SHUT
+                   handle stands down because the phone's TOP BAR took its
+                   corner, and the bars flip at `md`; this one stands down
+                   because the panel became a SHEET, and the sheet flips at
+                   45rem (see the dock's own block for why that boundary and not
+                   the other). Written with one breakpoint for tidiness, the
+                   720–768 band would either lose a close control it still has a
+                   use for or keep one that no longer points at an edge.
 
-                 `hidden` IS `display: none`, so the button is out of the tab
-                 order and out of the accessibility tree, not merely
-                 unpainted — measured with the focus sweep, not with
-                 `checkVisibility`. */
-              placement={cn(
-                "pointer-events-auto",
-                isAsideOpen
-                  ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
-                  : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
-              )}
-            />
+                   `hidden` IS `display: none`, so the button is out of the tab
+                   order and out of the accessibility tree, not merely
+                   unpainted — measured with the focus sweep, not with
+                   `checkVisibility`. */
+                placement={cn(
+                  "pointer-events-auto",
+                  isAsideOpen
+                    ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
+                    : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+                )}
+              />
+            )}
 
             {/* THE ASSISTANT'S ROW, FILLED — the client's timer, or whatever
                 the next caller needs beside the one control that is always in

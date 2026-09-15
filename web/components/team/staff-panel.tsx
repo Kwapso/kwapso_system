@@ -45,10 +45,19 @@ export function StaffPanel({
   teamId,
   userId,
   memberName,
+  editOpen,
+  onEditOpenChange,
 }: {
   teamId: string
   userId: string
   memberName: string
+  /** THE ONE `StaffProfileDialog`, CONTROLLED FROM ABOVE — client ruling,
+   * 2026-09-15: the member head grew its own visible edit pencil
+   * (member-screen.tsx), which opens this same dialog rather than a second
+   * one. This panel's own pencil, below, still opens it too — one dialog,
+   * two doors, never two competing edit surfaces on one page. */
+  editOpen: boolean
+  onEditOpenChange: (open: boolean) => void
 }) {
   const { t } = useLanguage()
   const { can } = usePermissions(teamId)
@@ -66,7 +75,6 @@ export function StaffPanel({
     })
   )
 
-  const [profileOpen, setProfileOpen] = React.useState(false)
   // The one confirm dialog this panel's red action asks through
   // (shared/web/use-confirm.tsx) — deactivating a profile. The confirm-free
   // restore beside it doesn't go through it.
@@ -175,7 +183,7 @@ export function StaffPanel({
             <Button
               variant="secondary"
               size="icon"
-              onClick={() => setProfileOpen(true)}
+              onClick={() => onEditOpenChange(true)}
               aria-label={profile?.active ? t("Edit profile") : t("Write a profile")}
             >
               <PencilSimple className="size-3.5" />
@@ -234,8 +242,8 @@ export function StaffPanel({
       </div>
 
       <StaffProfileDialog
-        open={profileOpen}
-        onOpenChange={setProfileOpen}
+        open={editOpen}
+        onOpenChange={onEditOpenChange}
         draftKey={`staff-profile:${userId}`}
         subjectName={memberName}
         initial={

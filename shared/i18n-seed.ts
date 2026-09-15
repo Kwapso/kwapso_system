@@ -1088,7 +1088,6 @@ export const SEED: Catalogue = {
   "Couldn't read the transcript.": { de: "Das Transkript konnte nicht gelesen werden.", es: "No se pudo leer la transcripción.", ca: "No s'ha pogut llegir la transcripció."},
   "Couldn't read your Google material just now.": { de: "Ihre Google-Materialien konnten gerade nicht gelesen werden.", es: "No se pudo leer tu material de Google en este momento.", ca: "Ara mateix no s'ha pogut llegir el teu material de Google."},
   "Couldn't record that.": { de: "Das konnte nicht erfasst werden.", es: "No se pudo registrar eso.", ca: "No s'ha pogut registrar."},
-  "Couldn't rename that value.": { de: "Der Wert konnte nicht umbenannt werden.", es: "No se pudo renombrar ese valor.", ca: "No s'ha pogut canviar el nom d'aquest valor."},
   "Couldn't revoke the token.": { de: "Das Token konnte nicht widerrufen werden.", es: "No se pudo revocar el token.", ca: "No s'ha pogut revocar el token."},
   "Couldn't save access rights.": { de: "Die Zugriffsrechte konnten nicht gespeichert werden.", es: "No se pudieron guardar los permisos de acceso.", ca: "No s'han pogut desar els drets d'accés."},
   "Couldn't save that correction.": { de: "Die Korrektur konnte nicht gespeichert werden.", es: "No se pudo guardar esa corrección.", ca: "No s'ha pogut desar aquesta correcció."},
@@ -1119,7 +1118,6 @@ export const SEED: Catalogue = {
   "Couldn't stop that timer.": { de: "Die Zeit konnte nicht gestoppt werden.", es: "No se pudo detener ese temporizador.", ca: "No s'ha pogut aturar aquest temporitzador."},
   "Couldn't switch. Try again.": { de: "Der Wechsel hat nicht geklappt. Bitte versuchen Sie es erneut.", es: "No se pudo cambiar. Inténtalo de nuevo.", ca: "No s'ha pogut canviar. Torna-ho a provar."},
   "Couldn't translate that.": { de: "Das konnte nicht übersetzt werden.", es: "No se pudo traducir eso.", ca: "No s'ha pogut traduir."},
-  "Couldn't update that value.": { de: "Der Wert konnte nicht aktualisiert werden.", es: "No se pudo actualizar ese valor.", ca: "No s'ha pogut actualitzar aquest valor."},
   "Couldn't update the profile.": { de: "Das Profil konnte nicht aktualisiert werden.", es: "No se pudo actualizar el perfil.", ca: "No s'ha pogut actualitzar el perfil."},
   "Couldn't update the role.": { de: "Die Rolle konnte nicht aktualisiert werden.", es: "No se pudo actualizar el rol.", ca: "No s'ha pogut actualitzar el rol."},
   "Couldn't update the source.": { de: "Die Quelle konnte nicht aktualisiert werden.", es: "No se pudo actualizar el origen.", ca: "No s'ha pogut actualitzar l'origen."},
@@ -1137,6 +1135,12 @@ export const SEED: Catalogue = {
   "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions.": { de: "Beschreiben Sie das Problem, das Sie haben. Tauschen Sie sich mit anderen aus, oder nutzen Sie dieses Ticket als Forum, um Lösungen zu besprechen.", es: "Describe el problema que tienes. Habla con otras personas, o usa este ticket como foro para discutir soluciones.", ca: "Descriu el problema que tens. Parla amb altres persones, o fes servir aquest ticket com a fòrum per debatre solucions."},
   "Disconnected here. Remove {brand} in your Google account too.": { de: "Hier getrennt. Entfernen Sie {brand} auch in Ihrem Google-Konto.", es: "Desconectado aquí. Quita {brand} también en tu cuenta de Google.", ca: "Desconnectat aquí. Treu {brand} també del teu compte de Google."},
   "Disconnected.": { de: "Getrennt.", es: "Desconectado.", ca: "Desconnectat."},
+  // THE PRIORITY LEVEL, level 4 — the Tasks table/board redesign, 2026-09-15.
+  // Same word `PRIORITY_LABEL` (shared/departments.ts) has always named; now a
+  // real catalogue position because `tasks-screen.tsx` reads it through a
+  // literal `t("Do it now")` (see that file's own `priorityWord`) rather than
+  // a dynamic lookup no catalogue entry could ever answer.
+  "Do it now": { de: "Sofort erledigen", es: "Hazlo ya", ca: "Fes-ho ja"},
   "Edit app": { de: "App bearbeiten", es: "Editar app", ca: "Editar app"},
   "Edit process": { de: "Prozess bearbeiten", es: "Editar proceso", ca: "Editar procés"},
   "Edit step": { de: "Schritt bearbeiten", es: "Editar paso", ca: "Editar pas"},
@@ -1197,7 +1201,6 @@ export const SEED: Catalogue = {
   "No work written down against this ticket yet.": { de: "Es wurde noch keine Arbeit für dieses Ticket festgehalten.", es: "Aún no hay trabajo anotado en este ticket.", ca: "Encara no hi ha feina anotada en aquest ticket."},
   "Nobody here matched.": { de: "Niemand hier passt dazu.", es: "Nadie coincide aquí.", ca: "Aquí no coincideix ningú."},
   "None of this time was logged in the last eight weeks.": { de: "Von dieser Zeit wurde in den letzten acht Wochen nichts erfasst.", es: "Nada de este tiempo se registró en las últimas ocho semanas.", ca: "Res d'aquest temps s'ha registrat en les últimes vuit setmanes."},
-  "Nothing due this month.": { de: "Diesen Monat ist nichts fällig.", es: "Nada vence este mes.", ca: "Aquest mes no venç res."},
   "Nothing has been handed over on this app yet.": { de: "Zu dieser App wurde noch nichts übergeben.", es: "Todavía no se ha entregado nada en esta app.", ca: "Encara no s'ha lliurat res en aquesta app."},
   "Nothing in Meetings this month.": { de: "Diesen Monat keine Termine.", es: "Nada en Reuniones este mes.", ca: "Res a Reunions aquest mes."},
   "Nothing logged yet": { de: "Noch nichts erfasst", es: "Aún no se ha registrado nada", ca: "Encara no s'ha registrat res"},
@@ -1216,11 +1219,14 @@ export const SEED: Catalogue = {
   "Pick a role.": { de: "Wählen Sie eine Rolle.", es: "Elige un rol.", ca: "Tria un rol."},
   "Pick an existing group or start a new one, then add the value.": { de: "Wählen Sie eine bestehende Gruppe oder legen Sie eine neue an, und fügen Sie dann den Wert hinzu.", es: "Elige un grupo existente o crea uno nuevo, y después añade el valor.", ca: "Tria un grup existent o crea'n un de nou, i després afegeix el valor."},
   "Picture": { de: "Bild", es: "Imagen", ca: "Imatge"},
+  // THE TASKS TAB, 2026-09-15 — the client's ruling replaced List/Calendar/
+  // Upcoming with this one: every open task that is not overdue, dated or not
+  // (`tasks-screen.tsx`'s own header has the full definition).
+  "Planned": { de: "Geplant", es: "Planificado", ca: "Planificat"},
   "Planned by the assistant": { de: "Vom Assistenten geplant", es: "Planificado por el asistente", ca: "Planificat per l'assistent"},
   "Portal access": { de: "Portalzugang", es: "Acceso al portal", ca: "Accés al portal"},
   "Previous month": { de: "Vorheriger Monat", es: "Mes anterior", ca: "Mes anterior"},
   "Priority order": { de: "Nach Priorität", es: "Por orden de prioridad", ca: "Per ordre de prioritat"},
-  "Purpose": { de: "Zweck", es: "Propósito", ca: "Propòsit"},
   "Put away.": { de: "Weggelegt.", es: "Apartado.", ca: "Apartat."},
   "Put back.": { de: "Zurückgelegt.", es: "Devuelto a la lista.", ca: "Tornat a la llista."},
   "Put somebody on duty": { de: "Jemanden in den Dienst einteilen", es: "Poner a alguien de servicio", ca: "Posar algú de guàrdia"},
@@ -1301,6 +1307,18 @@ export const SEED: Catalogue = {
   "This version has no steps recorded.": { de: "Für diese Version sind keine Schritte erfasst.", es: "Esta versión no tiene pasos registrados.", ca: "Aquesta versió no té passos registrats."},
   "Ticked off. It's under All tasks.": { de: "Abgehakt. Es steht unter Alle Aufgaben.", es: "Marcado. Está en Todas las tareas.", ca: "Marcat. És a Totes les tasques."},
   "Today": { de: "Heute", es: "Hoy", ca: "Avui"},
+  /* ── MEETINGS: THIS WEEK / MINE / EVERYONE'S (client ruling, 2026-09-15) ──
+   * meetings-screen.tsx's own header block carries her words. New words, hand
+   * translated here rather than left to the generator. */
+  "Everyone's": { de: "Alle", es: "De todos", ca: "De tothom" },
+  "Time": { de: "Uhrzeit", es: "Hora", ca: "Hora" },
+  "Attendees": { de: "Teilnehmer", es: "Asistentes", ca: "Assistents" },
+  /* THE GLOSSARY RENAME, "Meeting purpose" → "Meeting type", read into this
+   * screen (`shared/glossary.ts` carries the rename itself; this lane only
+   * hand-seeds the two new labels meetings-screen.tsx now shows). Compound
+   * German the same way "Personality type" → "Persönlichkeitstyp" already is. */
+  "Meeting type": { de: "Termintyp", es: "Tipo de reunión", ca: "Tipus de reunió" },
+  "Meeting types": { de: "Termintypen", es: "Tipos de reunión", ca: "Tipus de reunió" },
   "Transcript read.": { de: "Mitschrift gelesen.", es: "Transcripción leída.", ca: "Transcripció llegida."},
   "Try fewer words, or clear the filters.": { de: "Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Prueba con menos palabras o borra los filtros.", ca: "Prova amb menys paraules o esborra els filtres."},
   "Update the details you hold for them.": { de: "Aktualisieren Sie die Angaben, die Sie zu dieser Person haben.", es: "Actualiza los datos que tienes de esta persona.", ca: "Actualitza les dades que en tens."},
@@ -1314,6 +1332,9 @@ export const SEED: Catalogue = {
   "What I read": { de: "Was ich gelesen habe", es: "Lo que he leído", ca: "El que he llegit"},
   "What it's called, when it runs, and what it was sold for. The account and the app it covers stay as they are.": { de: "Wie er heißt, wann er läuft und wofür er verkauft wurde. Der Kunde und die App, die er abdeckt, bleiben unverändert.", es: "Cómo se llama, cuándo se ejecuta y por cuánto se vendió. La cuenta y la app que cubre se quedan como están.", ca: "Com es diu, quan s'executa i per quant es va vendre. El compte i l'app que cobreix es queden com estan."},
   "What was asked": { de: "Was gefragt wurde", es: "Lo que se pidió", ca: "El que es va demanar"},
+  // THE PRIORITY LEVEL, level 1 — see "Do it now"'s own note above; the same
+  // pair, opposite ends of the scale.
+  "Whenever": { de: "Irgendwann", es: "Cuando sea", ca: "Quan sigui"},
   "Where the tickets are sitting": { de: "Wo die Tickets gerade stehen", es: "Dónde están los tickets", ca: "On són els tickets"},
   "Which account is it for?": { de: "Für welchen Kunden ist es?", es: "¿Para qué cuenta es?", ca: "Per a quin compte és?"},
   "Working…": { de: "Wird bearbeitet…", es: "Trabajando…", ca: "Treballant…"},
@@ -1436,7 +1457,6 @@ export const SEED: Catalogue = {
   // These five replaced six entries that all said Standard / predeterminado /
   // predeterminat, which translated the promise the English word was wrongly
   // making: nothing here is pre-selected, the flag refuses a deactivation.
-  "No longer protected.": { de: "Nicht mehr geschützt.", es: "Ya no está protegido.", ca: "Ja no està protegit."},
   "No meetings match": { de: "Keine Besprechungen passen", es: "No hay reuniones que coincidan", ca: "Cap reunió coincideix"},
   "No module": { de: "Kein Modul", es: "Sin módulo", ca: "Cap mòdul"},
   "No processes match": { de: "Keine Prozesse passen", es: "No hay procesos que coincidan", ca: "Cap procés coincideix"},
@@ -1463,10 +1483,7 @@ export const SEED: Catalogue = {
   "Search modules…": { de: "Module suchen…", es: "Buscar módulos…", ca: "Cerca mòduls…"},
   "Search people…": { de: "Personen suchen…", es: "Buscar personas…", ca: "Cerca persones…"},
   "Somebody": { de: "Jemand", es: "Alguien", ca: "Algú"},
-  "Protect it": { de: "Schützen", es: "Protegerlo", ca: "Protegeix-lo"},
   "Protected": { de: "Geschützt", es: "Protegido", ca: "Protegit"},
-  "Protected.": { de: "Geschützt.", es: "Protegido.", ca: "Protegit."},
-  "Stop protecting it": { de: "Schutz aufheben", es: "Dejar de protegerlo", ca: "Deixa de protegir-lo"},
   "Switch it off": { de: "Ausschalten", es: "Desactivarlo", ca: "Desactiva'l"},
   "Switch off": { de: "Ausschalten", es: "Desactivar", ca: "Desactivar"},
   "Switch off this module?": { de: "Dieses Modul ausschalten?", es: "¿Desactivar este módulo?", ca: "Vols desactivar aquest mòdul?"},
@@ -3467,7 +3484,6 @@ export const SEED: Catalogue = {
   "A ticket is something someone has asked us for. Raise one here, or wait for a client to raise one from their portal.": { de: "Ein Ticket ist etwas, worum uns jemand gebeten hat. Erstellen Sie hier eines, oder warten Sie, bis ein Kunde eines über sein Portal einreicht.", es: "Un ticket es algo que alguien nos ha pedido. Crea uno aquí, o espera a que un cliente cree uno desde su portal.", ca: "Un tiquet és una cosa que algú ens ha demanat. Crea'n un aquí, o espera que un client en creï un des del seu portal." },
   "Access switched back on.": { de: "Zugriff wieder aktiviert.", es: "Acceso reactivado.", ca: "Accés reactivat." },
   "Access taken away.": { de: "Zugriff entzogen.", es: "Acceso retirado.", ca: "Accés retirat." },
-  "Activated \"{value}\".": { de: "„{value}“ aktiviert.", es: "«{value}» activado.", ca: "«{value}» activat." },
   "Add the first": { de: "Das erste hinzufügen", es: "Añade el primero", ca: "Afegeix el primer" },
   "Add the parts of their company, so a role can say where it sits.": { de: "Fügen Sie die Bereiche ihres Unternehmens hinzu, damit eine Rolle angeben kann, wo sie sitzt.", es: "Añade las partes de su empresa, para que un rol pueda indicar dónde está.", ca: "Afegeix les parts de la seva empresa, perquè un rol pugui indicar on es troba." },
   "Add the sections this app is divided into, so tickets can say which one they are about.": { de: "Fügen Sie die Bereiche hinzu, in die diese App gegliedert ist, damit Tickets den Bereich nennen können.", es: "Añade las secciones en que se divide esta aplicación para que los tickets puedan indicarlas.", ca: "Afegeix les seccions en què es divideix aquesta aplicació perquè els tiquets les puguin indicar." },
@@ -3509,9 +3525,7 @@ export const SEED: Catalogue = {
   "Dark": { de: "Dunkel", es: "Oscuro", ca: "Fosc" },
   "Dark, whatever your theme.": { de: "Dunkel, unabhängig von Ihrem Design.", es: "Oscuro, sea cual sea tu tema.", ca: "Fosc, sigui quin sigui el teu tema." },
   "Dashboard": { de: "Dashboard", es: "Panel de control", ca: "Tauler de control" },
-  "Deactivate \"{value}\"?": { de: "„{value}“ deaktivieren?", es: "¿Desactivar «{value}»?", ca: "Vols desactivar «{value}»?" },
   "Deactivate this profile?": { de: "Dieses Profil deaktivieren?", es: "¿Desactivar este perfil?", ca: "Vols desactivar aquest perfil?" },
-  "Deactivated \"{value}\".": { de: "„{value}“ deaktiviert.", es: "«{value}» desactivado.", ca: "«{value}» desactivat." },
   "Decide": { de: "Entscheiden", es: "Decidir", ca: "Decidir" },
   "Earlier": { de: "Früher", es: "Antes", ca: "Abans" },
   "Every meeting they're in will show here once one is arranged.": { de: "Jeder Termin, an dem sie beteiligt sind, erscheint hier, sobald einer vereinbart ist.", es: "Aquí aparecerá cada reunión en la que participen, en cuanto se organice una.", ca: "Aquí apareixerà cada reunió en què participin, quan se n'organitzi una." },
@@ -3531,7 +3545,6 @@ export const SEED: Catalogue = {
   "Integrations": { de: "Integrationen", es: "Integraciones", ca: "Integracions" },
   "Invite someone by email and choose their role. The invite waits here until they accept it.": { de: "Laden Sie jemanden per E-Mail ein und wählen Sie seine Rolle. Die Einladung wartet hier, bis sie angenommen wird.", es: "Invita a alguien por correo y elige su rol. La invitación espera aquí hasta que la acepte.", ca: "Convida algú per correu i tria el seu rol. La invitació espera aquí fins que l'accepti." },
   "It comes out of Meetings. The record and its notes stay exactly where they are, and you can put it back any time.": { de: "Es verschwindet aus Terminen. Der Eintrag und seine Notizen bleiben genau dort, wo sie sind, und Sie können es jederzeit zurückholen.", es: "Desaparece de Reuniones. El registro y sus notas se quedan exactamente donde están, y puedes recuperarlo cuando quieras.", ca: "Desapareix de Reunions. El registre i les seves notes es queden exactament on són, i el pots recuperar quan vulguis." },
-  "It drops out of the pickers everywhere it's offered. Anything already using it keeps it, and you can turn it back on any time.": { de: "Es verschwindet aus allen Auswahllisten, in denen es angeboten wird. Alles, was es bereits verwendet, behält es, und Sie können es jederzeit wieder aktivieren.", es: "Desaparece de los selectores donde se ofrece. Lo que ya lo use lo conserva, y puedes reactivarlo cuando quieras.", ca: "Desapareix dels selectors on s'ofereix. El que ja l'utilitzi el conserva, i el pots tornar a activar quan vulguis." },
   "It stops showing as a live colleague. What was written stays written, and the panel reads it back the moment it comes on again.": { de: "Er wird nicht mehr als aktiver Kollege angezeigt. Was geschrieben wurde, bleibt geschrieben, und das Panel liest es wieder ein, sobald er reaktiviert wird.", es: "Deja de mostrarse como compañero activo. Lo que se escribió sigue escrito, y el panel vuelve a leerlo en cuanto se reactiva.", ca: "Deixa de mostrar-se com a company actiu. El que es va escriure continua escrit, i el panell ho torna a llegir tan bon punt es reactiva." },
   "It stops showing in the everyday lists. Everything on it, its work and its history, stays exactly where it is, and you can bring it back any time.": { de: "Es verschwindet aus den alltäglichen Listen. Alles darin, seine Arbeit und sein Verlauf, bleibt genau dort, wo es ist, und Sie können es jederzeit zurückholen.", es: "Deja de aparecer en las listas del día a día. Todo lo que contiene, su trabajo y su historial, se queda exactamente donde está, y puedes recuperarlo cuando quieras.", ca: "Deixa d'aparèixer a les llistes del dia a dia. Tot el que conté, la seva feina i el seu historial, es queda exactament on és, i el pots recuperar quan vulguis." },
   "It stops showing in the everyday lists. The conversation and its history stay exactly as they are, and you can take it back out any time.": { de: "Es verschwindet aus den alltäglichen Listen. Die Unterhaltung und ihr Verlauf bleiben genau, wie sie sind, und Sie können es jederzeit wieder hervorholen.", es: "Deja de aparecer en las listas del día a día. La conversación y su historial se quedan tal como están, y puedes recuperarlo cuando quieras.", ca: "Deixa d'aparèixer a les llistes del dia a dia. La conversa i el seu historial es queden tal com estan, i el pots recuperar quan vulguis." },
@@ -4062,4 +4075,97 @@ export const SEED: Catalogue = {
   "Search choices…": { de: "Optionen suchen…", es: "Buscar opciones…", ca: "Cerca opcions…" },
   "No choices match what you're looking for.": { de: "Keine Optionen passen zu Ihrer Suche.", es: "Ninguna opción coincide con lo que buscas.", ca: "Cap opció coincideix amb el que busques." },
   "Couldn't load the choices.": { de: "Optionen konnten nicht geladen werden.", es: "No se pudieron cargar las opciones.", ca: "No s'han pogut carregar les opcions." },
+
+  /* ── THE MEETING-TYPES ADAPTER (Task C, 15 Sep 2026) — new strings
+     `MeetingTypesPanel`/`MeetingTypeFormDialog` say (web/components/team/
+     internal-screens.tsx), hand-seeded rather than left for the generator.
+     "Meeting type(s)"/"New meeting type" are already seeded above (the
+     meetings-screen.tsx lane's own entries, this adapter reuses them
+     verbatim). */
+  "What a meeting is about, and the department it belongs to.": { de: "Worum es in einem Meeting geht, und zu welcher Abteilung es gehört.", es: "De qué trata la reunión, y a qué departamento pertenece.", ca: "De què tracta la reunió, i a quin departament pertany." },
+  "Couldn't add that meeting type.": { de: "Der Termintyp konnte nicht hinzugefügt werden.", es: "No se pudo añadir ese tipo de reunión.", ca: "No s'ha pogut afegir aquest tipus de reunió." },
+  "e.g. Kickoff": { de: "z. B. Kickoff", es: "p. ej. Kickoff", ca: "p. ex. Kickoff" },
+  "e.g. Production": { de: "z. B. Produktion", es: "p. ej. Producción", ca: "p. ex. Producció" },
+  "Couldn't load the meeting types.": { de: "Die Termintypen konnten nicht geladen werden.", es: "No se pudieron cargar los tipos de reunión.", ca: "No s'han pogut carregar els tipus de reunió." },
+  "Deactivate \"{name}\"?": { de: "„{name}“ deaktivieren?", es: "¿Desactivar «{name}»?", ca: "Desactivar «{name}»?" },
+  "It drops out of the meeting form's picker. Meetings already using it keep it, and you can turn it back on any time.": { de: "Er verschwindet aus der Auswahl im Meeting-Formular. Meetings, die ihn bereits nutzen, behalten ihn, und Sie können ihn jederzeit wieder aktivieren.", es: "Desaparece del selector del formulario de reunión. Las reuniones que ya lo usan lo conservan, y puedes volver a activarlo cuando quieras.", ca: "Desapareix del selector del formulari de reunió. Les reunions que ja el fan servir el conserven, i el pots tornar a activar quan vulguis." },
+  "Deactivated \"{name}\".": { de: "„{name}“ deaktiviert.", es: "«{name}» desactivado.", ca: "«{name}» desactivat." },
+  "Couldn't update that meeting type.": { de: "Der Termintyp konnte nicht aktualisiert werden.", es: "No se pudo actualizar ese tipo de reunión.", ca: "No s'ha pogut actualitzar aquest tipus de reunió." },
+  "Activated \"{name}\".": { de: "„{name}“ aktiviert.", es: "«{name}» activado.", ca: "«{name}» activat." },
+  "Search meeting types…": { de: "Termintypen suchen…", es: "Buscar tipos de reunión…", ca: "Cerca tipus de reunió…" },
+  "No meeting types yet.": { de: "Noch keine Termintypen.", es: "Aún no hay tipos de reunión.", ca: "Encara no hi ha tipus de reunió." },
+  "Added \"{name}\".": { de: "„{name}“ hinzugefügt.", es: "«{name}» añadido.", ca: "«{name}» afegit." },
+
+  /* ── ROW ACTIONS ON `SettingsChoicesPanel`, 15 Sep 2026 — the rename/protect/
+     deactivate door back behind a control (Task B's own fix to R "doors-have-
+     controls"; see that file's header, "EDITING AN EXISTING VALUE"). Same
+     strings `selectable-screen.tsx` always said, hand-seeded now because that
+     file (and its untranslated debt) is retired. */
+  "Couldn't rename that value.": { de: "Der Wert konnte nicht umbenannt werden.", es: "No se pudo renombrar ese valor.", ca: "No s'ha pogut reanomenar aquest valor." },
+  "Protected.": { de: "Geschützt.", es: "Protegido.", ca: "Protegit." },
+  "No longer protected.": { de: "Nicht mehr geschützt.", es: "Ya no está protegido.", ca: "Ja no està protegit." },
+  "Stop protecting it": { de: "Schutz aufheben", es: "Dejar de proteger", ca: "Deixar de protegir" },
+  "Protect it": { de: "Schützen", es: "Proteger", ca: "Protegir" },
+  "Deactivate \"{value}\"?": { de: "„{value}“ deaktivieren?", es: "¿Desactivar «{value}»?", ca: "Desactivar «{value}»?" },
+  "It drops out of the pickers everywhere it's offered. Anything already using it keeps it, and you can turn it back on any time.": { de: "Er verschwindet aus allen Auswahllisten, in denen er angeboten wird. Alles, was ihn bereits nutzt, behält ihn, und Sie können ihn jederzeit wieder aktivieren.", es: "Desaparece de todos los selectores donde se ofrece. Lo que ya lo usa lo conserva, y puedes volver a activarlo cuando quieras.", ca: "Desapareix de tots els selectors on s'ofereix. El que ja el fa servir el conserva, i el pots tornar a activar quan vulguis." },
+  "Couldn't update that value.": { de: "Der Wert konnte nicht aktualisiert werden.", es: "No se pudo actualizar ese valor.", ca: "No s'ha pogut actualitzar aquest valor." },
+  "Deactivated \"{value}\".": { de: "„{value}“ deaktiviert.", es: "«{value}» desactivado.", ca: "«{value}» desactivat." },
+  "Activated \"{value}\".": { de: "„{value}“ aktiviert.", es: "«{value}» activado.", ca: "«{value}» activat." },
+
+  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026 — the 45 strings the
+     ceiling check found with no seed entry for de/es/ca (a full lane round's
+     worth of new knowledge-base, task-view and meeting-type copy, landed
+     faster than it was translated). Hand-translated here, never in the
+     generated catalogue — the file's own header says why. Vocabulary kept
+     consistent with what is already seeded above: Account → Kunde/cuenta/
+     compte, source → Quelle/fuente/font, passage → Abschnitt/pasaje/fragment.
+     "Padelbase, Asekurans" is a placeholder of two proper nouns — company
+     names, which do not translate, so the same value is the correct answer
+     in every language, same as the German seed's own treatment of "Sprint"
+     and "Ticket" above. */
+  "\"{name}\" looks like it belongs to an account you already have on file.": { de: "„{name}“ sieht aus, als gehöre es zu einem Kunden, den Sie schon erfasst haben.", es: "«{name}» parece pertenecer a una cuenta que ya tienes registrada.", ca: "«{name}» sembla pertànyer a un compte que ja tens registrat." },
+  "1 app": { de: "1 App", es: "1 app", ca: "1 app" },
+  "Almost done…": { de: "Gleich fertig…", es: "Casi listo…", ca: "Gairebé llest…" },
+  "Edit filing": { de: "Ablage bearbeiten", es: "Editar archivado", ca: "Editar arxivat" },
+  "File this under {account}?": { de: "Unter „{account}“ ablegen?", es: "¿Archivar esto bajo «{account}»?", ca: "Vols arxivar això sota «{account}»?" },
+  "Found in search — never quoted in an answer.": { de: "Wird bei der Suche gefunden — aber nie in einer Antwort zitiert.", es: "Se encuentra en la búsqueda — pero nunca se cita en una respuesta.", ca: "Es troba en la cerca — però mai es cita en una resposta." },
+  "I looked at 1 piece of material.": { de: "Ich habe mir 1 Stück Material angesehen.", es: "He revisado 1 fragmento de material.", ca: "He revisat 1 fragment de material." },
+  "I looked at {count} pieces of material.": { de: "Ich habe mir {count} Stück Material angesehen.", es: "He revisado {count} fragmentos de material.", ca: "He revisat {count} fragments de material." },
+  "KB is kept in full and every word of it is searchable. Open the original below to read the rest.": { de: "KB werden vollständig aufbewahrt, und jedes Wort davon ist durchsuchbar. Öffnen Sie unten das Original, um den Rest zu lesen.", es: "KB se guardan completos, y cada palabra es buscable. Abre el original de abajo para leer el resto.", ca: "KB es guarden sencers, i cada paraula és cercable. Obre l'original de sota per llegir la resta." },
+  "Making sense of what it says…": { de: "Der Inhalt wird ausgewertet…", es: "Entendiendo lo que dice…", ca: "Entenent què diu…" },
+  "May narrow a search on its own": { de: "Darf eine Suche von sich aus eingrenzen", es: "Puede acotar una búsqueda por sí sola", ca: "Pot acotar una cerca per si sola" },
+  "May this name narrow a knowledge base search on its own?": { de: "Darf dieser Name eine Wissensdatenbank-Suche von sich aus eingrenzen?", es: "¿Puede este nombre acotar por sí solo una búsqueda en la base de conocimiento?", ca: "Pot aquest nom acotar per si sol una cerca a la base de coneixement?" },
+  "Must never narrow a search on its own": { de: "Darf eine Suche nie von sich aus eingrenzen", es: "Nunca debe acotar una búsqueda por sí sola", ca: "Mai ha d'acotar una cerca per si sola" },
+  "New meeting type": { de: "Neuer Termintyp", es: "Nuevo tipo de reunión", ca: "Nou tipus de reunió" },
+  "Not filed under an app": { de: "Keiner App zugeordnet", es: "No archivado bajo ninguna app", ca: "No arxivat sota cap app" },
+  "Not indexed yet": { de: "Noch nicht indexiert", es: "Aún no indexado", ca: "Encara no indexat" },
+  "Not reviewed": { de: "Nicht geprüft", es: "Sin revisar", ca: "Sense revisar" },
+  "Not this one": { de: "Das ist es nicht", es: "No es esto", ca: "No és això" },
+  "Nothing on our own list.": { de: "Nichts auf unserer eigenen Liste.", es: "Nada en nuestra propia lista.", ca: "Res a la nostra pròpia llista." },
+  "Other spellings the knowledge base should also recognise": { de: "Weitere Schreibweisen, die die Wissensdatenbank auch erkennen soll", es: "Otras formas de escribirlo que la base de conocimiento también debería reconocer", ca: "Altres maneres d'escriure-ho que la base de coneixement també hauria de reconèixer" },
+  "Padelbase, Asekurans": { de: "Padelbase, Asekurans", es: "Padelbase, Asekurans", ca: "Padelbase, Asekurans" },
+  "Reached us through one person": { de: "Über eine Person zu uns gelangt", es: "Nos llegó a través de una persona", ca: "Ens va arribar a través d'una persona" },
+  "Reached us through {count} people": { de: "Über {count} Personen zu uns gelangt", es: "Nos llegó a través de {count} personas", ca: "Ens va arribar a través de {count} persones" },
+  "Read 1 word of {kind} from {provider}.": { de: "1 Wort gelesen — {kind} von {provider}.", es: "Leída 1 palabra de {kind} en {provider}.", ca: "Llegida 1 paraula de {kind} a {provider}." },
+  "Read {words} words of {kind} from {provider}.": { de: "{words} Wörter gelesen — {kind} von {provider}.", es: "Leídas {words} palabras de {kind} en {provider}.", ca: "Llegides {words} paraules de {kind} a {provider}." },
+  "Reading the link…": { de: "Link wird gelesen…", es: "Leyendo el enlace…", ca: "Llegint l'enllaç…" },
+  "Renamed.": { de: "Umbenannt.", es: "Renombrado.", ca: "Reanomenat." },
+  "Rough notes, not the answer.": { de: "Grobe Notizen, nicht die Antwort.", es: "Notas preliminares, no la respuesta.", ca: "Notes preliminars, no la resposta." },
+  "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet.": { de: "Gespeichert, aber wir haben nichts vom Link gelesen — der Assistent weiß noch nicht, was in diesem Video gesagt wird.", es: "Guardado, pero no hemos leído nada del enlace — el asistente aún no sabrá qué dice este vídeo.", ca: "Desat, però no hem llegit res de l'enllaç — l'assistent encara no sabrà què diu aquest vídeo." },
+  "Tasks by priority": { de: "To-dos nach Priorität", es: "Tareas por prioridad", ca: "Tasques per prioritat" },
+  "That is the end of what this screen shows, not the end of the material —": { de: "Das ist das Ende dessen, was dieser Bildschirm zeigt, nicht das Ende des Materials —", es: "Eso es el final de lo que muestra esta pantalla, no el final del material —", ca: "Això és el final del que mostra aquesta pantalla, no el final del material —" },
+  "Then I re-read the strongest passages before answering.": { de: "Dann habe ich die stärksten Abschnitte noch einmal gelesen, bevor ich geantwortet habe.", es: "Después releí los pasajes más relevantes antes de responder.", ca: "Després vaig rellegir els fragments més rellevants abans de respondre." },
+  "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it.": { de: "Dieser Text wurde aus der Datei ausgelesen und wird daher korrigiert, indem Sie die Datei erneut hinzufügen, statt ihn hier zu überschreiben. Sie können sie weiterhin umbenennen, ihre Ablage ändern und festlegen, wer sie nutzen darf.", es: "Este texto se leyó del archivo, así que se corrige añadiendo el archivo de nuevo, no escribiéndolo aquí encima. Aún puedes renombrarlo, cambiar dónde está archivado y quién puede usarlo.", ca: "Aquest text es va llegir del fitxer, així que es corregeix afegint el fitxer de nou, no escrivint-hi a sobre aquí. Encara el pots reanomenar, canviar on està arxivat i qui el pot fer servir." },
+  "This is taking longer than it should.": { de: "Das dauert länger, als es sollte.", es: "Esto está tardando más de lo que debería.", ca: "Això està trigant més del que hauria." },
+  "We'll read this video's captions or transcript when you save it.": { de: "Wir lesen die Untertitel oder das Transkript dieses Videos, sobald Sie es speichern.", es: "Leeremos los subtítulos o la transcripción de este vídeo cuando lo guardes.", ca: "Llegirem els subtítols o la transcripció d'aquest vídeo quan el desis." },
+  "Who can read this follows who has already seen it — it isn't set here.": { de: "Wer dies lesen darf, richtet sich danach, wer es bereits gesehen hat — das wird hier nicht festgelegt.", es: "Quién puede leer esto depende de quién ya lo ha visto — no se define aquí.", ca: "Qui pot llegir això depèn de qui ja ho ha vist — no es defineix aquí." },
+  "Working it out": { de: "Denkt nach", es: "Pensando", ca: "Pensant" },
+  "Yes, file it under {account}": { de: "Ja, unter „{account}“ ablegen", es: "Sí, archivar bajo «{account}»", ca: "Sí, arxivar sota «{account}»" },
+  "captions": { de: "Untertitel", es: "subtítulos", ca: "subtítols" },
+  "description": { de: "Beschreibung", es: "descripción", ca: "descripció" },
+  "transcript": { de: "Transkript", es: "transcripción", ca: "transcripció" },
+  "{count} accounts": { de: "{count} Kunden", es: "{count} cuentas", ca: "{count} comptes" },
+  "{count} apps": { de: "{count} Apps", es: "{count} apps", ca: "{count} apps" },
+  "{count} pieces": { de: "{count} Stück", es: "{count} fragmentos", ca: "{count} fragments" },
+  "{title} (not in use)": { de: "{title} (nicht in Gebrauch)", es: "{title} (sin usar)", ca: "{title} (sense ús)" },
 }

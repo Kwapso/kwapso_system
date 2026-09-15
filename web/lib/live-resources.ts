@@ -252,12 +252,14 @@ export const listFetch = {
   // EVERY count comes back from ANY view's fetch (R16), because the badge on a
   // tab you are not looking at cannot be counted from the rows in front of you —
   // and the progress bar's pair rides along for the same reason: it is pinned to
-  // the top of all six tabs, so it must be true on whichever one is open.
+  // the top of every tab, so it must be true on whichever one is open.
   tasks: (teamId: string, view: TaskView = "open") =>
     contentApi.tasks(view).then((r) => {
       primeCache(totalKey("tasks", teamId), r.openTotal)
       primeCache(totalKey("tasks-all", teamId), r.allTotal)
       primeCache(totalKey("tasks-overdue", teamId), r.overdueTotal)
+      // ARRIVED 2026-09-15 — the redesigned tab strip's own badge.
+      primeCache(totalKey("tasks-planned", teamId), r.plannedTotal)
       primeCache(totalKey("tasks-upcoming", teamId), r.upcomingTotal)
       primeCache(totalKey("tasks-completed", teamId), r.completedTotal)
       primeCache(totalKey("tasks-calendar", teamId), r.calendarTotal)
@@ -266,9 +268,9 @@ export const listFetch = {
       // R14/R15: page one's rows live under the view's own key and its next
       // cursor in the sidecar beside it, so <LoadMore> can reach page two and
       // the row-level registry keeps the whole thing live without a second
-      // listener. Per VIEW, because each of the six is its own paged read with
-      // its own position — a cursor minted on `completed` means nothing to
-      // `overdue`, and the door refuses it rather than skipping a slice.
+      // listener. Per VIEW, because each is its own paged read with its own
+      // position — a cursor minted on `completed` means nothing to `overdue`,
+      // and the door refuses it rather than skipping a slice.
       primeCache(cursorKey(tasksKey(teamId, view)), r.nextCursor)
       return r.tasks
     }),
@@ -287,8 +289,11 @@ export const listFetch = {
         primeCache(cursorKey(meetingsKey(teamId, "mine")), r.nextCursor)
         return r.meetings
       }
-      if (view === "week") {
-        // THE WEEK ASKED OF THE DOOR, as its own read (19 Aug 2026). It used to
+      if (view === "mine-week") {
+        // THE WEEK ASKED OF THE DOOR, as its own read (19 Aug 2026), ALWAYS
+        // MINE (2026-09-15 — the client's ruling folded `mine` into this view
+        // permanently, so the door answers `view=mine-week` now rather than
+        // plain `week`; see `workers/content/src/lib/meetings.ts`). It used to
         // be the newest page filtered in the browser, on the stated assumption
         // that "the week sits inside the newest page for any agency that has not
         // held fifty meetings since Monday". The meetings list is ordered by START TIME,
@@ -298,15 +303,20 @@ export const listFetch = {
         // week. The badge said 11 and the list was empty.
         //
         // `total` here IS the week's count: the door counted the same question
-        // it listed. One answer, which is what R16 asks for.
+        // it listed. One answer, which is what R16 asks for. The cache key it
+        // still primes is `totalKey("meetings-week", …)` — the meetings screen's
+        // own badge is named for the TAB ("this week"), not for the door's own
+        // view literal, so the two are free to diverge as they just did.
         primeCache(totalKey("meetings-week", teamId), r.total)
-        primeCache(cursorKey(meetingsKey(teamId, "week")), r.nextCursor)
+        primeCache(cursorKey(meetingsKey(teamId, "mine-week")), r.nextCursor)
         return r.meetings
       }
       primeCache(totalKey("meetings", teamId), r.total)
-      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The badge on a
-      // tab nobody has opened still has to be exact, so the whole meetings list's read
-      // carries the week's count beside its own (R16).
+      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1) — and since
+      // 2026-09-15, the MINE-WEEK total (routes/meetings.ts's own `weekTotal`
+      // now counts `view: "mine-week"`, not plain `week`). The badge on a tab
+      // nobody has opened still has to be exact, so the whole meetings list's
+      // read carries the week's count beside its own (R16).
       primeCache(totalKey("meetings-week", teamId), r.weekTotal)
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
       return r.meetings
@@ -431,17 +441,21 @@ export function tasksKey(teamId: string, view: TaskView = "open"): string {
   return view === "open" ? `tasks:${teamId}` : `tasks-${view}:${teamId}`
 }
 
-/** WHICH SLICE OF THE MEETINGS LIST A KEY NAMES. The whole meetings list, the week the reader
- * is standing in, or the ones they were in the room for — the two views whose rows the whole
- * meetings list's newest page cannot be trusted to contain (see `listFetch.meetings`). */
-export type MeetingListView = "week" | "mine"
+/** WHICH SLICE OF THE MEETINGS LIST A KEY NAMES. The whole meetings list, this reader's own
+ * week (always mine — the client's ruling, 2026-09-15, folded `week` and `mine` into one view
+ * for the meetings screen's "This week" tab), or every meeting they were ever in the room for —
+ * the two views whose rows the whole meetings list's newest page cannot be trusted to contain
+ * (see `listFetch.meetings`). Plain `week` (agency-wide, not mine) has no key of its own here
+ * because nothing on this surface reads it any more — `routes/insights.ts`'s dashboard tile asks
+ * the door directly and keeps no client-side cache. */
+export type MeetingListView = "mine-week" | "mine"
 
 /** The meetings list's cache key (the paged meetings list). The WHOLE meetings list keeps the
  * bare key it has always had, so every listener, sidecar, prewarm and detail
  * screen that names `meetings:<team>` still lands on it — the same arrangement
- * `tasksKey` makes for its everyday pile. The week's own list sits under
- * `meetings-week:` and the reader's own under `meetings-mine:`, both of which the
- * registry's `slicePrefix: "meetings-"` already drops and re-reads on any meetings
+ * `tasksKey` makes for its everyday pile. The reader's own week sits under
+ * `meetings-mine-week:` and every meeting they were ever in under `meetings-mine:`, both of
+ * which the registry's `slicePrefix: "meetings-"` already drops and re-reads on any meetings
  * ping, so they stay live (R15) with nothing extra registered. */
 export function meetingsKey(teamId: string, view?: MeetingListView): string {
   return view ? `meetings-${view}:${teamId}` : `meetings:${teamId}`
@@ -1779,11 +1793,11 @@ export const TEAM_RESOURCES: Record<
     slicePrefix: [TODO_SLICE_PREFIX, RECORD_MAP_PREFIX],
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
-  // OPEN list; the OTHER FIVE views are dropped instead, because a task that has
+  // OPEN list; the OTHER views are dropped instead, because a task that has
   // just been ticked leaves one collection and joins another, and "patch the row
   // in place" has no answer for a row that changed which list it belongs to.
-  // R15: every one of the six is named here, so a view that gained a tab did not
-  // silently gain a list nothing keeps live.
+  // R15: every view in `TASK_VIEWS` is named here (derived, not hand-listed),
+  // so a view that gained a tab did not silently gain a list nothing keeps live.
   tasks: {
     key: (t) => tasksKey(t, "open"),
     idField: "id",

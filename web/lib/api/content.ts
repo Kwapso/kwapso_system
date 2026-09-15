@@ -197,6 +197,10 @@ export type TaskListResponse = {
   openTotal: number
   allTotal: number
   overdueTotal: number
+  /** ARRIVED 2026-09-15 — the redesigned tab strip's own badge (every open
+   * task that is not overdue, dated or not). See `TaskCounts` in
+   * `workers/content/src/lib/tasks.ts`. */
+  plannedTotal: number
   upcomingTotal: number
   completedTotal: number
   calendarTotal: number
@@ -1135,8 +1139,12 @@ export const content = {
        * `mine` is THE MEETINGS THE CALLER WAS IN THE ROOM FOR — the client's
        * own words, 2026-09-09. It takes no address: the door answers it against
        * the session (`guard.userId` + `actor.email`) and refuses to read one off
-       * the wire, so there is deliberately nothing here to pass. */
-      view?: "upcoming" | "week" | "mine" | "all"
+       * the wire, so there is deliberately nothing here to pass.
+       *
+       * `mine-week` is BOTH `week` AND `mine` AT ONCE — the client's ruling,
+       * 2026-09-15: the meetings screen's own "This week" tab is always mine
+       * now, on every body it can be read in. */
+      view?: "upcoming" | "week" | "mine" | "mine-week" | "all"
       /** the meetings list's search box, answered by the DOOR — the list pages, and the
        * meeting somebody digs for is the OLD one. */
       q?: string

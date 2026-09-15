@@ -174,45 +174,75 @@ describe("R70 — every automation is visible, and one that cannot be switched s
   it("a row that cannot be switched wears the dictionary's mark beside its reason, and a row that can wears neither", () => {
     const term = GLOSSARY.protectedChoice.term
     const says = `{t("${term}")}`
-    /** The word as a literal inside a pattern — it carries braces, brackets and
-     * parentheses of its own, every one of them a regex operator. */
-    const literal = says.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-    // 1 · THE PART, DERIVED OFF THE CHOICES HALF. Same page, same concept.
-    const choices = stripComments(
-      read(join(WEB, "components/choices/selectable-screen.tsx"))
-    )
-    const drawn = new RegExp(`<(\\w+)([^>]*)>\\s*${literal}`).exec(choices)
+    // 1 · THE PART, DERIVED OFF THE CHOICES HALF — READ OFF `shape.tsx` SINCE
+    // 15 SEP 2026, not `selectable-screen.tsx`. R70's own instruction, followed
+    // rather than amended around: "if the Choices screen changed, this check
+    // must follow it rather than be deleted." The Choices half that changed
+    // here is Task B's unification — the module-scoped Choices block
+    // (formerly `selectable-screen.tsx`, now retired) draws through the SAME
+    // `RecordTable` the general Choices tab always has, both reading their
+    // Status cell off `shapeChoicesTable` (`components/deep-link/shape.tsx`).
+    const choices = stripComments(read(join(WEB, "components/deep-link/shape.tsx")))
+    // NOT THE JSX-CONTAINER `literal` (`{t("Protected")}`) — `shapeChoicesTable`
+    // calls `t("Protected")` inside a plain ternary assignment (`statusWord`),
+    // never inside a `{…}` JSX expression container, so the call itself
+    // (`t("Protected")`) is what this half can honestly look for.
+    expect(
+      choices.includes(`t("${term}")`),
+      `R70 — the Choices half no longer says "${term}" at all, so there is nothing to derive the automations mark FROM. If the Choices screen changed, this check must follow it rather than be deleted: one concept, one part, one word, on one page`
+    ).toBe(true)
+    // THE WORD IS COMPUTED, NOT WRITTEN INLINE INSIDE THE BADGE —
+    // `shapeChoicesTable`'s one status cell serves three words (Protected /
+    // Active / Inactive) through the same element (`statusWord`, its own
+    // ternary), so the part is read off the element that renders THAT
+    // variable rather than off the literal `t(...)` call, which sits a few
+    // lines above the JSX rather than inside it.
+    const drawn = /<(\w+)([^>]*)>\s*\{statusWord\}/.exec(choices)
     expect(
       drawn,
-      `R70 — the Choices half no longer draws "${term}" as a badge, so there is nothing to derive the automations mark FROM. If the Choices screen changed, this check must follow it rather than be deleted: one concept, one part, one word, on one page`
+      "R70 — shape.tsx no longer wraps its computed status word in one element the way this check expects; re-read `shapeChoicesTable`'s status cell before changing the pattern"
     ).not.toBeNull()
     const part = drawn![1]
-    const variant = /variant="(\w+)"/.exec(drawn![2])?.[1]
-    expect(variant, `R70 — the Choices badge for "${term}" names no variant`).toBeTruthy()
+    // THE COLOUR IS NO LONGER A LITERAL, 15 SEP 2026 — the coordinator's own
+    // ruling: Choices' three-way status and Automations' own three-way status
+    // (`AUTOMATION_STATUS_VARIANT`, `automation-edit-sheet.tsx`) share ONE
+    // fill derivation now, so the proof that the two can never drift is the
+    // IMPORT, not a literal `variant="…"` string match — a stronger
+    // guarantee than the one this check used to make.
+    expect(
+      choices.includes('AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"'),
+      "R70 — the Choices half no longer imports the shared status→colour map (AUTOMATION_STATUS_VARIANT), so its badge can silently drift from Automations' own colour again"
+    ).toBe(true)
+    expect(
+      drawn![2].includes("AUTOMATION_STATUS_VARIANT["),
+      `R70 — the Choices ${part} no longer resolves its fill through AUTOMATION_STATUS_VARIANT`
+    ).toBe(true)
 
-    // 2 · THE AUTOMATIONS HALF SAYS THE SAME WORD, ONCE, THROUGH THE SAME PART.
-    //
-    // READ OFF `automation-edit-sheet.tsx` SINCE 2026-09-14, not the table.
-    // The client moved the row's own switch/badge off the list and into an
-    // edit sheet ("an edit button that opens a slide-in, and we can edit
-    // name, description, and status"); `module-automations.tsx` now draws a
-    // `RecordTable` and holds neither a `<Switch>` nor this badge anywhere in
-    // its own source. This is R70's OWN instruction, followed rather than
-    // amended around: "if the Choices screen changed, this check must follow
-    // it rather than be deleted" — the screen that changed here is this
-    // one's sibling, and the invariant (one mark, one guard, the reason never
-    // parted from it) is unchanged by which file draws it.
+    // 2 · THE AUTOMATIONS TABLE'S OWN STATUS BADGE DRAWS FROM THE SAME MAP —
+    // `module-automations.tsx`'s `RecordTable` column (`status: <Badge
+    // variant={AUTOMATION_STATUS_VARIANT[status]}>`), the table-shaped sibling
+    // of the Choices badge above and the more honest comparison since both
+    // are now a computed fill rather than a literal: two elements reading the
+    // SAME constant cannot disagree about a colour, which is what "one
+    // concept, one colour, on two pages" now means structurally rather than
+    // as a string match.
+    const table = stripComments(read(join(WEB, "components/screens/module-automations.tsx")))
+    expect(
+      /<Badge[^>]*variant=\{AUTOMATION_STATUS_VARIANT\[/.test(table),
+      "R70 — module-automations.tsx no longer draws its own status column through AUTOMATION_STATUS_VARIANT; re-read whether the Choices/Automations colour parity this check proves still holds"
+    ).toBe(true)
+
+    // 3 · THE EDIT SHEET STILL SAYS THE WORD, ONCE, IN THE UNSWITCHABLE
+    //     BRANCH — the ORIGINAL R70 subject (an automation nobody can turn
+    //     off wears the same WORD a protected choice does), unaffected by the
+    //     colour change above: this is about the SENTENCE, not the fill.
     const screen = stripComments(read(join(WEB, "components/screens/automation-edit-sheet.tsx")))
     const said = screen.split(says).length - 1
     expect(
       said,
       `R70 — the automation edit sheet says "${term}" ${said} time(s) and must say it exactly once: the mark belongs to the ONE branch that draws a row nobody can switch. The client's ruling of 2026-09-11 is that an unswitchable automation wears the same word a protected choice does ("like we have protected choices to have protected automations"), and a second occurrence is a mark drawn somewhere a person CAN change the row`
     ).toBe(1)
-    expect(
-      new RegExp(`<${part}\\s[^>]*variant="${variant}"[^>]*>\\s*${literal}`).test(screen),
-      `R70 — the automations mark is not the Choices half's own part. Both must be <${part} variant="${variant}"> carrying t("${term}"): two different-looking badges for one concept on one page is exactly what the ruling that asked for the word was aimed at`
-    ).toBe(true)
 
     // 3 · IT SHARES ITS GUARD WITH THE REASON, AND THAT GUARD IS THE
     //     UNSWITCHABLE ONE.

@@ -57,6 +57,7 @@ vi.mock("@/lib/api", () => ({
       openTotal: 0,
       allTotal: 0,
       overdueTotal: 0,
+      plannedTotal: door.tasks.length,
       upcomingTotal: 0,
       completedTotal: 0,
       calendarTotal: door.tasks.length,
@@ -214,38 +215,54 @@ const ONE_DATED_TASK = {
   department: "Design",
 } as unknown as Task
 
-function renderTasksCalendar(tasks: Task[]) {
+/** THE CALENDAR IS A SUB-VIEW OF PLANNED NOW, NOT A TAB OF ITS OWN — the
+ * client's ruling, 2026-09-15: "Kill the tabs 'List' and 'Calendar'… as a
+ * secondary option, a board by priority and a calendar by deadline." The
+ * strip is Overdue · Planned · Completed and the month grid is reached
+ * through the Planned tab's own toolbar view switch, so this suite can no
+ * longer get there with a `view` prop alone — it primes the REMEMBERED
+ * choice the real screen reads it from (`useRemembered("task-planned-view")`),
+ * exactly the move `renderMeetingsCalendar` above makes for its own
+ * List/Calendar switch, and for the identical reason: opening the kit's
+ * `ViewSwitch` (a Radix `Select`) in jsdom would make this a test of the mock. */
+function renderTasksCalendar(tasks: Task[], view: "table" | "calendar" = "calendar") {
   const teamId = coldTeam()
   door.tasks = tasks
-  primeCache(tasksKey(teamId, "calendar"), tasks)
+  primeCache(tasksKey(teamId, "planned"), tasks)
+  const slots: Record<string, unknown> = { "task-planned-view": view }
   return render(
-    <TasksScreen
-      teamId={teamId}
-      recipe={BASE_RECIPES["tasks.list"]}
-      rights={{ work: { read: true, create: true } } as never}
-      total={0}
-      counts={{
-        all: 0,
-        overdue: 0,
-        upcoming: 0,
-        completed: 0,
-        calendar: tasks.length,
-        dueToday: 0,
-        dueTodayDone: 0,
-      }}
-      view="calendar"
-      onViewChange={() => {}}
-      myUserId="u1"
-      canCreate
-      canRaiseTodo={false}
-      canCancelTodo={false}
-      onAction={() => {}}
-      onIntent={() => {}}
-    />
+    <RememberedScreen
+      memory={{ read: (slot) => slots[slot], write: (slot, value) => void (slots[slot] = value) }}
+    >
+      <TasksScreen
+        teamId={teamId}
+        recipe={BASE_RECIPES["tasks.list"]}
+        rights={{ work: { read: true, create: true } } as never}
+        total={0}
+        counts={{
+          all: 0,
+          overdue: 0,
+          planned: tasks.length,
+          upcoming: 0,
+          completed: 0,
+          calendar: tasks.length,
+          dueToday: 0,
+          dueTodayDone: 0,
+        }}
+        view="planned"
+        onViewChange={() => {}}
+        myUserId="u1"
+        canCreate
+        canRaiseTodo={false}
+        canCancelTodo={false}
+        onAction={() => {}}
+        onIntent={() => {}}
+      />
+    </RememberedScreen>
   )
 }
 
-describe("Tasks — the Calendar tab on a team with nothing dated", () => {
+describe("Tasks — the Planned tab's Calendar view on a team with nothing dated", () => {
   it("names the first act instead of drawing a month with nothing in it", async () => {
     renderTasksCalendar([])
     expect(await screen.findByText("No tasks with a deadline yet.")).toBeTruthy()
@@ -287,27 +304,31 @@ const ONE_MEETING = {
 
 /** THE CALENDAR IS A VIEW NOW, NOT A TAB — the client's ruling, 2026-09-09:
  * *"i was in the room, and calendar as a view"*. The strip is This week · Mine ·
- * All and the month grid is reached from the toolbar's own view switch, so this
- * suite can no longer get there with `pickTab`.
+ * Everyone's (the third tab renamed 2026-09-15) and the month grid is reached
+ * from the toolbar's own view switch, so this suite can no longer get there
+ * with `pickTab`.
  *
  * IT IS REACHED THROUGH THE SCREEN'S OWN MEMORY rather than by driving the
  * control, and that is a deliberate choice rather than a shortcut. The switch is
  * the kit's `ViewSwitch`, which is a Radix `Select` — opening one in jsdom means
  * stubbing `hasPointerCapture` and friends, which would make this suite a test
- * of the mock. `useRemembered("meeting-view")` is the REAL seam the real screen
- * reads that choice from (a person who last used the calendar comes back to it),
- * so priming it renders exactly what they would see. The control's own presence
- * is asserted separately below, so "the switch is gone" still fails. */
-function renderMeetingsCalendar(meetings: Meeting[], view: "list" | "calendar" = "calendar") {
+ * of the mock. `useRemembered("meeting-view-week")` is the REAL seam the real
+ * screen reads This week's own choice from (a person who last used the
+ * calendar comes back to it) — PER TAB since 2026-09-15 (`meeting-view-mine`/
+ * `meeting-view-all` are the other two, untouched here because every test in
+ * this file opens on the default tab) — so priming it renders exactly what
+ * they would see. The control's own presence is asserted separately below, so
+ * "the switch is gone" still fails. */
+function renderMeetingsCalendar(meetings: Meeting[], view: "table" | "calendar" | "agenda" = "calendar") {
   const teamId = coldTeam()
   door.meetings = meetings
   primeCache(meetingsKey(teamId), meetings)
-  primeCache(meetingsKey(teamId, "week"), meetings)
+  primeCache(meetingsKey(teamId, "mine-week"), meetings)
   primeCache(`meetings-mine:${teamId}`, meetings)
   primeCache(totalKey("meetings", teamId), meetings.length)
   primeCache(totalKey("meetings-week", teamId), meetings.length)
   primeCache(totalKey("meetings-mine", teamId), meetings.length)
-  const slots: Record<string, unknown> = { "meeting-view": view }
+  const slots: Record<string, unknown> = { "meeting-view-week": view }
   render(
     <RememberedScreen
       memory={{ read: (slot) => slots[slot], write: (slot, value) => void (slots[slot] = value) }}
@@ -342,8 +363,10 @@ describe("Meetings — the Calendar VIEW on a team with no meetings", () => {
   it("CANARY: one meeting draws the grid, not the register", async () => {
     const teamId = renderMeetingsCalendar([ONE_MEETING])
     // The grid asks the door for the month it opens on, narrowed by the TAB it
-    // is a view of — All, on a screen nobody has switched. Same one row.
-    primeCache(meetingsMonthKey(teamId, "2026-09", { view: "all" }), [ONE_MEETING])
+    // is a view of — This week, on a screen nobody has switched, and This week
+    // is always mine now (2026-09-15), so the door question is `mine-week`.
+    // Same one row.
+    primeCache(meetingsMonthKey(teamId, "2026-09", { view: "mine-week" }), [ONE_MEETING])
     expect(await screen.findByRole("button", { name: /next month/i })).toBeTruthy()
     expect(screen.queryByText("Nothing in Meetings yet.")).toBeNull()
     expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
@@ -353,11 +376,11 @@ describe("Meetings — the Calendar VIEW on a team with no meetings", () => {
 describe("Meetings — the strip the client asked for, and the switch beside it", () => {
   // R50 — a toolbar is drawn at all only over a collection with rows, so this
   // one is asked of a screen that has one.
-  it("is This week · Mine · All, and Calendar is a view rather than a tab", async () => {
-    renderMeetingsCalendar([ONE_MEETING], "list")
+  it("is This week · Mine · Everyone's, and Calendar is a view rather than a tab", async () => {
+    renderMeetingsCalendar([ONE_MEETING], "table")
     expect(await screen.findByRole("tab", { name: /This week/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Mine/ })).toBeTruthy()
-    expect(screen.getByRole("tab", { name: /All/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Everyone's/ })).toBeTruthy()
     // The tab she did NOT ask to keep as a tab.
     expect(screen.queryByRole("tab", { name: /Calendar/ })).toBeNull()
     // …because it moved HERE. The kit draws the view switch as a combobox
@@ -368,7 +391,7 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
 
   it("MINE IS THE DOOR'S QUESTION, not a filter over the loaded page", async () => {
     asked.length = 0
-    renderMeetingsCalendar([ONE_MEETING], "list")
+    renderMeetingsCalendar([ONE_MEETING], "table")
     // ASKED ON ARRIVAL, BEFORE THE TAB IS OPENED, and that is the assertion
     // rather than an accident of when the read fires: the badge on a tab nobody
     // has touched still has to be an exact server count (R16), and unlike the
@@ -386,5 +409,17 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
     // …and opening it does not turn that into a different question.
     pickTab(/Mine/)
     expect(asked.filter((q) => q.view === "mine").length).toBeGreaterThan(0)
+  })
+
+  it("THIS WEEK IS ALWAYS MINE NOW — the door question is mine-week (ruling, 2026-09-15)", async () => {
+    asked.length = 0
+    renderMeetingsCalendar([ONE_MEETING], "table")
+    // The default tab (This week) reads its own list on arrival — the same
+    // `weekQ` read the header block of meetings-screen.tsx documents — and it
+    // now asks `view: "mine-week"`, never plain `week`, because the tab folds
+    // the attendance predicate in permanently.
+    await screen.findByRole("tab", { name: /This week/ })
+    expect(asked.some((q) => q.view === "mine-week")).toBe(true)
+    expect(asked.some((q) => q.view === "week")).toBe(false)
   })
 })

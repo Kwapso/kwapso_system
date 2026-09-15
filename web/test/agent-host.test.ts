@@ -93,6 +93,21 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     )
   })
 
+  it("no mid-edge close circle floats over the open column (client ruling, 2026-09-15)", () => {
+    // The kit's aside EdgeHandle draws a mango circle in TWO places: the screen's
+    // top-trailing corner while shut (kept — the only way back into a column that
+    // renders nothing) and a top-1/2 mid-edge close grab while open (removed — this
+    // app already closes the open column from its own folder tab's ×, so the circle
+    // was a second control for the one thing the tab already does). Source-scanned
+    // rather than rendered: the suppression is a kit-level prop
+    // (`asideHandleOnOpen`, kit v1.2.85+), so the only thing this app can get wrong
+    // is forgetting to pass it.
+    const shell = read("components/shell/app-shell.tsx")
+    expect(shell, "the open mid-edge handle must be turned off at the ScreenShell call site").toContain(
+      "asideHandleOnOpen={false}"
+    )
+  })
+
   it("the session cache is reactive, so the root-mounted launcher appears without a reload", () => {
     // AgentHost mounts BEFORE login; its useActiveTeam instance must pick up the session
     // the moment another instance logs in / creates a team — else the launcher only shows

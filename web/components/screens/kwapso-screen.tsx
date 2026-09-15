@@ -24,7 +24,7 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
@@ -133,11 +133,17 @@ export function KwapsoScreen({
         )}
       </div>
 
-      <TabsView
-        config={tabsConfig}
-        value={tab}
-        onValueChange={setTab}
-        renderPanel={(panel) => {
+      {/* THE STRIP AND ITS PANEL ARE SIBLINGS, R77 (`tab-strips-pin`) — the
+          same split settings-screen.tsx's own header explains: `renderFolderTabs`
+          is the one place `STICKY_FOLDER_TABS` is applied, and it pins the
+          whole `<Tabs>` root it draws (unlike `STICKY_TABS`, which is scoped
+          to `[role=tablist]` alone) — so a root that ALSO wraps the panel via
+          `TabsView`'s own `renderPanel` prop would pin the panel along with
+          the strip. The panel is a plain sibling instead, keyed on `tab`
+          directly. */}
+      <div className="flex w-full flex-col">
+        {renderFolderTabs({ config: tabsConfig, value: tab, onValueChange: setTab })}
+        {(function renderPanel(panel: { value: string }): React.ReactNode {
           if (panel.value === "team") return <TeamPanel teamId={teamId} canRead={can("team_members", "read")} />
           if (panel.value === "brand")
             return <BrandPanel teamId={teamId} canRead={can("brand_assets", "read")} />
@@ -168,8 +174,8 @@ export function KwapsoScreen({
               )}
             </div>
           )
-        }}
-      />
+        })({ value: tab })}
+      </div>
 
       <TeamEditDialog
         open={identityOpen}

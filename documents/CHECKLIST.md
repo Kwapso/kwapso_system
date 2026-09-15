@@ -83,7 +83,7 @@ longer builds the purged ones.
 | # | The thing | Status |
 |---|---|---|
 | 4.1 | "Today's tasks" progress bar pinned to the top of every tab | **DONE**, reads 100 / 133 done on staging |
-| 4.2 | Tabs: Overdue, List, Calendar, Completed, Upcoming, All | **DONE**. Overdue 32, List 80, Calendar 138, Completed 172, Upcoming 2, All 251. The calendar is the library's, not a hand-built one |
+| 4.2 | Tabs: Overdue, List, Calendar, Completed, Upcoming, All | **DONE, then reshaped.** Four tabs, in the client's own order: Overdue, Planned, Completed, Everyone's (the last shown only to a reader with `all_tasks:read`). Each tab carries its own view switch rather than one calendar bolted on beside a list: Overdue is Table/Board, Planned is Table/Board/Calendar (dated tasks only), Completed is Table only (nothing left to switch), and Everyone's is the same Table/Board pair Overdue offers. The calendar is the library's, not a hand-built one |
 | 4.3 | Priority becomes important and urgent ticks, scored `(important x 2) + urgent + 1` | **DONE**, worked out on the fly rather than stored, so it can never go stale |
 | 4.4 | An assignee selector that defaults to whoever is creating the task | **DONE**, and it uncovered a real bug: the row had been storing the CREATOR's name as the assignee |
 | 4.5 | A department selector: Admin, Business, Marketing, Production, Sales, each with its icon and brand colour | **DONE**, seeded as editable dropdown values, so you can change them without a deploy |
@@ -168,7 +168,7 @@ longer builds the purged ones.
 
 | # | The thing | Status |
 |---|---|---|
-| 9.1 | Meeting views: this week, calendar, all | **DONE**, this week, a month grid, and an all view with nine columns |
+| 9.1 | Meeting views: this week, calendar, all | **DONE, then reshaped 15 Sep 2026** at the client's own ruling. Three tabs — This week (Agenda / Calendar / Table), Mine (Calendar / Table, every meeting this person was in the room for, past and present) and Everyone's (Table / Calendar, the agency's whole list) — the first view named in each is that tab's default. Every tab's Table draws the SAME seven columns now, rather than Everyone's own six plus two tabs still drawing a two-line list: Meeting, Date, Time, Meeting type, Department, Attendees, Account |
 | 9.2 | A transcript creates a work log per participant | **PART DONE**, built and running against your real calendar every time. It could not be PROVED, because none of your 17 repeating meetings is a recorded call, so no transcript exists to bring in. The refusal path is proved; the write path is not |
 | 9.3 | Those logs are marked as meeting time and can be excluded from any figure | **DONE**, any figure can be shown with meeting time, without it, or only it |
 | 9.4 | "Meeting held" ticks itself when a transcript arrives | **WITHDRAWN 18 Aug 2026.** The owner: *"this held mark is held release. I don't care. It's too complicated."* A meeting's own start time already says whether it has happened, so the status was a second source of truth for a question the clock answers. Retired; the transcript still writes the work logs (9.2) and is still idempotent, on `transcript_captured_at` rather than on any status |

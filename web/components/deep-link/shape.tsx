@@ -24,6 +24,11 @@ import { Swatch } from "@/components/records/record-picker"
 import type { PickablePerson } from "@/lib/members"
 import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
 import { CONCEPT_ICON } from "@/lib/pages"
+// THE ONE STATUS→FILL DERIVATION, IMPORTED RATHER THAN COPIED — see
+// `shapeChoicesTable`'s own status-cell comment below. `automation-edit-sheet.tsx`
+// is the module that defines it (`ModuleAutomations` already imports it the
+// same way); this is the second, not a third.
+import { AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"
 // THE CLASS, NOT THE CHIP. `REF_LEADS_NAME` is the one spelling of "a shrink-0
 // thing in front of a name that truncates", written for the reference lozenge
 // and exactly as true of the contacts table's mark — the alternative was a
@@ -437,8 +442,19 @@ export function shapeAccountsList(
         // (shared/web/record-mark.tsx's header carries what that cost).
         mark: <RecordMark picture={a.logoUrl} name={a.name} />,
         // Archived rows stay visible (archive-never-delete), flagged like retired
-        // roles and articles are.
-        name: a.active ? a.name : `${a.name} (archived)`,
+        // roles and articles are. For the TABLE VIEW, client ruling 2026-09-15:
+        // "on the accounts list, on the left of the name, in the same column,
+        // put the logo of the company." The gallery renders the mark separately
+        // (`size="band"`); the table renders both mark+name in one cell.
+        name: (
+          <span className="flex items-center gap-2">
+            <RecordMark picture={a.logoUrl} name={a.name} />
+            <span>{a.active ? a.name : `${a.name} (archived)`}</span>
+          </span>
+        ),
+        // Keep the plain text for search and sort. The table's own column
+        // definition will use `searchKey` to find this field for filtering.
+        nameText: a.active ? a.name : `${a.name} (archived)`,
         // K1: what it is, and where it sits in the tree. The CODE left the line
         // — it is a lookup key, not something anybody scans a list for, and it
         // leads the eyebrow on the record's own screen. The parent stayed,
@@ -827,8 +843,19 @@ export function shapeChoicesTable(
         // so it cannot share a key with a node column any more than search
         // or sort can.
         moduleSegment: segment,
+        // ── SAME WORD, SAME COLOUR AS AUTOMATIONS — 15 Sep 2026 ─────────────
+        // The coordinator's own ruling: Choices' three-way status
+        // (Protected/Active/Inactive) and Automations' own three-way
+        // (Protected/On/Off, `AUTOMATION_STATUS_VARIANT`,
+        // automation-edit-sheet.tsx) are the SAME concept read from two
+        // modules, and a reader who learns "grey outline = off" on one
+        // settings tab should not have to learn a second palette for the
+        // other. ONE derivation, imported rather than copied — this file
+        // maps its own `isDefault`/`active` pair onto the automations
+        // module's own key domain (`"protected" | "on" | "off"`) rather than
+        // carrying a second copy of the map itself.
         status: (
-          <Badge variant="secondary" className={v.active ? undefined : "opacity-60"}>
+          <Badge variant={AUTOMATION_STATUS_VARIANT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
             {statusWord}
           </Badge>
         ),

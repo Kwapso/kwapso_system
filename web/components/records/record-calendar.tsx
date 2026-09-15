@@ -32,6 +32,17 @@
 // no record moves by being dropped on a day. A calendar in this app is a way
 // IN to records that already have a date; the date itself is changed on the
 // record's own form, where it is validated at the door like every other field.
+//
+// TWO EXPORTS, ONE KIT COMPONENT EACH, since 2026-09-15. `RecordCalendar`
+// (above) is a MONTH — grid or agenda, its own navigation, its own fetch of
+// whichever month is on screen. `RecordAgenda` (below) is neither: a
+// caller-narrowed set of entries (a week, never a month this file would have
+// to filter down to), read day by day, with no navigation of its own — the
+// Meetings screen's own "This week" Agenda view is its first caller. Both are
+// the "ONE CALENDAR" law's answer to the same question, `web/test/rules.test.ts`'s
+// `one-calendar`: nothing outside this file may import the kit's own
+// `calendar-view` or `agenda` directly, so a record on either shape is never a
+// picture with no click (UI-GAPS #22).
 
 import * as React from "react"
 
@@ -444,5 +455,90 @@ export function RecordCalendar({
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/* ------------------------------- the agenda -------------------------------- */
+
+/** ONE ROW OF `RecordAgenda` — the kit's own `AgendaItem` (time / title / who),
+ * minus the fields this file supplies itself (`id` doubles as the React key and
+ * the handle `onOpen` gets, so it is not repeated as a separate prop here). */
+export type AgendaEntry = {
+  id: string
+  /** the day it falls on, `YYYY-MM-DD` — grouped and headed the same way
+   * `RecordCalendar`'s own month agenda groups `CalendarEntry.day`. */
+  day: string
+  /** when, already formatted by the caller (ruling 07) — the kit's own
+   * time column. */
+  time?: React.ReactNode
+  /** the machine-readable instant, for the kit's `<time datetime>` — never
+   * shown, never formatted for reading (RAW_DATE_EXEMPT, shared/rules/
+   * registry.ts, carries the reasoning). Sorts rows within a day when two
+   * share no other order. */
+  dateTime?: string
+  /** what it is — the kit's one full-measure column. */
+  title: React.ReactNode
+  /** who it is with, at the inline end — the kit's own "who". */
+  who?: React.ReactNode
+}
+
+/**
+ * A CHRONOLOGICAL LIST OF RECORDS, GROUPED BY DAY — no month, no grid, no
+ * navigation: the caller has already decided which records and which days
+ * (`meetings-screen.tsx`'s own Agenda view hands it a server-answered week,
+ * never a month `RecordCalendar` would have to fetch and filter down).
+ *
+ * STILL THE KIT'S `Agenda`, THROUGH THIS ONE FILE — the "ONE CALENDAR" law
+ * (`web/test/rules.test.ts`'s `one-calendar`) requires every screen that wants
+ * `shared/ui/components/agenda/agenda.tsx` to reach it here rather than
+ * importing it directly, so a record on it is never a picture with no click
+ * (UI-GAPS #22, the same reason `RecordCalendar` above exists at all). This is
+ * the SECOND door into that same kit component — `RecordCalendar`'s own agenda
+ * mode is a MONTH read day by day; this one is ANY set of entries the caller
+ * already narrowed, read day by day — and both end at the identical
+ * `onItemSelect={(item) => onOpen(item.id)}` wiring.
+ *
+ * "TODAY" IS MARKED the same way `RecordCalendar`'s own agenda days are. */
+export function RecordAgenda({
+  entries,
+  onOpen,
+  emptyText,
+}: {
+  entries: AgendaEntry[]
+  /** open the record — the screen's own `onIntent`, exactly as `RecordCalendar` above takes. */
+  onOpen: (id: string) => void
+  /** what an empty answer says, in the caller's own words — this file does no
+   * narrowing of its own, so it does not know whether "empty" means "nothing
+   * on the books" or "nothing matched a search". */
+  emptyText: string
+}) {
+  const { t, lang } = useLanguage()
+  const today = dayKey(new Date())
+  const byDay = new Map<string, AgendaEntry[]>()
+  for (const e of entries) {
+    const list = byDay.get(e.day)
+    if (list) list.push(e)
+    else byDay.set(e.day, [e])
+  }
+  const days: AgendaDay[] = [...byDay.keys()].sort().map((day) => ({
+    key: day,
+    label: `${formatDayKey(day, lang)}${day === today ? ` · ${t("Today")}` : ""}`,
+    items: [...(byDay.get(day) ?? [])]
+      .sort((a, b) => (a.dateTime ?? "").localeCompare(b.dateTime ?? ""))
+      .map((e) => ({ id: e.id, time: e.time, dateTime: e.dateTime, title: e.title, who: e.who })),
+  }))
+  return (
+    <Agenda
+      days={days}
+      onItemSelect={(item) => onOpen(item.id)}
+      empty={entries.length === 0}
+      emptyState={
+        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+          <CalendarDots aria-hidden className="size-4 shrink-0" />
+          {emptyText}
+        </p>
+      }
+      label={t("Agenda")}
+    />
   )
 }

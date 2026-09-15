@@ -25,12 +25,8 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { CalendarBlank, ListBullets, Plus, UploadSimple } from "@shared/ui/foundations/icons"
-import {
-  ScreenRenderer,
-  type ScreenActionContext,
-  type ScreenIntent,
-} from "@shared/web/screen-engine/screen-renderer"
+import { CalendarBlank, Plus, Rows, Table as TableViewIcon, UploadSimple } from "@shared/ui/foundations/icons"
+import { type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider, CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
@@ -46,7 +42,7 @@ import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
-import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
+import { RecordCalendar, RecordAgenda, type CalendarEntry, type AgendaEntry } from "@/components/records/record-calendar"
 import { RecordTable, visibleActions, type TableColumn } from "@/components/records/record-table"
 import { RecordMark } from "@shared/web/record-mark"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
@@ -60,6 +56,7 @@ import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
+import type { Language } from "@shared/i18n"
 
 /* THE "EARLIER NOT LOADED" NOTICE IS GONE, and its absence is the fix.
  *
@@ -75,26 +72,32 @@ import { useLanguage } from "@shared/web/language"
  */
 
 
-/** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
- * list is for scanning; this is the one somebody reads across.
+/** WHAT "TABLE" SHOWS, ON EVERY TAB THAT OFFERS IT (ruling, 2026-09-15) — one
+ * definition rather than "All"'s own six columns plus two tabs still drawing a
+ * two-line list. SEVEN COLUMNS, named in her own order: Name/Title, Date, Time,
+ * Meeting type, Department, Attendees, Account.
  *
- * SIX COLUMNS, NOT NINE. "Every fact a meeting row can state" was the brief and
- * nine columns was the result — the widest table in either front door, against
- * N1's table budget of six. A table's column header does the labelling, which is
- * why it gets six where a list row gets four; past that the row stops being
- * scannable and becomes something you read, which is what the record is for.
- *
- * The three that went: `Why we met` and `Notes` are prose, and prose in a table
- * cell is a truncated sentence nobody can read either way; `Reference` already
- * rides the record's own eyebrow (D4), so it was the same string in two places.
- * All three are on the meeting, one click from the row they were crowding. */
-const ALL_COLUMNS = [
+ * WHAT CHANGED FROM THE OLD SIX. `App` and `Where` are gone — this table is no
+ * longer the "far more columns" 9.1 asked for on "All" alone, it is the one
+ * table every tab reaches, and her list for it names neither. `Status` is gone
+ * with them, for the reason `COLUMN_SORT` below already recorded: the door has
+ * no order for it and never did. `When` split into `Date` and `Time`, because a
+ * table a person reads across wants the two separately rather than one string
+ * carrying both. `Meeting type` is `purpose` under its new name (the glossary
+ * rename this lane hands over verbatim; the field key stays `purposeId` /
+ * `purpose` everywhere in code — only the label a reader sees changed).
+ * `Department` and `Attendees` are new: the first off the meeting's own type
+ * (`MeetingPurpose.department`, already read for the picker below — no door
+ * change, a client-side lookup), the second off `googleGuests`, which every
+ * meeting row already carries (MEETING_COLS) and needed no plumbing either. */
+const TABLE_COLUMNS = [
   field("name", "Meeting"),
-  field("when", "When"),
+  field("when", "Date"),
+  field("time", "Time"),
+  field("purpose", "Meeting type"),
+  field("department", "Department"),
+  field("attendees", "Attendees"),
   field("client", "Account"),
-  field("app", "App"),
-  field("where", "Where"),
-  field("state", "Status"),
 ]
 
 /** WHAT THE DOOR CALLS EACH OF THOSE COLUMNS.
@@ -102,10 +105,10 @@ const ALL_COLUMNS = [
  * The meetings list PAGES, so a column header orders it at the door or it does not order
  * it at all — arranging the fifty rows in the browser under a badge counting 254
  * is the lie `<PagedFind>` exists to stop, one control along (SEARCH.md § *The
- * third question*). So a header sends a NAME out of `MEETING_SORTS`, and the two
- * columns the door has no name for — App and Where — draw a plain header. A
- * header that cannot order is honest; one that looks like it can and does not is
- * the defect this whole lane is about.
+ * third question*). So a header sends a NAME out of `MEETING_SORTS`, and the
+ * columns the door has no name for — Time, Meeting type, Department, Attendees —
+ * draw a plain header. A header that cannot order is honest; one that looks
+ * like it can and does not is the defect this whole lane is about.
  *
  * Hand-paired because it is a translation between two vocabularies (a shaped
  * row's column, and the door's menu name); the DIRECTION is not, it is read off
@@ -115,28 +118,20 @@ const COLUMN_SORT: Record<string, string> = {
   name: "title",
   when: "when",
   client: "client",
-  state: "status",
 }
 
-/** …AND THE PAIRING IS CHECKED AGAINST THE MENU, not trusted.
- *
- * `state: "status"` above is a name the door does not have. The meetings menu is
- * `when | title | client | added` (collection-sorts.ts, whose own comment
+/** …AND THE PAIRING IS CHECKED AGAINST THE MENU, not trusted. The meetings menu
+ * is `when | title | client | added` (collection-sorts.ts, whose own comment
  * records that a Status option "went with the status: sorting by when a meeting
- * IS is already sorting by whether it has happened") — so the Status header was
- * a live-looking control sending an order nothing answers, which is the exact
- * defect the paragraph above says this table must not ship. It survived because
- * a hand-written pair has nobody to disagree with.
- *
- * So a name the menu does not offer produces NO `sort`, and the column draws a
- * plain header beside App and Where. The line stays in the map deliberately: it
- * records that somebody wanted Status ordered, and the day the door grows a
- * `status` option the header lights up on its own with no second edit here.
+ * IS is already sorting by whether it has happened") — so a name the menu does
+ * not offer produces NO `sort`, and the column draws a plain header. A header
+ * that cannot order is honest; one that looks like it can and does not is the
+ * defect this whole lane is about.
  *
  * `defaultDir` comes off the same lookup, so a header can never land in a
  * different direction from the picker above it offering the same order — that
  * is why the option object is found once and read twice. */
-const ALL_COLUMN_HEADERS: TableColumn[] = ALL_COLUMNS.map((f) => {
+const TABLE_COLUMN_HEADERS: TableColumn[] = TABLE_COLUMNS.map((f) => {
   const option = COLLECTION_SORTS.meetings.options.find((o) => o.value === COLUMN_SORT[f.column])
   return {
     key: f.column,
@@ -152,34 +147,66 @@ const ALL_COLUMN_HEADERS: TableColumn[] = ALL_COLUMNS.map((f) => {
   }
 })
 
-/* ── THE STRIP AND THE VIEW SWITCH, 2026-09-09 ──────────────────────────────
+/* ── THE STRIP AND THE VIEWS, 2026-09-09 → 2026-09-15 ────────────────────────
  *
- * THE CLIENT'S RULING, in her own words: *"tabs for meetings: this week, mine,
- * all"*. Told that this would delete the Calendar tab and that "Mine" did not
- * exist, she answered both at once: *"i was in the room, and calendar as a
- * view"*.
+ * THE FIRST RULING, 2026-09-09, in her own words: *"tabs for meetings: this
+ * week, mine, all"*. Told that this would delete the Calendar tab and that
+ * "Mine" did not exist, she answered both at once: *"i was in the room, and
+ * calendar as a view"*. That gave This week · Mine · All, every tab read as a
+ * list or a month grid through one shared view slot. SUPERSEDED BELOW — kept
+ * here for the history, not for the shape.
  *
- * So two changes, and only one of them is a rename.
+ * THE RULING THAT REPLACES IT, 2026-09-15, verbatim: *"In meetings, the tabs
+ * that I would like are: This week / Mine / and: Replace 'All' with
+ * 'Everyone's'. The views I want in 'This week' are: Agenda chronological
+ * (this is only for mine, unless I say so, and it's always filtered to mine).
+ * Same goes for tasks and meetings. Again, on 'This week', I want the views:
+ * Agenda / Calendar / Table. On the 'Mine' tab, this shows all of my meetings,
+ * past and present. I also want the views: Calendar / Table. On 'Everyone's',
+ * I want the views: Table / Calendar."*
  *
- * 1 · THE STRIP IS THIS WEEK · MINE · ALL. It was This week · Calendar · All.
- *     "Mine" means I WAS IN THE ROOM — attendance, not authorship — and it is
- *     answered by the DOOR (`view=mine`), because attendance lives in a JSON
- *     mirror column no browser filter can reach and a badge over a filtered page
- *     is the exact arrangement R16 forbids. `workers/content/src/lib/meetings.ts`
- *     carries the whole rule, the fallback for a meeting nobody synced, and what
- *     the scan costs.
+ * FOUR CHANGES, not one.
  *
- * 2 · CALENDAR IS A VIEW, NOT A TAB — and it was not deleted, which is the half
- *     worth recording. Any tab can now be read as a list or as a month grid,
- *     through the toolbar's own view slot, so "my meetings, on a calendar" and
- *     "this week, on a calendar" are questions the screen can now be asked and
- *     could not be before. The pattern is Tickets' (`tickets-collection.tsx`'s
- *     `viewSlot`), followed rather than reinvented: a `ToolbarViewSlot` config
- *     handed to the row, never a node, so R53's fixed slot order places it.
+ * 1 · THE THIRD TAB IS RENAMED, NOT REBUILT. "All" became "Everyone's" on its
+ *     label only — `view=all` is unchanged on the wire, so nothing downstream
+ *     of the door had to learn a new word.
  *
- * THE TWO ARE REMEMBERED SEPARATELY (`meeting-tab`, `meeting-view`) because they
- * are two independent choices now: switching to Mine must not throw away the
- * fact that somebody is reading in a calendar.
+ * 2 · "THIS WEEK" IS NOW ALWAYS MINE. It used to be the agency's whole week;
+ *     this ruling folds Mine's own attendance predicate into it PERMANENTLY —
+ *     the tab reads mine-this-week, never the agency's this-week, on every
+ *     body it can be read in. The door answers a new combined view,
+ *     `view=mine-week` (`workers/content/src/lib/meetings.ts`'s own `whereFor`
+ *     carries the rule and what it costs). Plain `week` stays, unchanged and
+ *     un-mine'd, because `routes/insights.ts`'s own dashboard tile still asks
+ *     for the agency's whole week and is not this screen.
+ *
+ * 3 · EACH TAB NOW OFFERS ITS OWN BODIES, not one switch shared by all three:
+ *     This week is Agenda / Calendar / Table; Mine is Calendar / Table;
+ *     Everyone's is Table / Calendar — the FIRST named in each case is that
+ *     tab's own default (her ordering, read literally). Remembered PER TAB
+ *     (`meeting-view-week` / `meeting-view-mine` / `meeting-view-all`) rather
+ *     than in one slot, because switching tabs must never strand a reader on a
+ *     body their new tab does not even offer.
+ *
+ * 4 · "LIST" IS GONE, AND "TABLE" IS WHAT IT BECAME. She asked for Table, not
+ *     List — so the two-line list this screen used to draw through the
+ *     library engine (`ScreenRenderer`) is retired outright, and every tab
+ *     that offers a Table draws the SAME seven-column `RecordTable`
+ *     (Name/Title, Date, Time, Meeting type, Department, Attendees, Account),
+ *     the pattern `record-table.tsx` already gives every other screen, rather
+ *     than the "All" table standing alone beside two tabs still drawing the
+ *     old two-line list.
+ *
+ * "AGENDA" IS THE KIT'S OWN `Agenda` (shared/ui/components/agenda/agenda.tsx,
+ * CH19 view 10) — day headings over a time column — never a hand-rolled
+ * grouped list: it already exists, so drawing a second one would be a second
+ * answer to a settled drawing. Its row is three slots (time / title / who);
+ * Meeting type has no fourth column of its own, so it rides inside the title
+ * as a quiet second line, and Attendees is the "who".
+ *
+ * THE VIEW SLOT STAYS `ToolbarViewSlot` — a CONFIG, never a node — the pattern
+ * Tickets' `viewSlot` (`tickets-collection.tsx`) set and this file followed on
+ * 2026-09-09; only WHICH views it lists now depends on the open tab.
  */
 
 /** THE CALENDAR VIEW'S OWN MONTH READ — its own component, and not a `const`
@@ -254,6 +281,60 @@ function MeetingsMonthCalendar({
   )
 }
 
+/** THE AGENDA — This week's own default body (ruling, 2026-09-15): the week's
+ * meetings, chronological, grouped by day. Drawn through `RecordAgenda`
+ * (web/components/records/record-calendar.tsx) rather than the kit's own
+ * `Agenda` directly — the "ONE CALENDAR" law (`web/test/rules.test.ts`'s
+ * `one-calendar`) requires every screen that wants that kit component to reach
+ * it through that one host file, so a record on it is never a picture with no
+ * click (UI-GAPS #22). This file only SHAPES the rows into `AgendaEntry[]`;
+ * the grouping, the day headings, "Today" and the open-wiring are that file's.
+ *
+ * DOES NO FILTERING OF ITS OWN. `rows` is whatever `weekQ` (view=mine-week)
+ * already answered — always this reader's own week, never the agency's — so
+ * this component only shapes what it is handed; the same separation
+ * `MeetingsMonthCalendar` above keeps between the door's question and the
+ * grid's own drawing.
+ *
+ * THE KIT ROW IS THREE SLOTS (time / title / who), and the client asked for
+ * four facts (day headings, time, title, type, attendees). Meeting type has no
+ * column of its own, so it rides inside `title` as a quiet second line — the
+ * same move `record-calendar.tsx`'s own month agenda makes to carry its accent
+ * dot — and Attendees is `who`. A meeting with no guest list (typed in, not
+ * synced) says nothing there rather than inventing a name to fill the slot. */
+function MeetingsAgenda({
+  rows,
+  lang,
+  onOpen,
+  emptyText,
+}: {
+  rows: Meeting[]
+  lang: Language
+  onOpen: (id: string) => void
+  emptyText: string
+}) {
+  const entries: AgendaEntry[] = rows.map((m) => ({
+    id: m.id,
+    day: m.startsAt.slice(0, 10),
+    time: formatTime(m.startsAt, lang),
+    dateTime: m.startsAt,
+    // A CANCELLED meeting still says so here — the same word `shape.tsx`'s
+    // own `shapeMeetingsList` appends to the list/table row, unwrapped there
+    // too (a template literal, not a sentence of its own for `t` to
+    // translate).
+    title: (
+      <span className="flex min-w-0 flex-col">
+        <span className="min-w-0 truncate">{m.active ? m.title : `${m.title} (cancelled)`}</span>
+        {m.purposeName ? (
+          <span className="text-muted-foreground min-w-0 truncate text-xs">{m.purposeName}</span>
+        ) : null}
+      </span>
+    ),
+    who: m.googleGuests?.length ? m.googleGuests.map((g) => g.name || g.email).join(", ") : undefined,
+  }))
+  return <RecordAgenda entries={entries} onOpen={onOpen} emptyText={emptyText} />
+}
+
 export function MeetingsScreen({
   teamId,
   recipe,
@@ -304,11 +385,12 @@ export function MeetingsScreen({
     listFetch.purposes(teamId)
   )
   const [open, setOpen] = React.useState(false)
-  // THE THREE TABS (client ruling, 2026-09-09 — the block above this component
-  // carries her words). This week is past AND upcoming, because "this week" is
-  // the week somebody is in rather than the days left of it; Mine is the ones
-  // this person was in the room for; and All shows far more columns, which is
-  // what makes it worth being a tab of its own at all.
+  // THE THREE TABS (client ruling, 2026-09-09, renamed 2026-09-15 — the block
+  // above this component carries her words both times). This week is past AND
+  // upcoming, because "this week" is the week somebody is in rather than the
+  // days left of it, and — since 2026-09-15 — always MINE; Mine is every
+  // meeting this person was in the room for, past and present; and Everyone's
+  // shows the agency's whole list, with far more columns on its Table.
   //
   // A NEW SLOT NAME (`meeting-tab`, not `view`) because the VALUES changed: the
   // old slot could be holding "calendar", which is no longer a tab and would
@@ -318,35 +400,57 @@ export function MeetingsScreen({
   // `revive` IS THE GUARD, and it is the shape `useRemembered` documents for
   // exactly this: a remembered value is data about a world that has moved, so
   // anything that is not one of the three tabs lands on the default instead of
-  // selecting nothing. The rename alone would have been enough today; the
-  // revive is what makes the NEXT change to this strip safe.
+  // selecting nothing. The VALUE stored is still `"week" | "mine" | "all"` —
+  // the 2026-09-15 rename only touched the THIRD tab's label, never its door
+  // value (see the header block above), so no revive change was needed for it.
   const [tab, setTab] = useRemembered<"week" | "mine" | "all">("meeting-tab", "week", (r) =>
     r === "week" || r === "mine" || r === "all" ? r : undefined
   )
-  // …AND THE BODY, WHICH IS NOW A SEPARATE CHOICE. Every tab can be read either
-  // way; list first and list by default, which is the client's own rule for
-  // every view switch in the app ("for all of them (except dashboard) start with
-  // list view", 2026-09-06).
-  const [mode, setMode] = useRemembered<"list" | "calendar">("meeting-view", "list", (r) =>
-    r === "list" || r === "calendar" ? r : undefined
+  // …AND THE BODY, ONE CHOICE PER TAB (ruling, 2026-09-15 — see the header
+  // block above). A single shared slot could not survive the redesign: the
+  // three tabs no longer offer the same bodies, so "the last body somebody
+  // picked" is meaningless without knowing which tab they picked it ON. Each
+  // default is the FIRST view she named for that tab, the same rule the old
+  // single slot followed ("start with list view", 2026-09-06) generalised to
+  // three slots instead of one.
+  const [weekMode, setWeekMode] = useRemembered<"agenda" | "calendar" | "table">(
+    "meeting-view-week",
+    "agenda",
+    (r) => (r === "agenda" || r === "calendar" || r === "table" ? r : undefined)
   )
+  const [mineMode, setMineMode] = useRemembered<"calendar" | "table">("meeting-view-mine", "calendar", (r) =>
+    r === "calendar" || r === "table" ? r : undefined
+  )
+  const [allMode, setAllMode] = useRemembered<"table" | "calendar">("meeting-view-all", "table", (r) =>
+    r === "table" || r === "calendar" ? r : undefined
+  )
+  const mode = tab === "week" ? weekMode : tab === "mine" ? mineMode : allMode
   const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
   // MINE'S OWN EXACT COUNT (R16), primed by the read below out of the same
   // response whose rows the tab shows — the door counted the question it listed.
   const mineTotal = useCachedValue<number>(totalKey("meetings-mine", teamId))
-  // THIS WEEK IS ITS OWN READ (19 Aug 2026) — the door's week, not a browser
-  // filter over the meetings list's newest page. The comment that used to sit on that
-  // filter argued the week was inside page one for any agency that had not held
-  // fifty meetings since Monday; the meetings list is ordered by start time DESCENDING,
-  // so page one is the furthest-out FUTURE, and once repeating calendar entries
+  // THIS WEEK IS ITS OWN READ (19 Aug 2026), AND NOW MINE'S OWN QUESTION TOO
+  // (2026-09-15) — the door's week, not a browser filter over the meetings
+  // list's newest page. The comment that used to sit on that filter argued the
+  // week was inside page one for any agency that had not held fifty meetings
+  // since Monday; the meetings list is ordered by start time DESCENDING, so
+  // page one is the furthest-out FUTURE, and once repeating calendar entries
   // were swept in it ran from June 2027 to August 2027 with nothing of this week
   // in it. Badge 11, list empty. A client-side filter underneath a server
   // COUNT(*) is the arrangement R16 exists to forbid, and the search box on this
   // very screen had already been moved to the door for that reason.
   //
+  // `view=mine-week` (not plain `week`) BECAUSE THE TAB IS ALWAYS MINE NOW —
+  // her ruling, verbatim, on the Agenda view: "it's always filtered to mine".
+  // The header block above says why that is a fifth door VIEW rather than a
+  // second predicate bolted on in the browser: `whereFor`
+  // (workers/content/src/lib/meetings.ts) already treats `week` and `mine` as
+  // two independent clauses over the SAME filter object, so the combined
+  // question is one more named literal, not a new shape.
+  //
   // It costs one extra read while this tab is showing, and there is no way round
   // it: the week's rows are genuinely not in the page the meetings list hands back.
-  // Only while it is showing — the other two views read the meetings list itself.
+  // Only while it is showing — the other two tabs read their own lists.
   //
   // WHICH LIST THE RESTING SCREEN IS STANDING ON, as an argument rather than as
   // a second name for the key: `meetingsKey(teamId, weekView)` is written out at
@@ -355,9 +459,9 @@ export function MeetingsScreen({
   // and they are right to. A const holding the resolved key satisfies a
   // reader and nothing
   // else; the four censuses went red on it within one run.
-  const weekView = tab === "week" ? ("week" as const) : undefined
+  const weekView = tab === "week" ? ("mine-week" as const) : undefined
   const weekQ = useCached<Meeting[]>(weekView ? meetingsKey(teamId, weekView) : null, () =>
-    listFetch.meetings(teamId, "week")
+    listFetch.meetings(teamId, "mine-week")
   )
   // MINE IS ITS OWN READ, FOR THE WEEK'S OWN REASON AND ONE MORE.
   //
@@ -419,7 +523,7 @@ export function MeetingsScreen({
       notes: values.notes || undefined,
     })
     invalidate(meetingsKey(teamId))
-    invalidate(meetingsKey(teamId, "week"))
+    invalidate(meetingsKey(teamId, "mine-week"))
     // …AND MINE, because a meeting you just wrote down is one you were in: the
     // door's fallback puts a typed-in meeting with no guest list into its
     // creator's Mine (lib/meetings.ts), so leaving this out would show the new
@@ -469,20 +573,43 @@ export function MeetingsScreen({
         ? t("Nothing in Meetings you were in.")
         : t("Nothing in Meetings yet.")
 
-  /** THE BODY SWITCH — list or month grid, on every tab (client ruling,
-   * 2026-09-09: *"calendar as a view"*). A CONFIG and never a node, which is the
-   * shape `PagedFind` takes and R53 requires, so this row's fixed slot order
-   * (search → filters → sort → view → actions) places it and no call site can
-   * put it somewhere else. The pattern is Tickets' own `viewSlot` — read that
-   * one before changing this one; there is deliberately only one of these in the
-   * app. */
+  /** THE BODY SWITCH — WHICH BODIES DEPENDS ON THE TAB (ruling, 2026-09-15 —
+   * the header block above carries her words). A CONFIG and never a node,
+   * which is the shape `PagedFind` takes and R53 requires, so this row's fixed
+   * slot order (search → filters → sort → view → actions) places it and no
+   * call site can put it somewhere else. The pattern is Tickets' own
+   * `viewSlot` — read that one before changing this one; there is deliberately
+   * only one of these in the app.
+   *
+   * THE OPTIONS ARE THE TAB'S OWN LIST, in her order (first = default, already
+   * enforced by `weekMode`/`mineMode`/`allMode`'s own initial values above) —
+   * This week: Agenda, Calendar, Table; Mine: Calendar, Table; Everyone's:
+   * Table, Calendar. `onValueChange` writes to whichever of the three
+   * remembered slots this tab owns, never the other two, so switching tabs
+   * cannot cross-contaminate a choice made on a different one. */
   const viewSlot: ToolbarViewSlot = {
-    views: [
-      { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
-      { value: "calendar", label: t("Calendar"), icon: <CalendarBlank className="size-4" /> },
-    ],
+    views:
+      tab === "week"
+        ? [
+            { value: "agenda", label: t("Agenda"), icon: <Rows className="size-4" /> },
+            { value: "calendar", label: t("Calendar"), icon: <CalendarBlank className="size-4" /> },
+            { value: "table", label: t("Table"), icon: <TableViewIcon className="size-4" /> },
+          ]
+        : tab === "mine"
+          ? [
+              { value: "calendar", label: t("Calendar"), icon: <CalendarBlank className="size-4" /> },
+              { value: "table", label: t("Table"), icon: <TableViewIcon className="size-4" /> },
+            ]
+          : [
+              { value: "table", label: t("Table"), icon: <TableViewIcon className="size-4" /> },
+              { value: "calendar", label: t("Calendar"), icon: <CalendarBlank className="size-4" /> },
+            ],
     value: mode,
-    onValueChange: (v: string) => setMode(v === "calendar" ? "calendar" : "list"),
+    onValueChange: (v: string) => {
+      if (tab === "week") setWeekMode(v === "calendar" ? "calendar" : v === "table" ? "table" : "agenda")
+      else if (tab === "mine") setMineMode(v === "table" ? "table" : "calendar")
+      else setAllMode(v === "calendar" ? "calendar" : "table")
+    },
   }
 
   return (
@@ -557,6 +684,13 @@ export function MeetingsScreen({
         fetchPage={(query, cursor) =>
           contentApi
             .meetings({
+              // THE QUESTION ITSELF, spread whole and FIRST: `listQuery`
+              // forwards every key, so a filter cannot be lost on the way to
+              // the door and `view` below (never present in `query` — no
+              // facet in `translatedFacets("meetings", …)` is named `view`)
+              // cannot be shadowed by it either.
+              ...query,
+              cursor,
               // WHICH LIST THIS PAGE COMES OUT OF, and it is two questions
               // wearing one function.
               //
@@ -581,12 +715,11 @@ export function MeetingsScreen({
               // `Object.keys(query).length` IS the distinction rather than a
               // second flag: `active` in paged-find.tsx is that exact
               // expression, so this cannot drift from what the control means by
-              // "something is being asked".
-              view: Object.keys(query).length > 0 ? "all" : tab,
-              // …then the question itself, spread whole: `listQuery` forwards
-              // every key, so a filter cannot be lost on the way to the door.
-              ...query,
-              cursor,
+              // "something is being asked". And `tab === "week" ? "mine-week" :
+              // tab` translates the strip's OWN value into the door's
+              // (2026-09-15, header block above) — `tab` itself is never
+              // renamed, only the word sent on the wire.
+              view: Object.keys(query).length > 0 ? "all" : tab === "week" ? "mine-week" : tab,
             })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
@@ -632,8 +765,15 @@ export function MeetingsScreen({
                 badgeVariant: "" as const,
               },
               {
+                // "EVERYONE'S", WHERE "ALL" USED TO READ — label only (ruling,
+                // 2026-09-15, the header block above carries her words). The
+                // VALUE stays `"all"`: it is what `useRemembered` has stored for
+                // every returning reader, what `whereFor` compares against, and
+                // what R19's machine-parity census derived off this door's own
+                // source — renaming it would touch all three for a change that
+                // is a label, nothing else.
                 value: "all",
-                label: t("All"),
+                label: t("Everyone's"),
                 icon: "list",
                 badge: formatCount(total),
                 badgeVariant: "" as const,
@@ -712,16 +852,50 @@ export function MeetingsScreen({
           // three tabs reading the same month are three entries and cannot show
           // each other's rows.
           //
-          // "all" is written out rather than left to that default on purpose: it
-          // makes the key say which question it answered, so the day that
-          // fetcher's own default changes this screen does not silently change
-          // with it.
-          monthNarrowing.view = tab
-          // ALL shows far more columns (9.1). The other two TABS stay the
-          // two-line list a person scans, which is the rulebook's own rule about
-          // a table being for scanning and a list for reading. (It is a property
-          // of the tab, not of the body: the calendar view is a month grid on
-          // all three, because a grid has no columns to widen.)
+          // "mine-week" (not the tab's own stored "week") for the SAME reason
+          // `fetchPage`'s own `view:` line translates it (see that note): the
+          // door has no plain `week` that is also mine, and This week is
+          // always mine now (ruling, 2026-09-15). Written out here too rather
+          // than read off a shared const, for `weekView`'s own reason — a
+          // resolved-key const satisfies a reader and not a census.
+          monthNarrowing.view = tab === "week" ? "mine-week" : tab
+          // THE TABLE, ON EVERY TAB THAT OFFERS ONE (ruling, 2026-09-15 — the
+          // header block above carries her words). One column set now, not
+          // "All"'s own six beside two tabs still drawing a two-line list —
+          // `TABLE_COLUMNS` at the top of this file says what changed and why.
+          // `department`/`attendees` are NOT on the shaped row `shapeMeetingsList`
+          // returns (that shaper is also read by the calendar view above, which
+          // has no use for either), so they are joined on here rather than
+          // added to a shaper two other bodies do not need.
+          //
+          // DEPARTMENT COMES OFF THE PURPOSE, client-side — `purposesQ` (read
+          // above for the create form's own picker) already carries
+          // `MeetingPurpose.department`, so this is a lookup over a cache this
+          // screen was already paying for, never a door change. A meeting whose
+          // reader cannot see purposes at all (`purposesQ.data` unset) or that
+          // carries no type says "—", same as the picker beside it.
+          //
+          // ATTENDEES NEEDED NO NEW PLUMBING EITHER — `googleGuests` rides
+          // every meeting row already (`MEETING_COLS`, workers/content/src/lib/
+          // meetings.ts), because the door's own `q` search has matched against
+          // it for months. A meeting typed in rather than synced carries none,
+          // and says so rather than guessing at who was in the room.
+          const departmentByPurpose = new Map((purposesQ.data ?? []).map((p) => [p.id, p.department]))
+          const byId = new Map(shown.map((m) => [String(m.id), m]))
+          // TYPED EXPLICITLY (not inferred) — `RecordTable` is generic over its
+          // `rows` element type, and an inferred literal (just the three keys
+          // this map adds) would lose the spread's `id` for `onRowClick` and
+          // `refColumn` below, which read it off the SAME row object.
+          const tableRows: Record<string, unknown>[] = (data.rows ?? []).map((row) => {
+            const m = byId.get(String(row.id))
+            return {
+              ...row,
+              time: m ? formatTime(m.startsAt, lang) : "",
+              department: (m?.purposeId ? departmentByPurpose.get(m.purposeId) : null) ?? "—",
+              attendees:
+                m && m.googleGuests?.length ? m.googleGuests.map((g) => g.name || g.email).join(", ") : "—",
+            }
+          })
           // The display is decided BEFORE the collection is tuned, so the tuner
           // can see it is drawing a table (whose column headers are its own sort
           // control) and stand its picker down — see tasks-screen for the whole
@@ -730,28 +904,19 @@ export function MeetingsScreen({
           // resolveRecipe translated the recipe, so they had never been through
           // the pass and every heading rendered in English whatever language the
           // reader chose.
+          //
+          // …AND THE EMPTY SENTENCE IS THE TAB'S, not one recipe's fallback —
+          // `found.emptyText` ("Nothing matched.") still wins mid-search;
+          // otherwise every tab's own Table gets that tab's own honest word
+          // (`tabEmpty`), the same one the Agenda and Calendar bodies below get,
+          // so the three bodies of one tab can never disagree about what an
+          // empty answer means (2026-09-03 audit made exactly this correction
+          // for the week, and it now applies to all three tabs' Tables alike).
           const tableRecipe = withDataDrivenCollection(
-            { ...recipe, display: "table" as const, fields: translateFields(ALL_COLUMNS, t) },
-            data.rows ?? [],
-            found.emptyText
+            { ...recipe, display: "table" as const, fields: translateFields(TABLE_COLUMNS, t) },
+            tableRows,
+            found.emptyText ?? tabEmpty
           )
-          // `listRecipe` IS DRAWN FOR THE WEEK AND MINE TABS in list mode (the
-          // calendar view and the All tab each draw their own renderer), so
-          // leaving its `emptyText` to `withDataDrivenCollection`'s own
-          // fallback meant a genuinely quiet week fell through to the
-          // COLLECTION's empty sentence — "Nothing in Meetings yet."
-          // (screens.ts's `meetingsListRecipe`), the whole-history claim,
-          // under a tab that only ever asks about seven days of it (2026-09-03
-          // audit). `found.emptyText` ("Nothing matched.") still wins
-          // mid-search; only the genuinely-empty tab gets its own honest word,
-          // the same shape the calendar view's own
-          // "Nothing in Meetings this month." already has.
-          // …AND THE SENTENCE IS THE TAB'S, not the week's. It was hard-coded to
-          // the week because the week was the only tab this recipe ever drew;
-          // Mine draws it now too, and "Nothing in Meetings this week." under an
-          // empty Mine would be a true sentence about the wrong question.
-          // `found.emptyText` ("Nothing matched.") still wins mid-search.
-          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText ?? tabEmpty)
           return (
             // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
             // `SectionWithCreate` does this identically) — the create button now
@@ -775,16 +940,17 @@ export function MeetingsScreen({
                   : null
               }
             >
-              {mode === "calendar" && !found.active && total === 0 ? (
+              {!found.active && total === 0 ? (
                 // GENUINELY EMPTY — the door's exact COUNT(*) (R16) says the
                 // team has no meetings at all, and nothing is being asked.
-                // The week and list tabs reach the engine's own register
-                // through `ScreenRenderer`/`RecordTable`, which read the
-                // create action published above; this grid never touches
-                // `CollectionFrame`, so a new team was shown a month with
-                // "Nothing in Meetings this month." under it — true, and no
-                // help. The same two acts the provider above carries, said
-                // directly, so all three tabs offer the same thing.
+                // NONE OF THE THREE BODIES TOUCHES `CollectionFrame` any more
+                // (2026-09-15 retired the engine-drawn list that used to —
+                // see the header block above), so none of them reads the
+                // create action published above on its own. Said directly
+                // here instead, once, ahead of the mode switch, so a new team
+                // gets the same two acts regardless of which tab or body they
+                // land on rather than only on the Calendar, which is what this
+                // gate used to be fenced to.
                 <CollectionEmptyState
                   title={t("Nothing in Meetings yet.")}
                   onCreate={canCreate ? () => setOpen(true) : undefined}
@@ -816,27 +982,43 @@ export function MeetingsScreen({
                   // two views of one question cannot disagree — because the grid
                   // is genuinely showing a month INTERSECTED with the tab, and
                   // "Nothing in Meetings this month." would be false about a
-                  // month that is full of everybody else's meetings. Only All,
-                  // which narrows nothing, keeps the grid's own month sentence.
+                  // month that is full of everybody else's meetings. Only
+                  // Everyone's, which narrows nothing, keeps the grid's own
+                  // month sentence.
                   emptyText={found.active ? found.emptyText : tab === "all" ? undefined : tabEmpty}
                   onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
                 />
-              ) : tab === "all" ? (
-                // THE MEETINGS LIST PAGES, so its headers ask the DOOR — `found.order`
-                // is the same handle the picker above the table holds, so the
-                // two controls are one question and the answer spans the whole
-                // meetings list instead of the fifty rows in the browser. The picker
-                // stays because it names orders that are not columns ("Recently
-                // added"); the headers cover the ones that are.
+              ) : mode === "agenda" ? (
+                // THIS WEEK'S OWN DEFAULT (ruling, 2026-09-15) — `shown` is
+                // already the mine-this-week rows the tab reads at rest, or
+                // whatever `found` narrowed them to mid-search; `MeetingsAgenda`
+                // only groups and draws what it is handed, exactly the
+                // separation `MeetingsMonthCalendar` above keeps.
+                <MeetingsAgenda
+                  rows={shown}
+                  lang={lang}
+                  onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
+                  emptyText={found.emptyText ?? tabEmpty}
+                />
+              ) : (
+                // TABLE — THE MEETINGS LIST PAGES, so its headers ask the DOOR —
+                // `found.order` is the same handle the picker above the table
+                // holds, so the two controls are one question and the answer
+                // spans the whole meetings list instead of the fifty rows in
+                // the browser. The picker stays because it names orders that
+                // are not columns ("Recently added"); the headers cover the
+                // ones that are. ONE DEFINITION drawn by all three tabs now —
+                // `TABLE_COLUMNS`/`tableRows` above say what it shows and where
+                // Department and Attendees come from.
                 //
                 // No `useKitPanel`: `CollectionCard` above (drawn by `wrap`) is
                 // the ONE box now — Accounts and Tickets dropped it the same day
                 // for the same reason ("the broken combination", screen-bits.tsx's
                 // own doc on `CollectionCard`).
                 <RecordTable
-                  columns={ALL_COLUMN_HEADERS}
-                  rows={data.rows ?? []}
-                  // THE NUMBER IN FRONT OF THE MEETING, not a seventh column.
+                  columns={TABLE_COLUMN_HEADERS}
+                  rows={tableRows}
+                  // THE NUMBER IN FRONT OF THE MEETING, not an eighth column.
                   // The `Reference` column was cut from this table on purpose
                   // ("already rides the record's own eyebrow (D4)", above) and
                   // that ruling stands — a column of identical black lozenges
@@ -855,17 +1037,6 @@ export function MeetingsScreen({
                      the narrowing from inside and its own query is always empty. A
                      term that matched nothing read as "this collection is empty" and
                      drew "Add the first" over rows the term was hiding. */
-                  narrowedOutside={found.active}
-                />
-              ) : (
-                <ScreenRenderer
-                  recipe={listRecipe}
-                  data={data}
-                  rights={rights}
-                  onAction={onAction}
-                  onIntent={onIntent}
-                  /* R62 — same reason as the table above: the narrowing happens at
-                     the door, one component out, and the frame has to be told. */
                   narrowedOutside={found.active}
                 />
               )}
@@ -925,7 +1096,7 @@ export function MeetingsScreen({
             }}
             onSynced={() => {
               invalidate(meetingsKey(teamId))
-              invalidate(meetingsKey(teamId, "week"))
+              invalidate(meetingsKey(teamId, "mine-week"))
               // …AND MINE. A calendar sweep is the single biggest source of new
               // rows in this person's Mine — every entry it brings in carries
               // the guest list that decides the tab.
@@ -962,11 +1133,16 @@ export function MeetingsScreen({
         </div>
       )}
 
-      {/* WHY WE MEET, one level down. A link rather than a nav line: the purposes
+      {/* WHY WE MEET, one level down. A link rather than a nav line: the types
           are the vocabulary this screen picks from, and a rail that lists both a
           page and the words behind it reads as two ideas. R16: the number is the
           door's exact total through the ONE seam, and an unloaded total renders
-          nothing rather than a "0" that reads as "there are none". */}
+          nothing rather than a "0" that reads as "there are none".
+          "MEETING TYPES", NOT "MEETING PURPOSES" — the glossary rename this
+          lane hands over (`shared/glossary.ts`, "Meeting purpose" → "Meeting
+          type"); the label is the only thing that moved, every prop and
+          identifier below it (`purposeId`, `purposeCount`, `canReadPurposes`,
+          `onPurposes`, `purposesQ`, `MeetingPurpose`) stays exactly as named. */}
       {canReadPurposes ? (
         <Button
           type="button"
@@ -983,7 +1159,7 @@ export function MeetingsScreen({
              control weight (500) stands instead. */
           className="h-auto w-fit p-0 underline-offset-4 hover:underline"
         >
-          {t("Meeting purposes")}
+          {t("Meeting types")}
           {formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
         </Button>
       ) : null}

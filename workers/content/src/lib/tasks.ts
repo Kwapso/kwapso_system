@@ -115,15 +115,25 @@ function tomorrowIso(): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** WHAT EACH OF THE SIX VIEWS ASKS FOR, as a WHERE fragment — written once so
- * the list and the counts beside it can never be asked different questions
+/** WHAT EACH OF THE SEVEN VIEWS ASKS FOR, as a WHERE fragment — written once
+ * so the list and the counts beside it can never be asked different questions
  * (R16). `?` is the date the caller passes; the count query below spells the
- * same six conditions out as CASE arms, which is the only duplication here and
- * the reason there is a test that runs both. */
+ * same seven conditions out as CASE arms, which is the only duplication here
+ * and the reason there is a test that runs both.
+ *
+ * `planned` ARRIVED 2026-09-15 — the redesigned tab strip's own "Planned":
+ * every OPEN task that is NOT overdue, dated or not. Written as the exact
+ * complement of `overdue` (`status<>done` minus the overdue clause) rather
+ * than as "dated and not yet due" (which is `upcoming`, still defined below
+ * it unchanged) — an undated task belongs here and never belonged on
+ * Upcoming, which is the whole reason the tab strip needed a new word rather
+ * than a new label on the old one. */
 function viewClause(view: TaskViewName): { sql: string | null; dated: "today" | "tomorrow" | null } {
   if (view === "all") return { sql: null, dated: null }
   if (view === "overdue")
     return { sql: "t.status <> 'done' AND t.due_on IS NOT NULL AND t.due_on < ?", dated: "today" }
+  if (view === "planned")
+    return { sql: "t.status <> 'done' AND (t.due_on IS NULL OR t.due_on >= ?)", dated: "today" }
   if (view === "upcoming")
     return { sql: "t.status <> 'done' AND t.due_on IS NOT NULL AND t.due_on >= ?", dated: "today" }
   if (view === "completed") return { sql: "t.status = 'done'", dated: null }
@@ -254,6 +264,9 @@ export async function listTasks(
 export type TaskCounts = {
   open: number
   overdue: number
+  /** ARRIVED 2026-09-15 — the redesigned tab strip's own badge. See
+   * `viewClause`'s own note on the view this counts. */
+  planned: number
   upcoming: number
   completed: number
   calendar: number
@@ -294,16 +307,19 @@ export async function countTasks(
   filter: { assigneeId?: string }
 ): Promise<TaskCounts> {
   const clauses: string[] = []
-  const params: string[] = [todayIso(), todayIso(), tomorrowIso(), tomorrowIso()]
+  // ONE MORE `todayIso()` FOR `planned_n`, inserted where its own SUM sits in
+  // the SELECT below (right after `upcoming_n`) — the params array is
+  // positional, so the two must move together.
+  const params: string[] = [todayIso(), todayIso(), todayIso(), tomorrowIso(), tomorrowIso()]
   if (filter.assigneeId) {
     clauses.push("t.assignee_id = ?")
     params.push(filter.assigneeId)
   }
   // BOUNDED, now that this is a collection R14 makes page (R16's amendment).
-  // Eight numbers over ONE scan is still the right shape and none of it changes
+  // Nine numbers over ONE scan is still the right shape and none of it changes
   // below the ceiling — `boundedInner` only stops a scan that previously ran to
-  // the end of the table. The eight stop TOGETHER, which is the property that
-  // matters: they are eight questions about one set of rows, and a `completed`
+  // the end of the table. The nine stop TOGETHER, which is the property that
+  // matters: they are nine questions about one set of rows, and a `completed`
   // badge counted over a million rows beside an `open` badge counted over all of
   // them would be two numbers that cannot be added up. Past the ceiling the door
   // reports `totalCapped` and every badge reads "at least".
@@ -314,6 +330,7 @@ export async function countTasks(
        SUM(CASE WHEN t.status <> 'done' THEN 1 ELSE 0 END) AS open_n,
        SUM(CASE WHEN t.status <> 'done' AND t.due_on IS NOT NULL AND t.due_on < ? THEN 1 ELSE 0 END) AS overdue_n,
        SUM(CASE WHEN t.status <> 'done' AND t.due_on IS NOT NULL AND t.due_on >= ? THEN 1 ELSE 0 END) AS upcoming_n,
+       SUM(CASE WHEN t.status <> 'done' AND (t.due_on IS NULL OR t.due_on >= ?) THEN 1 ELSE 0 END) AS planned_n,
        SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS completed_n,
        SUM(CASE WHEN t.due_on IS NOT NULL THEN 1 ELSE 0 END) AS calendar_n,
        COUNT(*) AS all_n,
@@ -331,6 +348,7 @@ export async function countTasks(
   return {
     open: n("open_n"),
     overdue: n("overdue_n"),
+    planned: n("planned_n"),
     upcoming: n("upcoming_n"),
     completed: n("completed_n"),
     calendar: n("calendar_n"),
