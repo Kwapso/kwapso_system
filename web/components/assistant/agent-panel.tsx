@@ -43,7 +43,8 @@ import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import { AssistantLimitNotice } from "@/components/assistant/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/assistant/agent-sources"
 import { AgentUsageDialog } from "@/components/assistant/agent-usage-dialog"
-import { useAgentDock } from "@/lib/agent-dock"
+import { useAgentDock, useAgentDockTabs } from "@/lib/agent-dock"
+import { setAgentOpen } from "@/lib/agent-open"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
 import {
   activateAgentTab,
@@ -284,16 +285,25 @@ const PANEL_COLUMN = "h-full w-full rounded-[var(--radius)] shadow-[var(--shadow
 /** THE DOCKED PANEL'S OWN LEADING CORNER, SQUARED. Client, 2026-09-03:
  * "Assistante (the name) should be a folder tab, like the breadcrumbs - then
  * the full container for the assistant would be aligned with the main one."
- * `screen-shell.tsx` now draws that tab (`asideLabel`, through
- * `BreadcrumbFolders`) directly above this column, the SAME way the content
- * card's own trail sits above IT — so this panel needs the SAME "one corner
- * given up for the joint" move `CARD_JOINED` makes there, for the identical
- * reason: the tab's silhouette is a fixed SVG path (`folder.tsx`) that may
- * not be edited, and a plain CSS radius is this file's own to remove.
- * `rounded-ss-none`, not `-tl-`, so it mirrors with the tab in RTL for free —
- * R31 by the letter (zero is the absence of a radius, not a third one; see
- * `RADIUS_EXCEPTION["rounded-ss-none"]`). DOCKED ONLY: the floating popover
- * draws no tab above it and keeps all four corners, exactly as before. */
+ * `screen-shell.tsx` draws a tab directly above this column, the SAME way the
+ * content card's own trail sits above IT — so this panel needs the SAME "one
+ * corner given up for the joint" move `CARD_JOINED` makes there, for the
+ * identical reason: the tab's silhouette is a fixed SVG path (`folder.tsx`)
+ * that may not be edited, and a plain CSS radius is this file's own to
+ * remove. `rounded-ss-none`, not `-tl-`, so it mirrors with the tab in RTL
+ * for free — R31 by the letter (zero is the absence of a radius, not a third
+ * one; see `RADIUS_EXCEPTION["rounded-ss-none"]`). DOCKED ONLY: the floating
+ * popover draws no tab above it and keeps all four corners, exactly as
+ * before.
+ *
+ * WHICH TAB CHANGED (kit v1.2.88's `asideTabs`), THE GEOMETRY DID NOT. It
+ * used to be the kit's own single fixed tab (`asideLabel`, through
+ * `BreadcrumbFolders`, `screen-shell.tsx`'s own default); it is now
+ * `AgentTabStrip`, portalled into the same `screen-shell-aside-tab` slot
+ * (`app-shell.tsx`'s `asideTabs`, this file's own JSX below). Either way it
+ * is a `BreadcrumbFolders` tab riding the identical fixed SVG silhouette
+ * directly above this column, so the corner this squares off stays squared
+ * for the identical reason. */
 const PANEL_COLUMN_DOCKED = cn(PANEL_COLUMN, "rounded-ss-none")
 
 function PanelFrame({ docked, children }: { docked: boolean; children: React.ReactNode }) {
@@ -423,6 +433,12 @@ export function AgentPanel({
 
   const chat = useAgentChat(teamId, open, canUse)
   const [usageOpen, setUsageOpen] = React.useState(false)
+  // THE TAB LEVEL'S OWN DOCK NODE — `AgentTabStrip`'s new home, DOCKED ONLY
+  // (kit v1.2.88's `asideTabs`; see the JSX below for the portal and
+  // `web/lib/agent-dock.tsx` for the whole argument). `null` on the narrow,
+  // floating presentation — there is no `ScreenShell` there to publish one —
+  // which is exactly where the strip stays inline, as it always has.
+  const dockTabs = useAgentDockTabs()
 
   /* ── THE TAB STRIP — the client's "+" ruling, 15 Sep 2026 ──────────────────
      web/lib/agent-conversation-tabs.ts carries the quote and the whole
@@ -461,12 +477,36 @@ export function AgentPanel({
     : undefined
 
   // SEED, ONCE — a bare panel gets one tab standing for whatever it resumes
-  // (or a blank one), never a picker. `seedAgentTabs` itself is the guard
-  // (no-op once a tab exists), so this can run on every render without its
-  // own gate.
+  // (or a blank one), never a picker. `seedAgentTabs` itself is the guard —
+  // a real ONE-SHOT now (its own header has the reason), not merely "no-op
+  // while a tab exists" — so this can run on every render without its own
+  // gate, and it stays permanently inert once the reader has closed their
+  // own last tab (see `handleCloseAgentTab` / the reopen effect below, which
+  // is what a session-only "while empty" guard here would have raced).
   React.useEffect(() => {
     if (agentTabs.length === 0) seedAgentTabs(chat.threadId, t("Conversation"))
   }, [agentTabs.length, chat.threadId, t])
+
+  // REOPENING AN EMPTY STRIP STARTS FRESH, ON THE PICKER — the other half of
+  // the closing ruling, 15 Sep 2026 (see `handleCloseAgentTab` below for the
+  // half that shuts the column). The seed above only ever fires ONCE per
+  // session and never again once the strip has been non-empty — so by the
+  // time `open` can transition back to `true` with zero tabs, it is because
+  // the reader closed every conversation on purpose, not because nothing has
+  // loaded yet. That reader pressing the top-right opener again should not
+  // land back on the RESUMED thread the seed gave them at launch (gone, and
+  // rightly — they closed it); "+" always opens the picker, and this is that
+  // same door, pressed from outside instead of from the strip itself.
+  const wasOpenRef = React.useRef(open)
+  React.useEffect(() => {
+    const wasOpen = wasOpenRef.current
+    wasOpenRef.current = open
+    if (open && !wasOpen && agentTabs.length === 0) {
+      openNewAgentTab()
+      chat.newChat()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, agentTabs.length])
 
   // KEEP THE ACTIVE TAB'S THREAD IN STEP WITH THE ONE LIVE THREAD. Covers both
   // directions at once: a resume that finishes after the seed above, and a
@@ -511,9 +551,24 @@ export function AgentPanel({
     void chat.openThread(threadId)
   }
 
+  // CLOSING THE LAST CONVERSATION TAB CLOSES THE COLUMN ITSELF — the client's
+  // ruling, 15 Sep 2026, read together with the "only one tab level" one
+  // (`web/lib/agent-dock.tsx`'s own header has that half in full): once
+  // `AgentTabStrip` IS the aside's one tab level, a strip with nothing left
+  // on it is not a state this app draws — History and "+" are furniture, not
+  // conversations, so `closeAgentTab` returning `null` (its own doc: "a real
+  // state here, just the '+' remains") is precisely "no conversation is open
+  // any more," and the honest answer to that is the column going away, not an
+  // empty transcript sitting open. `setAgentOpen(false)` is the exact call
+  // the shell's own edge handle and the mobile Sparkle toggle already make —
+  // one flag, still, never a second "closed because empty" state to keep in
+  // step with it. The reopen effect above is this rule's other half: the
+  // top-right opener does not resume what was just closed, it starts fresh
+  // on the picker.
   function handleCloseAgentTab(id: string) {
     const wasActive = id === activeAgentTabId
     const landingId = closeAgentTab(id)
+    if (landingId === null) setAgentOpen(false)
     if (!wasActive) return
     switchToAgentTab(landingId ? agentTabsSnapshot().find((t) => t.id === landingId) : undefined)
   }
@@ -667,6 +722,22 @@ export function AgentPanel({
       </span>
     ) : null
 
+  // THE TAB STRIP ITSELF — built once, placed differently by presentation
+  // (see the JSX below). Drawn only once there is a conversation surface at
+  // all (`canUse`); a role the assistant is closed to has nothing for tabs
+  // to switch between.
+  const tabStrip = canUse ? (
+    <AgentTabStrip
+      tabs={agentTabs}
+      activeId={activeAgentTabId}
+      historyActive={historyTabOpen}
+      onSelect={handleSelectAgentTab}
+      onClose={handleCloseAgentTab}
+      onNew={handleNewAgentTab}
+      onOpenHistory={openHistoryTab}
+    />
+  ) : null
+
   return (
     // ONE TREE, TWO BOXES — `PanelFrame` above, and everything from here down
     // is drawn identically in both. Wide: the shell's third column. Narrow: the
@@ -711,62 +782,52 @@ export function AgentPanel({
     // assistant bubble itself closed, which was never the intent (open Usage
     // from the panel, then dismiss the panel with Escape — Usage stays put).
     <>
+    {/* THE TAB STRIP, DOCKED — a PORTAL, sibling to `PanelFrame` rather than a
+        child of it. Client ruling, 15 Sep 2026, in two parts the same day:
+        the "+" itself ("all the time, there is a visible tab that has a plus
+        button"), and — over a screenshot of exactly the shape this used to
+        be, nested one level inside the panel's own header — *"The tabs need
+        to be at the same level as the assistant tab... it's only one tab
+        level."* This IS that one level now: `useAgentDockTabs()` (above)
+        reads the node `app-shell.tsx` publishes as `ScreenShell`'s
+        `asideTabs` (kit v1.2.88), which lands the strip in
+        `screen-shell-aside-tab` — the SAME slot the kit's own single fixed
+        tab used to occupy, not a box inside `screen-shell-aside-body`
+        underneath it. `docked && dockTabs` both have to be true: the second
+        clause is the ordinary null-during-first-paint guard every dock read
+        needs (`useAgentDock`'s own doc has the twin case), and the first is
+        because the floating presentation publishes no such node at all — see
+        below, where this same `tabStrip` renders inline instead.
+
+        THE RE-BASE HACK THIS REPLACED IS GONE, AND ITS OWN MEASUREMENTS STAY
+        HERE AS THE RECORD OF WHY. Until kit v1.2.88, `AgentTabStrip` was the
+        aside body's own first child, nested UNDER the kit's fixed "Assistant"
+        tab — and that tab pays `margin-block-end: calc(var(--folder-tab-
+        overlap) * -1)` (`screen-shell.tsx`'s own comment: "the strip's feet
+        land beneath the card's top edge"), pulling `screen-shell-aside-body`
+        up 17.02px on purpose so a CARD underneath could ride over it. This
+        panel IS that card everywhere else it is asked to be one, but nested
+        here its own first child was a SECOND strip of tabs, not paper — so
+        the pull landed on `AgentTabStrip` instead, stacked on top of that
+        component's own unrelated -4.5px (its focus-ring padding given back),
+        and the inner strip's first tab rendered under the outer tab's own
+        painted area (measured on staging: `document.elementFromPoint` at
+        that corner returned the OUTER tab). `mt-[var(--folder-tab-overlap)]`
+        on a wrapping `<div>` was the fix — cancel the outer pull this was
+        the first thing to receive. Once `AgentTabStrip` IS the one tab level
+        rather than riding under it, there is no outer pull left to cancel:
+        the wrapper and its margin are simply gone, not replaced by anything.
+        `min-w-0` is a different fix for a different problem (still true, see
+        `AgentDockTabsSlot`'s own doc) and survives — the kit's own
+        `screen-shell-aside-tab` wrapper already carries it. */}
+    {docked && dockTabs ? createPortal(tabStrip, dockTabs) : null}
     <PanelFrame docked={docked}>
-      {/* THE TAB STRIP — client ruling, 15 Sep 2026: "all the time, there is a
-          visible tab that has a plus button. That's how you create a new
-          one." Drawn only once there is a conversation surface at all
-          (`canUse`); a role the assistant is closed to has nothing for tabs
-          to switch between (see the `!canUse` branch below). One level below
-          the kit's own single "Assistant" folder tab — see
-          `agent-tab-strip.tsx` for why that tab cannot carry this strip
-          itself.
-
-          RE-BASED, BECAUSE THE KIT'S OWN ATTACHMENT MECHANIC ASSUMES WHAT
-          FOLLOWS THE OUTER TAB IS PAPER, NOT A SECOND STRIP OF TABS.
-          `screen-shell.tsx`'s "Assistant" tab pays
-          `margin-block-end: calc(var(--folder-tab-overlap) * -1)` — its own
-          comment: "the strip's feet land beneath the card's top edge" — so
-          the aside body underneath it (`screen-shell-aside-body`) is pulled
-          up 17.02px on purpose, to be ridden over by a card's rounded top
-          edge exactly the way the content column's own card is. This panel
-          IS that card everywhere else. Here the aside body's first child is
-          `AgentTabStrip` — a SECOND `BreadcrumbFolders`, which carries its
-          OWN unrelated negative block-start margin (4.5px, that component's
-          own focus-ring padding given back) and no card-like top surface to
-          absorb the outer 17.02px into. Both pulls stack, and the inner
-          strip's first tab renders under the outer tab's own painted area —
-          measured on staging: `document.elementFromPoint` at that corner
-          returns the OUTER tab, not the inner one. `mt-[var(--folder-tab-
-          overlap)]` cancels exactly the outer pull this wrapper is the
-          first thing to receive, pushing the inner strip back down clear of
-          it — the inner strip's OWN -4.5px stays untouched, since that one
-          is its own internal geometry, not this nesting's problem.
-
-          `min-w-0` FOR THE SAME REASON THE MARGIN IS NEEDED: PanelFrame's
-          `PANEL_QUIET_SCOPE` is a flex COLUMN (`flex flex-1 min-h-0
-          flex-col`), and a flex item's block-axis default is `min-width:
-          auto` — content, never the container, decides how narrow it may
-          get. `AgentTabStrip`'s own `overflow-x: auto` (inside
-          `BreadcrumbFolders`) only ever activates once something has
-          already forced the strip's own box down to the panel's width; measured on staging,
-          without it the strip renders at its full intrinsic width instead —
-          the "+" tab's own right edge sat 49px past the panel's own right
-          edge, 26.6px past the viewport itself. Same fix this file already
-          uses lower down for the same class of overflow (see `min-w-0` on
-          the header row below). */}
-      {canUse && (
-        <div className="min-w-0 mt-[var(--folder-tab-overlap)]">
-          <AgentTabStrip
-            tabs={agentTabs}
-            activeId={activeAgentTabId}
-            historyActive={historyTabOpen}
-            onSelect={handleSelectAgentTab}
-            onClose={handleCloseAgentTab}
-            onNew={handleNewAgentTab}
-            onOpenHistory={openHistoryTab}
-          />
-        </div>
-      )}
+      {/* THE TAB STRIP, FLOATING — unchanged in kind: the narrow popover
+          draws no `ScreenShell` at all (`agent-host.tsx`'s own header), so
+          there is no outer kit tab here to be "one level" wrong relative to
+          and no dock node to portal into — the strip is simply this
+          component's own first thing, exactly as it always has been. */}
+      {!docked && tabStrip}
       <div className="flex shrink-0 flex-col gap-[var(--space-2h)] shadow-[var(--hairline-under)] px-4 pt-[var(--space-5)] pb-[var(--space-4h)]">
         {/* ITEM 1 (owner, 31 Aug 2026): "remove the x button on top right (i
             dont need it anymore)". The launcher button itself already toggles

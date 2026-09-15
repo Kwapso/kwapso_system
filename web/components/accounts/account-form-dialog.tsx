@@ -98,7 +98,7 @@ import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
-import { RecordPicker } from "@/components/records/record-picker"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import type { PickablePerson } from "@/lib/members"
 
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }
@@ -232,6 +232,7 @@ export function AccountFormDialog({
   onSubmit,
   draftKey,
   members = [],
+  defaultAccountManagerId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -247,10 +248,20 @@ export function AccountFormDialog({
    * (defaults to `[]`, an empty picker) so a caller that has no opinion —
    * most of this suite's own render calls — is not forced to fabricate one. */
   members?: PickablePerson[]
+  /** THE SIGNED-IN USER, preselected as account manager on a NEW account —
+   * client ruling, 15 Sep 2026: "always put the user preselected by default."
+   * Ignored on an edit (`initial` wins), and "" is a legitimate answer (no
+   * session yet, or the caller has no opinion — most of this suite's own
+   * render calls). */
+  defaultAccountManagerId?: string
 }) {
   const { t, lang } = useLanguage()
   const isEdit = !!initial
-  const [values, setValues, clearDraft] = useFormDraft(draftKey, initial ?? EMPTY, open)
+  const [values, setValues, clearDraft] = useFormDraft(
+    draftKey,
+    initial ?? { ...EMPTY, accountManagerId: defaultAccountManagerId ?? "" },
+    open
+  )
   const [busy, setBusy] = React.useState(false)
 
   // The team's own vocabulary for the two picked fields. Cache-first and shared
@@ -466,26 +477,28 @@ export function AccountFormDialog({
         t("Ours")
       )}
 
-      {/* 0091 — WHO IS RESPONSIBLE, client ruling 14 Sep 2026. `RecordPicker`,
-          not the plain `Select` the four fields above use: a member carries a
-          FACE (R35), and this is THE assignee picker the rest of the app
-          already reaches for (task-form-dialog.tsx, story-form-dialog.tsx) —
-          options only (the members list is a bounded, already-cached read,
-          never a paged one), so no `search`/`searchKey`.
+      {/* 0091 — WHO IS RESPONSIBLE, client ruling 14 Sep 2026, redrawn 15 Sep
+          2026 as `StaffPillPicker` — not the plain `Select` the four fields
+          above use: a member carries a FACE (R35), and this is THE staff
+          picker the rest of the app now reaches for (task-form-dialog.tsx,
+          story-form-dialog.tsx) — horizontal pills, never a dropdown.
           COMPANIES ONLY, the same `isCompany` gate the Industry field above
           uses: a company is what has an account manager in this product, a
           contact is somebody AT one. */}
       {isCompany && (
         <Field config={accountManagerField} htmlFor="account-manager" className={fieldSpacing}>
-          <RecordPicker
+          {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN — client ruling, 15 Sep
+              2026, preselected to the signed-in user on a new account
+              (`defaultAccountManagerId`, above). */}
+          <StaffPillPicker
             id="account-manager"
-            value={values.accountManagerId || NONE}
-            onChange={(v) => set({ accountManagerId: v === NONE ? "" : v })}
-            options={sortedOptions(members, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
-            emptyOption={{ value: NONE, label: t("Nobody yet") }}
-            placeholder={t("Nobody yet")}
-            searchPlaceholder={t("Search members…")}
-            emptyText={t("Nothing matched.")}
+            ariaLabel={t(accountManagerField.label)}
+            people={members.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
+            value={values.accountManagerId}
+            onValueChange={(v) => set({ accountManagerId: v })}
+            allowNobody
+            nobodyLabel={t("Nobody yet")}
             disabled={busy}
           />
         </Field>

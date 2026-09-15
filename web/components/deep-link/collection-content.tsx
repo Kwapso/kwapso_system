@@ -25,7 +25,6 @@ import { Graph, ListBullets } from "@shared/ui/foundations/icons"
 import { WavesScreen } from "@/components/work/waves-screen"
 import { ProcessesScreen } from "@/components/process/processes-screen"
 import { AppsScreen } from "@/components/apps/apps-screen"
-import { SprintsScreen } from "@/components/work/sprints-screen"
 import { StoriesScreen } from "@/components/work/stories-screen"
 import { TasksScreen } from "@/components/work/tasks-screen"
 import { TimeScreen } from "@/components/work/time-screen"
@@ -169,28 +168,25 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       />
     )
   }
-  if (module === "sprints") {
-    return (
-      <SprintsScreen
-        teamId={teamId as string}
-        recipe={recipe}
-        rights={rights}
-        total={totals.sprints}
-        canCreate={can("work", "create")}
-        onAction={onAction}
-        onIntent={onIntent}
-      />
-    )
-  }
+  // SPRINTS' OWN COLLECTION BRANCH STOOD HERE — client ruling, 2026-09-15:
+  // "killing the sprints main page completely… keeping the waves one on top
+  // of the build section". A sprint is planned from inside its wave
+  // (wave-detail.tsx's own Sprints tab and its "Plan a sprint" button) and
+  // opened from there or from wherever else it is already linked; there is no
+  // bare sprints collection to render any more, so a typed `/sprints` or
+  // `/t/<teamId>/sprints` now falls through to NotFound like any other
+  // retired address, rather than quietly still drawing the killed screen.
+  // `SprintsScreen` itself is unused here now but stays on disk — its
+  // `createSprintFrom` export is still `app-detail.tsx`'s own door for
+  // starting a sprint from an app's record, and its header explains what a
+  // future lane may still delete outright.
   if (module === "apps") {
     return (
       <AppsScreen
         teamId={teamId as string}
-        recipe={recipe}
         rights={rights}
         total={totals.apps}
         canCreate={can("processes", "create")}
-        onAction={onAction}
         onIntent={onIntent}
       />
     )
@@ -225,8 +221,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <MeetingsScreen
         teamId={teamId as string}
-        recipe={recipe}
-        rights={rights}
         total={totals.meetings}
         purposeCount={totals.purposes}
         canCreate={can("meetings", "create")}
@@ -240,10 +234,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         // deep-link file (see the Task C lane report for the full account —
         // this is one of the two files named there, beside `web/lib/pages.ts`).
         onPurposes={() => go(`/settings/meetings`)}
-        onImport={() =>
-          openInNewTab(`/t/${teamId}/import/meetings`, `${t("Import")} · ${IMPORT_TARGET_LABEL.meetings}`)
-        }
-        onAction={onAction}
+        // NO `onImport` ANY MORE — the client's ruling, 2026-09-15 evening:
+        // "On meetings, kill the import." MeetingsScreen dropped the prop
+        // outright (its own header carries her words); the import DOOR
+        // itself is untouched — `/t/${teamId}/import/meetings` still
+        // resolves, reachable from Home's own generic "Import" tile.
         onIntent={onIntent}
       />
     )

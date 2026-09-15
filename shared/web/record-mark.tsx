@@ -171,6 +171,15 @@ const BOX = {
   row: "size-9 text-lg",
   tile: "size-12 text-2xl",
   band: "size-14 text-3xl sm:size-[72px]",
+  /** THE FIFTH SIZE, NAMED THE SAME DELIBERATE WAY `choice` WAS — a real need
+   * rather than a one-off className fighting this file's own size prop (see
+   * this comment block's own warning about that). The apps board's own
+   * ruling, 15 Sep 2026: "In the board, make the icon bigger" — bigger than
+   * `band`, which is already the largest of the four this file had, so a
+   * fifth had to exist rather than a caller stretching `band` with a
+   * className. `size-20` (80px) is one Tailwind step past `band`'s own
+   * `sm:size-[72px]`, not a number chosen for its own sake. */
+  board: "size-20 text-4xl",
 } as const
 
 /** The picture-or-fallback CONTENT alone — no box, no background, no shape,
@@ -245,7 +254,8 @@ export function RecordMark({
    * and for `record-picker.tsx`'s closed control + open candidate list — see
    * the header on `BOX` above for why. `row` stays the size for an ordinary
    * collection row read on its own, which a picker's stack of candidates is
-   * not. */
+   * not. `board` (80px) is for the apps board's own Kanban card — see `BOX`'s
+   * own note. */
   size?: keyof typeof BOX
   className?: string
 }) {

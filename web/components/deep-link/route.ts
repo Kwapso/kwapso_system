@@ -69,7 +69,15 @@ export const TOP_LEVEL_MODULES = [
   // away the warm in-memory cache the whole caching model is built on. The four
   // work-engine destinations join it here on the way in rather than after the
   // same bug is noticed again.
-  "knowledge", "apps", "sprints", "waves", "stories", "tasks", "time", "meetings",
+  //
+  // "sprints" LEFT THIS LIST 15 SEP 2026 with its sidebar row and its
+  // web/app/sprints/[[...rest]]/page.tsx shell — the client's ruling killed
+  // the bare top-level Sprints address along with the main page it served. A
+  // sprint is reached nested now (`/waves/<id>/sprints/<id>`, the same nested
+  // grammar `/apps/<id>/sprints/<id>` already used), which needs no entry of
+  // its own here: only the OUTERMOST segment of a URL is ever looked up in
+  // this list (`in-app-link.tsx`), and that segment is "waves" or "apps".
+  "knowledge", "apps", "waves", "stories", "tasks", "time", "meetings",
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "brand", "purposes",

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.87",
-  "sha": "e8e4cdad2268b351e411900a40a80d9703ad3927",
+  "tag": "v1.2.89",
+  "sha": "28ffc1b6ae19266094eff0eae83b20b4a1d0ea2d",
   "syncedAt": "2026-09-15"
  },
- "generatedAt": "2026-09-15T11:01:36.372Z",
+ "generatedAt": "2026-09-15T16:13:46.186Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -13,13 +13,13 @@
   "withoutVariants": 77,
   "cvaSites": 52,
   "variantGroups": 79,
-  "variantOptions": 256,
+  "variantOptions": 260,
   "typedEnumProps": 43,
   "typedBooleanProps": 317,
   "compositions": 47,
   "icons": 1512,
-  "tokens": 365,
-  "tokenDeclarations": 569,
+  "tokens": 369,
+  "tokenDeclarations": 573,
   "unresolved": 0
  },
  "components": [
@@ -1026,6 +1026,26 @@
         },
         {
          "name": "done",
+         "classes": "",
+         "note": null
+        },
+        {
+         "name": "red",
+         "classes": "",
+         "note": "PRIORITY'S OWN FOUR (2026-09-15, tokens.css's own note beside `--dot-red`/`--dot-orange`/`--dot-purple`/`--dot-blue`). Additive, never a fifth compound variant: none of the four is `building`, so the dark-mode mango special case above is never reached by a priority chip — it stays scoped to `dotTone: \"building\"` alone."
+        },
+        {
+         "name": "orange",
+         "classes": "",
+         "note": null
+        },
+        {
+         "name": "purple",
+         "classes": "",
+         "note": null
+        },
+        {
+         "name": "blue",
          "classes": "",
          "note": null
         }

@@ -25,6 +25,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { isMeetingTypeIcon } from "@shared/meeting-icons"
 import type { MeetingPurpose } from "@shared/types"
 import { ensureSelectableValue } from "./vocabulary"
 
@@ -35,6 +36,7 @@ type PurposeRow = {
   name: string
   department: string | null
   description: string | null
+  icon: string | null
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -42,7 +44,7 @@ type PurposeRow = {
   editor_name: string | null
 }
 
-const PURPOSE_COLUMNS = `id, name, department, description,
+const PURPOSE_COLUMNS = `id, name, department, description, icon,
                          deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 function toPurpose(r: PurposeRow): MeetingPurpose {
@@ -51,6 +53,7 @@ function toPurpose(r: PurposeRow): MeetingPurpose {
     name: r.name,
     department: r.department,
     description: r.description,
+    icon: r.icon,
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -87,18 +90,25 @@ async function purposeOrThrow(cfg: D1Rest, guard: MemberGuard, id: string): Prom
   return rows[0]
 }
 
-export type MeetingPurposeInput = { name?: string; department?: string; description?: string }
+export type MeetingPurposeInput = { name?: string; department?: string; description?: string; icon?: string }
 
 /** One validation path for both writes — the department is pick-or-created, which
- * is the whole reason this table kept its own shape. */
+ * is the whole reason this table kept its own shape. `icon` is checked against
+ * the closed vocabulary (@shared/meeting-icons) rather than trusted: a name
+ * that resolves to no glyph would render a hole on the Choices row, the meeting
+ * list and the picker alike. */
 async function cleanPurpose(cfg: D1Rest, guard: MemberGuard, actor: Actor, input: MeetingPurposeInput) {
   const name = requireText(input.name, "Name", TEXT_LIMITS.short)
   const department = optionalText(input.department, "Department", TEXT_LIMITS.short) ?? null
   if (department) await ensureSelectableValue(cfg, guard, actor, SELECTABLE_GROUPS.department, department)
+  const icon = optionalText(input.icon, "Icon", TEXT_LIMITS.short) ?? null
+  if (icon && !isMeetingTypeIcon(icon))
+    throw new GuardError(400, "invalid_icon", "That isn't a meeting-type icon we know.")
   return {
     name,
     department,
     description: optionalText(input.description, "Description", TEXT_LIMITS.long) ?? null,
+    icon,
   }
 }
 
@@ -114,8 +124,8 @@ export async function createMeetingPurpose(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO meeting_purposes (id, name, department, description, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(v.name)}, ${sqlString(v.department)}, ${sqlString(v.description)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO meeting_purposes (id, name, department, description, icon, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(v.name)}, ${sqlString(v.department)}, ${sqlString(v.description)}, ${sqlString(v.icon)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting purpose created",
@@ -139,12 +149,13 @@ export async function updateMeetingPurpose(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE meeting_purposes SET name = ${sqlString(v.name)}, department = ${sqlString(v.department)}, description = ${sqlString(v.description)}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE meeting_purposes SET name = ${sqlString(v.name)}, department = ${sqlString(v.department)}, description = ${sqlString(v.description)}, icon = ${sqlString(v.icon)}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
   )
   const changes = describeChanges([
     { label: "Name", from: before.name, to: v.name },
     { label: "Department", from: before.department, to: v.department },
     { label: "Description", from: before.description, to: v.description },
+    { label: "Icon", from: before.icon, to: v.icon },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting purpose edited",

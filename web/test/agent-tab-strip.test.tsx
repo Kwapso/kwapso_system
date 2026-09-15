@@ -10,6 +10,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+
 import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import type { AgentTab } from "@/lib/agent-conversation-tabs"
 
@@ -110,5 +112,49 @@ describe("AgentTabStrip", () => {
       // link, same as "Beringer" (the other background tab) already is.
       expect(screen.getByRole("link", { name: "Conversation" })).toBeTruthy()
     })
+  })
+})
+
+// MOUNTED THROUGH THE KIT'S OWN SLOT — the client's ruling, 15 Sep 2026, over
+// a screenshot of this strip nested one level below the kit's single, fixed
+// "Assistant" tab, verbatim: "The tabs need to be at the same level as the
+// assistant tab, so it will have no assistant name... it's only one tab
+// level." Kit v1.2.88's `ScreenShell` gained `asideTabs` for exactly this —
+// drawn IN PLACE of the kit's own fixed tab, not beside or under it — and
+// this is the proof that the app's own call site (`app-shell.tsx`'s
+// `asideTabs={<AgentDockTabsSlot />}`, portalled from `agent-panel.tsx`)
+// actually lands there: render the real kit composition with this app's real
+// strip as its `asideTabs` and read the aside's own DOM, rather than trusting
+// either file's comments.
+describe("AgentTabStrip mounted as ScreenShell's asideTabs", () => {
+  it("the aside draws exactly one tab strip — the app's own, never the kit's fixed one nested beside it", () => {
+    const { container } = render(
+      <ScreenShell asideOpen aside={<div>panel body</div>} asideTabs={<AgentTabStrip {...baseProps()} />}>
+        <div>content</div>
+      </ScreenShell>
+    )
+    // Scoped to the aside itself (`screen-shell-aside`), not the whole
+    // document — the RAIL draws its own `<nav>` too (`Rail`, R45), and this
+    // proof is about the ASIDE's tab level specifically, not a document-wide
+    // count that a change to the rail could move for an unrelated reason.
+    const aside = container.querySelector('[data-slot="screen-shell-aside"]')
+    expect(aside, "ScreenShell must draw the aside at all when asideOpen + asideTabs are given").toBeTruthy()
+    const navs = aside!.querySelectorAll("nav")
+    expect(navs, "one tab level — the app's AgentTabStrip, not a second one nested under the kit's own").toHaveLength(1)
+  })
+
+  it("no tab is named \"Assistant\" — that word is the landmark's own name now, never a tab", () => {
+    render(
+      <ScreenShell asideOpen aside={<div>panel body</div>} asideTabs={<AgentTabStrip {...baseProps()} />}>
+        <div>content</div>
+      </ScreenShell>
+    )
+    // The landmark itself still carries the word (`asideLabel`'s default,
+    // unchanged) — this is `role="complementary"`'s OWN accessible name, read
+    // off the region rather than off any tab inside it.
+    expect(screen.getByRole("complementary", { name: "Assistant" })).toBeTruthy()
+    // But nothing INSIDE it is a tab called "Assistant" any more — every link
+    // the strip actually draws is History, a real conversation, or "+".
+    expect(screen.queryByRole("link", { name: "Assistant" })).toBeNull()
   })
 })

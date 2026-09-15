@@ -42,7 +42,9 @@
 // they simply have no tab pointing at them any more.
 //
 // EACH TAB OFFERS ITS OWN VIEWS, through the toolbar's `view` slot (R53) rather
-// than a fixed body per tab: Overdue is Table (default) + Board by priority;
+// than a fixed body per tab: Overdue is Table + Board by priority, BOARD
+// DEFAULT (client, 2026-09-15, third pass: "the default view on tasks overdue
+// is board" — see `overdueView`'s own note below for why Planned is untouched);
 // Planned is Table (default) + Board by priority + Calendar by deadline;
 // Completed is Table only; Everyone's is Table (default) + Board by priority,
 // the same pair Overdue offers. All views within one tab read the SAME loaded
@@ -131,6 +133,25 @@
 // "whose is this" is the first question that tab's whole reason for existing
 // asks.
 //
+// "WHY NOW DON'T I SEE ANY TASK ON ANY TAB?" — the SAME EVENING, still later.
+// The unconditional narrowing above had a second effect nobody had asked for:
+// read against the Kwapso team's own staging data (2026-09-15 investigation),
+// 254 of 259 tasks carry no `assignee_id` at all, so `assignee_id = caller`
+// left Overdue/Planned/Completed close to empty for close to everyone —
+// unclaimed work along with everyone else's, not one reader's own list gone
+// missing. The client's own words for the fix: "a task nobody has is on my
+// list too." The door's `getTasks` now narrows those three views to
+// `assignee_id = caller OR assignee_id IS NULL` (`includeUnassigned`,
+// workers/content/src/lib/tasks.ts's `TaskFilter`) — an unclaimed row rides
+// every caller's three MINE tabs alongside their own, and the badges above
+// them (`countTasks`) take the identical OR-NULL clause, never a narrower one
+// than the rows they badge (R16). NOTHING CHANGES IN THIS FILE for this
+// ruling — the decision is entirely the door's, the same way the narrowing
+// itself was, and `TASK_COLUMNS`/`EVERYONE_COLUMNS` already read `assignee`
+// as "Nobody yet" (`shapeTasks`, below) for exactly this row shape. See
+// K19, documents/UI-RULEBOOK.md, for the full account and the test that
+// proves it (`workers/content/test/todos-tasks.test.ts`).
+//
 // TWO LOGOS, THE SAME RULING: "also, add the logos to account and app." The
 // Account and App cells draw `<RecordMark picture={…} name={…} />` beside the
 // name — the exact node `shape.tsx`'s `shapeAccountsList` already draws for
@@ -190,6 +211,49 @@
 // each with its own raise/cancel controls, so the door keeps a working front
 // door — this screen was never its only one. Awaiting the new home the client
 // named ("we will put this somewhere else").
+//
+// ── A THIRD PASS, SAME EVENING — "why don't I see any task on any tab?" ────
+//
+// Five more items, each the client's own words, on top of everything above.
+//
+// 1 · Covered at length where it belongs, above: "why now don't I see any
+//     task on any tab?" — `includeUnassigned`, the "WHY NOW DON'T I SEE ANY
+//     TASK ON ANY TAB?" section a few paragraphs up.
+// 2 · "the task list is not correctly aligned. It is missing some width. Just
+//     replicate the list component as we have it in tickets." Fixed here
+//     first with an opt-in `<RecordTable frame="bare">` (this screen's own
+//     `<RecordTable>` call site, below) — then SUPERSEDED, same evening, by
+//     R80 (below): a coordinator-relayed ruling made "bare" the component's
+//     ONLY shape, for every caller, so the alignment fix now lives in
+//     `record-table.tsx` itself rather than as this screen's own opt-out.
+//     `frame="bare"` is left on the call site, vestigial and harmless — see
+//     its own comment.
+// 3 · "The default view on tasks overdue is board." Covered where it lives —
+//     `overdueView`'s own comment, below.
+// 4 · "adding a chip inside the board component with the app, account, or
+//     department, whatever is the most detailed… in a chip on top of the
+//     title, like we have it already somewhere else." Covered at
+//     `boardChip`'s own comment, below (R65/K16 is the "somewhere else").
+// 5 · "On Everyone's, add the column 'Closed On' or 'Finished On'." Everyone's
+//     gains an eighth column, `closed` — the same `completedAt`-sourced cell
+//     Completed's own eighth column already draws (`shapeTasks`'s `closed`
+//     field, below) — blank ("—") for a task still open, exactly as
+//     Completed's own reads for nothing to report. `EVERYONE_COLUMNS` below
+//     is the only one of the four column sets naming it: Everyone's is
+//     status-agnostic (open and done both land on it), so it is the one tab
+//     where "when did this close" is a genuine, sometimes-blank question — on
+//     Overdue/Planned every row is open by construction and the answer would
+//     be "—" down every line, the identical furniture reasoning Status and
+//     "Who has it" were already dropped for (this file's header, above).
+// 6 · R80, a coordinator-relayed ruling mid-pass, verbatim: "I don't like this
+//     table anywhere, so anywhere in the app where you have it, replace it
+//     with list. I don't want to say this again." `tableViewOption`'s own
+//     `label` reads `t("List")` now, not `t("Table")` — the same word and
+//     glyph (`ListBullets`) `tickets-collection.tsx`'s own view switch
+//     already uses for its own `list` option — while the VALUE stays
+//     `"table"` throughout (`useRemembered`'s stored strings, `subView`, every
+//     comment in this file that still says "table" is naming the SHAPE, never
+//     the word a reader sees). See `tableViewOption`'s own comment, below.
 
 import * as React from "react"
 
@@ -205,6 +269,7 @@ import {
   ListBullets,
   Kanban as KanbanGlyph,
   CalendarBlank,
+  CalendarDots,
 } from "@shared/ui/foundations/icons"
 import type {
   ScreenActionContext,
@@ -224,6 +289,7 @@ import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
+import { RecordWeek } from "@/components/records/record-week"
 import {
   RecordTable,
   visibleActions,
@@ -276,6 +342,7 @@ function priorityWord(t: (s: string) => string, level: 1 | 2 | 3 | 4): string {
  * neither can silently disagree with the other about which end is "worse". */
 const PRIORITY_ORDER: readonly (1 | 2 | 3 | 4)[] = [4, 3, 2, 1]
 
+
 /** THE PRIORITY CHIP — the client's own words, "Priority (has a color here)".
  * Nothing in the app had ever coloured a task's priority before this (see
  * `PRIORITY_DOT_TONE`'s own header): the shaped row used to fold the plain word
@@ -288,6 +355,79 @@ function PriorityChip({ level, t }: { level: 1 | 2 | 3 | 4; t: (s: string) => st
       {priorityWord(t, level)}
     </Badge>
   )
+}
+
+/** THE BOARD CARD'S OWN CHIP — client, 2026-09-15, fourth feedback item:
+ * "adding a chip inside the board component with the app, account, or
+ * department, whatever is the most detailed… if it has app I only see the
+ * app; if only account, the account; if only department, department — in a
+ * chip on top of the title, like we have it already somewhere else." That
+ * "somewhere else" is R65/K16 (documents/UI-RULEBOOK.md, "on a card that
+ * stands for a record, the chip sits above the title") — `KanbanCard.badges`
+ * is the exact slot, the same one the tickets board already draws its own
+ * card chip through (`badges: <TriageChips … />`, tickets-collection.tsx).
+ *
+ * APP > ACCOUNT > DEPARTMENT — the client's own order ("whatever is the most
+ * detailed"): an app belongs to an account, and a department names neither,
+ * so the narrowest fact wins outright rather than the three combining into
+ * one crowded chip. THE RECORD MARK rides the app/account branches only —
+ * `<RecordMark>`, the identical node this file's own table cells already
+ * draw for App/Account (`shapeTasks`, below) — because a department is a
+ * team vocabulary word, not a record with a logo; it carries its own glyph
+ * (`departmentGlyph`) instead, the same mark the table's Department column
+ * already leads with, never a picture.
+ *
+ * `size="choice"`/`size="pill"`: the kit's own smallest mark (24, `--avatar-
+ * sm`) inside its own pill-height badge (26, `--control-height-pill`) — the
+ * one standard pairing in the kit's own vocabulary sized to hold a mark at
+ * all (`shared/ui/docs/TOKENS.md`). */
+/** APP > ACCOUNT > DEPARTMENT, decided once — the one thing `boardChip` (the
+ * board's own Badge) and `weekDetail` (below, the week view's plain-text
+ * line, item 7) must never answer differently. `undefined` when a task names
+ * none of the three, matching `boardChip`'s own "no chip" and `weekDetail`'s
+ * own "no detail line". */
+function mostDetailed(r: Task): "app" | "account" | "department" | undefined {
+  if (r.appName) return "app"
+  if (r.accountName) return "account"
+  if (r.department) return "department"
+  return undefined
+}
+
+function boardChip(r: Task): React.ReactNode {
+  const kind = mostDetailed(r)
+  if (kind === "app")
+    return (
+      <Badge variant="secondary" size="pill" className="gap-1.5">
+        <RecordMark picture={r.appLogoUrl} name={r.appName} size="choice" />
+        {r.appName}
+      </Badge>
+    )
+  if (kind === "account")
+    return (
+      <Badge variant="secondary" size="pill" className="gap-1.5">
+        <RecordMark picture={r.accountLogoUrl} name={r.accountName} size="choice" />
+        {r.accountName}
+      </Badge>
+    )
+  if (kind === "department") {
+    const mark = departmentGlyph(r.department)
+    return <Badge variant="secondary" size="pill">{[mark, r.department].filter(Boolean).join(" ")}</Badge>
+  }
+  return undefined
+}
+
+/** THE WEEK VIEW'S OWN DETAIL LINE (item 7 of the third pass: "entries with
+ * `dotTone` and the chip rule from item 4") — `CalendarEntry.detail` is a
+ * plain string, not a node (`record-calendar.tsx`'s own type; `RecordWeek`
+ * draws it as the card's quiet second line, no chip/logo slot on that type),
+ * so the SAME `mostDetailed` precedence `boardChip` reads is read again here,
+ * in words only — no `<RecordMark>`, which stays a board-only affordance. */
+function weekDetail(r: Task): string | undefined {
+  const kind = mostDetailed(r)
+  if (kind === "app") return r.appName ?? undefined
+  if (kind === "account") return r.accountName ?? undefined
+  if (kind === "department") return [departmentGlyph(r.department), r.department].filter(Boolean).join(" ")
+  return undefined
 }
 
 /** One task, as a row. Every column any view needs is on it, so the shaping is
@@ -392,7 +532,21 @@ const COMPLETED_COLUMNS = [...TASK_COLUMNS, field("closed", "Closed")]
  * caller's own name. SECOND, right after Task and ahead of Priority, per the
  * coordinator's earlier follow-up ("same columns plus Assignee prominent"):
  * the moment a tab shows everyone's tasks together, "whose is this" is the
- * first question a team-wide scan asks. */
+ * first question a team-wide scan asks.
+ *
+ * "CLOSED ON" IS THE EIGHTH, LAST — client, same evening: "On Everyone's, add
+ * the column 'Closed On' or 'Finished On'." Reads the identical row key
+ * Completed's own eighth column does (`closed`, `shapeTasks` below —
+ * `t.completedAt`, blank "—" for a task still open), under its own label
+ * rather than Completed's plain "Closed": the two tables answer a different
+ * question with the same fact — Completed's rows are ALL done, so "Closed"
+ * alone reads as a fact about the row; Everyone's mixes open and done, so the
+ * fuller "Closed on" reads correctly beside a row that has no answer yet.
+ * Everyone's is the only tab where this is a genuine, sometimes-blank
+ * question — every row on Overdue/Planned is open by construction, so the
+ * column would read "—" down every line there, the identical furniture
+ * reasoning Status and "Who has it" were already dropped for (this file's
+ * header, above). */
 const EVERYONE_COLUMNS = [
   field("name", "Task"),
   field("assignee", "Who has it"),
@@ -401,6 +555,7 @@ const EVERYONE_COLUMNS = [
   field("department", "Department"),
   field("client", "Account"),
   field("app", "App"),
+  field("closed", "Closed on"),
 ]
 
 /** THE TOOLBAR'S OWN SORT VOCABULARY (R53, 2026-09-15 ruling: "add sort by
@@ -480,11 +635,21 @@ const EVERYONE_TAB: { value: TaskView; label: string; icon: string } = {
  * (Completed only ever offered "table"; Overdue never offered "calendar"),
  * landing on the tab's own default instead of an error or a blank body. */
 type OverdueView = "table" | "board"
-type PlannedView = "table" | "board" | "calendar"
-/** Everyone's own sub-view — the same pair Overdue offers (Table + Board by
- * priority), so a reader who has learned one tab's switch has learned the
- * other's too. */
-type EveryoneView = "table" | "board"
+/** WEEK ARRIVED 2026-09-15, LAST ITEM OF THE THIRD PASS, once the week lane's
+ * own `RecordWeek` (`web/components/records/record-week.tsx`) landed —
+ * Planned's fourth view, reading the identical `CalendarEntry[]`
+ * `RecordCalendar`'s own Calendar view already builds (`calendarEntries`,
+ * below), plus `dotTone` (already set there) and a `detail` line built off
+ * the same app/account/department precedence `boardChip` uses (`mostDetailed`,
+ * above `shapeTasks`) — the client's own "like we have it already somewhere
+ * else" idiom, reused a second time rather than invented again. Overdue does
+ * NOT gain it: the client's own list of tabs for Week named Planned and
+ * Everyone's only. */
+type PlannedView = "table" | "board" | "calendar" | "week"
+/** Everyone's own sub-view — Table + Board, the pair Overdue offers, PLUS
+ * Week (same arrival as Planned's, above; Everyone's has no Calendar view to
+ * begin with, so Week is its second addition, third overall). */
+type EveryoneView = "table" | "board" | "week"
 
 export function TasksScreen({
   teamId,
@@ -552,20 +717,30 @@ export function TasksScreen({
   // because Overdue/Planned/Everyone's offer different bodies (see
   // `useRemembered`'s own doc on why tickets-collection.tsx keeps
   // `openView`/`readyView` apart rather than folding them into one).
+  // OVERDUE OPENS ON BOARD — client, 2026-09-15, third feedback pass: "the
+  // default view on tasks overdue is board." Planned keeps Table (its own
+  // default, below, is unchanged): the client's words named Overdue alone,
+  // and the two tabs answer different questions — Overdue's own board (by
+  // priority, deadline-ascending within a column) is the "what is on fire,
+  // worst first" read; Planned's Table is still the wider, sortable list of
+  // everything not yet due. `useRemembered` persists per reader from the
+  // first switch they make — this only changes what a reader who has never
+  // touched the switch opens on, exactly as every other default in this file
+  // reads (see the header on `sortField`/`sortDir`, `compareTasks`).
   const [overdueView, setOverdueView] = useRemembered<OverdueView>(
     "task-overdue-view",
-    "table",
+    "board",
     (r) => (r === "table" || r === "board" ? r : undefined)
   )
   const [plannedView, setPlannedView] = useRemembered<PlannedView>(
     "task-planned-view",
     "table",
-    (r) => (r === "table" || r === "board" || r === "calendar" ? r : undefined)
+    (r) => (r === "table" || r === "board" || r === "calendar" || r === "week" ? r : undefined)
   )
   const [everyoneView, setEveryoneView] = useRemembered<EveryoneView>(
     "task-everyone-view",
     "table",
-    (r) => (r === "table" || r === "board" ? r : undefined)
+    (r) => (r === "table" || r === "board" || r === "week" ? r : undefined)
   )
   const subView: OverdueView | PlannedView | "table" =
     view === "overdue" ? overdueView : view === "planned" ? plannedView : view === "all" ? everyoneView : "table"
@@ -842,6 +1017,9 @@ export function TasksScreen({
   const boardCard = (r: Task) => ({
     id: r.id,
     title: r.title,
+    // THE CHIP, ABOVE THE TITLE (R65/K16) — client ruling, this file's own
+    // header on `boardChip` above.
+    badges: boardChip(r),
     description:
       [r.accountName, r.dueOn ? t("due {date}", { date: formatDate(r.dueOn, lang) }) : null]
         .filter(Boolean)
@@ -892,18 +1070,58 @@ export function TasksScreen({
         .join(" · "),
     }))
 
+  // THE WEEK (Planned and Everyone's, item 7 of the third pass) — the SAME
+  // dated rows `calendarEntries` reads, mapped a second time rather than
+  // reshaped from it: the two views ask for different `detail` lines (item
+  // 7's own words, "entries with `dotTone` and the chip rule from item 4" —
+  // `weekDetail`, above, not the Calendar month grid's priority+assignee
+  // line), and `RecordWeek` is `PlannedView`/`EveryoneView`'s own fourth/
+  // third sub-view, never Overdue's. NO `time` — `CalendarEntry.time` is a
+  // caller-ALREADY-FORMATTED clock reading (that field's own doc,
+  // record-calendar.tsx) and a task carries no time of day at all, only a
+  // due DATE (`task-form-dialog.tsx`'s own picker), so every `dueOn` this
+  // screen ever writes lands on midnight UTC — fabricating "00:00" on every
+  // card would be an eyebrow that lies by omission on all of them. Absent,
+  // exactly as the type's own doc reads: "a card with no time draws no
+  // eyebrow."
+  const weekEntries: CalendarEntry[] = filteredRows
+    .filter((r) => r.dueOn)
+    .map((r) => ({
+      id: r.id,
+      day: (r.dueOn as string).slice(0, 10),
+      title: r.title,
+      dotTone: PRIORITY_DOT_TONE[r.priority],
+      detail: weekDetail(r),
+    }))
+
   // THE VIEW SLOT — R53's config, built by the toolbar itself. Completed
   // offers one body and still passes one (kit v1.2.60 draws a static label
   // rather than nothing, matching every other collection in the app that
   // genuinely has only one view), so the toolbar never loses its right-hand
   // element on the one tab that has nothing to switch.
-  const tableViewOption = { value: "table", label: t("Table"), icon: <ListBullets className="size-4" /> }
+  // LABELLED "LIST", NOT "TABLE" — client, just now, verbatim: "I don't like
+  // this table anywhere, so anywhere in the app where you have it, replace it
+  // with list. I don't want to say this again." The VALUE stays `"table"`
+  // (`useRemembered`'s own stored strings, `TableColumn`/`RecordTable`'s own
+  // prop names, `subView === "table"` throughout this file — none of that is
+  // a WORD a reader sees) — only the label a reader reads changes, to the
+  // same word and the same glyph (`ListBullets`) `tickets-collection.tsx`'s
+  // own view switch already uses for the identical shape (`list`, that
+  // file's own `tabsConfig`).
+  const tableViewOption = { value: "table", label: t("List"), icon: <ListBullets className="size-4" /> }
   const boardViewOption = { value: "board", label: t("Board"), icon: <KanbanGlyph className="size-4" /> }
   const calendarViewOption = {
     value: "calendar",
     label: t("Calendar"),
     icon: <CalendarBlank className="size-4" />,
   }
+  // WEEK — item 7 of the third pass, once the week lane's own `RecordWeek`
+  // landed. `CalendarDots` rather than `CalendarBlank`: the two views need
+  // visibly different glyphs on the same switch, and the dots read as several
+  // marked days rather than one month grid, which is the shape this view
+  // actually draws (`record-week.tsx`'s own W4 design, Mon–Fri plus weekend
+  // folded).
+  const weekViewOption = { value: "week", label: t("Week"), icon: <CalendarDots className="size-4" /> }
   const viewSlot: ToolbarViewSlot =
     view === "overdue"
       ? {
@@ -913,25 +1131,32 @@ export function TasksScreen({
         }
       : view === "planned"
         ? {
-            views: [tableViewOption, boardViewOption, calendarViewOption],
+            // WEEK, LAST — the client's own order ("Table · Board · Calendar
+            // · Week", the coordinator's brief), appended after the three
+            // views this tab already offered rather than inserted among them.
+            views: [tableViewOption, boardViewOption, calendarViewOption, weekViewOption],
             value: plannedView,
             onValueChange: (v) =>
-              setPlannedView(v === "board" ? "board" : v === "calendar" ? "calendar" : "table"),
+              setPlannedView(
+                v === "board" ? "board" : v === "calendar" ? "calendar" : v === "week" ? "week" : "table"
+              ),
           }
         : view === "all"
           ? {
-              // THE SAME PAIR OVERDUE OFFERS — a reader who has learned one
-              // switch has learned the other's too (this file's own header).
-              views: [tableViewOption, boardViewOption],
+              // THE SAME PAIR OVERDUE OFFERS, PLUS WEEK (this tab's own
+              // second addition, third view overall — see `EveryoneView`'s
+              // own doc, above).
+              views: [tableViewOption, boardViewOption, weekViewOption],
               value: everyoneView,
-              onValueChange: (v) => setEveryoneView(v === "board" ? "board" : "table"),
+              onValueChange: (v) => setEveryoneView(v === "board" ? "board" : v === "week" ? "week" : "table"),
             }
           : { views: [tableViewOption], value: "table", onValueChange: () => {} }
 
-  // THIS TAB'S OWN "GENUINELY EMPTY" (R50) — the calendar sub-view asks a
-  // narrower question (has anything here got a date at all) than the other two
-  // (does this pile hold any row at all).
-  const rawEmpty = subView === "calendar" ? !hasDueDated : rawRows.length === 0
+  // THIS TAB'S OWN "GENUINELY EMPTY" (R50) — the calendar AND week sub-views
+  // both ask a narrower question (has anything here got a date at all) than
+  // the other two (does this pile hold any row at all): a task with no
+  // deadline cannot fall into any day's column, calendar or week alike.
+  const rawEmpty = subView === "calendar" || subView === "week" ? !hasDueDated : rawRows.length === 0
   const toolbarEmpty = !tasksLoading && rawEmpty
 
   const toolbar = (
@@ -985,7 +1210,9 @@ export function TasksScreen({
     // their own translation.
     <CollectionEmptyState
       title={
-        subView === "calendar" ? t("No tasks with a deadline yet.") : t("Nothing on our own list.")
+        subView === "calendar" || subView === "week"
+          ? t("No tasks with a deadline yet.")
+          : t("Nothing on our own list.")
       }
       onCreate={canCreate ? () => setTaskOpen(true) : undefined}
     />
@@ -1011,6 +1238,13 @@ export function TasksScreen({
       onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
       emptyText={t("No tasks match your search.")}
     />
+  ) : subView === "week" ? (
+    // ITEM 7 — the week lane's own `RecordWeek`, wired the same way Planned's
+    // Calendar is above: the dated slice of `filteredRows` (`weekEntries`),
+    // and the whole entry handed back on select (`onSelect`, `RecordWeek`'s
+    // own contract — unlike `RecordCalendar`'s `onOpen(id)`, this component
+    // has no second lookup table to resolve an id against).
+    <RecordWeek entries={weekEntries} onSelect={(entry) => onIntent({ kind: "open", module: "tasks", id: entry.id })} />
   ) : (
     // `action={null}` OVERRIDES THE AMBIENT CREATE ACTION `<SectionWithCreate
     // onCreate={…}>` PUBLISHES BELOW (`CollectionCreateActionProvider`) — the
@@ -1031,6 +1265,22 @@ export function TasksScreen({
         actions={visibleActions(tableRecipe, rights, onAction)}
         onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
         useKitPanel
+        // `frame="bare"` — VESTIGIAL, kept only because `record-table.tsx`'s
+        // own type still names it (R80's own doc there). It started as this
+        // screen's fix for the alignment complaint ("the task list is not
+        // correctly aligned... replicate the list component as we have it in
+        // tickets", 2026-09-15's second screenshot) — dropping `<RecordTable>`'s
+        // DEFAULT row wrapper, a second, nested `rounded`+`bg-surface-panel`
+        // card that read as inset against this screen's own flush toolbar
+        // card one level up. R80 (the client's later, blanket ruling — "I
+        // don't like this table anywhere... replace it with list") made that
+        // fix UNCONDITIONAL for every `<RecordTable>` caller in the app, not
+        // only this one, so the alignment complaint is resolved at the
+        // component's own default now and this prop no longer does anything
+        // (`record-table.tsx` destructures it and never reads it). Left in
+        // place rather than deleted: harmless, self-documenting, and one
+        // fewer diff the day R80 finishes removing the prop's type entirely.
+        frame="bare"
       />
     </CollectionCreateActionProvider>
   )

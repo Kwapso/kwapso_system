@@ -297,6 +297,37 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
     expect(trail[trail.length - 1].href, "you are already here").toBeUndefined()
   })
 
+  it("a sprint opened from its wave: Wave, then Sprint — no Sprints rung between", () => {
+    // THE ONE DOOR A SPRINT HAS NOW (client ruling, 2026-09-15 — see the note
+    // beside `sprints` in web/lib/pages.ts's own TEAM_SECTIONS): it is planned
+    // and opened from inside its wave, never from a sidebar collection of its
+    // own. `waves` carries no loaded `list` in `CrumbRecords` (RECORD_FACE.waves
+    // has no `list` — the trail resolver reads it by id) so this exercises the
+    // by-id `resolved` map the same way a cold link does.
+    const trail = buildCrumbs({
+      topLevel: true,
+      module: "sprints",
+      recordId: "S1",
+      levels: [
+        { module: "waves", id: "W1" },
+        { module: "sprints", id: "S1" },
+      ],
+      teamName: "Kwapso",
+      teamPath: "/t/TEAM1",
+      sectionPath: "/sprints",
+      records: NO_RECORDS,
+      resolved: new Map([["waves:W1", "Q4 delivery"]]),
+      t: (s: string) => s,
+    })
+    // Same shape the account → story case pins above: the ancestor names
+    // itself, the record names itself, and no generic "Sprints" rung sits
+    // between them — a rung there would recite a Sprints collection page
+    // this ruling killed.
+    expect(trail.map((c) => c.label)).toEqual(["Q4 delivery", "BERG-SP12"])
+    expect(trail[0].href).toBe("/waves/W1")
+    expect(trail[trail.length - 1].href, "you are already here").toBeUndefined()
+  })
+
   it("FOUR levels — the owner's own example, uncapped", () => {
     const trail = crumbs("/apps/A1/sprints/S1/stories/ST1/accounts/CONFIA")
     expect(trail.map((c) => c.label)).toEqual([

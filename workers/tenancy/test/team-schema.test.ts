@@ -9,6 +9,7 @@ import {
   buildTeamSeed,
   SPRINT_TYPE_CATALOGUE,
   DEFAULT_SELECTABLE,
+  MEETING_TYPES,
   TEAM_MIGRATIONS,
   TEAM_MODULES,
 } from "../src/team-schema"
@@ -20,10 +21,10 @@ const ACTOR = { id: "01TEST", email: "chris@x.com", name: "Chris O'Brien" }
 describe("buildTeamSeed", () => {
   const seed = buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z")
 
-  it("seeds 2 roles + a full tall permission sheet + all dropdown defaults", () => {
+  it("seeds 2 roles + a full tall permission sheet + all dropdown defaults + the eight meeting types", () => {
     const inserts = seed.script.match(/INSERT INTO/g) ?? []
-    // 2 roles + (2 roles × modules) permissions + dropdown defaults
-    expect(inserts.length).toBe(2 + 2 * TEAM_MODULES.length + DEFAULT_SELECTABLE.length)
+    // 2 roles + (2 roles × modules) permissions + dropdown defaults + meeting types
+    expect(inserts.length).toBe(2 + 2 * TEAM_MODULES.length + DEFAULT_SELECTABLE.length + MEETING_TYPES.length)
   })
 
   it("Admin gets every switch; Viewer is read-only except the agent (use) and everyone's tasks (off)", () => {

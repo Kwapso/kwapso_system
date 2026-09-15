@@ -31,8 +31,6 @@
 // second question — `departmentMark` answers null and `departmentAsks` answers
 // "nothing else", which is the honest reading of a word the code has never met.
 
-import type { DotTone } from "./app-stages"
-
 /** One of the five the agency already runs on: its name, its mark, its colour. */
 export type DepartmentStyle = {
   name: string
@@ -111,24 +109,50 @@ export const PRIORITY_LABEL: Record<1 | 2 | 3 | 4, string> = {
   4: "Do it now",
 }
 
-/** THE PRIORITY'S OWN COLOUR (2026-09-15, the client's ruling on the Tasks
- * table: "Priority (has a color here)"). No chip anywhere in the app had ever
- * coloured a task's priority before this — `shapeTasks` folded the plain word
- * into a summary sentence, nothing else read it — so there was no existing
- * colour to reuse (R32's own "reuse the chip the app already has" could not be
- * followed literally; this is the FIRST one).
+/** PRIORITY'S OWN FOUR TONES — never App Stage's six.
  *
- * REUSES THE SAME SIX DOT TONES `shared/status-tones.ts` READS A LIFECYCLE
- * THROUGH (`Badge`'s own `DotTone`, `shared/app-stages.ts`) rather than
- * inventing a seventh (R32: no colour outside the closed palette). Four
- * escalating tones, the same four steps `PRIORITY_LABEL` already names:
- * `archived` (quiet grey — nothing pressing), `review` (info blue — worth a
- * look), `building` (charcoal — real weight), `blocked` (poppy red — the one
- * that reads as urgent even across a room). Ordinal, not a status: it says
- * nothing about a task's lifecycle, only how loud its priority chip reads. */
-export const PRIORITY_DOT_TONE: Record<1 | 2 | 3 | 4, DotTone> = {
-  1: "archived",
-  2: "review",
-  3: "building",
-  4: "blocked",
+ * `PriorityTone` is a SEPARATE type from `DotTone` (`shared/app-stages.ts`),
+ * on purpose, not four new members bolted onto it. Two files elsewhere hold
+ * an EXHAUSTIVE `Record<DotTone, …>` over the app-stage six
+ * (`web/components/records/record-week.tsx`'s own `DOT_FILL`,
+ * `web/components/tickets/tickets-collection.tsx`'s `DOT_TONE_FILL`) —
+ * widening `DotTone` would silently demand a fifth, sixth, seventh and
+ * eighth entry in both, neither of which has anything to do with a task's
+ * priority. `Badge`'s `dot` prop and `Kanban`'s `KanbanColumn.dot` both
+ * accept `PriorityTone`'s four names too (kit v1.2.89: `--dot-red` /
+ * `--dot-orange` / `--dot-purple` / `--dot-blue`, `shared/ui/foundations/
+ * tokens/tokens.css`), because the kit's own `BadgeDot` / `KanbanColumnDot`
+ * unions grew the same four members the six already had — a caller never
+ * imports this type to pass one through. */
+export type PriorityTone = "red" | "orange" | "purple" | "blue"
+
+/** THE PRIORITY'S OWN COLOUR — SUPERSEDED 2026-09-15, the same day it
+ * shipped. The client's first ruling on the Tasks table ("Priority (has a
+ * color here)") landed with no existing chip to reuse, so `PRIORITY_DOT_TONE`
+ * borrowed four of `Badge`'s six App-Stage tones — `archived`/`review`/
+ * `building`/`blocked` — "the only reusable name in reach". Shown back to
+ * her the same afternoon (the artifact at claude.ai/code/artifact/
+ * 895888b7-ca1a-4df0-ae2d-c61b9127fb4e measures why in a table), and one of
+ * the four was a real defect: `building` is charcoal, the exact hex
+ * `--surface-inverse` is in light, so a priority-3 dot vanished wherever the
+ * two met, and in dark it tripped `Badge`'s `building`-on-mango special case
+ * by accident — the one colour this system reserves for the brand, painted
+ * onto a chip one rank below "Do it now".
+ *
+ * HER RULING, VERBATIM, THE SAME DAY: "For the priorities: 4: keep the red.
+ * 3: use the orange. Urgent: use the purple. Whenever: use the blue."
+ * Checked against `PRIORITY_LABEL` above, not assumed: 4 is "Do it now", 3 is
+ * "Important", 2 is "Urgent", 1 is "Whenever" — so "Urgent" names priority 2
+ * and "Whenever" names priority 1, exactly as spelled out below.
+ *
+ * NOTHING PRIORITY-RELATED READS AN APP-STAGE TONE ANY MORE. Every value
+ * here is one of `PriorityTone`'s own four, never `archived`/`review`/
+ * `building`/`blocked`/`shipped`/`done` — and `building`'s dark-mode
+ * mango special case (`Badge`'s one compound variant) can therefore never
+ * fire for a priority chip again, because no priority is ever `building`. */
+export const PRIORITY_DOT_TONE: Record<1 | 2 | 3 | 4, PriorityTone> = {
+  1: "blue",
+  2: "purple",
+  3: "orange",
+  4: "red",
 }

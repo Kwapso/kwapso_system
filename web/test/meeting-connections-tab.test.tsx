@@ -100,6 +100,7 @@ function makeMeeting(over: Partial<Meeting> = {}): Meeting {
     appName: null,
     purposeId: null,
     purposeName: null,
+    purposeIcon: null,
     agenda: null,
     notes: null,
     location: null,

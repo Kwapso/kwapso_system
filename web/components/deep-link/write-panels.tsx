@@ -293,6 +293,7 @@ export function WritePanels({
         // 0091 — off the SAME `membersQ` this file already reads (line 249's
         // role-change picker), never a second fetch.
         members={assignableMembers(membersQ.data)}
+        defaultAccountManagerId={active.user?.id ?? ""}
         onSubmit={createAccount}
       />
 

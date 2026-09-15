@@ -1086,6 +1086,31 @@ again, which is the only property that matters here.
   screen's own labelling strip (a nested view switch already inside a pinned
   panel, a strip that navigates instead of labelling one) is named in
   `TAB_STRIP_PIN_EXEMPT` (`shared/rules/registry.ts`) with the real reason.
+- **R78 `no-sort-in-calendar-views`** — if your collection offers a calendar,
+  week or agenda body, draw its view switch through `<ToolbarRow>`'s
+  structured `view` slot and pass nothing else: the row itself drops the
+  `<SortControl>` the moment that view is active (`NO_SORT_VIEW_VALUES`,
+  `web/components/deep-link/screen-bits.tsx`), no matter what `sort` you hand
+  it. A file that builds its own sort/view pair outside the row (named in
+  `TOOLBAR_CONTROL_OWNERS`) must suppress its own sort control on a
+  calendar-shaped view the same way, or be named in `NO_SORT_VIEW_EXEMPT`
+  with the reason it cannot.
+- **R79 `staff-pill-row`** — if a field picks a member of staff (an assignee,
+  an account manager, an app's lead or staff list, a stakeholder), draw it
+  with `shared/web/staff-pill-picker.tsx`'s `StaffPillPicker`, never a
+  `<Select>` or a `<RecordPicker>` without `layout="row"` fed a staff list.
+  Preselect the signed-in user on a NEW record (`defaultAssigneeId`/the
+  equivalent prop on your form dialog); an EDIT form keeps the stored value.
+  A picker that is genuinely not this shape is named in
+  `STAFF_PILL_ROW_EXEMPT` (`shared/rules/registry.ts`) with the real reason.
+- **R80 `rows-are-a-list`** — if your module's collection draws its rows as a
+  table, mount `<RecordTable>` (`web/components/records/record-table.tsx`)
+  and pass nothing for `frame`: it draws one shape, flush and full-width,
+  with no second boxed card around it. There is no opt-in for the old
+  banded look — the `frame` prop that used to choose one still exists only
+  for source compatibility, accepts the literal `"bare"` and nothing else,
+  and is never read. A view switch that offers this body calls it "List",
+  with the kit's `ListBullets` glyph, never "Table".
 
 **The words** (the ones that catch every new module, every time)
 

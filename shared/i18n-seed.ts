@@ -533,6 +533,7 @@ export const SEED: Catalogue = {
     
     
   },
+  "Keep in the loop": { de: "Auf dem Laufenden halten", es: "Mantener informado", ca: "Mantenir al corrent" },
   "You can add members, but no one is ever removed.": {
     de: "Du kannst Mitglieder hinzufügen, aber niemand wird je entfernt.",
     es: "Puedes añadir miembros, pero nadie se elimina nunca.",
@@ -1309,8 +1310,6 @@ export const SEED: Catalogue = {
    * meetings-screen.tsx's own header block carries her words. New words, hand
    * translated here rather than left to the generator. */
   "Everyone's": { de: "Alle", es: "De todos", ca: "De tothom" },
-  "Time": { de: "Uhrzeit", es: "Hora", ca: "Hora" },
-  "Attendees": { de: "Teilnehmer", es: "Asistentes", ca: "Assistents" },
   /* THE GLOSSARY RENAME, "Meeting purpose" → "Meeting type", read into this
    * screen (`shared/glossary.ts` carries the rename itself; this lane only
    * hand-seeds the two new labels meetings-screen.tsx now shows). Compound
@@ -1479,7 +1478,6 @@ export const SEED: Catalogue = {
   "Reading what's attached…": { de: "Anhänge werden gelesen…", es: "Leyendo lo adjunto…", ca: "Llegint el que hi ha adjunt…"},
   "Renaming it updates every ticket filed against it.": { de: "Eine Umbenennung wirkt sich auf jedes dazu erstellte Ticket aus.", es: "Al renombrarlo se actualizan todos los tickets creados sobre él.", ca: "En canviar-li el nom s'actualitzen tots els tiquets creats sobre ell."},
   "Search modules…": { de: "Module suchen…", es: "Buscar módulos…", ca: "Cerca mòduls…"},
-  "Search people…": { de: "Personen suchen…", es: "Buscar personas…", ca: "Cerca persones…"},
   "Somebody": { de: "Jemand", es: "Alguien", ca: "Algú"},
   "Protected": { de: "Geschützt", es: "Protegido", ca: "Protegit"},
   "Switch it off": { de: "Ausschalten", es: "Desactivarlo", ca: "Desactiva'l"},
@@ -1496,7 +1494,6 @@ export const SEED: Catalogue = {
   "What it does": { de: "Was es tut", es: "Qué hace", ca: "Què fa"},
   "What it gives them": { de: "Was es ihnen bringt", es: "Qué les aporta", ca: "Què els aporta"},
   "Where the team manages their own preferences.": { de: "Wo das Team seine eigenen Einstellungen verwaltet.", es: "Donde el equipo gestiona sus propias preferencias.", ca: "On l'equip gestiona les seves preferències."},
-  "You're not on this app": { de: "Sie sind nicht auf dieser App", es: "No estás en esta aplicación", ca: "No ets en aquesta aplicació"},
   "Your invite has been accepted, so nothing is waiting on you. Open the portal at the address your invite came from, and sign in with this same email address.": { de: "Ihre Einladung wurde angenommen, es wartet also nichts auf Sie. Öffnen Sie das Portal unter der Adresse, von der Ihre Einladung kam, und melden Sie sich mit derselben E-Mail-Adresse an.", es: "Tu invitación ya está aceptada, así que no hay nada pendiente. Abre el portal en la dirección desde la que llegó tu invitación e inicia sesión con este mismo correo.", ca: "La teva invitació ja està acceptada, així que no hi ha res pendent. Obre el portal a l'adreça des d'on va arribar la invitació i inicia sessió amb aquest mateix correu."},
   "Yours unless you say otherwise, an unassigned task is a task nobody picks up.": { de: "Ihre, sofern Sie nichts anderes sagen – eine nicht zugewiesene Aufgabe nimmt niemand auf.", es: "Tuya salvo que digas lo contrario: una tarea sin asignar es una tarea que nadie recoge.", ca: "Teva llevat que diguis el contrari: una tasca sense assignar és una tasca que ningú no agafa."},
   "an account": { de: "ein Kunde", es: "una cuenta", ca: "un compte"},
@@ -3039,7 +3036,6 @@ export const SEED: Catalogue = {
    * register as "Shape" above it — plain, short, the ordinary word a
    * 45–55-year-old manager already uses for each shape. */
   Gallery: { de: "Galerie", es: "Galería", ca: "Galeria" },
-  Table: { de: "Tabelle", es: "Tabla", ca: "Taula" },
   "{count} sources": { de: "{count} Quellen", es: "{count} fuentes", ca: "{count} fonts" },
   "A map of the whole knowledge base, grouped by account": {
     de: "Eine Karte der ganzen Wissensbasis, nach Konto gruppiert",
@@ -3706,7 +3702,6 @@ export const SEED: Catalogue = {
   "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it.": { de: "Das ist alles, was der Assistent lesen darf. Fügen Sie eine Notiz oder eine Datei hinzu, und er kann darauf basierend antworten.", es: "Esto es todo lo que el asistente puede leer. Añade una nota o un archivo, y podrá empezar a responder a partir de ahí.", ca: "Això és tot el que l'assistent pot llegir. Afegeix una nota o un fitxer, i podrà començar a respondre a partir d'aquí." },
   "This is how the work was described when {version} was cut on {date}.": { de: "So wurde die Arbeit beschrieben, als {version} am {date} erstellt wurde.", es: "Así se describió el trabajo cuando se generó {version} el {date}.", ca: "Així es va descriure la feina quan es va generar {version} el {date}." },
   "This is how the work was described when {version} was cut.": { de: "So wurde die Arbeit beschrieben, als {version} erstellt wurde.", es: "Así se describió el trabajo cuando se generó {version}.", ca: "Així es va descriure la feina quan es va generar {version}." },
-  "Tiles": { de: "Kacheln", es: "Mosaico", ca: "Mosaic" },
   "Timeline": { de: "Zeitleiste", es: "Cronología", ca: "Cronologia" },
   "Triage queue": { de: "Sichtungswarteschlange", es: "Cola de clasificación", ca: "Cua de classificació" },
   "Triaged.": { de: "Gesichtet.", es: "Clasificado.", ca: "Classificat." },
@@ -4199,6 +4194,7 @@ export const SEED: Catalogue = {
   "Renamed.": { de: "Umbenannt.", es: "Renombrado.", ca: "Reanomenat." },
   "Rough notes, not the answer.": { de: "Grobe Notizen, nicht die Antwort.", es: "Notas preliminares, no la respuesta.", ca: "Notes preliminars, no la resposta." },
   "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet.": { de: "Gespeichert, aber wir haben nichts vom Link gelesen — der Assistent weiß noch nicht, was in diesem Video gesagt wird.", es: "Guardado, pero no hemos leído nada del enlace — el asistente aún no sabrá qué dice este vídeo.", ca: "Desat, però no hem llegit res de l'enllaç — l'assistent encara no sabrà què diu aquest vídeo." },
+  "Apps by stage": { de: "Apps nach Phase", es: "Apps por etapa", ca: "Apps per etapa" },
   "Tasks by priority": { de: "To-dos nach Priorität", es: "Tareas por prioridad", ca: "Tasques per prioritat" },
   "That is the end of what this screen shows, not the end of the material —": { de: "Das ist das Ende dessen, was dieser Bildschirm zeigt, nicht das Ende des Materials —", es: "Eso es el final de lo que muestra esta pantalla, no el final del material —", ca: "Això és el final del que mostra aquesta pantalla, no el final del material —" },
   "Then I re-read the strongest passages before answering.": { de: "Dann habe ich die stärksten Abschnitte noch einmal gelesen, bevor ich geantwortet habe.", es: "Después releí los pasajes más relevantes antes de responder.", ca: "Després vaig rellegir els fragments més rellevants abans de respondre." },
@@ -4215,4 +4211,19 @@ export const SEED: Catalogue = {
   "{count} apps": { de: "{count} Apps", es: "{count} apps", ca: "{count} apps" },
   "{count} pieces": { de: "{count} Stück", es: "{count} fragmentos", ca: "{count} fragments" },
   "{title} (not in use)": { de: "{title} (nicht in Gebrauch)", es: "{title} (sin usar)", ca: "{title} (sense ús)" },
+
+  /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026, SAME DAY, LATER — the
+     seven strings the ceiling check found with no seed entry for de/es/ca:
+     Tasks' own "Closed on"/"Week" (this pass's items 5 and 7 —
+     web/components/work/tasks-screen.tsx) plus the week lane's own
+     `RecordWeek` navigation words (web/components/records/record-week.tsx).
+     Hand-translated here, never in the generated catalogue — the file's own
+     header says why. */
+  "Closed on": { de: "Abgeschlossen am", es: "Cerrado el", ca: "Tancat el" },
+  "Week": { de: "Woche", es: "Semana", ca: "Setmana" },
+  "Weekend": { de: "Wochenende", es: "Fin de semana", ca: "Cap de setmana" },
+  "Next day": { de: "Nächster Tag", es: "Día siguiente", ca: "Dia següent" },
+  "Next week": { de: "Nächste Woche", es: "Semana siguiente", ca: "Setmana següent" },
+  "Previous day": { de: "Vorheriger Tag", es: "Día anterior", ca: "Dia anterior" },
+  "Previous week": { de: "Vorherige Woche", es: "Semana anterior", ca: "Setmana anterior" },
 }

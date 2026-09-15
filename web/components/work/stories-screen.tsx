@@ -39,6 +39,7 @@ import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-f
 import { StartTimerStrip } from "@/components/work/time-panel"
 import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { appsKey, helpKey, listFetch, processesKey, sprintsKey, storiesKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
@@ -251,6 +252,9 @@ export function StoriesScreen({
   onIntent: (intent: ScreenIntent) => void
 }) {
   const { t, lang } = useLanguage()
+  // THE SIGNED-IN USER, preselected as the assignee on a new story (client
+  // ruling, 15 Sep 2026 — see `StoryFormDialog`'s own `defaultAssigneeId`).
+  const myUserId = useSessionUserId()
   // Page one of the backlog, its next cursor parked in the sidecar <LoadMore>
   // reads (R14). The same fetcher primes the exact `total:` sidecar (R16).
   const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
@@ -426,6 +430,7 @@ export function StoriesScreen({
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:${teamId}`}
+        defaultAssigneeId={myUserId ?? ""}
         onSubmit={(v) => createStoryFrom(teamId, v, t)}
       />
     </div>

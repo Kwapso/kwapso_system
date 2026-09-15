@@ -329,6 +329,7 @@ export function RecordTable<T extends TableRowData>({
   className,
   useKitPanel,
   narrowedOutside,
+  frame,
 }: {
   columns: TableColumn[]
   rows: T[]
@@ -363,7 +364,31 @@ export function RecordTable<T extends TableRowData>({
    * reason; this puts the number back on the row without putting it back in
    * the header. Omit it and every cell renders exactly as before. */
   refColumn?: string
+  /** VESTIGIAL — ACCEPTED AND IGNORED, kept only so the tasks/meetings lanes'
+   * own existing call sites (`tasks-screen.tsx`) keep compiling while their
+   * briefs land. R80 (client, 15 Sep 2026: "I don't like this table anywhere,
+   * so anywhere in the app where you have it, replace it with list. I don't
+   * want to say this again") made the "bare" shape the ONLY shape this
+   * component draws, unconditionally — see `renderItems` below, which no
+   * longer boxes the `<Table>` in a second `rounded-[var(--radius)]
+   * bg-surface-panel` card at all. That second box was the defect, not a
+   * variant: every real caller already sits inside ONE surface of its own
+   * (a `CollectionCard` from `<PagedFind>`'s `wrap`, or the kit's own
+   * `useKitPanel` collection panel), so `RecordTable`'s own card was always a
+   * redundant, doubly-nested one — the exact shape `tickets-collection.tsx`'s
+   * `TicketRowsTable` never drew, composed straight from the kit's own
+   * primitives with nothing wrapping them. That is the shape this file draws
+   * now too, for every caller, with no opt-in.
+   *
+   * The type accepts only `"bare"` (never `"panel"` again) so a caller cannot
+   * even ask, at compile time, for the banded box this law deleted; a call
+   * site with nothing to say may omit the prop entirely. */
+  frame?: "bare"
 }) {
+  // R80 — `frame` IS NEVER READ. Destructured only so the type stays on the
+  // signature (see its own doc above); `void` says that out loud rather than
+  // leaving an unused parameter for the next reader to wonder about.
+  void frame
   const [own, setOwn] = React.useState<{ by: string; dir: "asc" | "desc" } | null>(null)
   const live: CollectionOrder = order ?? {
     by: own?.by ?? "",
@@ -397,11 +422,20 @@ export function RecordTable<T extends TableRowData>({
       className={className}
       useKitPanel={useKitPanel}
       narrowedOutside={narrowedOutside}
-      renderItems={(page) => (
-        <div className="overflow-hidden rounded-[var(--radius)] bg-surface-panel">
+      renderItems={(page) => {
+        const table = (
           <Table>
             <TableHeader>
-              <TableRow>
+              {/* NO HOVER ON THE HEADER — the same rule
+                  `tickets-collection.tsx`'s `TicketRowsTable` states in full:
+                  `TableRow` carries the kit's row wash unconditionally, which
+                  is the right affordance on a BODY row (the whole row opens
+                  the record) and a lie on this one — the header row itself
+                  does nothing, only the small button inside a sortable
+                  header's own cell does, so a wash on the row is a surface
+                  that lights up under the pointer and then refuses the
+                  click. */}
+              <TableRow className="hover:bg-transparent">
                 {columns.map((c) => {
                   const active = c.sort != null && live.by === c.sort
                   return (
@@ -506,8 +540,17 @@ export function RecordTable<T extends TableRowData>({
               ))}
             </TableBody>
           </Table>
-        </div>
-      )}
+        )
+        // R80 — NO SECOND BOX, EVER. `frame` is accepted-and-ignored (see its
+        // own doc above); there is no branch left that wraps `table` in a
+        // card of its own. Every caller already sits inside ONE surface —
+        // `<PagedFind>`'s `CollectionCard`, or the kit's own `useKitPanel`
+        // collection panel — and this used to paint a second, redundant one
+        // on top of it: the exact grey, rounded, inset band the client ruled
+        // out everywhere ("I don't like this table anywhere … replace it with
+        // list").
+        return table
+      }}
     />
   )
 }

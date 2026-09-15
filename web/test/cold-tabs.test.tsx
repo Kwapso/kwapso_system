@@ -317,7 +317,7 @@ const ONE_MEETING = {
  * this file opens on the default tab) — so priming it renders exactly what
  * they would see. The control's own presence is asserted separately below, so
  * "the switch is gone" still fails. */
-function renderMeetingsCalendar(meetings: Meeting[], view: "table" | "calendar" | "agenda" = "calendar") {
+function renderMeetingsCalendar(meetings: Meeting[], view: "list" | "calendar" | "agenda" = "calendar") {
   const teamId = coldTeam()
   door.meetings = meetings
   primeCache(meetingsKey(teamId), meetings)
@@ -333,15 +333,11 @@ function renderMeetingsCalendar(meetings: Meeting[], view: "table" | "calendar" 
     >
       <MeetingsScreen
         teamId={teamId}
-        recipe={BASE_RECIPES["meetings.list"]}
-        rights={{ meetings: { read: true, create: true } } as never}
         total={meetings.length}
         purposeCount={0}
         canCreate
         canReadPurposes={false}
         onPurposes={() => {}}
-        onImport={() => {}}
-        onAction={() => {}}
         onIntent={() => {}}
       />
     </RememberedScreen>
@@ -350,11 +346,14 @@ function renderMeetingsCalendar(meetings: Meeting[], view: "table" | "calendar" 
 }
 
 describe("Meetings — the Calendar VIEW on a team with no meetings", () => {
-  it("names both acts (add, import) instead of an empty month", async () => {
+  it("names the add act instead of an empty month, and offers no import act any more", async () => {
     renderMeetingsCalendar([])
     expect(await screen.findByText("Nothing in Meetings yet.")).toBeTruthy()
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
-    expect(screen.getByRole("button", { name: /Import a list/ })).toBeTruthy()
+    // NO IMPORT ACT ANY MORE (client ruling, 2026-09-15 evening: "On
+    // meetings, kill the import.") — the empty state's own secondary act
+    // went with the toolbar button, both fed by the now-gone `onImport` prop.
+    expect(screen.queryByRole("button", { name: /Import a list/ })).toBeNull()
     expect(screen.queryByText("Nothing in Meetings this month.")).toBeNull()
   })
 
@@ -375,7 +374,7 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
   // R50 — a toolbar is drawn at all only over a collection with rows, so this
   // one is asked of a screen that has one.
   it("is This week · Mine · Everyone's, and Calendar is a view rather than a tab", async () => {
-    renderMeetingsCalendar([ONE_MEETING], "table")
+    renderMeetingsCalendar([ONE_MEETING], "list")
     expect(await screen.findByRole("tab", { name: /This week/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Mine/ })).toBeTruthy()
     expect(screen.getByRole("tab", { name: /Everyone's/ })).toBeTruthy()
@@ -389,7 +388,7 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
 
   it("MINE IS THE DOOR'S QUESTION, not a filter over the loaded page", async () => {
     asked.length = 0
-    renderMeetingsCalendar([ONE_MEETING], "table")
+    renderMeetingsCalendar([ONE_MEETING], "list")
     // ASKED ON ARRIVAL, BEFORE THE TAB IS OPENED, and that is the assertion
     // rather than an accident of when the read fires: the badge on a tab nobody
     // has touched still has to be an exact server count (R16), and unlike the
@@ -411,7 +410,7 @@ describe("Meetings — the strip the client asked for, and the switch beside it"
 
   it("THIS WEEK IS ALWAYS MINE NOW — the door question is mine-week (ruling, 2026-09-15)", async () => {
     asked.length = 0
-    renderMeetingsCalendar([ONE_MEETING], "table")
+    renderMeetingsCalendar([ONE_MEETING], "list")
     // The default tab (This week) reads its own list on arrival — the same
     // `weekQ` read the header block of meetings-screen.tsx documents — and it
     // now asks `view: "mine-week"`, never plain `week`, because the tab folds

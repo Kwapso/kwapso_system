@@ -117,7 +117,7 @@ import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
-import { AgentDockSlot } from "@/lib/agent-dock"
+import { AgentDockSlot, AgentDockTabsSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 
 /** A list with at least one thing in it, said in the type.
@@ -1440,6 +1440,31 @@ export function AppShell({
            "Close the assistant" is new (R28: extracted, catalogued, and the
            ceiling moved in the same commit). */
         aside={can("agent", "create") ? <AgentDockSlot /> : undefined}
+        /* THE ASIDE'S OWN TAB LEVEL — kit v1.2.88's `asideTabs`, ADDED for the
+           client's ruling, 15 Sep 2026, over a screenshot of this app's own
+           conversation tabs (History · one per open thread · "+") drawn one
+           level BELOW the kit's single, fixed "Assistant" tab, verbatim:
+           "The tabs need to be at the same level as the assistant tab, so it
+           will have no assistant name. We know that's what it is. Rather,
+           each tab will have the name... it's only one tab level." An empty
+           box, exactly like `aside` above and for the identical reason: the
+           live tab list belongs to `AgentPanel` at the root
+           (`agent-conversation-tabs.ts`, `use-agent-chat.tsx`), not to this
+           per-route shell, so `AgentTabStrip` is built there and portalled
+           into this slot (`web/lib/agent-dock.tsx`'s `AgentDockTabsSlot` /
+           `useAgentDockTabs`, the tab-level twin of `AgentDockSlot` /
+           `useAgentDock`). GATED THE SAME WAY `aside` IS: no `agent:create`,
+           no strip and no column to attach one to.
+
+           `asideLabel`, BELOW, IS NOT RETIRED BY THIS. Two jobs survive that
+           a tab strip cannot do instead: it stays the accessible name on
+           `screen-shell-aside`'s own landmark (a strip names each of ITS OWN
+           tabs, never the region as a whole), and it would still be the
+           whole story for a caller that passed no `asideTabs` — which this
+           one no longer is, but the kit itself still falls back to it, and a
+           second reader of this file should not have to open the kit to
+           learn that. */
+        asideTabs={can("agent", "create") ? <AgentDockTabsSlot /> : undefined}
         /* THIS APP DRAWS ITS OWN MOBILE TOP BAR — see the `<header>` above and
            the assistant trigger inside it for why the kit's row cannot carry
            a profile menu. Without this the two would stack. */
@@ -1457,13 +1482,19 @@ export function AppShell({
            when the assistant is closed, but the one in the middle when the
            assistant is open, remove it." That circle (`ScreenShell`'s aside
            `EdgeHandle`, kit v1.2.85+) duplicated a close control this app
-           already draws on the open column: the × the assistant's own
-           folder tab carries (`BreadcrumbFolders.onClose`, inside the kit's
-           own dock). `asideHandleOnOpen` is a kit-level prop for exactly
-           this — default `true` everywhere else, `false` here. The SHUT
-           corner draw is untouched: it is still this app's only way back
-           into a column that renders nothing while closed (see "SHUT MEANS
-           ABSENT" below). */
+           already draws on the open column. THAT CONTROL MOVED, THE SAME DAY,
+           WITH `asideTabs` ABOVE: it used to be the single kit-drawn
+           "Assistant" tab's own × (`BreadcrumbFolders.onClose`, inside the
+           kit's own dock); it is now each CONVERSATION tab's own ×
+           (`AgentTabStrip`'s `onClose`, `agent-panel.tsx`'s
+           `handleCloseAgentTab`) — closing the last one closes the column
+           itself (`setAgentOpen(false)`, same file), so the column is still
+           reached by pressing an × on its own tab level either way, only the
+           tab has a name now instead of being the region's name.
+           `asideHandleOnOpen` is a kit-level prop for exactly this — default
+           `true` everywhere else, `false` here. The SHUT corner draw is untouched:
+           it is still this app's only way back into a column that renders
+           nothing while closed (see "SHUT MEANS ABSENT" above). */
         asideHandleOnOpen={false}
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,

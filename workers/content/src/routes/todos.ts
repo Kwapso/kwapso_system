@@ -303,7 +303,7 @@ async function taskPage(
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
     listTasks(cfg, guard, filter, cursor),
-    countTasks(cfg, guard, { assigneeId: filter.assigneeId }),
+    countTasks(cfg, guard, { assigneeId: filter.assigneeId, includeUnassigned: filter.includeUnassigned }),
   ])
   const view = filter.view ?? "open"
   // R14: rows + exact total + hasMore + an opaque cursor, through the ONE seam.
@@ -377,9 +377,21 @@ export async function getTasks(request: Request, env: Env): Promise<Response> {
   // un-narrowed. A caller without the right still gets their own name on every
   // view, exactly as before.
   const MINE_VIEWS: readonly TaskViewName[] = ["overdue", "planned", "completed"]
+  const isMineView = MINE_VIEWS.includes(filter.view ?? "open")
+  // A SECOND RULING, SAME EVENING: "why now don't I see any task on any tab?"
+  // Staging's own numbers answered it — 254 of this team's 259 tasks carry no
+  // `assignee_id` at all, so the unconditional narrowing above (landed a few
+  // hours earlier) had left every MINE tab showing almost nothing for almost
+  // everyone, unclaimed work included, not "Aurora's list specifically empty".
+  // The fix is the client's own words: "a task nobody has is on my list too"
+  // — `includeUnassigned` (TaskFilter, lib/tasks.ts) rides ONLY the three MINE
+  // views, never `all` (Everyone's already shows every row, claimed or not) and
+  // never the `!everyones` fallback below (a caller reaching for `all` without
+  // the right is refused down to their OWN name, the pre-existing rule, not
+  // handed a bonus pile of unclaimed work it never asked the client to grant).
   const narrowed =
-    MINE_VIEWS.includes(filter.view ?? "open") || !everyones
-      ? { ...filter, assigneeId: guard.userId }
+    isMineView || !everyones
+      ? { ...filter, assigneeId: guard.userId, includeUnassigned: isMineView }
       : filter
   // ONE TASK BY ID IS A LOOKUP, NOT A PAGE — the same shape the tickets door
   // takes, and for the same reason: once a collection pages, filtering a page
@@ -390,13 +402,19 @@ export async function getTasks(request: Request, env: Env): Promise<Response> {
   if (id) {
     const [one, counts] = await Promise.all([
       getTask(cfg, guard, id),
-      countTasks(cfg, guard, { assigneeId: narrowed.assigneeId }),
+      countTasks(cfg, guard, { assigneeId: narrowed.assigneeId, includeUnassigned: narrowed.includeUnassigned }),
     ])
     // Whose task it is, applied to the lookup as well as to the list: without
     // the everyone's-tasks right a caller reads their own by id and nobody
     // else's, rather than the door narrowing the list and leaving the direct
-    // link open beside it.
-    const mine = one && (everyones || one.assigneeId === guard.userId) ? one : null
+    // link open beside it. UNCLAIMED TOO, unconditionally (not gated on
+    // `narrowed.includeUnassigned`, which only exists for a MINE view and this
+    // lookup carries no `view` — the task-detail screen's own fetch never sends
+    // one, `web/lib/api/content.ts`): every MINE tab now shows a row with no
+    // `assignee_id` to every caller alike, so a caller opening one BY ID it
+    // just clicked from that same list must not meet a 404 the list itself
+    // disagrees with.
+    const mine = one && (everyones || one.assigneeId === guard.userId || one.assigneeId === null) ? one : null
     // The same nine, spelled out again — see the note in `taskPage`.
     return pagedJson(
       "tasks",

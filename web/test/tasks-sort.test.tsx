@@ -104,13 +104,25 @@ function warmTeam(tasks: Task[]): string {
   return teamId
 }
 
-/** The Overdue tab, table subview (the toolbar's default) unless a remembered
- * board choice is injected. */
+/** The Overdue tab, TABLE subview by default — the toolbar's own default
+ * FLIPPED to Board on 2026-09-15's third pass (the client: "the default view
+ * on tasks overdue is board", `overdueView`'s own note, tasks-screen.tsx),
+ * but most of what this file pins (the toolbar's sort order, the header
+ * census, the logo cells, the single add button) is a claim about the TABLE,
+ * not about which sub-view a cold reader lands on — that is
+ * `cold-tabs.test.tsx`'s own claim to prove, not this file's to re-litigate
+ * at every call site. So `"task-overdue-view": "table"` is primed here,
+ * UNCONDITIONALLY, before any override the caller hands in — the identical
+ * "priming the REMEMBERED choice directly" shape this file's own header
+ * already describes for reaching the board, just defaulted the other way
+ * now that the app's own default is not the table any more. A caller that
+ * wants the board (`renderOverdueBoard`, below) still overrides it. */
 function renderOverdue(tasks: Task[], remembered: Record<string, unknown> = {}) {
   const teamId = warmTeam(tasks)
+  const memory: Record<string, unknown> = { "task-overdue-view": "table", ...remembered }
   return render(
     <RememberedScreen
-      memory={{ read: (slot) => remembered[slot], write: (slot, value) => void (remembered[slot] = value) }}
+      memory={{ read: (slot) => memory[slot], write: (slot, value) => void (memory[slot] = value) }}
     >
       <TasksScreen
         teamId={teamId}
@@ -292,9 +304,11 @@ describe("Tasks: the board's own fixed order and its silent empty column (2026-0
 
   it("colours the priority-4 column head with the priority's own dot tone", () => {
     renderOverdueBoard(TASKS)
-    // `PRIORITY_DOT_TONE[4]` is "blocked" (shared/departments.ts) — the same
-    // tone the table's own chip and the calendar's own dot read.
-    expect(document.querySelector('[class*="dot-blocked"]')).toBeTruthy()
+    // `PRIORITY_DOT_TONE[4]` is "red" (shared/departments.ts, client ruling
+    // 2026-09-15: "4: keep the red") — the same tone the table's own chip
+    // and the calendar's own dot read. Priority 4 no longer borrows
+    // App Stage's "blocked".
+    expect(document.querySelector('[class*="dot-red"]')).toBeTruthy()
   })
 
   it("shows an empty priority column with no placeholder sentence at all", () => {

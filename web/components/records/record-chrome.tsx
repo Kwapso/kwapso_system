@@ -778,9 +778,47 @@ const IDENTITY_ROW =
    mark edge left to pull the pills flush WITH, and `identityChips` (below)
    no longer computes any such offset at all. This note stays only as the
    pointer to why an offset class briefly existed here and does not any
-   more. */
+   more.
+
+   2026-09-15: THE MARK'S EDGE IS BACK — see `RECORD_MARK_BOX` immediately
+   below, and the `mark` prop's own doc comment, for the ruling that brought
+   it back and why it is narrower than the one this note describes leaving. */
+
+/** THE MARK'S OWN BOX — B1 (client ruling, 2026-09-15, quoted in full on the
+ * `mark` prop above). Sized to the TITLE'S OWN LINE BOX, never a magic
+ * number: `--text-4xl` is the h1 step's font-size and `--text-4xl--line-
+ * height` its own unitless multiplier (tokens.css) — the exact two tokens
+ * `RECORD_TITLE_SIZE` (shared/web/record-heading.tsx) already points the
+ * kit's own rendered heading at, via the same "reach the kit's font-size
+ * bridge" route that file's own comment explains (`@theme inline` ties
+ * font-size, line-height and letter-spacing to one Tailwind step). So the
+ * mark is exactly as tall as the line of text beside it, BY CONSTRUCTION —
+ * not tuned to match it once and left to drift the next time the root scale
+ * or the heading step moves — and the artifact's own arithmetic (Reference
+ * section) adds this same product as the title's line-box height on the
+ * exact stack this file renders.
+ *
+ * REACHED THROUGH TO THE CALLER'S OWN MARK, NOT PASSED AS A SIZE PROP. The
+ * derived value has no rung on `RecordMark`'s `size` ladder
+ * (shared/web/record-mark.tsx: `choice`/`row`/`tile`/`band`, each a literal
+ * pixel step, none of them this calc) and neither that file nor
+ * `web/components/apps/app-tiles.tsx` (`AppMark`) is this lane's to edit —
+ * so this reaches the caller's own rendered box from OUTSIDE it, the same
+ * "descendant selector outranks a vendored/foreign component's own size
+ * class on specificity alone" trick `IDENTITY_ROW` above already uses on a
+ * kit-vendored badge for the identical reason (a class this file cannot add
+ * at the source). `RecordMark`/`AppMark` both render one root `<span>`, so
+ * `[&>span]:size-full` reaches it: a child COMBINATOR selector
+ * out-specifies that span's own single-class size rule regardless of which
+ * class won the JSX-order coin toss, so the caller may pass `size="tile"`
+ * (or any other) for a sane fallback-letter font-size and this box still
+ * wins the actual box dimensions. */
+const RECORD_MARK_BOX =
+  "size-[calc(var(--text-4xl)*var(--text-4xl--line-height))] shrink-0 " +
+  "[&>span]:size-full"
 
 export function RecordScreen({
+  mark,
   recordNumber,
   collectionLabel,
   chips,
@@ -801,27 +839,39 @@ export function RecordScreen({
   errorAction,
 }: {
   /**
-   * The record type's glyph, when the type has one.
+   * THE MARK COMES BACK, NARROWLY — CLIENT RULING, 2026-09-15, verbatim: "For
+   * cover and logo, I choose B1. Apply this on apps, accounts, and team
+   * members." B1 is the artifact's own name for the shape drawn below:
+   * https://claude.ai/code/artifact/ab68749e-6970-4fc1-a7f6-eb220c7f2900,
+   * Component B, variation B1 — the logo (an account, an app) or the avatar (a
+   * team member) sits INLINE LEFT of the title, on the title's own line, boxed
+   * to the title's own line-height so "the title stays at the same height as
+   * other pages" (her words the same message) holds exactly, not
+   * approximately.
    *
-   * NO LONGER READ BY THIS COMPONENT — CLIENT RULING, 2026-09-01, verbatim:
-   * "for now there are no - under no case - images on title. remove it
-   * everywhere." `RecordScreen` used to fold this into `headerMark` and hand
-   * it to both the kit's own `RecordChrome` (`mark`) and the condensed bar
-   * (`CondensedTitleBar`'s own former `mark` prop, now deleted outright,
-   * condensed-title.tsx); neither happens any more, so a value here renders
-   * nowhere. The PROP survives on this signature, unlike `eyebrow`'s own
-   * "the condensed bar still reads it" reason: here it is simply that every
-   * `*-detail.tsx` call site still passes one (`mark={appStageMark(app.stage)}`,
-   * `mark={kindMark}`…) and none of the thirteen of them needs to change for
-   * a ruling stated "for now" — removing the prop from this type would force
-   * a matching edit at every one of them to delete an argument that is
-   * already inert. `RecordMark` (shared/web/record-mark.tsx), the component a
-   * caller builds this value FROM, is untouched: it still draws a mark in every
-   * list row, tile and picker that isn't a title, which this ruling never
-   * reached. (`TypeMark`, named here until 7 Sep 2026, was a wrapper round it
-   * with no callers left — see the note where it used to be, above.)
+   * THIS REVERSES THE 2026-09-01 RULING ABOVE, AND ON PURPOSE NARROWLY. That
+   * ruling ("under no case — images on title. remove it everywhere") is why
+   * this prop went quiet in the first place, and the type used to be a bare
+   * `string | null` — the record TYPE's own glyph (`appStageMark(app.stage)`,
+   * `kindMark`, `typeMark(...)`), never a picture. The new ruling names three
+   * record kinds, not "everywhere" — so THIS PROP DOES NOT GO LIVE FOR EVERY
+   * CALLER THAT ALREADY PASSES ONE. It goes live only for a caller that hands
+   * it a real NODE (an element such as `<RecordMark …/>` or `<AppMark …/>`) —
+   * `showMark` below reads `typeof mark !== "string"` for exactly that reason.
+   * Every OTHER `*-detail.tsx` still on the old shape (`sprint-detail.tsx`'s
+   * `mark={kindMark}`, `story-detail.tsx`'s `mark={typeMark(...)}`) keeps
+   * passing a bare string and stays exactly as inert as it was the day before
+   * this ruling — those screens were never named, and a lane that has not
+   * opted in should not wake up with a glyph beside its title because this
+   * file widened the prop's type. Widening `string | null` to `React.ReactNode`
+   * is backward compatible on its own (a string already satisfies
+   * `ReactNode`); the type discriminator is what keeps the BEHAVIOUR backward
+   * compatible too, which the type alone cannot do.
+   *
+   * `RecordMark` (shared/web/record-mark.tsx) is the component a caller
+   * builds the node FROM — untouched by this change, same as before.
    */
-  mark?: string | null
+  mark?: React.ReactNode
   /**
    * A logo or avatar, when the record has a real image — it used to replace
    * the mark in the same square (G3). NO LONGER READ, for the exact reason
@@ -1111,6 +1161,13 @@ export function RecordScreen({
     subtitle === undefined || subtitle === null ? null : (
       <span className="text-badge tabular-nums text-ink-tertiary">{subtitle}</span>
     )
+  // THE MARK, B1 — see `mark`'s own doc comment above for the ruling and the
+  // string-vs-node discriminator. A bare string (every `*-detail.tsx` still on
+  // the OLD `mark={appStageMark(...)}` shape, unmigrated by this ruling) stays
+  // exactly as inert as it was; only a real node — the three call sites this
+  // ruling actually named — draws.
+  const showMark = mark !== undefined && mark !== null && typeof mark !== "string"
+  const markBox = !showMark ? null : <span className={RECORD_MARK_BOX}>{mark}</span>
   // `titleRef` sits on the OUTER node either way — the whole block (pills,
   // heading and subtitle) is what has to fully leave the viewport before the
   // condensed stand-in takes over.
@@ -1142,16 +1199,30 @@ export function RecordScreen({
   // list rows" — exactly this shape, one row (the pills) sitting above the
   // next (the title) — so it reads as a real, unambiguous break rather than
   // a same-size echo of the control gap one level down.
-  const titleBlock =
-    identityChips === undefined && subtitleLine === null ? (
+  // THE TITLE'S OWN LINE — plain when there is nothing beside it (the shape
+  // the record-heading-clamps suite already pins), or, since B1, the mark and
+  // the heading side by side in one row — `items-center` so a shorter mark box
+  // never happens (`RECORD_MARK_BOX` is derived to the exact title line-box
+  // height, this file's own note above), `gap-3` for the kit's `--space-3`
+  // control gap between them, matching `IDENTITY_ROW`'s own pill gap.
+  const titleLine = !showMark ? (
+    <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+  ) : (
+    <span className="flex min-w-0 items-center gap-3">
+      {markBox}
       <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+    </span>
+  )
+  const titleBlock =
+    identityChips === undefined && subtitleLine === null && !showMark ? (
+      titleLine
     ) : (
       <span className="flex min-w-0 flex-col">
         {identityChips !== undefined ? (
           <span className="mb-[var(--space-4)]">{identityChips}</span>
         ) : null}
         <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
-          <span className="min-w-0 break-words">{clampRecordHeading(title)}</span>
+          {titleLine}
           {subtitleLine}
         </span>
       </span>

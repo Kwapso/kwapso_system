@@ -36,6 +36,7 @@ import { AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-
 // differently (`record-ref.tsx` carries the whole argument for each one).
 import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
+import type { MeetingTypeIcon } from "@shared/meeting-icons"
 import { translator, type Language } from "@shared/i18n"
 import type {
   Account,
@@ -313,6 +314,30 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
 
 /* -------------------------------- meetings -------------------------------- */
 
+// THE EIGHT MEETING-TYPE ICONS, NAMED LITERALLY — `MeetingPurpose.icon` and
+// `Meeting.purposeIcon` arrive from the database at runtime (`<Icon
+// name={p.icon} …>` below and in `internal-screens.tsx`'s Choices row), and
+// `scripts/icon-map.mjs`'s census can only see a literal `icon: "…"` in
+// SOURCE — it has no way to read a value that only exists once a row comes
+// back from the door. Without this, the generated `icon-map.ts` would never
+// import `ClockCounterClockwise` et al., and every meeting-type icon would
+// resolve to nothing (`iconComponent()` returns null for a name the map
+// doesn't carry) — a silent hole, never a build failure. Kept beside
+// `MEETING_TYPE_ICONS` (@shared/meeting-icons), the vocabulary the write door
+// checks against, so the two can never drift: an icon added there and not
+// here draws nothing; one added here and not there refuses at the door.
+const MEETING_TYPE_ICON_CENSUS: { icon: MeetingTypeIcon }[] = [
+  { icon: "clock-counter-clockwise" },
+  { icon: "calendar-blank" },
+  { icon: "check-circle" },
+  { icon: "arrows-clockwise" },
+  { icon: "rocket-launch" },
+  { icon: "arrow-clockwise" },
+  { icon: "calendar-dots" },
+  { icon: "target" },
+]
+void MEETING_TYPE_ICON_CENSUS
+
 /** One meeting, as a row: when it was, who it was with and why. The date leads
  * because a calendar is scanned by date — the title is what you read once you have
  * found the day. */
@@ -364,6 +389,19 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
         </span>
       ),
       purpose: m.purposeName ?? "Not said",
+      // THE TYPE, WEARING ITS OWN ICON — same `client`/`accountCell` split as
+      // above: `purpose` stays plain text (a consumer may still read it as a
+      // string), `purposeCell` is the node with the type's Phosphor icon
+      // (MeetingPurpose.icon) beside its name, for a table cell or an agenda
+      // row that wants to draw it instead of bare text.
+      purposeCell: m.purposeName ? (
+        <span className={REF_LEADS_NAME}>
+          {m.purposeIcon ? (
+            <Icon name={m.purposeIcon} className="text-muted-foreground size-4 shrink-0" />
+          ) : null}
+          <span className="min-w-0 truncate">{m.purposeName}</span>
+        </span>
+      ) : null,
       // WHETHER IT HAS HAPPENED, FROM THE CLOCK. There used to be a `held` status
       // on the row and this read it; a flag somebody had to remember to tick
       // could disagree with the calendar in both directions, so the start time

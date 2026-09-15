@@ -41,7 +41,7 @@ import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
-import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, SPRINT_TYPE_CATALOGUE } from "./seed"
+import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, MEETING_TYPES, SPRINT_TYPE_CATALOGUE } from "./seed"
 
 /** THE APP ORDER THE CLIENT DICTATED, 2026-09-01, TRANSCRIBED EXACTLY.
  *
@@ -276,6 +276,25 @@ const PICTOGRAPH_MARK_RANGES: readonly (readonly [number, number])[] = [
   [0x1FA6E, 0x1FAFF],
   [0x1FC00, 0x1FFFD],
 ]
+
+/** THE SPELLING A LIVE ROW MIGHT ALREADY CARRY, per canonical `MEETING_TYPES`
+ * name (imported above from ./seed, the same eight rows a newborn team's seed
+ * plants). Read off the 15 Sep 2026 staging census (27 rows, the artifact
+ * 0092's own header cites): the row is either already spelled correctly, or
+ * carries the one other spelling named here. Matched case-sensitively — a
+ * case-insensitive compare would paper over a genuine second spelling nobody
+ * has looked at (0072's own rule for the app-order list, restated). A name
+ * with no second entry needed no rename. */
+const MEETING_TYPE_OLD_NAMES: Record<string, string[]> = {
+  "Week planning": ["Week Planning"],
+  "Follow-up": ["Follow-Up"],
+  "Jour fixe": ["Jourfix"],
+}
+
+/** Every spelling that resolves to one canonical meeting type — its own
+ * canonical name always included, so a re-run (already renamed) still
+ * matches. */
+const meetingTypeCandidates = (name: string): string[] => [name, ...(MEETING_TYPE_OLD_NAMES[name] ?? [])]
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
@@ -6485,6 +6504,81 @@ DROP TABLE IF EXISTS staff_certificates;
     sql: `
 ALTER TABLE accounts ADD COLUMN account_manager_user_id TEXT;
 CREATE INDEX idx_accounts_manager ON accounts (account_manager_user_id);
+`,
+  },
+  {
+    // ── MEETING TYPES, CUT TO EIGHT — client ruling, 15 Sep 2026, verbatim ────
+    //
+    //   "Let's review the meeting types because there is so much shit. The
+    //    only ones that I want are: Recap, Week planning, Validation, Sync,
+    //    Kickoff, Follow-up. All of these are regarding build and operations.
+    //    For the department Business, we have: Jira Fix, Strategy. That's it.
+    //    The rest, just remove them."
+    //
+    // TWO READINGS, NEITHER SILENT. "Jira Fix" matches no live row — the
+    // staging row spelled "Jourfix" is the German "Jour fixe" (a fixed
+    // recurring status meeting), so this migration writes "Jour fixe" and
+    // renames the existing "Jourfix" row onto it rather than inserting a
+    // second row: a meeting held under that type keeps reading it correctly.
+    // "Kickoff" lands on "Kick-off" — the live row's own spelling, matched
+    // as-is, no rename needed.
+    //
+    // AN ICON, NOT A DELETE. `icon` is a new nullable column — a kebab-case
+    // Phosphor name (@shared/meeting-icons, checked against the kit's own
+    // export at the eight names' introduction). `meeting_purposes` never
+    // deletes (meetings.purpose_id references it, and its own header says
+    // why), so every row this ruling did not name is DEACTIVATED, never
+    // dropped — a meeting held under a retired type still reads its type.
+    //
+    // DEPARTMENT. "Business" exists in TASK_DEPARTMENTS (@shared/departments)
+    // and is used for the two rows her ruling put there. The six she called
+    // "regarding build and operations" get no department: TASK_DEPARTMENTS is
+    // Sales / Admin / Production / Marketing / Business — none spelled
+    // "Operations" or "Build" — so their department is left NULL rather than
+    // guessed onto the nearest-sounding one (Production).
+    //
+    // THE EIGHT ROWS THEMSELVES ARE `MEETING_TYPES` (./seed), the same list a
+    // newborn team's seed plants — one definition, so an existing team
+    // upgraded by this migration and a team born tomorrow land on the exact
+    // same names, departments and icons.
+    //
+    // IDEMPOTENT THROUGHOUT, this ledger's usual shape (0034, 0039): every
+    // INSERT is guarded `WHERE NOT EXISTS`, the rename/reactivate UPDATEs
+    // carry no side effect that duplicates on a second run, and the final
+    // DEACTIVATE runs `AND deactivated_at IS NULL` so a repeat moves zero
+    // rows. `icon` itself is a bare `ADD COLUMN`, matching every column this
+    // ledger has ever added (0091, the entry right before this one, included)
+    // — SQLite has no conditional form of it (`ADD COLUMN IF NOT EXISTS` is
+    // not valid syntax, checked against this repo's own SQLite engine) and
+    // none is needed: `_migrations` is what stops a team ever running 0092
+    // twice, the same guarantee every un-guarded `ADD COLUMN` above already
+    // relies on.
+    //
+    // ORDER MATTERS: the renames run BEFORE the deactivate-everyone-else
+    // statement, so a row's OLD spelling (still "Jourfix" when this migration
+    // starts) is never caught by the final sweep — by the time it runs, every
+    // canonical row already carries its NEW name.
+    version: "0092_meeting_types_cut_to_eight",
+    sql: `
+ALTER TABLE meeting_purposes ADD COLUMN icon TEXT;
+${MEETING_TYPES.map((t) => {
+  const candidates = meetingTypeCandidates(t.name).map((n) => sqlString(n)).join(", ")
+  return `
+UPDATE meeting_purposes
+   SET name = ${sqlString(t.name)}, department = ${sqlString(t.department)}, icon = ${sqlString(t.icon)},
+       deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       updated_at = datetime('now')
+ WHERE name IN (${candidates});
+
+INSERT INTO meeting_purposes (id, name, department, icon, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(t.name)}, ${sqlString(t.department)}, ${sqlString(t.icon)}, datetime('now'), 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM meeting_purposes WHERE name IN (${candidates}));`
+}).join("\n")}
+
+UPDATE meeting_purposes
+   SET deactivated_at = datetime('now'), deactivator_name = 'System'
+ WHERE deactivated_at IS NULL
+   AND name NOT IN (${MEETING_TYPES.map((t) => sqlString(t.name)).join(", ")});
 `,
   },
 ]

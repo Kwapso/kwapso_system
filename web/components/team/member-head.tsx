@@ -1,8 +1,9 @@
 "use client"
 
-// THE MEMBER DETAIL'S FIRST PANEL — the picture, and the facts that used to be
-// three lines (role, joined, email) and are now the whole first thing a reader
-// sees on a colleague's own page.
+// THE MEMBER DETAIL'S FIRST PANEL — the facts that used to be three lines
+// (role, joined, email) and are now the whole first thing a reader sees on a
+// colleague's own page. The picture that used to open this panel is drawn in
+// the title instead now — see the note below.
 //
 // ── THE CLIENT'S RULING, VERBATIM ───────────────────────────────────────────
 //
@@ -12,18 +13,19 @@
 //    Position · A button to send email · A button to call · The field for the
 //    phone number. Just put all of this in there."
 //
-// ── THE PICTURE, AND WHY IT IS HERE AND NOT IN THE TITLE ───────────────────
+// ── THE PICTURE MOVED TO THE TITLE, B1 (2026-09-15) ─────────────────────────
 //
-// A record's title carries no picture anywhere in this app — the client's own
-// 2026-09-01 ruling, "under no case - images on title. remove it everywhere",
-// which `record-chrome.tsx` and the recipe engine both still hold shut. This
-// screen does not fight that law: the picture sits here, in the first panel,
-// at the same `size="band"` RecordMark already draws it at on Settings ›
-// Team's gallery cards (`members-gallery.tsx`) — the doc on `RecordMark`
-// itself names `band` as the size for exactly this seat, "the square in a
-// record's header band" — and through the SAME seam (`picture={member.image
-// Url}`, `shape="round"`, R60's `object-cover`), so a picture that exists on
-// the gallery card is the same picture, drawn the same way, here.
+// It used to sit here, in this first panel, because the client's 2026-09-01
+// ruling — "under no case - images on title. remove it everywhere" — meant
+// this screen could not put it beside the name. That ruling is narrowly
+// reversed now: "For cover and logo, I choose B1. Apply this on apps,
+// accounts, and team members." (2026-09-15). B1 draws the avatar INLINE LEFT
+// of the title, on the title's own line — `member-screen.tsx`'s own `mark`
+// prop on `RecordScreen`, using the exact seam this file used to
+// (`picture={member.imageUrl}`, `shape="round"`, R60's `object-cover`), so
+// it's the same picture, drawn the same way, one level up. Drawing it AGAIN
+// here would be the same face twice on one screen, so the tile that used to
+// open this panel is gone — the fields below are unchanged.
 //
 // ── WHERE BIRTHDAY / POSITION / PHONE COME FROM ─────────────────────────────
 //
@@ -62,7 +64,6 @@ import { OverviewList } from "@/components/records/overview-list"
 import { content } from "@/lib/api"
 import { staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
-import { RecordMark } from "@shared/web/record-mark"
 import { formatDate } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import type { StaffProfile, TeamMember } from "@shared/types"
@@ -109,15 +110,9 @@ export function MemberHead({ teamId, member }: { teamId: string; member: TeamMem
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col items-start gap-4 sm:flex-row">
-        {/* THE FACE — visible here, R60 `object-cover`, the gallery's own
-            `size="band"` seat (shared/web/record-mark.tsx: "the square in a
-            record's header band"). */}
-        <RecordMark picture={member.imageUrl} name={name} shape="round" size="band" />
-        <div className="min-w-0 flex-1">
-          <OverviewList items={items} />
-        </div>
-      </div>
+      {/* THE FACE — no longer drawn here (see this file's header note): the
+          title itself carries it now, B1. */}
+      <OverviewList items={items} />
       <div className="flex flex-wrap gap-2">
         <a href={`mailto:${member.email}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
           <EnvelopeSimple className="size-3.5" />

@@ -178,29 +178,35 @@ describe("F2 · every declared import target has a way in from a screen", () => 
     .map((f) => stripComments(f.source))
     .join("\n")
 
-  /** THE CANARY, and it runs first. `import/meetings` has had a button since
+  /** THE CANARY, and it runs first. `import/stories` has had a button since
    * the importer shipped, so a census that cannot find THAT one is a broken
    * census and every zero below would be a lie.
    *
-   * IT USED TO BE `import/accounts` — the canary moved, not the mechanism,
-   * when the accounts button it was anchored to went (see the note on the
-   * `it.each` below). Any surviving per-module route proves the census still
-   * works; `meetings` was picked because nothing in this session touches it. */
+   * MOVED TWICE, NOT THE MECHANISM. It was `import/accounts` until the
+   * accounts button it was anchored to went (14 Sep 2026); it was
+   * `import/meetings` after that, until the client's ruling, 2026-09-15
+   * evening — "On meetings, kill the import." — took that screen's own
+   * button with it (see the note on the `it.each` below, where `meetings`
+   * came out of the list the same day). Any surviving per-module route
+   * proves the census still works; `stories` was picked because nothing in
+   * this session touches it. */
   it("finds an import route that is definitely there", () => {
     expect(agencySource, "the census cannot find a route that exists — every result below is meaningless").toContain(
-      "import/meetings"
+      "import/stories"
     )
   })
 
-  // ACCOUNTS AND MEMBER_ROLES ARE NOT IN THIS LIST ANY MORE. The client's own
-  // ruling, 14 Sep 2026, verbatim: "On Accounts, kill the Export and Import
-  // buttons. Not needed." That removed the accounts collection's own "Import
-  // CSV" button — its one DEDICATED route in from a screen. The same ruling
-  // applied to member_roles (roles-matrix.tsx) on 2026-09-15: "Kill import and
-  // export for permissions settings." So neither accounts nor member_roles
-  // contains the literal `import/accounts` or `import/member_roles`, and
-  // asserting them would be asserting routes that no longer have in-app entry
-  // points.
+  // ACCOUNTS, MEMBER_ROLES AND MEETINGS ARE NOT IN THIS LIST ANY MORE. The
+  // client's own ruling, 14 Sep 2026, verbatim: "On Accounts, kill the Export
+  // and Import buttons. Not needed." That removed the accounts collection's
+  // own "Import CSV" button — its one DEDICATED route in from a screen. The
+  // same ruling applied to member_roles (roles-matrix.tsx) on 2026-09-15:
+  // "Kill import and export for permissions settings." And on meetings the
+  // same evening: "On meetings, kill the import." (meetings-screen.tsx's own
+  // header carries her words in full) — so none of the three contains the
+  // literal `import/accounts`, `import/member_roles` or `import/meetings`
+  // any more, and asserting them would be asserting routes that no longer
+  // have in-app entry points.
   //
   // THE TARGETS THEMSELVES ARE NOT GONE, and neither is every way in: the door
   // (`POST /api/data-ops/import/batch/*`), the TargetDefs
@@ -209,9 +215,10 @@ describe("F2 · every declared import target has a way in from a screen", () => 
   // CSV for either target exactly as it always did — a file's target is read
   // off its own columns at the plan step, never off which button somebody
   // pressed to get there. What is gone is the one-click shortcut from each
-  // collection's own toolbar; the importer itself is unchanged.
+  // collection's own toolbar; the importer itself is unchanged. Meetings is
+  // still reachable through this generic screen, picking its target from the
+  // list the next `it` proves is linked.
   it.each([
-    ["meetings", "two years of somebody's diary"],
     ["stories", "the work in hand"],
     ["brand_assets", "the agency's own material"],
     ["meeting_purposes", "why we meet"],

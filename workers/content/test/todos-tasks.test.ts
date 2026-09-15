@@ -423,11 +423,13 @@ describe("our own admin comes in six piles, counted once", () => {
   // ASSIGNED TO THE CALLER — `titlesIn`/the R16 test below both read as
   // `IDS.staffUser`, and 2026-09-15's ruling narrows Overdue/Planned/Completed
   // to `assignee_id = caller` UNCONDITIONALLY now (see `MINE_VIEWS`,
-  // `workers/content/src/routes/todos.ts`). An unassigned task belongs to
-  // nobody's "mine" pile, so these four have to name the caller to still prove
-  // what this describe block is actually testing — that the SIX views ask six
-  // different questions, not who may see them (that is the block above,
-  // "who sees everyone else's tasks is a permission").
+  // `workers/content/src/routes/todos.ts`). Named here rather than left
+  // unassigned so this describe block still proves what it says it does — that
+  // the SIX views ask six different questions, not who may see them (that is
+  // the block above, "who sees everyone else's tasks is a permission") — and
+  // NOT because an unassigned task would be missing: the SAME EVENING'S SECOND
+  // ruling (`includeUnassigned`, lib/tasks.ts) puts one on Overdue/Planned/
+  // Completed for every caller alike, proved separately, below.
   beforeEach(async () => {
     await call(IDS.staffUser, "POST /api/content/tasks", {
       title: "Late",
@@ -485,6 +487,108 @@ describe("our own admin comes in six piles, counted once", () => {
   it("a made-up view is the everyday pile, not a SQL fragment (R20)", async () => {
     expect(await titlesIn("'; DROP TABLE tasks;--")).toEqual(["Late", "Soon", "Undated"])
     expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 4 })
+  })
+})
+
+// ── "A TASK NOBODY HAS IS ON MY LIST TOO" (2026-09-15, THE EVENING RULING) ─────
+//
+// Staging's own numbers are why this exists: 254 of the Kwapso team's 259 tasks
+// carry no `assignee_id` at all, so the SAME DAY'S EARLIER ruling — Overdue/
+// Planned/Completed narrow to `assignee_id = caller` UNCONDITIONALLY — had left
+// almost every one of those three tabs empty for almost everyone, unclaimed work
+// included. That is what the client's "why now don't I see any task on any tab"
+// was reporting, not that her OWN assigned tasks had vanished. The fix
+// (`includeUnassigned`, lib/tasks.ts) rides ONLY those three views: an unclaimed
+// task is not suddenly claimed by whoever looks, and Everyone's/`open` still
+// answer their own, older questions untouched.
+describe("an unassigned task rides the three MINE views too, not only its own", () => {
+  /** A second, ordinary team member — the "somebody else" a task can be
+   * assigned to, to prove the OR-NULL clause does not widen into "everyone's",
+   * only "mine, plus nobody's". */
+  const OTHER_USER = "U_TASK_OTHER"
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO users (id, email, first_name, current_team_id)
+        VALUES ('${OTHER_USER}', 'other@kwapso.app', 'Otto', '${IDS.team}');
+      INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
+        VALUES ('m_task_other', '${IDS.team}', '${OTHER_USER}', '${IDS.adminRole}', '2026-01-01');
+    `)
+  })
+
+  it("overdue/planned/completed show the caller's own AND the unclaimed ones, never a teammate's", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine, overdue",
+      dueOn: deadline(-1),
+      assigneeId: IDS.staffUser,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's, overdue", dueOn: deadline(-1) })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Otto's, overdue",
+      dueOn: deadline(-1),
+      assigneeId: OTHER_USER,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine, planned",
+      assigneeId: IDS.staffUser,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's, planned" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Otto's, planned",
+      assigneeId: OTHER_USER,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine, done",
+      assigneeId: IDS.staffUser,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's, done" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Otto's, done", assigneeId: OTHER_USER })
+    for (const title of ["Mine, done", "Nobody's, done", "Otto's, done"]) {
+      const id = (db().prepare(`SELECT id FROM tasks WHERE title = ?`).get(title) as { id: string }).id
+      await call(IDS.staffUser, "POST /api/content/tasks/done", { id, done: true })
+    }
+
+    expect(await titlesIn("overdue")).toEqual(["Mine, overdue", "Nobody's, overdue"])
+    expect(await titlesIn("planned")).toEqual(["Mine, planned", "Nobody's, planned"])
+    expect(await titlesIn("completed")).toEqual(["Mine, done", "Nobody's, done"])
+
+    // NOT A WIDER "EVERYONE'S" — the OR-NULL clause adds unclaimed rows, it does
+    // not stop narrowing to the caller. Otto's own three never appear above.
+    for (const title of ["Otto's, overdue", "Otto's, planned", "Otto's, done"]) {
+      expect((await titlesIn("overdue")).includes(title)).toBe(false)
+      expect((await titlesIn("planned")).includes(title)).toBe(false)
+      expect((await titlesIn("completed")).includes(title)).toBe(false)
+    }
+  })
+
+  it("R16 — the badge over Planned counts the unclaimed rows too, exactly what the list shows", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Mine", assigneeId: IDS.staffUser })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Otto's", assigneeId: OTHER_USER })
+    const body = (await (
+      await call(IDS.staffUser, "GET /api/content/tasks", undefined, "?view=planned")
+    ).json()) as { tasks: { title: string }[]; total: number; plannedTotal: number }
+    expect(body.tasks.map((t) => t.title).sort()).toEqual(["Mine", "Nobody's"])
+    expect(body.total).toBe(2)
+    expect(body.plannedTotal).toBe(2)
+  })
+
+  it("does NOT widen `all` or the everyday `open` pile — those ask a different question", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Mine", assigneeId: IDS.staffUser })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Otto's", assigneeId: OTHER_USER })
+    // `all`/`open` were never narrowed by this ruling — IDS.staffUser holds
+    // `all_tasks:read` (the Admin role, spine-harness) so both already show
+    // every row, exactly as before this pass.
+    expect(await titlesIn("all")).toEqual(["Mine", "Nobody's", "Otto's"])
+    expect(await titlesIn("open")).toEqual(["Mine", "Nobody's", "Otto's"])
+  })
+
+  it("an unclaimed task opens BY ID too — the row a MINE tab just showed is not a 404 one click later", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Nobody's" })
+    const id = (db().prepare(`SELECT id FROM tasks WHERE title = ?`).get("Nobody's") as { id: string }).id
+    const res = await call(IDS.staffUser, "GET /api/content/tasks", undefined, `?id=${id}`)
+    const body = (await res.json()) as { tasks: { title: string }[] }
+    expect(body.tasks.map((t) => t.title)).toEqual(["Nobody's"])
   })
 })
 

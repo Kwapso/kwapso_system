@@ -71,6 +71,34 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     expect(shell, "and the slot is the kit's own third column").toMatch(/aside=\{/)
   })
 
+  it("the aside's own tab strip is a SECOND portal, into the kit's asideTabs slot — one tab level, not a nested one (client ruling, 2026-09-15)", () => {
+    // Same mechanism as the body dock above, a second independent slot: the
+    // tab strip belongs to the root-mounted AgentPanel (it needs the live tab
+    // list + the one live chat), and ScreenShell's `asideTabs` (kit v1.2.88)
+    // is several levels below that, inside the routed AppShell.
+    const dock = read("lib/agent-dock.tsx")
+    expect(dock, "a second, independent dock node for the tab level").toContain("AgentDockTabsSlot")
+    expect(dock, "and its own hook").toContain("useAgentDockTabs")
+    const panel = read("components/assistant/agent-panel.tsx")
+    expect(panel, "the strip portals through the tab-level dock").toContain("useAgentDockTabs")
+    // THE RE-BASE HACK IS GONE FROM THE MARKUP — it existed only because the
+    // strip used to be nested INSIDE the kit's own fixed "Assistant" tab's
+    // pull, and once the strip IS the one tab level (`asideTabs`, not a box
+    // under it) there is no outer pull left to cancel. The literal class name
+    // may still appear in the file's own dated prose (the measurement history
+    // this change retired, kept as a record) — what must be gone is the
+    // wrapping `className` that actually APPLIED it.
+    expect(
+      panel,
+      "the folder-tab-overlap counter-margin is retired from the JSX, not merely moved"
+    ).not.toMatch(/className="min-w-0 mt-\[var\(--folder-tab-overlap\)\]"/)
+    const shell = read("components/shell/app-shell.tsx")
+    expect(shell, "the shell passes an empty slot for the tab level too, never the strip itself").toContain(
+      "<AgentDockTabsSlot />"
+    )
+    expect(shell, "wired to ScreenShell's own asideTabs prop").toMatch(/asideTabs=\{/)
+  })
+
   it("one flag drives both presentations, and the shell is CONTROLLED by it", () => {
     // The kit holds the aside's open state itself unless it is given one. It must be
     // given one: otherwise the column's state could not be persisted, and the phone's

@@ -1105,6 +1105,47 @@ export interface ScreenShellProps
   /** Accessible name for the assistant's column. */
   asideLabel?: string;
   /**
+   * THE ASIDE'S OWN TAB LEVEL, HANDED TO THE CALLER. ADDED 2026-09-15, over a
+   * screenshot of an application that had drawn its own conversation tabs
+   * (History · one folder tab per open thread · "+") one level BELOW this
+   * shell's single `asideLabel` tab, because `asideLabel` is a `string` and a
+   * `string` cannot be a strip. The client's ruling, verbatim, over that
+   * screenshot: *"You got it completely wrong. The tabs need to be at the
+   * same level as the assistant tab, so it will have no assistant name. We
+   * know that's what it is. Rather, each tab will have the name. Now you
+   * create it like a sub-level, but no, no, it's only one tab level."*
+   *
+   * WHEN GIVEN, THIS NODE REPLACES THE SINGLE ITEM — not the slot, the ITEM.
+   * `screen-shell-aside-tab` (the wrapper `<div>`, its geometry, its
+   * `--folder-tab-overlap` attachment to the card below it) is unchanged
+   * either way; only what is drawn INSIDE it differs — the kit's own
+   * `<BreadcrumbFolders items={[{ label: asideLabel }]} …>` when this is
+   * absent, or this node, unwrapped, when it is given. A caller that already
+   * OWNS a tab strip (its own `<BreadcrumbFolders>` call, its own close
+   * semantics — see `AgentTabStrip`, kwapso_system's own second direct call
+   * site of that same exported component) hands it here rather than nesting
+   * it inside the kit's one fixed tab, which is the "sub-level" the ruling
+   * rejects.
+   *
+   * `asideLabel` IS NOT RETIRED BY THIS. Two jobs stay on it that a node
+   * cannot do instead: it is still `aria-label` on `screen-shell-aside`'s own
+   * `role="complementary"` landmark (a caller-supplied strip names each of
+   * ITS OWN tabs, never the region as a whole), and it is still the whole
+   * story for every caller that passes no `asideTabs` — the kit's one fixed
+   * tab, exactly as it always drew.
+   *
+   * THE KIT DRAWS NO CLOSE MACHINERY FOR A CALLER-SUPPLIED STRIP. `toggleAside`
+   * / `onCurrentActivate` / the tab's own × are all wired onto the kit's OWN
+   * `<BreadcrumbFolders>` below, because that is the one tab this file
+   * controls the meaning of. A caller's strip has its own conversations, its
+   * own close targets and its own "closing the last one shuts the column"
+   * rule — the application's decision, not this file's — so this prop asks
+   * for the node and nothing about what it does when pressed. The edge
+   * handle (`asideHandleOnOpen`) is still every caller's way to shut the
+   * column from outside the strip, unconditionally, exactly as before.
+   */
+  asideTabs?: React.ReactNode;
+  /**
    * Whether the assistant column is open. CONTROLLED WHEN GIVEN; otherwise
    * the shell holds it. Defaults CLOSED, because a column that opens itself
    * on every screen is a column the reader did not ask for.
@@ -3204,6 +3245,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       railExpandLabel = "Open the navbar",
       aside,
       asideLabel = "Assistant",
+      asideTabs,
       asideOpen,
       defaultAsideOpen = false,
       onAsideOpenChange,
@@ -4961,37 +5003,47 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     UNPADDED AT THE BLOCK-END, same reasoning as
                     `screen-shell-breadcrumb`: the strip's own negative margin
                     (`--folder-tab-overlap`) is the whole attachment mechanic,
-                    so padding here would be subtracted from it. */}
+                    so padding here would be subtracted from it.
+
+                    `asideTabs`, WHEN GIVEN, REPLACES THE ITEM BELOW — NOT THE
+                    WRAPPER. The `<div data-slot="screen-shell-aside-tab">`
+                    and its `ASIDE_TAB` geometry (the overlap, the inset, the
+                    attachment to the card) are unconditional; only which tab
+                    strip they hold differs. See `asideTabs` on the props
+                    interface for the ruling and for why the kit draws no
+                    close machinery of its own around a caller's strip. */}
                 <div data-slot="screen-shell-aside-tab" className={cn("min-w-0 shrink-0", ASIDE_TAB)}>
-                  {/* THE × RIDES THE TAB, not the panel's header — client,
-                      2026-09-07: "the x for the assistant is on the tab (same as
-                      the old breadcrumb tabs) not a button".
-                      
-                      She is right that this is the same affordance, and it now
-                      exists: `onClose` grew on `BreadcrumbFolders` in v1.2.59
-                      for the workspace tab set, drawing a real <button> as a
-                      SIBLING of the crumb — never nested inside its anchor,
-                      which is invalid HTML and was the workaround that left a
-                      keyboard user unable to close anything. Handing it
-                      `toggleAside` makes the assistant's own tab close the way
-                      every other closable tab in the product closes, from one
-                      drawing rather than a second control invented here.
-                      
-                      `onCurrentActivate` STAYS. The two are not duplicates: the
-                      tab body toggles (press the tab you are on and the column
-                      folds), while the × is the visible, unambiguous "shut it"
-                      the tab body cannot advertise. Chapter 27's own edge
-                      handle keeps doing the same job from the other side. */}
-                  <BreadcrumbFolders
-                    items={[{ label: asideLabel }]}
-                    label={asideLabel}
-                    onCurrentActivate={toggleAside}
-                    currentActivateLabel={asideCloseLabel}
-                    currentActivateExpanded={isAsideOpen}
-                    onClose={toggleAside}
-                    closeLabel={asideCloseLabel}
-                    formatCloseLabel={(_itemLabel, close) => close}
-                  />
+                  {asideTabs ?? (
+                    /* THE × RIDES THE TAB, not the panel's header — client,
+                        2026-09-07: "the x for the assistant is on the tab (same as
+                        the old breadcrumb tabs) not a button".
+
+                        She is right that this is the same affordance, and it now
+                        exists: `onClose` grew on `BreadcrumbFolders` in v1.2.59
+                        for the workspace tab set, drawing a real <button> as a
+                        SIBLING of the crumb — never nested inside its anchor,
+                        which is invalid HTML and was the workaround that left a
+                        keyboard user unable to close anything. Handing it
+                        `toggleAside` makes the assistant's own tab close the way
+                        every other closable tab in the product closes, from one
+                        drawing rather than a second control invented here.
+
+                        `onCurrentActivate` STAYS. The two are not duplicates: the
+                        tab body toggles (press the tab you are on and the column
+                        folds), while the × is the visible, unambiguous "shut it"
+                        the tab body cannot advertise. Chapter 27's own edge
+                        handle keeps doing the same job from the other side. */
+                    <BreadcrumbFolders
+                      items={[{ label: asideLabel }]}
+                      label={asideLabel}
+                      onCurrentActivate={toggleAside}
+                      currentActivateLabel={asideCloseLabel}
+                      currentActivateExpanded={isAsideOpen}
+                      onClose={toggleAside}
+                      closeLabel={asideCloseLabel}
+                      formatCloseLabel={(_itemLabel, close) => close}
+                    />
+                  )}
                 </div>
                 {/* THE PANEL'S OWN SLOT. Still "paper on the ground, painting
                     nothing" — the caller's node fills this exactly as it

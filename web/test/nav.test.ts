@@ -133,12 +133,16 @@ describe("the sidebar sequence the client fixed", () => {
     expect(composeLikeTheShell().named[0]).toEqual(["tasks", "meetings", "knowledge", "tickets", "time"])
   })
 
-  it("puts Build second, in the client's own explicit order", () => {
-    // "build: Apps, sprints, stories" — that is this list's real order now, not
-    // a derived one. Waves was not named; it keeps the closest reading of the
-    // occasional half it used to sit in, appended after the three the client did
-    // name.
-    expect(composeLikeTheShell().named[1]).toEqual(["apps", "sprints", "stories", "waves"])
+  it("puts Build second, Waves leading it — the client's later, narrower ruling", () => {
+    // "build: Apps, sprints, stories" WAS this list's real order — then the
+    // client ruled, 2026-09-15, verbatim: "Regarding sprints and waves,
+    // sprints go inside waves. I would suggest killing the sprints main page
+    // completely and just keeping the waves one on top of the build section
+    // on the sidebar." Sprints lost its own sidebar row entirely (it is
+    // `placement: "contextual"` now, reached from inside a wave — see
+    // TEAM_SECTIONS' own note), and Waves — previously unnamed, appended last
+    // — moved to lead the section by name.
+    expect(composeLikeTheShell().named[1]).toEqual(["waves", "apps", "stories"])
   })
 
   it("puts Accounts third, both pages the client named", () => {

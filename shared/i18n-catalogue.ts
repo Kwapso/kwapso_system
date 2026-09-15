@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 806 strings · 3 languages · 1436 of the entries below are hand-written seed.
+// 804 strings · 3 languages · 1438 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -50,7 +50,6 @@ export const CATALOGUE: Catalogue = {
   "Add contact": { de: "Kontakt hinzufügen", es: "Añadir contacto", ca: "Afegir contacte" },
   "Add it to your home screen for a faster, full-screen, app-like experience.": { de: "Fügen Sie es zu Ihrem Startbildschirm hinzu für schnelleren, vollbildschirmfähigen Zugriff wie eine App.", es: "Añádelo a tu pantalla de inicio para una experiencia más rápida, a pantalla completa y similar a una aplicación.", ca: "Afegeix-ho a la pantalla d'inici per a una experiència més ràpida, de pantalla completa i similar a una aplicació." },
   "Add one on the map, the client sees these either way.": { de: "Einen auf der Karte hinzufügen, der Mandant sieht diese so oder so.", es: "Añade uno en el mapa, el cliente los ve de cualquier forma.", ca: "Afegeix-ne un al mapa, el client els veu de totes maneres." },
-  "Add stakeholder": { de: "Stakeholder hinzufügen", es: "Añadir interesado", ca: "Afegir una part interessada" },
   "Add step": { de: "Schritt hinzufügen", es: "Añadir paso", ca: "Afegir pas" },
   "Added": { de: "Hinzugefügt", es: "Añadido", ca: "Afegit" },
   "Added by": { de: "Hinzugefügt von", es: "Añadido por", ca: "Afegit per" },
@@ -461,7 +460,6 @@ export const CATALOGUE: Catalogue = {
   "Pick someone to keep in the loop": { de: "Wählen Sie jemanden, der informiert bleiben soll", es: "Elige a alguien para mantenerlo informado", ca: "Tria algú per mantenir al corrent" },
   "Pick the app": { de: "App auswählen", es: "Elige la aplicación", ca: "Tria l'aplicació" },
   "Pick the person who's a contact of": { de: "Wählen Sie die Person, die ein Kontakt von", es: "Elige a la persona que es contacto de", ca: "Tria la persona que és un contacte de" },
-  "Pick who's on duty": { de: "Wählen Sie, wer im Dienst ist", es: "Elige quién está de servicio", ca: "Tria qui està de guàrdia" },
   "Pinned to": { de: "Angeheftet an", es: "Fijado a", ca: "Fixat a" },
   "Point us at a page, a document or a recording, and give it a name we'll recognise.": { de: "Zeigen Sie auf eine Seite, ein Dokument oder eine Aufzeichnung und geben Sie ihm einen Namen, den wir wiedererkennen.", es: "Señálanos una página, un documento o una grabación, y dales un nombre que reconozcamos.", ca: "Indica'ns una pàgina, un document o una gravació, i dóna-li un nom que reconeixerem." },
   "Postal code": { de: "Postleitzahl", es: "Código postal", ca: "Codi postal" },

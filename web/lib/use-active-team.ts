@@ -92,6 +92,31 @@ function primeRights(ctx: ActiveContext): void {
   if (ctx.team && ctx.permissions) primeCache(`my-perms:${ctx.team.id}`, ctx.permissions, true)
 }
 
+/** THE SIGNED-IN USER'S ID ALONE, reactively, WITHOUT `useRouter`.
+ *
+ * `useActiveTeam` carries the onboarding/login BOUNCE (`router.replace(…)`),
+ * which needs the Next.js app router mounted — fine for a screen's own root,
+ * wrong for the handful of record-detail screens that only ever wanted this
+ * one field, to preselect a NEW record's own creator (R79, `shared/rules/registry.ts`
+ * — "always put the user preselected by default"). Calling the full hook
+ * there pulled `useRouter` into components that had never needed it and broke
+ * the shallow render a unit test gives a record detail with no app router
+ * mounted at all (measured: `AccountDetailScreen` via
+ * `contact-born-under-a-company.test.tsx`, "invariant expected app router to
+ * be mounted"). Same cache, same subscription (`sessionSubs`), none of the
+ * redirect logic — so a component reading only the id never needs a router. */
+export function useSessionUserId(): string | null {
+  const [id, setId] = React.useState<string | null>(sessionCache?.user?.id ?? null)
+  React.useEffect(() => {
+    const onChange = () => setId(sessionCache?.user?.id ?? null)
+    sessionSubs.add(onChange)
+    return () => {
+      sessionSubs.delete(onChange)
+    }
+  }, [])
+  return id
+}
+
 export function useActiveTeam(): ActiveTeam {
   const router = useRouter()
   const [user, setUser] = React.useState<SessionUser | null>(sessionCache?.user ?? null)

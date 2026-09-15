@@ -1213,6 +1213,7 @@ export function HelpDetailScreen({
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:ticket:${helpId}`}
+        defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {
           // The id goes back so the dialog can hang the picked files on it —
           // see the note at the sprint's copy of this call. Discarding it drops

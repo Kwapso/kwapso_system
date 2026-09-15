@@ -179,6 +179,7 @@ const meetingPurposeBody = (i: Record<string, unknown>): Record<string, unknown>
   name: str(i, "name"),
   department: opt(i, "department"),
   description: opt(i, "description"),
+  icon: opt(i, "icon"),
 })
 
 const staffProfileBody = (i: Record<string, unknown>): Record<string, unknown> => ({
@@ -2722,9 +2723,11 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting_purpose",
     summary:
-      "Add a meeting type (name required). `department` is picked-or-created as a dropdown value, which is why a type is a record and a department is not.",
+      "Add a meeting type (name required). `department` and `icon` are optional; `icon` must be from the fixed vocabulary.",
+    detail:
+      "Add a meeting type to the system. The type takes a required name, an optional department (which is picked or created as a dropdown value), and an optional icon from the fixed set of meeting-type icons. A type is a record in the system; a department is not.",
     binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes",
-    schema: obj({ name: S, department: S, description: S }, ["name"]),
+    schema: obj({ name: S, department: S, description: S, icon: S }, ["name"]),
     buildBody: (i) => meetingPurposeBody(i),
     agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" meeting type` },
   },
@@ -2732,7 +2735,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "update_meeting_purpose",
     summary: "Edit a meeting type (by id).",
     binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes/update",
-    schema: obj({ id: S, name: S, department: S, description: S }, ["id", "name"]),
+    schema: obj({ id: S, name: S, department: S, description: S, icon: S }, ["id", "name"]),
     buildBody: (i) => ({ id: str(i, "id"), ...meetingPurposeBody(i) }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit meeting type ${str(i, "id")}` },
   },

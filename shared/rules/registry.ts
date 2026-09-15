@@ -694,6 +694,29 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "tab-strips-pin",
     status: "enforced",
   },
+  {
+    id: "R78",
+    dimension: "ui",
+    law: "CALENDAR VIEWS CARRY NO SORT. The client's ruling, 2026-09-15, over the week design: \"Never put the sort in calendar components. Make this a law. Makes no sense.\" A reader looking at a month grid, a week board (Mon–Fri plus the folded weekend, `RecordWeek`) or a day-by-day agenda is not choosing an ORDER — the calendar frame (the date axis) already fixes one — so a sort control beside it offers a choice that does nothing, the identical \"dead UI\" argument `TOOLBAR_SORT_EXEMPT`'s own header already makes screen by screen (`sprints-screen.tsx#SprintsScreen`'s own entry there, among others) for a month grid or a queue. This turns that argument into a LAW rather than leaving it as N separate exemptions: \"calendar view, no sort\" is a fact about the SHAPE, not a decision each screen re-makes. ENFORCED CENTRALLY, at the one seam that already builds both controls (R53) — `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) draws no `<SortControl>` at all, regardless of what its `sort` prop is given, the moment its `view` slot's ACTIVE value (`view.value`, never the list of bodies a screen offers) is `\"calendar\"`, `\"week\"` or `\"agenda\"` (`NO_SORT_VIEW_VALUES`, the same file). No call site can opt back in by continuing to pass `sort` once its view lands on one of those three — the suppression lives in the row, not at eighteen call sites, which is the same move R53 itself made for the control's placement. A static census, `no-sort-in-calendar-views`, holds every OTHER file that independently builds a `<SortControl>`/`<ViewSwitch>` pair (R53's own `TOOLBAR_CONTROL_OWNERS` — the row is not the only file the kit lets draw these two controls) to the identical rule: a views array offering `calendar`/`week`/`agenda` there must suppress its own sort control on that view too, or the file is named in `NO_SORT_VIEW_EXEMPT` with the reason it is safe not to.",
+    checkId: "no-sort-in-calendar-views",
+    status: "enforced",
+  },
+  {
+    id: "R79",
+    dimension: "ui",
+    law: "STAFF IS PICKED FROM A PILL ROW, NEVER A DROPDOWN. The client's ruling, 15 Sep 2026, verbatim: \"On Add Task and generally absolutely everywhere where we are selecting staff, do the horizontal choices, not the dropdown. By default, in all of these where I'm selecting staff, always put the user preselected by default.\" ONE COMPONENT, `shared/web/staff-pill-picker.tsx`'s `StaffPillPicker`, on the same pill idiom `AppearancePillGroup` (`shared/web/appearance-pill-group.tsx`) already drew for Settings › Appearance: a bare `<button role=\"…\">` row, `rounded-pill` (R31), an inset hairline never a CSS border, the selected pill's own hairline strengthening rather than a second colour (R32). `role=\"radiogroup\"`/`role=\"radio\"` for a single pick (an assignee, an account manager, an app's lead), `role=\"group\"` + `aria-pressed` for many (an app's staff, a ticket's stakeholders), A→Z by name (R75's own seam, called once inside the component so no call site can forget), each pill wearing the person's own `RecordMark` (R35, round — a person in their own right, never a client/app square) and their FIRST NAME alone (a disambiguated name carries its email in parens, `assignableMembers`'s own dedup — the face beside the word is the disambiguator on a pill, not a longer string). Wraps to multiple lines, every pill its own real `<button>` (Tab order, Enter/Space, the kit's own focus ring) plus Left/Right/Up/Down roving focus along the row. A \"Nobody\" pill only where the field is genuinely optional, named by the caller's own words (`nobodyLabel`), never invented here. THE SECOND HALF OF HER RULING — the signed-in user preselected by default on a NEW record — is a per-form correctness question this law does not itself prove (a census cannot read intent); it is wired at each call site instead: `TaskFormDialog`'s pre-existing `defaultAssigneeId`, and the same shape added to `StoryFormDialog` (`defaultAssigneeId`), `AccountFormDialog` (`defaultAccountManagerId`), and `AppFormDialog` (`defaultStaffUserId`, seeding both the staff row and the lead). An EDIT form keeps the stored value, never the signed-in user's — `initial` always wins. A STATIC CENSUS OFF THE DISK, `staff-pill-row` (`web/test/staff-pill-row.test.ts`), holds every `<Select` (the kit's own) and every `<RecordPicker` NOT carrying `layout=\"row\"` (its own chip-row layout already draws the identical bare-button pill row, so it was never a dropdown to begin with) to account: none may be fed a staff/member list, found by the same three seams `web/lib/members.ts` supplies one through (`useAssignableMembers`/`assignableMembers`/`staffedOn`, called directly inside the mount's own tag or bound to a local the file threads in) or a value typed `PickablePerson[]`. `STAFF_PILL_ROW_EXEMPT` is the reasoned, rot-checked way out, empty on the day this law shipped — every dropdown the inventory found (task/story assignee, the account manager field, an app's staff checklist and lead, a ticket's `HelpStakeholders` add control, `TriageStrip`'s on-duty pick) was converted rather than excused. `triage-queue.tsx`'s two \"who is picking this up?\" rows are OUTSIDE this law's population on the same reasoning as the `RecordPicker` carve-out above: `layout=\"row\"` there already, years before this law, drew the horizontal choices her ruling asks for — an action row that commits on click has no submit step to preselect INTO, which is also why neither of those two rows nor `TriageStrip`'s own duty pick take a default: every click there already IS the assignment, and a pill that looked pre-chosen would be a click that does nothing.",
+    why: "TWO SHAPES DELIBERATELY LEFT ALONE, named so nobody rediscovers them as a gap. `record-picker.tsx`'s `layout=\"row\"` is not folded into `StaffPillPicker` even where it already carries a staff list (`triage-queue.tsx`'s two rows): it draws `role=\"group\"` unconditionally by its own design (buttons that ACT rather than a state a submit confirms) and has no radio/optional-Nobody shape, and an ACTION row that commits on the click has nothing for a default to preselect into — the click IS the commit. Folding it would have meant either weakening `StaffPillPicker`'s own radio semantics to match an action row, or leaving `triage-queue.tsx` half-migrated for no behavioural gain; the census excuses it structurally (the `layout=\"row\"` carve-out) rather than by name, so it never needs a `STAFF_PILL_ROW_EXEMPT` line to stay excused. `HelpStakeholders`' own picker went the other way: its old `RecordPicker` + separate Add button became a `StaffPillPicker` in `mode=\"multi\"` with `value={[]}` always — every addable pill click adds straight away (R54's ADD-ONLY rule already meant nothing here is ever un-clicked), which is a small behavioural simplification (one click instead of pick-then-press) earned by the conversion rather than merely ported.",
+    checkId: "staff-pill-row",
+    status: "enforced",
+  },
+  {
+    id: "R80",
+    dimension: "ui",
+    law: "ROWS ARE A LIST, NEVER A BANDED TABLE. The client's ruling, 2026-09-15, verbatim: \"On accounts, I want the views to be gallery and list. I don't like this table anywhere, so anywhere in the app where you have it, replace it with list. I don't want to say this again.\" Earlier the same day, about Tasks: \"Just replicate the list component as we have it in tickets. It's already good there.\" `RecordTable` (`web/components/records/record-table.tsx`) is the one row-collection component every screen but Tickets' own bespoke `TicketRowsTable` draws through, and it drew TWO shapes: a bare `<Table>` and, by DEFAULT, that same table wrapped a second time in `overflow-hidden rounded-[var(--radius)] bg-surface-panel` — a grey, rounded, inset band sitting inside whatever card already held the toolbar above it. That second box was the defect the client is naming, not a legitimate variant: every real caller already sits inside ONE surface of its own (a `CollectionCard` from `<PagedFind>`'s `wrap`, or the kit's own `useKitPanel` collection panel — ruling J2, \"toolbar, rows, pager inside it, one surface\"), so the banded shape was always a doubly-nested, inset, narrower-reading table standing beside Tickets' flush, full-width one. `RecordTable` draws the bare shape UNCONDITIONALLY now — the branch that produced the band is DELETED, not defaulted, and the `frame` prop that used to select between the two accepts only the literal `\"bare\"` (never `\"panel\"` again), so no call site can even ask for the old look at compile time. A static census, `rows-are-a-list` (`web/test/rows-are-a-list.test.ts`), reads `record-table.tsx` off disk and fails if the banded fill (`bg-surface-panel` wrapping the table) ever reappears there, and separately walks every `<RecordTable` mount across `web/` for a `frame` prop carrying anything other than the literal `\"bare\"` — so a reintroduced `frame=\"panel\"` (or any other value) turns the build red before it ever reaches a screen. The WORD moves with the shape: a view switch that used to offer \"Table\" offers \"List\" instead, with the kit's list glyph beside it (`ListBullets`, the same icon Tickets' own view switch already draws), never the kit's plain table icon.",
+    why: "Earned the same day as R78, over the same design pass, and it closes a gap that had already been PARTLY fixed and left that way. `<RecordTable>` had grown an opt-in `frame=\"bare\"` a few hours earlier, for exactly one caller (`tasks-screen.tsx`, client screenshot: \"the task list is not correctly aligned, it is missing some width\") — proof the second box was visible and wrong, patched for the one screen she happened to be looking at. Her later ruling, read literally (\"anywhere in the app where you have it\"), is the opposite of an opt-in: a component that defaults to the wrong shape and offers an escape hatch is a law with six ways around it, one per call site that forgets to ask. So the escape hatch is deleted along with the shape it escaped, rather than widened into six more `frame=\"bare\"` call sites — the only surface `RecordTable` draws now is the one Tickets' own `TicketRowsTable` proved out first, composed straight from the kit's own primitives with nothing wrapping them. The census holds both halves for the same reason R66's `optionalMark` clause does: a fixed component with one still-typeable old prop value is not a fixed law, and a call site that reintroduces the value is the regression this exists to catch before a screenshot does.",
+    checkId: "rows-are-a-list",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -809,6 +832,16 @@ export const SECTION_HOSTED_ELSEWHERE: Record<string, string> = {
     "An app's own record, the Processes panel on its Maps tab (web/components/apps/app-detail.tsx) — a process map is always a map OF something, so the question is never \"show me every map\", it is \"how does this app work\". The panel lists that app's maps with their step and version counts and opens each one at /t/<teamId>/processes/<id>, which is the address the COLLECTION screen at /t/<teamId>/processes would have led to anyway. Apps is a first-class sidebar page, so the route in is two clicks from anywhere. The collection screen still resolves and still works; what it does not have, and has never had, is a link.",
   purposes:
     "Settings › Meetings › Choices, the meeting-types panel (web/components/screens/module-settings-screen.tsx) — 15 Sep 2026, Task C: the client's own ruling that a meeting's purpose \"is a choice component, so make sure you move it inside meetings, settings, choices\" and the RENAME the same sentence asked for (\"maybe just 'type'\"). That page's `meetings` segment now carries a `choices` section mounting `MeetingTypesPanel` (web/components/team/internal-screens.tsx), a RecordTable of Name/Department/Status with its own add dialog, reading the same `meeting_purposes` doors and cache key the old screen and the meeting form's own picker always did. The Meetings screen's own button — relabelled \"Meeting types\" by its own lane — now redirects there instead of the old collection at /t/<teamId>/purposes (web/components/deep-link/collection-content.tsx's `onPurposes`). The old screen (`PurposesScreen`, internal-screens.tsx) still resolves and still works, kept on disk deliberately rather than torn out across the several shared deep-link files that wire it (module-content.tsx, collection-content.tsx, write-panels.tsx, route.ts, use-screen-data.ts, use-screen-actions.ts, live-resources.ts, agent-trace.ts — none of them owned by this lane); what it does not have, and no longer has, is a link. Full account in the Task C lane report.",
+  // SPRINTS — hosted inside Waves (ruling 15 Sep 2026). Unlike `processes` and
+  // `purposes` above, the collection screen itself did NOT stay standing: the
+  // client's own words were "killing the sprints main page completely", so
+  // web/app/sprints/[[...rest]]/page.tsx (the top-level shell) is deleted,
+  // "sprints" left TOP_LEVEL_MODULES (web/components/deep-link/route.ts), and
+  // collection-content.tsx's own `module === "sprints"` branch is gone with
+  // it — a typed /sprints or /t/<teamId>/sprints now falls through to
+  // NotFound rather than quietly still drawing the killed screen.
+  sprints:
+    "A wave's own record, the Sprints tab (web/components/work/wave-detail.tsx) — hosted inside Waves per the client's own ruling, 2026-09-15: \"sprints go inside waves… killing the sprints main page completely and just keeping the waves one\". That tab lists the sprints already in the package and is the ONLY door that creates one (its \"Plan a sprint\" button, plus \"Put a sprint in this wave\" for moving one already on the books); a sprint opened from there lands at the nested address `/waves/<waveId>/sprints/<sprintId>`, so its crumb trail names the wave and then the sprint, never a generic \"Sprints\" rung (crumbs.ts's own nested-trail clause — proved by web/test/nested-routes.test.ts's \"a sprint opened from its wave\" case). The `sprints` MODULE is unchanged and still gated (Settings › Modules and the roles matrix still list it, MODULE_PERMISSION still maps the segment) — only its stand-alone collection screen is gone; its recipe (`sprintsListRecipe`, web/lib/screens.ts) declares no `actions:` of its own for this clause to demand of the host. `web/components/work/sprints-screen.tsx` stays on disk: its `createSprintFrom` export is still `app-detail.tsx`'s own door for starting a sprint from an app's record, which this lane does not own and cannot repoint, so the file could not be deleted outright the way a `GONE_ON_PURPOSE` line would need — a future lane that moves that export elsewhere can finish the deletion.",
 }
 
 /** R59 — A CENTRED OVERLAY (`<DialogContent>`) THAT IS NEITHER A FORM NOR A
@@ -830,6 +863,8 @@ export const CENTRED_DIALOG_OK: Record<string, string> = {
     "A READ-ONLY USAGE PANEL — where the team's AI credits went, drawn as an ActivityFeed. It collects nothing (no field, no choice, no commit control; its only button is the kit's own close chip) and it asks nothing, so neither of the client's two buckets fits. Its sibling behind the next badge, agent-history-dialog.tsx, looks identical and IS a drawer, because every row there is a button that picks a thread — the pair is the clearest statement of where this law draws its line. Referred to the client 2026-09-09: a panel you only read may belong in the drawer with everything else, or the centre may be right for something you close without answering.",
   "web/components/records/record-calendar.tsx":
     "THE DAY LIST BEHIND A '+N more' CHIP — the records that did not fit in a month-grid cell, each one a link to its own screen. It is a disambiguation step for a click that has already happened, closer to a menu than to a screen: it collects nothing and asks nothing, and it is deliberately small and transient in a way a full-height drawer would contradict. Referred to the client 2026-09-09 with the usage panel above; if she rules that everything non-warning slides in, both lines go and both files move.",
+  "web/components/records/record-week.tsx":
+    "THE SAME DISAMBIGUATION STEP AS RECORD-CALENDAR.TSX ABOVE, ONE ROOM OVER — the day's own overflow, behind its '+N more' chip on the desktop grid (the mobile pager needs no dialog at all: it shows a day's every entry uncapped). It collects nothing, asks nothing, and is bounded by a single day's rows; the same referral to the client stands, and if she rules that everything non-warning slides in, this line goes with record-calendar.tsx's.",
 }
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -1753,15 +1788,10 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["translateFields(columns, t)", "t(tab.label)"],
     why: "a screen that composes its OWN table columns and its own six-tab strip. The columns are spread onto the recipe after `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` is that same rule called at the place they are spread in; the tab labels are read through `t` where the strip is built.",
   },
-  "web/components/meetings/meetings-screen.tsx": {
-    kinds: ["field-label"],
-    via: ["translateFields(ALL_COLUMNS, t)"],
-    why: "the meetings All view, host-composed for the same reason and translated through the same one call.",
-  },
   "web/components/accounts/contacts-screen.tsx": {
     kinds: ["field-label"],
     via: ["translateFields(CONTACT_COLUMNS, t)"],
-    why: "the contacts table's three column headings — Contact, Account, Role — the client's own 2026-09-09 ruling (\"for contacts lets do view table, also add column role after account\"). Same shape as the meetings All view one line up and the same single read: the columns are the HOST's, spread onto the recipe AFTER `resolveRecipe` has translated it, so `translateRecipe` never sees them and `translateFields` at the point they are spread in is the one place they can ask. Declared at module level because a `TableColumn` array is a constant and `t` is a hook.",
+    why: "the contacts table's three column headings — Contact, Account, Role — the client's own 2026-09-09 ruling (\"for contacts lets do view table, also add column role after account\"). The columns are the HOST's, spread onto the recipe AFTER `resolveRecipe` has translated it, so `translateRecipe` never sees them and `translateFields` at the point they are spread in is the one place they can ask. Declared at module level because a `TableColumn` array is a constant and `t` is a hook. (Meetings' own Table view drew through the identical pattern until 2026-09-15 evening, when the client's ruling — \"replace the view table for list\" — retired the table and this pin with it.)",
   },
   "web/components/knowledge/google-connections.tsx": {
     kinds: ["property"],
@@ -2081,6 +2111,8 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
     "A NAVIGATION MENU. Eight fixed destinations — the six module screens this reader may read, plus Team and Settings — declared as two arrays in this component. Searching it would search the app's own furniture; every one of the eight leads to a collection that searches its own rows, which is where somebody looking for a record is going.",
   "web/components/records/record-calendar.tsx#DayRows":
     "BOUNDED BY ONE DAY, AND DRAWN IN A DIALOG. This is what \"+N more\" on a calendar square opens into — everything falling on that one day, over the month grid. It cannot grow past a day's entries, the reader reached it by pointing at the day, and the collection it is a slice of is narrowed by the calendar host's own toolbar one level up.",
+  "web/components/records/record-week.tsx#RecordWeek":
+    "THE IDENTICAL SHAPE, ONE ROOM OVER. `RecordWeek`'s own overflow dialog draws the same bounded, one-day `<List>` `record-calendar.tsx#DayRows` draws above — reached only by pointing at a day's own \"+N more\" chip, narrowed to that one day's entries (never more than a handful, since it only exists once the day's cards already overflowed the grid's own cap), and the week itself is already narrowed by whatever toolbar the host screen draws one level up. Not split into its own named component the way `DayRows` is, because the list is the whole of the dialog's body and nothing else in the file shares it.",
   "web/components/team/invitations.tsx#InvitationsPanel":
     "BOUNDED BY THE INVITES WAITING FOR ONE PERSON — the teams that have asked THIS reader to join, read whole and accepted one button at a time. It is not a collection anybody browses: a row leaves the moment it is accepted, and the panel is also mounted on the teamless onboarding screen, where the whole point is that there is nothing else on the page yet.",
   "web-portal/components/company-screen.tsx#CompanyScreen":
@@ -2314,30 +2346,16 @@ export const SUBTITLE_OK: Record<string, string> = {
  * (web/test/sections-stand-on-paper.test.ts) has the client's three rulings and
  * the definition; this is the arrears against them. */
 export const UNCONTAINED_SECTION_OK: Record<string, string> = {
-  // ── THE AGENCY APP, FOUR LINES, ALL FOUND BY THE 2026-09-11 WIDENING ──────
+  // THE FORMER `web/components/apps/apps-screen.tsx` LINE (below, until
+  // 2026-09-15) DESCRIBED `<section><h2>{stage}</h2><AppTiles/></section>` —
+  // the Apps screen's stage-grouped tiles, drawn straight on the page. Both
+  // the grouping and `AppTiles` are gone: the client's 15 Sep 2026 ruling
+  // ("gallery … board by stage") replaced Tiles/List with Gallery (a flat
+  // `CardGrid`, no per-stage `<h2>`) and Board (the kit's own `Kanban`,
+  // which stands on no section of this law's subject at all — a board
+  // column is not a titled `<section>`). Deleted rather than left with a
+  // stale line, the same rot-check this table's own header describes.
   //
-  // The client's THIRD saying of one sentence ("remember in settings modules
-  // card, needs container background") was about Settings › Modules, which the
-  // law could not see: its subject was a `<section>` carrying a heading, and a
-  // tab panel is titled by its strip. That tab is fixed at the screen; these
-  // four are what the same widening turned up beside it, and they are debts
-  // rather than repairs for the reason the portal block below states — the lane
-  // that found them had Settings as its subject, and three of the four are a
-  // visual change on a screen the client has not been asked about.
-  //
-  // THE FIRST IS THE ONE TO READ. It is the client's own complaint, on a screen
-  // nobody has reported yet: the same 1.000 as the Modules wall, and worse,
-  // because these tiles carry no shadow either.
-  "web/components/apps/apps-screen.tsx":
-    "THE SAME BUG SHE REPORTED, ONE SCREEN OVER, AND STILL SHIPPING. The Apps screen's stage groups draw " +
-    "`<section><h2>{stage}</h2><AppTiles/></section>` straight on the page, and `app-tiles.tsx` fills each " +
-    "tile `bg-card`. In LIGHT `--card` and `--background` are both #FFFEF9, so every tile measures CONTRAST " +
-    "1.000 against the page it is standing on — and unlike a `Card variant=\"raised\"` these are deliberately " +
-    "flat (`motion-hover`, not `motion-hover-lift`, this file's own rule), so there is not even a shadow " +
-    "holding them up. It passed R67 until 2026-09-11 because `bg-card` was in the container family by NAME. " +
-    "THE FIX IS ONE PROP-SHAPED CHANGE — the group's tiles want the panel tone behind them, exactly as " +
-    "`CardGrid tone=\"panel\"` now gives Settings › Modules — but it restyles the app's busiest screen, so it " +
-    "goes to the client with a before/after rather than riding a Settings lane.",
   // THE THREE `kwapso-screen.tsx#team` / `#default` / `#brand` LINES WERE
   // DELETED FOR ONE DAY, 2026-09-15, THEN RESTORED THE SAME DAY BY AMENDMENT
   // 9. R77 (`tab-strips-pin`) had rewritten this screen's `<TabsView
@@ -2555,8 +2573,6 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
     "TriageQueue's <ToolbarRow> carries `empty={false}` — reached only past two earlier returns (`!view.yours`, `view.waiting.length === 0`), so the queue is guaranteed non-empty by the time this row renders; the literal records that guarantee rather than hides it. Pin moved from `tickets-collection.tsx` (W3, 15 Sep 2026) — the TriageQueue component this describes was split out unchanged.",
   "web/components/process/steps-panel.tsx":
     "TWO different first-adds on one collection, which is Contacts' exemption above in a different module: \"Add step\" types what somebody heard, and `<ReadACall>` beside it has the app propose the steps off a meeting and walk the person through them. `CollectionEmptyState` carries a single labelled `onCreate` and cannot offer both, so both stay reachable on an empty step list exactly as they are on a populated one.",
-  "web/components/tickets/help-stakeholders.tsx":
-    "not a heading's create button at all — this <AddButton> is the SUBMIT of the picker beside it (\"Pick someone to keep in the loop\" → Add stakeholder), and the pair is already gated on `addable.length > 0`, which is the candidate list rather than the collection above it. Gating it on the stakeholder list's own emptiness would remove the only way to add the first stakeholder, and the collection it would be gated on is not the one it draws from.",
   "web/components/team/roles-matrix.tsx":
     "the grid's own <ToolbarRow> carries `empty={false}` — the rows it narrows are the team's own MODULE CATALOGUE (`TEAM_MODULES`, read off the first role sheet), which is fixed furniture for a live team rather than data it empties out. R50's question is whether the RAW row list, before search, ever holds zero rows, and for a fixed catalogue the honest answer is always no; the toolbar's search can narrow the visible rows to zero, which is a different, filtered zero the matrix's own `emptyTitle`/`emptyDescription` pair already tells apart from a true empty state.",
 }
@@ -2658,6 +2674,19 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
   "web/components/team/roles-matrix.tsx#RolesMatrix":
     "THE ROWS ARE THE TEAM'S OWN MODULE CATALOGUE, not a list a reader fills up. `TEAM_MODULES` (shared/team-modules.ts) is a fixed, deliberately-ordered set — the order a permission matrix is read in, top to bottom, the same one `PermissionMatrix` has always drawn — and there is no second, equally valid sequence (alphabetical, by activity, by anything) that a reader would ask this grid for instead. A sort control here would offer to reorder the one axis this screen exists to make legible AT REST.",
 }
+
+/** R78 — reviewed exceptions, keyed the same way `TOOLBAR_SORT_EXEMPT` above
+ * is (by the file that independently builds its own `<SortControl>`/
+ * `<ViewSwitch>` pair, from R53's own `TOOLBAR_CONTROL_OWNERS` list — never
+ * `<ToolbarRow>` itself, which is R78's own seam and therefore not an
+ * exemption from it). A file lands here when it offers a calendar/week/
+ * agenda view AND cannot honestly suppress its own sort control on that view
+ * — narrow on purpose, the same "not 'we did not get round to it'" bar
+ * `TOOLBAR_SORT_EXEMPT`'s own header sets. Empty on the day this law shipped:
+ * every `TOOLBAR_CONTROL_OWNERS` file that currently offers one of the three
+ * values (none do, 2026-09-15) routes through `<ToolbarRow>` already. Rot-
+ * checked in both directions by `no-sort-in-calendar-views`. */
+export const NO_SORT_VIEW_EXEMPT: Record<string, string> = {}
 
 /** R29 — reviewed exceptions. A file listed here matches the page-container
  * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:
@@ -4142,6 +4171,8 @@ export const GONE_ON_PURPOSE: Record<string, string> = {
     "the deleted component's own dedicated spec file — deleted with it. Named in web/test/orphan-components.test.ts's own header as the reason the census missed the component in the first place: the file's import let the component's own test count as a 'mount', which is not evidence the app renders it",
   "web/components/team/certificate-form-dialog.tsx":
     "the certificate record's form dialog, deleted whole with the certificate module on 14 Sep 2026 at the client's ruling — \"kill the whole certificate module everywhere\". Team migration 0090's own comment names this exact path to say what it deleted alongside the table, the same shape 0078's role-detail entry above uses; DATA-MODEL.md's staff_profiles section names it in the same past tense",
+  "web/app/sprints/[[...rest]]/page.tsx":
+    "the top-level Sprints main page's own shell, deleted 15 Sep 2026 with its sidebar row at the client's ruling — \"killing the sprints main page completely and just keeping the waves one on top of the build section on the sidebar\". A sprint is reached nested under its wave now (`/waves/<waveId>/sprints/<sprintId>`, web/components/work/wave-detail.tsx), which needs no top-level shell of its own — the nested address resolves under web/app/waves' catch-all. web/components/deep-link/route.ts's own TOP_LEVEL_MODULES comment and SECTION_HOSTED_ELSEWHERE's `sprints` line (this file) both name this exact path to say what it deleted, the same shape the certificate dialog entry above uses",
 }
 
 // ── dates-are-formatted ─────────────────────────────────────────────────────
@@ -4182,6 +4213,27 @@ export const RAW_DATE_EXEMPT: Record<string, string> = {
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
+  'web/components/records/record-week.tsx: new Date(1970, 0, 5 + i).toLocaleDateString(lang, { weekday: "short" })':
+    "the same weekday-name-alone shape record-calendar.tsx's own identical " +
+    "line above is pinned for (weekdayShortLabels, this file's own copy of " +
+    "that helper, since it is not exported) — shared/web/format.ts has no " +
+    "formatter for a bare weekday, so Intl directly, with the real `lang`.",
+  'web/components/records/record-week.tsx: const start = monday.toLocaleDateString(lang, { month: "short", day: "numeric" })':
+    "the week range title (\"Sep 14–20, 2026\") needs a short month + day with " +
+    "no year on the START side — shared/web/format.ts has no formatter for " +
+    "that shape (formatMonth is the short-month AXIS one, formatDate always " +
+    "carries a year) — Intl directly, with the real `lang`, the identical " +
+    "reasoning record-calendar.tsx's own monthLabel is pinned for above.",
+  "web/components/records/record-week.tsx: const end = sunday.toLocaleDateString(":
+    "the week range title's END side — same call as the START side above, " +
+    "conditionally short-month-and-day or day-alone depending on whether the " +
+    "week crosses a month boundary, which is why the arguments are on the " +
+    "next two lines rather than inline: no formatter in shared/web/format.ts " +
+    "produces either shape.",
+  'web/components/records/record-week.tsx: const year = sunday.toLocaleDateString(lang, { year: "numeric" })':
+    "the week range title's own trailing year, read off Sunday (not Monday) " +
+    "so a week that crosses a New Year states the year the week ENDS in — " +
+    "shared/web/format.ts has no bare-year formatter either.",
   "web/lib/use-record-activity.ts: dateTime: a.createdAt,":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
@@ -4703,3 +4755,20 @@ export const TAB_STRIP_PIN_EXEMPT: Record<string, string> = {
     "the team area's own section switcher — its own header says it outright, \"selecting one navigates (no panel " +
     "content)\". A strip that NAVIGATES rather than labelling a panel underneath it has no panel for a pin to stay above.",
 }
+
+// ── R79 (staff-pill-row) ────────────────────────────────────────────────────
+
+/** R79 — a `<Select>`/non-row `<RecordPicker>` mount the census still finds
+ * fed a staff/member list, keyed by the file's path relative to the repo
+ * root. Rot-checked both ways: a line naming a file the census does not
+ * reach excuses nothing and fails, and a line naming a mount that has since
+ * been converted to `StaffPillPicker` (or moved to `layout="row"`) has
+ * outlived its subject and fails too — so the list can only shrink.
+ *
+ * EMPTY ON THE DAY THIS LAW SHIPPED (15 Sep 2026): every dropdown the
+ * inventory found — task/story assignee, the account manager field, an
+ * app's staff checklist and lead, a ticket's `HelpStakeholders` add
+ * control, `TriageStrip`'s on-duty pick — was converted rather than
+ * excused. If this table ever gains a line, it is a real, reasoned
+ * exception, never a placeholder for "do this later". */
+export const STAFF_PILL_ROW_EXEMPT: Record<string, string> = {}

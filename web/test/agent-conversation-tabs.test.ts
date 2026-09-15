@@ -47,11 +47,18 @@ describe("seedAgentTabs", () => {
     expect(tabs[0].threadId).toBe("t1")
   })
 
-  it("is a no-op once a tab already exists", () => {
-    seedAgentTabs("t1", "Conversation")
+  // A ONE-SHOT, NOT "WHENEVER EMPTY" — the closing ruling's own requirement
+  // (see `agent-panel.tsx`'s `handleCloseAgentTab`: closing the LAST
+  // conversation tab closes the assistant column itself, and a silent
+  // refill here would race that shut). `beforeEach` above already drove the
+  // strip back to zero tabs, the same empty state the reader reaches by
+  // closing their own last tab — proving this stays empty on a second seed
+  // is proving the store does not tell the difference between "never seeded"
+  // and "emptied on purpose", which is the whole point: it must not.
+  it("is a ONE-SHOT for the whole session — stays inert once it has fired, even after the strip empties back out", () => {
+    expect(agentTabsSnapshot()).toHaveLength(0) // the previous test's own seed, already spent
     seedAgentTabs("t2", "Something else")
-    expect(agentTabsSnapshot()).toHaveLength(1)
-    expect(agentTabsSnapshot()[0].threadId).toBe("t1")
+    expect(agentTabsSnapshot()).toHaveLength(0) // still nothing — no second seed, ever
   })
 })
 

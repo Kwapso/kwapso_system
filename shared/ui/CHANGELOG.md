@@ -2,6 +2,70 @@
 
 ## Unreleased
 
+### Added — `Badge` and `Kanban` get four priority tones: red, orange, purple, blue
+
+The client's ruling, 2026-09-15, over the consuming app's Tasks table:
+*"For the priorities: 4: keep the red. 3: use the orange. Urgent: use the
+purple. Whenever: use the blue."* The app had been colouring a task's
+priority by borrowing four of `Badge`'s six lifecycle dot tones — blocked,
+building, review, archived — because they were "the only reusable name in
+reach", not because a priority is a stage. One borrowing was a real defect:
+`building` is charcoal, the exact hex `--surface-inverse` is in light, so a
+priority-3 dot vanished wherever the two met, and in dark it tripped this
+kit's `building`-on-mango special case by accident, painting the whole chip
+the one colour this system reserves for the brand.
+
+Four new tokens, `tokens.css`: `--dot-red` (`--destructive`), `--dot-orange`
+(`--warning`), `--dot-purple` (`--kw-lavender`, admitted 2026-09-02), and
+`--dot-blue` (`--kw-sky`, the same hex `--info` already reaches, under a name
+that means priority rather than "informational"). No new hex for any of the
+four — every one is a colour this file had already admitted. `Badge`'s
+`dotTone` variant and `Kanban`'s `KanbanColumnDot` both grow the matching
+four entries, additively: none of the four is `building`, so the dark-mode
+mango special case stays scoped to that one tone alone and never fires for a
+priority chip. Measured against this file's own `mark` tier (1.5,
+`check-contrast.mjs`) rather than WCAG's 3:1 — ruling 26's "the dot never
+speaks alone" already set that floor for a 7px dot — all four clear it
+against every ground a dot renders on in this kit (`--pill-fill` and
+`--surface-inverse`, both palettes), with one bare, logged exception: blue
+against `--surface-quiet` in light measures 1.49, a ground no status-pill
+dot renders on today.
+
+Demo: `demo/sections/a-b.tsx`'s `badge` section gets a new "Priority tones"
+panel, the four new dots at the exact CH11 status-pill geometry, labelled
+with the consuming app's own four priority words.
+
+### Added — `ScreenShell` gets `asideTabs`, the aside's own tab level, handed to the caller
+
+The client's ruling, 2026-09-15, over a screenshot of an application that had
+drawn its own conversation tabs (History · one folder tab per open thread ·
+"+") one level BELOW the shell's single `asideLabel` tab, because `asideLabel`
+is a `string` and a string cannot be a strip: *"You got it completely wrong.
+The tabs need to be at the same level as the assistant tab, so it will have
+no assistant name. We know that's what it is. Rather, each tab will have the
+name. Now you create it like a sub-level, but no, no, it's only one tab
+level."*
+
+`asideTabs?: React.ReactNode`, new on `ScreenShellProps`. When given, it
+replaces the ITEM the kit draws inside `screen-shell-aside-tab`, not the
+slot: the wrapper `<div>`, its `ASIDE_TAB` geometry and its
+`--folder-tab-overlap` attachment to the card below it are unconditional
+either way, so a caller-supplied strip sits in exactly the same place the
+kit's own one fixed tab (`<BreadcrumbFolders items={[{ label: asideLabel
+}]}>`) always has. `asideLabel` is not retired: it is still `aria-label` on
+`screen-shell-aside`'s `role="complementary"` landmark, and it is still the
+whole story for every existing caller, who passes no `asideTabs` and renders
+byte-for-byte as before. The kit draws no close machinery around a
+caller-supplied strip — `toggleAside`/`onCurrentActivate`/the tab's own ×
+stay wired to the kit's own fixed tab only, because a caller with its own
+tabs has its own close targets and its own "closing the last one shuts the
+column" rule; the edge handle remains every caller's unconditional way to
+shut the column from outside the strip.
+
+Demo: `demo/shapes/templates-0.tsx`'s `screen-shell` section gets a new
+"asideTabs" panel, the kit's one fixed tab beside a caller-supplied strip in
+the identical slot, side by side.
+
 ### Added — `Kanban` gets `emptyColumns="bare"`, an empty column with no box and no words
 
 The client's ruling, 2026-09-15, on the tasks board view: *"when empty,

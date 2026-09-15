@@ -41,9 +41,9 @@ export async function getMeetingPurposesExport(request: Request, env: Env): Prom
   if (!complete)
     return exportTooLarge(EXPORT_HARD_CAP, "meeting purposes", "Archive the ones you no longer meet for, then export again.")
   const csv = toCsv(
-    ["name", "department", "description", "active", "created_at", "created_by", "updated_at", "updated_by"],
+    ["name", "department", "description", "icon", "active", "created_at", "created_by", "updated_at", "updated_by"],
     rows.map((p) => [
-      p.name, p.department, p.description,
+      p.name, p.department, p.description, p.icon,
       p.deactivated_at == null, p.created_at, p.creator_name, p.updated_at, p.editor_name,
     ])
   )

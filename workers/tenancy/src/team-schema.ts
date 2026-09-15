@@ -31,6 +31,7 @@ export { TEAM_MIGRATIONS } from "./team-schema/migrations"
 export {
   SPRINT_TYPE_CATALOGUE,
   DEFAULT_SELECTABLE,
+  MEETING_TYPES,
   buildTeamSeed,
   type Actor,
   type DefaultSelectable,

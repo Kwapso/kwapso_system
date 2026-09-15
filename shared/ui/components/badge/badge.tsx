@@ -155,6 +155,15 @@ const badgeVariants = cva(
         blocked: "",
         archived: "",
         done: "",
+        /* PRIORITY'S OWN FOUR (2026-09-15, tokens.css's own note beside
+           `--dot-red`/`--dot-orange`/`--dot-purple`/`--dot-blue`). Additive,
+           never a fifth compound variant: none of the four is `building`, so
+           the dark-mode mango special case above is never reached by a
+           priority chip — it stays scoped to `dotTone: "building"` alone. */
+        red: "",
+        orange: "",
+        purple: "",
+        blue: "",
       },
     },
     compoundVariants: [
@@ -198,7 +207,11 @@ const badgeVariants = cva(
   },
 );
 
-/** The six dot tones — one per `--dot-*` token, and no mango (never a status). */
+/** The ten dot tones — one per `--dot-*` token, and no mango (never a status).
+ * The first six are a LIFECYCLE (shipped/building/review/blocked/archived/
+ * done — App Stage, ticket and story status). The last four are a PRIORITY,
+ * never a lifecycle (tokens.css's own note beside `--dot-red` explains the
+ * split, and why the app's `PRIORITY_DOT_TONE` moved off the first six). */
 const DOT_FILL = {
   shipped: "bg-[var(--dot-shipped)]",
   building: "bg-[var(--dot-building)]",
@@ -206,6 +219,10 @@ const DOT_FILL = {
   blocked: "bg-[var(--dot-blocked)]",
   archived: "bg-[var(--dot-archived)]",
   done: "bg-[var(--dot-done)]",
+  red: "bg-[var(--dot-red)]",
+  orange: "bg-[var(--dot-orange)]",
+  purple: "bg-[var(--dot-purple)]",
+  blue: "bg-[var(--dot-blue)]",
 } as const;
 
 export type BadgeDot = keyof typeof DOT_FILL;

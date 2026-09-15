@@ -1,9 +1,18 @@
 "use client"
 
-// SPRINT DETAIL — one block of sold work at /sprints/<id>, as a tabbed record:
-// Overview / Stories. Its history is not a third tab any more — it is reached
-// from the ink footer's Latest activity column, on the client's 2026-09-06
-// ruling; web/components/records/activity-panel.tsx carries the ruling and the argument.
+// SPRINT DETAIL — one block of sold work, as a tabbed record: Overview / Stories.
+// Its history is not a third tab any more — it is reached from the ink footer's
+// Latest activity column, on the client's 2026-09-06 ruling;
+// web/components/records/activity-panel.tsx carries the ruling and the argument.
+//
+// NO MAIN PAGE OF ITS OWN, since the client's 2026-09-15 ruling ("killing the
+// sprints main page completely and just keeping the waves one"): this screen is
+// planned and opened from inside its wave now — wave-detail.tsx's own Sprints
+// tab — at the nested address `/waves/<waveId>/sprints/<id>`, `basePath` below
+// arriving as whatever ancestor the caller was actually opened through (see
+// SECTION_HOSTED_ELSEWHERE.sprints, shared/rules/registry.ts). Nothing in this
+// file hardcodes `/sprints` as its own root any more than it ever did — the
+// component only ever appended to the `basePath` it was handed.
 //
 // COMPLETING A SPRINT LIVES HERE, deliberately and nowhere else. It is not a
 // status word: it is the moment that cuts a version of every process map beneath
@@ -36,6 +45,7 @@ import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
 import { OverviewList } from "@/components/records/overview-list"
 import { ApiFailure, content as contentApi } from "@/lib/api"
+import { useSessionUserId } from "@/lib/use-active-team"
 import {
   RecordActionsMenu,
   RecordChipLink,
@@ -82,10 +92,15 @@ export function SprintDetailScreen({
 }: {
   teamId: string
   sprintId: string
-  /** the sprints list in the URL form we arrived through */
+  /** the ancestor collection's path, in the URL form we arrived through — its
+   * wave (`/waves/<id>/sprints`) since 15 Sep 2026, or wherever else a sprint
+   * is already linked from */
   basePath: string
 }) {
   const { t, lang } = useLanguage()
+  // THE SIGNED-IN USER, preselected as the assignee on a new story raised from
+  // here (client ruling, 15 Sep 2026 — see `StoryFormDialog`'s `defaultAssigneeId`).
+  const myUserId = useSessionUserId()
   // Sprints are bounded and read whole, so the record comes out of the same cache
   // the list holds — opening one costs no round-trip.
   // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
@@ -408,6 +423,7 @@ export function SprintDetailScreen({
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:sprint:${sprintId}`}
+        defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {
           // THE NEW STORY'S ID GOES BACK, and it is not bookkeeping: the dialog
           // hangs whatever files somebody picked on whatever this returns. Three

@@ -2484,6 +2484,9 @@ export type Meeting = {
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeId: string | null
   purposeName: string | null
+  /** the type's own Phosphor icon (MeetingPurpose.icon), read beside the name
+   * in the same subselect — never a second fetch. */
+  purposeIcon: string | null
   /** what we mean to talk about, and what was decided. The two fields no other
    * record in the app has anywhere to put. */
   agenda: string | null
@@ -2606,6 +2609,8 @@ export type MeetingPurpose = {
   /** pick-or-created into the "Department" dropdown group. */
   department: string | null
   description: string | null
+  /** kebab-case, one of MEETING_TYPE_ICONS (@shared/meeting-icons) or null. */
+  icon: string | null
   active: boolean
   createdAt: string
   creatorName: string | null

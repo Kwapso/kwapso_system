@@ -10,17 +10,14 @@ import * as React from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { UserPlus } from "@shared/ui/foundations/icons"
 
 import type { HelpStakeholder } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
 import { ApiFailure } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
 import { useLanguage } from "@shared/web/language"
-import { sortedOptions } from "@shared/web/sorted-options"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { AddButton } from "@/components/deep-link/screen-bits"
-import { RecordPicker } from "@/components/records/record-picker"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 
 const ORIGIN_LABEL: Record<HelpStakeholder["origin"], string> = {
   raiser: "Raiser",
@@ -43,18 +40,15 @@ export function HelpStakeholders({
   onAdd: (userId: string) => Promise<void>
 }) {
   const { t, lang } = useLanguage()
-  const [picked, setPicked] = React.useState("")
   const [busy, setBusy] = React.useState(false)
 
   const existing = new Set(stakeholders.map((s) => s.userId))
   const addable = members.filter((m) => !existing.has(m.id))
 
-  async function add() {
-    if (!picked) return
+  async function add(userId: string) {
     setBusy(true)
     try {
-      await onAdd(picked)
-      setPicked("")
+      await onAdd(userId)
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add them to the ticket."))
     } finally {
@@ -98,18 +92,26 @@ export function HelpStakeholders({
       )}
 
       {canAdd && addable.length > 0 && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <RecordPicker
-            value={picked}
-            onChange={setPicked}
-            options={sortedOptions(addable, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
-            placeholder={t("Pick someone to keep in the loop")}
-            searchPlaceholder={t("Search members…")}
-            emptyText={t("Nobody here matched.")}
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-xs">{t("Pick someone to keep in the loop")}</p>
+          {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN. A click adds straight
+              away — no separate confirm — and the pill it belonged to is gone
+              on the next render, folded into the list above with an "Added"
+              badge: ADD-ONLY (R54's own neighbour rule), so there is nothing
+              here to un-press. `value` stays `[]`: nothing in this row is ever
+              "selected" state, only clicked. */}
+          <StaffPillPicker
+            mode="multi"
+            ariaLabel={t("Keep in the loop")}
+            people={addable.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
+            value={[]}
+            onValueChange={(ids) => {
+              const picked = ids[0]
+              if (picked) void add(picked)
+            }}
             disabled={busy}
-            className="w-full sm:w-64"
           />
-          <AddButton label={t("Add stakeholder")} onClick={() => void add()} icon={<UserPlus className="size-4" />} />
         </div>
       )}
 

@@ -40,11 +40,18 @@
 //     engine a feature nothing else needs, matching Contact and Ticket rather
 //     than inventing a fourth shape.
 //
-// 2 · THE PICTURE. Both detail paths hold the SAME 2026-09-01 ruling shut —
-//     "under no case - images on title" — and this screen does not fight it:
-//     `RecordScreen`'s own `leading`/`mark` are still inert. The picture lives
-//     in the FIRST PANEL instead (`member-head.tsx`), which is where her own
-//     sentence puts every other new fact too ("on the first component…").
+// 2 · THE PICTURE. Held in `member-head.tsx`'s own first panel from
+//     2026-09-14 until 2026-09-15, because both detail paths held the SAME
+//     2026-09-01 ruling shut — "under no case - images on title" — and this
+//     screen did not fight it. THAT RULING WAS NARROWLY REVERSED THE NEXT
+//     DAY: "For cover and logo, I choose B1. Apply this on apps, accounts,
+//     and team members." (record-chrome.tsx's own `mark` prop doc has the
+//     artifact and the ruling in full.) B1 draws the avatar INLINE LEFT of
+//     the title, on the title's own line, boxed to the title's own
+//     line-height — `mark={<RecordMark … shape="round" />}`, below, on the
+//     SAME `RecordScreen` this screen already draws through, not a new prop.
+//     `member-head.tsx`'s own tile is gone (see that file's own note) — the
+//     face is drawn once, in the title, never twice on one screen.
 //
 // 3 · REMOVE THE TABS (R2). Moving to `RecordScreen` without ever building a
 //     `<TabsView>` — `children` (below) is one body, not a set of panels — is
@@ -101,6 +108,7 @@ import { PencilSimple, UserMinus } from "@shared/ui/foundations/icons"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { invalidate, primeCache } from "@shared/web/store"
+import { RecordMark } from "@shared/web/record-mark"
 import { staffFullName } from "@shared/staff-name"
 import { useT } from "@shared/web/language"
 import type { TeamMember, TeamRole } from "@shared/types"
@@ -259,8 +267,19 @@ export function MemberScreen({
   return (
     <>
       <RecordScreen
-        // THE CHIP, ABOVE THE TITLE (R65) — the SAME content the gallery card
-        // wears (`members-gallery.tsx`'s own `<Badge>{m.roleTitle}</Badge>`),
+        // THE AVATAR, INLINE LEFT OF THE TITLE — B1, client ruling 2026-09-15:
+        // "For cover and logo, I choose B1. Apply this on apps, accounts, and
+        // team members." record-chrome.tsx's own `mark` prop doc has the
+        // artifact and the full ruling; `shape="round"` is a PERSON's own
+        // shape (record-mark.tsx: "a person in their own right is a circle"),
+        // matching the picture `member-head.tsx` used to carry inside the
+        // body — REMOVED from there now that the head itself draws it (see
+        // that file's own note).
+        mark={<RecordMark picture={member.imageUrl} name={name} shape="round" size="tile" />}
+        // THE CHIP, ABOVE THE TITLE (R65, unchanged by the mark above — R65
+        // put the pills row above the title and this only adds something
+        // BESIDE it) — the SAME content the gallery card wears
+        // (`members-gallery.tsx`'s own `<Badge>{m.roleTitle}</Badge>`),
         // through the host every bespoke record detail uses for its own
         // identity row.
         chips={<Badge>{member.roleTitle}</Badge>}

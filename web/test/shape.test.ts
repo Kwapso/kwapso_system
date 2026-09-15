@@ -515,6 +515,7 @@ const meeting = (over: Partial<Meeting> & { id: string; title: string }): Meetin
   appName: null,
   purposeId: null,
   purposeName: null,
+  purposeIcon: null,
   agenda: null,
   notes: null,
   location: null,

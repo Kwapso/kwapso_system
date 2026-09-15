@@ -49,6 +49,7 @@ import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
 import { staffedOn, type PickablePerson } from "@/lib/members"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
@@ -154,6 +155,7 @@ export function StoryFormDialog({
   storyId,
   initial,
   draftKey,
+  defaultAssigneeId,
   onSubmit,
 }: {
   open: boolean
@@ -213,6 +215,14 @@ export function StoryFormDialog({
   /** Present = editing an existing story. */
   initial?: StoryFormValues
   draftKey?: string
+  /** THE SIGNED-IN USER, preselected on a new story — the client's ruling,
+   * 15 Sep 2026: "always put the user preselected by default" everywhere staff
+   * is picked. Read into the draft's own initial value (below), the same shape
+   * `TaskFormDialog`'s own `defaultAssigneeId` already uses, so a reopened
+   * draft keeps whatever was actually chosen rather than reverting to it.
+   * Ignored on an edit (`initial` wins). "" when the signed-in user is not
+   * assignable here (staffedOn's own fail-open still offers everyone else). */
+  defaultAssigneeId?: string
   /** RETURNS THE NEW STORY'S ID on a create, when the caller has one.
    *
    * An attachment needs a story to belong to, and on a create there is no
@@ -232,7 +242,7 @@ export function StoryFormDialog({
       sprintId: "",
       appId: "",
       ticketId: "",
-      assigneeId: "",
+      assigneeId: defaultAssigneeId ?? "",
       storyType: "",
       processIds: [],
       changesNoStep: false,
@@ -667,14 +677,20 @@ export function StoryFormDialog({
         </div>
       </Field>
       <Field config={assigneeField} htmlFor="story-assignee" className={fieldSpacing}>
-        {picker(
-          "story-assignee",
-          values.assigneeId,
-          "Nobody yet",
-          t("Search members…"),
-          assignable.map((m) => ({ id: m.id, label: m.name, picture: m.photo, shape: "round" as const })),
-          (v) => setValues((s) => ({ ...s, assigneeId: v }))
-        )}
+        {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN, preselected to the
+            signed-in user on a new story — the client's ruling, 15 Sep 2026.
+            `assignable` is `staffedOn`'s own fail-open list (see above). */}
+        <StaffPillPicker
+          id="story-assignee"
+          ariaLabel={t(assigneeField.label)}
+          people={assignable.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+          lang={lang}
+          value={values.assigneeId}
+          onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
+          allowNobody
+          nobodyLabel={t("Nobody yet")}
+          disabled={busy}
+        />
       </Field>
       {/* A hidden anchor so the label above always has a control to point at even
           when the process list is empty. Keeps the field accessible without

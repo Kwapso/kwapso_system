@@ -61,6 +61,7 @@ type MeetingRow = {
   app_name: string | null
   purpose_id: string | null
   purpose_name: string | null
+  purpose_icon: string | null
   agenda: string | null
   notes: string | null
   location: string | null
@@ -121,7 +122,8 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
   -- off the same row account_name already reads — one subselect, not two.
   (SELECT a.logo_url FROM accounts a WHERE a.id = m.account_id) AS account_logo_url,
   (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
-  (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name`
+  (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name,
+  (SELECT p.icon FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_icon`
 
 /** The sort a meeting list is keyed by: when it is / was, newest first. A calendar
  * read backwards is what somebody wants — the thing that just happened is the
@@ -213,6 +215,7 @@ function toMeeting(r: MeetingRow): Meeting {
     appName: r.app_name,
     purposeId: r.purpose_id,
     purposeName: r.purpose_name,
+    purposeIcon: r.purpose_icon,
     agenda: r.agenda,
     notes: r.notes,
     location: r.location,

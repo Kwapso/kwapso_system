@@ -39,7 +39,7 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
 - [3. Detail screens](#3-detail-screens) (D1 to D13)
-- [4. Collections](#4-collections) (K1 to K19)
+- [4. Collections](#4-collections) (K1 to K23)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
 - [7. Typography](#7-typography) (T1 to T8)
@@ -917,6 +917,45 @@ for the member screen alone.
 
 **Law.** Not yet a registry check. Written to establish the shape.
 
+### D14: the record head carries the record's mark inline with the title (B1), title height unchanged
+
+**The rule.** The client's ruling, 2026-09-15: *"For cover and logo, I choose B1. Apply this
+on apps, accounts, and team members."* B1 is Component B, variation B1 of the artifact
+(https://claude.ai/code/artifact/ab68749e-6970-4fc1-a7f6-eb220c7f2900): the account/app's
+logo, or the team member's avatar, sits **inline left of the title, on the title's own
+line** — never a row of its own above or below it, and never a second image alongside
+D8's related-record cards. `RecordScreen`'s `mark` prop (`web/components/records/record-chrome.tsx`)
+is what draws it, through `RecordMark`/`AppMark` exactly as every list row and tile already
+does (G3).
+
+**Title height is unchanged, by construction, not by eye.** The mark's own box is sized to
+the title's line box — `calc(var(--text-4xl) * var(--text-4xl--line-height))`, the same two
+tokens [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant)'s
+`RECORD_TITLE_TREATMENT` already points the kit's rendered heading at — never a pixel figure
+picked to look right on one screen. The row is `items-center gap-3` (the kit's `--space-3`),
+so the row's own height is the title's line-box height and nothing taller sits beside it to
+push it open. [D13](#d13-member-detail-head-carries-a-role-chip-above-the-title-with-one-pencil-for-change)'s
+role chip stays exactly where it was: above the title, untouched — the mark sits beside the
+title itself, one level down from the chip row, never merged into it.
+
+**Narrow on purpose.** The ruling names three record kinds, not "everywhere" — every other
+`*-detail.tsx` screen still on the pre-2026-09-01 `mark={appStageMark(...)}` /
+`mark={kindMark}` shape (a bare glyph string, not a picture) stays exactly as inert as the
+2026-09-01 ruling ("under no case — images on title. remove it everywhere") left it: `mark`
+only draws when a caller hands it a real node, never a string — the discriminator
+`RecordScreen`'s own doc comment on the prop explains in full.
+
+Evidence: the artifact's own Reference section computes the title's line-box height as the
+sum of the kit's stack (breadcrumb, band inset, pill row, gap, `--text-4xl` line box) and
+checks every B1 frame against that same line — the account, the app and the team-member
+mocks all land on it.
+
+**Law.** Not yet a registry check. Enforced by `web/test/record-head-mark.test.tsx`
+(the title's own wrapper carries an identical class with or without a mark; the mark is a
+sibling inside the title's own row, never a row of its own; the box is read off source as
+derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value; a string
+`mark` stays inert).
+
 ---
 
 ## 4. Collections
@@ -959,6 +998,16 @@ into list subtitles, which is what the five-part subtitle above is.
 Evidence: `A-4.05.42` (a real table: NAME, TYPE, MODULE, ASSIGNED TO, CREATED ON with
 uppercase headers) versus `A-3.58.53` (a real list). Both exist in the old app and they
 are never mixed.
+
+**The WORD retired, the SHAPE did not — see [K22](#k22-rows-are-a-list-never-a-banded-table).**
+This entry is about the comparing-columns idea, which is still real: named column headers, a
+person scanning across a row. What is gone is the SECOND, doubly-boxed shape a row-collection
+used to draw by default — a grey, rounded, inset band around the very table this entry is
+describing — and the word "table" as anything a person reads on screen. `RecordTable` still
+draws named column headers a reader can scan across; it draws them flush and full-width, the
+way `A-4.05.42`'s own uppercase-header table always looked, never boxed a second time inside
+the card that already holds it. The distinction this entry draws (scanning vs. reading) is
+untouched; the box around the scanning shape is what R80 deleted.
 
 ### K3: the count lives in the heading, formatted "N adjective plural"
 
@@ -1303,15 +1352,18 @@ collection BY ("Newest first", "Priority order"), a designed landing sequence
 
 **Law.** [R75](../RULES.md) (`alphabetical-options`).
 
-### K18: a record with a face defaults to the gallery; the table is the alternate view
+### K18: a record with a face defaults to the gallery; the list is the alternate view
 
 **The rule.** *"for accounts main: use gallery and add table as alternate view. filter by
 account manager, country, status. sort by name - in the table columns: name status,
-account manager, country."* — client, 14 Sep 2026. The general shape: a collection whose
-records carry a picture or a logo opens on the gallery (`CardGrid` + `RecordMark`, the same
-wall `members-gallery.tsx` already composes), offers the list as a table through
-`<ToolbarRow>`'s structured `view` slot ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default),
-the kit's `ViewSwitch`), and the table's own first column is the record's name carrying its
+account manager, country."* — client, 14 Sep 2026. **The second body's WORD changed the next
+day** — see [K22](#k22-rows-are-a-list-never-a-banded-table): "table" is retired everywhere,
+including here, so the switch this entry describes is Gallery/List now, not Gallery/Table.
+Nothing else about the rule moved: same second body, same `<RecordTable>`, same four columns.
+The general shape: a collection whose records carry a picture or a logo opens on the gallery
+(`CardGrid` + `RecordMark`, the same wall `members-gallery.tsx` already composes), offers the
+list through `<ToolbarRow>`'s structured `view` slot ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default),
+the kit's `ViewSwitch`), and the list's own first column is the record's name carrying its
 mark — never a bare label. Accounts is the first screen built to the shape:
 `AccountsScreen` (`web/components/accounts/accounts-screen.tsx`) opens on
 `view === "gallery"` ("the one on first load"), and its table draws four columns in her own
@@ -1363,12 +1415,25 @@ an undated task. The door grew a matching `planned` view (`shared/types.ts`'s `T
 stays defined (nothing else asked to lose it).
 
 **The views, per tab, through the toolbar's structured `view` slot** ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)):
-Overdue offers Table (default) + Board by priority; Planned offers Table (default) + Board
-by priority + Calendar by deadline; Completed offers Table only (the kit still draws a
-static one-view label, kit v1.2.60, rather than the switch vanishing); Everyone's offers the
-same pair Overdue does, Table (default) + Board by priority. All views within one tab read
-the SAME search/priority/department-narrowed page — narrowing happens once, ahead of the
-view switch, so Table→Board keeps what was typed.
+Overdue offers Table + Board by priority, **BOARD DEFAULT** (amended 2026-09-15, third pass —
+"the default view on tasks overdue is board"; Planned's own default stays Table, the client
+named Overdue alone and the two tabs answer different questions); Planned offers Table
+(default) + Board by priority + Calendar by deadline; Completed offers Table only (the kit
+still draws a static one-view label, kit v1.2.60, rather than the switch vanishing);
+Everyone's offers the same pair Overdue does, Table (default) + Board by priority. All views
+within one tab read the SAME search/priority/department-narrowed page — narrowing happens
+once, ahead of the view switch, so Table→Board keeps what was typed.
+
+**"TABLE" IS CALLED "LIST" NOW, EVERYWHERE — a later ruling the same evening, verbatim: "I
+don't like this table anywhere, so anywhere in the app where you have it, replace it with
+list. I don't want to say this again." The word above and everywhere else in this entry is
+the SHAPE, unchanged (rows and columns, still `<Table>`/`<RecordTable>`, still literally a
+table structurally); what changed is the LABEL a reader sees on the view switch —
+`tableViewOption` (tasks-screen.tsx) reads `t("List")` now, value still `"table"` (nothing
+stored, keyed or compared by that word changes), the identical word and glyph
+(`ListBullets`) `tickets-collection.tsx`'s own view switch already uses for its own `list`
+option. Applies to the word on every tab that offers it — Overdue, Planned, Completed's
+static one-view label, Everyone's — from the one shared `tableViewOption` object.
 
 **The table's seven columns**, one set for the three MINE tabs (replacing the old
 everyday/completed split, since the Priority chip already carries what the two dropped
@@ -1469,6 +1534,261 @@ shipped strip.** Each is the client's own words.
 Rulings 2, 4 and 6 apply to Planned and Completed too, not only Overdue (Completed: table
 only, still mine, still no "Who has it"); Everyone's keeps the assignee column and reads the
 same sort/filters/logos as the three MINE tabs.
+
+**AMENDED AGAIN, SAME EVENING, STILL LATER — "why now don't I see any task on any tab?"**
+The unconditional narrowing ruling 2 shipped a few hours earlier had an unintended second
+effect: read against the Kwapso team's own staging data, 254 of 259 tasks carry no
+`assignee_id` at all, so `assignee_id = caller` left Overdue/Planned/Completed showing
+almost nothing for almost anyone — unclaimed work included — not "one reader's tasks
+specifically gone missing". The client's own words for the fix: *"a task nobody has is on
+my list too."* `getTasks` now narrows those three views to `assignee_id = caller OR
+assignee_id IS NULL` (`includeUnassigned`, `workers/content/src/lib/tasks.ts`'s
+`TaskFilter`/`taskWhere`/`countTasks`) — an unclaimed task rides every caller's MINE tabs
+alongside their own, badges included (R16: `countTasks` takes the identical OR-NULL clause,
+never a narrower one than the rows it counts). Scoped to exactly those three views: Everyone's
+already shows every row, claimed or not, and a caller who reaches for `all` without
+`all_tasks:read` is still narrowed down to their own name only, no unclaimed bonus — the
+OR-NULL widening is a MINE-tab question, not a permission grant. The by-id lookup
+(`GET /api/content/tasks?id=`) was widened to match — `one.assigneeId === null` reads as
+"mine" there too, unconditionally, so a task a MINE tab just showed never 404s one click
+later. Proved in `workers/content/test/todos-tasks.test.ts`, describe block "an unassigned
+task rides the three MINE views too, not only its own".
+
+**FOUR MORE ITEMS, THE SAME EVENING'S THIRD PASS.** Each the client's own words, each
+applied in `web/components/work/tasks-screen.tsx`.
+
+- *"the task list is not correctly aligned. It is missing some width. Just replicate the
+  list component as we have it in tickets."* The Table view's own toolbar
+  (`<SectionWithCreate useKitPanel={false}>`) already sits inside its own card; nesting
+  `<RecordTable useKitPanel>`'s DEFAULT row frame — a second, rounded `bg-surface-panel`
+  card (`record-table.tsx`'s `renderItems`) — inside it read as inset and narrower than the
+  flush toolbar above. `<RecordTable>` gained an opt-in `frame="bare"` prop (default
+  `"panel"`, unchanged everywhere else) that drops the extra card, leaving a plain
+  `<Table>` — the identical frame `tickets-collection.tsx`'s `TicketRowsTable` already
+  draws for its own tabs. Tasks is the only call site that passes it; the other six
+  (Accounts, Contacts, Meetings, and the two settings screens) are untouched.
+- *"The default view on tasks overdue is board."* `overdueView`'s `useRemembered` default
+  changed from `"table"` to `"board"`. Planned's own default stays Table — the client named
+  Overdue alone, and the two tabs answer different questions (Overdue is "what is on fire,
+  worst first"; Planned is still the wider list of what is not yet due). A reader who has
+  already switched either tab keeps what they chose (`useRemembered` persists per reader
+  from the first switch).
+- *"adding a chip inside the board component with the app, account, or department, whatever
+  is the most detailed… if it has app I only see the app; if only account, the account; if
+  only department, department — in a chip on top of the title, like we have it already
+  somewhere else."* That "somewhere else" is [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title)/R65:
+  `KanbanCard.badges` is the exact slot, the same one the tickets board already draws its
+  own chip through. `boardChip` (tasks-screen.tsx) picks APP > ACCOUNT > DEPARTMENT — the
+  narrowest fact wins outright rather than combining — and draws `<RecordMark>` beside the
+  app/account branches (the identical node the table's own App/Account cells already draw)
+  or the department's own glyph (`departmentGlyph`) for the department branch, which carries
+  no picture.
+- *"On Everyone's, add the column 'Closed On' or 'Finished On'."* `EVERYONE_COLUMNS` gains
+  an eighth column, `closed`, reading the identical row key Completed's own eighth column
+  does (`t.completedAt`, blank "—" for a task still open) — labelled "Closed on" rather than
+  Completed's plain "Closed", because Everyone's mixes open and done rows where Completed's
+  are all done, so the fuller label reads correctly beside a row with no answer yet.
+  Overdue/Planned do not gain it: every row there is open by construction, so the column
+  would read "—" down every line — the same furniture reasoning Status and "Who has it"
+  were already dropped for.
+
+### K19a: Priority has its own four colours, never App Stage's
+
+**The rule.** The client's ruling, 2026-09-15, verbatim, the same day K19's "Priority (has
+a color here)" shipped: *"For the priorities: 4: keep the red. 3: use the orange. Urgent:
+use the purple. Whenever: use the blue."* Checked against `PRIORITY_LABEL`
+(`shared/departments.ts`), never assumed: 4 is "Do it now", 3 is "Important", 2 is
+"Urgent", 1 is "Whenever" — so the ruling reads **4 → red · 3 → orange · 2 (Urgent) →
+purple · 1 (Whenever) → blue**.
+
+**What shipped first, and why it moved.** `PRIORITY_DOT_TONE` had no existing chip to
+reuse, so it borrowed four of `Badge`'s six App Stage lifecycle tones —
+`archived`/`review`/`building`/`blocked` — "the only reusable name in reach", not because a
+priority is a stage. One borrowing was a real defect, not a style question: `building` is
+charcoal, the exact hex `--surface-inverse` is in light, so a priority-3 dot vanished
+wherever the two met, and in dark it tripped `Badge`'s `building`-on-mango special case by
+accident, painting the whole chip the one colour this system reserves for the brand — one
+rank below "Do it now". The artifact at
+`claude.ai/code/artifact/895888b7-ca1a-4df0-ae2d-c61b9127fb4e` measures the old mapping
+against the new, side by side, with the contrast numbers for each.
+
+**The tokens.** Four new tones, kit v1.2.89 (`shared/ui/foundations/tokens/tokens.css`):
+
+| Priority | Word | Tone | Token | Source |
+|---|---|---|---|---|
+| 4 | Do it now | `red` | `--dot-red` | `--destructive` (`--kw-poppy` light / `--kw-poppy-lift` dark) |
+| 3 | Important | `orange` | `--dot-orange` | `--warning` (`--kw-orange`, admitted 2026-09-02) |
+| 2 | Urgent | `purple` | `--dot-purple` | `--kw-lavender` (admitted 2026-09-02, chart series 4) |
+| 1 | Whenever | `blue` | `--dot-blue` | `--kw-sky` (the same hex `--info` reaches, under a name that means priority rather than "informational") |
+
+No new hex for any of the four — every one is a colour the kit had already admitted.
+`PriorityTone` (`shared/departments.ts`) is a type SEPARATE from `DotTone`
+(`shared/app-stages.ts`), not four members bolted onto it — `record-week.tsx` and
+`tickets-collection.tsx` each hold an exhaustive `Record<DotTone, …>` over the app-stage
+six, and widening `DotTone` would have silently demanded four more entries in both, neither
+of which has anything to do with a task's priority. `Badge`'s `dotTone` variant and
+`Kanban`'s `KanbanColumnDot` both grew the matching four entries in the kit itself,
+additively: none of the four is `building`, so the dark-mode mango special case stays
+scoped to that one App Stage tone and can never fire for a priority chip again.
+
+**Not a law.** Like K18, this is an arrangement/vocabulary decision recorded for the next
+reader, not a registry check — `shared/departments.ts`'s own comment on `PRIORITY_DOT_TONE`
+carries the same ruling and is the source to trust if the two ever disagree.
+
+### K20: calendar views carry no sort
+
+**The rule.** When a collection's active view is a calendar, a week or an agenda, its
+toolbar draws no sort control at all — even where the screen still hands `<ToolbarRow>` a
+`sort` config, because its OTHER views (Table, Board) genuinely want one. The suppression
+lives in the row itself: `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) checks
+its `view` slot's active value against `NO_SORT_VIEW_VALUES` (`"calendar" | "week" |
+"agenda"`, the same file) and drops the `<SortControl>` it would otherwise build, on every
+render, regardless of what `sort` is given. No call site can opt back in by continuing to
+pass `sort` once its view lands on one of those three.
+
+**Why it exists.** The client's ruling, 2026-09-15, over the week view design (see
+[K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default), R53, the
+sort slot's own law): *"Never put the sort in calendar components. Make this a law. Makes
+no sense."* K12 already lets a screen say "my rows have no order to offer" one exemption at
+a time (`TOOLBAR_SORT_EXEMPT`) — three of those entries were already a month grid, a
+calendar-shaped queue and a grouped pair of lists, the identical argument this law makes.
+What changed is that a CALENDAR-SHAPED VIEW no longer gets to make that argument
+screen-by-screen: it is a fact about the shape, decided once, centrally, rather than a
+decision every future calendar/week/agenda screen has to remember to re-make.
+
+**Law.** [R78](../RULES.md) (`no-sort-in-calendar-views`).
+
+---
+
+### K21: Sprints live inside Waves; no Sprints main page
+
+**The rule.** A sprint has no sidebar destination and no top-level collection screen of
+its own. It is planned and opened from the wave it belongs to: wave-detail.tsx's own
+Sprints tab lists the sprints already in the package, and its "Plan a sprint" button
+(plus "Put a sprint in this wave" for moving one already on the books) is the only door
+that creates one. Opening a sprint from there lands at the nested address
+`/waves/<waveId>/sprints/<sprintId>`, so its breadcrumb trail reads Wave → Sprint — never
+a generic "Sprints" rung in between, the same nested-crumb shape `/apps/<id>/sprints/<id>`
+already used. Waves leads the Build section of the sidebar now, first rather than last.
+
+The `sprints` MODULE itself is unchanged: Settings › Modules and the roles matrix still
+list it, and its permission right still gates the wave's own Sprints tab. Only the
+stand-alone collection screen — the sidebar row, the `/sprints` top-level route, and the
+render branch that drew it — is gone.
+
+**Why it exists.** The client's ruling, 2026-09-15, verbatim: *"Regarding sprints and
+waves, sprints go inside waves. I would suggest killing the sprints main page completely
+and just keeping the waves one on top of the build section on the sidebar."* A wave IS
+its sprints — putting one in or taking one out is the only thing that changes what the
+package runs between — so a second, parallel place to browse sprints outside their wave
+was two doors to the one fact, and the client asked for the redundant one closed rather
+than kept in sync.
+
+**Law.** [R64](../RULES.md) (`sections-have-a-door`) — `SECTION_HOSTED_ELSEWHERE.sprints`
+(`shared/rules/registry.ts`) is the reasoned line that keeps the census honest about
+where the capability lives now.
+
+---
+
+### K22: rows are a list, never a banded table
+
+**The rule.** `RecordTable` (`web/components/records/record-table.tsx`) — the one
+row-collection component every screen but Tickets' own bespoke `TicketRowsTable` draws
+through — draws exactly ONE shape now: a flush, full-width `<Table>` with plain uppercase
+column heads over hairlines, no hover wash on the header row, and nothing wrapping it. It
+used to draw a second shape by DEFAULT — that same table boxed a second time in
+`overflow-hidden rounded-[var(--radius)] bg-surface-panel`, a grey, rounded, inset card —
+and that second box is gone from the component's source entirely, not merely switched off.
+Every caller already sits inside ONE surface of its own (a `CollectionCard` from
+`<PagedFind>`'s `wrap`, or the kit's own `useKitPanel` collection panel), so the banded
+shape was always a redundant, doubly-nested box standing beside Tickets' own flush one —
+never a legitimate alternative. The `frame` prop that used to choose between the two shapes
+still exists, for source compatibility with the Tasks lane's own pre-existing call site, but
+it accepts only the literal `"bare"` now and is never read: no call site can even ask for
+the old look at compile time. A view switch that used to offer "Table" as a body offers
+"List" instead — Accounts' own Gallery/Table switch is Gallery/List now, with the kit's list
+glyph (`ListBullets`) beside it, matching Tickets' own view switch rather than the kit's
+plain table icon.
+
+**Why it exists.** The client's ruling, 2026-09-15, verbatim: *"On accounts, I want the
+views to be gallery and list. I don't like this table anywhere, so anywhere in the app
+where you have it, replace it with list. I don't want to say this again."* Earlier the same
+day, about Tasks: *"Just replicate the list component as we have it in tickets. It's
+already good there."* `<RecordTable>` had grown an opt-in `frame="bare"` a few hours before
+that second ruling, for exactly one caller (`tasks-screen.tsx`, over a screenshot: "the task
+list is not correctly aligned, it is missing some width") — proof the banded box was
+visible and wrong, patched for the one screen she happened to be looking at. Her later
+ruling, read literally, is the opposite of an opt-in: a component that defaults to the
+wrong shape and offers an escape hatch is a rule with one way around it per call site that
+forgets to ask, which is exactly how six screens ended up drawing the band while one did
+not. So the escape hatch is deleted along with the shape it escaped, rather than widened
+into six more `frame="bare"` call sites.
+
+**Law.** [R80](../RULES.md) (`rows-are-a-list`) — `web/test/rows-are-a-list.test.ts` reads
+`record-table.tsx` off disk for the banded fill and walks every `<RecordTable` mount across
+`web/` for a `frame` prop carrying anything other than the literal `"bare"`.
+
+---
+
+### K23: Apps — gallery and board by stage, never tiles or a table
+
+**The rule.** The client's ruling, 15 Sep 2026, verbatim: *"For the main screen for the
+apps, I want the gallery icon laid out. Make sure you add a chip with the status. I also
+want you to add an alternate view board by stage. Include the icon, and in both of them, I
+want to see the status. In the gallery, make this a chip, then the title and the subtitle:
+the name of the account. In the board, make the icon bigger, and as you have it, the title
+and subtitle: account name."* This replaces the Tiles/List pair the 2026-08-31/2026-09-01
+rulings put on `AppsScreen` (`web/components/apps/apps-screen.tsx`): Tiles becomes Gallery
+(a flat `CardGrid`, K18's own shape) and List is dropped outright rather than kept as a
+third view — no law pins it (`web/test/rows-are-a-list.test.ts` (R80/K22) governs
+`<RecordTable>`'s own shape and never reached Apps, whose old List body rendered through
+the screen ENGINE, `ScreenRenderer`, not `RecordTable` — so its removal answers this brief's
+own "remove it unless a law pins it" clause honestly: none did).
+
+**"Status" is the app's own stage.** `AppRow` (`shared/types.ts`) carries no separate status
+field — an app's lifecycle IS its `stage` (`shared/app-stages.ts`), the same fact
+`app-detail.tsx`'s own three pills already draw a coloured `Badge` off. Both new views draw
+`<Badge variant="status" dot={appStageDotTone(app.stage)}>{t(app.stage)}</Badge>`, above the
+title in source order ([K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title)/R65).
+
+**The Gallery** is a flat `CardGrid` of kit `Card`/`CardTitle` cells — `RecordMark`
+(`size="band"`, the same size K18's own accounts wall draws), the status chip, the title,
+and the account name as a subtitle line. THE SUBTITLE IS A CARD FACT, NOT A PAGE HEAD — R72
+(`no-default-subtitles.test.ts`) was amended 2026-09-14 to read the kit's own `CardTitle` as
+a heading, so the subtitle is built as a variable and interpolated (`{subtitle}`) rather
+than written as a literal prose tag the very next JSX sibling of `<CardTitle>` — the same
+escape `accounts-screen.tsx`'s own `accountGalleryBody` already takes for its manager chip.
+
+**The Board** is the kit's `Kanban` (`shared/ui/components/kanban/kanban.tsx`), one column
+per stage in the team's own "App stage" vocabulary order (`useAppStages`, exported from
+`app-form-dialog.tsx` — the identical team-ordered read that picker already made, never a
+second one with its own fallback), plus a trailing "No stage yet" column so an app with none
+recorded is never invisible. NEVER A→Z: R75's own `ORDERED_OPTIONS_OK` names the class of
+list this is (a lifecycle pipeline read left to right), though no registry line was needed
+here — the board's columns are a plain array fed to `<Kanban columns=…>`, never a
+`<SelectItem>`/`options=` prop, so R75's own picker census does not reach it. Each column's
+dot is the stage's own tone (`appStageDotTone`) when the code recognises the stage, absent
+otherwise. Cards carry the status chip, the icon — bigger than the Gallery's
+(`RecordMark size="board"`, 80px, the fifth NAMED size in `shared/web/record-mark.tsx`,
+added for exactly this call site rather than a className fighting the size prop) — beside
+the title (the vendored card draws chips, then title, then description, then `content` LAST
+always, with no leading-media slot before the chip row to put a big mark in without
+hand-editing the pinned kit, R39), and the account name as `description`. Dragging a card
+calls the app's existing update door (`POST /api/tenancy/apps/update`, gated
+`processes:update`, the same right the app record's own edit form writes through) with the
+minimal patch — `id`, the always-required `name`, and the new `stage` — so a drag can never
+silently empty an app's staff, logo or context. `emptyColumns="bare"` (client ruling,
+2026-09-15, the same sentence that shipped the Tasks board's own): a team with few apps
+across many stages draws no boxed "nothing here" registers, only a thin, still-droppable
+zone.
+
+**Not a law**, for the identical reason [K18](#k18-a-record-with-a-face-defaults-to-the-gallery-the-list-is-the-alternate-view)
+gives: the engine's own `display: "gallery"`/`"list"` would be the obvious chokepoint to
+derive a Gallery-default rule from, but `appsListRecipe` (`web/lib/screens.ts`) sets
+`display: "list"` and is explicitly VESTIGIAL — the screen renders through neither branch —
+so a census built against `recipe.display` would fail on the very screen this entry is
+about. Recorded here for the next reader rather than checked, until a real registry of
+host-composed screens exists to check against instead.
 
 ---
 
@@ -1621,16 +1941,63 @@ the first named in each is that tab's own default, and the choice is remembered 
 in one shared slot, so switching tabs never strands a reader on a body their new tab does not
 offer. Still one `ToolbarViewSlot` config (R53's fixed slot order), just built from the open
 tab rather than a constant. "List" retired everywhere it appeared here in favour of "Table" —
-she asked for Table, not List. "Agenda" is the kit's own `Agenda`
+she asked for Table, not List. SUPERSEDED A FEW HOURS LATER, the next paragraph. "Agenda" is
+the kit's own `Agenda`
 (`shared/ui/components/agenda/agenda.tsx`, CH19 view 10) drawn through the ONE host wrapper
 every calendar/agenda in the app is required to go through (`RecordCalendar` /
 `RecordAgenda`, `web/components/records/record-calendar.tsx` — see the "ONE CALENDAR" law,
-`web/test/rules.test.ts`'s `one-calendar`), never imported directly by a screen.
+`web/test/rules.test.ts`'s `one-calendar`), never imported directly by a screen. STILL TRUE.
 
 Evidence: `web/components/meetings/meetings-screen.tsx` (the header block above
 `MeetingsScreen` carries her words verbatim and the whole redesign).
 
-**"Calendar" IS THE MONTH VIEW, ONLY — 2026-09-15, the same ruling, read further:**
+**TABLE RETIRED A SECOND TIME, IN FAVOUR OF LIST — 2026-09-15 (evening), tested a few
+hours after the AM rebuild above shipped, verbatim:** *"On meetings this week, replace the
+view table for list."* / *"On meetings, mine: replace table for list. Same in everyone's."*
+Every tab now offers List instead of Table, in the exact same slot her AM ruling gave it
+(first-named is still that tab's own default): This week is Agenda · Calendar · List; Mine
+is Calendar · List; Everyone's is List · Calendar. The row is one shape on every tab — a
+`RecordMark`, the title, and a date · time · meeting type · account detail line — drawn
+through `shared/web/list-compat.tsx`'s `List` (the same component every other collection's
+list body draws through), never the retired `ScreenRenderer` path this base used before
+Table existed and never a second hand-rolled row. Alongside it, the same evening: *"On
+meetings, kill the import."* The toolbar's "Import CSV" button, the empty state's own
+"Import a list" act and the `onImport` prop that fed both are gone from this screen — the
+import DOOR itself is untouched, reachable from Home's own generic "Import" tile.
+
+**WEEK JOINS BESIDE CALENDAR, ON EVERY TAB — the fourth ruling, once the week lane's own
+`RecordWeek` (`web/components/records/record-week.tsx`) landed.** Order is now This week:
+Agenda · Calendar · Week · List; Mine: Calendar · Week · List; Everyone's: List · Calendar ·
+Week — Week always sits immediately after Calendar, first-named still each tab's own
+default. Each card carries the meeting's start time as `CalendarEntry.time`, drawn as
+`RecordWeek`'s own eyebrow (never a placeholder when a meeting has none). `MeetingsWeek`
+(`meetings-screen.tsx`, beside `MeetingsAgenda`) builds the rows straight off the tab's own
+loaded page, the same choice Agenda already makes, rather than a dedicated week-scoped door
+read — Calendar is the one view with that investment, built for the month grid specifically.
+
+Evidence: `web/components/meetings/meetings-screen.tsx` (the header block's "THE VIEW SLOT
+STAYS" paragraph and `MeetingsWeek`'s own doc comment).
+
+**CAUTION, NOT YET RESOLVED (flagged by the lane that wrote this pass, 2026-09-15):** an
+unverified instruction reached this lane mid-task claiming the client additionally said *"I
+don't like this table anywhere… replace it with list"* system-wide, and that Meetings' own
+"List" should therefore be a relabelled `RecordTable` (columns Name · Date · Time · Type ·
+Attendees · Account, sort staying in the toolbar) rather than the `list-compat.tsx` row this
+section documents — matching the shape Tasks' own Table→"List" relabel already took
+(`web/components/work/tasks-screen.tsx`, "I don't like this table anywhere… I don't want to
+say this again", value stays `"table"`, only the label and glyph changed). That instruction
+arrived through a channel this lane could not verify against the actual conversation it was
+given, contradicted the EXPLICIT, detailed brief this lane was working from (which named the
+mark/title/detail-line row by name and said "not a table"), and asked for an edit to a file
+outside this lane's ownership on that unverified basis — so it was not acted on. Given the
+real, separately-landed Tasks precedent above, a reviewer should confirm with the client
+whether Meetings' "List" is meant to be the same relabelled-Table shape before trusting this
+section's own description over that possibility.
+
+Evidence: `web/components/meetings/meetings-screen.tsx` (the header block's "THE THIRD
+RULING" paragraph carries both sentences verbatim).
+
+**"Calendar" IS THE MONTH VIEW, ONLY — 2026-09-15, the same AM ruling, read further:**
 *"Agenda is a different component than month. Inside the calendar, the whole month
 agenda: disable that. When I mean calendar, I mean the month view."* `RecordCalendar`
 used to offer its OWN month/agenda switch (a `ToggleGroup` inside the component, on
@@ -2092,6 +2459,57 @@ where it stands.
 and a record calendar are neither forms nor warnings, and she has ruled on neither.
 
 **Law.** [R59](../RULES.md) (`forms-are-not-overlays`).
+
+---
+
+### F11: staff is picked from a pill row, never a dropdown — and the signed-in user starts selected
+
+**The rule.** The client's ruling, 15 Sep 2026, verbatim: *"On Add Task and generally
+absolutely everywhere where we are selecting staff, do the horizontal choices, not the
+dropdown. By default, in all of these where I'm selecting staff, always put the user
+preselected by default."*
+
+Every field that picks a team member — an assignee, an account manager, an app's staff and
+lead, a ticket's stakeholders, who is on triage duty — draws through `StaffPillPicker`
+(`shared/web/staff-pill-picker.tsx`), the same pill idiom [F7](#f7-a-short-enumerated-choice-is-a-row-of-chips-not-a-select)
+already names, but unconditional: unlike a glyph choice, a staff list is never
+"six or more, so fall back to a `Select`" — it wraps to as many lines as it needs and stays
+pills whatever the team's size.
+
+- **One person** (an assignee, a lead, an account manager): `role="radiogroup"` of
+  `role="radio"` pills. A "Nobody" pill only where the field is genuinely optional, in the
+  screen's own words — never invented by the component.
+- **Several people** (an app's staff, a ticket's stakeholders): `role="group"` with
+  `aria-pressed` on each pill. Already-set, un-removable people (R54's ADD-ONLY sets) show
+  pressed and disabled rather than being left off the row.
+- Every pill wears the person's own `RecordMark` (round — a person in their own right,
+  never a client/app square) and their **first name alone**: a name disambiguated with an
+  email in parens (two colleagues sharing a first name) keeps the face as the
+  disambiguator on a pill, not a longer string.
+- A→Z by name, locale-aware, called once inside the component — no call site can forget it
+  ([K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language)'s own
+  seam).
+
+**The default.** On a **create** form, the field opens with the signed-in user's own pill
+already selected — `TaskFormDialog`'s pre-existing `defaultAssigneeId`, and the same shape
+added to `StoryFormDialog`, `AccountFormDialog` (account manager) and `AppFormDialog`
+(staff and lead both). An **edit** form keeps the stored value; the signed-in user is never
+substituted for one that is already there. An **action row that commits on the click** —
+`TriageStrip`'s on-duty pick, the triage queue's own "who is picking this up?" rows (already
+`RecordPicker`'s `layout="row"`, unaffected by this law) — has no submit step to preselect
+into, so nothing there is preselected: a pill that looked already-chosen would be a click
+that does nothing.
+
+**Evidence.** The task form's own field ("Who's doing it") was the client's named example;
+the account manager field, an app's staff checklist and lead, and a ticket's
+`HelpStakeholders` add control were four more dropdowns/checklists this ruling converted
+the same day.
+
+**Law.** [R79](../RULES.md) (`staff-pill-row`). A static census, `web/test/staff-pill-row.test.ts`:
+no `<Select>` and no `<RecordPicker>` without `layout="row"`, on either front door, may be
+fed a staff/member list (traced off `useAssignableMembers`/`assignableMembers`/`staffedOn`,
+or a value typed `PickablePerson[]`) — including through a local picker-factory closure,
+whose own JSX never names the list by its caller's variable.
 
 ---
 
@@ -3517,20 +3935,45 @@ tabs.ts`, `web/components/assistant/agent-tab-strip.tsx`, `agent-scope-picker.ts
 `agent-history-tab.tsx`). The old `agent-history-dialog.tsx` sheet and its launcher button are
 retired — the pinned clock tab is now the one way to reach a past conversation.
 
+**Assistant tabs, one level (2026-09-15):** the ruling above shipped with the app's own strip
+drawn one level BELOW the kit's single, fixed "Assistant" folder tab — a real conversation
+strip, but a sub-level under furniture that only ever said "Assistant." The client's ruling,
+over a screenshot of exactly that, verbatim: *"You got it completely wrong. The tabs need to
+be at the same level as the assistant tab, so it will have no assistant name. We know that's
+what it is. Rather, each tab will have the name. Now you create it like a sub-level, but no,
+no, it's only one tab level."* The aside has exactly ONE tab level: no tab is named
+"Assistant" — the word is now only the landmark's accessible name
+(`role="complementary"`'s `aria-label`), never a visible tab — and `AgentTabStrip` (History ·
+one tab per open conversation · "+") IS that one level, not a strip nested under it. Closing
+follows from the same reading: a conversation tab's × closes that conversation; History and
+"+" are furniture and are never closable; closing the LAST conversation tab closes the
+assistant column itself, and the top-right opener reopens it with a fresh conversation on the
+scope picker rather than resuming what was just closed. **Status: built.** Kit v1.2.88 added
+`ScreenShell`'s `asideTabs` prop for exactly this (`shared/ui/compositions/templates/
+screen-shell.tsx`) — drawn IN PLACE of the kit's own single fixed tab, in the identical slot
+and geometry, so the folder-tab attachment to the card below is unchanged. App-side:
+`web/lib/agent-dock.tsx` (`AgentDockTabsSlot` / `useAgentDockTabs`, the tab-level twin of the
+existing panel-body dock), `web/components/shell/app-shell.tsx` (`asideTabs={...}` on the one
+`ScreenShell` call site), `web/components/assistant/agent-panel.tsx` (the strip portalled
+there when docked; the old `mt-[var(--folder-tab-overlap)]` re-base retired outright — it was
+solving a nesting problem that no longer exists — and the closing/reopening behaviour above).
+`web/test/agent-tab-strip.test.tsx` proves the aside draws exactly one tab strip and that no
+tab renders named "Assistant."
+
 ---
 
 ## Rule index
 
-**135 rules.**
+**141 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
 | 2. Page layout and width | L1 to L11 (11) |
-| 3. Detail screens | D1 to D13 (13) |
-| 4. Collections | K1 to K19 (19) |
+| 3. Detail screens | D1 to D14 (14) |
+| 4. Collections | K1 to K23 (23) |
 | 5. Buttons and actions | B1 to B14 (14) |
-| 6. Forms and dialogs | F1 to F10 (10) |
+| 6. Forms and dialogs | F1 to F11 (11) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
@@ -3568,7 +4011,8 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
 | R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R72 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
 | R74 | [L11](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in) | R75 | [K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language) |
-| R77 | [D3](#d3-the-header-and-tabs-stick) | | |
+| R77 | [D3](#d3-the-header-and-tabs-stick) | R78 | [K20](#k20-calendar-views-carry-no-sort) |
+| R79 | [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected) | R80 | [K22](#k22-rows-are-a-list-never-a-banded-table) |
 
 ### The seven files that carry most of it
 

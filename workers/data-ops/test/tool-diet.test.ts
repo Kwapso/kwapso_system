@@ -573,7 +573,7 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     //
     // `get_app_impact` keeps its detail and had it rewritten in the first of the
     // two commits, so it is still counted here.
-    const DETAILED_TOOLS = 118
+    const DETAILED_TOOLS = 119
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

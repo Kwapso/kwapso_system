@@ -84,6 +84,7 @@ import { AppFormDialog } from "@/components/apps/app-form-dialog"
 import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/work/todo-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { RichText } from "@shared/web/rich-text-view"
 import { ImpactPanel } from "@/components/process/impact-panel"
@@ -169,6 +170,10 @@ export function AccountDetailScreen({
   const { can } = usePermissions(teamId)
   // Who can be put on an app (8.10), for the record-an-app dialog below.
   const members = useAssignableMembers(teamId)
+  // THE SIGNED-IN USER, preselected as staff on a new app raised from here, and
+  // as account manager on the edit form's own default — client ruling,
+  // 15 Sep 2026: "always put the user preselected by default."
+  const myUserId = useSessionUserId()
   // THE SYSTEMS A SPRINT ON THIS CLIENT COULD COVER. The SAME cache key the
   // Apps screen (and every other form in the work engine) reads, narrowed here
   // rather than asked for again: a sprint covers one app and an app belongs to
@@ -648,13 +653,17 @@ export function AccountDetailScreen({
 
   return (
     <RecordScreen
-      // THE CLIENT'S OWN MARK, where every other record already puts one. The
-      // column has been on this row since 0024 and the form has offered the
-      // picker since — it was simply never drawn, so the widest, most-visited
-      // record in the product opened with a bare title while a ticket three
-      // clicks away led with a glyph. No logo falls back to the company's
-      // initial, never to an empty square (shared/web/record-mark.tsx).
-      leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
+      // THE CLIENT'S OWN LOGO, INLINE LEFT OF THE TITLE — B1, client ruling
+      // 2026-09-15: "For cover and logo, I choose B1. Apply this on apps,
+      // accounts, and team members." record-chrome.tsx's own `mark` prop doc
+      // has the artifact and the full ruling; `mark` (not `leading`, which
+      // stayed inert through the 2026-09-01 "no images on title" ruling and
+      // is untouched here) is what makes it draw, boxed to the title's own
+      // line-height so the title itself never moves. The column has been on
+      // this row since 0024 and the form has offered the picker since — it
+      // was simply never drawn until now. No logo falls back to the
+      // company's initial, never to an empty square (shared/web/record-mark.tsx).
+      mark={<RecordMark picture={account.logoUrl} name={account.name} size="tile" />}
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself
@@ -904,6 +913,7 @@ export function AccountDetailScreen({
         teamId={teamId}
         accounts={[{ id: accountId, name: account.name }]}
         draftKey={`app:add:${accountId}`}
+        defaultStaffUserId={myUserId ?? ""}
         onSubmit={async (v) => {
           await createAppFrom(teamId, { ...v, accountId }, t)
           invalidate(sliceKey("apps-account", accountId))

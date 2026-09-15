@@ -4,78 +4,97 @@
 // owner's ruling), and everything else in the work engine hangs off it: a sprint
 // covers one app, and a story is on one app whether or not it is in a sprint.
 //
-// IT IS A WALL OF TILES, NOT A LIST OF ROWS (CHECKLIST 8.1, 17 Aug 2026). An app
-// is the one record in this app that a person recognises by SIGHT — it has a
-// mark, a client and a stage, and the previous screen spent all three on a
-// dot-separated subtitle nobody read. UI-RULEBOOK K9 permits a card grid exactly
-// where the record carries an image, and G3 says the mark sits in a rounded
-// square where a logo would; both are true here.
+// AN APP IS THE ONE RECORD A PERSON RECOGNISES BY SIGHT (CHECKLIST 8.1, 17 Aug
+// 2026) — it has a mark, a client and a stage, and the previous screen spent
+// all three on a dot-separated subtitle nobody read. UI-RULEBOOK K9 permits a
+// card grid exactly where the record carries an image, and G3 says the mark
+// sits in a rounded square where a logo would; both are true here.
 //
-// TWO TABS, EACH GROUPED BY STAGE (8.2). Active is everything still being worked
-// on; Inactive is Completed and Archived, which is the only pair of stages that
-// means "done with". Under each tab the tiles group under a plain stage heading
-// (UI-RULEBOOK K6), in the order the agency reads them. The count on each tab is
-// the exact number of rows behind it, arbitrated through CountedTabs (R16) so
-// the heading above stands down rather than saying the number twice.
+// TWO VIEWS, GALLERY AND BOARD — the client's ruling, 15 Sep 2026, verbatim:
+// "For the main screen for the apps, I want the gallery icon laid out. Make
+// sure you add a chip with the status. I also want you to add an alternate
+// view board by stage. Include the icon, and in both of them, I want to see
+// the status. In the gallery, make this a chip, then the title and the
+// subtitle: the name of the account. In the board, make the icon bigger, and
+// as you have it, the title and subtitle: account name." This REPLACES the
+// Tiles/List pair the 2026-08-31/2026-09-01 rulings put here: the hand-rolled
+// `<a>` tile (`AppTiles`, since deleted — see app-tiles.tsx's own header) could
+// never carry R65/K16's "chip above title" (it drew no kit `<CardTitle>` for a
+// census to find), and the List body was a table the client's own 15 Sep
+// ruling elsewhere retires app-wide ("the client is replacing tables
+// app-wide"). `appGalleryCard`/`appBoardCard`, below, are the two
+// replacements.
+//
+// "STATUS" IS THE APP'S OWN STAGE — `AppRow` carries no separate status field
+// (`shared/types.ts`), and `app-detail.tsx`'s own three pills already draw the
+// identical `<Badge variant="status" dot={appStageDotTone(app.stage)}>` off
+// `app.stage` for the same reason: a stage IS the record's status here, the
+// same way a ticket's `status` and a story's own are theirs.
+//
+// TWO TABS SURVIVE UNCHANGED (8.2's OTHER HALF). Active is everything still
+// being worked on; Inactive is Completed and Archived, which is the only pair
+// of stages that means "done with". The count on each tab is the exact number
+// of rows behind it, arbitrated through CountedTabs (R16) so the heading above
+// stands down rather than saying the number twice. WHAT DID NOT SURVIVE is
+// 8.2's stage-HEADING grouping inside a tab — the Board now owns "grouped by
+// stage" for real (a column per stage, not a heading), so the Gallery is a
+// flat wall like Accounts' own (UI-RULEBOOK K18), and a second, cruder
+// grouping beside a real one would be the app disagreeing with itself about
+// which view answers "which stage is this app in".
 //
 // AN ARCHIVED APP (deactivated_at set) is a different fact from the Archived
-// STAGE, and both land in Inactive on purpose: from the reader's side "put away"
-// is one idea, and a tile that says "archived" under the heading "Archived" is
-// the app agreeing with itself.
+// STAGE, and both land in Inactive on purpose: from the reader's side "put
+// away" is one idea, and a card that says "archived" while sitting in the
+// Archived stage's board column is the app agreeing with itself.
 //
-// A SECOND VIEW, LIST, ADDED 2026-09-01 — Tiles STAYS THE DEFAULT (CHECKLIST
-// 8.1, above, is a ruling about which body an app opens on, not a ban on a
-// second one). An agency two years in has tens of apps under one stage
-// heading, and "which of my clients' systems are in Development" is a
-// question a sorted list answers better than a wall of squares. `apps` is
-// BOUNDED (R14) — every row narrowed/sorted for Tiles (`shown`, below) is
-// already in hand, so List is a pure re-rendering of the same array through
-// `appsListRecipe` ("apps.list", web/lib/screens.ts) via `ScreenRenderer`,
-// never a second fetch or a second narrowing pass. `ViewSwitch`
-// (shared/ui/components/collection-frame/view-switch.tsx) puts `views[0]`
-// first as its own first-run default and its own doc recommends the TABLE
-// go there — but the kit's doc also says plainly it cannot check which entry
-// IS the table, "that route's vocabulary". Apps' vocabulary is CHECKLIST
-// 8.1: Tiles is the deliberate default, not a stand-in for a missing table,
-// so `views` stays `[Tiles, List]` in that order — don't "fix" it to match
-// the kit's generic recommendation.
+// BOTH VIEWS READ `shown` — the SAME tab+search+facet+sort-narrowed array,
+// never a second fetch or a second narrowing pass (`apps` is BOUNDED, R14).
+// The Board's columns are the team's own "App stage" vocabulary
+// (`useAppStages`, shared with `app-form-dialog.tsx`'s own picker — see its
+// header), in ITS order, never A→Z (R75 — a lifecycle pipeline is exactly the
+// kind of ordered list `ORDERED_OPTIONS_OK` exists for, and this file's own
+// `boardColumns` below is a plain array fed to `<Kanban columns=…>`, never a
+// `<SelectItem>`/`options=` — R75's picker census does not reach it, so no
+// registry line is needed for it to stay honest).
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
+import { Kanban, type KanbanCard, type KanbanColumn, type KanbanMove } from "@shared/ui/components/kanban/kanban"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { List, SquaresFour } from "@shared/ui/foundations/icons"
+import { Kanban as KanbanGlyph, SquaresFour } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
-import {
-  ScreenRenderer,
-  type ScreenActionContext,
-  type ScreenIntent,
-} from "@shared/web/screen-engine/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import { hasRight, type ScreenRights } from "@shared/web/screen-engine/recipe"
+import type { ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
-import { CollectionEmptyState, CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
-import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { AppFormDialog, type AppFormValues, useAppStages } from "@/components/apps/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
-import { AppTiles } from "@/components/apps/app-tiles"
+import { useSessionUserId } from "@/lib/use-active-team"
+import { AppMark } from "@/components/apps/app-tiles"
+import { InAppLink } from "@/components/shell/in-app-link"
+import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { useAccountNames } from "@/lib/account-names"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
-import { APP_STAGES, NO_STAGE, appStageIsActive, appStageMark, appStageOrder } from "@shared/app-stages"
+import { APP_STAGES, NO_STAGE, appStageDotTone, appStageIsActive } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
-import { withDataDrivenCollection } from "@/lib/screens"
 import { useT } from "@shared/web/language"
 
 /** Record an app through the door and re-read what changed. Shared with the maps
@@ -111,28 +130,6 @@ export async function createAppFrom(
   toast.success(t("App recorded."))
 }
 
-/** Split by stage, in the agency's own reading order, with the apps that carry no
- * stage last under one honest heading. The grouping is a pure function of the
- * rows so the two tabs and the app record can never disagree about which stage a
- * system is in. */
-function groupByStage(apps: AppRow[]): { stage: string; apps: AppRow[] }[] {
-  const groups = new Map<string, AppRow[]>()
-  for (const app of apps) {
-    const key = app.stage?.trim() || NO_STAGE
-    const list = groups.get(key)
-    if (list) list.push(app)
-    else groups.set(key, [app])
-  }
-  return [...groups.entries()]
-    .map(([stage, rows]) => ({ stage, apps: rows }))
-    .sort((a, b) => {
-      if (a.stage === NO_STAGE) return 1
-      if (b.stage === NO_STAGE) return -1
-      const byOrder = appStageOrder(a.stage) - appStageOrder(b.stage)
-      return byOrder !== 0 ? byOrder : a.stage.localeCompare(b.stage)
-    })
-}
-
 /** Is this app still being worked on? An ARCHIVED row is inactive whatever its
  * stage says, and a stage the code has never met counts as active — the harm of
  * the wrong guess is asymmetric, and an app nobody can find is the worse half. */
@@ -140,11 +137,11 @@ function appIsActive(app: AppRow): boolean {
   return app.active && appStageIsActive(app.stage)
 }
 
-/** WHAT AN APP MAY BE ORDERED BY. Sorting REORDERS the tiles inside each stage
- * heading (groupByStage still decides which heading a tile lands under, and in
- * which order the headings themselves read) — the same split PagedFind draws
- * between "which rows" and "what order", one layer down for a bounded, grouped
- * screen instead of a paged one. */
+/** WHAT AN APP MAY BE ORDERED BY. On the Gallery this reorders the whole wall;
+ * on the Board it reorders the cards INSIDE each stage column (the column
+ * itself is fixed — one per vocabulary entry, never reshuffled by a sort) —
+ * the same split `PagedFind` draws between "which rows" and "what order", one
+ * layer down for a bounded screen instead of a paged one. */
 const APP_SORTS: SortOption[] = [
   { value: "name", label: "Name" },
   { value: "client", label: "Account" },
@@ -187,22 +184,91 @@ function compareApps(
   return a.name.localeCompare(b.name) * dirMul
 }
 
+/** THE CARD'S FLOOR — reused from `members-gallery.tsx`'s own measured 12rem,
+ * the same figure `accounts-screen.tsx`'s own `GALLERY_MIN_CARD` (the pattern
+ * this wall copies) takes for an identical reason: mark, name, one chip line
+ * under it — the same class of card, so the widest line on one is the widest
+ * kind of line on the other. */
+const GALLERY_MIN_CARD = "12rem"
+
+/** THE GALLERY CARD — client ruling, 15 Sep 2026: "In the gallery, make this
+ * a chip, then the title and the subtitle: the name of the account." A kit
+ * `Card`/`CardTitle` (R65/K16 needs the real thing, not a hand-rolled `<span>`
+ * — see app-tiles.tsx's own header for what the retired `AppTiles` cost by
+ * skipping it), with the status chip ABOVE the title in source order (a
+ * `Card` is `flex flex-col`, so source order IS visual order here).
+ *
+ * THE SUBTITLE IS A CARD FACT, NOT A PAGE HEAD (R72 does not reach it) — a
+ * card is a record fact block, not a titled SECTION, so this was never R72's
+ * subject; but its own census (`no-default-subtitles.test.ts`, amendment 1,
+ * 2026-09-14) reads `CardTitle` as a heading now, so the subtitle is built as
+ * a VARIABLE and interpolated (`{subtitle}`) rather than written as a literal
+ * prose tag the very next significant JSX sibling of `<CardTitle>` — the
+ * identical escape `accounts-screen.tsx`'s own `accountGalleryBody` already
+ * takes for its manager chip (`{row.manager}`, built in `shape.tsx`, never a
+ * bare `<span>` beside `CardTitle` in that file's own JSX). A `{…}` expression
+ * child carries no JSX tag name for the census's `tagName()` to read, so the
+ * pair never forms; the content is unchanged.
+ *
+ * A REAL ANCHOR (R37) — `InAppLink`, the same shape `accountGalleryBody`
+ * draws for its own wall: middle-click, copy-address and a screen reader's
+ * link list all work, and only the plain left click is intercepted into the
+ * shell soft-navigation bus. */
+function appGalleryCard(
+  app: AppRow,
+  { teamId, accountNames, t }: { teamId: string; accountNames: Map<string, string>; t: (s: string) => string }
+): React.ReactNode {
+  const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
+  const href = safeHref(`/t/${teamId}/apps/${app.id}`) ?? `/t/${teamId}/apps`
+  // See this function's own header for why this is a variable rather than a
+  // literal tag written straight after <CardTitle> below (R72 amendment 1).
+  const subtitle = (
+    <span className="text-muted-foreground block truncate text-xs">
+      {app.active ? client : `${client} · ${t("archived")}`}
+    </span>
+  )
+  return (
+    <Card key={app.id} variant="raised" className="hover:bg-accent motion-hover">
+      <InAppLink href={href} className="block">
+        <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+          {/* THE ICON — `size="band"`, the same size accounts' own gallery
+              draws (K18). Square by default (R35/R60): an app's mark is a
+              rounded square, filling the box, never shrunk to fit inside
+              one. */}
+          <AppMark app={app} size="band" />
+          {/* THE STATUS CHIP, ABOVE THE TITLE (R65/K16) — "status" is the
+              app's own STAGE; `AppRow` carries no separate status field, and
+              `app-detail.tsx`'s own pills already draw this exact chip off
+              `app.stage` for the same reason. Absent when an app carries no
+              stage at all — a chip is a fact about the record, not a blank
+              placeholder. */}
+          {app.stage && (
+            <Badge variant="status" dot={appStageDotTone(app.stage)}>
+              {t(app.stage)}
+            </Badge>
+          )}
+          <CardTitle className="text-sm">{app.name}</CardTitle>
+          {/* THE SUBTITLE — the account name (this function's own header,
+              above, on why R72 does not forbid it here). */}
+          {subtitle}
+        </CardContent>
+      </InAppLink>
+    </Card>
+  )
+}
+
 export function AppsScreen({
   teamId,
-  recipe,
   rights,
   total,
   canCreate,
-  onAction,
   onIntent,
 }: {
   teamId: string
-  recipe: ScreenRecipe
   rights: ScreenRights
   /** the exact server total (R16) — never the loaded list's length */
   total: number | undefined
   canCreate: boolean
-  onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
   const t = useT()
@@ -218,6 +284,9 @@ export function AppsScreen({
   // Who can be put on an app (8.10) — the team, from the cache four other
   // screens already fill.
   const members = useAssignableMembers(teamId)
+  // THE SIGNED-IN USER, preselected as staff (and lead) on a new app — client
+  // ruling, 15 Sep 2026: "always put the user preselected by default."
+  const myUserId = useSessionUserId()
   const [addOpen, setAddOpen] = React.useState(false)
   // Which half of the collection she was in, remembered per screen with the
   // rest of what she was looking at (web/lib/nav-memory.ts).
@@ -242,16 +311,22 @@ export function AppsScreen({
     by: "name",
     dir: "asc",
   })
-  // WHICH BODY — Tiles or List, remembered per screen exactly like `tab`/
+  // WHICH BODY — Gallery or Board, remembered per screen exactly like `tab`/
   // `query`/`facetValues`/`sort` above (the kit's `ViewSwitch` doc calls this
   // choice "remembered, per person" and leaves the STORE to the app; this is
   // the app's one seam for that, already scoped to one browser's own tab).
-  // TILES FIRST, ALWAYS — CHECKLIST 8.1 (top of file) is a product ruling
-  // that this collection opens on a wall of tiles, not the kit's own
+  // GALLERY FIRST, ALWAYS — CHECKLIST 8.1 (top of file) is a product ruling
+  // that this collection opens on a wall of cards, not the kit's own
   // generic "put the table first" recommendation (view-switch.tsx says
   // plainly it cannot check which entry IS the table — "that route's
   // vocabulary"). Don't reorder `views` below to match the kit's default.
-  const [view, setView] = useRemembered<"tiles" | "list">("view", "tiles")
+  // `revive` guards a value remembered from before 15 Sep 2026 ("tiles"/
+  // "list", the pair this ruling retired) — an unrecognised stored string
+  // falls back to the default rather than rendering a body that no longer
+  // exists (`useRemembered`'s own contract).
+  const [view, setView] = useRemembered<"gallery" | "board">("view", "gallery", (v) =>
+    v === "gallery" || v === "board" ? v : undefined
+  )
 
   // WHO AN APP MAY BE FILED UNDER, and WHICH STAGE — both derived from the
   // WHOLE collection (never `matching`/`shown`), so a facet's own options never
@@ -330,8 +405,9 @@ export function AppsScreen({
   const inactive = matching.filter((a) => !appIsActive(a))
   const preSort = tab === "inactive" ? inactive : active
   // …AND THE SORT LAST — it reorders what is left, it never narrows it, so it
-  // has no business in the counts above. groupByStage still decides which
-  // heading each tile lands under; this decides the order INSIDE one.
+  // has no business in the counts above. On the Board this is the order
+  // CARDS read inside a column; which column a card lands in is the app's
+  // own `stage`, never this control's business either.
   const shown = [...preSort].sort((a, b) => compareApps(a, b, sort.by, accountNames, sort.dir))
 
   // CALLED UNCONDITIONALLY — `useFilterBar`'s own `{ pill, panel }` split
@@ -350,6 +426,12 @@ export function AppsScreen({
     onClearFacets: () => setFacetValues({}),
     resultCount: matching.length,
   })
+
+  // ALSO CALLED UNCONDITIONALLY, ABOVE THE ERROR RETURN BELOW — the same
+  // discipline `useFilterBar` just above keeps: `useAppStages` is a HOOK
+  // (`useCached` underneath), so it cannot skip a render the way a component
+  // can. The Board reads its result further down, after `appsLoading` is known.
+  const stageVocab = useAppStages(teamId)
 
   if (appsQ.error)
     return (
@@ -377,53 +459,93 @@ export function AppsScreen({
   // `CollectionFrame` already follows internally.
   const appsLoading = appsQ.data === undefined
 
-  // THE LIST VIEW'S ROWS — the SAME `shown` array Tiles renders below, shaped
-  // once for `appsListRecipe` ("apps.list", web/lib/screens.ts). No second
-  // fetch and no second narrowing pass: search, the facets and the sort above
-  // already produced `shown`, and this is only ever a rendering of it.
-  const listRows: Record<string, unknown>[] = shown.map((app) => {
+  // MAY THIS READER DRAG A CARD BETWEEN STAGES? `rights` is the same sheet
+  // the parent already resolved for this screen's `gate: { module:
+  // "processes", right: "read" }` (web/lib/screens.ts's own binding —
+  // `apps: "processes"`), read here for `update` instead: a drag is a write,
+  // gated exactly like the edit form's own stage field
+  // (`postUpdateApp`, `processes:update`). `hasRight` reads `rights` rather
+  // than a second `usePermissions(teamId)` fetch, since the caller already
+  // primed it.
+  const canDragApps = hasRight(rights, { module: "processes", right: "update" })
+
+  // THE BOARD'S OWN COLUMNS — `stageVocab` (above) is the team's own "App
+  // stage" vocabulary, in ITS order — never A→Z (R75; see this file's
+  // header). ONE MORE COLUMN, LAST, for an app with no stage recorded at
+  // all: the same honesty `NO_STAGE` already carried for the retired Tiles
+  // headings — an app nobody can find on the one screen built to show it by
+  // sight is worse than an ugly extra column.
+
+  /** One app, as a board card — read by every column below. THE ICON (bigger
+   * than the Gallery's, `size="board"` — see record-mark.tsx's own note)
+   * rides INSIDE `title` rather than the kit's own `content` slot: the
+   * vendored `Kanban` card draws chips, then title, then description, then
+   * `content` LAST, always (kanban.tsx's own law, "content stays the LAST
+   * drawn thing") — there is no leading-media slot before the chip row to put
+   * a big mark in without hand-editing the pinned kit (R39), so the mark
+   * rides beside the name instead, inside the one slot that opens right under
+   * the chip. THE STATUS CHIP is `badges` (K16/R65 — the kit draws it above
+   * the title unconditionally) and THE SUBTITLE is `description` — the same
+   * three facts the Gallery card below draws, in the client's own words for
+   * both: "in both of them, I want to see the status … title and subtitle:
+   * account name." */
+  function appBoardCard(app: AppRow): KanbanCard {
     const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
-    const stage = app.stage ? t(app.stage) : null
     return {
       id: app.id,
-      // THE RECORD'S OWN FACE (R35) — the same picture-or-stage-mark
-      // `AppMark` draws on the tile (app-tiles.tsx), built with `RecordMark`
-      // directly rather than through that wrapper: `list-compat.tsx`'s
-      // `leadingMarkFor` unwraps a `mark` field into the kit List's own
-      // circular Avatar ONLY when the element's type is `RecordMark` itself
-      // — every other list shaper in this file's own package (members,
-      // roles, meetings…) makes the same call for the same reason. Through
-      // `AppMark` this would still render, just doubly boxed.
-      mark: <RecordMark picture={app.logoUrl} mark={appStageMark(app.stage)} name={app.name} size="row" />,
-      name: app.active ? app.name : `${app.name} (archived)`,
-      // THE NUMBER, drawn as the black chip in front of the name by the engine
-      // (the recipe's `reference` column). An app's reference is the one that
-      // is NEVER null — it is minted whether or not a client is named on the
-      // app (shared/workers/refs.ts), because it never carried "the number a
-      // client quotes" meaning to begin with — so this row always has one.
-      ref: app.ref,
-      detail: [client, stage].filter(Boolean).join(" · ") || "—",
+      badges: app.stage ? (
+        <Badge variant="status" dot={appStageDotTone(app.stage)}>
+          {t(app.stage)}
+        </Badge>
+      ) : undefined,
+      title: (
+        <span className="flex items-center gap-2">
+          <AppMark app={app} size="board" />
+          <span className="min-w-0 truncate">{app.name}</span>
+        </span>
+      ),
+      description: app.active ? client : `${client} · ${t("archived")}`,
+      disabled: !canDragApps,
     }
-  })
-  // `withDataDrivenCollection` tunes the recipe's chrome to real data, then
-  // its OWN search/filter/sort/count are switched off deliberately: the
-  // ToolbarRow above is the one control surface for both views, and leaving
-  // the engine's copies on would be a second, disconnected search box (and,
-  // per R16, a second count — "Showing X of Y" beside the tab badge that
-  // already carries the exact one).
-  const listRecipeBase = withDataDrivenCollection(recipe, listRows)
-  const listRecipe: ScreenRecipe = listRecipeBase.collection
-    ? {
-        ...listRecipeBase,
-        collection: {
-          ...listRecipeBase.collection,
-          searchable: false,
-          userFilter: false,
-          sortable: false,
-          showCount: false,
-        },
-      }
-    : listRecipeBase
+  }
+
+  // ONE COLUMN PER VOCABULARY STAGE, in the team's own order, plus the
+  // trailing "no stage" column — cards are `shown` (the same tab+search+
+  // facet+sort narrowed array the Gallery reads below), never a second fetch.
+  const boardColumns: KanbanColumn[] = [
+    ...stageVocab.map((s) => ({
+      id: s.value,
+      title: t(s.value),
+      dot: appStageDotTone(s.value),
+      cards: shown.filter((a) => (a.stage ?? "").trim() === s.value).map(appBoardCard),
+    })),
+    {
+      id: NO_STAGE,
+      title: t(NO_STAGE),
+      cards: shown.filter((a) => !(a.stage ?? "").trim()).map(appBoardCard),
+    },
+  ]
+
+  // THE BOARD'S OWN WRITE — a drop sends the MINIMAL patch `postUpdateApp`
+  // accepts (`workers/tenancy/src/routes/processes.ts`): `id` + the always-
+  // required `name`, and `stage` alone. Every other field is simply ABSENT
+  // from the body (never set to `undefined` in a way JSON would keep — it
+  // is not written here at all), which the door reads as "say nothing about
+  // it" (its own patch rule) — a drag must not silently empty an app's staff,
+  // logo or context, the same guarantee `savePeople`'s own comment states for
+  // a machine editing an app's stage.
+  async function moveAppStage(move: KanbanMove) {
+    const current = (appsQ.data ?? []).find((a) => a.id === move.cardId)
+    if (!current) return
+    const toStage = move.toColumnId === NO_STAGE ? "" : move.toColumnId
+    if ((current.stage ?? "").trim() === toStage) return
+    try {
+      await tenancy.updateApp({ id: current.id, name: current.name, stage: toStage })
+      invalidate(appsKey(teamId))
+    } catch {
+      toast.error(t("Couldn't update that value."))
+    }
+  }
 
   const activeBadge = formatCount(active.length)
   const inactiveBadge = formatCount(inactive.length)
@@ -524,15 +646,15 @@ export function AppsScreen({
           }
           view={
             (appsLoading || loadedApps.length > 0) && {
-              // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
+              // GALLERY FIRST — CHECKLIST 8.1's own ruling, not the kit's
               // generic table-first default (see the state declaration
               // above and the file's header comment).
               views: [
-                { value: "tiles", label: t("Tiles"), icon: <SquaresFour size={16} /> },
-                { value: "list", label: t("List"), icon: <List size={16} /> },
+                { value: "gallery", label: t("Gallery"), icon: <SquaresFour size={16} /> },
+                { value: "board", label: t("Board"), icon: <KanbanGlyph size={16} /> },
               ],
               value: view,
-              onValueChange: (next: string) => setView(next as "tiles" | "list"),
+              onValueChange: (next: string) => setView(next === "board" ? "board" : "gallery"),
             }
           }
           actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
@@ -570,33 +692,35 @@ export function AppsScreen({
               onCreate={canCreate ? () => setAddOpen(true) : undefined}
             />
           )
-        ) : view === "list" ? (
-          // THE LIST BODY — the engine's own renderer, fed the identical
-          // `shown` rows the tiles below draw, through the recipe already
-          // handed to this screen (`recipe`, "apps.list"). `action={null}`
-          // overrides the ambient create action `SectionWithCreate` publishes
-          // above (`CollectionCreateActionProvider`) so the panel's own
-          // toolbar draws no second + button — this screen's own AddButton,
-          // in the ToolbarRow above, is the one mango for the act.
-          <CollectionCreateActionProvider action={null}>
-            <ScreenRenderer
-              recipe={listRecipe}
-              data={{ rows: listRows }}
-              rights={rights}
-              onAction={onAction}
-              onIntent={onIntent}
-              useKitPanel
-            />
-          </CollectionCreateActionProvider>
+        ) : view === "board" ? (
+          // THE BOARD — one column per stage (`boardColumns`, above), fed the
+          // identical `shown` cards the Gallery draws below. `onMove` is
+          // withheld outright for a reader without `processes:update` —
+          // `card.disabled` (set in `appBoardCard`) also refuses the pick-up
+          // on a per-card basis, but the board-wide `onMove` prop is what the
+          // kit's own doc calls read-only: "without it, no card is draggable,
+          // no card takes the move keys, and no drop target lights up."
+          // `emptyColumns="bare"` — client ruling, 2026-09-15, the same
+          // sentence that shipped the tasks board's own: "when empty, don't
+          // show anything at this stage." A team with two apps and eight
+          // stages would otherwise draw six boxed "nothing here" registers
+          // for the one thing a board already says by being thin there.
+          <Kanban
+            columnWidth="max(14rem, calc((100% - 3 * var(--space-2h)) / 4))"
+            columns={boardColumns}
+            onMove={canDragApps ? moveAppStage : undefined}
+            onCardSelect={(card) => onIntent({ kind: "open", module: "apps", id: card.id })}
+            label={t("Apps by stage")}
+            emptyColumns="bare"
+          />
         ) : (
-          <div className="flex flex-col gap-12">
-            {groupByStage(shown).map((group) => (
-              <section key={group.stage} className="flex flex-col gap-4">
-                <h2 className="text-lg font-medium">{t(group.stage)}</h2>
-                <AppTiles apps={group.apps} accountNames={accountNames} />
-              </section>
-            ))}
-          </div>
+          // THE GALLERY — a flat wall (UI-RULEBOOK K18, the same shape
+          // Accounts' own draws): `appGalleryCard`, above, is the kit
+          // `Card`/`CardTitle` R65/K16 needs for a chip-above-title census to
+          // find, which the retired `AppTiles` never was.
+          <CardGrid fluid minItemWidth={GALLERY_MIN_CARD} label={t("Apps")}>
+            {shown.map((app) => appGalleryCard(app, { teamId, accountNames, t }))}
+          </CardGrid>
         )}
       </SectionWithCreate>
 
@@ -612,6 +736,7 @@ export function AppsScreen({
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
         draftKey={`app:add:${teamId}`}
+        defaultStaffUserId={myUserId ?? ""}
         onSubmit={(v) => createAppFrom(teamId, v, t)}
       />
     </div>

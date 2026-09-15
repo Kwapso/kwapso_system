@@ -94,8 +94,28 @@ import type { Language, Vars } from "@shared/i18n"
 // types `CalendarEntry.dotTone` to the exact same union rather than a bare
 // `string` a typo could slip past.
 import type { DotTone } from "@shared/app-stages"
+// PRIORITY'S OWN FOUR TONES (kit v1.2.89: `--dot-red`/`--dot-orange`/
+// `--dot-purple`/`--dot-blue`), a SEPARATE type from `DotTone` on purpose —
+// `shared/departments.ts`'s own header on `PriorityTone` says why widening
+// `DotTone` itself would be wrong (it would silently demand a fifth/sixth/
+// seventh/eighth entry in every exhaustive `Record<DotTone, …>` this app
+// keeps, none of which have anything to do with a task's priority). `Badge`'s
+// `dot` prop and `Kanban`'s `ColumnDot` both already accept `PriorityTone`'s
+// four names too, so a chip built from either union paints correctly either
+// way — `EntryDotTone` below is the UNION a caller may hand this file,
+// exactly where `PRIORITY_DOT_TONE[priority]` (tasks-screen.tsx) meets
+// `CalendarEntry.dotTone`.
+import type { PriorityTone } from "@shared/departments"
 
 /* ------------------------------- what it takes ---------------------------- */
+
+/** EVERY DOT A CALENDAR CARD MAY WEAR — the app-stage six (`DotTone`) plus
+ * priority's own four (`PriorityTone`), exported so a caller (or this
+ * folder's own `record-week.tsx`) can type a variable against the exact
+ * union `CalendarEntry.dotTone` accepts rather than re-deriving it. The two
+ * source unions stay separate (see the import comment above); this is the
+ * one place they are combined, for the one field that has to accept either. */
+export type EntryDotTone = DotTone | PriorityTone
 
 /** ONE RECORD, on a calendar. The screens map their own rows to this, which is
  * why three collections that share no columns share one calendar. */
@@ -111,18 +131,48 @@ export type CalendarEntry = {
   /**
    * THE PRIORITY COLOUR CIRCLE (client ruling, 2026-09-15: "always show the
    * priority color circle"). Added for the Tasks lane's board, which sets it
-   * from `PRIORITY_DOT_TONE[priority]` (`shared/departments.ts`) — one of the
-   * kit's six fixed dot tones, never a hash like `accent`. When both are
-   * given, `dotTone` is what draws: a chip earns at most one dot (the same
-   * "the mark never carries the meaning alone, and never carries two"
-   * reasoning `tickets-collection.tsx`'s own `DOT_TONE_FILL` states), and a
-   * meaningful, named priority outranks an arbitrary per-department hash.
+   * from `PRIORITY_DOT_TONE[priority]` (`shared/departments.ts`) — never a
+   * hash like `accent`. When both are given, `dotTone` is what draws: a chip
+   * earns at most one dot (the same "the mark never carries the meaning
+   * alone, and never carries two" reasoning `tickets-collection.tsx`'s own
+   * `DOT_TONE_FILL` states), and a meaningful, named priority outranks an
+   * arbitrary per-department hash.
+   *
+   * WIDENED TO `EntryDotTone` (this file, above) the same day priority grew
+   * its own four tones (kit v1.2.89) instead of borrowing four of the
+   * app-stage six: `PRIORITY_DOT_TONE` now returns a `PriorityTone`, which a
+   * field typed bare `DotTone` would refuse — this is the one place that
+   * widening happens, and `DOT_FILL` below is kept exhaustive over the same
+   * union so a tone this file cannot paint fails to compile rather than
+   * painting nothing.
    */
-  dotTone?: DotTone
+  dotTone?: EntryDotTone
   /** the second line the "+N more" day view reads. A grid cell has no room for
    *  it; a list has, and it is the difference between "Standup" and
    *  "09:30 · Standup · Northwind". */
   detail?: string
+  /**
+   * WHEN, ALREADY FORMATTED BY THE CALLER — client ruling, 2026-09-15, over
+   * the week design: "make sure that on each card, you add an eyebrow with
+   * the time." Added for `RecordWeek` (`web/components/records/record-
+   * week.tsx`), which draws it as the card's EYEBROW — the small-caps line
+   * above the title, `RecordFooterEyebrow`'s own `text-micro` uppercase
+   * `text-ink-tertiary` treatment (`shared/ui/components/record-detail/
+   * record-detail.tsx`) — and never reformats it. A CONTRACT DECISION, the
+   * same one `AgendaEntry.time` above already made and for the identical
+   * reason: the value is EITHER an already-formatted "09:30" string, or the
+   * caller has run it through the app's own formatter first
+   * (`shared/web/format.ts`'s `formatTime`, if the kit ever needs it
+   * un-formatted) — never a bare ISO instant handed to this file to parse,
+   * because a calendar entry can come from three different screens with
+   * three different ideas of what "the time" means (a task's due time, a
+   * meeting's start, a sprint's own single-date placement), and only the
+   * caller knows which. `RecordCalendar`'s own month grid and the day-view
+   * dialog do not read this field at all — it is `RecordWeek`'s alone — so
+   * adding it here costs the two existing readers nothing. Undefined, same
+   * as `detail`: a card with no time draws no eyebrow.
+   */
+  time?: string
 }
 
 /* --------------------------------- colour --------------------------------- */
@@ -145,19 +195,29 @@ function accentClass(value: string): string {
 
 /** THE PRIORITY DOT'S OWN FILL — badge.tsx's `DOT_FILL`, copied in shape for
  * the same reason `ACCENTS` above is: the kit exports the component, not the
- * class map, and a `Record<DotTone, …>` (not a template literal) means a
- * seventh tone the kit ever grew fails this file's type check instead of
+ * class map, and a `Record<EntryDotTone, …>` (not a template literal) means a
+ * ninth tone the kit ever grew fails this file's type check instead of
  * silently painting nothing (`tickets-collection.tsx`'s own `DOT_TONE_FILL`
  * makes the identical argument). Written as Tailwind classes, not an inline
  * style, to match this file's existing `accentClass` dot exactly — the two
- * can sit in the same `label` node with the same shape. */
-const DOT_FILL: Record<DotTone, string> = {
+ * can sit in the same `label` node with the same shape.
+ *
+ * EXTENDED TO THE FOUR PRIORITY TONES (kit v1.2.89, `--dot-red`/`--dot-
+ * orange`/`--dot-purple`/`--dot-blue`, `shared/ui/foundations/tokens/
+ * tokens.css`) the same day `PriorityTone` stopped borrowing four of the six
+ * above it — `shared/departments.ts`'s own header names this file and
+ * `record-week.tsx`'s identical map as the two that had to grow to match. */
+const DOT_FILL: Record<EntryDotTone, string> = {
   shipped: "bg-[var(--dot-shipped)]",
   building: "bg-[var(--dot-building)]",
   review: "bg-[var(--dot-review)]",
   blocked: "bg-[var(--dot-blocked)]",
   archived: "bg-[var(--dot-archived)]",
   done: "bg-[var(--dot-done)]",
+  red: "bg-[var(--dot-red)]",
+  orange: "bg-[var(--dot-orange)]",
+  purple: "bg-[var(--dot-purple)]",
+  blue: "bg-[var(--dot-blue)]",
 }
 
 /** One entry's own dot class — `dotTone` (the priority circle) wins over

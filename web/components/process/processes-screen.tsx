@@ -35,6 +35,7 @@ import { translatedFacets } from "@/lib/collection-filters"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process/process-form-dialog"
 import { ImpactPanel } from "@/components/process/impact-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -90,6 +91,9 @@ export function ProcessesScreen({
   const t = useT()
   // Who can be put on an app (8.10), for the record-an-app dialog below.
   const members = useAssignableMembers(teamId)
+  // THE SIGNED-IN USER, preselected as staff (and lead) on a new app — client
+  // ruling, 15 Sep 2026: "always put the user preselected by default."
+  const myUserId = useSessionUserId()
   // Page one, and its next cursor parked in the sidecar <LoadMore> reads (R14).
   // The same fetcher primes the exact `total:` sidecar the heading badges (R16).
   const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
@@ -270,6 +274,7 @@ export function ProcessesScreen({
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
         draftKey={`app:add:${teamId}`}
+        defaultStaffUserId={myUserId ?? ""}
         onSubmit={createApp}
       />
 

@@ -12,16 +12,27 @@
 // main content trail uses (`web/components/shell/app-shell.tsx`), called
 // directly here rather than through `ScreenShell`'s `asideLabel`.
 //
-// `asideLabel` IS NOT THIS STRIP'S DOOR, AND IT CANNOT BE. It is a single
-// `string` the kit turns into exactly ONE fixed tab
-// (`shared/ui/compositions/templates/screen-shell.tsx`:
-// `<BreadcrumbFolders items={[{ label: asideLabel }]} onCurrentActivate={toggleAside} .../>`,
-// hardcoded) — there is no prop there for a caller-supplied item ARRAY, so a
-// strip of open conversations cannot be drawn through it without a change to
-// the kit itself. That single "Assistant" tab is left exactly as it is; this
-// strip draws one level BELOW it, inside the panel's own header.
+// THIS STRIP IS NOW THE ASIDE'S ONE AND ONLY TAB LEVEL, NOT A SECOND ONE
+// BELOW IT. A first version of this file drew here because `asideLabel` was
+// a single `string` the kit turned into exactly one fixed tab and offered no
+// prop for a caller-supplied item ARRAY — so this strip mounted one level
+// BELOW that fixed "Assistant" tab, inside the panel's own header, and
+// `agent-panel.tsx` carried a `mt-[var(--folder-tab-overlap)]` hack to pull
+// it clear of the outer tab's own negative margin. The client's ruling,
+// 15 Sep 2026, over a screenshot of exactly that: *"You got it completely
+// wrong. The tabs need to be at the same level as the assistant tab, so it
+// will have no assistant name. We know that's what it is. Rather, each tab
+// will have the name. Now you create it like a sub-level, but no, no, it's
+// only one tab level."* The kit answered with `ScreenShell`'s `asideTabs`
+// prop (kit v1.2.88): this component is now handed there directly, IN PLACE
+// of the kit's own fixed tab rather than nested under it — see
+// `web/lib/agent-dock.tsx`'s `AgentDockTabsSlot` for the portal that gets it
+// there from `AgentPanel` (mounted at the root) and `agent-panel.tsx`'s own
+// header for what the re-base hack retired with it. `asideLabel` still names
+// the landmark (`role="complementary"`'s `aria-label`); it draws no visible
+// tab at all once `asideTabs` is given.
 //
-// `BreadcrumbFolders` ITSELF IS NOT THAT WALL. It already takes a plain
+// `BreadcrumbFolders` ITSELF WAS NEVER THE WALL. It already took a plain
 // `items: BreadcrumbFoldersItem[]`, so this file is a second, direct call
 // site of the exported component — the same move `app-shell.tsx` already
 // makes for the record trail. The kit's own file even names this exact need
@@ -31,7 +42,8 @@
 // not an interface. Its answer is "ship the THING, not the string": pass the
 // "+" as an ordinary item in `items` and let the component draw it in its own
 // skin — which is what this file does. Nothing here reaches for an unexported
-// class, and nothing here needed a kit round-trip.
+// class, and nothing here needed a kit round-trip for its OWN drawing — only
+// the SLOT it now rides in did (`asideTabs`, above).
 //
 // THE "+" IS AN ITEM, NOT A SEPARATE CONTROL. `BreadcrumbFoldersItem.closable`
 // defaults to `true` once `onClose` is given; this file's own last item sets

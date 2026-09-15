@@ -18,14 +18,13 @@ import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Alarm, UserCheck } from "@shared/ui/foundations/icons"
 
-import { RecordPicker } from "@/components/records/record-picker"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { triageKey } from "@/lib/live-resources"
 import type { TeamMember } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { assignableMembers } from "@/lib/members"
 import { useLanguage } from "@shared/web/language"
-import { sortedOptions } from "@shared/web/sorted-options"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 
 type Triage = Awaited<ReturnType<typeof contentApi.triage>>
@@ -90,15 +89,17 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
       </span>
       {canSetDuty &&
         (picking ? (
-          <RecordPicker
+          // THE HORIZONTAL CHOICES, NOT THE DROPDOWN. Every click COMMITS
+          // (`assign`, immediately) — an action row, not a form field with a
+          // Save step — so nothing here is preselected: a pill that looked
+          // already-chosen would be a click that does nothing, on the one
+          // control in this file where every click has to do something.
+          <StaffPillPicker
             ariaLabel={t("Who is on triage duty")}
+            people={onDutyCandidates.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
             value=""
-            onChange={assign}
-            options={sortedOptions(onDutyCandidates, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
-            placeholder={t("Pick who's on duty")}
-            searchPlaceholder={t("Search people…")}
-            emptyText={t("Nobody here matched.")}
-            className="w-56"
+            onValueChange={assign}
           />
         ) : (
           <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>

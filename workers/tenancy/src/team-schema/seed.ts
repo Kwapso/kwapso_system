@@ -22,6 +22,7 @@ import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import type { MeetingTypeIcon } from "@shared/meeting-icons"
 
 // The module list itself lives in shared/team-modules.ts — data-ops builds the
 // import/export permission-matrix columns from the SAME list, so the matrix a
@@ -65,6 +66,37 @@ export const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
   { type: "Country", value: "Spain" },
   { type: "Country", value: "Andorra" },
   { type: "Country", value: "United Kingdom" },
+]
+
+/** THE EIGHT MEETING TYPES — client ruling, 15 Sep 2026 (migration 0092's own
+ * header carries it verbatim). `meeting_purposes` is a TEAM-BUILT list, not a
+ * fixed catalogue (delivery.ts's own header), and until this ruling the seed
+ * planted nothing under it — a brand-new team's Choices screen offered an
+ * empty picker and grew its own 27-row mess the same way kwapso's own team
+ * did. This is the STARTING set every newborn team gets instead, the same
+ * eight names, departments and icons migration 0092 backfills onto every team
+ * that already exists — so a newborn team and an upgraded one offer the same
+ * words, the shape every other starting vocabulary in this file already
+ * takes (TASK_DEPARTMENTS, APP_STAGES, DELIVERABLE_KINDS below).
+ *
+ * `department`: "Business" for the two her ruling named that way; NULL for
+ * the six she called "regarding build and operations" — TASK_DEPARTMENTS
+ * (Sales / Admin / Production / Marketing / Business) has no department
+ * spelled "Operations" or "Build", so their department is left unset rather
+ * than guessed onto the nearest-sounding one.
+ *
+ * `icon`: one of `MEETING_TYPE_ICONS` (@shared/meeting-icons) — kebab-case,
+ * checked against that vocabulary at the write door the same way a team's own
+ * future edits are. */
+export const MEETING_TYPES: { name: string; department: string | null; icon: MeetingTypeIcon }[] = [
+  { name: "Recap", department: null, icon: "clock-counter-clockwise" },
+  { name: "Week planning", department: null, icon: "calendar-blank" },
+  { name: "Validation", department: null, icon: "check-circle" },
+  { name: "Sync", department: null, icon: "arrows-clockwise" },
+  { name: "Kick-off", department: null, icon: "rocket-launch" },
+  { name: "Follow-up", department: null, icon: "arrow-clockwise" },
+  { name: "Jour fixe", department: "Business", icon: "calendar-dots" },
+  { name: "Strategy", department: "Business", icon: "target" },
 ]
 
 /** The vocabulary a COMPANY record picks from — the industry it is in. Ordinary
@@ -365,6 +397,19 @@ export function buildTeamSeed(
       `INSERT INTO selectable_data (id, type, value, is_default, mark, name_de, description, standard_days, created_at, creator_id, creator_email, creator_name)
 SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${sqlString(item.mark ?? null)}, ${sqlString(item.nameDe ?? null)}, ${sqlString(item.description ?? null)}, ${item.standardDays == null ? "NULL" : item.standardDays}, ${a([])}
  WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(item.type)} AND s.value = ${sqlString(item.value)});`
+    )
+  }
+
+  // THE EIGHT MEETING TYPES, same NOT-EXISTS guard as the vocabulary above —
+  // `meeting_purposes` is not a selectable-data group (it carries a department,
+  // MeetingPurpose's own comment says why), so it gets its own guarded insert
+  // rather than joining DEFAULT_SELECTABLE. Matched by name: a newborn team has
+  // none of these rows yet, so every one of the eight always lands.
+  for (const t of MEETING_TYPES) {
+    statements.push(
+      `INSERT INTO meeting_purposes (id, name, department, icon, created_at, creator_id, creator_email, creator_name)
+SELECT ${sqlString(ulid())}, ${sqlString(t.name)}, ${sqlString(t.department)}, ${sqlString(t.icon)}, ${a([])}
+ WHERE NOT EXISTS (SELECT 1 FROM meeting_purposes m WHERE m.name = ${sqlString(t.name)});`
     )
   }
 

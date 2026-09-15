@@ -536,6 +536,32 @@ export type ToolbarViewSlot = {
   onValueChange: (value: string) => void
 }
 
+/** R78 — CALENDAR VIEWS CARRY NO SORT. The client's ruling, 2026-09-15, over
+ * the week design: *"Never put the sort in calendar components. Make this a
+ * law. Makes no sense."*
+ *
+ * A reader looking at a month grid, a week board (Mon–Fri plus the folded
+ * weekend) or a day-by-day agenda is not choosing an ORDER — the calendar
+ * frame (the date axis) already fixes one — so a sort control beside it
+ * offers a choice that does nothing, the identical "dead UI" argument
+ * `TOOLBAR_SORT_EXEMPT`'s own header makes for a queue or a month grid one
+ * screen at a time (`sprints-screen.tsx#SprintsScreen`'s own entry there).
+ * This is that argument turned into a LAW rather than left as three
+ * screen-by-screen exemptions, because "calendar view, no sort" is a fact
+ * about the SHAPE and not about which screen happens to draw it.
+ *
+ * ENFORCED CENTRALLY, in the one row that already builds both controls
+ * (R53) — never at a call site, which is what "make this a law" asks for
+ * over "fix the three screens that have it today": a screen may still PASS a
+ * `sort` config alongside a calendar/week/agenda `view` (its other bodies —
+ * Table, Board — genuinely want one), and this row is what decides, every
+ * render, whether the control it already owns actually draws. No call site
+ * can opt back in by continuing to hand over `sort` once its `view.value`
+ * lands on one of these three; the three are typed once, here, so the
+ * question "which views are calendars" has one answer for `<ToolbarRow>` and
+ * for its own test census. */
+export const NO_SORT_VIEW_VALUES: ReadonlySet<string> = new Set(["calendar", "week", "agenda"])
+
 /** A BOUNDED COLLECTION'S OWN TOOLBAR ROW — the one shape a call site reaches
  * for below a `folderTabs` strip, still inside the card, whenever its tab body
  * is bespoke (a grouped list, a month grid, a chart) rather than a
@@ -713,7 +739,15 @@ export function ToolbarRow({
    * the real reason its collection has no order to offer — a queue, a month
    * grid, a grouped pair of lists, a paged list whose order is the door's.
    * `false`/`null` are accepted so a caller can gate it on the same
-   * "have the rows arrived" expression `search` beside it is gated on. */
+   * "have the rows arrived" expression `search` beside it is gated on.
+   *
+   * R78'S OWN EXCEPTION, on top of the default above: when `view`'s active
+   * value is calendar, week or agenda (`NO_SORT_VIEW_VALUES`, above), this
+   * row draws no sort control at all EVEN IF `sort` is given — a calendar's
+   * date axis already fixes the order, so the control would offer a choice
+   * that does nothing. The suppression lives here, not at the call site, so
+   * a screen cannot forget it by continuing to pass `sort` once its view
+   * lands on one of those three. */
   sort?: ToolbarSortSlot | false | null
   /** THE VIEW SWITCH — after `sort` and before the pinned-right `actions`,
    * and a CONFIG for the same reason `sort` is. Omitted wherever a screen
@@ -816,6 +850,13 @@ export function ToolbarRow({
   // for both rows — no gap between them either, because a gap is the seam
   // she is naming.
   const expanded = Boolean(toolbarPanel)
+  // R78 — CALENDAR VIEWS CARRY NO SORT ("never put the sort in calendar
+  // components... makes no sense", client ruling 2026-09-15). Computed once,
+  // off the ACTIVE view value only — not off the list of bodies a screen
+  // offers, so a collection whose OTHER views (Table, Board) still want a
+  // sort control keeps it the moment a reader switches off Calendar/Week/
+  // Agenda. See `NO_SORT_VIEW_VALUES` above for the full ruling.
+  const sortHiddenByView = Boolean(view && NO_SORT_VIEW_VALUES.has(view.value))
   return (
     // ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also want
     // the toolbar to be on top all time visible. everywhere."
@@ -949,7 +990,7 @@ export function ToolbarRow({
               order, the name and the hidden label are this component's now, so
               every collection toolbar in the app draws the same chip in the
               same place. */}
-          {sort && (
+          {sort && !sortHiddenByView && (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <SortControl
                 options={sort.options}

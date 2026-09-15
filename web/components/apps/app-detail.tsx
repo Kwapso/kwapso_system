@@ -31,6 +31,7 @@ import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 
 import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { ProcessFormDialog } from "@/components/process/process-form-dialog"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
@@ -70,7 +71,7 @@ import {
   totalKey,
   impactKey,
 } from "@/lib/live-resources"
-import { appStageDotTone, appStageMark } from "@shared/app-stages"
+import { appStageDotTone } from "@shared/app-stages"
 import { AppMark } from "@/components/apps/app-tiles"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -96,6 +97,11 @@ export function AppDetailScreen({
   basePath: string
 }) {
   const t = useT()
+  // THE SIGNED-IN USER, preselected wherever this screen opens a staff picker
+  // on a NEW record — the client's ruling, 15 Sep 2026: "always put the user
+  // preselected by default." A new story's assignee and a new app's staff/lead
+  // both read this.
+  const myUserId = useSessionUserId()
   // The apps set is bounded and read whole, so the record comes out of the same
   // cache the list holds — opening one costs no round-trip.
   // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
@@ -392,7 +398,7 @@ export function AppDetailScreen({
     { label: t("Account"), value: accountName ?? "Ours, no account" },
     // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
     // sits where an icon sits and never inside a sentence") — it already draws
-    // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
+    // beside the title (`mark={<AppMark app={app} .../>}` below, B1).
     // No "—" fallback: `undefined` lets `OverviewList` filter the row out
     // entirely instead (W2 — an unset fact is dropped, label and all, not
     // dashed and not left as an empty value beside its own label).
@@ -557,14 +563,17 @@ export function AppDetailScreen({
 
   return (
     <RecordScreen
-      // An app's own mark is its STAGE mark, from the same shared list the tiles
-      // read, so a system looks the same wherever it appears (G3) — and where
-      // the client has given us their logo, that goes in the same square
-      // instead, which is exactly what `leading` was put on RecordHeader for.
-      // `AppMark` decides between the two, so the heading and the tile can never
-      // disagree about which picture an app has.
-      mark={appStageMark(app.stage)}
-      leading={<AppMark app={app} size="band" />}
+      // AN APP'S OWN LOGO, INLINE LEFT OF THE TITLE — B1, client ruling
+      // 2026-09-15: "For cover and logo, I choose B1. Apply this on apps,
+      // accounts, and team members." record-chrome.tsx's own `mark` prop doc
+      // has the artifact and the full ruling; `mark` (not `leading`, which
+      // stayed inert through the 2026-09-01 "no images on title" ruling and
+      // is untouched here) is what makes it draw, boxed to the title's own
+      // line-height so the title itself never moves. `AppMark` decides
+      // between the client's own logo and the STAGE mark, so the heading and
+      // the tile (apps-screen.tsx) can never disagree about which picture an
+      // app has (G3) — unchanged by this move, only which prop carries it.
+      mark={<AppMark app={app} size="tile" />}
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself
@@ -896,6 +905,7 @@ export function AppDetailScreen({
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:app:${appId}`}
+        defaultAssigneeId={myUserId ?? ""}
         onSubmit={async (v) => {
           // The id goes back so the dialog can hang the picked files on it —
           // see the note at the sprint's copy of this call. Discarding it drops

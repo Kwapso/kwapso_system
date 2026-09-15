@@ -6,6 +6,16 @@
 // account manager, country." Five decisions, and this file is where all five
 // land.
 //
+// THE SECOND BODY IS "LIST" NOW, NOT "TABLE" — R80, the client's own
+// follow-up ruling one day later, 15 Sep 2026, verbatim: "On accounts, I
+// want the views to be gallery and list. I don't like this table anywhere,
+// so anywhere in the app where you have it, replace it with list. I don't
+// want to say this again." Nothing about the 14 Sep brief changed underneath
+// it — same second body, same `<RecordTable>`, same four columns, same three
+// facets — what changed is the SHAPE that component draws (see
+// `record-table.tsx`'s own header) and the word this screen's view switch
+// puts on it, matched to Tickets' own list icon and label.
+//
 // ── WHY THIS IS ITS OWN FILE, NOT A BRANCH OF `collection-content.tsx` ───────
 //
 // The switch that used to hold this branch is deliberately pure (no hooks, no
@@ -81,7 +91,7 @@ import * as React from "react"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Plus, SquaresFour, Table as TableIcon } from "@shared/ui/foundations/icons"
+import { Plus, SquaresFour, ListBullets } from "@shared/ui/foundations/icons"
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
@@ -288,7 +298,7 @@ export function AccountsScreen({
   // order). Local, like `ctx.knowledgeView`/`ctx.taskView` one module over,
   // except owned by this component instead of the host: nothing else on the
   // app needs to know which body the accounts screen is showing.
-  const [view, setView] = React.useState<"gallery" | "table">("gallery")
+  const [view, setView] = React.useState<"gallery" | "list">("gallery")
 
   // THE COUNTRY FACET'S OPTIONS — the team's own "Country" vocabulary
   // (`shared/selectable-groups.ts`), read through the SAME "selectable:all"
@@ -380,10 +390,16 @@ export function AccountsScreen({
           view={{
             views: [
               { value: "gallery", label: t("Gallery"), icon: <SquaresFour className="size-4" /> },
-              { value: "table", label: t("Table"), icon: <TableIcon className="size-4" /> },
+              // R80 (client, 15 Sep 2026, verbatim): "I don't like this table
+              // anywhere, so anywhere in the app where you have it, replace
+              // it with list." The second body is still `<RecordTable>` —
+              // that draws the list shape unconditionally now — this is only
+              // the WORD on the switch and the glyph beside it, matched to
+              // Tickets' own list icon (`tickets-collection.tsx`).
+              { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
             ],
             value: view,
-            onValueChange: (v) => setView(v === "table" ? "table" : "gallery"),
+            onValueChange: (v) => setView(v === "list" ? "list" : "gallery"),
           }}
           actions={() => (
             <>
@@ -421,7 +437,7 @@ export function AccountsScreen({
                     : null
                 }
               >
-                {view === "table" ? (
+                {view === "list" ? (
                   <RecordTable
                     columns={accountTableColumns(t)}
                     rows={shaped}

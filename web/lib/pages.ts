@@ -80,10 +80,13 @@ export type NavItem = {
  * account-scoped tab it replaces already checked. See the `contacts` entry
  * below for the whole of it.
  *
- * THE UNNAMED SIDEBAR PAGES (Knowledge base, Tickets, Work logs, Waves) were
- * not in the client's list. They keep the closest reading of their old half:
- * the three daily ones join My work, and Waves — the shelf a sprint sits
- * inside — joins Build beside Apps and Sprints. */
+ * THE UNNAMED SIDEBAR PAGES (Knowledge base, Tickets, Work logs) were not in
+ * the client's list. They keep the closest reading of their old half: the
+ * three daily ones join My work. WAVES — the shelf a sprint sits inside — was
+ * unnamed too when it first joined Build, but the client later named it
+ * explicitly and moved it to lead the section (15 Sep 2026: "keeping the
+ * waves one on top of the build section on the sidebar") the same ruling that
+ * killed Sprints' own row; see the note beside `sprints` in TEAM_SECTIONS. */
 export type NavGroup = "my-work" | "build" | "accounts"
 
 /** Render order for the rail's three named sections — a second, independent
@@ -356,9 +359,14 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //
   // The new sequence, this list's real order:
   //   My work   Tasks · Meetings · Knowledge base · Tickets · Work logs
-  //   Build     Apps · Sprints · Stories · Waves
+  //   Build     Waves · Apps · Stories
   //   Accounts  Accounts · Contacts
   //   (none)    Home, Kwapso — see NAV in this file
+  //
+  // BUILD LOST A ROW AND REORDERED, 15 SEP 2026 (client ruling, verbatim in
+  // the note beside `sprints` in TEAM_SECTIONS below): Sprints is no longer a
+  // sidebar destination at all — a sprint lives and opens inside its wave now
+  // — and Waves, previously last, leads the section.
   //
   // ACCOUNTS MOVED OUT OF THE DAILY SET into a named section of its own — the
   // client's own word for the group is the same as the page's, which reads as
@@ -431,15 +439,37 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // already sent each other, and a slug is not a word anybody reads. Not named
   // in the client's list — kept in My work, the closest reading of daily.
   { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
-  // ── BUILD: the work engine's other three destinations, in the client's own
-  // explicit order ("build: Apps, sprints, stories") ──────────────────────────
-  // Apps → Sprints → Stories, plus our own admin above. Each is a section AND a
-  // tab on the record above it, because the owner's comprehension answer on
-  // where a person starts looking was "it should not matter — all three should
-  // get her there". One path is a dead end in somebody's head; three are a
-  // product. Apps gates on `processes`, not `work`: an app is the thing a
-  // process hangs off, and the module that owns the App → Process → Step chain
-  // is the one whose right a person needs to see any of it.
+  // ── BUILD: the work engine's remaining destinations ─────────────────────────
+  //
+  // WAVES IS FIRST NOW — CLIENT RULING, 2026-09-15, verbatim: "Regarding
+  // sprints and waves, sprints go inside waves. I would suggest killing the
+  // sprints main page completely and just keeping the waves one on top of the
+  // build section on the sidebar." This SUPERSEDES the old explicit order
+  // ("build: Apps, sprints, stories", 31 Aug 2026) for the one destination the
+  // ruling names — Waves moves from last (the closest reading of the occasional
+  // half it used to sit in) to first, and Sprints loses its own row entirely
+  // (see the note beside it below).
+  { key: "waves", title: "Waves", module: "work", segment: "waves", placement: "sidebar", countCacheKey: "waves", group: "build" },
+  // SPRINTS — NO LONGER A MAIN PAGE, same ruling as `waves` above. A sprint is
+  // opened from the wave it belongs to (wave-detail.tsx's own Sprints tab lists
+  // them and its "Plan a sprint" button is the only place one is created) or
+  // from wherever else its detail is already linked (an app's own record); this
+  // row only tells the reachability laws where that capability lives now.
+  // `SECTION_HOSTED_ELSEWHERE.sprints` (shared/rules/registry.ts) carries the
+  // same reason for R64's own census. The module and its permission right are
+  // unchanged — the module still exists (Settings › Modules and the roles
+  // matrix still list it), only its stand-alone collection screen is gone; see
+  // `web/components/work/sprints-screen.tsx`'s own header for what stayed and
+  // what a future lane may delete outright once nothing else needs it.
+  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "contextual", countCacheKey: "sprints" },
+  // APPS → STORIES, the two Build destinations the client's 31 Aug 2026 list
+  // still names in this order ("build: Apps, sprints, stories" minus the
+  // now-gone middle word). Each is a section AND a tab on the record above it,
+  // because the owner's comprehension answer on where a person starts looking
+  // was "it should not matter — all three should get her there". Apps gates on
+  // `processes`, not `work`: an app is the thing a process hangs off, and the
+  // module that owns the App → Process → Step chain is the one whose right a
+  // person needs to see any of it.
   { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "build" },
   // PROCESSES — App → Process → Step, and the value drilled through them.
   // CONTEXTUAL since 17 Aug 2026: the owner's ruling is that a process lives under
@@ -453,25 +483,18 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // server total of the PROCESSES, keyed off the same `processes:<teamId>` cache
   // the list reads.
   { key: "processes", title: "Processes", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
-  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "build" },
   // STORIES — the page that used to be called Work. The sprints moved out to a
-  // section of their own, so what is left on it is the backlog — and the word
-  // for that in the glossary is Story. The URL segment moved with the title
-  // rather than being kept for old links: nothing outside this app has ever
-  // linked to /work, and a segment that disagrees with its heading is a cost
-  // paid for ever (Tickets pays it because a permission STRING in every team's
-  // database is behind it — there is no such string here, the module is `work`
-  // either way). LAST in Build, per the client's explicit order ("Apps,
-  // sprints, stories") — moved out of the old daily/My-work run it shared with
-  // Tasks, since the client's own grouping puts it with the rest of the work
-  // engine rather than with the team's day-to-day admin.
+  // section of their own (and then out of the sidebar entirely, 15 Sep 2026),
+  // so what is left on it is the backlog — and the word for that in the
+  // glossary is Story. The URL segment moved with the title rather than being
+  // kept for old links: nothing outside this app has ever linked to /work, and
+  // a segment that disagrees with its heading is a cost paid for ever (Tickets
+  // pays it because a permission STRING in every team's database is behind it
+  // — there is no such string here, the module is `work` either way). LAST in
+  // Build, per the client's explicit order — moved out of the old daily/My-work
+  // run it shared with Tasks, since the client's own grouping puts it with the
+  // rest of the work engine rather than with the team's day-to-day admin.
   { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "build" },
-  // WAVES — what a client BOUGHT: a package of sprints. Its own destination
-  // beside Sprints rather than a tab on one, because the question it answers is
-  // "what did they buy?" and a sprint answers "what are we doing this fortnight?".
-  // Not named in the client's Build list — kept beside Apps and Sprints, the
-  // closest reading of the occasional half it used to sit in.
-  { key: "waves", title: "Waves", module: "work", segment: "waves", placement: "sidebar", countCacheKey: "waves", group: "build" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is
   // an exact server total (R16) keyed off the same cache the list reads, so the

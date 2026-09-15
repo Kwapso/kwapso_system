@@ -1231,6 +1231,57 @@
   --dot-archived: var(--ink-disabled);
   --dot-done:     var(--kw-forest);
 
+  /* ---- Four more dots, for a PRIORITY rather than a LIFECYCLE ----------
+     CLIENT RULING, 2026-09-15, verbatim, over the consuming app's Tasks
+     table: "For the priorities: 4: keep the red. 3: use the orange. Urgent:
+     use the purple. Whenever: use the blue." The app had been painting a
+     task's priority through four of the six tones above — blocked, building,
+     review, archived — borrowed because they were "the only reusable name in
+     reach" (the app's own `PRIORITY_DOT_TONE`, before this ruling), not
+     because a priority is an app's lifecycle stage. One borrowing was a real
+     defect: `building` is charcoal, the exact hex `--surface-inverse` is in
+     light, so a priority-3 dot vanished wherever the two met, and in dark it
+     tripped THIS FILE's `building`-on-mango special case (badge.tsx's
+     compound variant, immediately above) by accident, painting the whole
+     chip the one colour this system reserves for the brand. These four are
+     ADDITIVE — nothing above moves, and none of the four below is ever
+     `building`, so that special case is never reached by a priority chip.
+
+     RED AND ORANGE ARE THE APP'S OWN TOKENS, CALLED BY THEIR OWN NAMES:
+     `--destructive` (`--kw-poppy` light, `--kw-poppy-lift` dark — ruling 3B,
+     ruling 43) and `--warning` (`--kw-orange`, admitted 2026-09-02, no dark
+     half). Neither is a new hex.
+
+     PURPLE IS A COLOUR THE KIT ALREADY ADMITTED: `--kw-lavender` (admitted
+     2026-09-02 beside orange, chart series 4 — HSL hue 259.1, the
+     purple/violet band, and the only lavender-or-purple hue in the raw
+     palette). Nothing new was typed for it either.
+
+     BLUE HAD NO NAME OF ITS OWN. `--kw-sky` is the only blue in the raw
+     palette, and every existing consumer reaches it through the
+     "informational" semantic (`--info`, and `--dot-review` above). A
+     priority is not information, so `--dot-blue` is a NEW NAME carrying the
+     SAME admitted hex — distinct from `--info` in what it means, not in what
+     it is typed, the same move `--dot-shipped` and `--dot-done` already make
+     twice for `--kw-forest`. Still no new hex: the client typed `--kw-sky`
+     for "the informational tone" on 2026-08-22 and this reuses it.
+
+     MEASURED AGAINST THIS FILE'S OWN `mark` TIER (1.5, `check-contrast.mjs`
+     — ruling 26's "the dot never speaks alone" means a 7px dot is held to a
+     same-family-separation floor, not WCAG's 4.5 or even its 3:1 non-text
+     minimum), all four clear it against every ground a dot actually stands
+     on in this kit — `--pill-fill` and `--surface-inverse`, both palettes —
+     with one bare exception logged rather than hidden: `--dot-blue` against
+     `--surface-quiet` in light measures 1.49, a hundredth under the floor,
+     on a ground no status-pill dot renders on today (`--surface-quiet` backs
+     `secondary`, not `status`). `npm run check`'s own `check-contrast.mjs`
+     is the gate; see the demo book's new "Priority tones" panel for the
+     pairs it now measures for real. */
+  --dot-red:    var(--destructive);
+  --dot-orange: var(--warning);
+  --dot-purple: var(--kw-lavender);
+  --dot-blue:   var(--kw-sky);
+
   /* ---- The mango heat ramp (kit CH17, "Pulse band", panel four) ---------
      "Four steps and an empty. The mango ramp from the heat map, plus the
       quiet fill for a day with nothing. No fifth step, no second hue, and

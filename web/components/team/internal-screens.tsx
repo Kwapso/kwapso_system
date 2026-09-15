@@ -54,6 +54,8 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Plus } from "@shared/ui/foundations/icons"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { defaultFieldConfig, defaultCollectionConfig, type CollectionConfig } from "@shared/web/screen-engine/config"
@@ -387,7 +389,19 @@ export function MeetingTypesPanel({
     const statusWord = p.active ? t("Active") : t("Inactive")
     return {
       id: p.id,
-      name: p.name,
+      // THE TYPE'S OWN ICON, beside the name — same idiom as `shapeChoicesTable`'s
+      // value cell (deep-link/shape.tsx): an `Icon` when the row carries one,
+      // the bare word otherwise. `nameText` rides beside it for search/sort,
+      // the same shape the `status` column below already takes.
+      name: p.icon ? (
+        <span className={REF_LEADS_NAME}>
+          <Icon name={p.icon} className="text-muted-foreground size-4 shrink-0" />
+          <span className="min-w-0 truncate">{p.name}</span>
+        </span>
+      ) : (
+        p.name
+      ),
+      nameText: p.name,
       department: p.department ?? "—",
       status: (
         <button
@@ -408,7 +422,7 @@ export function MeetingTypesPanel({
   })
 
   const columns: TableColumn[] = [
-    { key: "name", label: t("Name"), sort: "name" },
+    { key: "name", label: t("Name"), sort: "name", searchKey: "nameText", sortKey: (r) => r.nameText },
     { key: "department", label: t("Department"), sort: "department" },
     { key: "status", label: t("Status"), sort: "status", searchKey: "statusText", sortKey: (r) => r.statusText, defaultDir: "asc" },
   ]

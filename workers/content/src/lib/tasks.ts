@@ -160,6 +160,17 @@ export type TaskFilter = {
    * so there is ONE clause rather than a filter and a fence saying the same
    * thing in two places. */
   assigneeId?: string
+  /** THE 2026-09-15 EVENING RULING, second one that day — "a task nobody has
+   * is on my list too": a row with NO `assignee_id` rides along with the
+   * caller's own on Overdue/Planned/Completed (`MINE_VIEWS`,
+   * routes/todos.ts), because on this team's own staging data 254 of 259
+   * tasks carry no assignee at all — the unconditional `assignee_id = caller`
+   * narrowing landed a few hours earlier the same day left every "mine" tab
+   * empty for everyone, unclaimed work included, which is what the client's
+   * "why now don't I see any task on any tab" was actually reporting. ONLY
+   * meaningful alongside `assigneeId` — the door sets both together
+   * (`getTasks`) rather than this flag alone deciding anything. */
+  includeUnassigned?: boolean
 }
 
 function taskWhere(filter: TaskFilter): { sql: string; params: string[] } {
@@ -172,7 +183,11 @@ function taskWhere(filter: TaskFilter): { sql: string; params: string[] } {
     if (view.dated === "tomorrow") params.push(tomorrowIso())
   }
   if (filter.assigneeId) {
-    clauses.push("t.assignee_id = ?")
+    // THE OR-NULL FORM — see `includeUnassigned`'s own doc — is scoped to this
+    // one clause and nowhere else: a row still has to pass `view.sql` above
+    // (an unclaimed OPEN task on Completed is still someone else's closed
+    // task, never this caller's).
+    clauses.push(filter.includeUnassigned ? "(t.assignee_id = ? OR t.assignee_id IS NULL)" : "t.assignee_id = ?")
     params.push(filter.assigneeId)
   }
   return { sql: clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "", params }
@@ -315,7 +330,7 @@ export async function getTask(cfg: D1Rest, guard: MemberGuard, id: string): Prom
 export async function countTasks(
   cfg: D1Rest,
   guard: MemberGuard,
-  filter: { assigneeId?: string }
+  filter: { assigneeId?: string; includeUnassigned?: boolean }
 ): Promise<TaskCounts> {
   const clauses: string[] = []
   // ONE MORE `todayIso()` FOR `planned_n`, inserted where its own SUM sits in
@@ -323,7 +338,10 @@ export async function countTasks(
   // positional, so the two must move together.
   const params: string[] = [todayIso(), todayIso(), todayIso(), tomorrowIso(), tomorrowIso()]
   if (filter.assigneeId) {
-    clauses.push("t.assignee_id = ?")
+    // SAME OR-NULL FORM `taskWhere` uses, and for the same reason (R16): a
+    // badge counted with a narrower clause than the rows under it is a badge
+    // that disagrees with its own list.
+    clauses.push(filter.includeUnassigned ? "(t.assignee_id = ? OR t.assignee_id IS NULL)" : "t.assignee_id = ?")
     params.push(filter.assigneeId)
   }
   // BOUNDED, now that this is a collection R14 makes page (R16's amendment).

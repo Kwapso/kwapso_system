@@ -115,24 +115,6 @@ const DECLARED = /([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{\s*sortType\s*:/g
  * entry that is no longer an offending key at all is stale and turns the build
  * red, so this list can only shrink or stay true. */
 const DOOR_ORDERED: Record<string, string> = {
-  when: (
-    "the Meetings Table (every tab draws the same one since 2026-09-15, not " +
-    "only 'Everyone's'). The meetings list PAGES, so its headers ask " +
-    "`<PagedFind>` for the order and `meetings-screen.tsx` hands the answer " +
-    "to `RecordTable` as `order={found.order}` — the rows arrive already " +
-    "ordered and `ordered()` is never reached. Declaring a browser comparison " +
-    "here would arrange the fifty rows in hand under a badge counting the " +
-    "whole meetings list, which is a worse lie than the alphabetical one."
-  ),
-  time: (
-    "the same Meetings Table `when` is declared for, and the same reason: " +
-    "`order={found.order}` means `ordered()` is never reached for ANY column " +
-    "in this table. Unlike `when`, this one carries no `sort` at all — " +
-    "`COLUMN_SORT` (meetings-screen.tsx) has no door name for Time, so the " +
-    "header is not even clickable (record-table.tsx: 'a column the door has " +
-    "no name for carries no sort and is not clickable') — formatted for " +
-    "display only."
-  ),
   deadline: (
     "Tasks (web/components/work/tasks-screen.tsx). NOT door-ordered — the " +
     "misnomer this list already carries for `time` above, same shape here: " +
@@ -241,7 +223,10 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // adds column keys and no offenders, which is the shape a new table
       // should have.
       "web/components/accounts/contacts-screen.tsx",
-      "web/components/meetings/meetings-screen.tsx",
+      // Meetings drew a `RecordTable` here too, 2026-09-15 (AM) — gone the
+      // same evening (client ruling: "replace the view table for list"), so
+      // this file is out of the net again and `when`/`time` came out of
+      // `DOOR_ORDERED` with it.
       // The Automations table (both Settings › Automations and each module's
       // own settings page), 2026-09-14 — the client's ruling replaced the
       // hand-rolled card list with "the list component exactly the same as
@@ -264,11 +249,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)
     expect(cells.size, "no formatted cells were found in any shaper").toBeGreaterThan(3)
-    // …and the two that this whole pass was about are actually in the net: one
-    // declared, one door-ordered. If either drops out, the census stopped
-    // looking at the thing it was built for.
+    // …and the one that this whole pass was about is actually in the net,
+    // declared. If it drops out, the census stopped looking at the thing it
+    // was built for. (Meetings' own `when`/`time` pair, door-ordered, left
+    // the net the same evening `RecordTable` left meetings-screen.tsx — see
+    // the file list above.)
     expect(formattedColumns, "the Tasks Deadline column is not being censused").toContain("deadline")
-    expect(formattedColumns, "the Meetings When column is not being censused").toContain("when")
   })
 
   it("a declared column reads a RAW value, never the cell it is drawn from", () => {

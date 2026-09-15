@@ -1,33 +1,26 @@
 "use client"
 
-// APP TILES — one system, as a thing you recognise rather than a line you read.
+// APP MARK — the square an app is known by, wherever one is drawn.
 //
 // UI-RULEBOOK K9 allows a card grid exactly where a record carries an image, and
 // G3 says the type mark sits in a rounded square where a logo would. An app has
 // both, and since 0037_app_logo it has the second one for real: the client's own
-// mark where they have one, the stage mark where they do not. So the square is
-// the tile's subject and the words underneath are two lines at most — the name,
-// and the client (K1).
+// mark where they have one, the stage mark where they do not.
 //
-// FLAT FILL, NO BORDER, NO HOVER LIFT (C2): the separation between a tile and
-// the page is three per cent of lightness, which is the brand's whole surface
-// system. The one motion is the 200ms house curve on the background, which is
-// the interaction feedback UI-RULEBOOK C11 permits on an interactive control.
-//
-// It is a real <a> so the browser's own affordances work (open in a new tab,
-// copy the address), with softNavigate on click so the History API move stays
-// a soft one. Extracted from the apps screen because the account record shows
-// the same tiles for one client's systems.
+// THE WALL OF TILES THIS FILE USED TO DRAW LEFT ON 15 SEP 2026, with the client's
+// ruling that replaced it: "For the main screen for the apps, I want the gallery
+// icon laid out … I also want you to add an alternate view board by stage." The
+// hand-rolled `<a>` tile below was never a kit `<Card>`/`<CardTitle>`, so it could
+// never have carried R65/K16's "chip above title" — the new Gallery draws a real
+// kit `Card` instead (`apps-screen.tsx`'s own `appsGalleryCard`), and the new
+// Board is the kit's `Kanban`. `AppMark` is the one thing both of those, and every
+// other screen that draws an app's face, still read from here.
 
 import * as React from "react"
-import { CaretRight, Lock } from "@shared/ui/foundations/icons"
 
-import { softNavigate } from "@/lib/nav"
-import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { appStageMark } from "@shared/app-stages"
 import type { AppRow } from "@shared/types"
-import { useT } from "@shared/web/language"
 
 /** THE SQUARE AN APP IS KNOWN BY — its logo, or the stage mark it has always
  * drawn. It reads the two things an APP has that no other record does (its stage
@@ -48,79 +41,4 @@ export function AppMark({
   size?: React.ComponentProps<typeof RecordMark>["size"]
 }) {
   return <RecordMark picture={app.logoUrl} mark={appStageMark(app.stage)} name={app.name} size={size} />
-}
-
-export function AppTiles({
-  apps,
-  accountNames,
-  /** the URL prefix we are standing in — "" at the top level, "/t/<teamId>"
-   * inside a team, so a tile keeps the shape the reader arrived through */
-  base = "",
-}: {
-  apps: AppRow[]
-  accountNames: Map<string, string>
-  base?: string
-}) {
-  const t = useT()
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {apps.map((app) => {
-        const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
-        // Through the seam even though every part of it is ours: `base` is a
-        // literal or "/t/<teamId>" and the id is a ULID, so nothing here is
-        // typed by anybody. The rule is positional on purpose — a URL that
-        // reaches an attribute without passing the checker is the shape that
-        // eventually carries one that WAS typed.
-        const href = safeHref(`${base}/apps/${app.id}`) ?? "/apps"
-        return (
-          <a
-            key={app.id}
-            href={href}
-            onClick={(e) => {
-              // Let the browser take a modified click (new tab, new window) —
-              // only a plain left click is ours to intercept.
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
-              e.preventDefault()
-              softNavigate(href)
-            }}
-            // `motion-hover`, NOT `motion-hover-lift`, and the difference is this
-            // file's own rule above: a tile is flat, and a grid of them lifting
-            // is the page of reacting boxes UI-RULEBOOK C2 exists to prevent.
-            // motion.css §13 would allow the lift — a tile IS a card that is a
-            // link — and the narrower rule wins on the narrower surface.
-            // `duration-200` went with the hand-rolled transition: the kit owns
-            // the duration and the curve, which is the "house curve" the comment
-            // at the top of this file was already asking for by hand.
-            className="bg-card hover:bg-muted motion-hover flex items-center gap-2 rounded-[var(--radius)] p-4"
-          >
-            {/* The mark is aria-hidden and the stage WORD is on the heading above
-                it, which is the pair UI-CONVENTIONS §5 requires of a type mark.
-                A logo carries no meaning the name does not already say, so it is
-                hidden from a screen reader for exactly the same reason. */}
-            <AppMark app={app} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">{app.name}</span>
-              <span className="text-muted-foreground block truncate text-xs">
-                {app.active ? client : `${client} · ${t("archived")}`}
-              </span>
-            </span>
-            {/* THE CHEVRON IS A PROMISE THAT THIS OPENS. On an app the reader is
-                not on, it opens onto a refusal — so the tile says so before the
-                click rather than after it. Four bugs this month were controls
-                that looked like they worked and did not; this is the same shape
-                caught early. An admin and anybody on the app see the chevron,
-                which is nearly everyone, so the lock is rare by design. */}
-            {app.canOpen ? (
-              <CaretRight className="text-muted-foreground size-4 shrink-0" />
-            ) : (
-              <Lock
-                className="text-muted-foreground size-4 shrink-0"
-                aria-label={t("You're not on this app")}
-              />
-            )}
-          </a>
-        )
-      })}
-    </div>
-  )
 }

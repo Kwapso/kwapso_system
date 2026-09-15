@@ -109,14 +109,22 @@ import {
    The shapes
    ========================================================================= */
 
-/** The six status-dot tones — one per `--dot-*` token, matching `Badge`'s. */
+/** The ten status-dot tones — one per `--dot-*` token, matching `Badge`'s.
+ * The first six are a LIFECYCLE; the last four are a PRIORITY, never a
+ * lifecycle — tokens.css's own note beside `--dot-red` explains the split,
+ * added 2026-09-15 for a board column head keyed by priority rather than
+ * by stage (the consuming app's Tasks board, priority 1-4). */
 export type KanbanColumnDot =
   | "shipped"
   | "building"
   | "review"
   | "blocked"
   | "archived"
-  | "done";
+  | "done"
+  | "red"
+  | "orange"
+  | "purple"
+  | "blue";
 
 /** The 7px status dot a column head carries (27.24). Never alone: ruling 26. */
 const COLUMN_DOT: Record<KanbanColumnDot, string> = {
@@ -126,6 +134,10 @@ const COLUMN_DOT: Record<KanbanColumnDot, string> = {
   blocked: "bg-[var(--dot-blocked)]",
   archived: "bg-[var(--dot-archived)]",
   done: "bg-[var(--dot-done)]",
+  red: "bg-[var(--dot-red)]",
+  orange: "bg-[var(--dot-orange)]",
+  purple: "bg-[var(--dot-purple)]",
+  blue: "bg-[var(--dot-blue)]",
 };
 
 function ColumnDot({ dot }: { dot: KanbanColumnDot }) {

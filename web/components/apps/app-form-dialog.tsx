@@ -45,6 +45,7 @@ import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { RecordMark } from "@shared/web/record-mark"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeSrc } from "@shared/web/rich-text"
 import { fileToDataUrl } from "@/lib/image"
@@ -146,8 +147,13 @@ const NOBODY = "__none__"
  * curated on the Dropdown values screen, and the eight the agency already uses
  * as the fallback while that read is in flight or a team has retired the lot.
  * The mark rides the label, never the stored value — a stage is its WORD, and
- * the pictograph is a mark in an icon slot (UI-CONVENTIONS §5). */
-function useAppStages(teamId: string): { value: string; mark: string }[] {
+ * the pictograph is a mark in an icon slot (UI-CONVENTIONS §5).
+ *
+ * EXPORTED, 15 Sep 2026 — the apps board (`apps-screen.tsx`) reads the exact
+ * same team-ordered vocabulary for its Kanban columns, and a second read of
+ * `selectable_data` with its own fallback would be the two-copies-that-drift
+ * shape this file's own `ORDERED_OPTIONS_OK` entry already names once. */
+export function useAppStages(teamId: string): { value: string; mark: string }[] {
   const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
   const rows = (valuesQ.data ?? [])
     .filter((v) => v.active && v.type === SELECTABLE_GROUPS.appStage)
@@ -165,6 +171,7 @@ export function AppFormDialog({
   draftKey,
   onSubmit,
   teamId,
+  defaultStaffUserId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -181,6 +188,11 @@ export function AppFormDialog({
   onSubmit: (values: AppFormValues) => Promise<void>
   /** the team, so the stage picker can read the team's own vocabulary */
   teamId: string
+  /** THE SIGNED-IN USER, preselected on a NEW app as both staff and lead —
+   * client ruling, 15 Sep 2026: "always put the user preselected by default."
+   * Ignored on an edit (`initial` wins). "" (the default) offers nobody
+   * preselected, same as before this ruling. */
+  defaultStaffUserId?: string
 }) {
   const { t, lang } = useLanguage()
   const editing = initial !== undefined
@@ -215,8 +227,8 @@ export function AppFormDialog({
           clientContext: "",
           solution: "",
           keyActors: "",
-          staffUserIds: [] as string[],
-          leadUserId: "",
+          staffUserIds: defaultStaffUserId ? [defaultStaffUserId] : ([] as string[]),
+          leadUserId: defaultStaffUserId ?? "",
           stakeholderContactIds: [] as string[],
           mainStakeholderContactId: "",
         },
@@ -464,68 +476,44 @@ export function AppFormDialog({
           disabled={busy}
         />
       </Field>
-      {/* WHO IS ON IT (8.10). A tick list rather than a multi-select control,
-          because the library ships no multi-select and the rulebook is explicit
-          that nothing here edits the library — the same shape the story form
-          already uses for the processes it touches. */}
+      {/* WHO IS ON IT (8.10) — THE HORIZONTAL CHOICES, NOT THE DROPDOWN, and not
+          a checklist either (client ruling, 15 Sep 2026). `mode="multi"` is a
+          `role="group"` row of pills with `aria-pressed`, preselected with the
+          signed-in user on a new app (`defaultStaffUserId`, above). */}
       <Field config={staffField} shape="group" htmlFor="app-staff" className={fieldSpacing}>
-        <div className="flex flex-col gap-2" id="app-staff">
-          {members.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
-          ) : (
-            sortedOptions(members, lang, (m) => m.name).map((m) => (
-              <Label key={m.id} className="flex">
-                <Checkbox
-                  checked={values.staffUserIds.includes(m.id)}
-                  onCheckedChange={(c) =>
-                    setValues((s) => ({
-                      ...s,
-                      staffUserIds:
-                        c === true
-                          ? [...s.staffUserIds, m.id]
-                          : s.staffUserIds.filter((x) => x !== m.id),
-                    }))
-                  }
-                  disabled={busy}
-                />
-                {/* THEIR OWN FACE (R35) — a staff member is a person in their own
-                    right, the same round mark the lead and assignee pickers draw
-                    them with elsewhere on this exact form. Client-reported: "when
-                    creating an app on who's in it, there are no avatars."
-                    `size="choice"` — client-reported, 2026-08-31, TWICE on this
-                    exact checklist: first "avatars smaller in this cases, we have
-                    3 sizes of avatar, use the smaller one" (which `size="row"`,
-                    then the smallest of `record-mark.tsx`'s three sizes,
-                    answered), and then, on the same day, still "too big" — `row`
-                    was never actually the smallest box the component could draw,
-                    only the smallest of three sizes decided without reference to
-                    the kit's own person-mark scale. `choice` (24px,
-                    `record-mark.tsx`'s `BOX`) is a fourth, NAMED size, decided
-                    once in the shared component rather than hand-rolled here a
-                    second time. */}
-                <RecordMark picture={m.photo} name={m.name} shape="round" size="choice" />
-                {m.name}
-              </Label>
-            ))
-          )}
-        </div>
+        {members.length === 0 ? (
+          <p className="text-muted-foreground text-sm" id="app-staff">
+            {t("Nobody on the team yet.")}
+          </p>
+        ) : (
+          <StaffPillPicker
+            id="app-staff"
+            mode="multi"
+            ariaLabel={t(staffField.label)}
+            people={members.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
+            value={values.staffUserIds}
+            onValueChange={(ids) => setValues((s) => ({ ...s, staffUserIds: ids }))}
+            disabled={busy}
+          />
+        )}
       </Field>
       {/* THE LEAD IS CHOSEN FROM THE PEOPLE ALREADY TICKED, and the field is not
           there until somebody is: a lead is one of the staff by definition, and
           a picker with nothing in it is a question with no possible answer. */}
       {values.staffUserIds.length > 0 && (
         <Field config={leadField} htmlFor="app-lead" className={fieldSpacing}>
-          <RecordPicker
+          <StaffPillPicker
             id="app-lead"
-            value={lead || NOBODY}
-            onChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
-            options={sortedOptions(members, lang, (m) => m.name)
+            ariaLabel={t(leadField.label)}
+            people={sortedOptions(members, lang, (m) => m.name)
               .filter((m) => values.staffUserIds.includes(m.id))
-              .map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))}
-            emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
-            placeholder={t("Nobody yet")}
-            searchPlaceholder={t("Search members…")}
-            emptyText={t("Nobody here matched.")}
+              .map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
+            value={lead}
+            onValueChange={(v) => setValues((s) => ({ ...s, leadUserId: v }))}
+            allowNobody
+            nobodyLabel={t("Nobody yet")}
             disabled={busy}
           />
         </Field>

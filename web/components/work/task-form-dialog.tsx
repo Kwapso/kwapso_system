@@ -41,6 +41,7 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { sortedOptions } from "@shared/web/sorted-options"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -245,14 +246,23 @@ export function TaskFormDialog({
         />
       </Field>
       <Field config={assigneeField} htmlFor="task-assignee" className={fieldSpacing}>
-        {picker(
-          "task-assignee",
-          values.assigneeId,
-          "Nobody yet",
-          t("Search members…"),
-          members.map((m) => ({ id: m.id, label: m.name, picture: m.photo, shape: "round" as const })),
-          (v) => setValues((s) => ({ ...s, assigneeId: v }))
-        )}
+        {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN — the client's ruling,
+            15 Sep 2026, said of this exact field first ("On Add Task and
+            generally absolutely everywhere..."). Preselected already: the
+            draft's own initial value is `defaultAssigneeId` (above), so this
+            row opens with the signed-in user's own pill selected on a new
+            task, and an edit keeps the stored value. */}
+        <StaffPillPicker
+          id="task-assignee"
+          ariaLabel={t(assigneeField.label)}
+          people={members.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+          lang={lang}
+          value={values.assigneeId}
+          onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
+          allowNobody
+          nobodyLabel={t("Nobody yet")}
+          disabled={busy}
+        />
       </Field>
       <Field config={departmentField} htmlFor="task-department" className={fieldSpacing}>
         {picker(

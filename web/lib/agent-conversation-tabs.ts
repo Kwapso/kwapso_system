@@ -99,9 +99,18 @@ const NOTHING: AgentTab[] = []
  * already live (a resumed thread, or a blank one) — called once the panel
  * knows what it resumed. It is never a picker: only a tab opened through "+"
  * asks the reader anything, which is what keeps today's resumed-thread
- * behaviour byte for byte unless the reader presses "+" themselves. A no-op
- * once a tab already exists, so a caller may call this on every render that
- * has not yet seen one without needing its own guard. */
+ * behaviour byte for byte unless the reader presses "+" themselves.
+ *
+ * A ONE-SHOT, NOT "WHENEVER EMPTY" — changed for the closing ruling below.
+ * This used to guard on `tabs.length > 0`, which made it re-fire the moment
+ * the strip emptied for ANY reason, including the reader closing their own
+ * last tab on purpose. `hasEverSeeded` guards on having run once, ever, in
+ * this session, so a caller may still call this on every render that has not
+ * yet seen a tab (unchanged) but it stays permanently inert after the first
+ * real seed — closing down to zero later stays zero, which is what lets the
+ * aside itself close (`agent-panel.tsx`'s `handleCloseAgentTab`) instead of
+ * racing a silent refill. */
+let hasEverSeeded = false
 // A NAMED CONSTANT, NOT A LITERAL INLINE BELOW — R33's own walker treats an
 // object literal carrying a `label` field as a translatable config row (the
 // same reading that lets a `FieldConfig` spread translate itself) and then
@@ -112,7 +121,12 @@ const NOTHING: AgentTab[] = []
 const SEED_SCOPE: AgentTabScope = "everything"
 
 export function seedAgentTabs(threadId: string | undefined, label: string): void {
-  if (tabs.length > 0) return
+  // BOTH GUARDS STAY. `tabs.length > 0` is the original idempotency (never
+  // seed a SECOND tab beside one that arrived some other way — a history
+  // pick, a "+" — before this runs); `hasEverSeeded` is the new one, and it
+  // is the one that matters once the strip has been non-empty at least once.
+  if (hasEverSeeded || tabs.length > 0) return
+  hasEverSeeded = true
   const id = newTabId()
   tabs = [{ id, threadId, scope: SEED_SCOPE, label }]
   activeId = id

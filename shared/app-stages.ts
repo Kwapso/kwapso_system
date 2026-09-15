@@ -94,13 +94,6 @@ export function appStageIsActive(name: string | null | undefined): boolean {
   return !(appStage(name)?.closed ?? false)
 }
 
-/** The reading order for a stage — its place in APP_STAGES, and last for a stage
- * a team invented, so the eight the agency knows always come first. */
-export function appStageOrder(name: string | null | undefined): number {
-  const index = APP_STAGES.findIndex((s) => s.name === name)
-  return index === -1 ? APP_STAGES.length : index
-}
-
 /** The word an app with no stage at all is grouped under. One string, so the
  * heading on the apps page and the label in a picker can never disagree. */
 export const NO_STAGE = "No stage yet"
