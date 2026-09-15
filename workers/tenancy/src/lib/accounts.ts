@@ -68,10 +68,15 @@ type AccountRow = {
   creator_name: string | null
   updated_at: string | null
   editor_name: string | null
-  /** the two `LINKED_COMPANY` columns — null on a company row, and null on a
+  /** the three `LINKED_COMPANY` columns — null on a company row, and null on a
    * person nobody has linked yet */
   company_name: string | null
   relationship: string | null
+  /** R35, client ruling 2026-09-15 ("add the logos to account and app …
+   * identify everywhere else where it makes sense") — the Contacts table's
+   * own "Account" column face, off the SAME linked company `company_name`
+   * already resolves. See `toAccount`'s `companyLogoUrl`. */
+  company_logo_url: string | null
 }
 
 /** WHERE A PERSON WORKS AND WHAT THEY DO THERE, as two columns on the account
@@ -153,7 +158,11 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
   deactivated_at,
   created_at, creator_name, updated_at, editor_name,
   ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
-  ${LINKED_COMPANY("l.relationship")} AS relationship`
+  ${LINKED_COMPANY("l.relationship")} AS relationship,
+  -- R35: the Contacts table's own "Account" column face (client ruling
+  -- 2026-09-15), off the SAME linked company company_name already reads —
+  -- one more field on the identical subquery, not a second read.
+  ${LINKED_COMPANY("(SELECT c.logo_url FROM accounts c WHERE c.id = l.account_id)")} AS company_logo_url`
 
 // THE ADDRESS IS FOUR FIELDS NOW, and `address` is not one of them. The column
 // still exists — 0024 backfilled `street` from it and left it alone, because
@@ -223,7 +232,13 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
   // out of (workers/mcp/test/described-contracts.test.ts). A field a tool
   // description may not name is a field the model is not told about; the
   // alternative was a reasoned vocabulary line apologising for a spelling.
-  const contact = { companyName: r.company_name ?? null, relationship: r.relationship ?? null }
+  const contact = {
+    companyName: r.company_name ?? null,
+    relationship: r.relationship ?? null,
+    // R35, the Contacts table's own "Account" column face — the same
+    // withholding as `companyName` beside it, for the same reason (below).
+    companyLogoUrl: r.company_logo_url ?? null,
+  }
   return {
     id: r.id,
     accountType: r.account_type === "individual" ? "individual" : "entity",
@@ -270,6 +285,7 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     // purpose rather than one that arrived by accident.
     companyName: ours ? null : contact.companyName,
     relationship: ours ? null : contact.relationship,
+    companyLogoUrl: ours ? null : contact.companyLogoUrl,
     active: r.deactivated_at == null,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,

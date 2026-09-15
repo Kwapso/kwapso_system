@@ -216,8 +216,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         onViewChange={ctx.setTaskView}
         myUserId={ctx.myUserId}
         canCreate={can("work", "create")}
-        canRaiseTodo={can("todos", "create")}
-        canCancelTodo={can("todos", "delete")}
         onAction={onAction}
         onIntent={onIntent}
       />

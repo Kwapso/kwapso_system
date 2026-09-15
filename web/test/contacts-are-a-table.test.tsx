@@ -164,7 +164,13 @@ describe("the contacts screen draws a table", () => {
     await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
     const first = cellsOf("Marta Bergman")
     expect(first[0]).toContain("Marta Bergman")
-    expect(first[1]).toBe("Bergman S.A.")
+    // THE ACCOUNT CELL WEARS A FACE TOO NOW (R35, client ruling 2026-09-15:
+    // "add the logos to account and app … identify everywhere else where it
+    // makes sense") — the same mark-then-name shape the Contact column already
+    // draws one line up, so the raw text reads "BBergman S.A." (the linked
+    // company's own initial, since this fixture carries no logo). Matched
+    // loosely for the same reason the Contact column's own name is.
+    expect(first[1]).toContain("Bergman S.A.")
     expect(first[2]).toBe("CEO")
   })
 
@@ -177,15 +183,20 @@ describe("the contacts screen draws a table", () => {
     // The first cell reads "IInes Ortiz" — the mark's fallback initial, then the
     // name — which is the mark being drawn (none of these three has a picture,
     // and on the real team only 31 of 110 do). So the name is matched loosely
-    // and the two cells this case is about are matched exactly.
+    // and the role cell (no mark ever rides it) is matched exactly.
     const ines = cellsOf("Ines Ortiz")
     expect(ines[0]).toContain("Ines Ortiz")
-    expect(ines.slice(1), "a company, and nobody's word for what she does").toEqual([
-      "Delaval Nord",
-      "—",
-    ])
+    // THE ACCOUNT CELL CARRIES A MARK WHEN THERE IS A COMPANY TO DRAW ONE FOR
+    // (R35) — "DDelaval Nord", the same shape as the Contact column — so this
+    // is matched loosely too; the em dash beside it is exact.
+    expect(ines[1], "a company, wearing its own face").toContain("Delaval Nord")
+    expect(ines[2], "nobody's word for what she does").toBe("—")
     const tomas = cellsOf("Tomas Roig")
     expect(tomas[0]).toContain("Tomas Roig")
+    // NO COMPANY LINKED AT ALL draws the PLAIN em dash, no mark — the same
+    // absent-record treatment the ticket table's own App column gives an
+    // unset app: an ordinary absence is not a record with no picture, so
+    // there is no face to draw and nothing to match loosely here.
     expect(tomas.slice(1), "nobody has filed him under a company yet").toEqual(["—", "—"])
   })
 

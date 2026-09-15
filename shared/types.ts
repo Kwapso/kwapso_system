@@ -731,6 +731,15 @@ export type HelpTicket = {
    * sprint it could be scheduled into, and who the stakeholder to tell is. */
   appId: string | null
   appName: string | null
+  /** THE APP'S OWN FACE (R35, client ruling 2026-09-15, generalised from
+   * Tasks and Accounts: "add the logos to account and app … identify
+   * everywhere else where it makes sense"). The SAME field name
+   * `TriageWaiting` already carries (`web/lib/api/content.ts`) for the
+   * identical fact, resolved the identical way — a correlated subselect on
+   * `TICKET_COLS` (`workers/content/src/lib/help.ts`), not a second read: an
+   * app the ticket does not have draws no mark at all, the same em dash
+   * `appName` already falls back to. */
+  appLogo: string | null
   /** WHICH SECTION OF THAT APP (Aurora, 19 Aug 2026: "please implement MODULES
    * under apps, so i can group all the tickets I am creating in an organized
    * way"). 94% of the 1,820 tickets in the legacy data carried one, which is why
@@ -1304,6 +1313,18 @@ export type Account = {
    * companies, and one of them may sit outside the caller's fence. */
   companyName?: string | null
   relationship?: string | null
+  /** THE LINKED COMPANY'S OWN FACE (R35, client ruling 2026-09-15, generalised
+   * from Tasks and Accounts: "add the logos to account and app … identify
+   * everywhere else where it makes sense") — the Contacts table's own
+   * "Account" column. Resolved off the SAME `account_links` row `companyName`
+   * already is (`LINKED_COMPANY`, `workers/tenancy/src/lib/accounts.ts`), so
+   * this is one more field on that subquery rather than a second read.
+   * `null` on a company row (nobody's contact, same as `companyName`), `null`
+   * on a link with no company yet, and `null` on the way OUT to a client
+   * login — the identical withholding `companyName` carries two lines up,
+   * for the identical reason (a person can be a contact at two companies and
+   * only one may be inside the caller's fence). */
+  companyLogoUrl?: string | null
   /** false once archived (deactivate-never-delete) */
   active: boolean
   /** the audit block, for the detail Overview tab (the same shape every record
@@ -2229,6 +2250,12 @@ export type Task = {
    * time in the right margin. */
   accountId: string | null
   accountName: string | null
+  /** THE ACCOUNT'S OWN MARK (2026-09-15 client ruling: "add the logos to account
+   * and app"), joined off `accounts.logo_url` the same way `accountName` already
+   * is. `null` when the task names no account, or the account has no logo — the
+   * table cell draws `RecordMark`'s own initial in either case, the same as
+   * every other record face in the app (R35). */
+  accountLogoUrl: string | null
   /** THE EISENHOWER PAIR, which replaced a high/medium/low word. `priority` is
    * `(important × 2) + urgent + 1`, 1 to 4, computed from the two rather than
    * stored — a derived column is a column that can disagree with its inputs. */
@@ -2241,6 +2268,9 @@ export type Task = {
   department: string | null
   appId: string | null
   appName: string | null
+  /** THE APP'S OWN MARK — the same 2026-09-15 ruling as `accountLogoUrl`, joined
+   * off `apps.logo_url` the same way `appName` already is. */
+  appLogoUrl: string | null
   /** the one thing attached to it — a photo of the letter, the form to file. It
    * lives in the agency's own bucket, served at /media/internal/ by the agency
    * gateway alone (R21): a task is ours, and so is its evidence. */
@@ -2438,6 +2468,14 @@ export type Meeting = {
   /** which client it is with. Null = an internal meeting of our own. */
   accountId: string | null
   accountName: string | null
+  /** THE ACCOUNT'S OWN FACE (R35, client ruling 2026-09-15, generalised from
+   * Tasks and Accounts: "add the logos to account and app … identify
+   * everywhere else where it makes sense") — the Table's own "Account"
+   * column (`meetings-screen.tsx`'s `TABLE_COLUMNS`). Resolved beside
+   * `accountName` in the same read (`MEETING_COLS`,
+   * `workers/content/src/lib/meetings.ts`), never a second fetch. `null` on
+   * an internal meeting (no account) exactly as `accountName` is. */
+  accountLogoUrl: string | null
   /** WHICH SYSTEM IT WAS ABOUT, and the app's name so a row can say it without a
    * second lookup. Nullable: plenty of meetings are about the account rather
    * than one of its systems, and the first kickoff call is one of them. */

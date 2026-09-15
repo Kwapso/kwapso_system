@@ -244,6 +244,32 @@ describe("the meetings list itself", () => {
     expect(meetings[0].accountName).toBe("Bergman S.A.")
   })
 
+  // R35, client ruling 2026-09-15: "add the logos to account and app …
+  // identify everywhere else where it makes sense" — the Table's own
+  // "Account" column (meetings-screen.tsx). Resolved the same way
+  // `accountName` is, one correlated subselect on the same row
+  // (`MEETING_COLS`), never a second read.
+  it("carries the account's own logo, off the same read as its name", async () => {
+    db()
+      .prepare("UPDATE accounts SET logo_url = ? WHERE id = ?")
+      .run("/media/bergman-logo.png", IDS.victimAccount)
+    const m = await arrange({ accountId: IDS.victimAccount })
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, `?id=${m.id}`)
+    const { meetings } = (await res.json()) as { meetings: Meeting[] }
+    expect(meetings[0].accountLogoUrl).toBe("/media/bergman-logo.png")
+  })
+
+  // AN INTERNAL MEETING NAMES NO ACCOUNT AND THEREFORE NO LOGO — the honest
+  // null `accountName` already answers with, not an empty string a screen
+  // could mistake for "the account has no picture".
+  it("an internal meeting (no account) carries no logo either", async () => {
+    const m = await arrange({ title: "Team standup" })
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, `?id=${m.id}`)
+    const { meetings } = (await res.json()) as { meetings: Meeting[] }
+    expect(meetings[0].accountId).toBeNull()
+    expect(meetings[0].accountLogoUrl).toBeNull()
+  })
+
   it("a meeting with a client gets the reference that client quotes; ours gets none", async () => {
     // 2026-08-31: team-wide, no account-code prefix — the account's own code
     // no longer matters, so this is set (or not) without changing the result.

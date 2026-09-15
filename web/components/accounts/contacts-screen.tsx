@@ -127,7 +127,12 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
  * has already translated the recipe. */
 const CONTACT_COLUMNS = [
   field("person", "Contact"),
-  field("account", "Account"),
+  // THE ACCOUNT, WEARING ITS OWN FACE (R35, client ruling 2026-09-15: "add the
+  // logos to account and app … identify everywhere else where it makes
+  // sense"). `accountCell`, NOT `account` — `shapeContactsTable` keeps
+  // `account` as plain text for this column's own `searchKey` below, and a
+  // React node there would be unsearchable ("[object Object]").
+  field("accountCell", "Account"),
   field("role", "Role"),
 ]
 
@@ -150,6 +155,17 @@ const CONTACT_COLUMN_HEADERS: TableColumn[] = CONTACT_COLUMNS.map((f) => {
     label: f.field.label,
     sort: option?.value,
     defaultDir: option?.defaultDir,
+    // `accountCell` HOLDS A NODE (the mark + name span `shapeContactsTable`
+    // builds), not plain text — `account` is the sibling row key kept as a
+    // string for exactly this: `CollectionFrame`'s free-text match reads
+    // `String(row[key])` (record-table.tsx's own `searchKey` doc), and a
+    // node there is `"[object Object]"`. Inert on this PAGED table today
+    // (the door owns the search, same as Person and Role beside it), and
+    // still declared for the reason record-table.tsx gives one column over
+    // (the meetings table's own Account column carries the identical line):
+    // a column left unset is silently unsearchable the day this table stops
+    // being paged, rather than visibly correct now.
+    searchKey: f.column === "accountCell" ? "account" : undefined,
     // NO `sortType`/`sortKey` on any of these, and the absence is the statement:
     // every order this table can be put in is the DOOR's (`order={found.order}`
     // below), so nothing here is ever compared in the browser. Nor is any cell

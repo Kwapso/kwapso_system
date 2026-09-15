@@ -253,8 +253,6 @@ function renderTasksCalendar(tasks: Task[], view: "table" | "calendar" = "calend
         onViewChange={() => {}}
         myUserId="u1"
         canCreate
-        canRaiseTodo={false}
-        canCancelTodo={false}
         onAction={() => {}}
         onIntent={() => {}}
       />

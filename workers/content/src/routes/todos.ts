@@ -344,10 +344,15 @@ async function taskPage(
  * `calendar` stayed (see `viewClause`'s own note) even though the strip no
  * longer draws them as tabs of their own.
  *
- * WHOSE TASKS COME BACK IS NOW A PERMISSION (4.9). `work:read` opens the screen;
- * `all_tasks:read` decides whether the screen is the whole team's list or your
- * own. Without it the caller's own user id REPLACES whatever `assigneeId` the
- * request asked for — narrowed rather than refused, because "show me Ana's
+ * WHOSE TASKS COME BACK IS A PERMISSION (4.9), NARROWED PER VIEW SINCE
+ * 2026-09-15. `work:read` opens the screen; `all_tasks:read` decides whether
+ * `all` (the "Everyone's" tab) is the whole team's list or narrows to your own
+ * — Overdue/Planned/Completed narrow to the caller's own name UNCONDITIONALLY
+ * now, right or no right (the client's own words: "On overdue tasks, it's only
+ * mine"), because those three are "this is MY tasks" and Everyone's is the one
+ * tab that answers the other question. Without the right every view narrows,
+ * same as before — the caller's own user id REPLACES whatever `assigneeId` the
+ * request asked for, narrowed rather than refused, because "show me Ana's
  * tasks" from somebody who may not see them is a question with a perfectly good
  * answer (yours), and a 403 on a list door teaches a screen to hide a tab
  * instead of showing the right rows.
@@ -361,7 +366,21 @@ export async function getTasks(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   const filter = taskFilterFrom(url)
   const everyones = await hasRight(cfg, guard, "all_tasks", "read")
-  const narrowed = everyones ? filter : { ...filter, assigneeId: guard.userId }
+  // OVERDUE/PLANNED/COMPLETED ARE MINE, ALWAYS (client ruling, 2026-09-15: "On
+  // overdue tasks, it's only mine, so make sure you filter it to me"). Until
+  // this, `all_tasks:read` decided the narrowing for EVERY view — so a caller
+  // who may see everyone's got everyone's on the first three tabs too, and the
+  // fourth tab (`all`, "Everyone's") was the only place that right meant
+  // anything. The three MINE tabs now narrow to the caller's own name
+  // unconditionally; the right decides only whether `all` — the door's
+  // status-agnostic view, the one the "Everyone's" tab asks for — may come back
+  // un-narrowed. A caller without the right still gets their own name on every
+  // view, exactly as before.
+  const MINE_VIEWS: readonly TaskViewName[] = ["overdue", "planned", "completed"]
+  const narrowed =
+    MINE_VIEWS.includes(filter.view ?? "open") || !everyones
+      ? { ...filter, assigneeId: guard.userId }
+      : filter
   // ONE TASK BY ID IS A LOOKUP, NOT A PAGE — the same shape the tickets door
   // takes, and for the same reason: once a collection pages, filtering a page
   // for a record that may legitimately not be on it is how a screen comes to

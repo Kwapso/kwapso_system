@@ -21,7 +21,7 @@
 
 import * as React from "react"
 import { createPortal } from "react-dom"
-import { CaretDown, Check, ClockCounterClockwise, Plus, X } from "@shared/ui/foundations/icons"
+import { CaretDown, Check, ClockCounterClockwise, X } from "@shared/ui/foundations/icons"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@shared/ui/components/collapsible/collapsible"
 
 import { Button } from "@shared/ui/components/button/button"
@@ -32,19 +32,35 @@ import { PopoverContent } from "@shared/ui/components/popover/popover"
 import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
 import { Toggle } from "@shared/ui/components/toggle/toggle"
 
-import { SOURCE_CHIPS } from "@shared/knowledge-chips"
+import { SOURCE_CHIPS, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { CollectionRegister } from "@shared/ui/components/collection-frame/collection-frame"
 import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 import { Title } from "@shared/ui/components/title/title"
 import { cn } from "@shared/ui/lib/utils"
 
 import { AgentHistoryDialog } from "@/components/assistant/agent-history-dialog"
+import { AgentScopePicker } from "@/components/assistant/agent-scope-picker"
+import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import { AssistantLimitNotice } from "@/components/assistant/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/assistant/agent-sources"
 import { AgentUsageDialog } from "@/components/assistant/agent-usage-dialog"
 import { useAgentDock } from "@/lib/agent-dock"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
+import {
+  activateAgentTab,
+  agentTabsSnapshot,
+  closeAgentTab,
+  openNewAgentTab,
+  pickAgentTabScope,
+  seedAgentTabs,
+  setAgentTabThread,
+  useActiveAgentTabId,
+  useAgentTabs,
+  type AgentTabScope,
+} from "@/lib/agent-conversation-tabs"
 import { usePermissions } from "@/lib/perms"
+import { useActiveTabPath, useOpenTabs } from "@/lib/workspace-tabs"
+import { parseRoute } from "@/components/deep-link/route"
 import { useLanguage, useT } from "@shared/web/language"
 import { formatRelative } from "@shared/web/format"
 
@@ -407,6 +423,140 @@ export function AgentPanel({
   const [usageOpen, setUsageOpen] = React.useState(false)
   const [historyOpen, setHistoryOpen] = React.useState(false)
 
+  /* ── THE TAB STRIP — the client's "+" ruling, 15 Sep 2026 ──────────────────
+     web/lib/agent-conversation-tabs.ts carries the quote and the whole
+     argument for this shape; this component only wires it to the one live
+     chat (`use-agent-chat.tsx`) and to what the app currently has open
+     (`workspace-tabs.ts`). */
+  const agentTabs = useAgentTabs()
+  const activeAgentTabId = useActiveAgentTabId()
+  const activeAgentTab = agentTabs.find((tab) => tab.id === activeAgentTabId)
+
+  // WHETHER "THIS RECORD" HAS SOMETHING TO POINT AT. `useActiveTabPath()` is
+  // the same in-app address the main content trail tracks — reactive on every
+  // soft navigation — and `parseRoute` reads its DEEPEST level exactly as the
+  // deep-link shell does: a non-empty `recordId` is a record actually open,
+  // not a bare collection or the team overview. KNOWN GAP: that tracking is
+  // itself switched off on a narrow viewport (`workspace-tabs.ts`'s own
+  // decision 5, "on a phone there is no tab set at all"), so on the floating
+  // popover this can under-report — which is the conservative side to be
+  // wrong on: the task's own rule is "if 'This record' has no current record,
+  // hide that option," and hiding it a little more often than strictly
+  // necessary never offers something it cannot deliver.
+  const activeWorkspacePath = useActiveTabPath()
+  const openWorkspaceTabs = useOpenTabs()
+  const currentRoute = activeWorkspacePath ? parseRoute(activeWorkspacePath, "") : null
+  const hasCurrentRecord = !!currentRoute?.recordId
+  const currentRecordLabel = hasCurrentRecord
+    ? (openWorkspaceTabs.find((tab) => tab.path === activeWorkspacePath)?.label ?? currentRoute?.recordId)
+    : undefined
+
+  // SEED, ONCE — a bare panel gets one tab standing for whatever it resumes
+  // (or a blank one), never a picker. `seedAgentTabs` itself is the guard
+  // (no-op once a tab exists), so this can run on every render without its
+  // own gate.
+  React.useEffect(() => {
+    if (agentTabs.length === 0) seedAgentTabs(chat.threadId, t("Conversation"))
+  }, [agentTabs.length, chat.threadId, t])
+
+  // KEEP THE ACTIVE TAB'S THREAD IN STEP WITH THE ONE LIVE THREAD. Covers both
+  // directions at once: a resume that finishes after the seed above, and a
+  // draft tab's first message minting a real thread — `use-agent-chat.tsx`
+  // sets `chat.threadId` the moment either happens, and whichever tab is
+  // active right now is the one it happened TO, because switching tabs is a
+  // synchronous swap (see `switchToAgentTab` below) before either can occur.
+  React.useEffect(() => {
+    if (!chat.threadId || !activeAgentTabId) return
+    setAgentTabThread(activeAgentTabId, chat.threadId)
+  }, [chat.threadId, activeAgentTabId])
+
+  // Load whichever tab is now active into the one live chat — the swap model
+  // `agent-conversation-tabs.ts`'s own header argues for. A tab with a real
+  // thread resumes it (identical to the history sheet's own `onPick`); a
+  // draft (no thread yet — still on the picker, or scoped but not sent to)
+  // starts from a clean slate.
+  function switchToAgentTab(tab: { threadId?: string } | undefined) {
+    if (tab?.threadId) void chat.openThread(tab.threadId)
+    else chat.newChat()
+  }
+
+  function handleSelectAgentTab(id: string) {
+    const tab = agentTabs.find((t) => t.id === id)
+    if (!tab) return
+    activateAgentTab(id)
+    switchToAgentTab(tab)
+  }
+
+  function handleNewAgentTab() {
+    openNewAgentTab()
+    chat.newChat()
+  }
+
+  function handleCloseAgentTab(id: string) {
+    const wasActive = id === activeAgentTabId
+    const landingId = closeAgentTab(id)
+    if (!wasActive) return
+    switchToAgentTab(landingId ? agentTabsSnapshot().find((t) => t.id === landingId) : undefined)
+  }
+
+  // A picker row was pressed: name the scope, then apply its reading-from
+  // narrowing — diffed against whatever the shared source-chip row currently
+  // holds, one `toggleSource` per key that disagrees, because `useAgentChat`
+  // exposes only the single-key toggle (the same one `SourceChips` uses) and
+  // not a bulk setter. "This record" also narrows to the app's own records
+  // door and names the record in the first message, the identical convention
+  // `ask-the-assistant.tsx` already uses for a record-scoped question
+  // ("About {context}: …") — the chat door itself has no structured
+  // record-id field to hand it instead.
+  function handlePickScope(scope: AgentTabScope) {
+    if (!activeAgentTabId) return
+    const label =
+      scope === "record"
+        ? (currentRecordLabel ?? t("This record"))
+        : scope === "knowledge"
+          ? t("Knowledge base")
+          : t("Everything (today's default)")
+    pickAgentTabScope(activeAgentTabId, scope, label, scope === "record" ? currentRecordLabel : undefined)
+    const target = scope === "record" ? ["records"] : scope === "knowledge" ? ["articles"] : [...SOURCE_CHIP_KEYS]
+    for (const key of SOURCE_CHIP_KEYS) {
+      const has = chat.sources.includes(key)
+      const want = target.includes(key)
+      if (has !== want) chat.toggleSource(key)
+    }
+  }
+
+  // The record-scope prefix rides only the FIRST message of a record-scoped
+  // tab — `!tab.threadId` is "nothing sent yet in this tab", the same signal
+  // `setAgentTabThread` clears the moment the server mints one.
+  function handleSend(text: string) {
+    const tab = activeAgentTab
+    const prefixed =
+      tab?.scope === "record" && !tab.threadId && tab.recordLabel ? `About ${tab.recordLabel}: ${text}` : text
+    return chat.send(prefixed)
+  }
+
+  // ESCAPE ON A PICKER TAB CLOSES IT — the task's own rule for a surface drawn
+  // in the tab body rather than a dialog. DOCKED ONLY: on the narrow, floating
+  // presentation Escape already closes the whole `Popover` (Radix's own
+  // default — nothing here changes it), so a second handler would only race
+  // it, never add anything.
+  React.useEffect(() => {
+    if (!docked || !open || !activeAgentTabId || activeAgentTab?.scope !== null) return
+    const id = activeAgentTabId
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") handleCloseAgentTab(id)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+    // `handleCloseAgentTab` is remade every render (it closes over `chat`,
+    // itself a fresh object each render — the same reason use-agent-chat.tsx's
+    // own "handed-in question" effect excludes `send`) — listing it would tear
+    // this listener down and rebuild it on every keystroke elsewhere in the
+    // panel while the picker sits open, for a value that is already read
+    // fresh, by id, the moment Escape actually fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docked, open, activeAgentTabId, activeAgentTab?.scope])
+
   // Hand focus to the composer once the popover has animated in — Radix
   // focuses the PANEL by default, so keystrokes hit it (and paint a focus
   // ring around the whole bubble) instead of the message box. Best-effort: if
@@ -543,6 +693,23 @@ export function AgentPanel({
     // from the panel, then dismiss the panel with Escape — Usage stays put).
     <>
     <PanelFrame docked={docked}>
+      {/* THE TAB STRIP — client ruling, 15 Sep 2026: "all the time, there is a
+          visible tab that has a plus button. That's how you create a new
+          one." Drawn only once there is a conversation surface at all
+          (`canUse`); a role the assistant is closed to has nothing for tabs
+          to switch between (see the `!canUse` branch below). One level below
+          the kit's own single "Assistant" folder tab — see
+          `agent-tab-strip.tsx` for why that tab cannot carry this strip
+          itself. */}
+      {canUse && (
+        <AgentTabStrip
+          tabs={agentTabs}
+          activeId={activeAgentTabId}
+          onSelect={handleSelectAgentTab}
+          onClose={handleCloseAgentTab}
+          onNew={handleNewAgentTab}
+        />
+      )}
       <div className="flex shrink-0 flex-col gap-[var(--space-2h)] shadow-[var(--hairline-under)] px-4 pt-[var(--space-5)] pb-[var(--space-4h)]">
         {/* ITEM 1 (owner, 31 Aug 2026): "remove the x button on top right (i
             dont need it anymore)". The launcher button itself already toggles
@@ -599,22 +766,13 @@ export function AgentPanel({
                 </TooltipTrigger>
                 <TooltipContent>{t("Past conversations")}</TooltipContent>
               </Tooltip>
-              {chat.items.length > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={chat.newChat}
-                      disabled={chat.busy}
-                      aria-label={t("New chat")}
-                    >
-                      <Plus className="size-5" aria-hidden />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("New chat")}</TooltipContent>
-                </Tooltip>
-              )}
+              {/* NO SEPARATE "NEW CHAT" BUTTON HERE ANY MORE — superseded by
+                  the tab strip's own "+" above (`AgentTabStrip`), which the
+                  client's own ruling makes the ONE way to start a fresh
+                  conversation: "that's how you create a new one." Two
+                  controls for the identical action is the same "one-mango"
+                  problem `agent-host.tsx` already argues against for the
+                  launcher. */}
             </>
           }
         >
@@ -684,6 +842,15 @@ export function AgentPanel({
         // `py-4` and `AssistantLimitNotice`'s own `mb-2`. (A third, the
         // staged-attachment row's `pb-2`, went with the upload.)
         <div className="agent-chat-host flex min-h-0 flex-1 flex-col px-4 pb-4">
+          {activeAgentTab?.scope === null ? (
+            // THE SCOPE PICKER — a fresh "+" tab's first state, drawn INSIDE
+            // this same tab body rather than as a dialog (Laws R59/R67; see
+            // `agent-scope-picker.tsx`'s own header for the argument).
+            // Replaces the ordinary transcript and composer entirely until a
+            // row below is pressed.
+            <AgentScopePicker hasRecord={hasCurrentRecord} onPick={handlePickScope} />
+          ) : (
+          <>
           {/* WHY IT COULDN'T ANSWER, when the model door was the reason.
               PINNED UNDER THE HEADER, above the conversation — the first
               placement put it under the composer, which on screen reads as a
@@ -1102,7 +1269,7 @@ export function AgentPanel({
                   body={t("“Invite a member as a Viewer”, or “what changed this week?”")}
                 />
               }
-              onSend={(text) => void chat.send(text)}
+              onSend={(text) => void handleSend(text)}
             />
           </div>
 
@@ -1132,6 +1299,8 @@ export function AgentPanel({
                 </Button>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       )}

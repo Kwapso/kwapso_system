@@ -194,6 +194,39 @@ describe("the seven states", () => {
   })
 })
 
+// R35, client ruling 2026-09-15: "add the logos to account and app … identify
+// everywhere else where it makes sense" — the App column on the Open/Closed/
+// All/Triage tables (`TicketRowsTable`, web/components/tickets/tickets-
+// collection.tsx). Resolved the same way `appName` already is, off the same
+// correlated subselect (`TICKET_COLS`, workers/content/src/lib/help.ts) —
+// never a second read.
+describe("the App column's own face (R35)", () => {
+  it("carries the app's own logo, off the same read as its name", async () => {
+    db().prepare("UPDATE apps SET logo_url = ? WHERE id = ?").run("/media/dispatch-logo.png", IDS.victimApp)
+    const id = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", {
+        description: "The dispatch board is slow",
+        accountId: IDS.victimAccount,
+        appId: IDS.victimApp,
+      })
+    ))[0]
+    const res = await call(IDS.staffUser, "GET /api/content/help", undefined, `?id=${id}`)
+    const { tickets } = (await res.json()) as { tickets: { appName: string | null; appLogo: string | null }[] }
+    expect(tickets[0].appName).toBe("Bergman dispatch")
+    expect(tickets[0].appLogo).toBe("/media/dispatch-logo.png")
+  })
+
+  it("a ticket naming no app carries no logo either", async () => {
+    const id = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", { description: "No app on this one" })
+    ))[0]
+    const res = await call(IDS.staffUser, "GET /api/content/help", undefined, `?id=${id}`)
+    const { tickets } = (await res.json()) as { tickets: { appName: string | null; appLogo: string | null }[] }
+    expect(tickets[0].appName).toBeNull()
+    expect(tickets[0].appLogo).toBeNull()
+  })
+})
+
 describe("the reference number the client quotes", () => {
   it("is TEAM-wide (no account-code prefix) and counts across accounts", async () => {
     // 2026-08-31 ruling: the account-code prefix is gone, and so is the

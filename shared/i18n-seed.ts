@@ -1161,7 +1161,6 @@ export const SEED: Catalogue = {
   "Hours by kind of work": { de: "Stunden nach Art der Arbeit", es: "Horas por tipo de trabajo", ca: "Hores per tipus de feina"},
   "Hours by person": { de: "Stunden nach Person", es: "Horas por persona", ca: "Hores per persona"},
   "Hours logged": { de: "Erfasste Stunden", es: "Horas registradas", ca: "Hores registrades"},
-  "How to read this month": { de: "So lesen Sie diesen Monat", es: "Cómo leer este mes", ca: "Com llegir aquest mes"},
   "Important": { de: "Wichtig", es: "Importante", ca: "Important"},
   "In use": { de: "In Verwendung", es: "En uso", ca: "En ús"},
   "It no longer happens": { de: "Es passiert nicht mehr", es: "Ya no ocurre", ca: "Ja no passa"},
@@ -1176,7 +1175,6 @@ export const SEED: Catalogue = {
   "Looking…": { de: "Wird gesucht…", es: "Buscando…", ca: "Cercant…"},
   "Marta Bergman": { de: "Marta Bergman", es: "Marta Bergman", ca: "Marta Bergman"},
   "Member": { de: "Mitglied", es: "Miembro", ca: "Membre"},
-  "Month": { de: "Monat", es: "Mes", ca: "Mes"},
   "Most recent first": { de: "Neueste zuerst", es: "Más recientes primero", ca: "Els més recents primer"},
   "Most steps": { de: "Meiste Schritte", es: "Más pasos", ca: "Més passos"},
   "Never used yet": { de: "Noch nie verwendet", es: "Nunca usada aún", ca: "Encara mai utilitzada"},
@@ -1812,6 +1810,38 @@ export const SEED: Catalogue = {
     es: "Pregunta sobre este registro…",
     ca: "Pregunta sobre aquest registre…",
   },
+  /* The assistant's own "+" tab and its scope picker (client ruling,
+   * 15 Sep 2026 — see web/lib/agent-conversation-tabs.ts and
+   * web/components/assistant/agent-scope-picker.tsx). TRANSLATION_CEILING
+   * stays at 0/0/0, so every one of these carries all three languages. */
+  "New conversation": { de: "Neue Unterhaltung", es: "Nueva conversación", ca: "Nova conversa" },
+  "What should this conversation read?": {
+    de: "Was soll dieses Gespräch lesen?",
+    es: "¿Qué debe leer esta conversación?",
+    ca: "Què ha de llegir aquesta conversa?",
+  },
+  "This record": { de: "Dieser Datensatz", es: "Este registro", ca: "Aquest registre" },
+  "Picks up the record you're viewing": {
+    de: "Greift auf den Datensatz zu, den Sie sich gerade ansehen",
+    es: "Toma el registro que estás viendo",
+    ca: "Agafa el registre que estàs veient",
+  },
+  "Articles and indexed files": {
+    de: "Artikel und indexierte Dateien",
+    es: "Artículos y archivos indexados",
+    ca: "Articles i fitxers indexats",
+  },
+  "Everything (today's default)": {
+    de: "Alles (heutige Standardeinstellung)",
+    es: "Todo (opción predeterminada actual)",
+    ca: "Tot (opció predeterminada actual)",
+  },
+  "All six sources, untick later": {
+    de: "Alle sechs Quellen, später abwählen",
+    es: "Las seis fuentes, puedes desmarcarlas después",
+    ca: "Les sis fonts, les pots desmarcar després",
+  },
+  "Open conversations": { de: "Offene Unterhaltungen", es: "Conversaciones abiertas", ca: "Converses obertes" },
   "Asking a question needs the assistant": {
     de: "Um eine Frage zu stellen, benötigen Sie den Assistenten",
     es: "Para hacer una pregunta necesitas el asistente",

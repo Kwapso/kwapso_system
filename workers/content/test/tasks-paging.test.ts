@@ -92,10 +92,18 @@ function seedTasks(): void {
     // Deliberately COARSE — ten distinct deadlines over sixty-one rows, so runs
     // of identical sort keys are long enough to straddle the fifty-row boundary.
     const due = i % 5 === 4 ? null : `2026-1${i % 10}-01`
+    // ASSIGNED TO THE CALLER (`IDS.staffUser`, the same id `env()` acts as) —
+    // 2026-09-15's "Overdue/Planned/Completed are mine, unconditionally"
+    // ruling narrows every one of those three views to `assignee_id = caller`
+    // now, so a page test whose rows named nobody would empty out under
+    // `?view=completed` regardless of whether the cursor logic this file
+    // exists to prove is correct. The walk itself asks nothing about WHOSE
+    // tasks they are; it only needs every row to be visible to the one caller
+    // driving it.
     stmts.push(
-      `INSERT INTO tasks (id, title, status, important, urgent, due_on, created_at, creator_id, creator_email, creator_name)
+      `INSERT INTO tasks (id, title, status, important, urgent, due_on, created_at, creator_id, creator_email, creator_name, assignee_id, assignee_name)
        VALUES ('${id}', 'Task ${i}', '${done}', ${important}, ${urgent}, ${due ? `'${due}'` : "NULL"},
-               '2026-09-01T00:00:00Z', '${IDS.staffUser}', 'staff@kwapso.test', 'Staff')`
+               '2026-09-01T00:00:00Z', '${IDS.staffUser}', 'staff@kwapso.test', 'Staff', '${IDS.staffUser}', 'Staff')`
     )
   }
   for (const s of stmts) db().exec(s)

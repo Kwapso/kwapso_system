@@ -6,11 +6,11 @@
 // REBUILT ON THE KIT (30 Aug 2026). UI-GAPS #22's blocker — the library's
 // `CalendarView` took no click prop of any kind, so a record on the grid was a
 // picture of a record — was fixed upstream in kit v1.2.9: `CalendarViewProps`
-// now carries `onSelectDay` / `onSelectEvent` / `onSelectItem`. This file is
-// now composed from `CalendarView` (the month grid) and `Agenda` (the day-by-day
-// list, itself a thin wrapper over `CalendarView`'s own `agenda` view) rather
-// than hand-rolling both — the same reason `roles-matrix.tsx` reaches for the
-// kit's parts instead of drawing its own.
+// now carries `onSelectDay` / `onSelectEvent` / `onSelectItem`. This file's two
+// exports are each composed from one kit part rather than hand-rolling either
+// — the same reason `roles-matrix.tsx` reaches for the kit's parts instead of
+// drawing its own: `RecordCalendar` (below) from `CalendarView`, the month
+// grid; `RecordAgenda` (the file's tail) from `Agenda`, the day-by-day list.
 //
 // WHY A CELL IS NEVER A BUTTON. The kit makes a day cell a real `<button>` when
 // `onSelectDay` is given, wrapping its event chips — and a chip becomes its OWN
@@ -21,12 +21,32 @@
 // on its own — the same "+6 more must open something" reasoning UI-GAPS #22
 // raised in the first place.
 //
-// TWO WAYS TO READ ONE MONTH, unchanged. The GRID is for a desktop, where a
-// thousand pixels can hold a month at a glance. The AGENDA is that same month
-// as a list, day by day, and it is what a PHONE opens on: a month grid at
-// 375px is six rows of cells about three characters wide, which is not
-// information. Both open records the same way and both show the same period,
-// so flipping between them is a change of shape and never a change of subject.
+// THE PHONE'S OWN WAY IN, kit v1.2.86. Below `sm:` the kit swaps chips for
+// chapter 18's dots, which used to be `aria-hidden` decoration with nothing
+// wired to them — a busy day on a phone could be SEEN and not opened at all,
+// because the desktop "+N more" chip this file builds into `events` (above)
+// is itself inside the `sm:flex` chip column the kit hides below `sm:`. The
+// kit's `onSelectMore` is now also what the compact dots call, so this file
+// wires it to the exact same `setOpenDay` the overflow chip's `onSelectEvent`
+// branch already calls — one dialog, two doors in. The kit hands back the
+// day and its events, but this file re-reads `byDay` by `day.key` instead
+// (the second argument is the kit's own shaped `CalendarEvent[]`, not this
+// file's `CalendarEntry[]`), exactly as the overflow-chip branch already
+// does.
+//
+// ONE WAY TO READ ONE MONTH, since the client's ruling of 2026-09-15: *"Agenda
+// is a different component than month. Inside the calendar, the whole month
+// agenda: disable that. When I mean calendar, I mean the month view."* This
+// file used to offer the month as EITHER a grid or an agenda (a day-by-day
+// list drawn through the kit's own `Agenda`), with a phone opening on the
+// agenda by default because "a month grid at 375px is six rows of cells about
+// three characters wide, which is not information". That second reading is
+// gone — no `ToggleGroup`, no `Mode`, no device check — and a phone now gets
+// the same grid a desktop does (verified at 375px: `CalendarView`'s grid is a
+// fluid `repeat(7, 1fr)`, so the cells narrow rather than break; a chip's own
+// `truncate` keeps a long title from wrapping the row). What the kit calls
+// "agenda" — day by day, chronological — is a DIFFERENT component now, never
+// a mode switch inside this one.
 //
 // WHAT IT DELIBERATELY IS NOT. It is not a scheduler: nothing here drags, and
 // no record moves by being dropped on a day. A calendar in this app is a way
@@ -34,15 +54,21 @@
 // record's own form, where it is validated at the door like every other field.
 //
 // TWO EXPORTS, ONE KIT COMPONENT EACH, since 2026-09-15. `RecordCalendar`
-// (above) is a MONTH — grid or agenda, its own navigation, its own fetch of
-// whichever month is on screen. `RecordAgenda` (below) is neither: a
-// caller-narrowed set of entries (a week, never a month this file would have
-// to filter down to), read day by day, with no navigation of its own — the
-// Meetings screen's own "This week" Agenda view is its first caller. Both are
-// the "ONE CALENDAR" law's answer to the same question, `web/test/rules.test.ts`'s
-// `one-calendar`: nothing outside this file may import the kit's own
-// `calendar-view` or `agenda` directly, so a record on either shape is never a
-// picture with no click (UI-GAPS #22).
+// (above) is a MONTH GRID, only — its own navigation, its own fetch of
+// whichever month is on screen. `RecordAgenda` (below) is the "different
+// component" the ruling names: a caller-narrowed set of entries (a week,
+// never a month this file would have to filter down to), read day by day,
+// with no navigation of its own — the Meetings screen's own "This week"
+// Agenda view is its first caller. Both are the "ONE CALENDAR" law's answer
+// to the same question, `web/test/rules.test.ts`'s `one-calendar`: nothing
+// outside this file may import the kit's own `calendar-view` or `agenda`
+// directly, so a record on either shape is never a picture with no click
+// (UI-GAPS #22).
+//
+// TODAY'S CHIPS ARE INK, NOT BEIGE, since the same 2026-09-15 ruling: *"On the
+// calendar view, on today, make the tasks' background black instead of
+// beige, and always show the priority color circle."* Two separate changes —
+// see `buildDayEvents` below for both.
 
 import * as React from "react"
 
@@ -54,15 +80,20 @@ import {
   DialogTitle,
 } from "@shared/ui/components/dialog/dialog"
 import { List } from "@shared/web/list-compat"
-import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { CalendarView, type CalendarDay, type CalendarEvent } from "@shared/ui/components/calendar-view/calendar-view"
 import { Agenda, type AgendaDay } from "@shared/ui/components/agenda/agenda"
-import { CalendarBlank, CalendarDots, CaretLeft, CaretRight, ListNumbers } from "@shared/ui/foundations/icons"
+import { CalendarDots, CaretLeft, CaretRight } from "@shared/ui/foundations/icons"
 
-import { useIsPhone } from "@/lib/use-is-phone"
 import { formatDate } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
 import type { Language, Vars } from "@shared/i18n"
+// The same six dot tones `Badge`'s own `dot` prop and `Kanban`'s `ColumnDot`
+// read (badge.tsx's `BadgeDot`, kanban.tsx's `KanbanColumnDot` — one enum,
+// three names). `DotTone` is the app-level name for it, already the type
+// `PRIORITY_DOT_TONE` (`shared/departments.ts`) is keyed to, so this file
+// types `CalendarEntry.dotTone` to the exact same union rather than a bare
+// `string` a typo could slip past.
+import type { DotTone } from "@shared/app-stages"
 
 /* ------------------------------- what it takes ---------------------------- */
 
@@ -77,13 +108,22 @@ export type CalendarEntry = {
   title: string
   /** the value the colour is derived from ("" = one neutral colour) */
   accent?: string
-  /** the second line the agenda and the day view read. A grid cell has no room
-   *  for it; a list has, and it is the difference between "Standup" and
+  /**
+   * THE PRIORITY COLOUR CIRCLE (client ruling, 2026-09-15: "always show the
+   * priority color circle"). Added for the Tasks lane's board, which sets it
+   * from `PRIORITY_DOT_TONE[priority]` (`shared/departments.ts`) — one of the
+   * kit's six fixed dot tones, never a hash like `accent`. When both are
+   * given, `dotTone` is what draws: a chip earns at most one dot (the same
+   * "the mark never carries the meaning alone, and never carries two"
+   * reasoning `tickets-collection.tsx`'s own `DOT_TONE_FILL` states), and a
+   * meaningful, named priority outranks an arbitrary per-department hash.
+   */
+  dotTone?: DotTone
+  /** the second line the "+N more" day view reads. A grid cell has no room for
+   *  it; a list has, and it is the difference between "Standup" and
    *  "09:30 · Standup · Northwind". */
   detail?: string
 }
-
-type Mode = "month" | "agenda"
 
 /* --------------------------------- colour --------------------------------- */
 
@@ -101,6 +141,32 @@ function accentClass(value: string): string {
   let h = 0
   for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0
   return ACCENTS[h % ACCENTS.length]
+}
+
+/** THE PRIORITY DOT'S OWN FILL — badge.tsx's `DOT_FILL`, copied in shape for
+ * the same reason `ACCENTS` above is: the kit exports the component, not the
+ * class map, and a `Record<DotTone, …>` (not a template literal) means a
+ * seventh tone the kit ever grew fails this file's type check instead of
+ * silently painting nothing (`tickets-collection.tsx`'s own `DOT_TONE_FILL`
+ * makes the identical argument). Written as Tailwind classes, not an inline
+ * style, to match this file's existing `accentClass` dot exactly — the two
+ * can sit in the same `label` node with the same shape. */
+const DOT_FILL: Record<DotTone, string> = {
+  shipped: "bg-[var(--dot-shipped)]",
+  building: "bg-[var(--dot-building)]",
+  review: "bg-[var(--dot-review)]",
+  blocked: "bg-[var(--dot-blocked)]",
+  archived: "bg-[var(--dot-archived)]",
+  done: "bg-[var(--dot-done)]",
+}
+
+/** One entry's own dot class — `dotTone` (the priority circle) wins over
+ * `accent` (the department hash) when both are given; see `CalendarEntry.
+ * dotTone`'s own comment for why. `null` draws nothing, exactly as before. */
+function dotClass(e: CalendarEntry): string | null {
+  if (e.dotTone) return DOT_FILL[e.dotTone]
+  if (e.accent) return accentClass(e.accent)
+  return null
 }
 
 /* ---------------------------------- days ---------------------------------- */
@@ -178,38 +244,73 @@ function weekdayLabels(lang: Language): string[] {
 // argument `onSelectEvent` is handed back), never across the grid.
 const OVERFLOW_ID = "__overflow__"
 
-/** One day's events, capped at `maxPerDay`, with the hidden count folded into
+/**
+ * TODAY'S CHIPS ARE INK (client ruling, 2026-09-15, quoted at the file
+ * header). The kit's own event-chip `tone` enum is a fixed six —
+ * `quiet | brand | info | success | destructive | inverse` — and none of them
+ * is named "ink"; `inverse` is the one that draws it: `bg-surface-inverse
+ * text-ink-on-inverse`, the exact "charcoal fill, off-beige label" pair this
+ * app already calls ink everywhere else (the record footer — CLAUDE.md's "ink
+ * footer" — binds `--surface-record-footer` to the same token). So `inverse`
+ * is the closest tone, used here, not a new one: `quiet` (the beige the
+ * client rejected) for every other day, `inverse` for today's.
+ *
+ * THE DOT GETS A PAPER RING ON INK, because one tone's own fill defeats it
+ * there: `--dot-building` is `var(--foreground)`, which IS the ink chip's own
+ * fill — measured at 1.00:1, invisible, in both palettes (`--foreground` and
+ * `--surface-inverse` swap the same two colours between light and dark, so
+ * the collision survives the flip). `shadow-[var(--hairline-ink)]` is not a
+ * new ring invented for this: it is the kit's own halo for exactly "a ring
+ * that must read on an inverse ground" (tokens.css's `.bg-surface-inverse`
+ * block rebinds `--hairline-ink` from `var(--foreground)` to
+ * `var(--ink-on-inverse)` there — the same mechanism `card.tsx`'s selection
+ * ring and `flowchart.tsx`'s selected-node ring already take). Applied to
+ * every tone's dot on an ink chip, not only `building`'s, so one rule draws
+ * all six rather than a tone-shaped special case — and left OFF the quiet
+ * (beige) chip, where every tone already clears the fill on its own and a
+ * ring would be noise.
+ *
+ * One day's events, capped at `maxPerDay`, with the hidden count folded into
  * one more `CalendarEvent` rather than left as the kit's own dead more-line
  * (`formatMoreEvents` only changes the WORDS; the kit draws no click for it).
  * So the overflow is a real chip too, and `onSelectEvent` tells it apart from a
- * record by its id. */
+ * record by its id. It takes today's tone too, for the same reason the day's
+ * OTHER entries do: a "+N more" on today's square is still today's square.
+ */
 function buildDayEvents(
   entries: CalendarEntry[],
   maxPerDay: number,
-  t: (english: string, vars?: Vars) => string
+  t: (english: string, vars?: Vars) => string,
+  isToday: boolean
 ): CalendarEvent[] {
+  const tone = isToday ? "inverse" : "quiet"
+  const dotRing = isToday ? " shadow-[var(--hairline-ink)]" : ""
   const shown = entries.slice(0, maxPerDay)
   const hidden = entries.length - shown.length
   const events: CalendarEvent[] = shown.map((e) => ({
     id: e.id,
     title: e.title,
-    tone: "quiet",
+    tone,
     label: (
       <span className="flex min-w-0 items-center gap-1">
-        {e.accent ? (
-          <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${accentClass(e.accent)}`} />
+        {dotClass(e) ? (
+          <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${dotClass(e)}${dotRing}`} />
         ) : null}
         <span className="min-w-0 truncate">{e.title}</span>
       </span>
     ),
   }))
   if (hidden > 0) {
-    events.push({ id: OVERFLOW_ID, tone: "quiet", label: t("+{n} more", { n: hidden }) })
+    events.push({ id: OVERFLOW_ID, tone, label: t("+{n} more", { n: hidden }) })
   }
   return events
 }
 
-/** A day's records as a LIST — the shape the "+N more" dialog opens into. */
+/** A day's records as a LIST — the shape the "+N more" dialog opens into.
+ * Same dot, same precedence (`dotTone` over `accent`) as the chip it was
+ * opened from — a record does not change colour between the square and the
+ * dialog. Never drawn on ink: the dialog is its own surface, not today's
+ * square, so it keeps the quiet-list reading it always had. */
 function DayRows({
   entries,
   onOpen,
@@ -225,11 +326,8 @@ function DayRows({
         // `block` on purpose: the list wraps its leading slot in a plain div, so
         // an inline span would take no width or height at all and the colour
         // would simply not be there. (It was not, for one screenshot.)
-        leading: e.accent ? (
-          <span
-            aria-hidden
-            className={`mt-1.5 block size-2.5 shrink-0 rounded-pill ${accentClass(e.accent)}`}
-          />
+        leading: dotClass(e) ? (
+          <span aria-hidden className={`mt-1.5 block size-2.5 shrink-0 rounded-pill ${dotClass(e)}`} />
         ) : undefined,
         title: e.title,
         subtitle: e.detail,
@@ -271,11 +369,6 @@ export function RecordCalendar({
 }) {
   const { t, lang } = useLanguage()
   const weekdays = React.useMemo(() => weekdayLabels(lang), [lang])
-  const isPhone = useIsPhone()
-  // WHAT A PHONE OPENS ON. `null` means "nobody has chosen", so the answer keeps
-  // following the device — rotate a phone into landscape and the grid arrives.
-  // The moment somebody picks, their pick wins and stops moving under them.
-  const [picked, setPicked] = React.useState<Mode | null>(null)
   const [month, setMonth] = React.useState(() => startOfMonth(new Date()))
   // Told on mount as well as on every move: the first month a person sees is a
   // month somebody has to fetch, and it is the one they see most often.
@@ -297,52 +390,29 @@ export function RecordCalendar({
     return map
   }, [entries])
 
-  const mode: Mode = picked ?? (isPhone ? "agenda" : "month")
   const squares = monthSquares(month)
-  const monthStart = dayKey(startOfMonth(month))
   const today = dayKey(new Date())
-  // The month's own records, in day order — what the agenda lists, and what tells
-  // an empty month from a full one.
-  const inMonth = entries
-    .filter((e) => e.day.slice(0, 7) === monthStart.slice(0, 7))
-    .sort((a, b) => (a.day === b.day ? a.title.localeCompare(b.title) : a.day.localeCompare(b.day)))
-  const agendaDayKeys = [...new Set(inMonth.map((e) => e.day))]
 
   const dayEntries = openDay ? (byDay.get(openDay) ?? []) : []
 
   // THE GRID'S OWN CELLS. Never `onSelectDay` — see the file header on nested
-  // buttons — so a cell stays a plain `<div>` and only its chips (and the
-  // overflow chip) are real buttons.
+  // buttons — so a cell stays a plain `<div>` and only its chips, the overflow
+  // chip, and (below `sm:`, kit v1.2.86) the compact dot summary are real
+  // buttons. Every phone AND every desktop reads this same grid now — see the
+  // file header's 2026-09-15 ruling — so there is no device check here any
+  // more.
   const calendarDays: CalendarDay[] = squares.map((d) => {
     const key = dayKey(d)
+    const isToday = key === today
     return {
       key,
       label: d.getDate(),
       dateTime: key,
-      events: buildDayEvents(byDay.get(key) ?? [], maxPerDay, t),
+      events: buildDayEvents(byDay.get(key) ?? [], maxPerDay, t, isToday),
       outside: d.getMonth() !== month.getMonth(),
-      today: key === today,
+      today: isToday,
     }
   })
-
-  // THE AGENDA'S OWN DAYS — the same records, grouped and ordered exactly as
-  // the grid buckets them, handed to the kit's `Agenda` rather than drawn here.
-  const agendaKitDays: AgendaDay[] = agendaDayKeys.map((day) => ({
-    key: day,
-    label: `${formatDayKey(day, lang)}${day === today ? ` · ${t("Today")}` : ""}`,
-    items: (byDay.get(day) ?? []).map((e) => ({
-      id: e.id,
-      title: (
-        <span className="flex min-w-0 items-center gap-1.5">
-          {e.accent ? (
-            <span aria-hidden className={`size-2 shrink-0 rounded-pill ${accentClass(e.accent)}`} />
-          ) : null}
-          <span className="min-w-0 truncate">{e.title}</span>
-        </span>
-      ),
-      who: e.detail,
-    })),
-  }))
 
   const emptyState = (
     <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -353,88 +423,56 @@ export function RecordCalendar({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      {/* THE PERIOD, AND THE SHAPE — one row: which month, then how to read it.
-          The switch is the library's own segmented control rather than two
-          buttons whose variant flips, which is the shape R3 refuses. */}
+      {/* THE PERIOD, AND THE MOVE — one row: which month, then the three ways to
+          move it. No mode switch any more (2026-09-15: "when I mean calendar, I
+          mean the month view") — one shape, so this row is two flex children,
+          not three, and `justify-between` alone keeps the button group from
+          being pushed off either edge when it wraps (UI-CONVENTIONS C4). */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-medium">{monthLabel(month, lang)}</div>
-        {/* IT WRAPS, AND THE GROUP IS PUSHED WITH `ml-auto` — the house rule for
-            every action row in this app (UI-CONVENTIONS C4), which this one was
-            not following. Five controls whose widths are TEXT and therefore
-            change with the reader's language: the segmented control and the
-            three buttons come to about 307px in English, against roughly 309
-            inside the page's own padding and the collection card's at 375px. So
-            "Next month" was one or two pixels from the edge in English and off
-            it in German, where "Agenda" is "Tagesordnung" — and there is no
-            scrollable ancestor here, so off the edge means gone.
-            `ml-auto` rather than `justify-end` on this row, for the reason C4
-            gives: `justify-end` alone pushes the overflow off the LEFT edge,
-            where the container hides it instead of showing it. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <ToggleGroup
-            type="single"
-            value={mode}
-            onValueChange={(v) => v && setPicked(v as Mode)}
-            aria-label={t("How to read this month")}
+        <div className="flex items-center gap-1">
+          <Button variant="secondary" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
+            {t("Today")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="size-8"
+            aria-label={t("Previous month")}
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
           >
-            <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1 px-2.5">
-              <CalendarBlank className="size-3.5" />
-              <span className="text-xs">{t("Month")}</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1 px-2.5">
-              <ListNumbers className="size-3.5" />
-              <span className="text-xs">{t("Agenda")}</span>
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <div className="ml-auto flex items-center gap-1">
-            <Button variant="secondary" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
-              {t("Today")}
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-8"
-              aria-label={t("Previous month")}
-              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-            >
-              <CaretLeft />
-            </Button>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="size-8"
-              aria-label={t("Next month")}
-              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-            >
-              <CaretRight />
-            </Button>
-          </div>
+            <CaretLeft />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="size-8"
+            aria-label={t("Next month")}
+            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+          >
+            <CaretRight />
+          </Button>
         </div>
       </div>
 
-      {mode === "month" ? (
-        <CalendarView
-          view="month"
-          weekdayLabels={weekdays}
-          days={calendarDays}
-          maxEvents={maxPerDay + 1}
-          onSelectEvent={(event, day) => {
-            if (event.id === OVERFLOW_ID) setOpenDay(day.key)
-            else onOpen(event.id)
-          }}
-          emptyState={emptyState}
-          label={t("Calendar")}
-        />
-      ) : (
-        // THE AGENDA — the same month, day by day, every row a way in. This is
-        // what a calendar is FOR on a phone: what is on, in the order it happens.
-        <Agenda
-          days={agendaKitDays}
-          onItemSelect={(item) => onOpen(item.id)}
-          emptyState={emptyState}
-          label={t("Agenda")}
-        />
-      )}
+      <CalendarView
+        view="month"
+        weekdayLabels={weekdays}
+        days={calendarDays}
+        maxEvents={maxPerDay + 1}
+        onSelectEvent={(event, day) => {
+          if (event.id === OVERFLOW_ID) setOpenDay(day.key)
+          else onOpen(event.id)
+        }}
+        // THE PHONE'S OWN WAY IN (kit v1.2.86, file header) — the compact
+        // dots below `sm:` call this instead of `onSelectEvent`, since a dot
+        // is never individually a chip. Same dialog the desktop overflow
+        // chip opens; `day.key` is all either door needs, `byDay` does the
+        // rest.
+        onSelectMore={(day) => setOpenDay(day.key)}
+        emptyState={emptyState}
+        label={t("Calendar")}
+      />
 
       {/* THE DAY, opened from "+N more". Everything on that day, not just the
           overflow: a person who clicked "+6 more" on a square showing three is
@@ -493,12 +531,14 @@ export type AgendaEntry = {
  * `shared/ui/components/agenda/agenda.tsx` to reach it here rather than
  * importing it directly, so a record on it is never a picture with no click
  * (UI-GAPS #22, the same reason `RecordCalendar` above exists at all). This is
- * the SECOND door into that same kit component — `RecordCalendar`'s own agenda
- * mode is a MONTH read day by day; this one is ANY set of entries the caller
- * already narrowed, read day by day — and both end at the identical
- * `onItemSelect={(item) => onOpen(item.id)}` wiring.
+ * the ONLY door into that kit component now — `RecordCalendar` reads a month
+ * as a grid, never as an agenda (2026-09-15: "Agenda is a different component
+ * than month") — and it takes ANY set of entries the caller already narrowed
+ * (a week, never a month this file would filter down), read day by day,
+ * ending at the identical `onItemSelect={(item) => onOpen(item.id)}` wiring
+ * `RecordCalendar`'s own grid ends at with `onSelectEvent`.
  *
- * "TODAY" IS MARKED the same way `RecordCalendar`'s own agenda days are. */
+ * "TODAY" IS MARKED the same way `RecordCalendar`'s own grid marks a day. */
 export function RecordAgenda({
   entries,
   onOpen,

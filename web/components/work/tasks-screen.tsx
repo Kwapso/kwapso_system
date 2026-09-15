@@ -51,12 +51,38 @@
 // typed.
 //
 // ONE TOOLBAR PER TAB (R48/R50/R53/R63), never a second row beside it: search,
-// then the priority/department filters, then the view switch, then "New task" —
-// exactly the row `<ToolbarRow>` already draws for every other collection in
-// the app. SORT IS EXEMPTED (`TOOLBAR_SORT_EXEMPT`, keyed to this component):
-// the Table view orders by its own column headers, the Board's order is the
-// grouping itself, and the Calendar's order is the day a task falls on — none
-// of the four tabs' views has a second question a sort control could answer.
+// then the priority/department filters, then the sort control, then the view
+// switch, then "New task" — exactly the row `<ToolbarRow>` already draws for
+// every other collection in the app.
+//
+// ── A SECOND PASS, SAME DAY: THE SORT MOVES TO THE TOOLBAR ─────────────────
+//
+// The client's follow-up ruling, 2026-09-15, verbatim: "On tasks, on the list,
+// add the sort to the toolbar and add sort by task priority and deadline.
+// That's it. Make sure you remove it from the headers." And separately, on the
+// default: "the default sort is always by priority, so top priority on top,
+// and after that, the deadline. I mean, within the same priority" — and for the
+// Deadline sort itself, the mirror question: ties break by priority.
+//
+// TASKS WAS `TOOLBAR_SORT_EXEMPT` UNTIL THIS PASS (the paragraph above used to
+// say so): the Table view ordered by its own column headers and the exemption
+// argued none of the three views had a second question a sort control could
+// answer. The exemption is DELETED (`shared/rules/registry.ts`) and the Table
+// view's own column-header sort goes with it — `TableColumn`'s `sort` key is
+// no longer set on any of these columns, so a header click does nothing and
+// draws no arrow (`record-table.tsx` only wires the control when `sort` is
+// present). ONE ORDER now, computed here (`compareTasks`, below) rather than
+// wherever a header happened to leave the rows, exactly the shape R53 was
+// written to stop: a sortable column and a sortable toolbar disagreeing about
+// which one is live.
+//
+// THE BOARD AND THE CALENDAR ARE UNCHANGED BY THIS — the toolbar's sort chip
+// still draws on every sub-view (R53 makes it a property of the TAB, not the
+// body), but Board's own order is its priority grouping plus a fixed
+// deadline-ascending order WITHIN a column (this pass's own ruling #6, below),
+// and Calendar's order is the day a task falls on — neither reads `sortField`/
+// `sortDir` at all, which is a decision made once here rather than at each
+// call site.
 //
 // THE BOARD IS EDITABLE. `content.updateTask` already exists and replaces the
 // two ticks (`important`/`urgent`) that derive `priority` — the same door the
@@ -68,22 +94,102 @@
 // edit — on Everyone's too, where it means correcting somebody ELSE's task.
 //
 // "THIS IS MY TASKS" — AND THE FOURTH TAB IS EVERYONE'S. Overdue/Planned/
-// Completed all narrow to the caller's own tasks unless they hold
-// `all_tasks:read` — a DOOR decision (`getTasks`,
-// workers/content/src/routes/todos.ts), unchanged by this pass. The fourth tab
-// is that SAME status-agnostic `all` view the six-tab strip used to draw as
-// "All tasks" — not retired, RENAMED: the client's separate ruling ("replace
-// the tab 'All' with 'Everyone's'") reads as a rename, not a deletion, once the
-// tab is read as the team-wide counterpart to the first three MINE ones rather
-// than as a sixth, now-redundant status filter. It is shown only when
-// `seesEveryones` (`all_tasks:read`) is true — a caller without the right
-// cannot narrow past their own name at the door anyway, so a tab that would
-// answer identically to Overdue+Planned+Completed combined is not offered. On
-// this one tab the two-word ruling and the door's own narrowing finally name
-// the same thing, which is why it is the one case where the WORD "Everyone's"
-// belongs on a tab rather than only in the progress strip's caption ("these
-// are the tasks assigned to you — seeing everyone's is a separate access
-// right", unchanged, and still the sentence every OTHER tab relies on).
+// Completed narrow to the caller's own tasks UNCONDITIONALLY since the
+// 2026-09-15 follow-up ruling below — a DOOR decision (`getTasks`,
+// workers/content/src/routes/todos.ts). The fourth tab is that SAME
+// status-agnostic `all` view the six-tab strip used to draw as "All tasks" —
+// not retired, RENAMED: the client's separate ruling ("replace the tab 'All'
+// with 'Everyone's'") reads as a rename, not a deletion, once the tab is read
+// as the team-wide counterpart to the first three MINE ones rather than as a
+// sixth, now-redundant status filter. It is shown only when `seesEveryones`
+// (`all_tasks:read`) is true — a caller without the right cannot narrow past
+// their own name at the door anyway, so a tab that would answer identically to
+// Overdue+Planned+Completed combined is not offered. On this one tab the
+// two-word ruling and the door's own narrowing finally name the same thing,
+// which is why it is the one case where the WORD "Everyone's" belongs on a tab
+// rather than only in the progress strip's caption ("these are the tasks
+// assigned to you — seeing everyone's is a separate access right", unchanged,
+// and still the sentence every OTHER tab relies on).
+//
+// MINE STOPPED BEING CONDITIONAL ON 2026-09-15, SAME DAY, A FEW HOURS LATER.
+// The client, looking at the redesigned strip on staging: "On overdue tasks,
+// it's only mine, so make sure you filter it to me and remove the column 'Who
+// has it'." Until this the door's `all_tasks:read` gate decided the narrowing
+// for every view, Everyone's included — so a manager holding that right saw
+// the WHOLE team's board on Overdue/Planned/Completed too, and the fourth tab
+// bought that reader nothing the first three did not already show. The door's
+// `getTasks` now narrows Overdue/Planned/Completed to `guard.userId`
+// UNCONDITIONALLY (`MINE_VIEWS`, workers/content/src/routes/todos.ts) and
+// reserves `all_tasks:read` for the one view that is actually asking a
+// different question — `all`, the Everyone's tab. Applied at the door and not
+// here for the reason every other fence in this app is: a screen that merely
+// hides a column is a screen a differently-configured client could bypass.
+// "Who has it" is dropped from `TASK_COLUMNS`/`COMPLETED_COLUMNS` for the same
+// ruling — a column that reads the SAME name (yours) down every row is
+// furniture, exactly the reasoning `TASK_COLUMNS`'s own header already gives
+// for leaving Status off. `EVERYONE_COLUMNS` keeps it, prominent, because
+// "whose is this" is the first question that tab's whole reason for existing
+// asks.
+//
+// TWO LOGOS, THE SAME RULING: "also, add the logos to account and app." The
+// Account and App cells draw `<RecordMark picture={…} name={…} />` beside the
+// name — the exact node `shape.tsx`'s `shapeAccountsList` already draws for
+// the Accounts table's own Name cell — fed by two fields the door did not
+// carry before this pass, `accountLogoUrl`/`appLogoUrl` (`shared/types.ts`'s
+// `Task`, joined in `workers/content/src/lib/tasks.ts`'s `TASK_COLS` off
+// `accounts.logo_url`/`apps.logo_url`, the same two columns the Accounts and
+// Apps screens already read a logo from).
+//
+// ── ONE ADD BUTTON, NOT TWO ──────────────────────────────────────────────
+//
+// The client, looking at the same screenshot: "there is an add button with a
+// plus, but there is also one underneath. There should only be one, and the
+// correct one is in the toolbar." The second one was never THIS file's own —
+// `<RecordTable useKitPanel>` reads the ambient create action `<SectionWithCreate
+// onCreate={…}>` publishes (`CollectionCreateActionProvider`, shared/web/
+// screen-engine/collection-frame.tsx) and draws its OWN icon-only button in
+// the kit panel's ready-state toolbar, even with every one of that panel's
+// other controls (search/filters/sort/count) switched off — the exact shape
+// `apps-screen.tsx`'s own list body already worked around
+// (`<CollectionCreateActionProvider action={null}>`, its own comment: "so the
+// panel's own toolbar draws no second + button — this screen's own AddButton,
+// in the ToolbarRow above, is the one mango for the act"). Same fix here, same
+// reason: the Table view's own `<RecordTable>` is wrapped in the identical
+// `action={null}` provider, so the only create button left standing is this
+// screen's own `<AddButton>` in its `<ToolbarRow>`'s `actions` slot.
+//
+// ── THE BOARD'S HEADER CARRIES THE PRIORITY COLOUR, EMPTY MEANS EMPTY ──────
+//
+// Two more rulings against the board view, both applied to every tab that
+// offers one (Overdue/Planned/Everyone's): "on the board view for overdue, in
+// the headers, I want to see the color of this priority, and the sort inside
+// should be by deadline. On the top, the earliest deadline" — the kit's own
+// `KanbanColumn.dot` (`shared/ui/components/kanban/kanban.tsx`) takes exactly
+// the tone union `PRIORITY_DOT_TONE` already resolves a priority to, so the
+// column head draws it directly; the cards inside are sorted deadline
+// ascending, undated last, INDEPENDENTLY of whatever the toolbar's own
+// Priority/Deadline sort is set to — the board's order was never that
+// control's question (see this file's header, above), it is the client's own
+// fixed rule for what a column shows. And: "on the tasks board view, when
+// empty, don't show anything at this stage, but nothing on this priority" —
+// `<Kanban emptyColumns="bare">` (kit v1.2.87) draws no placeholder at all for
+// a zero-card column, box included, while keeping it droppable.
+//
+// ── "WAITING ON CLIENTS" LEAVES THIS SCREEN, 2026-09-15 ────────────────────
+//
+// The client's ruling, verbatim: "The whole 'waiting on clients': remove it
+// from tasks. This is a completely different module, and we will put this
+// somewhere else, but remove it from tasks." The to-do panel, its two dialogs
+// and its Open/Done counts are gone from THIS screen only — the door
+// (`workers/content/src/routes/todos.ts`), the lib (`workers/content/src/lib/
+// todos.ts`), the types (`shared/types.ts`'s `TODO_VIEWS`) and the cache key
+// (`todosKey`, web/lib/live-resources.ts) are untouched, because nothing here
+// asked to delete a to-do, only to stop showing it beside a task. The panel is
+// NOT orphaned: `TodosPanel` still renders on an account's own record
+// (account-detail.tsx's "todos" tab) and on a contact's (contact-detail.tsx),
+// each with its own raise/cancel controls, so the door keeps a working front
+// door — this screen was never its only one. Awaiting the new home the client
+// named ("we will put this somewhere else").
 
 import * as React from "react"
 
@@ -105,10 +211,12 @@ import type {
   ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
-import { type CollectionConfig, type FilterFacet } from "@shared/web/screen-engine/config"
+import {
+  CollectionEmptyState,
+  CollectionCreateActionProvider,
+} from "@shared/web/screen-engine/collection-frame"
+import { type CollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
-import { ClipboardText } from "@shared/ui/foundations/icons"
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
@@ -120,7 +228,6 @@ import {
   RecordTable,
   visibleActions,
   type TableColumn,
-  type TableRowData,
 } from "@/components/records/record-table"
 import {
   SectionWithCreate,
@@ -130,12 +237,10 @@ import {
 } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
-import { TodoFormDialog, type TodoFormValues } from "@/components/work/todo-form-dialog"
-import { TodosPanel } from "@/components/work/work-panels"
 import { content as contentApi } from "@/lib/api"
 import { LoadMore } from "@/components/records/load-more"
 import { usePermissions } from "@/lib/perms"
-import { listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
+import { listFetch, tasksKey, type TaskView } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { departmentGlyph, PRIORITY_DOT_TONE } from "@shared/departments"
 import { TASK_VIEWS, type Task } from "@shared/types"
@@ -189,7 +294,11 @@ function PriorityChip({ level, t }: { level: 1 | 2 | 3 | 4; t: (s: string) => st
  * a single pass rather than a per-view reshaping that could disagree about
  * what a task is. `priority` carries the RAW level (1-4) rather than a
  * formatted string now — it is a real column with its own coloured chip
- * (`RENDER_AS`, below), not text folded into a sentence. */
+ * (`RENDER_AS`, below), not text folded into a sentence.
+ *
+ * TAKES ROWS ALREADY IN ORDER (`compareTasks`, below) — this function shapes,
+ * it does not sort, so the table's row order is whatever the caller handed it
+ * (R53: one order, decided at the toolbar, never re-decided by a header). */
 function shapeTasks(tasks: Task[], lang: Language) {
   return {
     rows: tasks.map((t) => {
@@ -205,49 +314,59 @@ function shapeTasks(tasks: Task[], lang: Language) {
         // no-reference category as a process, a role or a dropdown value.
         name: t.title,
         // THE RAW LEVEL — see this function's own header. `RENDER_AS.priority`
-        // draws the chip; `SORT_AS.priority` needs no `sortKey` any more
-        // because the cell itself is the number now.
+        // draws the chip.
         priority: t.priority,
         // The department's own mark leads its name, in the colour the agency
         // already chose for it. A word a team invented itself has no mark and
         // simply reads as itself.
         department: t.department ? `${mark} ${t.department}`.trim() : "—",
-        app: t.appName ?? "—",
-        client: t.accountName ?? "—",
+        // THE APP AND ACCOUNT CELLS CARRY A LOGO NOW (client ruling, 2026-09-15:
+        // "add the logos to account and app") — the identical node
+        // `shape.tsx`'s `shapeAccountsList` draws for the Accounts table's own
+        // Name cell, `<RecordMark picture={…} name={…} />` beside the word. A
+        // row with no app/account still reads "—", exactly as it did in words
+        // alone; `RecordMark` draws nothing when handed no name to initial.
+        app: t.appName ? (
+          <span className="flex items-center gap-2">
+            <RecordMark picture={t.appLogoUrl} name={t.appName} />
+            <span>{t.appName}</span>
+          </span>
+        ) : (
+          "—"
+        ),
+        client: t.accountName ? (
+          <span className="flex items-center gap-2">
+            <RecordMark picture={t.accountLogoUrl} name={t.accountName} />
+            <span>{t.accountName}</span>
+          </span>
+        ) : (
+          "—"
+        ),
         // R54: a task is ours, so its assignee is named by first name.
         assignee: staffNameFromSnapshot(t.assigneeName) || "Nobody yet",
-        // THE TWO DATE COLUMNS, WARM AND COMPARED ON THE RAW INSTANT.
-        //
-        // The cell is the same locale-formatted date the summary line has
-        // always used; the table compares `dueOn`/`completedAt` beside it
-        // (`SORT_AS`, below) rather than re-parsing the words on screen, which
+        // THE TWO DATE CELLS — locale-formatted, the same words the summary
+        // line has always used. Ordering reads the RAW instant off the Task
+        // before shaping (`compareTasks`), never these formatted words, which
         // would answer differently in each of the four languages this app
         // ships.
         deadline: t.dueOn ? formatDate(t.dueOn, lang) : "—",
         closed: t.completedAt ? formatDate(t.completedAt, lang) : "—",
-        // ── THE RAW FACTS, RIDING BESIDE THE SHAPED CELLS ──────────────────
-        // Carried here rather than re-parsed out of the cell — see `SORT_AS`.
-        dueOn: t.dueOn ?? null,
-        completedAt: t.completedAt ?? null,
-        // The department's WORD, without the pictograph the cell leads with —
-        // sorting the shaped cell would sort by the glyph instead.
-        departmentName: t.department ?? "",
       }
     }),
   }
 }
 
-/** THE TABLE'S SEVEN COLUMNS — the client's own list, verbatim: "Task /
- * Priority (has a color here) / Deadline / Department / Account / App /
- * Whatever you think relevant" — plus "Who has it" (Assignee), which exists
- * on the row and is genuinely relevant the moment a reader holds
- * `all_tasks:read` and is looking at more than their own name. STATUS is
- * deliberately NOT a column: every tab is already a status scope
- * (Overdue/Planned show only open tasks, Completed only done ones, Everyone's
- * the same open/done split Overdue+Planned+Completed already are, per tab —
- * see `columns` below), so a Status column would read the same word down
- * every row of whichever tab is open — a column that carries no information
- * is furniture, not "whatever is relevant".
+/** THE TABLE'S SIX COLUMNS ON THE THREE "MINE" TABS — the client's own list,
+ * verbatim: "Task / Priority (has a color here) / Deadline / Department /
+ * Account / App / Whatever you think relevant." "Who has it" (Assignee) is
+ * NOT one of them any more (2026-09-15, same-day follow-up: "remove the
+ * column 'Who has it'") — Overdue/Planned/Completed are the caller's own
+ * tasks unconditionally now (see this file's header), so a column naming the
+ * one person every row already belongs to is furniture, the identical
+ * reasoning STATUS was already dropped for one paragraph up: every tab is
+ * already a status scope (Overdue/Planned show only open tasks, Completed
+ * only done ones), so a Status column would read the same word down every
+ * row of whichever tab is open.
  *
  * ONE SET FOR THE THREE "MINE" TABS, not the old EVERYDAY/COMPLETED split —
  * the client asked for one table shape ("the columns would be…") and the
@@ -255,8 +374,9 @@ function shapeTasks(tasks: Task[], lang: Language) {
  * own booleans; the Priority chip already carries both, so the split bought
  * nothing this table doesn't already say. Completed gets ONE column more
  * (Closed), appended rather than folded in, because "when it was finished" is
- * a question only that tab's rows can honestly answer. Everyone's reorders
- * rather than adds — see `EVERYONE_COLUMNS` below. */
+ * a question only that tab's rows can honestly answer. Everyone's is a
+ * DIFFERENT set, not this one with a column added back — see
+ * `EVERYONE_COLUMNS` below. */
 const TASK_COLUMNS = [
   field("name", "Task"),
   field("priority", "Priority"),
@@ -264,16 +384,15 @@ const TASK_COLUMNS = [
   field("department", "Department"),
   field("client", "Account"),
   field("app", "App"),
-  field("assignee", "Who has it"),
 ]
 const COMPLETED_COLUMNS = [...TASK_COLUMNS, field("closed", "Closed")]
-/** EVERYONE'S OWN ORDER — the coordinator's follow-up ruling: "same columns
- * plus Assignee prominent." Same seven fields, ASSIGNEE MOVED second (right
- * after Task, ahead of Priority) rather than a bespoke eighth column: on the
- * three MINE tabs "who has it" is a fact about the reader themselves and
- * belongs at the quiet end of the row; the moment a tab shows everyone's
- * tasks together, "whose is this" is the first question a scan actually asks,
- * so it reads first. */
+/** EVERYONE'S OWN COLUMNS — the ONLY one of the four table shapes that still
+ * carries Assignee (client ruling, 2026-09-15: "Everyone's keeps the assignee
+ * column"), because it is the one tab that is not already narrowed to the
+ * caller's own name. SECOND, right after Task and ahead of Priority, per the
+ * coordinator's earlier follow-up ("same columns plus Assignee prominent"):
+ * the moment a tab shows everyone's tasks together, "whose is this" is the
+ * first question a team-wide scan asks. */
 const EVERYONE_COLUMNS = [
   field("name", "Task"),
   field("assignee", "Who has it"),
@@ -284,14 +403,56 @@ const EVERYONE_COLUMNS = [
   field("app", "App"),
 ]
 
-/** WHAT EACH COLUMN ACTUALLY IS, where it is not a word — see `record-table.tsx`'s
- * `SortType` note for the long version. A column absent from here compares its
- * own text, which stays correct for `name`, `app`, `client` and `assignee`. */
-const SORT_AS: Record<string, Pick<TableColumn, "sortType" | "sortKey">> = {
-  priority: { sortType: "number" },
-  deadline: { sortType: "date", sortKey: (row: TableRowData) => row.dueOn },
-  closed: { sortType: "date", sortKey: (row: TableRowData) => row.completedAt },
-  department: { sortType: "text", sortKey: (row: TableRowData) => row.departmentName },
+/** THE TOOLBAR'S OWN SORT VOCABULARY (R53, 2026-09-15 ruling: "add sort by
+ * task priority and deadline. That's it."). Exactly two fields, never a
+ * per-column header any more — see this file's header for why the exemption
+ * was deleted rather than kept beside this. `defaultDir` is the direction each
+ * option LANDS ON when picked (`SortOption`'s own doc), and the two differ on
+ * purpose: Priority's natural reading is highest-first (4 → 1, "top priority
+ * on top"), Deadline's is soonest-first — so picking either one cold gives the
+ * client's own default sentence, never a reversed list a second click has to
+ * fix. */
+function taskSortOptions(t: (s: string) => string): SortOption[] {
+  return [
+    { value: "priority", label: t("Priority"), defaultDir: "desc" },
+    { value: "deadline", label: t("Deadline"), defaultDir: "asc" },
+  ]
+}
+
+/** THE DEFAULT TABLE ORDER, and what "Deadline" means when picked instead —
+ * the client's two rulings, both about ties: "the default sort is always by
+ * priority, so top priority on top, and after that, the deadline. I mean,
+ * within the same priority" (priority DESC — 4 → 1 — ties broken by deadline
+ * ASC, undated last), and the Deadline sort's own mirror question answered the
+ * same way round: deadline ASC, ties broken by priority DESC (the app's own
+ * scale, `PRIORITY_ORDER`).
+ *
+ * ONE COMPARATOR, not two — `field` picks the PRIMARY key and `dir` flips it;
+ * the SECONDARY key is fixed by which primary is active, exactly as the two
+ * sentences above read, and does not itself flip with `dir`: reversing which
+ * priority sorts first does not ask a reversed question about which deadline
+ * is soonest.
+ *
+ * UNDATED SORTS LAST, both ways, the same rule `TASK_SORTS` (the door's own
+ * priority order, workers/content/src/lib/tasks.ts) already keeps — a sentinel
+ * date past any real ISO instant, compared as a plain string. */
+const NO_DEADLINE_SENTINEL = "9999-99-99"
+
+function compareTasks(a: Task, b: Task, field: "priority" | "deadline", dir: "asc" | "desc"): number {
+  const key = (t: Task) => (field === "priority" ? t.priority : (t.dueOn ?? NO_DEADLINE_SENTINEL))
+  const av = key(a)
+  const bv = key(b)
+  const primary = av < bv ? -1 : av > bv ? 1 : 0
+  const directed = dir === "asc" ? primary : -primary
+  if (directed !== 0) return directed
+  // THE TIE-BREAK, fixed by the primary field rather than by `dir` — see this
+  // function's own header.
+  if (field === "priority") {
+    const ad = a.dueOn ?? NO_DEADLINE_SENTINEL
+    const bd = b.dueOn ?? NO_DEADLINE_SENTINEL
+    return ad < bd ? -1 : ad > bd ? 1 : 0
+  }
+  return b.priority - a.priority
 }
 
 /** THE THREE "MINE" TABS, in the client's own order. Written as data so the
@@ -335,8 +496,6 @@ export function TasksScreen({
   view,
   onViewChange,
   myUserId,
-  canRaiseTodo,
-  canCancelTodo,
   onAction,
   onIntent,
 }: {
@@ -364,8 +523,6 @@ export function TasksScreen({
   /** whoever is signed in — the assignee a new task defaults to */
   myUserId: string | null
   canCreate: boolean
-  canRaiseTodo: boolean
-  canCancelTodo: boolean
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -388,7 +545,6 @@ export function TasksScreen({
   // same door the edit form uses, so the same right gates both.
   const canEditTasks = usePermissions(teamId).can("work", "update")
   const [taskOpen, setTaskOpen] = React.useState(false)
-  const [todoOpen, setTodoOpen] = React.useState(false)
 
   // EACH MULTI-VIEW TAB REMEMBERS ITS OWN SUB-VIEW (`useRemembered`, the same
   // seam meetings-screen.tsx's own List/Calendar switch and the tickets
@@ -422,6 +578,15 @@ export function TasksScreen({
   // `apps-screen.tsx` makes for its own Active/Inactive split.
   const [query, setQuery] = React.useState("")
   const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
+  // THE TOOLBAR'S OWN SORT (R53, 2026-09-15 ruling — see this file's header).
+  // ONE state for the three tabs, the same simplification `query`/
+  // `facetValues` already make: a sort chosen on one tab is not a decision
+  // about a DIFFERENT collection the way a remembered VIEW is (`useRemembered`,
+  // above) — it is a fresh read of "what order do I want these in", so plain
+  // `useState` rather than a value that survives a reload is the honest match.
+  // Lands on the client's own default: priority, highest first.
+  const [sortField, setSortField] = React.useState<"priority" | "deadline">("priority")
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc")
 
   async function addTask(values: TaskFormValues) {
     await contentApi.createTask({
@@ -440,17 +605,6 @@ export function TasksScreen({
     // A new task belongs in SEVERAL piles and only one of them is on screen.
     for (const v of TASK_VIEWS) invalidate(tasksKey(teamId, v))
     toast.success(t("Task added."))
-  }
-
-  async function raiseTodo(values: TodoFormValues) {
-    await contentApi.raiseTodo({
-      accountId: values.accountId,
-      title: values.title,
-      detail: values.detail || undefined,
-      dueOn: values.dueOn ? new Date(values.dueOn).toISOString() : undefined,
-    })
-    invalidate(todosKey(teamId))
-    toast.success(t("Asked, and emailed to them."))
   }
 
   // THE BOARD'S OWN WRITE — a drop sends the task's WHOLE current shape back
@@ -622,12 +776,19 @@ export function TasksScreen({
       />
     )
 
-  const data = shapeTasks(filteredRows, lang)
+  // THE TABLE'S OWN ORDER (R53) — computed on the RAW `Task[]` (`compareTasks`
+  // reads `priority`/`dueOn` off the record, never the shaped, locale-formatted
+  // cell) and only THEN shaped into rows. A fresh array: `Array.prototype.sort`
+  // mutates in place and `filteredRows` is read again below (Board, Calendar),
+  // which must keep the door's own arrival order rather than inherit the
+  // Table's.
+  const sortedRows = [...filteredRows].sort((a, b) => compareTasks(a, b, sortField, sortDir))
+  const data = shapeTasks(sortedRows, lang)
   const columns =
     view === "completed" ? COMPLETED_COLUMNS : view === "all" ? EVERYONE_COLUMNS : TASK_COLUMNS
   // A TABLE, not a two-line list, and that is what makes the four priority
-  // levels distinct: each is its own sortable, filterable column rather than
-  // the fourth clause of a summary sentence nobody reads to the end of.
+  // levels distinct: each is its own filterable column rather than the fourth
+  // clause of a summary sentence nobody reads to the end of.
   const tableRecipeBase = withDataDrivenCollection(
     // TRANSLATED HERE, because `resolveRecipe` translated the recipe before this
     // screen got it and these columns are the host's own — spread on afterwards,
@@ -636,13 +797,15 @@ export function TasksScreen({
     { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
     data.rows
   )
-  // THE OUTER TOOLBAR IS THE ONE CONTROL SURFACE — its search/filters already
-  // narrowed `filteredRows` above, so the engine's OWN copies are switched off
-  // (`apps-screen.tsx`'s own `listRecipe`, the identical move): a second,
-  // disconnected search box under this one would be the shape R53 exists to
-  // stop. `showHeader` (collection-frame.tsx) draws nothing at all once title,
-  // count, search, filters and sort are all false/empty — this table is then
-  // ONLY the rows and their header-click sort, `RecordTable`'s own.
+  // THE OUTER TOOLBAR IS THE ONE CONTROL SURFACE — its search/filters/sort
+  // already narrowed and ordered `sortedRows` above, so the engine's OWN
+  // copies are switched off (`apps-screen.tsx`'s own `listRecipe`, the
+  // identical move): a second, disconnected search box (or sort) under this
+  // one would be the shape R53 exists to stop. `showHeader`
+  // (collection-frame.tsx) draws nothing at all once title, count, search,
+  // filters and sort are all false/empty — this table is then ONLY the rows,
+  // in the order they arrived, `RecordTable`'s own header-click sort switched
+  // off column by column below.
   const tableRecipe: ScreenRecipe = tableRecipeBase.collection
     ? {
         ...tableRecipeBase,
@@ -655,14 +818,16 @@ export function TasksScreen({
         },
       }
     : tableRecipeBase
-  // BOUNDED TO THE LOADED PAGE (R14): the headers order what is here and order
-  // ALL of it — no `order` prop, `RecordTable` owns the answer through its own
-  // column-header clicks, exactly as before this pass.
+  // NO `sort` KEY (R53, 2026-09-15 ruling: "make sure you remove it from the
+  // headers") — `record-table.tsx` only wires a header's click handler and
+  // arrow when the column carries one, so these columns render as plain
+  // labels and the toolbar's own `<SortControl>` (below) is the only order a
+  // reader can ask for. No `order` prop either: the rows arrive PRE-SORTED
+  // (`sortedRows`, above), and `RecordTable` with neither draws them exactly
+  // as handed.
   const tableColumns: TableColumn[] = tableRecipe.fields.map((f) => ({
     key: f.column,
     label: f.field.label,
-    sort: f.column,
-    ...SORT_AS[f.column],
     ...(f.column === "priority"
       ? { render: (value: unknown) => <PriorityChip level={value as 1 | 2 | 3 | 4} t={t} /> }
       : {}),
@@ -682,11 +847,26 @@ export function TasksScreen({
         .filter(Boolean)
         .join(" · ") || undefined,
   })
+  // CARDS SORT BY DEADLINE ASCENDING WITHIN THE COLUMN, EARLIEST ON TOP,
+  // UNDATED LAST — the client's own ruling, 2026-09-15: "on the board view for
+  // overdue, in the headers, I want to see the color of this priority, and the
+  // sort inside should be by deadline. On the top, the earliest deadline."
+  // FIXED, not the toolbar's own Priority/Deadline sort (see this file's
+  // header) — the grouping already answers "which priority"; this answers the
+  // one question left inside a column.
+  const boardDeadlineKey = (r: Task) => r.dueOn ?? NO_DEADLINE_SENTINEL
   const boardColumns: KanbanColumn[] = PRIORITY_ORDER.map((p) => ({
     id: String(p),
     title: priorityWord(t, p),
-    cards: filteredRows.filter((r) => r.priority === p).map(boardCard),
-    emptyLabel: t("Nothing at this stage."),
+    // THE COLUMN HEAD CARRIES THE PRIORITY'S OWN COLOUR — the same ruling,
+    // its first half, and the same `PRIORITY_DOT_TONE` the table's own chip
+    // reads (`PriorityChip`, above): one lookup, two chips, never two answers
+    // for what "priority 4" is coloured.
+    dot: PRIORITY_DOT_TONE[p],
+    cards: filteredRows
+      .filter((r) => r.priority === p)
+      .sort((a, b) => (boardDeadlineKey(a) < boardDeadlineKey(b) ? -1 : boardDeadlineKey(a) > boardDeadlineKey(b) ? 1 : 0))
+      .map(boardCard),
   }))
 
   // THE CALENDAR (Planned only) — the host's own (record-calendar.tsx), fed
@@ -702,6 +882,11 @@ export function TasksScreen({
       // NO REFERENCE PREFIX — see the same note on the list row above.
       title: r.title,
       accent: r.department ?? "",
+      // THE PRIORITY COLOUR CIRCLE — `CalendarEntry.dotTone` (record-calendar.tsx),
+      // set from the same lookup the table chip and the board column head both
+      // read (`PRIORITY_DOT_TONE`, `shared/departments.ts`), so all three faces
+      // of one task's priority agree.
+      dotTone: PRIORITY_DOT_TONE[r.priority],
       detail: [priorityWord(t, r.priority), staffNameFromSnapshot(r.assigneeName)] // R54
         .filter(Boolean)
         .join(" · "),
@@ -765,6 +950,25 @@ export function TasksScreen({
       }
       filters={(tasksLoading || !rawEmpty) && filterPill}
       toolbarPanel={(tasksLoading || !rawEmpty) && filterPanel}
+      // R53's SORT DEFAULT — "add sort by task priority and deadline. That's
+      // it." Picking the OTHER field lands on that field's own default
+      // direction (`taskSortOptions`' `defaultDir`), not whatever direction
+      // the previous field happened to be showing — the same "a fresh field
+      // is a fresh question" shape `contact-panels.tsx`'s own multi-option
+      // sort already answers its `onValueChange` with.
+      sort={
+        (tasksLoading || !rawEmpty) && {
+          options: taskSortOptions(t),
+          value: sortField,
+          onValueChange: (v) => {
+            const next = v === "deadline" ? "deadline" : "priority"
+            setSortField(next)
+            setSortDir(next === "deadline" ? "asc" : "desc")
+          },
+          direction: sortDir,
+          onDirectionChange: setSortDir,
+        }
+      }
       view={(tasksLoading || !rawEmpty) && viewSlot}
       actions={canCreate && <AddButton label={t("New task")} onClick={() => setTaskOpen(true)} />}
     />
@@ -795,6 +999,11 @@ export function TasksScreen({
       onMove={canEditTasks ? movePriority : undefined}
       onCardSelect={(card) => onIntent({ kind: "open", module: "tasks", id: card.id })}
       label={t("Tasks by priority")}
+      // NO PLACEHOLDER, kit v1.2.87 (client ruling: "when empty, don't show
+      // anything at this stage, but nothing on this priority") — `"bare"`
+      // drops `EmptyRegister` entirely and keeps an unstyled, still-droppable
+      // zone; see this file's header for the full ruling.
+      emptyColumns="bare"
     />
   ) : subView === "calendar" ? (
     <RecordCalendar
@@ -803,14 +1012,27 @@ export function TasksScreen({
       emptyText={t("No tasks match your search.")}
     />
   ) : (
-    <RecordTable
-      columns={tableColumns}
-      rows={data.rows}
-      config={tableRecipe.collection as CollectionConfig}
-      actions={visibleActions(tableRecipe, rights, onAction)}
-      onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
-      useKitPanel
-    />
+    // `action={null}` OVERRIDES THE AMBIENT CREATE ACTION `<SectionWithCreate
+    // onCreate={…}>` PUBLISHES BELOW (`CollectionCreateActionProvider`) — the
+    // client's ruling, 2026-09-15: "there is an add button with a plus, but
+    // there is also one underneath. There should only be one, and the correct
+    // one is in the toolbar." `<RecordTable useKitPanel>` reads that same
+    // ambient action and draws its OWN icon-only create button in its ready
+    // state, even with every other kit-panel control switched off — the
+    // identical shape `apps-screen.tsx`'s own list body already worked around
+    // for the same reason ("so the panel's own toolbar draws no second +
+    // button — this screen's own AddButton, in the ToolbarRow above, is the
+    // one mango for the act"). See this file's header for the full account.
+    <CollectionCreateActionProvider action={null}>
+      <RecordTable
+        columns={tableColumns}
+        rows={data.rows}
+        config={tableRecipe.collection as CollectionConfig}
+        actions={visibleActions(tableRecipe, rights, onAction)}
+        onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
+        useKitPanel
+      />
+    </CollectionCreateActionProvider>
   )
 
   return (
@@ -878,20 +1100,14 @@ export function TasksScreen({
         </div>
       </SectionWithCreate>
 
-      {/* R14: BOUNDED, not paged — admin is ticked off as fast as it arrives. */}
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
-          <ClipboardText className="size-3.5" />
-          {t("Waiting on clients")}
-        </h2>
-        <TodosPanel
-          teamId={teamId}
-          canCancel={canCancelTodo}
-          onNew={canRaiseTodo ? () => setTodoOpen(true) : undefined}
-          onOpenTicket={(id) => onIntent({ kind: "open", module: "tickets", id })}
-        />
-      </section>
+      {/* "WAITING ON CLIENTS" LEFT THIS SCREEN 2026-09-15 — the client's ruling,
+          verbatim: "The whole 'waiting on clients': remove it from tasks. This
+          is a completely different module, and we will put this somewhere
+          else, but remove it from tasks." See this file's header for the full
+          account: the to-do door, lib, types and cache key are untouched, and
+          `TodosPanel` still renders on an account's own record and a
+          contact's, so removing it here does not leave the door with no UI —
+          it awaits the new home the client named. */}
 
       <TaskFormDialog
         open={taskOpen}
@@ -904,12 +1120,6 @@ export function TasksScreen({
         departments={options.departments}
         defaultAssigneeId={myUserId ?? ""}
         onSubmit={addTask}
-      />
-      <TodoFormDialog
-        open={todoOpen}
-        onOpenChange={setTodoOpen}
-        draftKey={`todo:add:${teamId}`}
-        onSubmit={raiseTodo}
       />
     </div>
     </CountedAbove>

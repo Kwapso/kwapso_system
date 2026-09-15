@@ -420,11 +420,31 @@ async function titlesIn(view: string): Promise<string[]> {
 }
 
 describe("our own admin comes in six piles, counted once", () => {
+  // ASSIGNED TO THE CALLER — `titlesIn`/the R16 test below both read as
+  // `IDS.staffUser`, and 2026-09-15's ruling narrows Overdue/Planned/Completed
+  // to `assignee_id = caller` UNCONDITIONALLY now (see `MINE_VIEWS`,
+  // `workers/content/src/routes/todos.ts`). An unassigned task belongs to
+  // nobody's "mine" pile, so these four have to name the caller to still prove
+  // what this describe block is actually testing — that the SIX views ask six
+  // different questions, not who may see them (that is the block above,
+  // "who sees everyone else's tasks is a permission").
   beforeEach(async () => {
-    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Late", dueOn: deadline(-3) })
-    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Soon", dueOn: deadline(5) })
-    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Undated" })
-    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Finished", dueOn: deadline(-1) })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Late",
+      dueOn: deadline(-3),
+      assigneeId: IDS.staffUser,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Soon",
+      dueOn: deadline(5),
+      assigneeId: IDS.staffUser,
+    })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Undated", assigneeId: IDS.staffUser })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Finished",
+      dueOn: deadline(-1),
+      assigneeId: IDS.staffUser,
+    })
     const done = (db().prepare(`SELECT id FROM tasks WHERE title = 'Finished'`).get() as { id: string }).id
     await call(IDS.staffUser, "POST /api/content/tasks/done", { id: done, done: true })
   })

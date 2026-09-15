@@ -1659,6 +1659,8 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "documented and deliberate: web/components/assistant/agent-host.tsx names copilot-overlay in its own comment, explaining that only the launcher's PLACEMENT was reused (it has to clear the phone's bottom nav bar, which the kit's own corner-pinned launcher does not account for) — the panel was rebuilt because agent-panel.tsx needs RunSteps and citation pills the kit's overlay does not model.",
   "components/detail-view":
     "a documented architecture choice, not an oversight: UI-CONVENTIONS.md §2b rules that bespoke `*-detail.tsx` screens are host-composed from TabsView + ActivityFeed + DescriptionList + Card precisely because each carries a control the screen engine (and this generic template) has no block for.",
+  "components/toggle-group":
+    "unreached as of 2026-09-15, and by a deletion rather than a gap: its one caller, web/components/records/record-calendar.tsx's month/agenda switch, was removed on the client's own ruling — \"Agenda is a different component than month. Inside the calendar, the whole month agenda: disable that. When I mean calendar, I mean the month view.\" `RecordCalendar` is a month grid only now, on every device, so nothing in the app switches between two readings of the same period any more. The day a screen needs a real segmented either/or control again, this is the part to reach for rather than two buttons whose variant flips (R3).",
 }
 
 /** R39 — the reviewed exceptions. A file here imports a UI package directly
@@ -2624,6 +2626,16 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
  * list is worse than dead — it is wrong. Rot-checked in both directions: an
  * entry whose component now passes `sort` fails the build. */
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
+  // DELETED 2026-09-15 — `web/components/work/tasks-screen.tsx#TasksScreen`.
+  // The entry argued the Table view ordered by its own column headers and
+  // none of the three tabs' views had a second question a sort control could
+  // answer. The client's same-day follow-up ruling disagreed with the first
+  // half directly: "add the sort to the toolbar and add sort by task priority
+  // and deadline... make sure you remove it from the headers." The screen now
+  // passes `sort` (Priority/Deadline, R53's structured config) and no column
+  // carries a `sort` key of its own — Board and Calendar still have no second
+  // question (the grouping and the day are each their own order), which is
+  // why the exemption's OTHER two-thirds is simply gone rather than narrowed.
   // DELETED 2026-09-11 — `members-gallery.tsx#MembersGallery`. It argued that
   // "a sort picker offering a single option over a bounded, alphabetical wall
   // is a control that answers nothing", and the client ruled the opposite for
@@ -2633,8 +2645,6 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
   // DIRECTION button beside the field unless a caller passes
   // `showDirection: false`, and `ToolbarRow` never does — so one field is a
   // real choice between A→Z and Z→A. The gallery now passes `sort`.
-  "web/components/work/tasks-screen.tsx#TasksScreen":
-    "REDESIGNED 2026-09-15 — Overdue · Planned · Completed, each with its own `<ToolbarRow>` and none of the three views any of them offers has a second question a sort control could answer. TABLE orders by its own column headers (`RecordTable`'s own header-click sort, unchanged by the redesign — the argument this entry made about the old six-tab strip's five table tabs is exactly as true of the new three). BOARD groups the loaded page by priority, so the grouping itself is the order — a picker beside it would be asking twice. CALENDAR (Planned only) is `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The toolbar's own search/filters now narrow the page once, ahead of every view (the redesign's own reason for switching off `CollectionFrame`'s copies via `searchable:false`/`userFilter:false`/`sortable:false` on the recipe handed to `RecordTable`), so there is exactly one `<ToolbarRow>` per tab regardless of which view is showing, and this single component-level entry covers all of them.",
   "web/components/apps/stakeholders-panel.tsx#StakeholdersPanel":
     "NOT ONE LIST. It draws two named groups — Ours and Theirs — each with the lead/main contact pinned at the top, so the grouping and that pin ARE the order; one search box narrows both (\"who is on this, on either side\" is one question). There is no single sequence for a sort control to act on, and applying one per group would order two lists from one chip.",
   "web/components/work/work-logs-panel.tsx#WorkLogsPanel":

@@ -1671,6 +1671,15 @@ export type TicketFace = {
   ref: string | null
   helpType: string | null
   appName: string | null
+  /** THE APP'S OWN FACE (R35, client ruling 2026-09-15: "add the logos to
+   * account and app … identify everywhere else where it makes sense") — the
+   * App column's leading mark. Named `appLogo`, not `appLogoUrl`: it is the
+   * same field `TriageWaiting` already carries (`workers/content/src/lib/
+   * triage.ts` resolves it at the door, same reasoning as `accountLogo`
+   * beside it there), and `HelpTicket` now resolves the identical column
+   * (`TICKET_COLS`, `workers/content/src/lib/help.ts`) so both real row
+   * shapes this generic table draws answer to one name rather than two. */
+  appLogo: string | null
   createdAt: string
   titleDe: string | null
   titleEn: string | null
@@ -1951,7 +1960,22 @@ export function TicketRowsTable<T extends TicketFace>({
                   toolbar above, and the ticket's own screen is one row-click
                   away with the app link on it. */}
               {columns.includes("app") && (
-                <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {/* THE APP, WEARING ITS OWN FACE (R35, client ruling
+                      2026-09-15) — the same mark+name node every other
+                      account/app cell in the app now draws
+                      (`shapeAccountsList`, `shapeMeetingsList`). Still text,
+                      not a link (R37-shaped — see the note above this
+                      column): the whole row's own click opens the TICKET,
+                      and a second destination inside it is the mistake this
+                      column already refuses. An absent app still says so
+                      with an em dash, drawn by the mark's own initial tile
+                      falling back to "?" rather than a blank box. */}
+                  <span className="flex items-center gap-2">
+                    {w.appName ? <RecordMark picture={w.appLogo} name={w.appName} /> : null}
+                    <span className="min-w-0 truncate">{w.appName ?? "—"}</span>
+                  </span>
+                </TableCell>
               )}
               {columns.includes("created") && (
                 <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">

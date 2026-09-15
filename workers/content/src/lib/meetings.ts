@@ -54,6 +54,9 @@ type MeetingRow = {
   title: string
   account_id: string | null
   account_name: string | null
+  /** R35, the Table's own "Account" column face — see `toMeeting`'s
+   * `accountLogoUrl`. */
+  account_logo_url: string | null
   app_id: string | null
   app_name: string | null
   purpose_id: string | null
@@ -114,6 +117,9 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
     WHERE ks.origin_table = 'meetings' AND ks.origin_row_id = m.id
       AND ks.deactivated_at IS NULL) AS knowledge_indexed_at,
   (SELECT a.name FROM accounts a WHERE a.id = m.account_id) AS account_name,
+  -- R35: the Table's own "Account" column face (client ruling 2026-09-15),
+  -- off the same row account_name already reads — one subselect, not two.
+  (SELECT a.logo_url FROM accounts a WHERE a.id = m.account_id) AS account_logo_url,
   (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
   (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name`
 
@@ -201,6 +207,8 @@ function toMeeting(r: MeetingRow): Meeting {
     title: r.title,
     accountId: r.account_id,
     accountName: r.account_name,
+    // R35 — the Table's own "Account" column face (client ruling 2026-09-15).
+    accountLogoUrl: r.account_logo_url,
     appId: r.app_id,
     appName: r.app_name,
     purposeId: r.purpose_id,

@@ -95,6 +95,7 @@ function makeMeeting(over: Partial<Meeting> = {}): Meeting {
     title: "Strategy Session w kwapso",
     accountId: null,
     accountName: null,
+    accountLogoUrl: null,
     appId: null,
     appName: null,
     purposeId: null,

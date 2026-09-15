@@ -56,7 +56,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R32 | enforced | `closed-palette` | `web/test/rules.test.ts` |
 | R33 | enforced | `wrapped-strings` | `web/test/wrapped-strings.test.ts` |
 | R34 | enforced | `glossary-in-copy` | `web/test/rules.test.ts` |
-| R35 | enforced | `records-carry-their-face` | `web/test/rules.test.ts` |
+| R35 | enforced | `records-carry-their-face` | `web/test/rules.test.ts`<br>`workers/content/test/ticket-work-engine.test.ts` |
 | R38 | enforced | `details-ask-the-door` | `web/test/rules.test.ts` |
 | R39 | enforced | `kit-supplies-the-ui` | `web/test/rules.test.ts` |
 | R44 | enforced | `translation-ceiling` | `web/test/translation-ceiling.test.ts` |

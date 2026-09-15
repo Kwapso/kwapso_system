@@ -42,124 +42,28 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { primeCache } from "@shared/web/store"
 import { PagedFind } from "@/components/records/paged-find"
 import { RecordTable } from "@/components/records/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { appsKey, tasksKey } from "@/lib/live-resources"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
-import { TasksScreen } from "@/components/work/tasks-screen"
-import type { Task } from "@shared/types"
-
-// The screen mounts its "new task"/"ask a client" dialogs, which reach the
-// router, and every cached read revalidates on mount. Neither is what is being
-// tested; both have to answer for the screen to stay rendered.
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: () => {}, push: () => {} }) }))
-const { door } = vi.hoisted(() => ({ door: { tasks: [] as unknown[] } }))
-vi.mock("@/lib/api", () => ({
-  ApiFailure: class extends Error {},
-  content: {
-    tasks: async () => ({
-      tasks: door.tasks,
-      openTotal: door.tasks.length,
-      allTotal: 0,
-      overdueTotal: 0,
-      upcomingTotal: 0,
-      completedTotal: 0,
-      calendarTotal: 0,
-      dueTodayTotal: 0,
-      dueTodayDone: 0,
-    }),
-    todos: async () => ({ todos: [], total: 0 }),
-  },
-  tenancy: {
-    members: async () => ({ members: [] }),
-    apps: async () => ({ apps: [], total: 0 }),
-    accounts: async () => ({
-      accounts: [],
-      total: 0,
-      entityTotal: 0,
-      individualTotal: 0,
-      nextCursor: null,
-    }),
-    selectable: async () => ({ values: [], total: 0 }),
-    myPermissions: async () => ({
-      permissions: { work: { read: true }, all_tasks: { read: true } },
-    }),
-  },
-}))
 
 afterEach(cleanup)
 
-/* ───────────────────────────── the tasks screen ───────────────────────────── */
-
-/** THE SCREENSHOT, as rows: the door hands back priority first, so the one
- * `4 · Do it now` task leads and everything under it climbs by deadline. Sorting
- * by Deadline has to move the top row to the BOTTOM — no arrangement of these
- * five is a no-op, which is what stops a dead control passing by luck. */
-const TASKS = [
-  // deliberately two rows sharing a deadline, as the screenshot had — ties keep
-  // the order they arrived in, both ways round, which is what a stable sort owes
-  // a person who is scanning the same list twice.
-  { id: "t1", title: "Feedback 01", priority: 4, department: "Sales", assigneeName: "Ana", dueOn: "2026-09-21T00:00:00.000Z" },
-  { id: "t2", title: "Visuals", priority: 1, department: "Design", assigneeName: "Bea", dueOn: "2025-04-14T00:00:00.000Z" },
-  { id: "t3", title: "Copy", priority: 1, department: "Content", assigneeName: "Cal", dueOn: "2025-04-14T00:00:00.000Z" },
-  { id: "t4", title: "HR Dashboard Hogo", priority: 1, department: "Ops", assigneeName: "Dev", dueOn: "2025-04-23T00:00:00.000Z" },
-  // Nothing filled in at all: it must sit LAST in both directions, because a
-  // sort is for finding the extremes of what you have and a screen of em-dashes
-  // is not one of them.
-  { id: "t5", title: "Someday", priority: 1, department: null, assigneeName: null, dueOn: null },
-] as unknown as Task[]
-
-let team = 0
-/** A team with its caches already warm, so the screen renders its rows on the
- * first paint and nothing here is waiting on a mocked fetch. */
-function warmTeam(tasks: Task[]): string {
-  const teamId = `team-${++team}`
-  primeCache(tasksKey(teamId, "open"), tasks)
-  primeCache(`my-perms:${teamId}`, { work: { read: true }, all_tasks: { read: true } })
-  primeCache(`members:${teamId}`, [])
-  primeCache(appsKey(teamId), [])
-  primeCache(`accounts:${teamId}`, [])
-  primeCache(`selectable:${teamId}`, [])
-  return teamId
-}
-
-function renderTasks(tasks: Task[] = TASKS) {
-  const teamId = warmTeam(tasks)
-  // …and the same rows come back when the screen revalidates on mount, so the
-  // list under test is never quietly replaced mid-assertion.
-  door.tasks = tasks
-  render(
-    <TasksScreen
-      teamId={teamId}
-      recipe={BASE_RECIPES["tasks.list"]}
-      rights={{ work: { read: true } } as never}
-      total={tasks.length}
-      counts={{
-        all: undefined,
-        overdue: undefined,
-        planned: undefined,
-        upcoming: undefined,
-        completed: undefined,
-        calendar: undefined,
-        dueToday: undefined,
-        dueTodayDone: undefined,
-      }}
-      view="open"
-      onViewChange={() => {}}
-      myUserId="u1"
-      canCreate={false}
-      canRaiseTodo={false}
-      canCancelTodo={false}
-      onAction={() => {}}
-      onIntent={() => {}}
-    />
-  )
-}
+// TASKS' OWN HEADER-SORT TESTS LIVED HERE UNTIL 2026-09-15, AND ARE GONE — not
+// moved, DELETED. The client's ruling that day retired the very thing this
+// suite proved for that screen: "add the sort to the toolbar… make sure you
+// remove it from the headers." A table whose headers no longer carry a `sort`
+// key draws no button and no `aria-sort` at all (`record-table.tsx` only wires
+// either when the column has one), so the shape this file's own header
+// documents — a lit arrow over rows that never moved — cannot recur on Tasks
+// specifically because there is no arrow left to lie. Tasks' NEW invariants
+// (the toolbar's own Priority/Deadline sort, its default order and ties, and
+// that the headers are now inert) are pinned in `web/test/tasks-sort.test.tsx`
+// instead — a different claim than "the header moves the rows", so it earns a
+// different file rather than a rewritten describe block here.
 
 /** The first cell of every rendered row, in the order they are painted. The
  * whole point of the file: what a person actually sees down the page. */
@@ -174,130 +78,7 @@ const header = (label: string) => screen.getByRole("button", { name: new RegExp(
  * the rows can be compared rather than assumed to agree. */
 const claimed = (label: string) => header(label).closest("th")?.getAttribute("aria-sort") ?? null
 
-describe("Tasks: the rows move when the header is clicked", () => {
-  it("opens in the door's order — priority first, exactly as reported", () => {
-    renderTasks()
-    expect(rowOrder()[0]).toContain("Feedback 01")
-  })
-
-  it("sorting by Deadline REPLACES that order rather than sorting inside it", () => {
-    renderTasks()
-    const before = rowOrder()
-    fireEvent.click(header("Deadline"))
-    const after = rowOrder()
-
-    // The assertion the old code could not pass: the list is not what it was.
-    expect(after, "the rows did not move — the header is drawing a dead control").not.toEqual(before)
-    // Soonest first, and the priority-4 row is no longer privileged: it has the
-    // furthest-out deadline, so it goes last of the dated rows. Anything that
-    // "sorted within priority" would still have it on top.
-    expect(after.map((r) => r.replace(/ .*/, ""))).toEqual([
-      "Visuals",
-      "Copy",
-      "HR",
-      "Feedback",
-      // no deadline — last, and it stays last when the direction flips
-      "Someday",
-    ])
-    expect(claimed("Deadline")).toBe("ascending")
-  })
-
-  it("a second click reverses it, and the blanks stay at the bottom", () => {
-    renderTasks()
-    fireEvent.click(header("Deadline"))
-    fireEvent.click(header("Deadline"))
-    expect(rowOrder().map((r) => r.replace(/ .*/, ""))).toEqual([
-      "Feedback",
-      "HR",
-      // the tie, still in the order it arrived in
-      "Visuals",
-      "Copy",
-      "Someday",
-    ])
-    expect(claimed("Deadline")).toBe("descending")
-  })
-
-  it("a third click gives the door's own order back", () => {
-    renderTasks()
-    const arrived = rowOrder()
-    fireEvent.click(header("Deadline"))
-    fireEvent.click(header("Deadline"))
-    fireEvent.click(header("Deadline"))
-    // The priority-first default is a decision, not an accident — it is one more
-    // press away rather than gone until the screen is reloaded.
-    expect(rowOrder()).toEqual(arrived)
-    expect(claimed("Deadline")).toBeNull()
-  })
-
-  // EVERY column with a header button moves the rows — column by column, because
-  // the defect was per-column and uniform: five lit headers, none of them wired.
-  // One passing column would have hidden four.
-  //
-  // The assertion is that the column's two DIRECTIONS differ from each other,
-  // not that either differs from the arrival order — a column whose ascending
-  // order happens to be the order the door already used is a live control that
-  // legitimately moved nothing (Priority, here, is exactly that). A dead one
-  // cannot pass: it gives the same list all three times.
-  //
-  // ONE CASE PER COLUMN rather than one case with a loop in it. Five full
-  // renders inside a single `it` cost five times a normal test against the one
-  // shared 5000ms budget — and that budget is WALL CLOCK, so in a 58-file
-  // parallel suite it was measuring how busy the machine was rather than
-  // anything about this code. It went red on 19 Aug 2026 because a lane added
-  // two test files elsewhere in the workspace. Split, each column gets its own
-  // budget, its own name in the output, and the coverage is identical.
-  it.each(["Task", "Priority", "Department", "Who has it", "Deadline"])(
-    "the %s header moves the rows",
-    (label) => {
-      renderTasks()
-      fireEvent.click(header(label))
-      const oneWay = rowOrder()
-      fireEvent.click(header(label))
-      expect(rowOrder(), `the ${label} header changes nothing in either direction`).not.toEqual(
-        oneWay
-      )
-    }
-  )
-})
-
-describe("the rest of the collection's chrome survived the swap", () => {
-  // The order was one thing taken off the library frame; the SEARCH is another,
-  // moved onto the tab's own outer toolbar (2026-09-15's Overdue/Planned/
-  // Completed redesign, so the toolbar can carry a Table/Board[/Calendar] view
-  // switch the library frame has no slot for) — narrowed by TITLE only now,
-  // the same bounded match the old Calendar tab's own search box always made,
-  // rather than the frame's former every-column match. Facets, the count and
-  // the empty line are still drawn (through the SAME toolbar, not the frame),
-  // so a table that gained a working sort by losing its narrowing is still not
-  // the trade this suite is pinning.
-  /** The state updates synchronously (this screen's own `query`, not the
-   * frame's debounced one), so a re-read right after the change is honest. */
-  const search = async (text: string) => {
-    fireEvent.change(screen.getAllByRole("searchbox")[0], { target: { value: text } })
-    await waitFor(() => expect(rowOrder().length).toBeLessThan(5))
-  }
-
-  it("still searches the rows it holds", async () => {
-    renderTasks()
-    expect(rowOrder().length).toBe(5)
-    await search("Visuals")
-    expect(rowOrder()).toEqual(["Visuals"])
-  })
-
-  it("still narrows, and sorting what is left keeps it narrowed", async () => {
-    renderTasks()
-    // The two TITLES that share "da" — one dated, one not, which is also what
-    // keeps this test honest about the empty-sorts-last rule one level down.
-    await search("da")
-    const narrowed = rowOrder()
-    expect(narrowed.length).toBe(2)
-    fireEvent.click(header("Deadline"))
-    // Ordering happens before the toolbar narrows, and narrowing preserves
-    // order — so the two compose rather than fight.
-    expect(rowOrder().length, "sorting a searched list must not widen it").toBe(narrowed.length)
-    expect([...rowOrder()].sort()).toEqual([...narrowed].sort())
-  })
-})
+let team = 0
 
 /* ───────────────────────────── the meetings list's table ──────────────────── */
 

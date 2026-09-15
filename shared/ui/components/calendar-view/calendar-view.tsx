@@ -74,6 +74,27 @@
      absent, the same text it always was, and no tab stop. It hands back
      the day and the events the cell did not show, so the caller can open
      them without recounting.
+   · THE COMPACT DOTS ARE THE SAME LAW, 2026-09-15. The client's ruling that
+     the calendar is the month grid, full stop, even on a phone ("Agenda is
+     a different component than month … disable that") removed the one
+     escape hatch a busy phone had — and left chapter 18's below-`sm:` dots
+     exactly where CV-3 found the more-line: `aria-hidden`, no
+     `onSelectEvent`/`onSelectMore` wiring, nothing to tap. Given
+     `onSelectMore` (preferred, the SAME handler the desktop more-line
+     calls, so the day opens the same way from either width) or
+     `onSelectDay` (the fallback), the dots sit inside a real button whose
+     accessible name is the day's own label plus the count
+     (`formatDaySummary`) — read off the button's ordinary subtree, not a
+     hand-built `aria-label`, because `day.label` is a caller node and this
+     file does no string formatting (see above). Capped at three
+     (`MOBILE_MAX_DOTS`), independent of `maxEvents`: the true count already
+     lives in the accessible name, so a fourth, fifth, sixth dot would only
+     be colour a reader cannot act on differently from the third. Each dot
+     reads `event.dot` (27.25's status colour) before `tone`, the same
+     precedence `eventChipClass` uses for the chip it stands in for. When
+     the cell is ALREADY a button (`onSelectDay`, `pickable`), a nested
+     button is invalid HTML, so the count instead rides the cell's own
+     accessible name through a plain `sr-only` span — no second control.
 
    RENDERING CONTEXT
    `"use client"` — the day and event handlers are created during this
@@ -333,6 +354,18 @@ export interface CalendarViewProps
    * line; see GAPS-COL1 CV-3. What the line DOES is `onSelectMore`'s.
    */
   formatMoreEvents?: (hidden: number) => string;
+  /**
+   * Turns a day's event count into the compact (below-`sm:`) cell's
+   * accessible name. The dots there are `aria-hidden` (a colour is not a
+   * word), so this is the only place that count reaches a screen reader —
+   * read off the control's own subtree, beside the day's own visible label,
+   * never a hand-assembled `aria-label` (`day.label` is the caller's node,
+   * and this file formats nothing; see the header). Handed the day too, in
+   * case a caller wants to fold its own words in; the default reads only
+   * the count, the same restraint `formatMoreEvents` keeps for the desktop
+   * line.
+   */
+  formatDaySummary?: (day: CalendarDay, count: number) => string;
   /** Picking a day. Given, every enabled cell becomes a real button. */
   onSelectDay?: (day: CalendarDay) => void;
   /** Picking an event. Given, every chip becomes a real button. */
@@ -400,6 +433,115 @@ function eventChipBody(event: CalendarEvent): React.ReactNode {
       />
       <span className="min-w-0 truncate">{event.label}</span>
     </React.Fragment>
+  );
+}
+
+/* How many dots the compact (below-`sm:`) cell shows before the rest fold
+   into one "+N" mark. Independent of `maxEvents`, which caps the DESKTOP
+   chip column only — chapter 18's small drawing has room for three. */
+const MOBILE_MAX_DOTS = 3;
+
+/** One compact dot's fill — 27.25's status colour (`event.dot`) when the
+ * caller set one, the chip's own `tone` otherwise. The same precedence
+ * `eventChipClass` uses for the chip this dot stands in for below `sm:`. */
+function compactDotClass(event: CalendarEvent): string {
+  return cn(
+    "block size-[var(--dot-status)] rounded-pill p-0",
+    event.dot !== undefined
+      ? EVENT_DOT[event.dot]
+      : eventChipVariants({ tone: event.tone }),
+  );
+}
+
+/**
+ * The compact (below-`sm:`) day summary. Chapter 18's dots, capped at
+ * `MOBILE_MAX_DOTS` with a "+N" mark for the rest, and — since 2026-09-15,
+ * see the header's THREE BREAKPOINTS note — a real control the moment the
+ * caller can open the day.
+ *
+ * `onSelectMore` is preferred: it is the SAME handler the desktop more-line
+ * calls, so the day opens identically from either width, handed every event
+ * the compact dots did not individually show (all of them; a dot is never
+ * itself a chip). `onSelectDay` is the fallback for a caller with only
+ * that. When the cell is ALREADY a button (`pickable`), nesting a second one
+ * is invalid HTML — the accessible-name job still gets done, by dropping a
+ * plain `sr-only` span into the cell's own subtree, which the browser's
+ * default accessible-name computation already reads.
+ */
+function CompactDaySummary({
+  day,
+  events,
+  pickable,
+  onSelectMore,
+  onSelectDay,
+  formatDaySummary,
+}: {
+  day: CalendarDay;
+  events: CalendarEvent[];
+  pickable: boolean;
+  onSelectMore?: (day: CalendarDay, hidden: CalendarEvent[]) => void;
+  onSelectDay?: (day: CalendarDay) => void;
+  formatDaySummary: (day: CalendarDay, count: number) => string;
+}) {
+  const shown = events.slice(0, MOBILE_MAX_DOTS);
+  const hidden = events.length - shown.length;
+  const summary = formatDaySummary(day, events.length);
+
+  const dots = (
+    <span aria-hidden="true" className="flex flex-wrap items-center gap-1">
+      {shown.map((event) => (
+        <span key={event.id} className={compactDotClass(event)} />
+      ))}
+      {hidden > 0 ? (
+        <span className="text-badge leading-none text-ink-tertiary tabular-nums">
+          +{hidden}
+        </span>
+      ) : null}
+    </span>
+  );
+
+  // The cell is already a button (`onSelectDay`, no chip/more nesting
+  // beneath it) — add the count to ITS accessible name, draw no second one.
+  if (pickable) {
+    return (
+      <span className="sm:hidden">
+        {dots}
+        <span className="sr-only">{summary}</span>
+      </span>
+    );
+  }
+
+  const open = onSelectMore
+    ? () => onSelectMore(day, events)
+    : onSelectDay
+      ? () => onSelectDay(day)
+      : null;
+
+  if (!open || day.disabled) {
+    return <span className="sm:hidden">{dots}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      data-slot="calendar-day-summary"
+      onClick={(e) => {
+        // Inside a pickable cell this branch never renders (see above);
+        // stopped anyway so a caller that adds `onSelectDay` later never has
+        // to remember this file too — the same defensiveness the chip and
+        // more-line clicks already carry.
+        e.stopPropagation();
+        open();
+      }}
+      className={cn(
+        "sm:hidden cursor-pointer rounded-pill text-start",
+        "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+        "enabled:hover:bg-accent",
+      )}
+    >
+      {dots}
+      <span className="sr-only">{summary}</span>
+    </button>
   );
 }
 
@@ -474,7 +616,12 @@ function resolveDayState(day: CalendarDay): NonNullable<
  *    small drawing) and the event CHIPS are replaced by chapter 18's 6 dots —
  *    a 45-wide cell cannot hold a chip with a readable label, and the kit
  *    solved this itself the second time it drew a calendar. The header's two
- *    steps stay at the standing 40 control height.
+ *    steps stay at the standing 40 control height. SINCE 2026-09-15 the dots
+ *    are no longer only a picture: given `onSelectMore` or `onSelectDay`,
+ *    they sit inside one real button per cell (capped at three dots + a
+ *    "+N" mark; see the DESIGN SOURCE block's own note above), because the
+ *    client's ruling that a phone reads the month grid too (no agenda
+ *    fallback) means this is now the ONLY way in on a phone.
  *  · tablet (`sm:`, 40rem) — chapter 19's drawing: the cell grows to a 5.5rem
  *    minimum with its height set by its content, and the chips come back.
  *  · desktop — UNCHANGED from tablet. A month is seven columns at every
@@ -504,6 +651,7 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
       /* 27.25: "Each day shows up to three chips … then '+2 more'." */
       maxEvents = 3,
       formatMoreEvents = (hidden) => `+${hidden} more`,
+      formatDaySummary = (_day, count) => `${count} event${count === 1 ? "" : "s"}`,
       onSelectDay,
       onSelectEvent,
       onSelectMore,
@@ -696,21 +844,17 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
 
                     {events.length ? (
                       <>
-                        {/* Below `sm:` the chips become chapter 18's dots. */}
-                        <span className="flex flex-wrap gap-1 sm:hidden">
-                          {shown.map((event) => (
-                            <span
-                              key={event.id}
-                              aria-hidden="true"
-                              className={cn(
-                                eventChipVariants({ tone: event.tone }),
-                                // The chip's own width and inset are dropped;
-                                // what is left is its FILL at the dot size.
-                                "block size-[var(--dot-status)] rounded-pill p-0",
-                              )}
-                            />
-                          ))}
-                        </span>
+                        {/* Below `sm:` the chips become chapter 18's dots —
+                            and, since 2026-09-15, a real control; see
+                            `CompactDaySummary` above. */}
+                        <CompactDaySummary
+                          day={day}
+                          events={events}
+                          pickable={pickable}
+                          onSelectMore={onSelectMore}
+                          onSelectDay={onSelectDay}
+                          formatDaySummary={formatDaySummary}
+                        />
 
                         <span className="hidden min-w-0 flex-col gap-1 sm:flex">
                           {shown.map((event) =>

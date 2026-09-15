@@ -1121,24 +1121,13 @@ export function ModuleSettingsScreen({
  * so a gear in `actions` would vanish from a team with no tickets yet — which
  * is the exact moment somebody goes looking for the ticket types.
  *
- * IT IS NOT MANGO IN THE "CREATE" SENSE — the Tickets screen's own create act
- * is "Raise ticket" — but it draws the SAME FILLED CIRCLE every toolbar icon
- * button in the app does. The client's ruling, 2026-09-15, over a screenshot of
- * Settings › Theme's gear sitting bare on the page ground: *"The gear button in
- * the toolbar in Settings Theme needs the background for the button to be the
- * same everywhere. There cannot be a button in the toolbar without a circle
- * around it."* THIS OVERRULES THE `ghost` REASONING THAT USED TO SIT HERE
- * (kept below, struck through in spirit rather than in fact, because the
- * argument for `ghost` was real and the next reader should see it was weighed
- * and not missed): a secondary/ghost fill on the bare page ground is
- * `var(--card)`, which measured `--background` in light — true, and beside the
- * point once the ruling reads "no button in the toolbar without a circle
- * around it" rather than "no button that measures wrong". `AddButton`
- * (`web/components/deep-link/screen-bits.tsx`) already draws every collection's
- * create action as a bare `<Button size="icon">` with no `variant` — the
- * library's own `default`, the filled dark circle — and this gear now draws
- * the SAME variant, so a toolbar's icon buttons read as one family rather than
- * two: one filled, one bare. See UI-RULEBOOK.md B11 for the rule this earned.
+ * THE CLIENT'S RULING, 2026-09-15: *"The settings gear should never be mango.
+ * Make it with a beige background."* Over a screenshot of Tasks' heading where
+ * the gear was drawn with the default mango fill, she asked for the beige
+ * filled circle (`variant: "secondary"`), the same background the member page's
+ * pencil uses. Every gear mount (module headings, Team toolbar) draws through
+ * this one function. Changed from `buttonVariants({ size: "icon" })` (default =
+ * mango) to `buttonVariants({ variant: "secondary", size: "icon" })` (beige).
  *
  * A REAL ANCHOR (R37) — `InAppLink`, so middle-click opens the settings page in
  * a tab and the address can be copied, while a plain left click stays inside
@@ -1177,7 +1166,7 @@ export function ModuleSettingsGear({
         <span className="inline-flex">
           <InAppLink
             href={`/settings/${segment}`}
-            className={buttonVariants({ size: "icon" })}
+            className={buttonVariants({ variant: "secondary", size: "icon" })}
           >
             <Gear className="size-4" />
             <span className="sr-only">{label}</span>

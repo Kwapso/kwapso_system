@@ -133,6 +133,25 @@ const DOOR_ORDERED: Record<string, string> = {
     "no name for carries no sort and is not clickable') — formatted for " +
     "display only."
   ),
+  deadline: (
+    "Tasks (web/components/work/tasks-screen.tsx). NOT door-ordered — the " +
+    "misnomer this list already carries for `time` above, same shape here: " +
+    "the 2026-09-15 ruling moved Tasks' order to the TOOLBAR's own Priority/" +
+    "Deadline `<SortControl>` (`compareTasks`, computed over the raw `Task[]` " +
+    "before the row is ever shaped) and deleted `sort` from every column in " +
+    "`tableColumns` — `record-table.tsx`'s `ordered()` returns `rows` " +
+    "untouched whenever `by` is empty, and `by` can never become non-empty " +
+    "when no header carries a `sort` to click. The formatted cell is real " +
+    "(`formatDate`) and the column is real, but neither the door nor the " +
+    "browser ever compares it — a third place an order can live, which this " +
+    "census's two named ways out (`sortType` for a real browser comparison, " +
+    "`DOOR_ORDERED` for the door's) did not anticipate."
+  ),
+  closed: (
+    "Tasks' Completed tab, the identical reasoning `deadline` carries one " +
+    "line up — `COMPLETED_COLUMNS`' own extra field, formatted the same way, " +
+    "sorted nowhere in the browser for the same reason."
+  ),
 }
 
 /** Every `key: value` line in a file where the value calls a formatter. */
