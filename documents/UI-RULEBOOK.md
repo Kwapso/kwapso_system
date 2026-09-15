@@ -38,7 +38,7 @@ the concrete implementation, and its evidence.
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
-- [3. Detail screens](#3-detail-screens) (D1 to D12)
+- [3. Detail screens](#3-detail-screens) (D1 to D13)
 - [4. Collections](#4-collections) (K1 to K19)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
@@ -568,6 +568,12 @@ somebody who measures the settled geometry. The column is sized on `inline-size`
 
 **Law.** [R51](../RULES.md) (`aside-collapse`).
 
+**Mid-edge close control, 2026-09-15:** When the assistant is OPEN, there is no mid-edge
+close control on the right edge of the assistant column. The top-right opener button stays
+visible (it never hides), toggling the assistant state. The assistant itself closes only
+from its own tab close action (kit v1.2.85 `asideHandleOnOpen`,
+`web/components/shell/app-shell.tsx`). This removes ambiguity about what the edge gesture does.
+
 ### L9: every section on the team area's strip has a door, or names the screen that took its place
 
 **The rule.** A section that lives on the team area's own strip (`TEAM_SECTIONS` in
@@ -898,6 +904,19 @@ The door had accepted an id the whole time.
 
 **Law.** [R38](../RULES.md) (`details-ask-the-door`).
 
+### D13: member detail head carries a role chip above the title, with one pencil for change
+
+**The rule.** The client's ruling, 2026-09-15: *"role chip above the title, actions = Change
+role + a visible pencil, Remove in the ⋯ menu; the footer draws both sections (Record +
+Latest activity) like every record."* A member's detail screen (`web/components/team/member-screen.tsx`)
+renders the role as a **chip positioned above the title** (following [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title)).
+The primary action is "Change role" with a visible pencil icon, and a destructive "Remove"
+action lives in the three-dot menu. The footer draws TWO sections: one for record fields and
+one for Latest activity, the same layout every detail record uses — never a custom footer
+for the member screen alone.
+
+**Law.** Not yet a registry check. Written to establish the shape.
+
 ---
 
 ## 4. Collections
@@ -925,6 +944,11 @@ Evidence: `A-3.58.53` (contact rows: name plus company, nothing else), `P-4.10.0
 (ticket rows: title plus "Created on 6 August 2026 · Paras Maroo"), `A-4.00.11` (sprint
 rows: name plus date range). The one place the old app shows more fields is a **table**,
 never a list ([K2](#k2-a-table-is-for-scanning-a-list-is-for-reading)).
+
+**Logo placement in the name cell, 2026-09-15:** For rows that have a logo or mark —
+Accounts, Apps, Deliverables — the company logo (or mark) sits to the left of the name,
+**inside the same cell**. The logo and name form one unit in the cell's flex row, with the
+logo leading (`shape.tsx` `shapeAccountsList`, `name` node + `nameText`).
 
 ### K2: a table is for scanning, a list is for reading
 
@@ -1488,6 +1512,10 @@ and not guessable from a glyph.
 Evidence: (inferred) the old app has no import surface to copy; this follows from
 UI-CONVENTIONS.md §4 and from the same reasoning as the portal exception in B3.
 
+**Exception, 2026-09-15:** The Roles settings screen (`roles-matrix.tsx`) has no import or
+export buttons. The client's ruling: *"Kill import and export for permissions settings."*
+Permissions are maintained through the matrix UI only, never via bulk CSV operations.
+
 ### B5: a full-width outlined button is the pattern for a secondary action inside a panel
 
 ```tsx
@@ -1643,6 +1671,13 @@ component. The standalone Purposes screen this replaced is off the Meetings scre
 paths unchanged, only the word ("Meeting purpose" → "Meeting type") and the door into the
 editor moved.
 
+**Automations status colours, 2026-09-15:** Every automation status draws its own colour,
+shared with Choices — **protected** renders as ink (inverse), **active** renders as success,
+**inactive** renders as outline (`AUTOMATION_STATUS_VARIANT`, `web/components/screens/automation-edit-sheet.tsx`).
+A row in the Automations list opens a DETAIL sheet showing the automation (chip above title,
+Edit pencil top-right like a record head, description, module), and tapping Edit swaps the
+same sheet to the form mode for editing.
+
 ### B12: settings changes preview first and apply on Save, through the pinned bar
 
 **The rule.** *"We need some kind of hint or flag, very visible, probably not at the
@@ -1739,6 +1774,14 @@ writing.
 **Code.** `shared/web/appearance-panel.tsx` (the staging), `web/lib/unsaved-changes.ts` (the
 registry), `web/lib/nav.ts` (the guard), `web/components/shell/unsaved-changes-dialog.tsx`
 (the one dialog and its host).
+
+**The bar's colour is warning-tinted, not the container's own tone (2026-09-15).** The client's
+ruling, verbatim: *"the 'You have unsaved changes' pinned bar at the top had a different
+color. Please implement that because right now it's in the same color as the container,
+which makes it not so visible."* The bar renders as `bg-warning/10` plus a warning hairline
+(`UnsavedChangesBar`, kit v1.2.84), a distinct warning-tinted band in both light and dark
+palettes, never the container's own surface tone. This styling is enforced by the kit
+component itself — no app-side law required.
 
 ### B13: a protected value is always active — there is no such state as "active, protected"
 
@@ -3372,15 +3415,23 @@ library, not a synthesised weight in the host.
 
 ---
 
+## Rulings awaiting implementation
+
+**Assistant conversations (2026-09-15):** A "+" tab is always visible in the assistant's tab
+strip and remains visible even when the assistant is closed. A new conversation opens on a
+scope picker first. **Status: ruled, not yet built.**
+
+---
+
 ## Rule index
 
-**134 rules.**
+**135 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
 | 2. Page layout and width | L1 to L11 (11) |
-| 3. Detail screens | D1 to D12 (12) |
+| 3. Detail screens | D1 to D13 (13) |
 | 4. Collections | K1 to K19 (19) |
 | 5. Buttons and actions | B1 to B14 (14) |
 | 6. Forms and dialogs | F1 to F10 (10) |
