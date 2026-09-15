@@ -1683,17 +1683,29 @@ Four things follow, and none of them is a per-screen decision:
    reader who may see tickets but not the vocabulary should not be offered a door that
    refuses them."*
 4. **inside one module's own page, a tab is drawn only where something is behind it, and
-   its count counts GROUPS, never values.** A module that owns both an Automations section
-   and a Choices section gets two tabs; a module with only one kind gets a single tab,
-   never a second, empty one beside it — the standing refusal against a control that
-   decides nothing, read onto a tab instead of a switch
-   (`module-settings-screen.tsx`, reasoned from R36/R50/R61). The badge on each follows R16
-   through the one `formatCount` seam, and what it counts is a fact about
-   `MODULE_SETTINGS` itself rather than a query: the Automations count is the module's own
-   row count in the `AUTOMATIONS` registry, and the Choices count is how many GROUPS
-   (categories) the page's vocabulary sections declare, never how many values sit inside
-   them — client, 2026-09-14, pointing at the two tabs: *"show the total count for
-   Automations and for Choice Components categories, not for the amount of choices."*
+   its badge counts ROWS — the same rule R16 states for every collection in the app, not
+   an exception to it.** A module that owns both an Automations section and a Choices
+   section gets two tabs; a module with only one kind gets a single tab, never a second,
+   empty one beside it — the standing refusal against a control that decides nothing, read
+   onto a tab instead of a switch (`module-settings-screen.tsx`, reasoned from
+   R36/R50/R61). The badge on each follows R16 through the one `formatCount` seam. The
+   Automations count is the module's own row count in the `AUTOMATIONS` registry — a code
+   constant rather than a query, but still a count of automations, one row per automation.
+   **The Choices count RULED TWICE, one day apart, and the second ruling is the one
+   standing.** Client, 2026-09-14, pointing at the two tabs: *"show the total count for
+   Automations and for Choice Components categories, not for the amount of choices"* — read
+   at the time as GROUPS (categories), never the values inside them. Client, 2026-09-15,
+   on seeing what that produces on the Tickets page (a badge reading 1 over a panel
+   listing 15 values): *"Even though I can see a lot of active ticket choices, it still
+   shows me the choices count as 1… I would rather all badge counts show me the count of
+   rows rather than types, so please change it."* The second ruling is broader than the one
+   screen it was noticed on — every tab badge in the app, ~25 of them, already counted the
+   rows its own panel lists; the Choices badge was the lone exception, and the
+   inconsistency was the defect. It now counts VALUES, read off the same cache the panel
+   below it already primes (R56 — no second door ask), standing down to no badge at all
+   (`formatCount(undefined)`) rather than a possibly-wrong one whenever its source is still
+   loading or came back at the door's own hard cap — a wrong number is worse than no
+   number, the same refusal R23 and R42 make elsewhere in this app.
 
 **Law.** [R61](../RULES.md) (`module-settings-two-doors`).
 
