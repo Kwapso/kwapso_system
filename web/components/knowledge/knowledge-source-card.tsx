@@ -185,9 +185,30 @@ export function KnowledgeSourceCard({
             `items-start` on the header (was `items-center`): a header row
             with a fixed-size icon beside a title that can now be two lines
             needs the icon pinned to the top, not floating to the row's
-            vertical middle once the title is taller than it is. */}
+            vertical middle once the title is taller than it is.
+
+            UPDATED 15 Sep 2026, SAME DAY: two lines at `text-lg` (20.25px)
+            was measured on staging to still clip 16 of 50 real cards at
+            phone width — these are machine-generated calendar titles
+            ("Accepted: HOGO: Optimising the candidate CV upload workflow @
+            Tue Sep 1, 2026 7:15pm - 7:45pm (IST) (Alaap Kanchwala) (not in
+            use)", 130 characters) that no reasonable clamp fits whole; the
+            `title` attribute already carries the full text, so an ellipsis
+            staying visible is correct and expected, not a residual bug.
+            `text-base sm:text-lg` and `line-clamp-3 sm:line-clamp-2`: a
+            smaller step and a third line below the kit's `sm` breakpoint
+            (640px, the same threshold `CardGrid`'s own column ladder
+            already keys off, so "phone" here means the same thing it means
+            to the grid around it), unchanged at `sm` and above — desktop
+            measured 0 of 50 clipped before this change and nothing here
+            touches it. NO EXISTING PATTERN for responsive type size existed
+            anywhere in this app before this line; checked
+            documents/UI-RULEBOOK.md and the rest of web/ first, found
+            nothing to match, so this is a new one, kept to the smallest
+            shape (a variant prefix on the existing utilities, no new
+            component, no new token). */}
         <CardTitle
-          className="min-w-0 flex-1 line-clamp-2 break-words"
+          className="min-w-0 flex-1 line-clamp-3 sm:line-clamp-2 text-base sm:text-lg break-words"
           title={source.active ? source.title : t("{title} (not in use)", { title: source.title })}
         >
           {source.active ? source.title : t("{title} (not in use)", { title: source.title })}
