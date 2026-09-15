@@ -39,7 +39,7 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
 - [3. Detail screens](#3-detail-screens) (D1 to D12)
-- [4. Collections](#4-collections) (K1 to K17)
+- [4. Collections](#4-collections) (K1 to K19)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
 - [7. Typography](#7-typography) (T1 to T8)
@@ -703,6 +703,40 @@ Evidence: compare `A-4.00.19` (header full, tabs at y≈653) with `A-4.00.30` an
 `A-4.00.37` (header scrolled away, the same tab strip pinned at y≈494 with the tab labels
 and badges intact). The tabs demonstrably stick in the old app.
 
+> **AMENDED 2026-09-15 — A MAIN SCREEN DRAWING ITS OWN PANEL CONTENT OWNS THE
+> SAME SEAM, EVEN THOUGH IT LOOKS LIKE A RECORD DETAIL'S SHAPE.** The client's
+> ruling, over Settings specifically: *"When I scroll down in settings, the
+> tabs do not stay pinned at the top. Make sure you fix this here and
+> everywhere else. Should be the same behavior when scrolling down: the tab
+> should stay visible."* `settings-screen.tsx` drew `<TabsView config={…}
+> value={tab} onValueChange={…} renderPanel={(panel) => …}>` — ONE `<Tabs>`
+> root holding both the tablist and every panel's `TabsContent` — with no
+> `className` at all, so the strip scrolled away with the page. Handing that
+> same root `STICKY_FOLDER_TABS` (above) would not have fixed it: unlike
+> `STICKY_TABS`, `STICKY_FOLDER_TABS` is not scoped to `[role=tablist]` alone,
+> so a `<Tabs>` root that also wraps the panel would pin the PANEL along with
+> the strip — sticking the whole screen's content to the top of the
+> scrollport the moment it engaged, which is worse than the bug it fixes. The
+> real fix is the split every collection screen already draws: the strip
+> renders through `renderFolderTabs` as a SIBLING of its panel, and the panel
+> is a plain function called for the current tab, never a `TabsContent`
+> inside the sticky root. Two other main screens drew the identical bare
+> shape — `screens/kwapso-screen.tsx` and `screens/module-settings-screen.tsx`
+> — and were named as a known, dated gap in `TAB_STRIP_PIN_EXEMPT`
+> (`shared/rules/registry.ts`) rather than silently left for a narrower
+> census to stop seeing; both were split the same way within the day
+> (`kwapso-screen.tsx` by this law's own lane, `module-settings-screen.tsx`
+> by the Choices lane), and both lines came back out — the client's
+> "everywhere else" read literally.
+>
+> **Law.** [R77](../RULES.md) (`tab-strips-pin`). A static census: every
+> `<TabsView` mount in `web/` and `web-portal/` either is reached through
+> `renderFolderTabs` (so no literal `<TabsView` text names it at all) or
+> carries `STICKY_FOLDER_TABS`/`STICKY_TABS` in its own `className`, or is
+> named in `TAB_STRIP_PIN_EXEMPT` with a reason — today, four nested view
+> switches and one route-navigation strip, none of them a screen's own
+> labelling strip.
+
 ### D4: the eyebrow names the type, in caps, above the title
 
 > **REVERSED, 3 Sep 2026 — there is no eyebrow anywhere in the app.** The client:
@@ -1272,6 +1306,77 @@ field the shipped code has already said it ignores is not an honest check, so th
 rulebook entry rather than a law until a real registry of host-composed screens exists to
 check against instead.
 
+### K19: Tasks — three tabs of your own, and a fourth for everyone's
+
+**The rule.** The client's ruling, 2026-09-15, verbatim: *"For tasks in tab 'Overdue', I
+want the board view by priority. This would be the secondary view. The main view would be
+a table, and this is my tasks. This is my overdue tasks. Put the table, and the columns
+would be: Task / Priority (has a color here) / Deadline / Department / Account / App /
+Whatever you think relevant. Filters by priority, by department. For the tab 'Completed',
+I want the view table only. Kill the tabs 'List' and 'Calendar' and replace them with a
+new tab called 'Planned' or something like this. You choose the word. Here, I would like a
+table view to be the main one, and then, as a secondary option, a board by priority and a
+calendar by deadline. Also kill upcoming."* Her separate, standing ruling — "replace the
+tab 'All' with 'Everyone's'" — reaches this screen too, in the follow-up the same day: the
+old six-tab strip's status-agnostic "All tasks" is not retired with List/Calendar/Upcoming,
+it is RENAMED and kept as a fourth tab, because it is the one tab that genuinely answers a
+different question than the first three (team-wide rather than "this is my tasks").
+
+**The tab strip.** `TASK_TABS`/`EVERYONE_TAB` (`web/components/work/tasks-screen.tsx`) is
+now **Overdue · Planned · Completed · Everyone's** — four SERVER views (R14/R16), replacing
+the six-tab strip (Overdue/List/Calendar/Completed/Upcoming/All tasks) this screen drew
+before. The first three are MINE ("this is my tasks") — they narrow to the caller's own
+name at the door unless the caller holds `all_tasks:read`; **Everyone's is the fourth, last
+in the strip, and drawn only when the caller holds that same right** (`seesEveryones`) —
+a caller who cannot see past their own name at the door would find it answering identically
+to the first three tabs combined, so it is not offered. It is the door's own `all` view,
+unchanged: no status filter, every task regardless of who has it. **Planned** is the
+tester's own word for a precise definition: every OPEN task that is NOT overdue, whether or
+not it carries a deadline at all — the exact complement of Overdue among the open ones, and
+a strictly wider set than the old "Upcoming" view (dated, not yet due), which never included
+an undated task. The door grew a matching `planned` view (`shared/types.ts`'s `TASK_VIEWS`,
+`workers/content/src/lib/tasks.ts`'s `viewClause`) rather than relabelling Upcoming, which
+stays defined (nothing else asked to lose it).
+
+**The views, per tab, through the toolbar's structured `view` slot** ([K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default)):
+Overdue offers Table (default) + Board by priority; Planned offers Table (default) + Board
+by priority + Calendar by deadline; Completed offers Table only (the kit still draws a
+static one-view label, kit v1.2.60, rather than the switch vanishing); Everyone's offers the
+same pair Overdue does, Table (default) + Board by priority. All views within one tab read
+the SAME search/priority/department-narrowed page — narrowing happens once, ahead of the
+view switch, so Table→Board keeps what was typed.
+
+**The table's seven columns**, one set for the three MINE tabs (replacing the old
+everyday/completed split, since the Priority chip already carries what the two dropped
+boolean columns — Important, Urgent — used to): Task, Priority (a coloured chip,
+`Badge variant="status" dot={PRIORITY_DOT_TONE[level]}`, `shared/departments.ts` — the
+first time anything in the app has coloured a task's priority), Deadline, Department,
+Account, App, Who has it (Assignee). Completed adds an eighth, Closed. Status is
+deliberately NOT a column: every tab is already a status scope (Overdue/Planned show only
+open tasks, Completed only done ones, and Everyone's carries no filter of its own to
+narrow it further), so a Status column would repeat one word down every row of whichever
+tab is open. **Everyone's reorders rather than adds** (`EVERYONE_COLUMNS`): the same seven
+fields, Assignee moved second — right after Task, ahead of Priority — because "whose is
+this" is the first question a team-wide scan asks, where on the three MINE tabs it is a
+fact about the reader themselves and belongs at the quiet end of the row.
+
+**The board is editable, Everyone's included.** `content.updateTask` already replaces the
+two ticks (`important`/`urgent`) that derive `priority`, the same door the edit form writes
+through, so a drop sends the task's whole current shape back with the two ticks set for the
+column it landed in (`movePriority`, tasks-screen.tsx) — contrast the tickets board
+(tickets-collection.tsx's `OpenBoard`), which stays read-only because its stages are
+flipped by OTHER events a drag would fight. Gated on `work:update`, on every tab that draws
+a board — on Everyone's, that means a reader with the right can correct someone else's
+priority from the board, exactly as they already could from that task's own record.
+
+**The filter menu's own quirk, written down rather than hidden.** Priority's four options
+are the app's own SCALE — 4→1, the door's own default order — but the shared facet reader
+(`useFilterBar`'s `optionsFor`, [K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language))
+sorts every facet's options A→Z unconditionally, with no per-facet escape hatch at that one
+chokepoint. So the FILTER DROPDOWN reads alphabetically ("Do it now" · "Important" ·
+"Urgent" · "Whenever") while the table column and the board columns both read the true
+4→1 order — an accepted, R75-driven consequence rather than a bug.
+
 ---
 
 ## 5. Buttons and actions
@@ -1406,6 +1511,28 @@ Do not make them icon-only; they are modes, not actions.
 
 Evidence: `A-4.08.47` and `A-4.08.56` ("Grid" as a filled dark pill with a grid glyph).
 
+**A view switch's OPTION SET may depend on the tab it sits beside** — Meetings,
+2026-09-09 ("calendar as a view") and 2026-09-15 (her tabs/views ruling in full, verbatim):
+*"In meetings, the tabs that I would like are: This week / Mine / and: Replace 'All' with
+'Everyone's'. The views I want in 'This week' are: Agenda chronological (this is only for
+mine, unless I say so, and it's always filtered to mine). Same goes for tasks and meetings.
+Again, on 'This week', I want the views: Agenda / Calendar / Table. On the 'Mine' tab, this
+shows all of my meetings, past and present. I also want the views: Calendar / Table. On
+'Everyone's', I want the views: Table / Calendar."* Three tabs, three DIFFERENT view lists —
+This week: Agenda · Calendar · Table; Mine: Calendar · Table; Everyone's: Table · Calendar —
+the first named in each is that tab's own default, and the choice is remembered PER TAB, not
+in one shared slot, so switching tabs never strands a reader on a body their new tab does not
+offer. Still one `ToolbarViewSlot` config (R53's fixed slot order), just built from the open
+tab rather than a constant. "List" retired everywhere it appeared here in favour of "Table" —
+she asked for Table, not List. "Agenda" is the kit's own `Agenda`
+(`shared/ui/components/agenda/agenda.tsx`, CH19 view 10) drawn through the ONE host wrapper
+every calendar/agenda in the app is required to go through (`RecordCalendar` /
+`RecordAgenda`, `web/components/records/record-calendar.tsx` — see the "ONE CALENDAR" law,
+`web/test/rules.test.ts`'s `one-calendar`), never imported directly by a screen.
+
+Evidence: `web/components/meetings/meetings-screen.tsx` (the header block above
+`MeetingsScreen` carries her words verbatim and the whole redesign).
+
 ### B8: action rows wrap and the group is pushed right with `ml-auto`
 
 Already law (UI-CONVENTIONS.md, C4). Restated because [B1](#b1-two-visible-actions-maximum-on-any-title)
@@ -1489,6 +1616,32 @@ answer the same brief B10 already answers twice over — a reader who wants the 
 picture across every module never has to open each module's settings page in turn — and
 both are gated the identical way B10 already is: `moduleSettingsIndex(can)`, never a second
 `can(` call.
+
+**AND THE MODULE-SCOPED HALF IS THE SAME COMPONENT TOO, 15 SEP 2026.** `SettingsChoicesPanel`
+took a `scope` prop the day after it shipped — B10's own module-settings page mounted
+`SelectableScreen` (the grouped-list/chip-wall editor) for its own "Choices" tab, one editor
+for the general table and a different one for every module's own narrowing, which is exactly
+the second-editor drift B10's header already refuses ("never a second editor"). `scope`
+narrows `modulesWithChoices` to one page's segment, drops the now-redundant Module column and
+its filter facet (the page's own tab strip already says which module), and hands the create
+dialog that one module's `types` directly rather than asking a question with one answer —
+same table, same door, same cache key, two scopes. `SelectableScreen` is retired
+(`GONE_ON_PURPOSE`, `shared/rules/registry.ts`).
+
+**A CHOICE THAT IS NOT `selectable_data` GETS ITS OWN ADAPTER, NOT A FORCED FIT.** The
+client's ruling on Meetings, same session: *"purpose is a choice component, so make sure you
+move it inside meetings, settings, choices. And maybe you find another word for
+'purposes.' … Maybe just 'type.'"* Meeting types (`meeting_purposes`, its own table — a
+department per row is the one thing a dropdown value cannot carry) cannot be forged into a
+`selectable_data` row, so `MeetingTypesPanel` (`web/components/team/internal-screens.tsx`) is
+the smallest adapter: the SAME design (a `RecordTable`, one filled create circle, no emoji)
+over a different door, mounted from the `meetings` page's own `choices` section
+(`ModuleSettingsSection`'s third `kind`, `"meetingTypes"`, beside `"vocabulary"` and
+`"automations"`) — sharing the "Choices" TAB with a vocabulary section without sharing its
+component. The standalone Purposes screen this replaced is off the Meetings screen's nav
+(`SECTION_HOSTED_ELSEWHERE.purposes`, `shared/rules/registry.ts`) — DB table, columns and API
+paths unchanged, only the word ("Meeting purpose" → "Meeting type") and the door into the
+editor moved.
 
 ### B12: settings changes preview first and apply on Save, through the pinned bar
 
@@ -1593,8 +1746,8 @@ registry), `web/lib/nav.ts` (the guard), `web/components/shell/unsaved-changes-d
 protected, just protected."* — client, 14 Sep 2026, over Choices' own status column.
 Protection and activity are not two independent flags a reader reconciles by hand: every
 screen that shows the state draws ONE word, `Protected`, standing in for the whole thing,
-mutually exclusive against `Active`/`Inactive` (`selectable-screen.tsx`,
-`settings-choices-panel.tsx` — the latter's own header: "every Protected row IS an Active
+mutually exclusive against `Active`/`Inactive` (`settings-choices-panel.tsx` — its own
+header: "every Protected row IS an Active
 row, so a second facet asking 'is it protected?' beside a Status facet that already offers
 'Protected' as one of its three values" would draw a state that can never match a real
 row).
@@ -1617,6 +1770,32 @@ whether or not it was correct. This law is that check's own account, not a secon
 written beside it.
 
 **Law.** [R76](../RULES.md) (`protected-is-active`).
+
+### B14: every toolbar button is the filled icon circle
+
+**The rule.** *"The gear button in the toolbar in Settings Theme needs the background for
+the button to be the same everywhere. There cannot be a button in the toolbar without a
+circle around it."* — client, 15 Sep 2026, over a screenshot of Settings › Theme's gear
+sitting bare on the page ground. `AddButton` (`web/components/deep-link/screen-bits.tsx`) —
+the app's one create-button seam — already draws the filled dark circle: a bare
+`<Button size="icon">` with no `variant`, the library's own `default`. A toolbar's OTHER
+icon buttons must draw the identical variant, never a ghost/secondary one that measures as
+no fill at all against the bare page ground (`--btn-secondary-fill` resolves to `var(--card)`,
+which is `--background` in light — the 1.000 that shipped three times before this ruling).
+
+**Where it landed.** `ModuleSettingsGear` (`web/components/screens/module-settings-screen.tsx`)
+was the offender named in the screenshot — it drew `buttonVariants({ variant: "ghost", size:
+"icon" })`, the one shape B3's own reasoning about `AddButton` never got applied to, because
+it is a settings door rather than a create act. It now draws `buttonVariants({ size: "icon"
+})`, the library's bare default, matching every toolbar's own create circle. This is the ONE
+mounting: `ModuleSettingsGear` is placed on every module's own `CollectionHeading` action slot
+(R61), so fixing the one function fixes every toolbar it appears on at once.
+
+**Law.** Not yet a registry check (`TAB_STRIP_PIN_EXEMPT`'s own caution applies here too — a
+census over every icon-only `<Button>`/`buttonVariants` call in the app, keyed to whether it
+sits inside a toolbar, is a real derivation to build rather than a rule stated once and
+trusted). Written down so the next toolbar icon button is built to this shape from the start,
+and so a reviewer has the client's own sentence to check a screenshot against.
 
 ---
 
@@ -3195,15 +3374,15 @@ library, not a synthesised weight in the host.
 
 ## Rule index
 
-**132 rules.**
+**134 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
 | 2. Page layout and width | L1 to L11 (11) |
 | 3. Detail screens | D1 to D12 (12) |
-| 4. Collections | K1 to K18 (18) |
-| 5. Buttons and actions | B1 to B13 (13) |
+| 4. Collections | K1 to K19 (19) |
+| 5. Buttons and actions | B1 to B14 (14) |
 | 6. Forms and dialogs | F1 to F10 (10) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
@@ -3242,6 +3421,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
 | R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | R72 | [W13](#w13-no-subtitle-under-a-heading-unless-she-asked) |
 | R74 | [L11](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in) | R75 | [K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language) |
+| R77 | [D3](#d3-the-header-and-tabs-stick) | | |
 
 ### The seven files that carry most of it
 

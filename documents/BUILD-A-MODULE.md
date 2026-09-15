@@ -1073,6 +1073,19 @@ again, which is the only property that matters here.
   door, not something your module's own write path has to remember. Display
   one word, `Protected`, standing in for the whole state; never a second
   "Protected: yes/no" facet beside a Status facet that already offers it.
+- **R77 `tab-strips-pin`** — if your screen draws a tab strip, its strip stays
+  visible while the rows under it scroll, everywhere: a collection's own
+  strip (or a main screen's, like a module's own settings page) goes through
+  `renderFolderTabs` (`shared/web/screen-engine/tabs-view.tsx`) as a SIBLING
+  of its panel content, never a `<TabsView renderPanel={…}>` in one root — a
+  record detail's inner strip carries `STICKY_TABS`
+  (`web/components/records/record-chrome.tsx`) instead, already scoped to the
+  tablist alone. Reaching for `STICKY_FOLDER_TABS` directly on a `<Tabs>` root
+  that also renders its own panel pins the panel along with the strip, which
+  is worse than the bug it fixes. A `<TabsView>` that is genuinely not a
+  screen's own labelling strip (a nested view switch already inside a pinned
+  panel, a strip that navigates instead of labelling one) is named in
+  `TAB_STRIP_PIN_EXEMPT` (`shared/rules/registry.ts`) with the real reason.
 
 **The words** (the ones that catch every new module, every time)
 

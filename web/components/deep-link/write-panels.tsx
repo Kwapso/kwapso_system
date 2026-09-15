@@ -109,7 +109,7 @@ const INTERNAL_MODULE: Record<string, string> = {
 /** What to call one in a sentence a person reads before archiving it. */
 const INTERNAL_NOUN: Record<string, string> = {
   brand: "brand asset",
-  purposes: "meeting purpose",
+  purposes: "meeting type",
 }
 
 /** A loaded record → the flat string map the form prefills from. Every value is
@@ -207,7 +207,7 @@ export function WritePanels({
           },
           purposes: {
             fields: purposeFields(departmentOptions),
-            title: t("Meeting purpose"),
+            title: t("Meeting type"),
             subtitle: "Why we meet, and the department it belongs to.",
             rows: purposesQ.data,
           },

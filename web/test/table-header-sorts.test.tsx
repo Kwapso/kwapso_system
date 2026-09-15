@@ -49,7 +49,6 @@ import { primeCache } from "@shared/web/store"
 import { PagedFind } from "@/components/records/paged-find"
 import { RecordTable } from "@/components/records/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { formatDate } from "@shared/web/format"
 import { appsKey, tasksKey } from "@/lib/live-resources"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
 import { TasksScreen } from "@/components/work/tasks-screen"
@@ -143,6 +142,7 @@ function renderTasks(tasks: Task[] = TASKS) {
       counts={{
         all: undefined,
         overdue: undefined,
+        planned: undefined,
         upcoming: undefined,
         completed: undefined,
         calendar: undefined,
@@ -261,10 +261,17 @@ describe("Tasks: the rows move when the header is clicked", () => {
 })
 
 describe("the rest of the collection's chrome survived the swap", () => {
-  // The order was the ONLY thing taken off the library frame. Search, facets,
-  // the count and the empty line are still its own, and a table that gained a
-  // working sort by losing its search box would be a bad trade nobody asked for.
-  /** The box debounces (200ms upstream), so a keystroke is not a filter. */
+  // The order was one thing taken off the library frame; the SEARCH is another,
+  // moved onto the tab's own outer toolbar (2026-09-15's Overdue/Planned/
+  // Completed redesign, so the toolbar can carry a Table/Board[/Calendar] view
+  // switch the library frame has no slot for) — narrowed by TITLE only now,
+  // the same bounded match the old Calendar tab's own search box always made,
+  // rather than the frame's former every-column match. Facets, the count and
+  // the empty line are still drawn (through the SAME toolbar, not the frame),
+  // so a table that gained a working sort by losing its narrowing is still not
+  // the trade this suite is pinning.
+  /** The state updates synchronously (this screen's own `query`, not the
+   * frame's debounced one), so a re-read right after the change is honest. */
   const search = async (text: string) => {
     fireEvent.change(screen.getAllByRole("searchbox")[0], { target: { value: text } })
     await waitFor(() => expect(rowOrder().length).toBeLessThan(5))
@@ -279,19 +286,14 @@ describe("the rest of the collection's chrome survived the swap", () => {
 
   it("still narrows, and sorting what is left keeps it narrowed", async () => {
     renderTasks()
-    // The two rows that share a deadline — the frame searches every column.
-    //
-    // DERIVED FROM THE FORMATTER rather than typed, because the Deadline cell is
-    // now the warm date and the words in it are the reader's language's: typing
-    // "Apr 14, 2025" here would pin this assertion to English and to a build of
-    // ICU, and typing "2025-04-14" is what it used to say when the cell was the
-    // sortable spelling — which is exactly the string this pass removed.
-    await search(formatDate("2025-04-14T00:00:00.000Z", "en"))
+    // The two TITLES that share "da" — one dated, one not, which is also what
+    // keeps this test honest about the empty-sorts-last rule one level down.
+    await search("da")
     const narrowed = rowOrder()
     expect(narrowed.length).toBe(2)
     fireEvent.click(header("Deadline"))
-    // Ordering happens before the frame narrows, and narrowing preserves order —
-    // so the two compose rather than fight.
+    // Ordering happens before the toolbar narrows, and narrowing preserves
+    // order — so the two compose rather than fight.
     expect(rowOrder().length, "sorting a searched list must not widen it").toBe(narrowed.length)
     expect([...rowOrder()].sort()).toEqual([...narrowed].sort())
   })

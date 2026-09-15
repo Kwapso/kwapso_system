@@ -543,7 +543,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       const base = resolveRecipe("purposes.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "the meeting purposes",
+        what: "the meeting types",
         query: ctx.purposesQ,
         shape: shapePurposeDetail as InternalShaper,
       })

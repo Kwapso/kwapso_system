@@ -156,32 +156,14 @@
 // a later reader finding only that message would restore the second mango
 // believing they were following her.
 //
-// ── IMPORT + EXPORT CSV MOVED IN, 2026-09-14 ─────────────────────────────────
+// ── THE TOOLBAR, WHICH KILLS IMPORT + EXPORT CSV, 2026-09-15 ───────────────
 //
-// This grid used to be reachable ONLY through the roles LIST screen at
-// /t/<teamId>/roles — the one this component itself says it replaces, in the
-// header above — and that list screen drew two acts nothing else in the app
-// offered: a secondary "Import CSV" (`go`'d to /t/<teamId>/import/member_roles`,
-// checked by F2's own census in web/test/cold-account.test.tsx — a member_roles
-// import target needs a screen that names that exact address) and a download
-// "Export CSV" (`/api/tenancy/roles/export`), both beside its own now-deleted
-// "New role" button. The client's 2026-09-14 ruling ("Team management is
-// reachable only from Settings › Team. The team area's own standalone pages
-// must go.") retires that whole screen — web/lib/pages.ts and
-// web/components/deep-link/module-content.tsx carry the rest of that change —
-// and R64 (`sections-have-a-door`) is explicit that a capability may not be
-// deleted along with the page that used to host it: it needs a real home
-// first. "New role" and the create/revoke acts already had one; these two did
-// not, so they are rebuilt here, beside "New role", through `ToolbarAction`
-// (web/components/deep-link/screen-bits.tsx) — NOT the black `+` (they create
-// nothing) and NOT a hand-built `buttonVariants` anchor, which
-// web/test/toolbar-search-floor.test.tsx polices for exactly this reason: a
-// toolbar action built any other way does not fold to its glyph when the row
-// runs out of room. Export is shown whenever there is at least one role to
-// export, the same gate the list screen used ("export needs only READ —
-// implied by seeing this list" applies here too, since the whole tab is
-// already gated on `member_roles:read`); Import is shown only for
-// `member_roles:create`, the same right the list screen's own button gated on.
+// The client's ruling, 2026-09-15: "Kill import and export for permissions
+// settings." The toolbar now draws search (which narrows the matrix rows by
+// module name), the "Deactivated" disclosure (moved in from the foot of the
+// grid the same day), and the black "+" button to create a new role. Nothing
+// else. Import and Export, which moved in on 2026-09-14 when the roles list
+// screen was retired, are deleted this same day along with that ruling.
 //
 // ── THE PINNED BAR, AND ROLES FINALLY GETS A DISCARD, 2026-09-14 ───────────
 //
@@ -236,8 +218,10 @@
 //            registry.ts`): the rows are `TEAM_MODULES`'s own fixed order,
 //            the order a permission matrix is read in top to bottom, and
 //            there is no second, equally valid order for a control to offer.
-//   actions  Import CSV, Export CSV, "Deactivated" (moved in from the bottom
-//            of this file the same day — see below) and the black `+`.
+//   actions  "Deactivated" (moved in from the bottom of this file on
+//            2026-09-14 — see below) and the black `+` to create a new role.
+//            Import CSV and Export CSV were deleted 2026-09-15 by client
+//            ruling: "Kill import and export for permissions settings."
 //   empty    `false`, always — see the prop's own comment for why that is
 //            the honest answer and not a dodge.
 //
@@ -261,17 +245,15 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
-import { Download, Plus, Power, UploadSimple } from "@shared/ui/foundations/icons"
+import { Plus, Power } from "@shared/ui/foundations/icons"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
-import { ToolbarAction, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { cn } from "@shared/ui/lib/utils"
 import { List } from "@shared/web/list-compat"
 import { formatCount } from "@shared/web/format-count"
-import { openInNewTab } from "@/lib/nav"
-import { IMPORT_TARGET_LABEL } from "@/components/deep-link/crumbs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -787,25 +769,6 @@ export function RolesMatrix({
         // exempted for one slot along.
         actions={
           <>
-            {canCreate && (
-              <ToolbarAction
-                label={t("Import CSV")}
-                icon={<UploadSimple className="size-4" />}
-                onClick={() =>
-                  openInNewTab(
-                    `/t/${teamId}/import/member_roles`,
-                    `${t("Import")} · ${IMPORT_TARGET_LABEL.member_roles}`
-                  )
-                }
-              />
-            )}
-            {sheets && sheets.length > 0 && (
-              <ToolbarAction
-                label={t("Export CSV")}
-                icon={<Download className="size-4" />}
-                href="/api/tenancy/roles/export"
-              />
-            )}
             {/* "DEACTIVATED", THE SAME SHAPE AS MEMBERS' "INVITES" — client,
                 2026-09-14: "In Roles Permission, remove the whole
                 'Deactivated' from the bottom and make it a button in the

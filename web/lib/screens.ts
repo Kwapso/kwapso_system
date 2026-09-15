@@ -870,14 +870,14 @@ const purposesListRecipe: ScreenRecipe = {
   surface: "none",
   binding: { module: "purposes" },
   gate: { module: "delivery", right: "read" },
-  fields: [field("name", "Purpose"), field("detail", "Details")],
+  fields: [field("name", "Type"), field("detail", "Details")],
   // The record's own face in the leading slot (R35). Every shaper builds a
   // `mark` node — a picture where the record has one, its type's glyph
   // where the type has one, and its initial where it has neither, which
   // is what keeps every list in the app the same shape.
   leading: "mark",
   actions: [],
-  collection: listCollection("No meeting purposes yet.", "Search meeting purposes…", [
+  collection: listCollection("No meeting types yet.", "Search meeting types…", [
     { field: "department", label: "Department", control: "select" },
     { field: "state", label: "Archived", control: "select" },
   ], { icon: "purposes" }),
@@ -888,7 +888,7 @@ const purposesDetailRecipe: ScreenRecipe = {
   binding: { module: "purposes" },
   gate: { module: "delivery", right: "read" },
   fields: [],
-  actions: internalDetailActions("delivery", "purpose", "Archive purpose"),
+  actions: internalDetailActions("delivery", "purpose", "Archive type"),
   header: { title: "name", subtitle: "detail" },
   tabs: internalDetailTabs([
     { label: "Department", column: "department" },

@@ -163,7 +163,10 @@ export function DeepLinkScreen() {
   // Which pile of our own admin the Tasks screen shows. A SERVER view for the
   // same reason (the list is capped, so "the done ones" is a question for the
   // door, not a sieve over the rows already loaded), so it is declared here too.
-  const [taskView, setTaskView] = React.useState<TaskView>("open")
+  // "overdue" — the redesigned tab strip's first tab (2026-09-15), not "open":
+  // that view has had no tab of its own since the "List" tab was retired, so
+  // defaulting to it would land a cold screen on a pile nothing points at.
+  const [taskView, setTaskView] = React.useState<TaskView>("overdue")
 
   // WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture of
   // the whole base (R53's `view` slot on that screen's toolbar). Declared beside

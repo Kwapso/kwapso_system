@@ -8,6 +8,7 @@ import type {
   TeamRole,
 } from "@shared/types"
 import { describe, expect, it } from "vitest"
+import React from "react"
 
 import {
   HELP_STATUS,
@@ -35,6 +36,8 @@ const member: TeamMember = {
   isAdmin: true,
   isClient: false,
   joinedAt: "2026-06-13T10:00:00.000Z",
+  createdByName: null,
+  updatedAt: null,
 }
 
 const role: TeamRole = {
@@ -372,7 +375,9 @@ describe("shapeAccountsList", () => {
     const rows = shapeAccountsList([
       account({ id: "a1", name: "Bergman S.A.", code: "BERG" }),
     ]).rows
-    expect(rows?.[0].name).toBe("Bergman S.A.")
+    // Client ruling 2026-09-15: name is a React element with logo and text
+    expect(rows?.[0].nameText).toBe("Bergman S.A.")
+    expect(React.isValidElement(rows?.[0].name)).toBe(true)
     // NO STATUS (0042). Whether an account is live is the archive flag, and the
     // NAME carries that as "(archived)" — so a live account says nothing about
     // its state, which is the honest thing for a fact true of almost every row.
@@ -406,6 +411,7 @@ describe("shapeAccountsList", () => {
       "manager",
       "mark",
       "name",
+      "nameText",
       "status",
     ])
     expect(rows?.[0].mark, "the leading column must hold a node, not a string").toBeTypeOf("object")
@@ -451,7 +457,9 @@ describe("shapeAccountsList", () => {
     // The row SAYS so in its name — which is what a person reads. "Only the
     // archived ones" is a question for the door (`archived=yes`), asked from the
     // find bar, and web/test/facets-ask-the-door.test.tsx is where that lives.
-    expect(rows?.[0].name).toBe("Old Co (archived)")
+    // Client ruling 2026-09-15: name is a React element with logo and text
+    expect(rows?.[0].nameText).toBe("Old Co (archived)")
+    expect(React.isValidElement(rows?.[0].name)).toBe(true)
   })
 })
 

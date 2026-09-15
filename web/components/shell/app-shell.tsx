@@ -1449,6 +1449,22 @@ export function AppShell({
         onAsideOpenChange={setAgentOpen}
         asideOpenLabel={t("Open the assistant")}
         asideCloseLabel={t("Close the assistant")}
+        /* THE OPEN MID-EDGE HANDLE IS GONE — client ruling, 2026-09-15,
+           verbatim: "remove the button with the emoji and the mango
+           background that's vertically in the middle of the screen on the
+           extreme right when I have the assistant opened. It has a function
+           to close it. We don't need this. Keep the one on the top right
+           when the assistant is closed, but the one in the middle when the
+           assistant is open, remove it." That circle (`ScreenShell`'s aside
+           `EdgeHandle`, kit v1.2.85+) duplicated a close control this app
+           already draws on the open column: the × the assistant's own
+           folder tab carries (`BreadcrumbFolders.onClose`, inside the kit's
+           own dock). `asideHandleOnOpen` is a kit-level prop for exactly
+           this — default `true` everywhere else, `false` here. The SHUT
+           corner draw is untouched: it is still this app's only way back
+           into a column that renders nothing while closed (see "SHUT MEANS
+           ABSENT" below). */
+        asideHandleOnOpen={false}
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
              stated at the kit's own `breadcrumb` prop: no buttons, no pills,

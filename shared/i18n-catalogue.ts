@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 819 strings · 3 languages · 1349 of the entries below are hand-written seed.
+// 811 strings · 3 languages · 1386 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -63,7 +63,6 @@ export const CATALOGUE: Catalogue = {
   "All": { de: "Alle", es: "Todo", ca: "Tot" },
   "All sections": { de: "Alle Abschnitte", es: "Todas las secciones", ca: "Totes les seccions" },
   "All sprints": { de: "Alle Sprints", es: "Todos los sprints", ca: "Tots els sprints" },
-  "All tasks": { de: "Alle Aufgaben", es: "Todas las tareas", ca: "Totes les tasques" },
   "All tickets": { de: "Alle Tickets", es: "Todos los tickets", ca: "Tots els tiquets" },
   "Almost there": { de: "Fast fertig", es: "Casi listo", ca: "Gairebé a punt" },
   "Answer and close": { de: "Beantworten und schließen", es: "Responder y cerrar", ca: "Respondre i tancar" },
@@ -143,7 +142,6 @@ export const CATALOGUE: Catalogue = {
   "Couldn't add that. Try again.": { de: "Das konnte nicht hinzugefügt werden. Versuchen Sie es erneut.", es: "No se pudo agregar eso. Intenta de nuevo.", ca: "No s'ha pogut afegir. Prova de nou." },
   "Couldn't copy. Select it by hand.": { de: "Konnte nicht kopiert werden. Wählen Sie es manuell aus.", es: "No se pudo copiar. Selecciona manualmente.", ca: "No s'ha pogut copiar. Selecciona-ho manualment." },
   "Couldn't copy. Try again.": { de: "Konnte nicht kopiert werden. Versuchen Sie es erneut.", es: "No se pudo copiar. Intenta de nuevo.", ca: "No s'ha pogut copiar. Prova de nou." },
-  "Couldn't load dropdown values.": { de: "Dropdown-Werte konnten nicht geladen werden.", es: "No se pudieron cargar los valores del menú desplegable.", ca: "No s'han pogut carregar els valors del menú desplegable." },
   "Couldn't load that version.": { de: "Diese Version konnte nicht geladen werden.", es: "No se pudo cargar esa versión.", ca: "No s'ha pogut carregar aquesta versió." },
   "Couldn't load the account.": { de: "Konto konnte nicht geladen werden.", es: "No se pudo cargar la cuenta.", ca: "No s'ha pogut carregar el compte." },
   "Couldn't load the app.": { de: "App konnte nicht geladen werden.", es: "No se pudo cargar la aplicación.", ca: "No s'ha pogut carregar l'aplicació." },
@@ -340,8 +338,6 @@ export const CATALOGUE: Catalogue = {
   "Mark": { de: "Markieren", es: "Marcar", ca: "Marca" },
   "Martin": { de: "Martin", es: "Martin", ca: "Martin" },
   "Meeting": { de: "Termin", es: "Reunión", ca: "Reunió" },
-  "Meeting purpose": { de: "Meeting-Zweck", es: "Propósito de la reunión", ca: "Propòsit de la reunió" },
-  "Meeting purposes": { de: "Meeting-Zwecke", es: "Propósitos de la reunión", ca: "Propòsits de la reunió" },
   "Meeting updated.": { de: "Meeting aktualisiert.", es: "Reunión actualizada.", ca: "Reunió actualitzada." },
   "Meetings": { de: "Termine", es: "Reuniones", ca: "Reunions" },
   "Meetings this week": { de: "Besprechungen diese Woche", es: "Reuniones esta semana", ca: "Reunions aquesta setmana" },
@@ -444,7 +440,6 @@ export const CATALOGUE: Catalogue = {
   "Open tickets": { de: "offene Tickets", es: "Tickets abiertos", ca: "Tiquets oberts" },
   "Open where this came from": { de: "Quelle öffnen", es: "Abrir de dónde vino esto", ca: "Obrir d'on va venir" },
   "Operations": { de: "Operationen", es: "Operaciones", ca: "Operacions" },
-  "Option": { de: "Option", es: "Opción", ca: "Opció" },
   "Optional": { de: "optional", es: "Opcional", ca: "Opcional" },
   "Organiser": { de: "Organisator", es: "Organizador", ca: "Organitzador" },
   "Our details": { de: "Unsere Angaben", es: "Nuestros detalles", ca: "Els nostres detalls" },
@@ -503,7 +498,6 @@ export const CATALOGUE: Catalogue = {
   "Reload": { de: "Neu laden", es: "Recargar", ca: "Recarregar" },
   "Remove": { de: "Entfernen", es: "Eliminar", ca: "Eliminar" },
   "Remove from team": { de: "Aus dem Team entfernen", es: "Eliminar del equipo", ca: "Eliminar de l'equip" },
-  "Renamed.": { de: "Umbenannt.", es: "Renombrado.", ca: "Renomenat." },
   "Reopen": { de: "Erneut öffnen", es: "Reabrir", ca: "Reobrir" },
   "Repeats": { de: "Wiederholungen", es: "Se repite", ca: "Repeticions" },
   "Reply": { de: "Antworten", es: "Responder", ca: "Respondre" },
@@ -528,7 +522,6 @@ export const CATALOGUE: Catalogue = {
   "Scheduled": { de: "Geplant", es: "Programado", ca: "Programat" },
   "Search": { de: "Suchen", es: "Buscar", ca: "Cercar" },
   "Search accounts…": { de: "Konten durchsuchen…", es: "Buscar cuentas…", ca: "Cercar comptes…" },
-  "Search dropdown values": { de: "Dropdown-Werte durchsuchen", es: "Buscar valores de lista desplegable", ca: "Cercar valors del desplegable" },
   "Search meetings…": { de: "Meetings durchsuchen…", es: "Buscar reuniones…", ca: "Cercar reunions…" },
   "Search processes…": { de: "Prozesse durchsuchen…", es: "Buscar procesos…", ca: "Cercar processos…" },
   "Search tickets…": { de: "Tickets durchsuchen…", es: "Buscar tickets…", ca: "Cercar entrades…" },
@@ -685,7 +678,6 @@ export const CATALOGUE: Catalogue = {
   "Type": { de: "Eingeben", es: "Tipo", ca: "Tipus" },
   "Type as you go, this is the part worth keeping.": { de: "Tippen Sie mit, das ist der Teil, den es sich lohnt zu behalten.", es: "Escribe mientras avanzas, esta es la parte que vale la pena guardar.", ca: "Escriu mentre vas, aquesta és la part que val la pena conservar." },
   "Until": { de: "Bis", es: "Hasta", ca: "Fins a" },
-  "Upcoming": { de: "Anstehend", es: "Próximo", ca: "Pròxim" },
   "Upload a file": { de: "Datei hochladen", es: "Cargar un archivo", ca: "Pujar un fitxer" },
   "Urgent, it has to happen soon": { de: "Dringend, muss bald geschehen", es: "Urgente, tiene que suceder pronto", ca: "Urgent, ha de passar aviat" },
   "Use a different email": { de: "Andere E-Mail verwenden", es: "Usa un correo electrónico diferente", ca: "Utilitza un correu diferent" },

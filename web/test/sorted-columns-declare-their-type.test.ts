@@ -116,12 +116,22 @@ const DECLARED = /([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{\s*sortType\s*:/g
  * red, so this list can only shrink or stay true. */
 const DOOR_ORDERED: Record<string, string> = {
   when: (
-    "the Meetings 'All' table. The meetings list PAGES, so its headers ask " +
+    "the Meetings Table (every tab draws the same one since 2026-09-15, not " +
+    "only 'Everyone's'). The meetings list PAGES, so its headers ask " +
     "`<PagedFind>` for the order and `meetings-screen.tsx` hands the answer " +
     "to `RecordTable` as `order={found.order}` — the rows arrive already " +
     "ordered and `ordered()` is never reached. Declaring a browser comparison " +
     "here would arrange the fifty rows in hand under a badge counting the " +
     "whole meetings list, which is a worse lie than the alphabetical one."
+  ),
+  time: (
+    "the same Meetings Table `when` is declared for, and the same reason: " +
+    "`order={found.order}` means `ordered()` is never reached for ANY column " +
+    "in this table. Unlike `when`, this one carries no `sort` at all — " +
+    "`COLUMN_SORT` (meetings-screen.tsx) has no door name for Time, so the " +
+    "header is not even clickable (record-table.tsx: 'a column the door has " +
+    "no name for carries no sort and is not clickable') — formatted for " +
+    "display only."
   ),
 }
 
@@ -225,6 +235,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // all words, never a date or a number, so this file only adds column
       // keys and no offenders.
       "web/components/screens/settings-choices-panel.tsx",
+      // The meeting-types adapter (`MeetingTypesPanel`), 15 Sep 2026 — Task
+      // C's "smallest adapter", the module-scoped Choices editor for
+      // `meeting_purposes` (its own table, never `selectable_data`). Like
+      // Choices and Automations, NO formatted cell: Name, Department and
+      // Status are all words or nodes, never a date or a number.
+      "web/components/team/internal-screens.tsx",
       "web/components/work/tasks-screen.tsx",
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)

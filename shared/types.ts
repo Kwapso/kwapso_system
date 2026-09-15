@@ -99,6 +99,19 @@ export type TeamMember = {
    * the team's own database, the same table the account fence reads. */
   isClient: boolean
   joinedAt: string
+  /** WHO ADDED THEM — the `team_members` row's own `creator_name` (set once,
+   * at insert: team creation, invite acceptance, or a direct add — every
+   * `INSERT INTO team_members` in workers/tenancy/src/lib/teams.ts writes it).
+   * `null` for a row old enough to predate the column. Fed to the member's
+   * own detail page footer (member-screen.tsx `audit`), the Record column
+   * every other record's footer already carries. */
+  createdByName: string | null
+  /** THE MEMBERSHIP ROW'S OWN `updated_at` — touched by a role change
+   * (`changeMemberRole`, workers/tenancy/src/lib/members.ts) and nothing
+   * else today. There is no `editor_*` column on `team_members` the way
+   * `accounts`/`member_roles` carry one, so this is a bare date with no name
+   * behind it — `null` until the role has actually changed once. */
+  updatedAt: string | null
 }
 
 /** The four access switches for one module (matches the library
@@ -2237,7 +2250,7 @@ export type Task = {
   createdByName: string | null
 }
 
-/** THE SIX PILES of our own admin, as SERVER views — the tab strip's own words.
+/** THE SEVEN PILES of our own admin, as SERVER views — the tab strip's own words.
  *
  * Not client filters, for the reason the ticket strip is a server scope: the list
  * is capped (R14), so sieving the loaded rows for the overdue ones would show
@@ -2245,8 +2258,30 @@ export type Task = {
  *
  * `open` is the everyday one and keeps its old name on the wire — the door has
  * answered to `?view=open` and `?view=all` since it shipped, and a rename would
- * be a contract change to relabel a tab. */
-export const TASK_VIEWS = ["open", "overdue", "upcoming", "completed", "calendar", "all"] as const
+ * be a contract change to relabel a tab.
+ *
+ * `planned` ARRIVED 2026-09-15, the client's ruling on the tab strip
+ * (verbatim below, `web/components/work/tasks-screen.tsx`'s own header carries
+ * the full account): the tabs List/Calendar/Upcoming are replaced by ONE new
+ * tab, "Planned" — every OPEN task that is not overdue, whether or not it has a
+ * deadline at all. `upcoming` (dated, not yet due) is the strict SUBSET of it
+ * that excludes an undated task, and stays exactly as it was — nothing reads it
+ * from the redesigned screen any more, but a task with no deadline belongs on
+ * Planned and never belonged on Upcoming, so the two are not the same question
+ * and neither is retired. `calendar`/`all` are unchanged for the same reason:
+ * `all` backs the by-id lookup (R38) and `calendar`'s "every dated task,
+ * finished or not" answers a different question than Planned's calendar
+ * sub-view (which reads the PLANNED page's own rows, already open and not
+ * overdue, filtered to the ones with a date — see the screen's own header). */
+export const TASK_VIEWS = [
+  "open",
+  "overdue",
+  "planned",
+  "upcoming",
+  "completed",
+  "calendar",
+  "all",
+] as const
 export type TaskViewName = (typeof TASK_VIEWS)[number]
 
 /* ── THE PULSE — the team's week as numbers a screen can draw ──────────────── */

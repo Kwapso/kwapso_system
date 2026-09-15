@@ -231,21 +231,19 @@ describe("the collection toolbar's search box has a floor, and it is on the fiel
     ).toBe(true)
   })
 
-  // ── iii · THE REAL CALL SITE STILL HAS THAT SHAPE. Without this the harness
-  // above can drift into modelling a screen the app no longer draws, and (i)
-  // would keep passing over a bug nobody can reach.
-  it("`selectable-screen.tsx` still hands two controls to one `search` slot", () => {
-    const source = stripComments(
-      readFileSync(join(ROOT, "web/components/choices/selectable-screen.tsx"), "utf8")
-    )
-    const slot = /search=\{[\s\S]*?sort=\{/.exec(source)?.[0] ?? ""
-    expect(slot, "the search slot's own JSX must be readable here").toContain("<SearchInput")
-    expect(
-      slot,
-      "the settings page packs a status Select in beside the search box; if that stops " +
-        "being true, re-read whether this whole file is still measuring the reported bug"
-    ).toContain("<SelectTrigger")
-  })
+  // ── iii · THE REAL CALL SITE THAT ORIGINALLY REPORTED THIS IS GONE, 15 SEP
+  // 2026 — `selectable-screen.tsx` (the settings-page-scoped Choices editor
+  // that hand-placed a `SearchInput` and a status `Select` into one
+  // `<ToolbarRow search={…}>` slot) was retired when the module-scoped
+  // Choices block moved onto `SettingsChoicesPanel` (the same `RecordTable`/
+  // `useKitPanel` editor the general Choices tab draws — Task B,
+  // `module-settings-screen.tsx`'s own header). That editor's toolbar is the
+  // kit's own `CollectionFrame` panel, with filters in a separate `FilterBar`
+  // slot rather than packed into `search` — so the exact shape this check
+  // held the real call site to no longer exists anywhere in the app. (i) and
+  // (ii) above stay as synthetic regression coverage for `<ToolbarRow>`'s
+  // floor mechanism itself, which is still real and still reachable through
+  // any future call site that shares the slot the way this one used to.
 
   // ── iv · NOBODY SPELLS THE GROWING SLOT BY HAND. One string, three wearers.
   // A fourth bespoke row is exactly how the first three came to disagree.

@@ -192,27 +192,29 @@ describe("F2 · every declared import target has a way in from a screen", () => 
     )
   })
 
-  // ACCOUNTS IS NOT IN THIS LIST ANY MORE. The client's own ruling, 14 Sep
-  // 2026, verbatim: "On Accounts, kill the Export and Import buttons. Not
-  // needed." That removed the accounts collection's own "Import CSV" button —
-  // its one DEDICATED route in from a screen — so `agencySource` genuinely no
-  // longer contains the literal `import/accounts`, and asserting it would be
-  // asserting a route that no longer exists.
+  // ACCOUNTS AND MEMBER_ROLES ARE NOT IN THIS LIST ANY MORE. The client's own
+  // ruling, 14 Sep 2026, verbatim: "On Accounts, kill the Export and Import
+  // buttons. Not needed." That removed the accounts collection's own "Import
+  // CSV" button — its one DEDICATED route in from a screen. The same ruling
+  // applied to member_roles (roles-matrix.tsx) on 2026-09-15: "Kill import and
+  // export for permissions settings." So neither accounts nor member_roles
+  // contains the literal `import/accounts` or `import/member_roles`, and
+  // asserting them would be asserting routes that no longer have in-app entry
+  // points.
   //
-  // THE TARGET ITSELF IS NOT GONE, and neither is every way in: the door
-  // (`POST /api/data-ops/import/batch/*`), the TargetDef
-  // (workers/data-ops/src/lib/targets.ts) and its sample file all stay, and
-  // the GENERIC `/t/<team>/import` screen asserted two tests down accepts an
-  // accounts CSV exactly as it always did — a file's target is read off its
-  // own columns at the plan step, never off which button somebody pressed to
-  // get there. What is gone is the one-click shortcut from the accounts
+  // THE TARGETS THEMSELVES ARE NOT GONE, and neither is every way in: the door
+  // (`POST /api/data-ops/import/batch/*`), the TargetDefs
+  // (workers/data-ops/src/lib/targets.ts) and their sample files all stay, and
+  // the GENERIC `/t/<team>/import` screen asserted two tests down accepts a
+  // CSV for either target exactly as it always did — a file's target is read
+  // off its own columns at the plan step, never off which button somebody
+  // pressed to get there. What is gone is the one-click shortcut from each
   // collection's own toolbar; the importer itself is unchanged.
   it.each([
     ["meetings", "two years of somebody's diary"],
     ["stories", "the work in hand"],
     ["brand_assets", "the agency's own material"],
     ["meeting_purposes", "why we meet"],
-    ["member_roles", "the permission sheet"],
     ["selectable_data", "the team's dropdowns"],
   ])("names import/%s on a screen (%s)", (tableKey) => {
     expect(

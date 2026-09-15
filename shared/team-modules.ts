@@ -191,8 +191,11 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // WHY WE MEET. One thin table, and a module of its own rather than four more
   // rights on `meetings`: the taxonomy of why an agency meets is a settled list
   // somebody sets and leaves, and what was SAID in the room is a different
-  // question to ask a role about.
-  delivery: "Meeting purposes",
+  // question to ask a role about. RENAMED, 15 SEP 2026 (Task C) — "Meeting
+  // purposes" → "Meeting types", the client's own word; the module KEY
+  // (`delivery`) is unchanged, this is only the label the Roles matrix and
+  // similar module-name readers show.
+  delivery: "Meeting types",
   // The person behind the member row: their profile. Visible to the team,
   // never to a client — which is why it is its own permission row and not four
   // more rights on `team_members`: an agency can want everyone to see who

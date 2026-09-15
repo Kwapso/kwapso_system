@@ -73,7 +73,7 @@ const INTERNAL_WRITERS: Record<
   },
   purposes: {
     table: "meeting_purposes",
-    created: "Meeting purpose added.",
+    created: "Meeting type added.",
     key: purposesKey,
     save: async (v, id) => {
       const body = {

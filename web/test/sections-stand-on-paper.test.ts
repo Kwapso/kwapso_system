@@ -1578,6 +1578,46 @@ describe("R67 — a titled section stands on paper", () => {
     return "default"
   }
 
+  // JUDGES ONE `renderPanel` HOST — pulled out of the attribute-form loop
+  // below (amendment 9) so the sibling-form loop after it can ask the exact
+  // same question of a differently-spelled host, rather than a second,
+  // drifting copy of these twelve lines. `mount` is the element that stands
+  // in for "the box a fill on this host would paint": the `<TabsView>` itself
+  // for the attribute form (a caller could spell `<TabsView
+  // className="bg-surface-panel">`), the shared wrapper for the sibling form
+  // (see amendment 9's own header for why).
+  function judgePanelHost(f: Parsed, fn: ts.ArrowFunction | ts.FunctionExpression, mount: ts.Node | undefined) {
+    // (a) THE MOUNT IS BOXED — the record-chrome shape. The mount, or any
+    // JSX ancestor of it, paints.
+    let boxed = false
+    for (let p: ts.Node | undefined = mount; p && !boxed; p = p.parent)
+      if ((ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) && paints(p)) boxed = true
+    if (!boxed) {
+      // (b) …or EVERY BODY stands on paper, per branch, with the same four
+      // things that are deliberately not content.
+      const byPanel = new Map<string, string[]>()
+      const lineOf = new Map<string, number>()
+      for (const b of bodies(fn)) {
+        const t = tagName(b)
+        const value = panelValueOf(b, fn)
+        const line = f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1
+        if (!lineOf.has(value)) lineOf.set(value, line)
+        if (carriesHeading(b)) continue
+        if (t && PROSE.test(t)) continue
+        if (t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])) continue
+        if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
+        if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
+        if (subtreePaints(b)) continue
+        if (t && READABLE_PROSE.test(t)) amendment4.proseBare++
+        if (!byPanel.has(value)) byPanel.set(value, [])
+        byPanel.get(value)!.push(`<${t}> at line ${line}`)
+      }
+      for (const [value, bare] of byPanel) panels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+    }
+    panelCensus.hosts++
+    if (boxed) panelCensus.boxed++
+  }
+
   for (const f of app) {
     const visit = (node: ts.Node) => {
       if (
@@ -1590,38 +1630,94 @@ describe("R67 — a titled section stands on paper", () => {
           ts.isFunctionExpression(node.initializer.expression))
       ) {
         const fn = node.initializer.expression
-        // (a) THE MOUNT IS BOXED — the record-chrome shape. The `<TabsView>`
-        // carrying this prop, or any JSX ancestor of it, paints.
+        // THE MOUNT — the `<TabsView>` carrying this prop.
         let mount: ts.Node | undefined = node
         while (mount && !ts.isJsxElement(mount) && !ts.isJsxSelfClosingElement(mount)) mount = mount.parent
-        let boxed = false
-        for (let p: ts.Node | undefined = mount; p && !boxed; p = p.parent)
-          if ((ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) && paints(p)) boxed = true
-        if (!boxed) {
-          // (b) …or EVERY BODY stands on paper, per branch, with the same four
-          // things that are deliberately not content.
-          const byPanel = new Map<string, string[]>()
-          const lineOf = new Map<string, number>()
-          for (const b of bodies(fn)) {
-            const t = tagName(b)
-            const value = panelValueOf(b, fn)
-            const line = f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1
-            if (!lineOf.has(value)) lineOf.set(value, line)
-            if (carriesHeading(b)) continue
-            if (t && PROSE.test(t)) continue
-            if (t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])) continue
-            if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
-            if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
-            if (subtreePaints(b)) continue
-            if (t && READABLE_PROSE.test(t)) amendment4.proseBare++
-            if (!byPanel.has(value)) byPanel.set(value, [])
-            byPanel.get(value)!.push(`<${t}> at line ${line}`)
-          }
-          for (const [value, bare] of byPanel)
-            panels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+        judgePanelHost(f, fn, mount)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(f.tree)
+  }
+
+  // ── AMENDMENT 9 (2026-09-15) — THE SIBLING renderPanel SHAPE, R77'S OWN
+  //    SPLIT WENT BLIND TO THE PANELS IT MOVED ─────────────────────────────
+  //
+  // R77 (`tab-strips-pin`, 2026-09-15) rewrote three main screens' own
+  // `<TabsView renderPanel={…}>` JSX ATTRIBUTE into `renderFolderTabs(…)`
+  // beside a plain SIBLING `(function renderPanel(panel) {…})(…)` — the split
+  // every collection screen already draws, so `STICKY_FOLDER_TABS` (which
+  // pins the WHOLE `<Tabs>` root, unlike `STICKY_TABS`) pins the strip
+  // without pinning the panel's own content along with it. `kwapso-screen.tsx`
+  // and `settings-screen.tsx`'s own headers have the full account; R77's law
+  // text and `TAB_STRIP_PIN_EXEMPT` above name `module-settings-screen.tsx`
+  // as the third screen the same lane split the same day.
+  //
+  // THE LOOP JUST ABOVE FINDS A HOST BY ITS JSX ATTRIBUTE, which is the shape
+  // this file's own header names ("every body a `renderPanel` returns") —
+  // the sibling form spells no such attribute at all, so all three screens
+  // dropped out of the census the moment they adopted R77. Their
+  // `UNCONTAINED_SECTION_OK` entries were deleted as "matching nothing"
+  // rather than re-judged — a green that measured nothing, the exact failure
+  // this file's own tripwire exists to refuse (see the census's own tripwire
+  // assertions below, which this amendment adds two new ones to).
+  //
+  // THE SUBJECT IS THE SAME FUNCTION, FOUND A DIFFERENT WAY. A sibling host
+  // is TWO JSX children of one element, in that order: one that CALLS
+  // `renderFolderTabs(` (the strip), immediately followed by one that is an
+  // IMMEDIATELY-INVOKED function expression or arrow (the panel) —
+  // POSITIONAL ADJACENCY, not a name, because an arrow IIFE carries no name
+  // to match and this file's own house style is to derive a shape rather
+  // than pick one by spelling ("ANCESTRY IS READ FROM THE SYNTAX TREE", this
+  // file's header). The named form all three call sites actually write today
+  // (`function renderPanel(panel) {…}`) matches on adjacency too, so one
+  // clause covers both without asking which syntax a fourth screen picks
+  // tomorrow. Whitespace-only `JsxText` between the two children (the source
+  // formatter's own newline+indent) is skipped rather than treated as a
+  // third sibling standing between them.
+  //
+  // THE MOUNT IS THE SHARED WRAPPER — the element that is the JSX PARENT of
+  // both siblings (`<div className="flex w-full flex-col">` on all three
+  // screens today), the position a caller would actually paint a fill on if
+  // this host were ever boxed at its own root rather than through a
+  // record-chrome ancestor further up. Same ancestor walk as the attribute
+  // form, `judgePanelHost` above, starting one level up.
+  //
+  // MEASURED AGAINST FALSE POSITIVES, NOT ASSUMED SAFE: `renderFolderTabs(`
+  // has three OTHER call sites in the app (`tickets-collection.tsx`,
+  // `paged-find.tsx`, `deep-link/screen-bits.tsx`) and not one of them is
+  // followed by an IIFE — a ternary, a `wrap ? wrap(...) : ...` and a
+  // `<CollectionCreateActionProvider>` respectively — so this clause reaches
+  // exactly the three screens named above and nothing else, today.
+  function unwrapParens(e: ts.Expression): ts.Expression {
+    while (ts.isParenthesizedExpression(e)) e = e.expression
+    return e
+  }
+  /** The function an expression immediately invokes, if it is one — the
+   * callee unwrapped through any parentheses, and only when THAT is itself a
+   * function literal (an ordinary call, `renderFolderTabs(…)`, has a callee
+   * that is an Identifier, which this rejects). */
+  function iifeFn(e: ts.Expression): ts.ArrowFunction | ts.FunctionExpression | undefined {
+    if (!ts.isCallExpression(e)) return undefined
+    const callee = unwrapParens(e.expression)
+    return ts.isArrowFunction(callee) || ts.isFunctionExpression(callee) ? callee : undefined
+  }
+  function callsRenderFolderTabs(e: ts.Expression): boolean {
+    return ts.isCallExpression(e) && e.expression.getText() === "renderFolderTabs"
+  }
+  for (const f of app) {
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxExpression(node) && node.expression && ts.isJsxElement(node.parent)) {
+        const fn = iifeFn(node.expression)
+        if (fn) {
+          const kids = node.parent.children
+          const idx = kids.indexOf(node)
+          let prev = idx - 1
+          while (prev >= 0 && ts.isJsxText(kids[prev]) && !kids[prev].getText().trim()) prev--
+          const before = prev >= 0 ? kids[prev] : undefined
+          if (before && ts.isJsxExpression(before) && before.expression && callsRenderFolderTabs(before.expression))
+            judgePanelHost(f, fn, node.parent)
         }
-        panelCensus.hosts++
-        if (boxed) panelCensus.boxed++
       }
       ts.forEachChild(node, visit)
     }

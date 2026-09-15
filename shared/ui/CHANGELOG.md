@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+### Added — `ScreenShell` gets `asideHandleOnOpen`, so a caller can drop the OPEN mid-edge close grab
+
+The client, 2026-09-15, verbatim, over a screenshot of the consuming app's
+open assistant: *"remove the button with the emoji and the mango background
+that's vertically in the middle of the screen on the extreme right when I
+have the assistant opened. It has a function to close it. We don't need
+this. Keep the one on the top right when the assistant is closed, but the
+one in the middle when the assistant is open, remove it."*
+
+`ScreenShell`'s aside `EdgeHandle` has always drawn in two places: the
+SHUT branch takes the screen's top-trailing corner (the only way back into
+a column that draws nothing else, added 2026-09-04) and the OPEN branch
+takes a `top-1/2` mid-edge close grab on the column's own edge. The
+consuming app already carries a second close control on the open column —
+the × its `BreadcrumbFolders` folder tab draws (`onClose`, in
+`web/components/shell/app-shell.tsx`) — so the mid-edge circle was a second
+way to do the one thing the tab already does, on the exact screen the
+client is looking at.
+
+New prop, default `true` (every other consumer draws exactly as before,
+unconditionally): `asideHandleOnOpen={false}` drops the OPEN branch only —
+the SHUT branch is untouched, because it is still every caller's only way
+back in. Gated at the `EdgeHandle` call site with
+`{(asideHandleOnOpen || !isAsideOpen) && (…)}`; see the props interface for
+the full ruling, including why this is a per-caller opt-out and not a
+kit-wide default change (a caller with no other close control on the open
+column would lose its only way back with nothing offered in trade).
+
+### Changed — `UnsavedChangesBar` gets a visible band, not a matching one
+
+The client, 2026-09-15, verbatim, over the shipped v1.2.82/83 row: *"the 'You
+have unsaved changes' pinned bar at the top had a different color. Please
+implement that because right now it's in the same color as the container,
+which makes it not so visible."* Exactly right: the two real call sites
+(`kwapso_system`'s Settings › Appearance and Settings › Team › Roles) both
+leave `ground` at its default, `"bare"`, so the row painted nothing and the
+app's own `PINNED_TOOLBAR` wrapper painted the container's own tone straight
+through it — a warning DOT was the only thing distinguishing "you have
+unsaved changes" from the panel it sat in.
+
+The row now paints its own translucent warning wash unconditionally —
+`bg-warning/10` plus a `--warning`-tinted hairline at 35% (the boundary law's
+inset-shadow remedy, `foundations/rules/borders.mjs`; a `border-*` utility is
+forbidden outright) — instead of matching whichever paper it stands on.
+`ground` no longer picks a fill (every value now paints the same wash); it
+now decides only which corners round: `"bare"` rounds the top edge alone
+(`rounded-t-[var(--radius)]`, R31's own second named position, "the top band
+of a pinned toolbar," R63 part 4) so it agrees with `PINNED_TOOLBAR`'s own
+corner engineering instead of rounding the same edge a second way, and
+`"page"`/`"panel"` round all four for the un-pinned, standing-alone mount.
+
+Measured against every ground this row is ever laid over — light/dark
+`--surface-panel` and `--surface-raised` — the 10% wash still clears AA
+4.5:1 for the caption's `text-ink-secondary` with wide margin (7.55 / 8.27 /
+9.56 / 8.54); see the component's own header, "MEASURED", for the script and
+the four flattened hexes. This is a deliberate, narrow exception to `Alert`'s
+own law ("the panel stays neutral — accents never become a background") —
+the component's header says why a row whose entire job is being the one
+non-neutral thing on the screen is not the case that law was written for.
+
 ### Added — `UnsavedChangesBar`, the dirty-draft flag and its two acts
 
 The consuming app (kwapso_system), 14 Sep 2026: the client, over a screenshot

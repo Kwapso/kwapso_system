@@ -125,7 +125,8 @@ type Translate = (english: string) => string
  * than a silent `undefined`. */
 type ShapedAccountRow = Record<string, unknown> & {
   id: string
-  name: string
+  name: React.ReactNode
+  nameText: string
   status: React.ReactNode
   manager: React.ReactNode
   country: string
@@ -203,8 +204,8 @@ function accountGalleryBody({
                       accounts hold none, so this reads as an initial tile far
                       more often than a logo — same honesty the table's own
                       column carries. */}
-                  <RecordMark picture={row.logoUrl} name={row.name} size="band" />
-                  <CardTitle className="text-sm">{row.name}</CardTitle>
+                  <RecordMark picture={row.logoUrl} name={row.nameText} size="band" />
+                  <CardTitle className="text-sm">{row.nameText}</CardTitle>
                   {/* W2: a card hides an empty field; a table cell keeps its column */}
                   {row.manager}
                 </CardContent>
@@ -226,7 +227,16 @@ function accountGalleryBody({
 function accountTableColumns(t: Translate): TableColumn[] {
   const nameSort = COLLECTION_SORTS.accounts.options.find((o) => o.value === "name")
   return [
-    { key: "name", label: t("Name"), sort: nameSort?.value, defaultDir: nameSort?.defaultDir },
+    {
+      key: "name",
+      label: t("Name"),
+      sort: nameSort?.value,
+      defaultDir: nameSort?.defaultDir,
+      // Search on nameText, not on the rendered JSX node. The shaper builds
+      // the mark+name JSX in the `name` field and keeps the plain text in
+      // `nameText` for search and sort.
+      searchKey: "nameText" as const,
+    },
     { key: "status", label: t("Status") },
     {
       key: "manager",

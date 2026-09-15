@@ -34,14 +34,19 @@
      top corners the client asked for a second time ("when pin, I still want
      it round") arrive here for free — they are the wrapper's `::before`, not
      a radius this file draws.
-   · GROUND. Same shape as `ToolbarRow`'s own `ground` prop and for the
-     identical reason: a fixed fill is right on exactly one screen, and a
-     toolbar-shaped row cannot know what it is standing on. `bare` (the
-     default) paints nothing, which is correct wherever a caller wraps this
-     in `PINNED_TOOLBAR` — that box already paints the ground behind it.
-     `page`/`panel` are here only for the day a caller mounts this bar
-     un-pinned, standing directly on paper it names itself; the token pair is
-     `ToolbarRow`'s own, not a second opinion.
+   · GROUND, NARROWED 2026-09-15. Used to be `ToolbarRow`'s own `ground`
+     prop, matching this row's own fill to whatever paper it stood on —
+     `bare` painted nothing so `PINNED_TOOLBAR`'s wrapper could paint the
+     container's own tone straight through. That was the bug the client
+     rang in about (see "AN ACCENT DOES BECOME A BACKGROUND" below): a row
+     whose whole job is being visible cannot also be the same colour as its
+     container. So `ground` no longer picks a fill — every value now paints
+     the identical `--warning` wash, which is the fix, because a translucent
+     accent reads as distinct against ANY backdrop without being told which
+     one it is (see "MEASURED"). What `ground` still decides is the one
+     thing that genuinely differs by context: which corners round (see
+     "RADIUS" below) — `bare` rides `PINNED_TOOLBAR`'s own corner
+     engineering, `page`/`panel` stand alone and round on their own.
    · COPY. Not one string lives in this file. `message`, `saveLabel`,
      `discardLabel` and `savingLabel` are all props — R28's own boundary
      (`resolveImport` in the consuming app refuses every specifier under
@@ -61,16 +66,57 @@
    "something is unresolved" without competing with Save for the one mango a
    view is allowed.
 
-   NO ROLE PLAYS AN ACCENT AS A PANEL. Unlike `Alert`, this bar has no panel
-   fill of its own to warm — `ground="bare"` paints nothing, in front of
-   whatever the pin wrapper already paints — so there is no "fill a panel
-   with poppy" mistake available to make here.
+   AN ACCENT DOES BECOME A BACKGROUND HERE, AND IT IS DELIBERATE. `Alert`'s
+   own law is "the panel stays neutral — accents never become a background"
+   (see that file's header). This row breaks it on the client's own ruling,
+   2026-09-15, verbatim: *"the 'You have unsaved changes' pinned bar at the
+   top had a different color. Please implement that because right now it's
+   in the same color as the container, which makes it not so visible."* A
+   neutral row with only a warning DOT (v1.2.82/83, as shipped) is exactly
+   `Alert`'s law applied here, and it is exactly what she is describing.
+   `Alert`'s law holds for a box that sits AMONG other neutral boxes and uses
+   a dot to say which kind of notice it is; this row is never one of
+   several — it is the one thing on the screen that means "something changed
+   and is not saved yet", and its whole job is failing if it reads as more
+   of the same paper. So it takes `--warning` at 10% alpha as its own fill —
+   never the raw `--kw-orange`, never opaque; a WASH, not `Alert`'s "fill a
+   panel with poppy" mistake, which is a full-strength brand fill standing in
+   for a neutral one — plus a `--warning`-tinted hairline at 35% (the
+   boundary law's inset-shadow remedy; see the cva block). `Alert`'s law is
+   untouched everywhere else; this is a second, narrower one, written down
+   rather than left implicit: a translucent accent wash is allowed on a row
+   whose entire job is being the one thing on the screen that is not
+   neutral.
 
-   RADIUS — TWO, NEVER A THIRD. `rounded-[var(--radius)]` only when this
-   file itself paints (`ground !== "bare"`); when a caller wraps this in
-   `PINNED_TOOLBAR` the wrapper's own `::before` is what rounds the corners
-   a reader is looking at (R63 part 4), and this file stays unrounded so the
-   two boxes never round the same edge twice.
+   MEASURED, 2026-09-15 (a script against the real hexes in tokens.css §2/§3,
+   not eyeballed). `--warning` (`--kw-orange` #F7953E) at 10% alpha, flattened
+   over every ground this row is ever laid over — light `--surface-panel`
+   #F7F2EB, light `--surface-raised` #FFFEF9, dark `--surface-panel` #1C1B18,
+   dark `--surface-raised` #26241F — resolves to #F7E9DA / #FEF4E6 / #32271C
+   / #3B2F22. The caption's `text-ink-secondary` (#4a4946 light, #d5d1c9
+   dark) measures 7.55 / 8.27 / 9.56 / 8.54 against those four in turn — all
+   clear AA's 4.5:1 with wide margin, so `text-ink-secondary` stays; nothing
+   here forced a switch to a stronger ink. 10% was picked as the low end of a
+   range that already clears comfortably rather than the alpha the numbers
+   required — the dark grounds pass north of 8.5 at this same value, so there
+   was room to go lower and none to spare going up.
+
+   RADIUS — TWO, NEVER A THIRD, AND NOW BOTH ARE THIS FILE'S OWN. This row
+   paints unconditionally as of 2026-09-15 (see "AN ACCENT DOES BECOME A
+   BACKGROUND" above), so it can no longer leave rounding to whatever it is
+   standing on. `ground="bare"` (`PINNED_TOOLBAR`, the two real call sites)
+   rounds the TOP edge only, `rounded-t-[var(--radius)]` — R31's own second
+   named position, "the top band of a pinned toolbar" (added 2026-09-10 for
+   this exact wrapper's corner engineering, R63 part 4) — because the
+   wrapper's own `::before` still rounds those SAME top corners one layer
+   further out, at the container's real border box, which is part 4's whole
+   argument; this row's fill sits inside that and agrees with it rather than
+   rounding the same edge a second, competing way. The bottom edge stays
+   square: there is nothing below this row for a rounded corner to separate
+   it from, the container's own content keeps scrolling under it and shares
+   that edge. `page`/`panel` (standing alone, unpinned) round all four,
+   `rounded-[var(--radius)]` — the ordinary box, nothing beside them already
+   carries a corner.
 
    A11Y — THE APPEARANCE OF THE ROW IS THE ANNOUNCEMENT. `role="status"` on
    the row itself, the same shape the kit's own `data-table.tsx` selection
@@ -104,25 +150,51 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 import { Button } from "../button/button";
 
-/* Reuses `ToolbarRow`'s own two ground tokens rather than minting a third
-   opinion about which paper a toolbar-shaped row stands on — see the header,
-   "WHAT THIS FILE DOES NOT DECIDE · GROUND". */
+/* CLIENT RULING, 2026-09-15 — see the header, "AN ACCENT DOES BECOME A
+   BACKGROUND HERE". This row now paints its own warning wash unconditionally
+   instead of matching whatever paper it stands on, so `ground` decides only
+   the corner radius below — see "RADIUS" in the header. */
 const unsavedChangesBarVariants = cva(
-  ["flex min-w-0 flex-nowrap items-center justify-between gap-3", "px-4 py-3"],
+  [
+    "flex min-w-0 flex-nowrap items-center justify-between gap-3",
+    "px-4 py-3",
+    /* THE WASH. `--warning` (`--kw-orange`) at 10% — measured against every
+       ground this row is laid over, both palettes; see the header,
+       "MEASURED". Never the raw `--kw-orange` and never opaque: a translucent
+       accent reads as distinct against any backdrop without needing to know
+       which one it is, which is the whole point (the header, "GROUND"). */
+    "bg-warning/10",
+    /* THE BOUNDARY LAW (`foundations/rules/borders.mjs`) forbids a `border-*`
+       utility outright — a boundary is a fill or an inset shadow, never a
+       stroke. This is the inset-shadow remedy, the same idiom
+       `select.tsx`/`date-picker.tsx` already use for a tinted hairline
+       (`color-mix(in srgb, var(--destructive) 65%, transparent)`), at
+       `--warning` and a lower percentage: this line decorates a translucent
+       wash, it is not a form field's required stroke. */
+    "shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--warning)_35%,transparent)]",
+  ],
   {
     variants: {
       ground: {
-        /** Nothing painted — the right answer wherever a caller wraps this
-         * row in the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`),
-         * which already paints the ground behind it. The default, because a
-         * row that paints nothing cannot paint the wrong thing. */
-        bare: "",
-        /** Standing directly on off-beige (a page, a body pane) — takes soft
-         * paper, `ToolbarRow`'s own `page` token. */
-        page: "bg-surface-panel",
-        /** Standing directly on soft paper (a card, a panel, a sheet) —
-         * takes off-beige, `ToolbarRow`'s own `panel` token. */
-        panel: "bg-surface-raised",
+        /** Riding the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`)
+         * — the two real call sites, both left at this default. Rounds the
+         * TOP edge only, `rounded-t-[var(--radius)]`: R31's own second named
+         * position ("the top band of a pinned toolbar", R63 part 4), so this
+         * row's corner agrees with the wrapper's own `::before` instead of
+         * rounding the same edge a second, competing way. The bottom stays
+         * square — the container's own content keeps scrolling under it and
+         * shares that edge. */
+        bare: "rounded-t-[var(--radius)]",
+        /** Standing directly on off-beige, un-pinned — the day a caller
+         * mounts this bar without `PINNED_TOOLBAR`. An ordinary box, all four
+         * corners: `rounded-[var(--radius)]`. */
+        page: "rounded-[var(--radius)]",
+        /** Standing directly on soft paper, un-pinned. Same shape as `page` —
+         * kept as its own name because a call site should still say which
+         * paper it believes it is floating on, even though the wash no
+         * longer varies by it (the header, "GROUND": that was the bug, not a
+         * distinction worth two branches). */
+        panel: "rounded-[var(--radius)]",
       },
     },
     defaultVariants: { ground: "bare" },
@@ -206,18 +278,12 @@ const UnsavedChangesBar = React.forwardRef<HTMLDivElement, UnsavedChangesBarProp
   ) => {
     if (!dirty) return null;
 
-    const painted = ground !== "bare";
-
     return (
       <div
         ref={ref}
         data-slot="unsaved-changes-bar"
         role="status"
-        className={cn(
-          unsavedChangesBarVariants({ ground }),
-          painted && "rounded-[var(--radius)]",
-          className,
-        )}
+        className={cn(unsavedChangesBarVariants({ ground }), className)}
         {...props}
       >
         <span className="flex min-w-0 items-center gap-2 text-caption text-ink-secondary">

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.83",
-  "sha": "81213891a4b5f81c4c90ea2423e493b09954eaa2",
-  "syncedAt": "2026-09-14"
+  "tag": "v1.2.85",
+  "sha": "cf395129a3a732cc6a7ece0d85756924e6da1099",
+  "syncedAt": "2026-09-15"
  },
- "generatedAt": "2026-09-14T21:14:41.253Z",
+ "generatedAt": "2026-09-15T07:35:37.181Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -8662,26 +8662,26 @@
     {
      "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
      "name": "unsavedChangesBarVariants",
-     "line": 110,
-     "base": "flex min-w-0 flex-nowrap items-center justify-between gap-3 px-4 py-3",
+     "line": 157,
+     "base": "flex min-w-0 flex-nowrap items-center justify-between gap-3 px-4 py-3 bg-warning/10 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--warning)_35%,transparent)]",
      "groups": [
       {
        "name": "ground",
        "options": [
         {
          "name": "bare",
-         "classes": "",
-         "note": "Nothing painted — the right answer wherever a caller wraps this row in the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`), which already paints the ground behind it. The default, because a row that paints nothing cannot paint the wrong thing."
+         "classes": "rounded-t-[var(--radius)]",
+         "note": "Riding the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`) — the two real call sites, both left at this default. Rounds the TOP edge only, `rounded-t-[var(--radius)]`: R31's own second named position (\"the top band of a pinned toolbar\", R63 part 4), so this row's corner agrees with the wrapper's own `::before` instead of rounding the same edge a second, competing way. The bottom stays square — the container's own content keeps scrolling under it and shares that edge."
         },
         {
          "name": "page",
-         "classes": "bg-surface-panel",
-         "note": "Standing directly on off-beige (a page, a body pane) — takes soft paper, `ToolbarRow`'s own `page` token."
+         "classes": "rounded-[var(--radius)]",
+         "note": "Standing directly on off-beige, un-pinned — the day a caller mounts this bar without `PINNED_TOOLBAR`. An ordinary box, all four corners: `rounded-[var(--radius)]`."
         },
         {
          "name": "panel",
-         "classes": "bg-surface-raised",
-         "note": "Standing directly on soft paper (a card, a panel, a sheet) — takes off-beige, `ToolbarRow`'s own `panel` token."
+         "classes": "rounded-[var(--radius)]",
+         "note": "Standing directly on soft paper, un-pinned. Same shape as `page` — kept as its own name because a call site should still say which paper it believes it is floating on, even though the wash no longer varies by it (the header, \"GROUND\": that was the bug, not a distinction worth two branches)."
         }
        ]
       }

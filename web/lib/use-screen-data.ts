@@ -301,12 +301,14 @@ export function useScreenData({
     stories: useCachedValue<number>(enabled ? totalKey("stories", teamId as string) : null),
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
-    // OUR OWN ADMIN, six views and one progress pair — every number exact, every
-    // one primed by whichever view's fetch landed, so the badge on a tab nobody
-    // has opened is still the server's answer rather than a guess.
+    // OUR OWN ADMIN, seven views and one progress pair — every number exact,
+    // every one primed by whichever view's fetch landed, so the badge on a tab
+    // nobody has opened is still the server's answer rather than a guess.
     tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
     tasksAll: useCachedValue<number>(enabled ? totalKey("tasks-all", teamId as string) : null),
     tasksOverdue: useCachedValue<number>(enabled ? totalKey("tasks-overdue", teamId as string) : null),
+    // ARRIVED 2026-09-15 — the redesigned tab strip's own badge.
+    tasksPlanned: useCachedValue<number>(enabled ? totalKey("tasks-planned", teamId as string) : null),
     tasksUpcoming: useCachedValue<number>(enabled ? totalKey("tasks-upcoming", teamId as string) : null),
     tasksCompleted: useCachedValue<number>(enabled ? totalKey("tasks-completed", teamId as string) : null),
     tasksCalendar: useCachedValue<number>(enabled ? totalKey("tasks-calendar", teamId as string) : null),

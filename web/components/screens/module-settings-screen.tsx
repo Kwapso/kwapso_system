@@ -55,9 +55,20 @@
 //
 //   • *"the choices: yes, this would survive, but not as a general thing, but
 //     inside each module."* — so the vocabulary sections below are the EXISTING
-//     Choices editor narrowed to this module's groups (`SelectableScope` in
-//     `web/components/choices/selectable-screen.tsx`), never a second editor.
-//     A value edited in two places is a value that drifts.
+//     Choices editor narrowed to this module's groups
+//     (`SettingsChoicesPanel`'s `scope` prop,
+//     `web/components/screens/settings-choices-panel.tsx`), never a second
+//     editor. A value edited in two places is a value that drifts.
+//
+//     THE EDITOR ITSELF CHANGED ONCE ALREADY, 15 SEP 2026: this page used to
+//     narrow `SelectableScreen` (`web/components/choices/selectable-screen.tsx`,
+//     the grouped-list/chip-wall design), and the general Choices tab on
+//     Settings was rebuilt a day earlier onto `SettingsChoicesPanel` (a
+//     `RecordTable`, the client's own Contacts-table reference). Two
+//     components drawing one concept was the exact drift the sentence above
+//     exists to refuse, so this page now narrows the SAME `RecordTable`
+//     editor the general tab draws — see `SettingsChoicesPanel`'s own header
+//     for the scope prop's shape.
 //
 //   • *"Does every module get the gear? Only the ones with something to set."*
 //     — so `MODULE_SETTINGS` is a LIST, not a map over every module, and a
@@ -121,17 +132,20 @@
 // A content component rendered inside the one deep-link shell (the shell
 // provides the AppShell chrome), like every other screen in `screens/`.
 
+import * as React from "react"
+
 import { buttonVariants } from "@shared/ui/components/button/button"
 import { Gear } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
-import { TabsView, defaultTabsConfig, type TabItem } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs, defaultTabsConfig, type TabItem } from "@shared/web/screen-engine/tabs-view"
 
 import { InAppLink } from "@/components/shell/in-app-link"
 import { openInNewTab } from "@/lib/nav"
 import { NoAccess } from "@/components/deep-link/screen-bits"
 import { ModuleAutomations } from "@/components/screens/module-automations"
-import { SelectableScreen } from "@/components/choices/selectable-screen"
+import { SettingsChoicesPanel } from "@/components/screens/settings-choices-panel"
+import { MeetingTypesPanel } from "@/components/team/internal-screens"
 import type { Can, Right } from "@/lib/perms"
 import { ticketTypeColour } from "@/lib/type-colours"
 import { usePermissions } from "@/lib/perms"
@@ -210,14 +224,17 @@ export type ModuleSettingsSection =
       kind: "vocabulary"
       /** The `selectable_data.type` groups this block edits. */
       types: string[]
-      /** Whether this vocabulary can grow — `SelectableScope.create` carries the
-       * whole argument, and it is a fact about the words rather than the reader. */
+      /** Whether this vocabulary can grow — read by `SettingsChoicesPanel`'s
+       * `moduleOptions` derivation (`settings-choices-panel.tsx`) exactly as
+       * it always was, and it is a fact about the words rather than the reader. */
       create: boolean
-      /** THE COLOUR EACH WORD IS KNOWN BY, when this group has one — and the whole
-       * of what turns the section from a LIST into a WALL OF CHIPS.
+      /** THE COLOUR EACH WORD IS KNOWN BY, when this group has one — read into
+       * `ChoiceGroupHome.colour` (`deep-link/shape.tsx`'s `shapeChoicesTable`)
+       * so the Value column draws a `Swatch` beside the word, on both scopes
+       * of `SettingsChoicesPanel` alike.
        *
        * The client, 2026-09-10: *"on ticket type, show it like chips with their
-       * color, not a list."* A ticket type is already a coloured chip everywhere
+       * color, not a list."* A ticket type is already a coloured mark everywhere
        * else in the app — the list's Type cell, the triage card, the type picker,
        * every panel on the dashboard — and it was a stack of grey rows only on the
        * one screen where the words are SET. Her ruling of 2026-09-07 is the same
@@ -228,11 +245,11 @@ export type ModuleSettingsSection =
        * `selectable_data` has four meaningful columns and none of them is a colour
        * (`web/lib/type-colours.ts` argues that out at length and is the ONE place a
        * ticket type's colour is decided). Passing the resolver down is what keeps
-       * that true — the editor draws whatever colour it is handed and knows nothing
+       * that true — the table draws whatever colour it is handed and knows nothing
        * about ticket types, and a second group that gains a palette hands its own.
        *
-       * ABSENT MEANS A LIST, which is every other vocabulary: Sprint types and
-       * Story types have a MARK rather than a colour and their rows read as rows. */
+       * ABSENT MEANS A PLAIN WORD, which is every other vocabulary: Sprint types
+       * and Story types carry no palette and their rows read as plain text. */
       colour?: (value: string) => string
     })
   | (ModuleSettingsSectionBase & {
@@ -241,6 +258,26 @@ export type ModuleSettingsSection =
        * `AUTOMATIONS` filtered to this page's own segment, so a module that
        * gains an automation gains a row without anybody editing this table. */
       kind: "automations"
+    })
+  | (ModuleSettingsSectionBase & {
+      /** A THIRD KIND, 15 SEP 2026 — a choice that does NOT back onto
+       * `selectable_data`. The client's ruling: *"purpose is a choice
+       * component, so make sure you move it inside meetings, settings,
+       * choices."* Meeting types (`meeting_purposes`, `shared/types.ts`'s
+       * own `MeetingPurpose`) carry a department per row and are their own
+       * table — `shared/selectable-homes.ts` never claimed them, because
+       * they cannot become a dropdown value. `kind: "vocabulary"` is a
+       * discriminated union member for a REASON (this file's own header,
+       * `types`/`create`/`colour` are facts about a `selectable_data` group
+       * and mean nothing beside a table that is not one), so this needed a
+       * sibling rather than a `types: []` that would have shipped a
+       * `SettingsChoicesPanel` scope with nothing to narrow. STILL DRAWS ON
+       * THE "Choices" TAB, same as a vocabulary section does — the union
+       * member is about the DATA source, not the tab it appears on. No
+       * fields of its own: today there is exactly one meeting-types section
+       * and it is `MeetingTypesPanel`'s own concern
+       * (`web/components/team/internal-screens.tsx`) to fetch and shape. */
+      kind: "meetingTypes"
     })
 
 export type ModuleSettingsPage = {
@@ -313,12 +350,17 @@ export type ModuleSettingsPage = {
  *
  * ONE SECTION PER PAGE, EVEN WHERE A MODULE OWNS TWO GROUPS — Accounts owns
  * Industry and Country, Apps owns App stage and Deliverable kind. A section is
- * a whole `SelectableScreen`, and a `SelectableScreen` is a toolbar (R63 pins
- * it to the top of the scroll) plus a mango `AddButton` (the kit rules one per
- * view). Two of them stacked would pin two bars to one edge and draw two brand
- * fills. `SelectableScope.types` already takes a LIST and heads each group with
- * its own name inside the one card, so the reader still sees "Industry" and
- * "Country" as two named blocks — they share a search, a filter and one
+ * a whole `SettingsChoicesPanel` (scoped), and that panel is a `RecordTable`
+ * (R63 pins its toolbar to the top of the scroll) plus a mango `AddButton`
+ * (the kit rules one per view). Two of them stacked would pin two bars to one
+ * edge and draw two brand fills. Since 15 Sep 2026 the two groups share ONE
+ * flat table rather than two named blocks — the scoped Module column is
+ * dropped (settings-choices-panel.tsx's own header: redundant once the page's
+ * own tab already says which module), so "Industry" and "Country" rows sit
+ * side by side, told apart only by their own word and the create dialog's
+ * Group field (a pick-or-create datalist over the page's own `types` —
+ * `SelectableFormDialog`'s `types` shape, unchanged since before this table
+ * existed) — they share a search, a filter and one
  * "New value" that asks which group, which is what the whole-vocabulary screen
  * has always done and is the narrowing this prop exists for. */
 
@@ -506,8 +548,10 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   },
   // THE BUILD SIDE. Apps owns TWO groups and gets ONE section for the reason
   // this table's own header gives: a second section is a second pinned toolbar
-  // and a second mango. `SelectableScope.types` heads each group by name inside
-  // the one card, so the page still reads as stages and kinds.
+  // and a second mango. Both groups share the one scoped table
+  // (`SettingsChoicesPanel`), told apart by their own word rather than a
+  // second block, the same shape Accounts' two groups now take (see that
+  // page's own comment above).
   {
     segment: "apps",
     title: navPageTitle("apps"),
@@ -595,9 +639,24 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
     ],
   },
   {
-    /* What is said in a room, written down by itself. The taxonomy of why we
-     * meet lives under `delivery` and has its own screen; this page is only
-     * about the capture. */
+    /* What is said in a room, written down by itself — and, since 15 Sep
+     * 2026, what a meeting is ABOUT lives here too.
+     *
+     * THE TAXONOMY MOVED, RULED BY THE CLIENT: *"For meetings, purpose is a
+     * choice component, so make sure you move it inside meetings, settings,
+     * choices. And maybe you find another word for 'purposes.' … Maybe just
+     * 'type.'"* "Meeting type" is the word (`shared/glossary.ts`'s own
+     * `meetingType` entry). It used to be a standalone screen reached
+     * CONTEXTUALLY from a button on the Meetings screen itself — this
+     * comment used to say so, and the second sentence ("this page is only
+     * about the capture") is what that ruling deletes: the module now owns
+     * both halves, on two tabs of the same settings page, the same shape
+     * Tickets and Accounts already take (this file's own header,
+     * `visibleModuleSettings`). The old screen's plumbing is left in place
+     * (`web/components/team/internal-screens.tsx`'s `PurposesScreen`) —
+     * nothing structurally fenced points at it any more, and it is a
+     * separate, smaller change to retire the rest of it; see the Task C
+     * lane report for the full account. */
     segment: "meetings",
     title: navPageTitle("meetings"),
     sections: [
@@ -606,6 +665,18 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "meetings", right: "read" },
         kind: "automations",
         title: "Automations",
+      },
+      // MEETING TYPES — gated on `delivery:read`, the permission the taxonomy
+      // has always lived under (`shared/team-modules.ts`'s own `delivery` row,
+      // now titled "Meeting types" for the same reason). NOT `meetings:read`:
+      // a reader who may see meetings but not the agency's own housekeeping
+      // module should not be shown a door into it, the same refusal
+      // `visibleModuleSettings` already applies everywhere else on this page.
+      {
+        key: "meeting-types",
+        gate: { module: "delivery", right: "read" },
+        kind: "meetingTypes",
+        title: "Meeting types",
       },
     ],
   },
@@ -832,6 +903,15 @@ export function ModuleSettingsScreen({
   const vocabularySections = sections.filter(
     (s): s is Extract<ModuleSettingsSection, { kind: "vocabulary" }> => s.kind === "vocabulary"
   )
+  // THE THIRD KIND, 15 SEP 2026 — a choice that is not a `selectable_data`
+  // group (this file's own `ModuleSettingsSection` header). It shares the
+  // "Choices" TAB with `vocabularySections` — the tab is about what the
+  // reader is looking for, not about which table backs it — but draws
+  // through its own component (`MeetingTypesPanel`), never
+  // `SettingsChoicesPanel`.
+  const meetingTypesSection = sections.find(
+    (s): s is Extract<ModuleSettingsSection, { kind: "meetingTypes" }> => s.kind === "meetingTypes"
+  )
 
   // R16 — THE NUMBER ON EACH TAB, exactly once, through the one `formatCount`
   // seam. Client, 2026-09-14: "show the total count for Automations and for
@@ -850,7 +930,12 @@ export function ModuleSettingsScreen({
   //     itself rather than a query — a team can rename a value but cannot add
   //     or remove a GROUP from a page, that is a code change to this table.
   const automationsCount = AUTOMATIONS.filter((a) => a.segment === segment).length
-  const choiceGroupCount = vocabularySections.reduce((n, s) => n + s.types.length, 0)
+  // MEETING TYPES COUNT AS ONE GROUP — the same "how many GROUPS, never how
+  // many values" rule vocabulary sections follow, read onto the one kind
+  // that is not a `selectable_data` group: `meeting_purposes` is its own
+  // single taxonomy, not a list of `types`, so there is no list to sum.
+  const choiceGroupCount =
+    vocabularySections.reduce((n, s) => n + s.types.length, 0) + (meetingTypesSection ? 1 : 0)
 
   const tabs: TabItem[] = []
   if (automationsSection)
@@ -861,7 +946,7 @@ export function ModuleSettingsScreen({
       badge: formatCount(automationsCount),
       badgeVariant: "" as const,
     })
-  if (vocabularySections.length > 0)
+  if (vocabularySections.length > 0 || meetingTypesSection)
     tabs.push({
       // THE GLOSSARY'S OWN WORD (`shared/glossary.ts`, `dropdownValues.term`),
       // never "Choice components" — the client asked for "whatever the
@@ -908,12 +993,26 @@ export function ModuleSettingsScreen({
           its own reads, its own toolbar and its own dialogs exactly as the
           stacked layout did; only the arrangement (tabbed, not `gap-8`
           stacked) and the section's own name (now on the tab, not inside the
-          Choices panel's toolbar — see selectable-screen.tsx) changed. */}
-      <TabsView
-        config={{ ...defaultTabsConfig, tabs }}
-        value={tab}
-        onValueChange={setTab}
-        renderPanel={(panel) => {
+          Choices panel's toolbar — see settings-choices-panel.tsx) changed.
+
+          THE STRIP AND ITS PANEL ARE SIBLINGS, DRAWN THROUGH THE SAME SEAM
+          EVERY OTHER MAIN SCREEN USES (R63/R77, 15 Sep 2026) — this is a main
+          screen (an address, a workspace tab, not a record), so its strip
+          pins on scroll exactly like Accounts', Apps', Tickets' and
+          Settings' own do: through `renderFolderTabs`, the one place
+          `STICKY_FOLDER_TABS` is applied, never a second class hand-rolled
+          here. `TabsView`'s own `renderPanel` prop wraps each panel in a
+          Radix `TabsContent` inside the SAME `<Tabs>` root as the tablist —
+          fine for a record's inner strip (`STICKY_TABS` scopes its sticky
+          rule to `[role=tablist]` alone), wrong here, because
+          `STICKY_FOLDER_TABS` pins the whole `<Tabs>` root and a root that
+          also wraps the panel content would pin the CONTENT along with the
+          strip. So the panel is rendered as a plain sibling instead, keyed
+          on `tab` directly rather than on Radix's own `value` — the exact
+          split `settings-screen.tsx` already reads this pattern off of. */}
+      <div className="flex w-full flex-col">
+        {renderFolderTabs({ config: { ...defaultTabsConfig, tabs }, value: tab, onValueChange: setTab })}
+        {(function renderPanel(panel: { value: string }): React.ReactNode {
           if (panel.value === "automations")
             return automationsSection ? (
               <ModuleAutomations
@@ -928,76 +1027,86 @@ export function ModuleSettingsScreen({
               />
             ) : null
           if (panel.value === "choices")
+            // ── ONE EDITOR, TWO SCOPES — 15 SEP 2026 ─────────────────────
+            // This used to mount `SelectableScreen` (this file's own header,
+            // "never a second editor") — true the day it was written, and
+            // it stopped being true the day `SettingsChoicesPanel` shipped
+            // as the general Choices tab's OWN editor, one day before this
+            // change: two components drawing one concept is the exact drift
+            // that sentence exists to refuse. `SettingsChoicesPanel`'s
+            // `scope` prop (settings-choices-panel.tsx's own header, "the
+            // one module-settings allowed edit here") is what makes this
+            // file's editor and that one the SAME editor again — narrowed to
+            // THIS page's segment, which already covers every vocabulary
+            // section it owns (there is at most one per page today; see
+            // `MODULE_SETTINGS`'s own header), so this is one mounting
+            // rather than a `.map` over sections the way `SelectableScreen`
+            // needed.
+            //
+            // AND A SECOND, DIFFERENT COMPONENT BESIDE IT ON THE SAME TAB —
+            // `meetingTypesSection`, this file's own third `kind`. The tab
+            // is "Choices" because that is what the reader is looking for,
+            // not because one table backs everything under it; the Meetings
+            // page is the one place today that draws both halves at once
+            // (though it in fact only ever has one, `meetingTypesSection`),
+            // stacked the same way two vocabulary sections used to stack
+            // before Task B narrowed that to one `SettingsChoicesPanel` call.
             return (
               <div className="flex flex-col gap-8">
-                {vocabularySections.map((section) => (
-                  <SelectableScreen
-                    key={section.key}
+                {vocabularySections.length > 0 && (
+                  <SettingsChoicesPanel
                     teamId={teamId}
-                    // ── THE IMPORT DOOR, THIS PAGE'S OWN — 11 SEP 2026 ──────
-                    // This line used to read "NO `onImport`", because the CSV
-                    // doors acted on the team's whole vocabulary and a button
-                    // on a page titled "Ticket settings" would have done more
-                    // than the page said. The client ruled otherwise when she
-                    // retired the Choices tab: *"each module's settings page
-                    // gets its own import and export for its own groups…
-                    // nothing sits outside Settings."*
-                    //
-                    // SO THE DOOR NARROWED, not the button. The wizard is the
-                    // app's one import screen and the scope travels in its
-                    // address — the confirm door reads the same list off the
-                    // body and skips every row in another group with a
-                    // reason, so this page cannot write a Country even if the
-                    // file holds one. `section.types` is the same list the
-                    // section's Export CSV sends to `?groups=`, so the two
-                    // halves of her sentence are one fact.
-                    onImport={() =>
-                      openInNewTab(
-                        `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(section.types.join(","))}`,
-                        // NO PER-GROUP WORD TO GIVE IT — see `IMPORT_TARGET_LABEL`'s
-                        // own note: the scope here lives in `?groups=`, which the tab
-                        // store never sees (its identity is the bare pathname), so a
-                        // richer label here would only be clobbered back to "Import"
-                        // the moment `deep-link-screen.tsx`'s own crumb effect runs.
-                        // Passing the same word it will settle on keeps this a single
-                        // paint rather than a flash.
-                        t("Import")
-                      )
-                    }
-                    // STILL NO RECORD TO OPEN, and that is a decision rather
-                    // than an omission — `onOpen` is what draws the row's
-                    // link to a value's own detail screen, and that screen
-                    // was retired on 11 Sep 2026 with the whole-vocabulary
-                    // screen that was its only door. A settings page
-                    // navigating OUT of Settings is the move the client
-                    // stopped on Settings › Team ("Everything should be in
-                    // different containers… not taken anywhere else",
-                    // 2026-09-09), and the report on this change records
-                    // what the removed screen carried and where it is read
-                    // now. Renaming, the mark, the default mark and
-                    // deactivating are all on the row (or, on a coloured
-                    // group, on the chip).
-                    //
-                    // NO `standalone` EITHER: the prop is gone. It chose
-                    // between a page-sized heading with the registry's own
-                    // count (R16 ii) and a section heading, and there is only
-                    // one mounting left.
+                    can={can}
                     scope={{
-                      types: section.types,
-                      title: t(section.title),
-                      create: section.create,
-                      // ABSENT ON A GROUP WITH NO PALETTE, which is what
-                      // turns the section back into a list — see
-                      // `ModuleSettingsSection.colour`.
-                      colour: section.colour,
+                      segment,
+                      // ── THE IMPORT DOOR, THIS PAGE'S OWN — 11 SEP 2026 ──
+                      // Unchanged in substance from the `SelectableScreen`
+                      // mounting this replaces: *"each module's settings
+                      // page gets its own import and export for its own
+                      // groups… nothing sits outside Settings"* (client
+                      // ruling). The groups are every vocabulary section's
+                      // own `types` (usually one section, occasionally two —
+                      // Accounts owns Industry and Country in ONE section
+                      // already, so this is the same union `section.types`
+                      // alone used to be).
+                      onImport: () =>
+                        openInNewTab(
+                          `/t/${teamId}/import/selectable_data?groups=${encodeURIComponent(
+                            vocabularySections.flatMap((s) => s.types).join(",")
+                          )}`,
+                          // NO PER-GROUP WORD TO GIVE IT — see
+                          // `IMPORT_TARGET_LABEL`'s own note: the scope here
+                          // lives in `?groups=`, which the tab store never
+                          // sees (its identity is the bare pathname), so a
+                          // richer label here would only be clobbered back
+                          // to "Import" the moment `deep-link-screen.tsx`'s
+                          // own crumb effect runs. Passing the same word it
+                          // will settle on keeps this a single paint rather
+                          // than a flash.
+                          t("Import")
+                        ),
                     }}
                   />
-                ))}
+                )}
+                {/* MEETING TYPES — its own adapter, not `selectable_data`
+                    (this file's `kind: "meetingTypes"` header). `?groups=`
+                    is `selectable_data`'s own import door's argument and
+                    means nothing to `meeting_purposes`'s import target
+                    (`workers/data-ops/src/lib/targets.ts`, keyed by table),
+                    so this passes the bare wizard address rather than
+                    reusing the vocabulary sections' URL. */}
+                {meetingTypesSection && (
+                  <MeetingTypesPanel
+                    teamId={teamId}
+                    can={can}
+                    onImport={() => openInNewTab(`/t/${teamId}/import/meeting_purposes`, t("Import"))}
+                  />
+                )}
               </div>
             )
           return null
-        }}
-      />
+        })({ value: tab })}
+      </div>
     </div>
   )
 }
@@ -1012,15 +1121,24 @@ export function ModuleSettingsScreen({
  * so a gear in `actions` would vanish from a team with no tickets yet — which
  * is the exact moment somebody goes looking for the ticket types.
  *
- * IT IS NOT MANGO, and it is not `AddButton`. The Tickets screen's one brand
- * fill is "Raise ticket" (kit RULES §2.5, one mango per view), and this is not
- * even a create. `ghost` is also the only honest choice on this ground: the
- * kit's own ch26 note says an icon-only control is `secondary`, and a secondary
- * button resolves `--btn-secondary-fill` to `var(--card)` — which on the bare
- * page ground IS `--background` in light (#FFFEF9 both), the 1.000 that shipped
- * three times this week. Ghost carries no fill at all, so it introduces no
- * ground and there is nothing to measure: tertiary ink on the page, going to
- * full ink on hover.
+ * IT IS NOT MANGO IN THE "CREATE" SENSE — the Tickets screen's own create act
+ * is "Raise ticket" — but it draws the SAME FILLED CIRCLE every toolbar icon
+ * button in the app does. The client's ruling, 2026-09-15, over a screenshot of
+ * Settings › Theme's gear sitting bare on the page ground: *"The gear button in
+ * the toolbar in Settings Theme needs the background for the button to be the
+ * same everywhere. There cannot be a button in the toolbar without a circle
+ * around it."* THIS OVERRULES THE `ghost` REASONING THAT USED TO SIT HERE
+ * (kept below, struck through in spirit rather than in fact, because the
+ * argument for `ghost` was real and the next reader should see it was weighed
+ * and not missed): a secondary/ghost fill on the bare page ground is
+ * `var(--card)`, which measured `--background` in light — true, and beside the
+ * point once the ruling reads "no button in the toolbar without a circle
+ * around it" rather than "no button that measures wrong". `AddButton`
+ * (`web/components/deep-link/screen-bits.tsx`) already draws every collection's
+ * create action as a bare `<Button size="icon">` with no `variant` — the
+ * library's own `default`, the filled dark circle — and this gear now draws
+ * the SAME variant, so a toolbar's icon buttons read as one family rather than
+ * two: one filled, one bare. See UI-RULEBOOK.md B11 for the rule this earned.
  *
  * A REAL ANCHOR (R37) — `InAppLink`, so middle-click opens the settings page in
  * a tab and the address can be copied, while a plain left click stays inside
@@ -1059,7 +1177,7 @@ export function ModuleSettingsGear({
         <span className="inline-flex">
           <InAppLink
             href={`/settings/${segment}`}
-            className={buttonVariants({ variant: "ghost", size: "icon" })}
+            className={buttonVariants({ size: "icon" })}
           >
             <Gear className="size-4" />
             <span className="sr-only">{label}</span>

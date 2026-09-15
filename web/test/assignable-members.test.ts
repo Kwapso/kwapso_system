@@ -36,6 +36,8 @@ const person = (over: Partial<TeamMember> & { userId: string }): TeamMember => (
   isAdmin: false,
   isClient: false,
   joinedAt: "2026-01-01",
+  createdByName: null,
+  updatedAt: null,
   ...over,
 })
 

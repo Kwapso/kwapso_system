@@ -97,6 +97,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import { PencilSimple, UserMinus } from "@shared/ui/foundations/icons"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { invalidate, primeCache } from "@shared/web/store"
@@ -105,7 +106,7 @@ import { useT } from "@shared/web/language"
 import type { TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
-import { RecordScreen } from "@/components/records/record-chrome"
+import { RecordActionsMenu, RecordScreen, type RecordAction } from "@/components/records/record-chrome"
 import { MemberHead } from "@/components/team/member-head"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
@@ -142,6 +143,14 @@ export function MemberScreen({
   const t = useT()
   const [pickRole, setPickRole] = React.useState(false)
   const [confirmRemove, setConfirmRemove] = React.useState(false)
+  // THE HEAD'S OWN EDIT PENCIL — client ruling, 2026-09-15: "make the pencil
+  // button visible." Lifted here rather than left as `StaffPanel`'s own local
+  // state so the SAME `StaffProfileDialog` opens whether a reader presses the
+  // pencil beside "Change role" (the visible affordance she asked for, in the
+  // actions row every other record's edit pencil sits in — record-chrome.tsx,
+  // account-detail.tsx, contact-detail.tsx) or the one still beside "Profile"
+  // below: one dialog, two doors onto it, never two competing edit surfaces.
+  const [editProfile, setEditProfile] = React.useState(false)
   const name = staffFullName(member)
 
   // THE MEMBER'S OWN HISTORY, THROUGH THE ONE GENERIC (table, id) PATH (R5) —
@@ -164,10 +173,12 @@ export function MemberScreen({
   // `RecordScreen`'s `onAddNote` — this screen was the one exception, and it
   // is why a member with no logged history (never role-changed, never
   // removed — which is every seeded/founding admin, since only an ACCEPTED
-  // INVITE writes a "Member joined" row) drew no ink footer at all: no audit
-  // (a membership genuinely has no creator/editor), zero activity rows, and no
-  // note composer to fall back on is the one combination `RecordDetail` itself
-  // (`showActivityColumn`, record-detail.tsx) draws NOTHING for.
+  // INVITE writes a "Member joined" row) used to draw no ink footer at all:
+  // no `audit` (this screen passed none until the 2026-09-15 ruling below —
+  // see the "THE RECORD COLUMN" note on `RecordScreen`'s own `audit` prop),
+  // zero activity rows, and no note composer to fall back on is the one
+  // combination `RecordDetail` itself (`showActivityColumn`,
+  // record-detail.tsx) draws NOTHING for.
   const activity = useRecordActivity("users", member.userId)
 
   // ── THE TWO DOORS ───────────────────────────────────────────────────────
@@ -204,6 +215,47 @@ export function MemberScreen({
     else reportError("member-screen:unknown-action", new Error(actionId))
   }
 
+  // THE HEAD'S ACTIONS ROW — client ruling, 2026-09-15, verbatim: "Inside the
+  // team detail, put the change role and remove the 'For Team' button and make
+  // the pencil button visible." Nothing in this app's catalogue, this recipe or
+  // this screen's own history ever carried a button literally labelled "For
+  // Team" (checked: `shared/i18n-strings.json`, `shared/i18n-catalogue.ts`, the
+  // recipe's own two action labels, and `git log -S` across every branch — R28
+  // makes the catalogue exactly the set of strings the app can ever render, so
+  // a label that isn't in it was never on screen). Read against what WAS here
+  // — two plain buttons, "Change role" and "Remove from team", side by side —
+  // and against what she asks to KEEP (Remove, "wherever it lives today: menu
+  // or button"), the button she means is "Remove from team": the one she is
+  // naming by what it does ("for [removing someone from] team"), not by its
+  // exact copy. So it comes OFF the row — the row keeps exactly "Change role"
+  // and the new pencil, matching every other record head (account-detail.tsx,
+  // contact-detail.tsx: one text button, one icon button, then the overflow) —
+  // and Remove moves into the SAME `RecordActionsMenu` those screens already
+  // reach for, its destructive styling and its confirm both untouched. The
+  // recipe itself (`members.remove`, gate and all) is unchanged; only which
+  // component reads it moved.
+  const buttonActions = recipe.actions.filter((a) => a.id !== "members.remove")
+  const removeRecipeAction = recipe.actions.find((a) => a.id === "members.remove")
+  const removeGate = removeRecipeAction ? gateState(rights, removeRecipeAction.gate) : "hidden"
+  const removeMenuActions: RecordAction[] =
+    removeRecipeAction && removeGate !== "hidden"
+      ? [
+          {
+            key: removeRecipeAction.id,
+            label: removeRecipeAction.label,
+            icon: <UserMinus className="size-3.5" />,
+            onSelect: () => onAction(removeRecipeAction.action),
+            disabled: removeGate === "disabled",
+            destructive: true,
+          },
+        ]
+      : []
+  // THE PENCIL ITSELF — same gate `StaffPanel`'s own edit button already reads
+  // (`staff_profiles:update`), and `:read` too: `StaffPanel` renders nothing
+  // without read (mounts no dialog to open), so the head's own pencil must not
+  // promise a door that isn't there.
+  const canEditProfile = Boolean(rights.staff_profiles?.read && rights.staff_profiles?.update)
+
   return (
     <>
       <RecordScreen
@@ -214,38 +266,66 @@ export function MemberScreen({
         chips={<Badge>{member.roleTitle}</Badge>}
         title={name}
         actions={
-          recipe.actions.length > 0 ? (
-            <>
-              {recipe.actions.map((a) => {
-                const gs = gateState(rights, a.gate)
-                if (gs === "hidden") return null
-                return (
-                  <Button
-                    key={a.id}
-                    variant={a.variant}
-                    disabled={gs === "disabled"}
-                    onClick={() => onAction(a.action)}
-                  >
-                    {a.label}
-                  </Button>
-                )
-              })}
-            </>
-          ) : undefined
+          <>
+            {buttonActions.map((a) => {
+              const gs = gateState(rights, a.gate)
+              if (gs === "hidden") return null
+              return (
+                <Button
+                  key={a.id}
+                  variant={a.variant}
+                  disabled={gs === "disabled"}
+                  onClick={() => onAction(a.action)}
+                >
+                  {a.label}
+                </Button>
+              )
+            })}
+            {/* ICON-ONLY (matching account-detail.tsx / contact-detail.tsx:
+                "edit, only the pencil icon", client ruling 2026-08-31) — the
+                head's own edit pencil, made VISIBLE per the 2026-09-15 ruling
+                quoted above, never behind a hover state or the overflow. */}
+            {canEditProfile && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setEditProfile(true)}
+                aria-label={t("Edit")}
+              >
+                <PencilSimple className="size-3.5" />
+              </Button>
+            )}
+            <RecordActionsMenu actions={removeMenuActions} />
+          </>
         }
-        // NO `audit` — a MEMBERSHIP has no creator/editor the way an account or
-        // a ticket does (`TeamMember` carries none); the footer's Record column
-        // is simply absent, which is the kit's own honest answer to a fact the
-        // record doesn't know (record-chrome.tsx: "Renders no row for a fact
-        // the record doesn't know").
+        // THE RECORD COLUMN — client ruling, 2026-09-15: "the footer … is
+        // missing the two sections' design." A MEMBERSHIP has no editor the
+        // way an account or a ticket does (`team_members` carries
+        // `creator_id`/`creator_email`/`creator_name` — who added this person
+        // — and `updated_at`, but no `editor_*` columns at all: a role change
+        // touches `updated_at` and nothing else, workers/tenancy/src/lib/
+        // members.ts `changeMemberRole`), so `editedByName` is left unset
+        // rather than invented — `recordAuditEntries` (record-chrome.tsx)
+        // already renders a bare "Last edited {when}" row when only the date
+        // is known, which is the honest reading of what this row actually
+        // says. `createdByName`/`createdAt` are real: who added them, and
+        // when — the same two facts every other record's Record column
+        // opens with.
+        audit={{
+          createdByName: member.createdByName,
+          createdAt: member.joinedAt,
+          updatedAt: member.updatedAt,
+        }}
         //
-        // `onAddNote` IS WHAT MAKES THE FOOTER RELIABLE WITH NO AUDIT AND NO
-        // HISTORY YET — the same pairing every other bespoke detail passes
-        // (Contact, Account, a knowledge source…): `RecordDetail`'s own
-        // `showActivityColumn` draws the column when it has rows, a composer,
-        // OR the rail's door, so a member with zero logged events still gets a
-        // footer with somewhere to write a first entry, exactly the same
-        // guarantee CH27.8 makes for every other record.
+        // `onAddNote` IS WHAT MAKES THE FOOTER RELIABLE EVEN WHEN THE MEMBER
+        // HAS NO LOGGED HISTORY YET — the same pairing every other bespoke
+        // detail passes (Contact, Account, a knowledge source…):
+        // `RecordDetail`'s own `showActivityColumn` draws the column when it
+        // has rows, a composer, OR the rail's door, so a member with zero
+        // activity rows still gets a footer with somewhere to write a first
+        // entry, exactly the same guarantee CH27.8 makes for every other
+        // record — now alongside a Record column that is never empty (every
+        // membership has a `createdAt`).
         activity={activity}
         onAddNote={rights.team_members?.create ? activity.addNote : undefined}
         notePlaceholder={t("Add a note")}
@@ -255,7 +335,13 @@ export function MemberScreen({
             than between them (see this file's header, point 4). */}
         <div className="flex flex-col gap-8">
           <MemberHead teamId={teamId} member={member} />
-          <StaffPanel teamId={teamId} userId={member.userId} memberName={name} />
+          <StaffPanel
+            teamId={teamId}
+            userId={member.userId}
+            memberName={name}
+            editOpen={editProfile}
+            onEditOpenChange={setEditProfile}
+          />
         </div>
       </RecordScreen>
 
