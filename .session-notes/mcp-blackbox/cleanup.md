@@ -4,6 +4,23 @@ Run this after the test is over. It archives the two BLACKBOX records the
 tester created (tasks 8/9) and shuts the sandbox down. Nothing here is a
 delete — the deactivate-not-delete rule holds, so this is reversible.
 
+**Step 3 (revoke) is already DONE, by the scorer.** Token
+`01M2N1JV4Y23M64E6W7SRG6662` is revoked and the Keychain item
+`mcp-blackbox-token-kwapso` has been deleted — confirmed again 2026-09-16
+(nothing live remains under it). Steps 1/2 (archive the BLACKBOX ticket,
+cancel the BLACKBOX to-do) are still open if they weren't done separately.
+
+**Why the tester's run didn't test the narrow role at all**: the scorer
+found (`mcp_call_log`) that the tester's 16 calls ran under
+`alaap@kwapso.com`'s own standing Admin token, not this sandbox token —
+whichever MCP connector the tester session had configured pointed at the
+owner's personal token, not the one this sandbox minted. **A real
+narrow-role run needs a fresh tester session whose only MCP connector
+carries a freshly-minted sandbox token** — `setup.mjs` can mint that
+token again any time, but only the owner can point a tester session's
+connector at it (this session doesn't configure the desktop app's MCP
+connectors, and cannot mint the connection on the tester's behalf).
+
 Fill in `<ticket-id>` and `<todo-id>` from the tester's `answers.md` (or
 look them up: `list_help_tickets({"q":"BLACKBOX-1"})` /
 `query_records({"module":"todos", "where":[{"field":"title","op":"eq","value":"BLACKBOX-2"}]})`).
@@ -56,7 +73,8 @@ always resets the matrix to the narrow one.
 
 ## 3. Revoke the token
 
-Revoking is scoped to the token's OWNER, not the admin — sign the machine-
+**Already done for this run** (see the note at the top). Kept below for
+the next run. Revoking is scoped to the token's OWNER, not the admin — sign the machine-
 tester account in the same way `setup.mjs` does (the staging test-login
 door) and call:
 
