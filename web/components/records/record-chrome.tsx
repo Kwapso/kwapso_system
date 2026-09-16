@@ -818,6 +818,7 @@ const RECORD_MARK_BOX =
   "[&>span]:size-full"
 
 export function RecordScreen({
+  cover,
   mark,
   recordNumber,
   collectionLabel,
@@ -838,6 +839,24 @@ export function RecordScreen({
   emptyAction,
   errorAction,
 }: {
+  /**
+   * THE COVER BAND — C1, client ruling, 16 Sep 2026: "For the cover, let's
+   * try C1. I want this for accounts and members." A full-width image band
+   * ABOVE the whole head below — B1's mark-inline-with-the-title (the `mark`
+   * prop's own doc, next) stays exactly as it is; the band sits a level
+   * above it, not beside it. Forwarded straight to the kit's own `banner`
+   * slot (`shared/ui/compositions/templates/record-chrome.tsx`) — the ONE
+   * node that composition already draws above everything else inside the
+   * body pane, for exactly this reason (that file's own doc: "ruling 35
+   * requires the picture to be above every word on the page… `hero` sits
+   * UNDER the identity row… one region too low"). Nothing here builds the
+   * band itself — `RecordCoverBand` (shared/web/record-mark.tsx) is the one
+   * component every caller reaches for, so the box, the top radius, the
+   * fixed height and the quiet no-cover tint can never drift between an
+   * account's screen and a member's. Absent on every OTHER record: the
+   * ruling names two kinds, not "everywhere".
+   */
+  cover?: React.ReactNode
   /**
    * THE MARK COMES BACK, NARROWLY — CLIENT RULING, 2026-09-15, verbatim: "For
    * cover and logo, I choose B1. Apply this on apps, accounts, and team
@@ -1240,6 +1259,10 @@ export function RecordScreen({
           is now the only thing a scrolled record screen pins. */}
       <RecordChrome
         className={`${FOOTER_TO_BOTTOM} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
+        /* THE COVER BAND, C1 — the kit's own `banner` slot, the one node it
+           draws above everything else in the body pane. See the `cover`
+           prop's own doc above for the ruling and why this is the slot. */
+        banner={cover}
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
            HEADER TOO", this file's header comment. `headerMark` (the local
            variable that used to fold `leading`/`mark` together) is deleted;

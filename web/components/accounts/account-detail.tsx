@@ -70,7 +70,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail, AppRow } from "@shared/types"
 import { type SavingsView } from "@shared/workers/savings"
-import { RecordCover, RecordMark } from "@shared/web/record-mark"
+import { RecordCover, RecordCoverBand, RecordMark } from "@shared/web/record-mark"
 import { AccountFormDialog, type AccountFormValues } from "@/components/accounts/account-form-dialog"
 import { ContactsPanel, type PanelActions } from "@/components/accounts/account-detail-panels"
 import {
@@ -655,6 +655,13 @@ export function AccountDetailScreen({
 
   return (
     <RecordScreen
+      // THE COVER BAND — C1, client ruling, 16 Sep 2026: "For the cover,
+      // let's try C1. I want this for accounts and members." Full-width,
+      // above the whole head below (the B1 mark next to it is untouched);
+      // `RecordCoverBand` draws the fixed-height band with or without a
+      // picture — a quiet tinted surface when `account.coverUrl` is unset,
+      // never a hole and never placeholder text (record-mark.tsx's own doc).
+      cover={<RecordCoverBand picture={account.coverUrl} />}
       // THE CLIENT'S OWN LOGO, INLINE LEFT OF THE TITLE — B1, client ruling
       // 2026-09-15: "For cover and logo, I choose B1. Apply this on apps,
       // accounts, and team members." record-chrome.tsx's own `mark` prop doc
@@ -944,7 +951,10 @@ export function AccountDetailScreen({
       <SprintFormDialog
         open={sprintOpen}
         onOpenChange={setSprintOpen}
-        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId).map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW: `AccountAppPicker` narrows by `accountId` itself
+        // (ruling 2, 16 Sep 2026), so the field it reads must survive this
+        // filter rather than being mapped away right after it is used.
+        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId)}
         fixedAccount={{ id: accountId, name: account.name }}
         draftKey={`sprint:add:account:${accountId}`}
         onSubmit={async (v) => {

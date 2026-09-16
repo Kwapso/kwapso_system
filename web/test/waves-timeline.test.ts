@@ -316,9 +316,12 @@ describe("waveListRows / waveListColumns — R80's shape", () => {
     expect(rows[0]!.accountName).toBe("Hogo")
   })
 
-  it("declares exactly the seven columns the brief names, Wave first — App added task C, 16 Sep 2026", () => {
+  // R82 — a table row holds at most six columns (UI-RULEBOOK N1). The App
+  // fact (task C, 16 Sep 2026) rides the Account cell's own second line
+  // (`waveListRows`, above) rather than an eighth-turned-seventh column.
+  it("declares exactly six columns, Wave first — App rides Account's own second line, never a seventh column", () => {
     const cols = waveListColumns(t)
-    expect(cols.map((c) => c.key)).toEqual(["name", "account", "app", "sprints", "start", "end", "state"])
+    expect(cols.map((c) => c.key)).toEqual(["name", "account", "sprints", "start", "end", "state"])
   })
 })
 

@@ -111,3 +111,56 @@ describe("an accounts filter narrows the rows AND the count", () => {
     expect(rows.map((r) => r.id).sort()).toEqual(inTheDatabase("deactivated_at IS NOT NULL"))
   })
 })
+
+// THE CONTACTS SCREEN'S "Portal" COLUMN (client ruling, 16 Sep 2026: "add a
+// column to show if they are in the portal or not") — `Account.hasPortalLogin`,
+// read off `buildSpineDb`'s own spine rather than the four-row book above: it
+// already carries one person WITH a live grant (Marta Ruiz, IDS.victimPerson,
+// IDS.victimPortal — spine-harness.ts) and one WITHOUT (Nadia Ruiz,
+// IDS.clientPerson — seeded with no `portal_users` row at all, unlike Luis
+// Vera and Diego Sanz beside her, who both hold one), which is the exact pair
+// this column exists to tell apart. `IDS` is already imported at this file's
+// own top, above.
+
+describe("the Portal column answers per row, honestly, and only to a caller who may ask", () => {
+  /** Both people, off whatever page `listAccounts` hands back — the fixture
+   * is small enough that neither ever falls past page one. */
+  async function portalStates(sight: Parameters<typeof listAccounts>[3]) {
+    const page = await listAccounts(cfg, guard, staff, sight)
+    const byId = new Map(page.rows.map((r) => [r.id, r.hasPortalLogin]))
+    return { marta: byId.get(IDS.victimPerson), nadia: byId.get(IDS.clientPerson) }
+  }
+
+  it("true for a live grant, false for none — never guessed from the filter", async () => {
+    const { marta, nadia } = await portalStates(SEES_PEOPLE)
+    expect(marta, "Marta holds a live portal_users row").toBe(true)
+    expect(nadia, "Nadia holds none").toBe(false)
+  })
+
+  it("a revoked grant reads false, not true — deactivate-never-delete keeps the row", async () => {
+    db().prepare("UPDATE portal_users SET deactivated_at = '2026-02-01' WHERE id = ?").run(IDS.victimPortal)
+    const { marta } = await portalStates(SEES_PEOPLE)
+    expect(marta, "the row survives revocation; a current login must not").toBe(false)
+  })
+
+  it("null, never false, without portal_users:read — the same withholding the filter already gives", async () => {
+    // The exact `ContactSight.maySeeLogins` the WHERE-level `portal` filter
+    // already answers to (the describe block above) — a caller who cannot
+    // ask "who is in the portal" must not be handed a confident "no" either.
+    const { marta, nadia } = await portalStates({ mayListPeople: true, maySeeLogins: false })
+    expect(marta).toBeNull()
+    expect(nadia).toBeNull()
+  })
+
+  it("the EXPORT answers the same three ways — one seam, two doors", async () => {
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE)
+    const byId = new Map(rows.map((r) => [r.id, r.hasPortalLogin]))
+    expect(byId.get(IDS.victimPerson)).toBe(true)
+    expect(byId.get(IDS.clientPerson)).toBe(false)
+    const { rows: withheld } = await listAccountsForExport(cfg, guard, staff, {
+      mayListPeople: true,
+      maySeeLogins: false,
+    })
+    expect(withheld.every((r) => r.hasPortalLogin === null)).toBe(true)
+  })
+})

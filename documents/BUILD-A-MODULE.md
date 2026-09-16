@@ -1123,6 +1123,24 @@ again, which is the only property that matters here.
   dialog that asks about the action, never the create/edit form beside it —
   name the file in `FORM_HINT_OK` (`shared/rules/registry.ts`) with the real
   reason.
+- **R82 `table-column-budget`** — a table row holds at most six columns. The
+  seventh does not get squeezed onto the end: it rides an existing column's
+  own second line (the same primary-plus-muted-subline shape a collection
+  row's title already draws one column along), or it goes in the three-dot
+  menu, or off the screen. A recipe-driven column list built by `.map()`
+  over a config array is out of reach by construction — its own ceiling is
+  the recipe's `fields` array — and any other literal `TableColumn[]`-shaped
+  array over six entries needs its enclosing function named in
+  `TABLE_COLUMN_BUDGET_EXEMPT` (`shared/rules/registry.ts`) with the real
+  reason.
+- **R83 `toolbar-lead-gap`** — a tab strip and the card it labels share one
+  gapless column: the strip pays the whole gap above the toolbar as its own
+  trailing padding, and the column wrapping the two of them carries no
+  `gap-*`/`space-y-*` of its own. Wrap `renderFolderTabs(…)` and the panel it
+  labels in their own `flex w-full flex-col` (no gap), with any page heading
+  staying outside that wrapper in the screen's real outer gap. A file that
+  cannot draw it this way is named in `TOOLBAR_LEAD_GAP_EXEMPT`
+  (`shared/rules/registry.ts`) with the real reason.
 
 **The words** (the ones that catch every new module, every time)
 

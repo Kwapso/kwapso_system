@@ -7327,6 +7327,27 @@ UPDATE waves
    ) = 1;
 `,
   },
+  {
+    // THE COVER BAND'S OWN COLUMN — C1, the client's ruling, 16 Sep 2026:
+    // "For the cover, let's try C1. I want this for accounts and members."
+    // `accounts.cover_url` has existed since 0024; a team member's own record
+    // (`staff_profiles`) never had one. Same shape as 0089's own three-column
+    // add immediately above it in this file — one bare column, filled through
+    // the SAME upload door `photo_url` already uses
+    // (workers/content/src/routes/staff.ts), never a new upload path.
+    //
+    // NUMBERED 0102, NOT 0101 — read live off `origin/main` right before this
+    // migration was appended (CLAUDE.md, "team migration numbers are read,
+    // never recalled"): this branch's own tree topped out at 0100, but
+    // `origin/main` had already minted 0101
+    // ("0101_every_ticket_and_story_gets_a_number", the Alaap line's ticket/
+    // story ref backfill) ahead of this one. 0102 is the next free number
+    // against BOTH.
+    version: "0102_staff_profiles_get_a_cover_band",
+    sql: `
+ALTER TABLE staff_profiles ADD COLUMN cover_url TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

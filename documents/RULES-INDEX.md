@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-81 laws, 78 resolved to at least one check file, 3 unresolved.
+83 laws, 80 resolved to at least one check file, 3 unresolved.
 
 ## Architecture (27)
 
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (45)
+## UI (47)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -87,6 +87,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R79 | enforced | `staff-pill-row` | `web/test/staff-pill-row.test.ts` |
 | R80 | enforced | `rows-are-a-list` | `web/test/rows-are-a-list.test.ts` |
 | R81 | enforced | `form-carries-no-hints` | *unresolved — see below* |
+| R82 | enforced | `table-column-budget` | `web/test/table-column-budget.test.ts` |
+| R83 | enforced | `toolbar-lead-gap` | `web/test/toolbar-lead-gap.test.ts` |
 
 ## Workflow (2)
 

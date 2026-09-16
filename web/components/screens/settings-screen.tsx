@@ -113,16 +113,27 @@
 //                        since the 2026-09-14 preview-led ruling above: four
 //                        choices about how the app looks and reads to one
 //                        person, still, just no longer four separate boxes.
-//   2. Team           — the team's PEOPLE and their RIGHTS, in two containers
-//                        on one page: the members gallery
-//                        (web/components/team/members-gallery.tsx) and the
-//                        roles matrix (web/components/team/roles-matrix.tsx).
-//                        It was called "Members & roles" and drew the team
-//                        area's own two recipe LISTS a second time; both are
-//                        gone — "This whole tab under settings, just call it
-//                        Team" and "Everything should be in different
-//                        containers… not taken anywhere else" (client,
-//                        2026-09-09).
+//   2. Team           — the team's PEOPLE and their RIGHTS, on its own two
+//                        tabs: Members (the members gallery,
+//                        web/components/team/members-gallery.tsx) and Roles
+//                        (the roles matrix, web/components/team/roles-matrix.tsx)
+//                        — client ruling, 2026-09-16, verbatim: "In settings,
+//                        split into tabs: members and roles. Roles deserve
+//                        their own tab." SPLIT AGAIN FROM WHAT WAS ITSELF A
+//                        SPLIT: this tab used to stack both as two containers
+//                        on one page (2026-09-09, "Everything should be in
+//                        different containers… not taken anywhere else"),
+//                        before that it drew the team area's own two recipe
+//                        LISTS a second time ("This whole tab under settings,
+//                        just call it Team", same day). The two containers
+//                        move house rather than change shape: each still owns
+//                        its own reads, its own toolbar and its own dialogs,
+//                        drawn through the library `TabsView` exactly as the
+//                        outer strip is (`renderFolderTabs`, below) — a NESTED
+//                        strip, never a hand-rolled toggle (`no-handrolled-toggles`).
+//                        Each inner tab carries its own R16 count now
+//                        (`membersCount` / `rolesCount`, below) instead of the
+//                        one blended badge the outer "Team" tab used to wear.
 //                        THIS TAB IS THE ONLY DOOR to member management. It
 //                        carries every act on a person — change role and remove
 //                        on the member's own full-screen profile, which a card
@@ -239,7 +250,7 @@ import { UnsavedChangesDialog } from "@/components/shell/unsaved-changes-dialog"
 import { isDirty, markDirty } from "@/lib/unsaved-changes"
 
 import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
-import { renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs, defaultTabsConfig, type TabItem } from "@shared/web/screen-engine/tabs-view"
 import { NoAccess, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { MembersGallery } from "@/components/team/members-gallery"
@@ -295,6 +306,22 @@ export function SettingsScreen({
   // lands back on whichever tab was open, unless the URL names one.
   const [tab, setTab] = useRemembered("tab", initialTab ?? "appearance", (remembered) =>
     initialTab ? initialTab : typeof remembered === "string" ? remembered : undefined
+  )
+
+  // THE TEAM TAB'S OWN TWO TABS — Members / Roles, client ruling, 2026-09-16:
+  // "In settings, split into tabs: members and roles. Roles deserve their own
+  // tab." A separate remembered slot from `tab` above, the same "screen" and
+  // "module settings page" pattern already use for a nested strip
+  // (module-settings-screen.tsx's own Automations/Choices `useRemembered("tab", …)`)
+  // — a visit to Team's Roles tab and a visit to Team's Members tab are two
+  // different things to come back to. Defaults to whichever inner tab this
+  // reader can actually see, the same fallback module-settings-screen.tsx's
+  // own `automationsSection ? "automations" : "choices"` uses, so a role with
+  // `member_roles:read` and no `team_members:read` does not land on a tab
+  // that renders `<NoAccess>`.
+  const [teamTab, setTeamTab] = useRemembered<string>(
+    "teamTab",
+    can("team_members", "read") ? "members" : "roles"
   )
 
   // THE MODULES WALL'S OWN TOOLBAR STATE — client, 11 Sep 2026: *"to modules in
@@ -374,6 +401,27 @@ export function SettingsScreen({
       return
     }
     setTab(next)
+  }
+
+  // THE SAME GUARD, ONE LEVEL DOWN — the Team tab's own Members/Roles strip
+  // unmounts whichever inner panel you are leaving exactly as the outer strip
+  // always did (same `renderPanel`-as-sibling shape, see the "team" branch
+  // below), so a draft staged on Roles (`TEAM_DIRTY_KEY`) needs the identical
+  // protection switching Roles → Members that switching AWAY from "team"
+  // entirely already gets. A second `pending*` slot rather than widening
+  // `pendingTabSwitch` to hold either kind of switch: the two are read by two
+  // different setters (`setTab` / `setTeamTab`) and keeping them apart means
+  // neither can be confused for the other. Both slots open the SAME
+  // `<UnsavedChangesDialog>` below — one confirm in the app, not two that read
+  // almost, but not quite, the same (this file's own note above).
+  const [pendingTeamTabSwitch, setPendingTeamTabSwitch] = React.useState<string | null>(null)
+
+  function handleTeamTabChange(next: string) {
+    if (isDirty(TEAM_DIRTY_KEY)) {
+      setPendingTeamTabSwitch(next)
+      return
+    }
+    setTeamTab(next)
   }
 
   // THE TWO CALLBACKS THEMSELVES, MEMOISED. Each panel's own effect depends
@@ -488,12 +536,21 @@ export function SettingsScreen({
     automationModules.some((m) => m.segment === a.segment)
   ).length
 
-  // R16 — THE TEAM TAB'S COUNT. `members` (`membersQ.data`, above) is the
-  // exact array `MembersGallery` itself renders; that panel draws no total
-  // of its own (only its own Invites sub-count, a different fact — see
-  // `invitesBadge` in members-gallery.tsx), so this badge is the one place
-  // the number appears. Same client ruling as `modulesCount`, above.
+  // R16 — THE TEAM TAB'S TWO INNER COUNTS. `members` (`membersQ.data`, above)
+  // is the exact array `MembersGallery` itself renders; that panel draws no
+  // total of its own (only its own Invites sub-count, a different fact — see
+  // `invitesBadge` in members-gallery.tsx). `roles` is `rolesQ.data`, the
+  // exact array `RolesMatrix` draws as columns.
+  //
+  // MOVED OFF THE OUTER "TEAM" TAB, 2026-09-16 — client ruling: "In settings,
+  // split into tabs: members and roles. Roles deserve their own tab." The
+  // outer tab used to wear `membersCount` alone, one blended number standing
+  // in for two different collections; now each inner tab (below, the "team"
+  // panel) wears its own exact count and the outer tab wears none, so the
+  // number appears exactly once rather than the outer strip and an inner one
+  // saying the same thing twice.
   const membersCount = members.length
+  const rolesCount = roles.length
 
   if (!ctx) return null
 
@@ -506,7 +563,10 @@ export function SettingsScreen({
       // `members` and whose label says Team is the next reader's wrong guess,
       // and `?tab=` links to it are ours (settings-screen is the only writer),
       // so there is nothing outside this file to keep in step.
-      { value: "team", label: t("Team"), icon: "users-three", badge: formatCount(membersCount), badgeVariant: "" as const },
+      // NO BADGE ANY MORE (2026-09-16) — see `membersCount`/`rolesCount`'s own
+      // note above: the number now lives on the Members/Roles tabs this outer
+      // tab hosts, not blended into one figure up here.
+      { value: "team", label: t("Team"), icon: "users-three", badge: "", badgeVariant: "" as const },
       { value: "integrations", label: t("Integrations"), icon: "key", badge: "", badgeVariant: "" as const },
       // THE INDEX (client, 2026-09-09) — see this file's header for the word,
       // the position, and for the Choices tab that stood after it until
@@ -661,25 +721,75 @@ export function SettingsScreen({
           }
 
           if (panel.value === "team") {
-            return (
-              <div className="flex flex-col gap-8">
-                {/* TWO CONTAINERS ON ONE TAB, AND NOTHING NAVIGATES — the
-                    client's own instruction, 2026-09-09: "Everything should be
-                    in different containers, like the different sections and
-                    member roles on this single page, not taken anywhere else."
+            // THE TEAM TAB'S OWN TWO TABS — Members / Roles, client ruling,
+            // 2026-09-16, verbatim: "In settings, split into tabs: members
+            // and roles. Roles deserve their own tab." Drawn through the
+            // library `TabsView` exactly as the outer strip above is
+            // (`renderFolderTabs`, R2/R3/R8: no hand-rolled tab strip —
+            // `no-handrolled-toggles`), a NESTED strip rather than a second
+            // pattern invented for it. R77 (`tab-strips-pin`) is satisfied
+            // for free the same way the outer strip is: `renderFolderTabs`
+            // is the one place `STICKY_FOLDER_TABS` is applied, nothing to
+            // add here.
+            //
+            // MEMBERS FIRST, because inviting somebody is what this tab is
+            // for and the tab's one mango lives in that container's toolbar.
+            // ROLES SECOND, as a matrix of every role at once — "All the
+            // roles together, I want to have an overview" — with a QUIET New
+            // role button, because the kit rules one mango per view and she
+            // ruled on the exception herself: "No exceptions to the rules.
+            // It was my mistake." Each still owns its own reads past the two
+            // this screen already made, its own toolbar and its own dialogs
+            // — the same "the panel is the arrangement and nothing else"
+            // argument the old stacked layout made (2026-09-09: "Everything
+            // should be in different containers… not taken anywhere else"),
+            // just one panel showing at a time instead of both stacked.
+            //
+            // EACH TAB CARRIES ITS OWN R16 COUNT — `membersCount` /
+            // `rolesCount`, computed once above beside `modulesCount` and
+            // `automationsCount` — replacing the one blended badge the outer
+            // "Team" tab used to wear.
+            const teamTabs: TabItem[] = [
+              {
+                value: "members",
+                label: t("Members"),
+                icon: "users-three",
+                badge: formatCount(membersCount),
+                badgeVariant: "" as const,
+              },
+              {
+                value: "roles",
+                label: t("Roles"),
+                icon: "user-gear",
+                badge: formatCount(rolesCount),
+                badgeVariant: "" as const,
+              },
+            ]
 
-                    MEMBERS FIRST, because inviting somebody is what this tab is
-                    for and the tab's one mango lives in that container's
-                    toolbar. ROLES SECOND, as a matrix of every role at once —
-                    "All the roles together, I want to have an overview" — with
-                    a QUIET New role button, because the kit rules one mango per
-                    view and she ruled on the exception herself: "No exceptions
-                    to the rules. It was my mistake."
-
-                    Each container owns its own reads past the two this screen
-                    already made, its own toolbar and its own dialogs; this
-                    panel is the arrangement and nothing else. */}
-                {!can("team_members", "read") ? (
+            // ONE EXPRESSION, NEVER A `return` — deliberately not the
+            // `(function renderPanel(panel) {…})(…)` shape the OUTER strip
+            // above uses beside its own `renderFolderTabs` call, and not even
+            // a plain named function with its own `return`s. Both are R77's
+            // own fix (`web/test/sections-stand-on-paper.test.ts` amendment 9
+            // reads a `renderFolderTabs(` call immediately followed by an
+            // INVOKED function literal as a second, independent panel host;
+            // separately, that same file's `bodies()` walker collects every
+            // `return` statement in a function's whole subtree, nested
+            // functions included, as a body of whichever `panel.value === …`
+            // branch encloses it lexically). Either shape would judge
+            // `<NoAccess>` and `MembersGallery` bare on their own — they have
+            // always stood, and still stand, inside the outer "team" panel's
+            // one already-proven body, exactly as the old stacked layout's
+            // two ternaries did — and wrapping them in a second paper
+            // container here would be the literal "container inside a
+            // container" the client rejected by name on the Overview tab. So
+            // this is a plain CONDITIONAL EXPRESSION assigned to a `const`,
+            // no `function`, no `return`, invisible to that walker the same
+            // way the old two ternaries embedded directly in the div's JSX
+            // children were.
+            const teamPanelContent: React.ReactNode =
+              teamTab === "members" ? (
+                !can("team_members", "read") ? (
                   <NoAccess />
                 ) : (
                   <MembersGallery
@@ -699,9 +809,9 @@ export function SettingsScreen({
                     // other two acts on the member's own profile now.
                     canRemoveMembers={can("team_members", "delete")}
                   />
-                )}
-
-                {!can("member_roles", "read") ? (
+                )
+              ) : teamTab === "roles" ? (
+                !can("member_roles", "read") ? (
                   <NoAccess />
                 ) : teamId ? (
                   <RolesMatrix
@@ -710,10 +820,36 @@ export function SettingsScreen({
                     rolesLoading={rolesQ.data === undefined && !rolesQ.error}
                     canCreate={can("member_roles", "create")}
                     // THE UNSAVED-TAB GUARD'S OWN FEED — see
-                    // `setTeamDirty` above.
+                    // `setTeamDirty` above. Read by TWO guards now, the
+                    // same registry key both times: the outer
+                    // `handleTabChange` switching away from "team"
+                    // entirely, and `handleTeamTabChange` switching
+                    // Roles → Members inside it.
                     onDirtyChange={setTeamDirty}
                   />
-                ) : null}
+                ) : null
+              ) : null
+
+            return (
+              <div className="flex flex-col gap-8">
+                {/* THE STRIP AND ITS PANEL ARE SIBLINGS — see
+                    `teamPanelContent` above for why the panel is a plain
+                    conditional expression rather than the outer strip's own
+                    inline-invoked shape. Still one `<Tabs>` root per strip,
+                    still a plain sibling rather than a Radix `TabsContent`,
+                    so the SAME unsaved-tab guard shape applies: switching
+                    away from "roles" while `RolesMatrix` is dirty unmounts it
+                    exactly as switching away from the outer "team" tab always
+                    did, and `handleTeamTabChange` below is what stands
+                    guard. */}
+                <div className="flex w-full flex-col">
+                  {renderFolderTabs({
+                    config: { ...defaultTabsConfig, tabs: teamTabs },
+                    value: teamTab,
+                    onValueChange: handleTeamTabChange,
+                  })}
+                  {teamPanelContent}
+                </div>
 
                 {/* THE TEAMS YOU ARE IN. Hidden, not deleted: the constant is
                     the whole of the switch, the list below is exactly what it
@@ -1229,10 +1365,23 @@ export function SettingsScreen({
           nav-rail press, a record link, closing this Settings tab, the
           browser's own Back — see `web/lib/nav.ts`'s `guardNavigate`) so
           there is exactly one unsaved-changes confirm in the app, not two
-          that read almost, but not quite, the same. */}
+          that read almost, but not quite, the same.
+
+          ONE DIALOG, TWO PENDING SLOTS — `pendingTabSwitch` (the outer
+          strip) and `pendingTeamTabSwitch` (the Team tab's own inner strip,
+          2026-09-16) are mutually exclusive by construction (a press on one
+          strip cannot also be a press on the other), so `open` is simply
+          "either is set" and `onDiscard` performs whichever one is. Still
+          the SAME `<UnsavedChangesDialog>` mount this comment's own claim is
+          about — a second mount, even a correct one, is the drift the claim
+          exists to refuse. */}
       <UnsavedChangesDialog
-        open={pendingTabSwitch !== null}
-        onOpenChange={(open) => !open && setPendingTabSwitch(null)}
+        open={pendingTabSwitch !== null || pendingTeamTabSwitch !== null}
+        onOpenChange={(open) => {
+          if (open) return
+          setPendingTabSwitch(null)
+          setPendingTeamTabSwitch(null)
+        }}
         onDiscard={() => {
           // Performs the switch that was on hold. The leaving panel unmounts
           // on the next render the same way it always would have; its draft
@@ -1242,7 +1391,9 @@ export function SettingsScreen({
           // call, the same argument `roles-matrix.tsx`'s own `discardDraft`
           // makes about itself.
           if (pendingTabSwitch) setTab(pendingTabSwitch)
+          if (pendingTeamTabSwitch) setTeamTab(pendingTeamTabSwitch)
           setPendingTabSwitch(null)
+          setPendingTeamTabSwitch(null)
         }}
       />
     </div>

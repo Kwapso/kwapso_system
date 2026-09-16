@@ -800,7 +800,11 @@ export function SprintsScreen({
         <SprintFormDialog
           open={addOpen}
           onOpenChange={setAddOpen}
-          apps={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+          // THE WHOLE ROW, so the App field can narrow to whichever account
+          // gets chosen above it (ruling 2, 16 Sep 2026) — a `.map((a) => ({
+          // id, name }))` here would drop `accountId` one hop before the
+          // picker could read it.
+          apps={(appsQ.data ?? []).filter((a) => a.active)}
           draftKey={`sprint:add:${teamId}`}
           onSubmit={(v) => createSprintFrom(teamId, v, t)}
         />

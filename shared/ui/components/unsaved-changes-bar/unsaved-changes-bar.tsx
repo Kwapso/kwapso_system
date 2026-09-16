@@ -101,22 +101,30 @@
    required — the dark grounds pass north of 8.5 at this same value, so there
    was room to go lower and none to spare going up.
 
-   RADIUS — TWO, NEVER A THIRD, AND NOW BOTH ARE THIS FILE'S OWN. This row
-   paints unconditionally as of 2026-09-15 (see "AN ACCENT DOES BECOME A
+   RADIUS — ONE SHAPE, ALL THREE `ground` VALUES, CORRECTED 2026-09-16. This
+   row paints unconditionally as of 2026-09-15 (see "AN ACCENT DOES BECOME A
    BACKGROUND" above), so it can no longer leave rounding to whatever it is
    standing on. `ground="bare"` (`PINNED_TOOLBAR`, the two real call sites)
-   rounds the TOP edge only, `rounded-t-[var(--radius)]` — R31's own second
-   named position, "the top band of a pinned toolbar" (added 2026-09-10 for
-   this exact wrapper's corner engineering, R63 part 4) — because the
-   wrapper's own `::before` still rounds those SAME top corners one layer
-   further out, at the container's real border box, which is part 4's whole
-   argument; this row's fill sits inside that and agrees with it rather than
-   rounding the same edge a second, competing way. The bottom edge stays
-   square: there is nothing below this row for a rounded corner to separate
-   it from, the container's own content keeps scrolling under it and shares
-   that edge. `page`/`panel` (standing alone, unpinned) round all four,
-   `rounded-[var(--radius)]` — the ordinary box, nothing beside them already
-   carries a corner.
+   USED TO round the TOP edge only, `rounded-t-[var(--radius)]` — R31's own
+   second named position, "the top band of a pinned toolbar" (added
+   2026-09-10 for this exact wrapper's corner engineering, R63 part 4) — on
+   the argument that the wrapper's own `::before` already rounds those SAME
+   top corners one layer further out, so the bottom stayed square: nothing
+   below this row for a rounded corner to separate it from, the container's
+   own content keeps scrolling under it and shares that edge.
+
+   THE CLIENT OVERRULED THAT, 2026-09-16, DIRECTLY ON THE SHIPPED BAR: "use
+   the orange color in the kit and make sure the container is round on all
+   corners, because currently two corners are not round." Two of `bare`'s
+   corners were exactly the ones that argument left square. `bare` now
+   matches `page`/`panel`: `rounded-[var(--radius)]`, all four, unconditionally
+   — one shape for every `ground` value. Riding `PINNED_TOOLBAR` still rounds
+   the SAME top pair a second, now-redundant way at the wrapper's own border
+   box; two coincident radii on one corner draw as one, so nothing doubles
+   visibly. `ground` is kept as three names rather than collapsed to a single
+   unconditional class only because a call site should still say which paper
+   it believes it is standing on — the same reasoning `page` and `panel`
+   already state below for why they stayed apart despite an identical value.
 
    A11Y — THE APPEARANCE OF THE ROW IS THE ANNOUNCEMENT. `role="status"` on
    the row itself, the same shape the kit's own `data-table.tsx` selection
@@ -176,15 +184,22 @@ const unsavedChangesBarVariants = cva(
   {
     variants: {
       ground: {
-        /** Riding the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`)
-         * — the two real call sites, both left at this default. Rounds the
-         * TOP edge only, `rounded-t-[var(--radius)]`: R31's own second named
-         * position ("the top band of a pinned toolbar", R63 part 4), so this
-         * row's corner agrees with the wrapper's own `::before` instead of
-         * rounding the same edge a second, competing way. The bottom stays
-         * square — the container's own content keeps scrolling under it and
-         * shares that edge. */
-        bare: "rounded-t-[var(--radius)]",
+        /** ALL FOUR CORNERS, `rounded-[var(--radius)]` — CORRECTED 2026-09-16.
+         * Used to be TOP ONLY (`rounded-t-[var(--radius)]`): the reasoning
+         * was that the wrapper's own `PINNED_TOOLBAR` `::before`
+         * (`shared/web/pinned-chrome.ts`, R63 part 4) already rounds those
+         * same top corners one layer further out, and the bottom edge had
+         * nothing below it to be separated from — the container's own
+         * content keeps scrolling under this row and shares that edge. The
+         * client looked at the shipped bar and ruled directly against that:
+         * "use the orange color in the kit and make sure the container is
+         * round on all corners, because currently two corners are not
+         * round." Riding `PINNED_TOOLBAR` still rounds the SAME top pair a
+         * second, now-redundant way at the wrapper's own border box, which
+         * is harmless — two coincident radii on the same corner draw as
+         * one — but the bottom pair no longer stays square waiting on a
+         * distinction the client never asked for. */
+        bare: "rounded-[var(--radius)]",
         /** Standing directly on off-beige, un-pinned — the day a caller
          * mounts this bar without `PINNED_TOOLBAR`. An ordinary box, all four
          * corners: `rounded-[var(--radius)]`. */

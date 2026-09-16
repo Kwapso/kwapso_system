@@ -22,8 +22,8 @@
 // Description, Status). `mode` picks between them; pressing the pencil
 // swaps to "edit", Save and Cancel both return to "detail" — Save because
 // the values it saved are now the detail face's own values, Cancel because
-// nothing changed. Closing the whole sheet (backdrop, Escape, the panel's ✕)
-// is a third, different act and is untouched by either.
+// nothing changed. Closing the whole sheet (backdrop, Escape) is a third,
+// different act and is untouched by either.
 //
 // WHY THIS HAND-BUILDS ITS PANEL INSTEAD OF `FormShellDialog` — the same
 // reasoning `web/components/team/access-tokens.tsx` already wrote out for its
@@ -32,12 +32,25 @@
 // So the `Sheet`/`SheetContent` are built here, mirroring that file's own
 // decisions — `side="right"`, the same width clamp (one form panel width
 // across the app), `p-0` because `FormShell` owns its own edges on the edit
-// face. `showClose` only comes on for the detail face: the client's 2026-08-31
-// ruling ("on add/edit … we already have the cancel for that") is why every
-// `FormShellDialog` panel hides the kit's own ✕ in favour of the footer's
-// Cancel button, and the edit face here is exactly that shape; the detail
-// face draws no Cancel button at all, so its dismiss control has to be the
-// kit's own ✕ (or the backdrop/Escape either already reaches).
+// face. The edit face draws its own Cancel button in the form footer (the
+// client's 2026-08-31 ruling: "on add/edit … we already have the cancel for
+// that"); the detail face draws none. Both close by backdrop click or Escape
+// alone — see "NO ✕, ON EITHER FACE" below for the 2026-09-16 ruling that
+// took the kit's own close chip off this sheet entirely.
+//
+// ── THE HEAD'S OWN ORDER, AND THE ✕ (client ruling, 2026-09-16) ─────────────
+//
+//   *"Remove the X button to close it and put the module first, and
+//    underneath the description."*
+//
+// Two changes to the DETAIL face's body, both below: the `OverviewList` now
+// reads Module, then Description — it read the other way round from
+// 2026-09-15 until this ruling — and `SheetContent`'s `showClose` (this
+// file's own final return, below) is `false` unconditionally rather than
+// moving with `mode`. Closing was never IN QUESTION — her sentence removes a
+// CONTROL, not a capability — so both faces keep reaching it exactly the way
+// they already did: the backdrop and Escape, `Sheet`'s own modal `Dialog`
+// behaviour underneath, wired by neither `mode` nor `showClose`.
 //
 // ── THE STATUS CHIP'S COLOUR ─────────────────────────────────────────────────
 //
@@ -346,9 +359,14 @@ export function AutomationEditSheet({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          {/* MODULE FIRST, DESCRIPTION UNDERNEATH — client ruling, 2026-09-16,
+              verbatim: "put the module first, and underneath the description."
+              The module's own mark/icon rides beside its name exactly as it
+              does everywhere else the app draws a module (this same icon+name
+              pairing, off `CONCEPT_ICON`, is `module-automations.tsx`'s own
+              Module cell one file over). */}
           <OverviewList
             items={[
-              { id: "description", label: t("Description"), value: description },
               {
                 id: "module",
                 label: t("Module"),
@@ -362,6 +380,7 @@ export function AutomationEditSheet({
                   </span>
                 ),
               },
+              { id: "description", label: t("Description"), value: description },
             ]}
           />
         </div>
@@ -377,16 +396,24 @@ export function AutomationEditSheet({
       }}
     >
       {/* WIDTH AND SIDE mirror `FormShellDialog`/`access-tokens.tsx`'s own
-       * hand-built panel — one form-panel width across the app. `showClose`
-       * is the one thing that moves with `mode`: the edit face draws its own
-       * Cancel button (above), so the kit's ✕ stands down for it exactly as
-       * `FormShellDialog` already stands it down everywhere else; the detail
-       * face draws no Cancel button of its own, so its ✕ is the only click
-       * target that dismisses the whole panel (the backdrop and Escape still
-       * reach it too). */}
+       * hand-built panel — one form-panel width across the app.
+       *
+       * NO ✕, ON EITHER FACE — client ruling, 2026-09-16, verbatim: "Remove
+       * the X button to close it." `showClose` is now `false` unconditionally
+       * rather than moving with `mode` (it used to stand down only for the
+       * edit face, matching `FormShellDialog`'s own Cancel-button panels).
+       * Closing still reaches exactly the way it already did on BOTH faces —
+       * this sheet's own 2026-09-15 header said so before this ruling ever
+       * removed the chip: "the backdrop and Escape either already reaches" —
+       * `Sheet` is Radix's modal `Dialog` underneath, so the overlay click and
+       * Escape are the primitive's own behaviour, never wired by `showClose`.
+       * The edit face keeps its own Cancel button in the form footer
+       * (`FormShell`'s `onCancel` above); the detail face now closes by
+       * backdrop or Escape alone — no other control on this face was ever
+       * built to dismiss the panel, so those two are the whole of its door. */}
       <SheetContent
         side="right"
-        showClose={mode !== "edit"}
+        showClose={false}
         className="w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)] p-0"
       >
         {panelBody}

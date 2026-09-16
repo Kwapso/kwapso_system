@@ -933,29 +933,58 @@ export interface BreadcrumbFoldersProps
    * to write (tokens.css §8 already rings it).
    */
   /**
-   * DRAG-TO-REORDER — client ruling 16 Sep 2026 ("go with the drag order").
-   * Given, every tab whose own `closable` is not `false` becomes draggable
-   * (native HTML5 drag, the same pattern `kanban.tsx` uses for its cards —
-   * `draggable`, `onDragStart`/`onDragOver`/`onDrop`/`onDragEnd`, the
-   * `.motion-drag` / `.motion-drag-placeholder` / `.motion-drop-target`
-   * classes motion.css already ships, no new keyframe here) and a focused
-   * tab also picks up a keyboard door: Alt+ArrowLeft / Alt+ArrowRight moves
-   * it one movable slot in that direction.
+   * DRAG-TO-REORDER, CHROME'S OWN MODEL — client ruling 16 Sep 2026, the
+   * second of the day on this file. The first cut ("go with the drag
+   * order", same day) shipped native HTML5 drag-and-drop, the same pattern
+   * `kanban.tsx` uses for its cards. Her correction, over that build on
+   * staging, verbatim: *"visually it's a bit confusing. Can we drag it
+   * instead of freely on the same edge, only horizontally, so to say?
+   * Exactly the same behavior as when dragging tabs in Google Chrome.
+   * Research and implement that."* Native HTML5 drag hands the browser a
+   * free-floating drag IMAGE — it can drift off the strip's own axis and
+   * carries no sense of the other tabs sliding to open a slot — which is
+   * exactly the "freely" she is naming. Replaced with pointer events and a
+   * measured `translateX`, no new dependency:
    *
-   * `fromIndex`/`toIndex` are positions in the `items` array the caller
-   * passed — the caller applies the move (an array splice, typically),
-   * exactly as `onClose` hands back an index rather than mutating anything
-   * itself.
+   *   · THE DRAGGED TAB NEVER LEAVES THE STRIP'S OWN AXIS. Its own
+   *     `translateX` is a plain signed number clamped between the
+   *     leftmost and rightmost edge of the CONTIGUOUS run of movable tabs
+   *     around it; `translateY` is never written, so it cannot lift off
+   *     the row the way a free HTML5 drag image does.
+   *   · IT FOLLOWS THE POINTER, 1:1, ALONG THAT AXIS — no easing while a
+   *     finger or a mouse button is down, the same "the pointer is the
+   *     clock" rule `cursor-glow.tsx` and `kanban.tsx`'s own carry state
+   *     already write down for this kit.
+   *   · THE OTHER TABS SLIDE LIVE. The moment the dragged tab's OWN centre
+   *     crosses a neighbour's original centre, that neighbour's own
+   *     `translateX` steps by the dragged tab's width (plus the strip's
+   *     own gap) to open the slot — Chrome's own "make room before you let
+   *     go" — rather than waiting for a drop to reveal where it landed.
+   *   · RELEASE SETTLES IT. Every transform clears on pointer-up (or
+   *     pointer-cancel) with a short settle transition, and `onReorder`
+   *     fires exactly once, with the FINAL slot — never once per frame.
    *
-   * A tab with `closable: false` (pinned) is never draggable and never a
-   * drop target — dragging over one does not call `preventDefault`, so the
-   * browser's own refusal is what stops a drop there, not a check in this
-   * file's drop handler. A pinned tab therefore never moves and nothing
-   * ever lands between it and the strip's end, which is what keeps trailing
-   * pinned tabs (History, "+") pinned last with no extra bookkeeping.
+   * `fromIndex`/`toIndex` are UNCHANGED as a contract — positions in the
+   * `items` array the caller passed, applied with a plain `splice`, exactly
+   * as the native-drag build already shipped it and exactly as `onClose`
+   * hands back an index rather than mutating anything itself. Nothing
+   * downstream of this file (the app's `AgentTabStrip`, the demo) has to
+   * change to keep working.
    *
-   * Omitted, no tab is draggable and no `onKeyDown` is added — byte-
-   * identical to the strip before this feature existed.
+   * A tab with `closable: false` (pinned) is never a drag SOURCE (no
+   * pointer handler is attached to it at all) and never a landing SLOT —
+   * `movableRange` below stops the contiguous run at the first pinned
+   * neighbour on either side, so the run a dragged tab can reorder within
+   * never reaches past one. A pinned tab therefore never moves and is never
+   * crossed, which is what keeps trailing pinned tabs (History, "+") pinned
+   * last with no extra bookkeeping.
+   *
+   * Alt+ArrowLeft / Alt+ArrowRight on a focused, movable tab still moves it
+   * one movable slot in that direction — untouched by today's ruling, which
+   * was about the POINTER gesture only.
+   *
+   * Omitted, no tab carries a pointer handler and no `onKeyDown` is added —
+   * byte-identical to the strip before this feature existed.
    */
   onReorder?: (fromIndex: number, toIndex: number) => void;
   onCurrentActivate?: () => void;
@@ -1079,12 +1108,13 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
     },
     ref,
   ) => {
-    /* DRAG STATE FOR `onReorder` — the index currently picked up, and the
-       index currently under the pointer as a drop target. Both `null` at
-       rest, which is also every render where `onReorder` is not given (the
-       handlers below are never attached, so these never change). */
+    /* DRAG STATE FOR `onReorder` — ONLY the index currently picked up needs
+       to be React state; it drives `data-dragging` and the `motion-drag`
+       lift, both of which change once per gesture (on pick-up, on
+       release), not once per pointer-move. `null` at rest, which is also
+       every render where `onReorder` is not given (no pointer handler is
+       ever attached, so this never changes). */
     const [carryingIndex, setCarryingIndex] = React.useState<number | null>(null);
-    const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(null);
 
     const isMovable = React.useCallback(
       (index: number) => onReorder !== undefined && items[index]?.closable !== false,
@@ -1094,7 +1124,9 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
     /* THE KEYBOARD DOOR — Alt+ArrowLeft/Right on a focused movable tab moves
        it to the next or previous MOVABLE slot, skipping over any pinned tab
        rather than swapping into its place (a pinned tab is never a landing
-       spot, same rule the drag handlers enforce). */
+       spot, same rule the pointer handlers below enforce). Untouched by
+       today's pointer-drag ruling, which was about the mouse/touch gesture
+       only. */
     const moveByKeyboard = React.useCallback(
       (fromIndex: number, direction: -1 | 1) => {
         if (!onReorder || !isMovable(fromIndex)) return;
@@ -1106,6 +1138,295 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         onReorder(fromIndex, toIndex);
       },
       [items.length, isMovable, onReorder],
+    );
+
+    /* EVERY RENDERED `<li>`, BY ITS OWN `items` INDEX — an imperative map,
+       not React state, because the pointer handlers below read and write
+       these nodes' `style.transform` on every `pointermove` and a re-render
+       per frame is exactly what a dragged tab must not cost. Populated by
+       the composed ref callback in the render below; a `<li>` that leaves
+       the DOM (closed, folded) removes its own entry. */
+    const itemRefs = React.useRef<Map<number, HTMLLIElement>>(new Map());
+
+    /* THE CONTIGUOUS RUN A DRAGGED TAB MAY REORDER WITHIN — walked outward
+       from `fromIndex` while the neighbour on each side is itself movable.
+       A pinned tab (`closable: false`) stops the walk on that side without
+       being included, which is the whole mechanism behind "a pinned tab is
+       never crossed": the run this returns never reaches past one, so nothing
+       below ever measures, displaces or targets a pinned neighbour. */
+    const movableRange = React.useCallback(
+      (fromIndex: number): [number, number] => {
+        let min = fromIndex;
+        while (min - 1 >= 0 && isMovable(min - 1)) min -= 1;
+        let max = fromIndex;
+        while (max + 1 < items.length && isMovable(max + 1)) max += 1;
+        return [min, max];
+      },
+      [items.length, isMovable],
+    );
+
+    /* ONE DRAG'S WHOLE STATE, IN A REF — not React state, for the reason
+       `itemRefs` is one: every field here is read and written from
+       `pointermove`, and only `carryingIndex` (above) needs to reach a
+       render. `others` is the run's geometry at PICK-UP time, captured once
+       — Chrome's own tabs do not re-measure mid-drag either, they reorder
+       against where things STARTED, which is what makes the "crosses the
+       midpoint" rule stable rather than chasing a target that is itself
+       moving. */
+    const dragRef = React.useRef<{
+      fromIndex: number;
+      pointerId: number;
+      startClientX: number;
+      min: number;
+      draggedLeft: number;
+      draggedWidth: number;
+      minLeft: number;
+      maxLeft: number;
+      gap: number;
+      /* Every OTHER movable tab in the run, in strip order, with its
+         ORIGINAL centre (inline-axis px, relative to the strip). */
+      others: { index: number; center: number }[];
+      /* This dragged tab's own rank among `others` at pick-up — i.e. how
+         many of them sit to its left. Constant for the whole gesture; see
+         `toIndex`'s own derivation below for why. */
+      localSlot: number;
+      /* The live candidate drop position, in `items`-array terms, recomputed
+         every `pointermove` and read once on release. Starts equal to
+         `fromIndex` — "no move yet" — which is also what makes a plain
+         click-with-no-movement a correct no-op (see the pointer-up
+         handler). */
+      toIndex: number;
+      moved: boolean;
+    } | null>(null);
+
+    /* Return every `<li>` this gesture touched — the dragged one and every
+       `other` — to its resting transform, with (`animate`) or without
+       (an aborted gesture that never moved) a settle transition. */
+    const releaseTransforms = React.useCallback((indices: number[], animate: boolean) => {
+      for (const index of indices) {
+        const el = itemRefs.current.get(index);
+        if (!el) continue;
+        if (animate) {
+          el.style.transition = "transform var(--duration-settle) var(--ease-move)";
+          // THE Z-INDEX LIFT OUTLIVES THE TRANSFORM, BY DESIGN — cleared only
+          // once the settle transition has actually finished, not the
+          // instant release fires. Dropping it early would let a `z-0`
+          // sibling it is still sliding past win the tie again for the last
+          // `--duration-settle` of the animation, which is the "inactive in
+          // front" shape one settle-frame late rather than fixed.
+          window.setTimeout(() => {
+            el.style.transition = "";
+            el.style.zIndex = "";
+          }, 260);
+        } else {
+          el.style.transition = "";
+          el.style.zIndex = "";
+        }
+        el.style.transform = "";
+      }
+    }, []);
+
+    /* PICK UP. Measures the run ONCE — every participant's left edge and
+       width, read off the live boxes before anything moves — and captures
+       pointer input on the `<li>` itself so every later event in this
+       gesture reaches these handlers regardless of where the pointer
+       physically travels (off the tab, off the strip, anywhere). */
+    const onTabPointerDown = React.useCallback(
+      (fromIndex: number) => (event: React.PointerEvent<HTMLLIElement>) => {
+        // Left button / primary touch contact only — the same guard a
+        // click already gets natively, made explicit because a pointer
+        // gesture has no such default.
+        if (!onReorder || !isMovable(fromIndex) || event.button !== 0) return;
+        const strip = listRef.current;
+        const draggedEl = itemRefs.current.get(fromIndex);
+        if (!strip || !draggedEl) return;
+
+        const [min, max] = movableRange(fromIndex);
+        const stripRect = strip.getBoundingClientRect();
+
+        const others: { index: number; center: number }[] = [];
+        let draggedLeft = 0;
+        let draggedWidth = 0;
+        let runStart = 0;
+        let runEnd = 0;
+        let previousRight: number | null = null;
+        let gap = 4; // `--space-1` at the kit's own 16px authoring base; a
+        // measured sample below replaces this the moment there are two
+        // adjacent tabs in the run to measure it from.
+
+        for (let index = min; index <= max; index += 1) {
+          const el = itemRefs.current.get(index);
+          if (!el) continue;
+          const rect = el.getBoundingClientRect();
+          const left = rect.left - stripRect.left;
+          const right = left + rect.width;
+          if (index === min) runStart = left;
+          if (index === max) runEnd = right;
+          if (previousRight !== null) gap = left - previousRight;
+          previousRight = right;
+          if (index === fromIndex) {
+            draggedLeft = left;
+            draggedWidth = rect.width;
+          } else {
+            others.push({ index, center: left + rect.width / 2 });
+          }
+        }
+
+        /* CAPTURE, DEFENSIVELY. Every real pointerdown carries an id the
+           platform is already tracking, so this never fails for an actual
+           finger or mouse — but `setPointerCapture` is specified to THROW
+           (`NotFoundError`) for an id the platform is not tracking, and an
+           uncaught throw here would abandon the gesture with `carryingIndex`
+           already unset and no cleanup run. Caught and refused rather than
+           left to reach React: the tab simply does not pick up, exactly as
+           if `movable` had been false. */
+        try {
+          draggedEl.setPointerCapture(event.pointerId);
+        } catch {
+          return;
+        }
+        dragRef.current = {
+          fromIndex,
+          pointerId: event.pointerId,
+          startClientX: event.clientX,
+          min,
+          draggedLeft,
+          draggedWidth,
+          minLeft: runStart,
+          maxLeft: runEnd - draggedWidth,
+          gap,
+          others,
+          localSlot: others.filter((other) => other.index < fromIndex).length,
+          toIndex: fromIndex,
+          moved: false,
+        };
+        setCarryingIndex(fromIndex);
+        draggedEl.style.transition = "none";
+        /* THE SECOND RULING, APPLIED HERE — 16 Sep 2026, same session: "the
+           inactive tabs' shape appears in front of the active one … it
+           should be behind", the same class of bug the main content strip
+           needed several passes to close (TAB_REST's own `z-0` note, above,
+           tells that history). `TAB_REST`/`TAB_LIVE` already answer it AT
+           REST — every inactive tab is `z-0`, the active one `z-[1]` — but a
+           tab sliding under drag can be ANY tab, active or not, and it now
+           visually crosses siblings it never used to share a pixel with (the
+           strip's own `gap-1` used to keep every rest tab clear of every
+           other). Left at its resting `z-0`, a rest tab being dragged RIGHT
+           over later, still-`z-0` siblings would lose the DOM-order
+           tie-break to them — the exact "inactive in front" shape of the
+           complaint, just triggered by a drag instead of a static layout.
+           `transform` already makes this `<li>` its own stacking context
+           (the file's own `z-0 IS STILL A STACKING CONTEXT` note, restated
+           for a transform rather than a position), so `2` here settles the
+           tie the same way the live tab's own `z-[1]` settles ITS tie
+           against a `z-0` neighbour — with room held below the card's own
+           `z-[2]` (a DOM-order tie there, nav before card, still resolves to
+           the card, so a horizontal drag still never paints over content).
+           Cleared with everything else on release, in `releaseTransforms`. */
+        draggedEl.style.zIndex = "2";
+      },
+      [onReorder, isMovable, movableRange],
+    );
+
+    /* TRACK. Every call is one `pointermove`; nothing here waits for a
+       frame, because a dragged tab that lags the pointer by even one frame
+       is exactly the "confusing" `onReorder`'s own ruling is about. */
+    const onTabPointerMove = React.useCallback((event: React.PointerEvent<HTMLLIElement>) => {
+      const drag = dragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+
+      // THE AXIS LOCK. `newLeft` is clamped to the run's own bounds before
+      // anything is written, so the dragged tab can neither cross a pinned
+      // neighbour nor overrun the strip's own end; `translateY` is never
+      // set anywhere in this handler, so the tab never lifts off the row.
+      const rawDeltaX = event.clientX - drag.startClientX;
+      const newLeft = Math.min(Math.max(drag.draggedLeft + rawDeltaX, drag.minLeft), drag.maxLeft);
+      const deltaX = newLeft - drag.draggedLeft;
+      if (deltaX !== 0) drag.moved = true;
+
+      const draggedEl = itemRefs.current.get(drag.fromIndex);
+      if (draggedEl) draggedEl.style.transform = `translateX(${deltaX}px)`;
+
+      // THE MIDPOINT RULE. `target` is how many of the run's OTHER tabs the
+      // dragged tab's own centre now sits past, measured against their
+      // ORIGINAL centres (captured at pick-up, never re-read mid-drag —
+      // see `dragRef`'s own note on why). It is also, directly, this tab's
+      // new rank among them.
+      const draggedCenter = newLeft + drag.draggedWidth / 2;
+      const target = drag.others.filter((other) => other.center < draggedCenter).length;
+      const shiftBy = drag.draggedWidth + drag.gap;
+
+      // OPEN THE SLOT. Every other tab the dragged one has moved PAST — its
+      // rank was between where the drag started and where it is now — steps
+      // aside by exactly the dragged tab's own width plus the strip's gap,
+      // opposite the direction of travel; everything else sits still.
+      drag.others.forEach((other, position) => {
+        const el = itemRefs.current.get(other.index);
+        if (!el) return;
+        let shift = 0;
+        if (target > drag.localSlot && position >= drag.localSlot && position < target) {
+          shift = -shiftBy;
+        } else if (target < drag.localSlot && position >= target && position < drag.localSlot) {
+          shift = shiftBy;
+        }
+        el.style.transform = shift ? `translateX(${shift}px)` : "";
+      });
+
+      // `min + target` — NOT `others[target].index` — because `target` is a
+      // COUNT (how many original-order neighbours now sit before the
+      // dragged tab), and the run is a contiguous span of `items` indices
+      // starting at `min`; a count offset from that start is directly the
+      // `items`-array position this gesture is currently proposing, in the
+      // exact `(fromIndex, toIndex)` shape `onReorder` has always taken.
+      drag.toIndex = drag.min + target;
+    }, []);
+
+    /* RELEASE (or cancel). Fires `onReorder` at most once, with the FINAL
+       slot only — never mid-drag — and only when the slot actually changed;
+       a tap with no movement (`toIndex === fromIndex`) is a correct no-op,
+       which is also what keeps an ordinary click through to the tab's own
+       link working unchanged (see the click guard just below). */
+    const onTabPointerEnd = React.useCallback(
+      (event: React.PointerEvent<HTMLLIElement>) => {
+        const drag = dragRef.current;
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        dragRef.current = null;
+        setCarryingIndex(null);
+
+        const draggedEl = itemRefs.current.get(drag.fromIndex);
+        if (draggedEl?.hasPointerCapture(drag.pointerId)) {
+          draggedEl.releasePointerCapture(drag.pointerId);
+        }
+
+        releaseTransforms(
+          [drag.fromIndex, ...drag.others.map((other) => other.index)],
+          drag.moved,
+        );
+
+        const committed = event.type === "pointerup" && drag.toIndex !== drag.fromIndex;
+        if (committed) onReorder?.(drag.fromIndex, drag.toIndex);
+
+        /* THE CLICK GUARD. A pointer gesture that actually moved still ends
+           in an ordinary `click` on whatever element was under the pointer
+           at pick-up — the SAME anchor, since capture kept every event
+           addressed to it — and left alone that click re-selects the tab
+           the reader just finished dragging, which reads as the strip
+           fighting the gesture it just drew. Swallowed once, on the
+           dragged element itself, only when the gesture actually moved; a
+           plain tap (`drag.moved` false) never installs this and its click
+           reaches the app's own `onClickCapture` exactly as before. */
+        if (draggedEl && drag.moved) {
+          const swallow = (clickEvent: MouseEvent) => {
+            clickEvent.preventDefault();
+            clickEvent.stopPropagation();
+          };
+          draggedEl.addEventListener("click", swallow, { capture: true, once: true });
+          window.setTimeout(() => {
+            draggedEl.removeEventListener("click", swallow, { capture: true });
+          }, 0);
+        }
+      },
+      [releaseTransforms, onReorder],
     );
     /* THE STRIP'S OWN NODE, KEPT SEPARATELY FROM `ref`. `ref` above is the
        forwarded `<nav>` — `Breadcrumb`'s own root — and the thing that needs
@@ -1515,56 +1836,26 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                      THE REF GOES ON THE LIVE ITEM ONLY — one of them, or none
                      when `activeIndex` points outside the array — and it is
                      what the scroll effect above brings into view. */
-                  ref={live ? liveRef : undefined}
-                  draggable={movable}
+                  /* THE REF ALSO REGISTERS THIS `<li>` INTO `itemRefs`, FOR
+                     EVERY ENTRY — the pointer handlers need to read and move
+                     ANY tab in the strip, not only the live one, which is
+                     the one case `liveRef` already covered. Both live in one
+                     callback because `ref` takes exactly one function. */
+                  ref={(node: HTMLLIElement | null) => {
+                    if (node) itemRefs.current.set(entry.index, node);
+                    else itemRefs.current.delete(entry.index);
+                    if (live) liveRef.current = node;
+                  }}
                   data-dragging={carryingIndex === entry.index ? "true" : undefined}
-                  data-drop-target={
-                    dropTargetIndex === entry.index && carryingIndex !== entry.index ? "true" : undefined
-                  }
-                  onDragStart={
-                    movable
-                      ? (event) => {
-                          event.dataTransfer.setData("text/plain", String(entry.index));
-                          event.dataTransfer.effectAllowed = "move";
-                          setCarryingIndex(entry.index);
-                        }
-                      : undefined
-                  }
-                  onDragEnd={
-                    movable
-                      ? () => {
-                          setCarryingIndex(null);
-                          setDropTargetIndex(null);
-                        }
-                      : undefined
-                  }
-                  /* A PINNED TAB (`movable` false) GETS NEITHER HANDLER, so
-                     the browser never sees `preventDefault` over it and a
-                     `drop` event never fires there — the "never a drop
-                     target" rule from a refusal rather than a check. */
-                  onDragOver={
-                    movable
-                      ? (event) => {
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = "move";
-                          if (dropTargetIndex !== entry.index) setDropTargetIndex(entry.index);
-                        }
-                      : undefined
-                  }
-                  onDrop={
-                    movable
-                      ? (event) => {
-                          event.preventDefault();
-                          const raw = event.dataTransfer.getData("text/plain");
-                          const fromIndex = raw === "" ? NaN : Number(raw);
-                          setCarryingIndex(null);
-                          setDropTargetIndex(null);
-                          if (!Number.isNaN(fromIndex) && fromIndex !== entry.index) {
-                            onReorder?.(fromIndex, entry.index);
-                          }
-                        }
-                      : undefined
-                  }
+                  /* NO HANDLER AT ALL ON A PINNED TAB (`movable` false) — the
+                     refusal IS the rule, same as the native-drag build's own
+                     "never a drop target": nothing here can pick one up, so
+                     nothing has to separately check that one was not
+                     dropped on. */
+                  onPointerDown={movable ? onTabPointerDown(entry.index) : undefined}
+                  onPointerMove={movable ? onTabPointerMove : undefined}
+                  onPointerUp={movable ? onTabPointerEnd : undefined}
+                  onPointerCancel={movable ? onTabPointerEnd : undefined}
                   onKeyDown={
                     movable
                       ? (event) => {
@@ -1582,11 +1873,13 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                   className={cn(
                     "shrink-0",
                     closable && "group relative",
-                    movable && "motion-drag cursor-grab",
-                    carryingIndex === entry.index && "motion-drag-placeholder",
-                    dropTargetIndex === entry.index &&
-                      carryingIndex !== entry.index &&
-                      "motion-drop-target",
+                    // `touch-action: none` ONLY on a movable tab, and only
+                    // because it is one: without it a touch drag along the
+                    // strip's own axis is also a scroll gesture the browser
+                    // is free to start instead of ever calling `pointermove`
+                    // here. A read-only crumb keeps the platform's ordinary
+                    // touch scrolling.
+                    movable && "motion-drag cursor-grab touch-none select-none",
                   )}
                 >
                   {live ? (
@@ -1658,10 +1951,14 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                       href={entry.item.href}
                       /* Browsers make an `<a>` draggable by default (drag to
                          bookmark / open in a new tab); left alone that fires
-                         its OWN dragstart before the `<li>` ever sees one,
-                         hijacking `onReorder`'s gesture. Suppressed only when
-                         this tab actually is one, so a read-only trail's
-                         links keep their ordinary browser behaviour. */
+                         a native `dragstart` the instant the pointer moves,
+                         which cancels the pointer gesture `onTabPointerMove`
+                         is tracking before it ever sees a second event —
+                         hijacking `onReorder`'s own drag, not merely a
+                         leftover from the retired HTML5-drag build.
+                         Suppressed only when this tab actually is one, so a
+                         read-only trail's links keep their ordinary browser
+                         behaviour. */
                       draggable={movable ? false : undefined}
                       className={cn(
                         TAB,

@@ -26,6 +26,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
+import { AccountAppPicker, type AccountScopedApp } from "@/components/records/account-app-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { sortedOptions } from "@shared/web/sorted-options"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -96,8 +97,10 @@ export function MeetingFormDialog({
    * answer arrives, and where an edited meeting's client gets its NAME. */
   accountOptions: PickableRecord[]
   /** the systems a meeting can be filed against — the same bounded apps list
-   * every other form in the work engine picks from. */
-  appOptions: PickableRecord[]
+   * every other form in the work engine picks from, each tagged with whose
+   * account it is on so the row below can narrow once one is chosen (ruling
+   * 2, 16 Sep 2026). */
+  appOptions: AccountScopedApp[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeOptions: PickableRecord[]
   /** Set when the form is opened FROM an app's own screen — the system the
@@ -235,16 +238,23 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
-        <RecordPicker
+        {/* THE HORIZONTAL CHOICE COMPONENT, once an account is named — client
+            ruling, 16 Sep 2026: "when selecting app in cases account has been
+            selected first, show horizontal choice component." No account
+            named yet keeps the search-and-pick control this field always had. */}
+        <AccountAppPicker
           id="meeting-app"
-          value={values.appId}
-          onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-          options={sortedOptions(appOptions, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
-          emptyOption={{ value: NONE, label: t("Not about one app") }}
+          ariaLabel={t(appField.label)}
+          accountId={values.accountId === NONE ? null : values.accountId}
+          apps={appOptions}
+          value={values.appId === NONE ? "" : values.appId}
+          onChange={(v) => setValues((s) => ({ ...s, appId: v || NONE }))}
+          lang={lang}
+          disabled={busy}
           placeholder={t("Not about one app")}
           searchPlaceholder={t("Search apps…")}
+          emptyOption={{ value: NONE, label: t("Not about one app") }}
           emptyText={t("No app matched.")}
-          disabled={busy}
         />
       </Field>
       <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>

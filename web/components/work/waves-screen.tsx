@@ -398,10 +398,18 @@ type WaveListRow = {
   id: string
   ref: string | null
   name: string
+  // ACCOUNT CARRIES THE APP TOO, AS A MUTED SECOND LINE — R82's own fix
+  // (`table-column-budget`). The App fact (client ruling, 16 Sep 2026: "I
+  // want the name of the app") used to be its own, eighth-turned-seventh
+  // column; a table row's ceiling is six (UI-RULEBOOK N1, "the fifth fact
+  // moves to a second line … it does not get squeezed onto the end"), and
+  // this collection was already at six before it landed. So the app rides
+  // the SAME cell the account does, on its own line, the identical
+  // primary-plus-muted-subline shape `record-timeline.tsx`'s own
+  // `TimelineRow.sublabel` already draws one column along — never a
+  // seventh column.
   account: React.ReactNode
   accountName: string
-  app: React.ReactNode
-  appName: string
   sprints: React.ReactNode
   state: React.ReactNode
   start: React.ReactNode
@@ -489,30 +497,33 @@ export function waveListRows(
       ref: w.ref,
       name: w.name,
       accountName: w.accountName ?? "",
+      // THE APP RIDES THIS CELL'S SECOND LINE — client ruling, 16 Sep 2026:
+      // "I want the name of the app." Same `waveApp` lookup the T3 timeline
+      // draws its own left column from (`w.appId`, team migration 0099), so
+      // List and Timeline can never name a different app for the same wave.
+      // Blank is ordinary — a wave sold before anybody named the system it
+      // covers — and draws no second line at all rather than an em dash
+      // nobody asked for (R82: a fact that is not there does not reserve
+      // the row's height either).
       account: (
-        // flex-wrap — harmless here (mark + name, two children) and keeps
-        // this span out of the wrapped-rows census's own false-positive
-        // shape: the census reads by source PROXIMITY, not by React tree,
-        // and this cell sits textually close to the `state` cell's own
-        // `<Badge>` a few lines below in this same row-shaping function.
-        <span className="flex min-w-0 flex-wrap items-center gap-2">
-          <RecordMark picture={null} name={w.accountName ?? ""} size="choice" />
-          <span className="min-w-0 truncate">{w.accountName ?? "—"}</span>
+        // flex-wrap on the top line — harmless here (mark + name, two
+        // children) and keeps this span out of the wrapped-rows census's own
+        // false-positive shape: the census reads by source PROXIMITY, not by
+        // React tree, and this cell sits textually close to the `state`
+        // cell's own `<Badge>` a few lines below in this same row-shaping
+        // function.
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <RecordMark picture={null} name={w.accountName ?? ""} size="choice" />
+            <span className="min-w-0 truncate">{w.accountName ?? "—"}</span>
+          </span>
+          {app ? (
+            <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-1 text-xs">
+              <AppMark app={app} size="choice" />
+              <span className="min-w-0 truncate">{app.name}</span>
+            </span>
+          ) : null}
         </span>
-      ),
-      // THE APP COLUMN — client ruling, 16 Sep 2026: "I want the name of the
-      // app." Same `waveApp` lookup the T3 timeline draws its own left column
-      // from (`w.appId`, team migration 0099), so List and Timeline can never
-      // name a different app for the same wave. Blank is ordinary: a wave
-      // sold before anybody named the system it covers.
-      appName: app?.name ?? w.appName ?? "",
-      app: app ? (
-        <span className="flex min-w-0 flex-wrap items-center gap-2">
-          <AppMark app={app} size="choice" />
-          <span className="min-w-0 truncate">{app.name}</span>
-        </span>
-      ) : (
-        "—"
       ),
       sprints: (
         <span className="flex items-center gap-2">
@@ -550,11 +561,17 @@ export function waveListRows(
   })
 }
 
+/** SIX COLUMNS, NEVER SEVEN (R82 — `table-column-budget`, UI-RULEBOOK N1: "at
+ * most … six in a table row … it does not get squeezed onto the end"). The
+ * App fact lives inside the Account cell's own second line
+ * (`waveListRows` above) rather than claiming a column of its own — the
+ * eighth-turned-seventh column the client's 16 Sep 2026 ruling almost grew
+ * here, which is exactly the shape this law now catches before it ships
+ * again. */
 export function waveListColumns(t: (s: string) => string): TableColumn[] {
   return [
     { key: "name", label: t("Wave") },
     { key: "account", label: t("Account"), searchKey: "accountName" },
-    { key: "app", label: t("App"), searchKey: "appName" },
     { key: "sprints", label: t("Sprints") },
     { key: "start", label: t("Start") },
     { key: "end", label: t("End") },
@@ -829,31 +846,55 @@ export function WaveCollection({
     <div className="flex flex-col gap-6">
       {heading}
 
-      {/* ACTIVE / ALL — the client's own two tabs, drawn flush against the
-          card exactly as `renderFolderTabs` draws every other collection's
-          strip (tasks-screen.tsx's own `folderTabs` slot is the direct
-          precedent; Waves is bespoke throughout, so this file calls the same
-          exported helper directly rather than adopting the whole
-          `SectionWithCreate` engine for a screen that already owns its own
-          toolbar and create button). */}
-      {renderFolderTabs({
-        config: tabsConfig,
-        value: tab,
-        onValueChange: (v) => {
-          setTab(v as "active" | "all")
-          // A fresh tab starts its Timeline at the current week — carrying
-          // an old scroll position across from the other tab would land on
-          // a window the reader never chose from this one.
-          setWeekOffset(0)
-        },
-      })}
+      {/* THE STRIP AND ITS CARD SHARE ONE GAPLESS COLUMN (R83 —
+          `toolbar-lead-gap`). `renderFolderTabs`' own strip pays the WHOLE
+          distance to what it labels as its own trailing padding
+          (`STICKY_FOLDER_TABS`'s `pb-[var(--tab-content-gap)]`,
+          `shared/web/screen-engine/tabs-view.tsx`) — exactly the way
+          `<ToolbarRow>` pays its OWN trailing `--toolbar-content-gap` rather
+          than leaving it to a caller (R49). Every other `renderFolderTabs`
+          call site in the app (`paged-find.tsx`, `tickets-collection.tsx`,
+          `kwapso-screen.tsx`, `settings-screen.tsx`,
+          `module-settings-screen.tsx`, `screen-bits.tsx`'s own
+          `SectionWithCreate`) wraps the strip and what it labels in a column
+          with NO `gap-*` of its own, in as many words: "this column has
+          nothing to say about [the gap] either way and must not grow a
+          `gap-*` of its own — that would be a second opinion about one
+          number" (`paged-find.tsx`). This file was the one call site that
+          disagreed — the strip and `<CollectionCard>` used to sit directly
+          in the OUTER `gap-6` column with `{heading}`, so the tab strip's own
+          20px trailing pad was paid AND a second, unrelated 24px heading gap
+          was spent again on top of it, above the toolbar and nowhere else.
+          The inner column below is that second opinion, retracted — `heading`
+          stays in the outer `gap-6` (a real, single gap: heading to the strip
+          below it), and the strip-to-card distance goes back to being the
+          strip's own number, spent once. */}
+      <div className="flex w-full flex-col">
+        {/* ACTIVE / ALL — the client's own two tabs, drawn flush against the
+            card exactly as `renderFolderTabs` draws every other collection's
+            strip (tasks-screen.tsx's own `folderTabs` slot is the direct
+            precedent; Waves is bespoke throughout, so this file calls the
+            same exported helper directly rather than adopting the whole
+            `SectionWithCreate` engine for a screen that already owns its own
+            toolbar and create button). */}
+        {renderFolderTabs({
+          config: tabsConfig,
+          value: tab,
+          onValueChange: (v) => {
+            setTab(v as "active" | "all")
+            // A fresh tab starts its Timeline at the current week — carrying
+            // an old scroll position across from the other tab would land on
+            // a window the reader never chose from this one.
+            setWeekOffset(0)
+          },
+        })}
 
-      {/* THE CANONICAL SHAPE — ONE card holding the toolbar and the rows,
-          with "Sell a wave" at the FAR RIGHT of the toolbar's own first line
-          rather than a row of its own above it (client ruling, 2026-08-31:
-          an action button never gets a separate row from the toolbar it
-          belongs to). */}
-      <CollectionCard>
+        {/* THE CANONICAL SHAPE — ONE card holding the toolbar and the rows,
+            with "Sell a wave" at the FAR RIGHT of the toolbar's own first line
+            rather than a row of its own above it (client ruling, 2026-08-31:
+            an action button never gets a separate row from the toolbar it
+            belongs to). */}
+        <CollectionCard>
         {/* R50 — never toolbar on an empty collection. `wavesLoading ||` is
             the same fold every sibling screen's own `empty` gate carries
             (2026-09-03 audit): `all` defaults to `[]` before the read
@@ -984,6 +1025,7 @@ export function WaveCollection({
           />
         )}
       </CollectionCard>
+      </div>
 
       <WaveFormDialog
         open={addOpen}

@@ -350,6 +350,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       <ContactsScreen
         teamId={teamId as string}
         t={t}
+        lang={lang}
         go={go}
         sectionPath={sectionPath}
         tab={ctx.query.tab}

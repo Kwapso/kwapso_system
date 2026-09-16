@@ -77,6 +77,10 @@ type AccountRow = {
    * own "Account" column face, off the SAME linked company `company_name`
    * already resolves. See `toAccount`'s `companyLogoUrl`. */
   company_logo_url: string | null
+  /** 0/1 — a LIVE `portal_users` grant on this row (see `ACCOUNT_COLUMNS`'
+   * EXISTS beside it). Read into `Account.hasPortalLogin` by `toAccount`,
+   * masked to `null` there for a caller without `portal_users:read`. */
+  has_portal_login: number
 }
 
 /** WHERE A PERSON WORKS AND WHAT THEY DO THERE, as two columns on the account
@@ -162,7 +166,16 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
   -- R35: the Contacts table's own "Account" column face (client ruling
   -- 2026-09-15), off the SAME linked company company_name already reads —
   -- one more field on the identical subquery, not a second read.
-  ${LINKED_COMPANY("(SELECT c.logo_url FROM accounts c WHERE c.id = l.account_id)")} AS company_logo_url`
+  ${LINKED_COMPANY("(SELECT c.logo_url FROM accounts c WHERE c.id = l.account_id)")} AS company_logo_url,
+  -- THE CONTACTS SCREEN'S "Portal" COLUMN (client ruling, 16 Sep 2026) — a
+  -- LIVE grant on THIS row, correlated the same way LINKED_COMPANY reads one
+  -- link per row: no join that could multiply a page's rows under R14's
+  -- keyset paging, one index lookup (idx_portal_users_account) per account.
+  -- deactivated_at IS NULL for the same reason the WHERE-level portal filter
+  -- checks it a few lines below — a revoked grant survives (deactivate,
+  -- never delete) and must not read as a current login.
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.account_id = accounts.id AND pu.deactivated_at IS NULL)
+    AS has_portal_login`
 
 // THE ADDRESS IS FOUR FIELDS NOW, and `address` is not one of them. The column
 // still exists — 0024 backfilled `street` from it and left it alone, because
@@ -222,8 +235,15 @@ function parseAltNames(json: string | null): string[] {
   }
 }
 
-function toAccount(r: AccountRow, scope: AccountScope): Account {
+/** `sight` is omitted by callers that never asked a `ContactSight` question in
+ * the first place (the detail door, the post-write re-reads) — `hasPortalLogin`
+ * comes back `null` for them rather than guessing, the same honest absence a
+ * caller without `portal_users:read` gets from the ONE caller that does ask
+ * (`listAccounts`/`listAccountsForExport`, both already holding `sight` for
+ * `accountsWhere`). */
+function toAccount(r: AccountRow, scope: AccountScope, sight?: ContactSight): Account {
   const ours = scope.kind === "portal"
+  const maySeeLogins = sight?.maySeeLogins === true
   // THE LINK'S TWO FACTS, READ BEFORE THE PROJECTION DECIDES WHO MAY HAVE THEM.
   // Written as a plain copy off the row rather than inline in the object below,
   // because inline they would be a conditional expression and this base's ONE
@@ -286,6 +306,11 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     companyName: ours ? null : contact.companyName,
     relationship: ours ? null : contact.relationship,
     companyLogoUrl: ours ? null : contact.companyLogoUrl,
+    // THE PORTAL COLUMN — see `Account.hasPortalLogin`'s own header for the
+    // full argument. `null`, never `false`, without the right: the same
+    // "reads as an absence, not a confident no" the WHERE-level `portal`
+    // filter already gives a caller who lacks `portal_users:read`.
+    hasPortalLogin: maySeeLogins ? r.has_portal_login === 1 : null,
     active: r.deactivated_at == null,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,
@@ -588,7 +613,7 @@ export async function listAccounts(
   const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
   return {
     ...page,
-    rows: page.rows.map((r) => toAccount(r, scope)),
+    rows: page.rows.map((r) => toAccount(r, scope, sight)),
     total: counted,
     entityTotal,
     individualTotal,
@@ -631,7 +656,10 @@ export async function listAccountsForExport(
       ORDER BY name ASC, id ASC LIMIT ${EXPORT_HARD_CAP + 1}`,
     params
   )
-  return { rows: rows.slice(0, EXPORT_HARD_CAP).map((r) => toAccount(r, scope)), complete: rows.length <= EXPORT_HARD_CAP }
+  return {
+    rows: rows.slice(0, EXPORT_HARD_CAP).map((r) => toAccount(r, scope, sight)),
+    complete: rows.length <= EXPORT_HARD_CAP,
+  }
 }
 
 /** One account with its people and its logins — the detail read. Outside the

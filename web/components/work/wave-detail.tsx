@@ -521,9 +521,10 @@ export function WaveDetailScreen({
       <SprintFormDialog
         open={planOpen}
         onOpenChange={setPlanOpen}
-        apps={(appsQ.data ?? [])
-          .filter((a) => a.active && a.accountId === wave.accountId)
-          .map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW: `AccountAppPicker` narrows by `accountId` itself
+        // (ruling 2, 16 Sep 2026), so it must survive this filter rather than
+        // being mapped away right after it did its job.
+        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === wave.accountId)}
         fixedAccount={wave.accountId ? { id: wave.accountId, name: wave.accountName ?? "" } : undefined}
         draftKey={`sprint:add:wave:${waveId}`}
         onSubmit={async (v) => {

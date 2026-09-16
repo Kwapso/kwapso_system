@@ -5587,7 +5587,30 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                    `bottom: 0` unchallenged, collapsing the seam to the
                    ancestor's BOTTOM half. Measured, not guessed: this file's
                    own review caught it rendering at exactly half height. */
-                placement="pointer-events-auto max-[45rem]:hidden end-[var(--shell-gutter)]"
+                /* `start-0`, NOT `end-[var(--shell-gutter)]` — CORRECTED
+                   2026-09-16, SAME DAY, SECOND RULING ON THIS EXACT SEAM.
+                   The first pass shipped this seam at the dock's END inset,
+                   copied from the round handle's own CLOSE-button placement
+                   two blocks up — the aside COLUMN's outer edge, one gutter
+                   short of the window. The client looked at the shipped
+                   build and corrected it: "you put it on the right edge. I
+                   want it on the left one, the one that's between the
+                   assistant and the main content." The dock's containing
+                   block is the `screen-shell-aside-dock` element, which pays
+                   an UNCONDITIONAL `ps-[var(--shell-gutter)]` (see that
+                   element's own class list) — the gutter strip between the
+                   content card and this column — so `start-0` (the padding
+                   edge, same value the pre-circle "bar" used successfully;
+                   see the aside dock's own header block, "THIS IS WHERE THE
+                   CIRCLE GENUINELY CHANGED THE GEOMETRY") lands this 8px
+                   seam exactly on the dock's card-facing edge: the seam
+                   SHARED WITH THE MAIN CONTENT, not the screen edge. Unlike
+                   the END side, the START gutter never grows a second,
+                   conditional padding to step past, so no offset is needed
+                   to clear it — `start-0` already IS the column's true
+                   start edge. Nothing on the right/screen edge carries this
+                   seam any more. */
+                placement="pointer-events-auto max-[45rem]:hidden start-0"
                 resize={asideResizeControls}
               />
             )}

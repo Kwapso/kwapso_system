@@ -49,6 +49,9 @@ type ProfileRow = {
   role_models: string | null
   about: string | null
   photo_url: string | null
+  /** THE COVER BAND'S OWN PICTURE — C1, client ruling 16 Sep 2026. Team
+   * migration adds the column; mirrors `photo_url` field for field. */
+  cover_url: string | null
   /** Team migration 0089 — the member detail head's own fields. */
   birthday: string | null
   position: string | null
@@ -61,7 +64,7 @@ type ProfileRow = {
 }
 
 const PROFILE_COLUMNS = `id, user_id, headline, personality_type, strengths, weaknesses, role_models,
-                         about, photo_url, birthday, position, phone,
+                         about, photo_url, cover_url, birthday, position, phone,
                          deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 function toProfile(r: ProfileRow): StaffProfile {
@@ -75,6 +78,7 @@ function toProfile(r: ProfileRow): StaffProfile {
     roleModels: r.role_models,
     about: r.about,
     photoUrl: r.photo_url,
+    coverUrl: r.cover_url,
     birthday: r.birthday,
     position: r.position,
     phone: r.phone,
@@ -113,6 +117,8 @@ export type StaffProfileInput = {
   roleModels?: string
   about?: string
   photoUrl?: string
+  /** THE COVER BAND'S OWN PICTURE — C1, client ruling 16 Sep 2026. */
+  coverUrl?: string
   /** Team migration 0089 — the member detail head's own fields. */
   birthday?: string
   position?: string
@@ -149,6 +155,10 @@ export async function saveStaffProfile(
     roleModels: optionalText(input.roleModels, "Role models", TEXT_LIMITS.long) ?? null,
     about: optionalText(input.about, "About", TEXT_LIMITS.long) ?? null,
     photoUrl: safeExternalLink(optionalText(input.photoUrl, "Photo", TEXT_LIMITS.link)),
+    // THE COVER BAND'S OWN PICTURE — C1, client ruling 16 Sep 2026. Same
+    // validation as `photoUrl` immediately above: a stored path, mirrored
+    // field for field, through the SAME upload door (never a new one).
+    coverUrl: safeExternalLink(optionalText(input.coverUrl, "Cover image", TEXT_LIMITS.link)),
     // A CALENDAR DAY, not a timestamp — the same door `staff_certificates`
     // used for `issued_on`/`expires_on` before that module was retired.
     birthday: optionalDate(input.birthday, "Birthday"),
@@ -169,12 +179,13 @@ export async function saveStaffProfile(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO staff_profiles (id, user_id, headline, personality_type, strengths, weaknesses, role_models, about, photo_url, birthday, position, phone, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(userId)}, ${sqlString(v.headline)}, ${sqlString(v.personalityType)}, ${sqlString(v.strengths)}, ${sqlString(v.weaknesses)}, ${sqlString(v.roleModels)}, ${sqlString(v.about)}, ${sqlString(v.photoUrl)}, ${sqlString(v.birthday)}, ${sqlString(v.position)}, ${sqlString(v.phone)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)})
+    `INSERT INTO staff_profiles (id, user_id, headline, personality_type, strengths, weaknesses, role_models, about, photo_url, cover_url, birthday, position, phone, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(userId)}, ${sqlString(v.headline)}, ${sqlString(v.personalityType)}, ${sqlString(v.strengths)}, ${sqlString(v.weaknesses)}, ${sqlString(v.roleModels)}, ${sqlString(v.about)}, ${sqlString(v.photoUrl)}, ${sqlString(v.coverUrl)}, ${sqlString(v.birthday)}, ${sqlString(v.position)}, ${sqlString(v.phone)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)})
 ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
   headline = excluded.headline, personality_type = excluded.personality_type,
   strengths = excluded.strengths, weaknesses = excluded.weaknesses,
   role_models = excluded.role_models, about = excluded.about, photo_url = excluded.photo_url,
+  cover_url = excluded.cover_url,
   birthday = excluded.birthday, position = excluded.position, phone = excluded.phone,
   updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)};`
   )
@@ -188,6 +199,7 @@ ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
         { label: "Role models", from: before.role_models, to: v.roleModels },
         { label: "About", from: before.about, to: v.about, hideValues: true },
         { label: "Photo", from: before.photo_url, to: v.photoUrl },
+        { label: "Cover image", from: before.cover_url, to: v.coverUrl },
         { label: "Birthday", from: before.birthday, to: v.birthday },
         { label: "Position", from: before.position, to: v.position },
         { label: "Phone", from: before.phone, to: v.phone },
@@ -207,8 +219,16 @@ ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
   })
   // The photo an upsert has just overwritten IN PLACE — the shape `updateProfile`
   // and `updateTeam` already reclaim, arriving late on a third column. `before` is
-  // null on a create, and `supersededMedia` answers null for that too.
-  return { id, created: !before, supersededUrls: [supersededMedia(before?.photo_url, v.photoUrl)] }
+  // null on a create, and `supersededMedia` answers null for that too. THE COVER
+  // is a FOURTH column now (C1, 16 Sep 2026), reclaimed the same way beside it.
+  return {
+    id,
+    created: !before,
+    supersededUrls: [
+      supersededMedia(before?.photo_url, v.photoUrl),
+      supersededMedia(before?.cover_url, v.coverUrl),
+    ],
+  }
 }
 
 /** Deactivate or activate a profile. R17: the predicate rides the UPDATE.

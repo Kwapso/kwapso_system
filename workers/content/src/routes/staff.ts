@@ -60,13 +60,16 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
   requireText(body.userId, "Member", TEXT_LIMITS.short)
   const { id, created, supersededUrls } = await saveStaffProfile(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "staff_profiles", id, created ? "add" : "edit")
-  // The photo this write stopped pointing at. AFTER the row moved, fail-soft,
-  // and proved against the owners list the upload door in this file mints with —
-  // `(guard.teamId, "staff")`, which is what makes "this team's staff material"
-  // provable rather than merely "this team's". Used to also carry
-  // `staff_certificates` here, because one generic upload door answered for both
-  // a profile's photo and a certificate's file and never learned which — that
-  // second destination went with the certificate module (0090).
+  // The photo (or, since C1, the cover) this write stopped pointing at. AFTER
+  // the row moved, fail-soft, and proved against the owners list the upload
+  // door in this file mints with — `(guard.teamId, "staff")`, which is what
+  // makes "this team's staff material" provable rather than merely "this
+  // team's". Used to also carry `staff_certificates` here, because one
+  // generic upload door answered for both a profile's photo and a
+  // certificate's file and never learned which — that second destination
+  // went with the certificate module (0090). `cover_url` is the fourth column
+  // this same upload door can now supersede (C1, 16 Sep 2026); `saveStaffProfile`
+  // already hands back both superseded URLs in one array, so this stays one call.
   await reclaimMedia(
     env.INTERNAL_MEDIA,
     await unreferencedKeys(
@@ -74,7 +77,7 @@ export async function postSaveStaffProfile(request: Request, env: Env): Promise<
       guard.databaseId,
       "/media/internal/",
       supersededUrls.map((u) => ownedMediaKey(u, "/media/internal/", guard.teamId, "staff")),
-      [{ table: "staff_profiles", columns: ["photo_url"] }]
+      [{ table: "staff_profiles", columns: ["photo_url", "cover_url"] }]
     ),
     { db: env.DB, source: "content", place: "POST /api/content/staff/profile, photo reclaim" }
   )

@@ -725,6 +725,22 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "form-carries-no-hints",
     status: "enforced",
   },
+  {
+    id: "R82",
+    dimension: "ui",
+    law: "A TABLE ROW HOLDS AT MOST SIX COLUMNS — THE SEVENTH GOES SOMEWHERE ELSE, NEVER SQUEEZED ONTO THE END. The client's ruling, 16 Sep 2026, over the Waves List view: \"the right side of the container in waves is shape wrong.\" UI-RULEBOOK N1 already named the ceiling (\"at most … six in a table row … the fifth fact moves to a second line … it does not get squeezed onto the end\") and Tickets' own `TICKET_COLUMNS_DEFAULT` stays at four (five on the Closed tab) by deliberate, dated design — but the ceiling was prose, not a check, so it could be broken silently. `waveListColumns` (`web/components/work/waves-screen.tsx`) is exactly that: the same commit that gave the T3 timeline's left column the wave's own App (client, 16 Sep 2026, \"I want the name of the app\") also gave List a SEVENTH column for it — Wave · Account · App · Sprints · Start · End · Status — on a collection that was already at the six-column ceiling before the App fact existed. A seventh column does not overflow the frame (the kit's own `<Table>` self-scrolls on the inline axis inside its own container, R39's `overflow-x-auto` — never through the card around it), it SQUEEZES: every column loses width to make room for the one that just arrived, most visibly at the row's own right end, where Start/End/Status crowd together against the card's own inset — the shape she is naming. THE FIX IS N1's OWN PRESCRIPTION, not a narrower table: the App fact rides the Account cell's own second line, the identical primary-plus-muted-subline shape `record-timeline.tsx`'s own `TimelineRow.sublabel` already draws one column along, never a column of its own. A STATIC CENSUS, off the disk: every array literal in `web/`, `web-portal/` and `shared/web/` whose elements are ALL object literals carrying both a `key` and a `label` property — the shape `TableColumn` and nothing else needs both of — is a table's own column list, and its element count must be six or fewer, or the array's enclosing function is named in `TABLE_COLUMN_BUDGET_EXEMPT` with the real reason. OUT OF THIS CENSUS'S REACH BY CONSTRUCTION, stated rather than exempted: a RECIPE-DRIVEN column list built by `.map()` over a config array (`tasks-screen.tsx`'s and `stories-screen.tsx`'s own `tableRecipe.fields.map(…)`, `contacts-screen.tsx`'s `contactColumnHeaders`) is not a literal array of object literals at all — its own ceiling is the recipe's `fields` array, a question for whoever edits that config, not for a census reading TSX source.",
+    why: "The kit's `Table` already answers the OVERFLOW question — its own container is `overflow-x-auto`, never `overflow: hidden`, so a wide table scrolls inside itself rather than spilling past the card around it (`shared/ui/components/table/table.tsx`'s own header: \"the container scrolls rather than hiding\"). That ruled out the obvious reading of \"shape wrong\" (a clipped right edge) and pointed at the other, quieter failure a column budget catches: a table that still FITS, by shrinking every column to make room for one more, reads as cramped rather than broken, and the client's own eye caught it before a scrollbar ever would have. N1 already had the sentence (\"it does not get squeezed onto the end\") and three worked examples — the language switcher, a 9-column table, two 8-fact rows — all fixed by 26 Aug 2026 and never enforced again once fixed, which is exactly how an eighth grew unnoticed six weeks later. The census reads by SHAPE (key + label, both required TableColumn fields, present together on every element) rather than by TypeScript's own type, because a build-time census has no type checker to ask and a positional signature is the same trade every other law in this file already makes.",
+    checkId: "table-column-budget",
+    status: "enforced",
+  },
+  {
+    id: "R83",
+    dimension: "ui",
+    law: "A TAB STRIP AND WHAT IT LABELS SHARE ONE GAPLESS COLUMN — THE STRIP PAYS THE WHOLE DISTANCE, A CALLER NEVER PAYS IT TWICE. The client's ruling, 16 Sep 2026: \"reduce the spacing above ALL TOOLBARS. i want it exactly as its currently below, make it like that above.\" `<ToolbarRow>` already pays its own trailing gap to what sits below it, once, as its own baked-in `mb-[var(--toolbar-content-gap)]` (R49) — that is the BELOW number, `--toolbar-content-gap`, `--space-5`. The ABOVE number is the identical value, `--tab-content-gap` (`web/app/globals.css`'s own comment: \"one value, not a new one … the same '--space-5' both already spend\"), paid by the tab strip that sits above the toolbar as ITS OWN trailing `pb-[var(--tab-content-gap)]` (`STICKY_FOLDER_TABS`, `shared/web/screen-engine/tabs-view.tsx`) — so the two numbers were already equal in the token, and every screen but one spent each exactly once: `paged-find.tsx`, `tickets-collection.tsx`, `kwapso-screen.tsx`, `settings-screen.tsx` (twice), `module-settings-screen.tsx` and `screen-bits.tsx`'s own `SectionWithCreate` all wrap a `renderFolderTabs(…)` call and the card/panel it labels in a column carrying NO `gap-*` of its own — `paged-find.tsx`'s own comment states the rule in as many words: \"this column has nothing to say about it either way and must not grow a `gap-*` of its own — that would be a second opinion about one number.\" `waves-screen.tsx` was the one call site that disagreed: its `renderFolderTabs(…)` call and the `<CollectionCard>` beneath it sat directly inside the screen's own OUTER `flex flex-col gap-6` column, alongside the page heading — a PER-SCREEN WRAPPER spending a second, unrelated 24px on top of the strip's own 20px, above the toolbar and nowhere else, which is exactly why the ABOVE gap measured larger than the BELOW one despite the token being identical. Fixed by giving the strip and its card their own inner `flex w-full flex-col` (no `gap-*`), the same shape the other six call sites already draw, with the heading staying in the outer `gap-6` where a real, single gap belongs. A STATIC CENSUS, off the disk: every `renderFolderTabs(` call whose immediate JSX parent element (fragments walked through, the same transparency R49's own census gives them) carries a `gap-*` or `space-y-*` utility in its `className` is a caller paying the strip's own number a second time, unless the file is named in `TOOLBAR_LEAD_GAP_EXEMPT` with the real reason.",
+    why: "The two tokens (`--tab-content-gap`, `--toolbar-content-gap`) were never the bug — both read `var(--space-5)` since R49 was written, and globals.css says so in its own header (\"one value, not a new one\"). The bug was a wrapper spending a SECOND number on top of the first, the identical shape R49 itself was written to stop (\"a call site that also wraps this row in a gapped column is paying the same gap twice\") — just one element higher in the tree, above the strip rather than below the row. `waves-screen.tsx`'s own comment named the reason it diverged: \"Waves is bespoke throughout, so this file calls the same exported helper directly rather than adopting the whole `SectionWithCreate` engine\" — reaching for the shared HELPER (`renderFolderTabs`) without also reaching for the shared WRAPPER SHAPE around it is exactly how one bespoke screen re-grew a gap six others had already agreed to stop paying. Checked as a census rather than left to the next screen's own care, because `SectionWithCreate`'s own comment already predicted the failure mode by name three lines above the code it describes: \"or the same number gets two owners again.\"",
+    checkId: "toolbar-lead-gap",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -4883,3 +4899,35 @@ export const TAB_STRIP_PIN_EXEMPT: Record<string, string> = {
  * excused. If this table ever gains a line, it is a real, reasoned
  * exception, never a placeholder for "do this later". */
 export const STAFF_PILL_ROW_EXEMPT: Record<string, string> = {}
+
+// ── R82 (table-column-budget) ───────────────────────────────────────────────
+
+/** R82 — a literal `TableColumn[]`-shaped array (every element carries both
+ * `key` and `label`) with more than six entries, keyed
+ * `${file path relative to repo root}#${enclosing function name}`. Rot-checked
+ * both ways: a line naming a function the census does not find, or one whose
+ * array has since shrunk to six or fewer, has outlived its subject and fails
+ * too — so the list can only shrink.
+ *
+ * EMPTY ON THE DAY THIS LAW SHIPPED (16 Sep 2026): the one table this census
+ * found over the ceiling — Waves' own `waveListColumns` — was fixed rather
+ * than excused (the App fact moved onto the Account cell's own second line).
+ * If this table ever gains a line, it is a real, reasoned exception, never a
+ * placeholder for "do this later". */
+export const TABLE_COLUMN_BUDGET_EXEMPT: Record<string, string> = {}
+
+// ── R83 (toolbar-lead-gap) ──────────────────────────────────────────────────
+
+/** R83 — a `renderFolderTabs(` call whose immediate JSX parent still carries
+ * a `gap-*`/`space-y-*` utility, keyed by the file's path relative to the
+ * repo root. Rot-checked both ways: a line naming a file the census no longer
+ * finds double-spending the gap has outlived its subject and fails too — so
+ * the list can only shrink.
+ *
+ * EMPTY ON THE DAY THIS LAW SHIPPED (16 Sep 2026): the one call site this
+ * census found paying the strip's own gap twice — `waves-screen.tsx` — was
+ * fixed rather than excused (the strip and its card moved into their own
+ * gapless inner column, matching every other call site). If this table ever
+ * gains a line, it is a real, reasoned exception, never a placeholder for
+ * "do this later". */
+export const TOOLBAR_LEAD_GAP_EXEMPT: Record<string, string> = {}

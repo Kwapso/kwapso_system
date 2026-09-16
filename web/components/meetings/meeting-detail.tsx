@@ -827,7 +827,10 @@ export function MeetingDetailScreen({
         // exists to end, dropping `logoUrl` one hop before the picker that draws
         // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
-        appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW HERE TOO, so `AccountAppPicker` can narrow by
+        // `accountId` (ruling 2, 16 Sep 2026) — the `.map((a) => ({ id, name }))`
+        // this used to read dropped it one hop before the picker could.
+        appOptions={(appsQ.data ?? []).filter((a) => a.active)}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         initial={{
           appId: item.appId ?? "",

@@ -2,6 +2,136 @@
 
 ## Unreleased
 
+### Changed — `BreadcrumbFolders` drag-to-reorder now follows the pointer, Chrome's own model
+
+Client ruling, 16 Sep 2026, second of the day on this file, over the native
+HTML5-drag build the first ruling shipped: "visually it's a bit confusing.
+Can we drag it instead of freely on the same edge, only horizontally, so to
+say? Exactly the same behavior as when dragging tabs in Google Chrome.
+Research and implement that." Native `draggable`/`dragstart`/`dragover`/
+`drop` hands the browser a free-floating drag image with no sense of the
+strip's own axis; replaced with pointer events and a measured `translateX`,
+no new dependency, same `onReorder?: (fromIndex, toIndex) => void` contract:
+
+- The dragged tab never leaves the strip's own axis — a signed `translateX`
+  clamped to the leading/trailing edge of the CONTIGUOUS run of movable tabs
+  around it; `translateY` is never written.
+- It follows the pointer 1:1 while held, no easing ("the pointer is the
+  clock", the same rule `cursor-glow.tsx` and `kanban.tsx`'s own carry state
+  already write down for this kit).
+- Every other tab in the run slides its own `translateX` live, the instant
+  the dragged tab's centre crosses that neighbour's ORIGINAL centre —
+  opening the drop slot before release rather than only revealing it after.
+- Release settles every transform and fires `onReorder` exactly once, with
+  the final slot.
+
+A pinned tab (`closable: false`) still gets no pointer handler at all and
+is never a landing slot — `movableRange()` stops the contiguous run at the
+first pinned neighbour on either side, so History/"+" stay pinned last with
+no extra bookkeeping. `<BreadcrumbLink>`'s own `<a>` keeps `draggable={false}`
+on a movable tab: a browser's native link-drag now fires a `dragstart` that
+would cancel the pointer gesture mid-flight rather than merely racing an
+HTML5 drop handler. Alt+ArrowLeft/Alt+ArrowRight keyboard reorder is
+unchanged. A gesture that actually moved swallows the trailing native
+`click` on the dragged tab once (release, capture-phase, self-removing) so
+letting go does not also re-select the tab the reader just finished
+dragging; a plain tap with no movement is untouched and reaches the app's
+own `onClickCapture` exactly as before.
+
+Demo: `demo/sections/a-b.tsx`'s workspace-tab-set specimen is unchanged in
+markup — same `onReorder` prop, same `reorderWithinArray` splice — and now
+exercises the pointer model instead of the retired HTML5 one.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system. No app
+wiring changes: `agent-tab-strip.tsx` and any future content-strip caller of
+`onReorder` inherit the new drag feel for free, same prop, same contract.
+
+### Fixed — `BreadcrumbFolders` inactive tabs never paint over the active (or dragged) one, icon-only tabs included
+
+Client ruling, 16 Sep 2026, third of the day on this file: "the inactive
+tabs' shape appears in front of the active one. That's wrong. It should be
+behind. We had this so many times with the main content tabs, and it took
+you many iterations to fix it." Named at the compact/icon-only assistant
+tabs specifically. The STATIC half of this was already correct and stayed
+correct: `TAB_REST`'s `z-0` / `TAB_LIVE`'s `z-[1]` (the 2026-09-06 fix for
+the main content strip, keyed to `entry.index === activeCrumb` rather than
+DOM position) are shared, unconditionally, with `TAB_ICON_ONLY` — that flag
+only ever adds padding classes, never touches which z a tab gets — so
+nothing in the component was ever WRONG for the static case; nothing had
+PROVEN it for the icon-only shape either, until now (see below).
+
+The DYNAMIC half is where the bug actually lives, and it is the same class
+of bug wearing the new pointer-drag feature above: at rest, the strip's own
+`gap-1` keeps every tab's box clear of its neighbours, so two `z-0` rest
+tabs never had to be compared at all and DOM order silently stood in for a
+real answer. A drag changes that — the dragged tab's `translateX` now
+genuinely overlaps a sibling's box for the length of the gesture — and an
+EARLIER-DOM tab dragged RIGHT over a LATER, still-`z-0` sibling lost the
+DOM-order tie to it: the inactive tab painting in front, on demand, of
+whichever tab a reader happened to be carrying. Fixed by lifting the
+dragged `<li>` to `z-index: 2` for the length of the gesture (a `transform`
+already makes it its own stacking context, the same "z-0 IS STILL A
+STACKING CONTEXT" mechanism `TAB_REST`'s own comment already documents, now
+read for a transform rather than a position) — high enough to beat any
+sibling at `z-0`/`z-[1]`, tied with (and losing, on DOM order, to) the
+card's own `z-[2]`, so a horizontal drag still never paints over content.
+Cleared on release, after the settle transition finishes rather than the
+instant it starts.
+
+`verify/breadcrumb-folder/page.tsx` case 8 pins both halves so this cannot
+regress a third time: `tabset-icononly` reproduces the assistant strip's
+exact shape (one active text tab beside two pinned icon-only tabs) and
+reads the same `zOrder` case 7 already checks; `tabset-drag-probe` fires a
+real pointer gesture, drags an early tab far enough to genuinely overlap a
+later one WITHOUT crossing the reorder midpoint, and proves the overlap is
+real (`getBoundingClientRect`) and the dragged tab's `z-index` wins it
+(`getComputedStyle`) — not `document.elementFromPoint`, which this harness's
+own tiny rendered viewport (see the file's header) returns `null` from even
+for a tab that never moves. Proved red on a copy first: with the lift line
+disabled, the probe's own capture check (independent of the disabled line)
+still reports a genuine overlap, but `z-index` reads `auto` and the check
+fails — restored and green after.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system. No app
+wiring changes.
+
+### Fixed — `ScreenShell`'s bare assistant resize seam moved to the assistant's left (start) edge
+
+Client, 16 Sep 2026, on the shipped build: "you put it on the right edge. I
+want it on the left one, the one that's between the assistant and the main
+content." The invisible 8px `RESIZE_SEAM` grab (`asideHandleOnOpen={false}`'s
+own branch, drag-to-resize added earlier the same day) had shipped on the
+aside dock's END inset — the assistant column's outer edge, one gutter short
+of the window — copied from the round handle's own CLOSE-button placement two
+blocks up. Moved to `start-0`, the dock's own card-facing padding edge: the
+seam the assistant actually shares with the main content. Snap points
+(320/400/520) and the hover-reveal arrow are unchanged.
+
+New `compositions/templates/check-screen-shell.mjs`, wired into `npm run
+check`, pins the placement string and fails if it ever carries an `end-`
+inset again.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
+### Fixed — `UnsavedChangesBar` rounds on all four corners
+
+Client, 16 Sep 2026: "use the orange color in the kit and make sure the
+container is round on all corners, because currently two corners are not
+round." `ground="bare"` — the variant both real call sites (Settings ›
+Appearance, Settings › Team › Roles) render — rounded only the top edge
+(`rounded-t-[var(--radius)]`), on the reasoning that the app's own
+`PINNED_TOOLBAR` wrapper `::before` already rounded those same corners one
+layer out. The client's ruling overrides that: `bare` now matches
+`page`/`panel` at `rounded-[var(--radius)]`, all four corners, unconditionally.
+The fill was already the kit's own `--warning` token (`--kw-orange`,
+`foundations/tokens/tokens.css`), confirmed unchanged.
+
+New `components/unsaved-changes-bar/check-unsaved-changes-bar.mjs`, wired
+into `npm run check`, pins all three `ground` variants to a four-corner
+radius and forbids a literal hex/rgb/hsl in the component's class strings.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
 ### Changed — `BreadcrumbFolders` icon-only tabs no longer render at the 128px text width
 
 Client, 16 Sep 2026, fifth ruling that day, on staging: "validated, but still

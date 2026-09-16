@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.97",
-  "sha": "5d7d1fbba1bc017e72d6161b67121ab3b4b225f3",
+  "tag": "v1.2.98",
+  "sha": "fb596313d51399ceba52b056c21a9d6a5211352b",
   "syncedAt": "2026-09-16"
  },
- "generatedAt": "2026-09-16T12:15:44.663Z",
+ "generatedAt": "2026-09-16T14:58:17.539Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -8734,7 +8734,7 @@
     {
      "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
      "name": "unsavedChangesBarVariants",
-     "line": 157,
+     "line": 165,
      "base": "flex min-w-0 flex-nowrap items-center justify-between gap-3 px-4 py-3 bg-warning/10 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--warning)_35%,transparent)]",
      "groups": [
       {
@@ -8742,8 +8742,8 @@
        "options": [
         {
          "name": "bare",
-         "classes": "rounded-t-[var(--radius)]",
-         "note": "Riding the app's own `PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`) — the two real call sites, both left at this default. Rounds the TOP edge only, `rounded-t-[var(--radius)]`: R31's own second named position (\"the top band of a pinned toolbar\", R63 part 4), so this row's corner agrees with the wrapper's own `::before` instead of rounding the same edge a second, competing way. The bottom stays square — the container's own content keeps scrolling under it and shares that edge."
+         "classes": "rounded-[var(--radius)]",
+         "note": "ALL FOUR CORNERS, `rounded-[var(--radius)]` — CORRECTED 2026-09-16. Used to be TOP ONLY (`rounded-t-[var(--radius)]`): the reasoning was that the wrapper's own `PINNED_TOOLBAR` `::before` (`shared/web/pinned-chrome.ts`, R63 part 4) already rounds those same top corners one layer further out, and the bottom edge had nothing below it to be separated from — the container's own content keeps scrolling under this row and shares that edge. The client looked at the shipped bar and ruled directly against that: \"use the orange color in the kit and make sure the container is round on all corners, because currently two corners are not round.\" Riding `PINNED_TOOLBAR` still rounds the SAME top pair a second, now-redundant way at the wrapper's own border box, which is harmless — two coincident radii on the same corner draw as one — but the bottom pair no longer stays square waiting on a distinction the client never asked for."
         },
         {
          "name": "page",

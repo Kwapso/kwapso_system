@@ -97,6 +97,22 @@
 // web/test/orphan-components.test.ts exists to catch once the component's own
 // dedicated test stopped counting as a mount (14 Sep 2026). Deleted, with
 // UI-GAPS.md #24 closed as abandoned rather than reopened as a live TODO.
+//
+// ── THE FOURTH COLUMN, PORTAL (client ruling, 16 Sep 2026) ───────────────────
+//
+//   "add a column to show if they are in the portal or not"
+//
+// A fourth column, spent only for a reader who could already press the In
+// portal TAB above it — `maySeeLogins` (`rights.portal_users?.read`, already
+// computed below for that tab) gates whether `PORTAL_COLUMN` joins
+// `CONTACT_COLUMNS` at all, the same reasoning the tab itself is drawn under.
+// N1's table budget is six; three plus this one is four, still short of it.
+// UNSORTABLE, exactly like Account and Role beside it and for their own
+// reason read the other way: the accounts door's ordering menu has no
+// per-role variant, so a `sort=portal` a caller without the right could
+// still send would let ordering answer, by position, the exact question the
+// row itself now withholds as `null` (R21's own argument, restated for a
+// boolean instead of a name) — the header draws no control, same as those two.
 
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
@@ -116,6 +132,7 @@ import { tenancy } from "@/lib/api"
 import { accountsKey, totalKey } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
+import type { Language } from "@shared/i18n"
 import type { Account } from "@shared/types"
 import { primeCache, useCachedValue } from "@shared/web/store"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
@@ -136,6 +153,19 @@ const CONTACT_COLUMNS = [
   field("role", "Role"),
 ]
 
+/** THE FOURTH, GATED COLUMN — see this file's own header. A `field`, not a
+ * literal spread inline, because `CONTACT_COLUMN_HEADERS` below reads
+ * `.column` off it the same way it does the other three. */
+const PORTAL_COLUMN = field("portal", "Portal")
+
+/** WHICH COLUMNS THIS READER GETS — her three, plus Portal for a reader who
+ * holds `portal_users:read`. Called once per render with `maySeeLogins`
+ * (below) rather than kept as a second module-level constant, because it is a
+ * per-ROLE answer and `CONTACT_COLUMNS` is not. */
+function contactColumns(withPortal: boolean) {
+  return withPortal ? [...CONTACT_COLUMNS, PORTAL_COLUMN] : CONTACT_COLUMNS
+}
+
 /** WHAT THE DOOR CALLS EACH OF THOSE COLUMNS — the same hand-paired translation
  * the meetings table makes between a shaped row's column and the door's menu
  * name, and the same rule about a name the menu does not offer producing no
@@ -146,37 +176,47 @@ const CONTACT_COLUMNS = [
  * forwards. The `defaultDir` is read off `COLLECTION_SORTS` rather than typed,
  * so a header can never land in a different direction from the picker above it
  * offering the same order. */
+// ONE ENTRY, and the three absences are the decision — see this file's own
+// header for Portal, and the earlier one above for why Account and Role must
+// not be orderable on a door the client portal forwards.
 const COLUMN_SORT: Record<string, string> = { person: "name" }
 
-const CONTACT_COLUMN_HEADERS: TableColumn[] = CONTACT_COLUMNS.map((f) => {
-  const option = COLLECTION_SORTS.accounts.options.find((o) => o.value === COLUMN_SORT[f.column])
-  return {
-    key: f.column,
-    label: f.field.label,
-    sort: option?.value,
-    defaultDir: option?.defaultDir,
-    // `accountCell` HOLDS A NODE (the mark + name span `shapeContactsTable`
-    // builds), not plain text — `account` is the sibling row key kept as a
-    // string for exactly this: `CollectionFrame`'s free-text match reads
-    // `String(row[key])` (record-table.tsx's own `searchKey` doc), and a
-    // node there is `"[object Object]"`. Inert on this PAGED table today
-    // (the door owns the search, same as Person and Role beside it), and
-    // still declared for the reason record-table.tsx gives one column over
-    // (the meetings table's own Account column carries the identical line):
-    // a column left unset is silently unsearchable the day this table stops
-    // being paged, rather than visibly correct now.
-    searchKey: f.column === "accountCell" ? "account" : undefined,
-    // NO `sortType`/`sortKey` on any of these, and the absence is the statement:
-    // every order this table can be put in is the DOOR's (`order={found.order}`
-    // below), so nothing here is ever compared in the browser. Nor is any cell
-    // a formatted value — there is no date and no money on a contact row — so
-    // there is nothing for a type to disambiguate either.
-  }
-})
+function contactColumnHeaders(columns: ReturnType<typeof contactColumns>): TableColumn[] {
+  return columns.map((f) => {
+    const option = COLLECTION_SORTS.accounts.options.find((o) => o.value === COLUMN_SORT[f.column])
+    return {
+      key: f.column,
+      label: f.field.label,
+      sort: option?.value,
+      defaultDir: option?.defaultDir,
+      // `accountCell` HOLDS A NODE (the mark + name span `shapeContactsTable`
+      // builds), not plain text — `account` is the sibling row key kept as a
+      // string for exactly this: `CollectionFrame`'s free-text match reads
+      // `String(row[key])` (record-table.tsx's own `searchKey` doc), and a
+      // node there is `"[object Object]"`. Inert on this PAGED table today
+      // (the door owns the search, same as Person and Role beside it), and
+      // still declared for the reason record-table.tsx gives one column over
+      // (the meetings table's own Account column carries the identical line):
+      // a column left unset is silently unsearchable the day this table stops
+      // being paged, rather than visibly correct now. `portal` HOLDS A NODE
+      // too (the kit `Badge` `shapeContactsTable` builds), and carries no
+      // `searchKey` at all — unlike Account, there is no plain-text sibling to
+      // point it at, so it stays exactly as unsearchable as Account and Role
+      // already are on this door-owned-search table.
+      searchKey: f.column === "accountCell" ? "account" : undefined,
+      // NO `sortType`/`sortKey` on any of these, and the absence is the statement:
+      // every order this table can be put in is the DOOR's (`order={found.order}`
+      // below), so nothing here is ever compared in the browser. Nor is any cell
+      // a formatted value — there is no date and no money on a contact row — so
+      // there is nothing for a type to disambiguate either.
+    }
+  })
+}
 
 export function ContactsScreen({
   teamId,
   t,
+  lang,
   go,
   sectionPath,
   tab,
@@ -189,6 +229,10 @@ export function ContactsScreen({
 }: {
   teamId: string
   t: (english: string) => string
+  /** For `shapeContactsTable`'s own `translator(lang)` — a pure shaper, no
+   * hook to call `useLanguage()` from, the same reason `accounts-screen.tsx`
+   * already hands `shapeAccountsList` the same prop. */
+  lang: Language
   go: (path: string, q?: Record<string, string>) => void
   sectionPath: string
   /** `ctx.query.tab` — the switch is pure, so the view rides the URL exactly
@@ -328,7 +372,12 @@ export function ContactsScreen({
             // is the resting fallback for the first paint before it lands.
             const rows = found.active ? found.rows : contactsLoading ? null : loaded
             if (rows === null) return <Skeleton variant="list" lines={4} />
-            const data = shapeContactsTable(rows)
+            const data = shapeContactsTable(rows, lang)
+            // THE FOURTH COLUMN, GATED HERE — see this file's own header. The
+            // SAME `maySeeLogins` the In portal tab above is drawn under, so a
+            // reader who cannot press that tab draws no column claiming to
+            // answer the question it asks either.
+            const columns = contactColumns(maySeeLogins)
             // The display is decided BEFORE the collection is tuned, so the
             // tuner can see it is drawing a table — whose column headers ARE
             // its sort control — and stand its own picker down (`screens.ts`,
@@ -343,7 +392,7 @@ export function ContactsScreen({
             // search matching nothing read as "this collection is empty" and
             // offered "Add the first" over people a term was hiding.
             const tableRecipe = withDataDrivenCollection(
-              { ...recipe, display: "table" as const, fields: translateFields(CONTACT_COLUMNS, t) },
+              { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
               data.rows ?? []
             )
             return (
@@ -352,7 +401,7 @@ export function ContactsScreen({
                     the ONE box — the "broken combination" screen-bits.tsx warns
                     against is a card drawn twice. */}
                 <RecordTable
-                  columns={CONTACT_COLUMN_HEADERS}
+                  columns={contactColumnHeaders(columns)}
                   rows={data.rows ?? []}
                   config={tableRecipe.collection as CollectionConfig}
                   order={found.order}

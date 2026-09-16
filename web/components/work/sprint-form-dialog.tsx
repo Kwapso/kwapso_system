@@ -34,7 +34,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { AccountAppPicker, type AccountScopedApp } from "@/components/records/account-app-picker"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -43,7 +43,6 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
-import { sortedOptions } from "@shared/web/sorted-options"
 import { SPRINT_TYPES } from "@shared/sprint-types"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
@@ -174,7 +173,9 @@ export function SprintFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  apps: PickableRecord[]
+  /** Each tagged with whose account it is on, so the App row below can narrow
+   * to it once an account is chosen (ruling 2, 16 Sep 2026). */
+  apps: AccountScopedApp[]
   /** Set when the form is opened FROM an app's own screen — the app is then a
    * fact about where you are standing rather than a question, so the picker is
    * replaced by the app's name and the value cannot be changed by accident. */
@@ -337,16 +338,25 @@ export function SprintFormDialog({
             {fixedApp.name}
           </p>
         ) : (
-          <RecordPicker
+          // THE HORIZONTAL CHOICE COMPONENT, once the account above is
+          // answered — client ruling, 16 Sep 2026: "when selecting app in
+          // cases account has been selected first, show horizontal choice
+          // component." No account yet (or none at all — "Ours, no
+          // account" is still an answer `AccountAppPicker` reads as "not
+          // chosen") keeps the search-and-pick control this field always had.
+          <AccountAppPicker
             id="sprint-app"
-            value={values.appId || NONE}
-            onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
-            options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
-            emptyOption={{ value: NONE, label: t("No app yet") }}
+            ariaLabel={t(appField.label)}
+            accountId={(fixedAccount ? fixedAccount.id : values.accountId) || null}
+            apps={apps}
+            value={values.appId}
+            onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+            lang={lang}
+            disabled={busy}
             placeholder={t("No app yet")}
             searchPlaceholder={t("Search apps…")}
+            emptyOption={{ value: NONE, label: t("No app yet") }}
             emptyText={t("No app matched.")}
-            disabled={busy}
           />
         )}
       </Field>

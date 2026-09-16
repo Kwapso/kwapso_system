@@ -32,6 +32,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
 import { RecordPicker } from "@/components/records/record-picker"
+import { AccountAppPicker } from "@/components/records/account-app-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -120,9 +121,10 @@ export function WaveFormDialog({
   // THE ONE ACCOUNT THIS FORM KNOWS ABOUT, whichever way it arrived — fixed,
   // freely picked, or (editing) the wave's own settled one — so the App
   // picker below narrows the same way whether or not the Account picker is
-  // even on screen.
+  // even on screen. `AccountAppPicker` does the narrowing itself now (ruling
+  // 2, 16 Sep 2026); this is still the one place that resolves WHICH account,
+  // fixed or chosen, for it to narrow by.
   const accountId = fixedClient?.id ?? values.accountId
-  const appsForAccount = apps.filter((a) => a.accountId === accountId)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -195,30 +197,34 @@ export function WaveFormDialog({
       </Field>
       {/* THE APP THIS PACKAGE COVERS — client ruling, 16 Sep 2026: "No, now
           you have the name of the wave. I want the name of the app." Narrowed
-          to the account above (`appsForAccount`), the same pairing the
-          "Plan a sprint" picker already enforces on the wave's own Sprints
-          tab — offered even with no account chosen yet (an empty list, same
-          as every other account-narrowed picker in this app), never a reason
-          to hide the field outright. THE APP'S OWN LOGO AS THE MARK
-          (`face: true`), the same flag the story form's own App row uses
-          (`story-form-dialog.tsx`), so a system with no logo on file still
-          draws its own initial rather than a blank row. */}
+          to the account above, through `AccountAppPicker`
+          (`web/components/records/account-app-picker.tsx`) — the same pairing
+          the "Plan a sprint" picker already enforces on the wave's own
+          Sprints tab, and since her SAME-DAY ruling on the horizontal choice
+          component, a pill row rather than a dropdown once the account is
+          known. THE APP'S OWN LOGO AS THE MARK (`face: true`), the same flag
+          the story form's own App row uses (`story-form-dialog.tsx`), so a
+          system with no logo on file still draws its own initial rather than
+          a blank row. */}
       <Field config={appField} htmlFor="wave-app" className={fieldSpacing}>
-        <RecordPicker
+        {/* THE HORIZONTAL CHOICE COMPONENT, once the account is answered —
+            client ruling, 16 Sep 2026: "when selecting app in cases account
+            has been selected first, show horizontal choice component." No
+            account yet keeps the picker this field always had
+            (`AccountAppPicker`'s own header explains the split). */}
+        <AccountAppPicker
           id="wave-app"
-          value={values.appId || NONE}
-          onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
-          options={sortedOptions(appsForAccount, lang, (a) => a.name).map((a) => ({
-            value: a.id,
-            label: a.name,
-            picture: a.logoUrl,
-            face: true,
-          }))}
-          emptyOption={{ value: NONE, label: t("No app yet") }}
+          ariaLabel={t(appField.label)}
+          accountId={accountId || null}
+          apps={apps}
+          value={values.appId}
+          onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          lang={lang}
+          disabled={busy}
           placeholder={t("No app yet")}
           searchPlaceholder={t("Search apps…")}
+          emptyOption={{ value: NONE, label: t("No app yet") }}
           emptyText={t("No app matched.")}
-          disabled={busy}
         />
       </Field>
       <Field config={goalField} htmlFor="wave-goal" className={fieldSpacing}>

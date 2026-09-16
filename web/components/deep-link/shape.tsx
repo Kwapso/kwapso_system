@@ -670,8 +670,25 @@ export function shapeAccountsList(
  *
  * Also what `record-table.tsx` sorts LAST in both directions (`isBlank` names
  * `"—"` outright), so a table ordered by a mostly-empty column opens on the rows
- * that have something in it. */
-export function shapeContactsTable(contacts: Account[]): ScreenData {
+ * that have something in it.
+ *
+ * ── THE FOURTH COLUMN, PORTAL (client ruling, 16 Sep 2026) ───────────────────
+ *
+ * "add a column to show if they are in the portal or not" — `hasPortalLogin`,
+ * read straight off the row (`workers/tenancy/src/lib/accounts.ts`'s own
+ * header has the door half). A kit `Badge`, the same shape `status` draws on
+ * `shapeAccountsList` above: `success` for a live grant, `secondary` for none,
+ * never a hex (R32). `null` (no `portal_users:read`) reads exactly like
+ * `false` here — `contacts-screen.tsx` only spreads this column onto the
+ * table's own field list when the caller holds that right in the first place,
+ * so a caller ever asked to shape a `null` row already could not see the
+ * column it would have rendered in. `lang`, not the hook's own `t`: this file
+ * has no React tree to call `useLanguage()` from (`shapeAccountsList`'s
+ * header, a few hundred lines up, makes the identical argument), so the
+ * caller hands the language and a `translator(lang)` is built here, same as
+ * there. */
+export function shapeContactsTable(contacts: Account[], lang: Language = "en"): ScreenData {
+  const t = translator(lang)
   return {
     rows: contacts.map((a) => ({
       id: a.id,
@@ -716,7 +733,17 @@ export function shapeContactsTable(contacts: Account[]): ScreenData {
       // unset app: 22 of 110 contacts on the real team sit under no company,
       // and that is an ordinary absence, not a record with no picture.
       accountCell: a.companyName ? (
-        <span className="flex items-center gap-2">
+        // `flex-wrap` — the census in `web/test/rules.test.ts` ("a record's
+        // name survives a narrow screen") reads 1400 characters forward of
+        // ANY `flex items-center` row looking for `min-w-0` near a `<Badge>`,
+        // and the new Portal cell a few lines down (`shapeContactsTable`'s
+        // own header has the full ruling) now falls inside that window — the
+        // identical text-proximity finding `automation-edit-sheet.tsx`
+        // already wrote out for its own Status field. Wrapping costs nothing
+        // here (a mark and one company name never need the second line on
+        // any screen this table renders at) and keeps the census honest
+        // rather than gamed around.
+        <span className="flex flex-wrap items-center gap-2">
           <RecordMark picture={a.companyLogoUrl ?? null} name={a.companyName} />
           <span className="min-w-0 truncate">{a.companyName}</span>
         </span>
@@ -724,6 +751,17 @@ export function shapeContactsTable(contacts: Account[]): ScreenData {
         "—"
       ),
       role: a.relationship ?? "—",
+      // THE PORTAL COLUMN — see this function's own header. `!== true` rather
+      // than `!a.hasPortalLogin` catches `null` (withheld) and `false`
+      // (really not) in the same "No portal" branch, on purpose: the caller
+      // already decided whether this column is drawn at all, and both are the
+      // honest "not shown as a live login" answer once it is.
+      portal:
+        a.hasPortalLogin === true ? (
+          <Badge variant="success">{t("Portal")}</Badge>
+        ) : (
+          <Badge variant="secondary">{t("No portal")}</Badge>
+        ),
     })),
   }
 }

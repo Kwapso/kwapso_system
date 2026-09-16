@@ -5322,6 +5322,8 @@ describe("RULES — the laws of the base", () => {
       "staff-pill-row", // R79: web/test/staff-pill-row.test.ts — every <Select>/non-row <RecordPicker> in web/ + web-portal/ fed a staff/member list (traced off useAssignableMembers/assignableMembers/staffedOn + PickablePerson[]-typed locals), or named in STAFF_PILL_ROW_EXEMPT
       "rows-are-a-list", // R80: web/test/rows-are-a-list.test.ts — record-table.tsx read off disk for the banded bg-surface-panel fill, plus every <RecordTable mount across web/ read for a `frame` prop carrying anything but the literal "bare"
       "form-carries-no-hints", // R81: web/test/form-hints.test.ts — no FieldConfig literal sets a non-empty helpText, no bare <p> hint sits between a form's fields (both over appFiles()), plus a fixture-based red proof of both censuses
+      "table-column-budget", // R82: the table-column-budget census below — every key+label-shaped array literal in web/ + web-portal/ + shared/web/, or named in TABLE_COLUMN_BUDGET_EXEMPT
+      "toolbar-lead-gap", // R83: the toolbar-lead-gap census below — every renderFolderTabs( call's immediate JSX parent read for a gap-*/space-y-* it should not carry, or named in TOOLBAR_LEAD_GAP_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

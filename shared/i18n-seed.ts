@@ -94,6 +94,12 @@ export const SEED: Catalogue = {
    * inside the phrase in all three, the way "Sprint" and "Ticket" do above —
    * the agency says "das Portal" to its German clients. */
   "In portal": { de: "Im Portal", es: "En el portal", ca: "Al portal" },
+  /* THE CONTACTS TABLE'S FOURTH COLUMN (client, 16 Sep 2026: "add a column to
+   * show if they are in the portal or not") — its header word and its own
+   * badge's two states. Same loanword treatment as "In portal" two lines up:
+   * "Portal" stays "Portal" in all three. */
+  Portal: { de: "Portal", es: "Portal", ca: "Portal" },
+  "No portal": { de: "Kein Portal", es: "Sin portal", ca: "Sense portal" },
   Ready: { de: "Fertig", es: "Listo", ca: "Llest" },
   Resolved: { de: "Erledigt", es: "Resuelto", ca: "Resolt" },
   Done: { de: "Erledigt", es: "Hecho", ca: "Fet" },

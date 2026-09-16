@@ -314,3 +314,44 @@ export function RecordCover({
     />
   )
 }
+
+/** THE COVER BAND — C1, the client's ruling, 16 Sep 2026: "For the cover, let's
+ * try C1. I want this for accounts and members." A full-width image band ABOVE
+ * the B1 head (D14, UI-RULEBOOK.md), one FIXED box the whole time — this is the
+ * one way this component's ABSENCE reading differs from `RecordCover` just
+ * above: her own words, "with no cover set the band is a quiet tinted surface
+ * (no placeholder text — the R81 spirit, no hints) and the head reads exactly
+ * as today." So the box always draws; only what is INSIDE it changes.
+ * `RecordCover` still does the picture-or-nothing work, filling this box when
+ * there is one and leaving the tint bare when there is not.
+ *
+ * THE RADIUS IS ONE EDGE OF THE TWO-RADII LAW (R31), not a third value: the top
+ * band of a record's own card carries the card's own top corners with it,
+ * `rounded-t-[var(--radius)]`, the same spelling R31's own prose already names
+ * for a pinned toolbar's top band. `bg-surface-panel` is the one quiet fill
+ * token this file's identity row already reaches for on this same transparent
+ * header (record-chrome.tsx's own `IDENTITY_ROW` note) — never a hex, never a
+ * Tailwind ramp step (R32).
+ *
+ * A FIXED HEIGHT, not a ratio: her own word was "fixed", and `RecordCover`'s
+ * `object-cover` inside it is what makes any picture, any shape, fill that one
+ * box rather than letterbox inside it (R60). Matches the height
+ * `account-detail.tsx`'s own pre-existing Overview-tab cover already drew
+ * before this ruling, so a cover picked for one still looks the same size in
+ * both places it now shows. */
+export function RecordCoverBand({
+  picture,
+  className = "",
+}: {
+  /** The stored path — same discriminator as `RecordCover.picture` above. */
+  picture?: string | null
+  className?: string
+}) {
+  return (
+    <div
+      className={`h-32 w-full shrink-0 overflow-hidden rounded-t-[var(--radius)] bg-surface-panel sm:h-40 ${className}`}
+    >
+      <RecordCover picture={picture} className="h-full w-full object-cover" />
+    </div>
+  )
+}

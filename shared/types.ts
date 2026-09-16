@@ -1274,6 +1274,19 @@ export type Account = {
    * for the identical reason (a person can be a contact at two companies and
    * only one may be inside the caller's fence). */
   companyLogoUrl?: string | null
+  /** WHETHER THIS PERSON CAN SIGN IN — the Contacts screen's own "Portal"
+   * column (client ruling, 16 Sep 2026: "add a column to show if they are in
+   * the portal or not"). The exact question `AccountFilters.portal` already
+   * asks of the whole collection, answered per row: a LIVE `portal_users`
+   * grant on this account (`workers/tenancy/src/lib/accounts.ts`'s own EXISTS
+   * subquery beside `LINKED_COMPANY`), not merely a revoked one
+   * (deactivate-never-delete keeps that row, so a stale grant must not read
+   * as a current login). `null`, never `false`, when the caller lacks
+   * `portal_users:read` — the same withholding `ContactSight.maySeeLogins`
+   * already gives the "In portal" tab and its badge, so a role without the
+   * right reads an absence rather than a confident "no". Always `null` on a
+   * COMPANY row (nobody signs in as a company). */
+  hasPortalLogin?: boolean | null
   /** false once archived (deactivate-never-delete) */
   active: boolean
   /** the audit block, for the detail Overview tab (the same shape every record
@@ -2636,6 +2649,12 @@ export type StaffProfile = {
   roleModels: string | null
   about: string | null
   photoUrl: string | null
+  /** THE COVER BAND'S OWN PICTURE — C1, client ruling 16 Sep 2026, mirroring
+   * `Account.coverUrl` (this file, `AccountDetail`) field for field: the same
+   * upload primitive, the same size limits, stored through the SAME door
+   * `photoUrl` already uses (`workers/content/src/routes/staff.ts`'s upload
+   * pair), never a new upload path. Team migration adds the column. */
+  coverUrl: string | null
   /** A calendar day, `YYYY-MM-DD`, through `optionalDate` — never a timestamp
    * (team migration 0089). Shown on the member's own detail head. */
   birthday: string | null

@@ -441,6 +441,22 @@ white — but which she means for each screen is hers. **Read
 client rules on the screens above; the registry's law text and `RULES.md` carry the running
 account, and they are the version to trust over this summary.
 
+### C13: the unsaved-changes bar is warning-orange, and round on all four corners
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"use the orange color in the kit
+and make sure the container is round on all corners, because currently two corners are not
+round."* Over a screenshot of `UnsavedChangesBar` (B12) sitting under the Settings tab
+strip with its bottom two corners square against the panel below it.
+
+**The fix.** The bar keeps its `--warning` tint (already the kit token, not a Tailwind
+ramp — R32) and gains `rounded-[var(--radius)]` on all four corners rather than only the
+top two, so it reads as one self-contained band regardless of what sits beneath it (kit
+v1.2.98).
+
+**Law.** Not a registry law — the kit component itself carries the fix
+(`shared/ui/components/unsaved-changes-bar/`), the same way B12's own colour note above it
+is enforced by the component and not by an app-side census.
+
 ---
 
 ## 2. Page layout and width
@@ -790,6 +806,50 @@ survives a reload) and `web/test/workspace-tabs-are-wired.test.tsx` pins the wir
 control renders when given and hides at one tab, and never touches an unsaved draft on the
 kept tab).
 
+### L17: the assistant resizes from its own left edge, never the screen's right one
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim, over the shipped seam: *"Okay,
+that's the behavior I want, but right now you put it on the right edge. I want it on the
+left one, the one that's between the assistant and the main content, obviously."* The
+draggable seam L14 describes is the assistant column's own left/start edge — the boundary
+it shares with the main content column — and nowhere else. The kit's `RESIZE_SEAM`
+(`screen-shell.tsx`) sits at `start-0` on the aside, never at the screen's own right edge,
+which is not a boundary between two panes at all and was never the one she meant to grab.
+The 320/400/520 snap points and the hover col-resize arrow L14 already describes are
+unchanged by this correction — only which edge answers the drag.
+
+**Law.** None registered — see L14's own account of the mechanism and its test.
+
+### L18: dragging a tab moves it along the strip's own axis, Chrome-style
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim, over L15's shipped reorder: *"I
+like the behavior, but visually it's a bit confusing. Can we drag it instead of freely on
+the same edge, only horizontally, so to say? Exactly the same behavior as when dragging
+tabs in Google Chrome."* L15's drag let a tab travel off its own strip's axis mid-drag,
+which read as a tab coming loose rather than sliding past its neighbours. The corrected
+drag is constrained to the strip's own axis — horizontal only, on either the content strip
+or the assistant strip — and neighbouring tabs slide live to open the slot the dragged tab
+is about to occupy, the same live-reflow Chrome's own tab strip draws. Pinned tabs (History
+and "+" on the assistant strip) never move and never open a slot.
+
+**Law.** None registered — `web/test/workspace-tabs.test.ts` and
+`web/test/agent-conversation-tabs.test.ts` pin the store-level reorder L15 already
+describes; the axis constraint and the live-slide are the kit's own drag mechanism.
+
+### L19: the active tab is always the topmost layer, everywhere a tab strip draws
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"It's correct what you did, but
+still, the 'inactive' tabs' shape appears in front of the active one. That's wrong. It
+should be behind."* Every tab strip in the app — the content strip's `BreadcrumbFolders`
+and the assistant's `AgentTabStrip`, including its compact, icon-only presentation — paints
+the active tab above every inactive neighbour, never the reverse: an inactive tab's own
+folder shape may not overlap the active tab's edge and read as sitting in front of it.
+
+**Law.** Pinned by the kit's own conformance check on `breadcrumb-folders.tsx`'s z-lift
+(`TAB_LIVE`/`TAB_REST`), not a registry law here — `web/test/agent-tab-strip.test.tsx`
+asserts the active tab carries the higher z-index in both the content and the assistant
+strip's compact form.
+
 ---
 
 ## 3. Detail screens
@@ -1106,6 +1166,22 @@ derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value
 **Calendar hover card (16 Sep 2026):** *"when I hover over the card in the calendar, it expands and I see what it is"* — client. Hover (300 ms) or focus opens a card with title, kind, dates; tap on touch (kit v1.2.94 `renderEventCard`, record-calendar.tsx).
 
 **Not a law.** This is a layout consistency decision recorded here for the next reader, same as K24's Calendar span implementation (shipped start-day-only on 15 Sep; spans since v1.2.90, 16 Sep).
+
+### D16: a record's cover is a band above the head, on accounts and members
+
+**The rule.** The client's ruling, 16 Sep 2026, choosing from a mocked artifact: *"For the
+cover, let's try C1. I want this for accounts and members."* A cover band renders above the
+B1 head (the record's mark inline with the title) on an account's and a member's own detail
+screen: a fixed-height band, `object-cover` (R60 — never shrunk to fit), a quiet tint fill
+and no placeholder image when the record carries no cover.
+
+**The mechanism.** `RecordCoverBand`, drawn through the kit's own banner slot. Set the same
+way the logo/avatar already is, from the record's own edit door — no separate upload
+surface. `staff_profiles.cover_url` is added by migration 0102; the accounts table's own
+equivalent column follows the same shape.
+
+**Law.** None registered — the band and the migration are the mechanism; nothing censuses
+it yet.
 
 ---
 
@@ -2521,6 +2597,75 @@ Drawn as an icon + word on a NEUTRAL pill, no colour, everywhere a sprint's type
 
 **Not a law.** This is a screen layout descope recorded here for the next reader.
 
+### K31: All Contacts shows a fourth column, whether the contact is in the portal
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"In the All Contacts, add a
+column to show if they are in the portal or not."* A fourth column, "Portal" / "No
+portal", draws as a kit badge — shown only to a reader holding `portal_users:read`, since a
+portal login is exactly the fact that right gates elsewhere in the app — and is unsortable,
+the same as the Account and Role columns beside it.
+
+**Law.** None registered — a column addition to an existing `<RecordTable>`, held to R82's
+six-column ceiling like any other (see K32).
+
+### K32: a table row holds at most six columns — the seventh goes on a second line, never squeezed onto the end
+
+**The rule.** The client's ruling, 16 Sep 2026, over the Waves List view: *"the right side
+of the container in waves is shape wrong. fix it and write the law."* N1 already named the
+ceiling in prose — "at most … six in a table row … it does not get squeezed onto the end" —
+but until this ruling it was prose, not a check. `waveListColumns`
+(`web/components/work/waves-screen.tsx`) broke it silently: the same change that gave the
+timeline's left column the wave's own App also gave List a seventh column for it, on a
+collection already at six. A seventh column does not overflow the frame — the kit's own
+`<Table>` self-scrolls inside its own container (R39) — it SQUEEZES every column, most
+visibly at the row's own right end, where Start/End/Status crowd together against the
+card's own inset.
+
+**The fix** is N1's own prescription: the App fact rides the Account cell's own second
+line, the identical primary-plus-muted-subline shape a collection row's title already draws
+one column along (`record-timeline.tsx`'s `TimelineRow.sublabel`), never a seventh column of
+its own.
+
+**The check.** A static census reads every literal array in `web/`, `web-portal/` and
+`shared/web/` whose elements ALL carry both a `key` and a `label` (the shape
+`TableColumn` needs of both) and fails past six entries, unless the array's enclosing
+function is named in `TABLE_COLUMN_BUDGET_EXEMPT` with the real reason. A recipe-driven
+column list built by `.map()` over a config array (Tasks, Stories, Contacts' own
+`contactColumnHeaders`) is out of reach by construction — it is not a literal array of
+object literals at all, and its own ceiling is the recipe's `fields` array.
+
+**Law.** [R82](../RULES.md) (`table-column-budget`), `web/test/table-column-budget.test.ts`.
+
+### K33: the gap above a toolbar equals the gap below it — the tab strip and its card share one gapless column
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"reduce the spacing above ALL
+TOOLBARS. i want it exactly as its currently below, make it like that above."* [K13](#k13-the-gap-under-a-toolbar-is-one-number-and-the-row-pays-it)
+already made the gap BELOW a toolbar one number the row itself pays,
+`--toolbar-content-gap`. The gap ABOVE is the identical value under a second name,
+`--tab-content-gap` — both spend the same `--space-5` — paid by the tab strip above the
+toolbar as its own trailing `pb-[var(--tab-content-gap)]` (`STICKY_FOLDER_TABS`,
+`shared/web/screen-engine/tabs-view.tsx`). Every screen but one already spent each value
+exactly once: `paged-find.tsx`, `tickets-collection.tsx`, `kwapso-screen.tsx`,
+`settings-screen.tsx` (twice), `module-settings-screen.tsx` and `screen-bits.tsx`'s own
+`SectionWithCreate` all wrap a `renderFolderTabs(…)` call and the card it labels in a
+column carrying no `gap-*` of its own — `paged-find.tsx`'s own comment states the rule:
+"this column has nothing to say about it either way and must not grow a `gap-*` of its own
+— that would be a second opinion about one number."
+
+**The one call site that disagreed.** `waves-screen.tsx`'s `renderFolderTabs(…)` call and
+the `<CollectionCard>` beneath it sat directly inside the screen's own outer
+`flex flex-col gap-6` column, alongside the page heading — a per-screen wrapper spending a
+second, unrelated 24px on top of the strip's own 20px, above the toolbar and nowhere else.
+Fixed by giving the strip and its card their own inner `flex w-full flex-col` (no `gap-*`),
+the shape the other six call sites already draw, with the heading staying in the outer
+`gap-6` where a real, single gap belongs.
+
+**The check.** A static census fails any `renderFolderTabs(` call whose immediate JSX
+parent (fragments walked through) carries a `gap-*`/`space-y-*` utility, unless the file is
+named in `TOOLBAR_LEAD_GAP_EXEMPT` with the real reason.
+
+**Law.** [R83](../RULES.md) (`toolbar-lead-gap`), `web/test/toolbar-lead-gap.test.ts`.
+
 ---
 
 ## 5. Buttons and actions
@@ -2881,6 +3026,12 @@ same sheet to the form mode for editing.
 
 **Badge status fill (16 Sep 2026):** *"go for the kit fix"* — client. The `status` variant never drops its neutral fill; the dark-mode "building → mango" clause is gone (kit v1.2.96).
 
+**Re-explained, 16 Sep 2026, pending her validation.** Both the Automations tab and the
+Choices tab above were walked through with her again, over a side-by-side artifact
+("Automations and Choices Explained"). Nothing in this section changed as a result — the
+walkthrough confirmed the shape rather than correcting it — but she has not yet signed off,
+so treat both as awaiting validation rather than closed until she does.
+
 ### B12: settings changes preview first and apply on Save, through the pinned bar
 
 **The rule.** *"We need some kind of hint or flag, very visible, probably not at the
@@ -3035,6 +3186,28 @@ census over every icon-only `<Button>`/`buttonVariants` call in the app, keyed t
 sits inside a toolbar, is a real derivation to build rather than a rule stated once and
 trusted). Written down so the next toolbar icon button is built to this shape from the start,
 and so a reviewer has the client's own sentence to check a screenshot against.
+
+### B15: on a member's head, Change role sits in the same three-dot menu as Remove
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Move the change rule also to
+the three buttons."* — read as "the three-dot menu," the same menu D6 already sends every
+action to beyond a title's first two buttons. "Change role" joins Remove there, sharing
+that action's own handler; the row's own dedicated button for changing role (D13's "one
+pencil for change") stays where it is — this ruling is about the member's own detail head,
+not the row.
+
+**Law.** None registered.
+
+### B16: Settings › Team splits into a Members tab and a Roles tab
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"In settings, split into tabs:
+members and roles. Roles deserve their own tab."* Settings › Team draws through the library
+`TabsView`, the same shape B11's Automations/Choices tabs already draw, with Members and
+Roles as two tabs rather than one combined page — each carries its own count badge, R16's
+exact-count rule applied per tab the way B10's own module settings tabs already do.
+
+**Law.** None registered — a `TabsView` split, held to the library-tabs rule (R3) like any
+other collection tab strip.
 
 ---
 
@@ -3323,6 +3496,45 @@ whose entire content is one static translated sentence. `FORM_HINT_OK`
 stay that way, except for the one shape her own ruling names as a real exception: a hint
 carrying something the user cannot know otherwise belongs in the CONFIRM dialog that asks
 about the action, never the create/edit form beside it.
+
+### F13: every create form with a staff picker preselects the signed-in member — everywhere, not just where it was checked
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"That's still not correct. For
+example, on Add Story, I don't see myself preselected. Make sure you fix it everywhere, not
+only here."* [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected)
+already states the rule; this ruling is the correction that the POPULATION it applies to
+must be derived, never a hand-list somebody forgot a form on. Every create form with a
+single-pick staff picker seeds the signed-in member as its default.
+
+**The check.** The population is DERIVED, not typed: `web/test/staff-preselect-call-sites.test.ts`
+censuses every `*FormDialog` mount carrying a `default*Id` prop and requires it be passed at
+every call site, over the call sites rather than the dialogs' own bodies — the shape that
+caught `contact-detail.tsx`'s own `<AccountFormDialog>` opening with no
+`defaultAccountManagerId`, the one call site among four that had never been wired.
+
+**Law.** [R79](../RULES.md) (`staff-pill-row`) — see F11's own account of the census.
+
+### F14: the automation sheet has no close button, and reads Module (with icon) above Description
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"That's kind of good. Remove the
+X button to close it and put the module first, and underneath the description."* The
+automation edit/view sheet closes by clicking the backdrop or pressing Escape, never a
+drawn ✕. Its head reads the Module (with the module's own icon) first, and the Description
+sits beneath it — the reverse of the order it shipped in.
+
+**Law.** None registered.
+
+### F15: once an account is chosen, the app field becomes a horizontal pill row of that account's own apps
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"when selecting app in cases
+account has been selected first, show horizontal choice componet."* Where a form picks both
+an account and an app, choosing the account first turns the app field into a pill row —
+that account's own apps, each carrying its mark — instead of the plain picker
+(`web/components/records/account-app-picker.tsx`). With no account chosen yet, the field
+stays the existing picker; with an account chosen that has no apps of its own, the field
+shows nothing and no hint explaining why (R81 — a form carries no hints).
+
+**Law.** None registered — `AccountAppPicker` is a form field, held to R81 like any other.
 
 ---
 
@@ -4845,20 +5057,38 @@ reader rather than independently checked. The stacking order IS checked (see abo
 test rather than by a registry law — no `shared/rules/registry.ts` entry censuses this
 strip's z-index the way it censuses e.g. R63's pinned toolbar.
 
+**App status ladder, ruled 16 Sep 2026, not yet built.** Over an artifact ("App Status
+Ladder"), the client chose model M2, the lifecycle ladder, with two corrections to it —
+verbatim: *"for app status i choose m2, lifecycle ladder. however make sure you add planned
+and not started. … when it's in validation and after it has a refinement, it's not yet
+built. It's in validation, and then we are refining. … Live is only after the first
+refinement sprint."* The DECIDED rungs, in order: Not started · Planned · In audit · In
+plan · In build · In validation · In refinements · Live · Archived. Archived is the one rung
+set by hand; every other rung is DERIVED from an app's waves and sprints. An app reaches
+Live only after its first Refinements sprint has wrapped — In validation and In refinements
+are two distinct rungs, not one, and an app sits in the earlier of the two until a
+refinement sprint has actually run. **Colouring of the dots is still pending her pick** —
+app stage pills stay coloured the old way meanwhile. Status: ruled, not yet built.
+
+**Accounts tabs, ruled 16 Sep 2026, replacement pending.** The client's ruling, verbatim:
+*"Accounts tab: drop the companies. It makes sense."* The Companies · All strip on the
+Accounts screen is retired. What replaces it is pending her pick from a follow-up artifact
+("Accounts Tabs"). Status: ruled, not yet built.
+
 ---
 
 ## Rule index
 
-**155 rules.**
+**168 rules.**
 
 | Section | Rules |
 |---|---|
-| 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L16 (16) |
-| 3. Detail screens | D1 to D15 (15) |
-| 4. Collections | K1 to K30 (30) |
-| 5. Buttons and actions | B1 to B14 (14) |
-| 6. Forms and dialogs | F1 to F12 (12) |
+| 1. Colour and surface | C1 to C13 (13) |
+| 2. Page layout and width | L1 to L19 (19) |
+| 3. Detail screens | D1 to D16 (16) |
+| 4. Collections | K1 to K33 (33) |
+| 5. Buttons and actions | B1 to B16 (16) |
+| 6. Forms and dialogs | F1 to F15 (15) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
@@ -4898,6 +5128,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R74 | [L11](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in) | R75 | [K17](#k17-the-options-a-control-offers-are-a-to-z-in-the-readers-own-language) |
 | R77 | [D3](#d3-the-header-and-tabs-stick) | R78 | [K20](#k20-calendar-views-carry-no-sort) |
 | R79 | [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected) | R80 | [K22](#k22-rows-are-a-list-never-a-banded-table) |
+| R82 | [K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end) | R83 | [K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column) |
 
 ### The seven files that carry most of it
 

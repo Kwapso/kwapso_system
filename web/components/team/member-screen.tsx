@@ -104,21 +104,22 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, UserMinus } from "@shared/ui/foundations/icons"
+import { PencilSimple, UserMinus, UserSwitch } from "@shared/ui/foundations/icons"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { invalidate, primeCache } from "@shared/web/store"
-import { RecordMark } from "@shared/web/record-mark"
+import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { RecordCoverBand, RecordMark } from "@shared/web/record-mark"
 import { staffFullName } from "@shared/staff-name"
 import { useT } from "@shared/web/language"
-import type { TeamMember, TeamRole } from "@shared/types"
+import type { StaffProfile, TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import { RecordActionsMenu, RecordScreen, type RecordAction } from "@/components/records/record-chrome"
 import { MemberHead } from "@/components/team/member-head"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure, content, tenancy } from "@/lib/api"
+import { staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { reportError } from "@shared/web/log"
 
@@ -242,7 +243,31 @@ export function MemberScreen({
   // reach for, its destructive styling and its confirm both untouched. The
   // recipe itself (`members.remove`, gate and all) is unchanged; only which
   // component reads it moved.
+  //
+  // THE SAME MENU, GROWN A SECOND ENTRY — client ruling, 2026-09-16, verbatim:
+  // "Move the change rule [Change role] also to the three buttons." "Also":
+  // the button on the row stays (`buttonActions` below still carries
+  // `members.changeRole`, untouched), and the ⋯ menu that already held Remove
+  // now offers the same act a second way — the identical pattern the row
+  // itself already carries for the pencil and `StaffProfileDialog` ("one
+  // dialog, two doors onto it", above). Same handler, same recipe action
+  // (`onAction("members.changeRole")` opens the same `RolePickerDialog`),
+  // never a second door.
   const buttonActions = recipe.actions.filter((a) => a.id !== "members.remove")
+  const changeRoleRecipeAction = recipe.actions.find((a) => a.id === "members.changeRole")
+  const changeRoleGate = changeRoleRecipeAction ? gateState(rights, changeRoleRecipeAction.gate) : "hidden"
+  const changeRoleMenuActions: RecordAction[] =
+    changeRoleRecipeAction && changeRoleGate !== "hidden"
+      ? [
+          {
+            key: changeRoleRecipeAction.id,
+            label: changeRoleRecipeAction.label,
+            icon: <UserSwitch className="size-3.5" />,
+            onSelect: () => onAction(changeRoleRecipeAction.action),
+            disabled: changeRoleGate === "disabled",
+          },
+        ]
+      : []
   const removeRecipeAction = recipe.actions.find((a) => a.id === "members.remove")
   const removeGate = removeRecipeAction ? gateState(rights, removeRecipeAction.gate) : "hidden"
   const removeMenuActions: RecordAction[] =
@@ -264,9 +289,36 @@ export function MemberScreen({
   // promise a door that isn't there.
   const canEditProfile = Boolean(rights.staff_profiles?.read && rights.staff_profiles?.update)
 
+  // THE COVER BAND'S OWN PICTURE — C1, client ruling, 16 Sep 2026: "For the
+  // cover, let's try C1. I want this for accounts and members." A member's
+  // cover lives on `staff_profiles`, not on `TeamMember` (`member`, above) —
+  // the same table `StaffPanel` (rendered inside this screen's own
+  // `children`, below) already reads, through the identical cache key
+  // (`staffProfilesKey`). R56: the store dedupes a repeated key, so this is
+  // NOT a second network read — whichever of this hook and `StaffPanel`'s own
+  // mounts first pays for the one request, the other joins it. Gated the same
+  // way `canEditProfile` above already is: no `staff_profiles:read` right, no
+  // read at all — a member without that right on their own team still opens
+  // this page, and the head must not open a door for them the app has
+  // already decided they cannot pass.
+  const mayReadProfile = Boolean(rights.staff_profiles?.read)
+  const profilesQ = useCached<StaffProfile[]>(mayReadProfile ? staffProfilesKey(teamId) : null, () =>
+    content.staffProfiles().then((r) => {
+      primeCache(totalKey("staff_profiles", teamId), r.total)
+      return r.profiles
+    })
+  )
+  const coverUrl = profilesQ.data?.find((p) => p.userId === member.userId)?.coverUrl
+
   return (
     <>
       <RecordScreen
+        // THE COVER BAND — C1, same ruling as the picture below. Full-width,
+        // above the whole head (the B1 mark stays exactly as it is);
+        // `RecordCoverBand` draws the fixed-height band with or without a
+        // picture — a quiet tinted surface when nothing is set, never a hole
+        // and never placeholder text (record-mark.tsx's own doc).
+        cover={<RecordCoverBand picture={coverUrl} />}
         // THE AVATAR, INLINE LEFT OF THE TITLE — B1, client ruling 2026-09-15:
         // "For cover and logo, I choose B1. Apply this on apps, accounts, and
         // team members." record-chrome.tsx's own `mark` prop doc has the
@@ -314,7 +366,7 @@ export function MemberScreen({
                 <PencilSimple className="size-3.5" />
               </Button>
             )}
-            <RecordActionsMenu actions={removeMenuActions} />
+            <RecordActionsMenu actions={[...changeRoleMenuActions, ...removeMenuActions]} />
           </>
         }
         // THE RECORD COLUMN — client ruling, 2026-09-15: "the footer … is

@@ -135,7 +135,12 @@ export function useStoryFormOptions(teamId: string) {
     // `PickableRecord` shape every other app/account picker in the app reads
     // (web/lib/pickable.ts) — an extra optional field, so every existing
     // reader of `apps` (this hook has five callers) keeps working unchanged.
-    apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name, logoUrl: a.logoUrl })),
+    // `accountId` rides along too (16 Sep 2026, ruling 2): `sprint-detail.tsx`
+    // reads this same `apps` list for `SprintFormDialog`'s own account-narrowed
+    // App row, and without it every app here would look account-less.
+    apps: (appsQ.data ?? [])
+      .filter((a) => a.active)
+      .map((a) => ({ id: a.id, name: a.name, logoUrl: a.logoUrl, accountId: a.accountId })),
     appNames: new Map((appsQ.data ?? []).map((a) => [a.id, a.name])),
     // CHECKLIST 6.4: OPEN tickets only, each tagged with the app it is about so
     // the form can narrow to the one being chosen.

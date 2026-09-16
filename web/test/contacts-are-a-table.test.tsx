@@ -68,7 +68,12 @@ import { BASE_RECIPES } from "@/lib/screens"
 import { clearCache } from "@shared/web/store"
 
 /** Three contacts, and the three states an Account/Role pair can be in: both
- * filled, a company with nobody's word for what she does there, and neither. */
+ * filled, a company with nobody's word for what she does there, and neither.
+ * `hasPortalLogin` rides the same three rows — one live grant (Marta), one
+ * ordinary "no" (Ines), and Tomas left WITHOUT the field at all, the shape a
+ * caller without `portal_users:read` actually receives off the door
+ * (`workers/tenancy/src/lib/accounts.ts`'s own `toAccount` masks it to
+ * `null`, and `undefined` here draws the identical "not true" branch). */
 const PEOPLE = [
   {
     id: "p1",
@@ -77,6 +82,7 @@ const PEOPLE = [
     name: "Marta Bergman",
     companyName: "Bergman S.A.",
     relationship: "CEO",
+    hasPortalLogin: true,
     active: true,
   },
   {
@@ -86,6 +92,7 @@ const PEOPLE = [
     name: "Ines Ortiz",
     companyName: "Delaval Nord",
     relationship: null,
+    hasPortalLogin: false,
     active: true,
   },
   {
@@ -114,6 +121,7 @@ function draw({ tab, maySeeLogins = true }: { tab?: string; maySeeLogins?: boole
     <ContactsScreen
       teamId={`team-${++team}`}
       t={(english: string) => english}
+      lang="en"
       go={go}
       sectionPath="/t/team/contacts"
       tab={tab}
@@ -149,13 +157,18 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("the contacts screen draws a table", () => {
-  it("draws Contact, then Account, then Role — her order, read off the DOM", async () => {
+  it("draws Contact, then Account, then Role, then Portal — her order, read off the DOM", async () => {
     draw()
     await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
+    // Portal is FOURTH — the client's 16 Sep 2026 ruling landed after the
+    // three above, and a reader who may see it (this fixture's `maySeeLogins`
+    // defaults to `true`) gets it as a fourth column, never ahead of her own
+    // three.
     expect(headers(), "the client asked for the role column AFTER account").toEqual([
       "Contact",
       "Account",
       "Role",
+      "Portal",
     ])
   })
 
@@ -172,6 +185,9 @@ describe("the contacts screen draws a table", () => {
     // loosely for the same reason the Contact column's own name is.
     expect(first[1]).toContain("Bergman S.A.")
     expect(first[2]).toBe("CEO")
+    // MARTA HOLDS A LIVE GRANT (`hasPortalLogin: true` on the fixture) — the
+    // fourth cell's own badge (client ruling, 16 Sep 2026).
+    expect(first[3]).toBe("Portal")
   })
 
   it("an absent company and an absent role are an em dash, not an error", async () => {
@@ -191,13 +207,22 @@ describe("the contacts screen draws a table", () => {
     // is matched loosely too; the em dash beside it is exact.
     expect(ines[1], "a company, wearing its own face").toContain("Delaval Nord")
     expect(ines[2], "nobody's word for what she does").toBe("—")
+    // AN ORDINARY "NO", never an em dash — a Portal cell is never blank the
+    // way Account/Role can be: `hasPortalLogin` is a real fact about every
+    // person on this door (`false` on the fixture), so the fourth cell reads
+    // "No portal" rather than "—".
+    expect(ines[3], "not a live login, said in words").toBe("No portal")
     const tomas = cellsOf("Tomas Roig")
     expect(tomas[0]).toContain("Tomas Roig")
     // NO COMPANY LINKED AT ALL draws the PLAIN em dash, no mark — the same
     // absent-record treatment the ticket table's own App column gives an
     // unset app: an ordinary absence is not a record with no picture, so
     // there is no face to draw and nothing to match loosely here.
-    expect(tomas.slice(1), "nobody has filed him under a company yet").toEqual(["—", "—"])
+    expect(tomas.slice(1, 3), "nobody has filed him under a company yet").toEqual(["—", "—"])
+    // TOMAS CARRIES NO `hasPortalLogin` AT ALL on this fixture (`undefined`,
+    // never sent by a real door) — the same "not true" branch `null` draws,
+    // so the cell reads exactly as it does for Ines rather than blanking out.
+    expect(tomas[3], "an absent field reads as a real no, never a dash").toBe("No portal")
   })
 
   it("only the column the door can order draws a control", async () => {
@@ -217,6 +242,30 @@ describe("the contacts screen draws a table", () => {
     expect(screen.queryByRole("button", { name: /^Role/ })).toBeNull()
     expect(screen.getByText("Account"), "…they are still column headings").toBeTruthy()
     expect(screen.getByText("Role")).toBeTruthy()
+    // PORTAL IS THE SAME SHAPE, for its own reason (this file's header, #3,
+    // read the other way round): the accounts door's ordering menu has no
+    // per-role variant, so a header that could be ordered would let a caller
+    // without `portal_users:read` learn a withheld `null` by POSITION.
+    expect(screen.queryByRole("button", { name: /^Portal/ })).toBeNull()
+    // `headers()`, not `getByText` — Marta's own row draws a "Portal" badge
+    // too (`hasPortalLogin: true` on the fixture), so the exact string is not
+    // unique on this screen and the column heading has to be read the same
+    // way the other three already are, above.
+    expect(headers(), "…still a column heading").toContain("Portal")
+  })
+})
+
+describe("the Portal column (client ruling, 16 Sep 2026)", () => {
+  it("is offered only to a reader who could already press the In portal tab", async () => {
+    draw({ maySeeLogins: false })
+    await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
+    // No fourth header, and no "Portal"/"No portal" badge text anywhere —
+    // the same `maySeeLogins` the tab strip is already drawn under (this
+    // file's "a role without portal_users:read is not offered the tab at
+    // all" test, above), read a second way.
+    expect(headers()).toEqual(["Contact", "Account", "Role"])
+    expect(screen.queryByText("Portal")).toBeNull()
+    expect(screen.queryByText("No portal")).toBeNull()
   })
 })
 
