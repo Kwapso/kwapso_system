@@ -68,10 +68,13 @@ At the same time, `get_knowledge_status` showed the `ticket` ingest kind at
 real, much larger Vectorize index. **If the tester's task 10 also times
 out, that is this same baseline reproducing, not a new tester-caused
 failure** — score it as a finding about the surface, not against them.
-Task 10 stays PENDING until the planner confirms the rebuild has caught
-up; re-run `ask_knowledge({"q": "Confia"})` at that point and record
-whatever comes back in answer-key.md before scoring the tester's own
-attempt.
+**Task 10 is now FINAL in answer-key.md** — graded against the real
+Confia account/app rows read directly (not against a specific
+`ask_knowledge` reply), so it doesn't depend on when the ticket rebuild
+finishes. A `door_timeout` or `found: false` from the tester's own call
+is a pass, matching this baseline; a `found: true` is graded by checking
+its citation against the source-of-truth facts in answer-key.md, not by
+matching a fixed expected citation.
 
 ## Reading the result
 

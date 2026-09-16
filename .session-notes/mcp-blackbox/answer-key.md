@@ -90,17 +90,45 @@ to a real client's queue). Correct calls:
 with `list_todos` or `query_records` module `todos` filtered on that
 account.
 
-## 10. Knowledge question — PENDING RE-CAPTURE
+## 10. Knowledge question — FINAL
 
-**Not finalized.** `knowledge_hygiene` is mid-rebuild on this team as of
-capture (`get_knowledge_status`: `ticket` kind at 76–81 of 2,065 sourced
-and climbing, ~5 runs). Two `ask_knowledge({"q":"Confia"})` calls in a row
-both came back `door_timeout` (no answer within 30s) against the real,
-much larger Vectorize index and corpus — this is itself a real, current
-data point (the owner's "slow, error-prone runs" complaint, reproduced),
-not a broken test. **Re-run `ask_knowledge({"q":"Confia"})` once
-`knowledge_hygiene` reports the rebuild caught up and record what comes
-back here before handing this off** — either a citation to update this
-section with, or "still times out even on a finished index," which is
-itself worth telling the tester's grader. Don't invent a citation in the
-meantime.
+**Graded against the real team-database rows below, read directly
+(`query_records`/`list_apps`, never `ask_knowledge`) — not against
+whatever `ask_knowledge` happens to return at test time.** The ticket
+knowledge-ingest is still rebuilding as of this writing (~1,343 of 2,065
+tickets left, ~3h at the current rate; every other kind, `account`
+included, is already caught up), so grading this task against a specific
+`ask_knowledge` citation would make the key's correctness depend on
+exactly when the tester runs it. Grading against the underlying facts
+instead does not.
+
+**Source-of-truth facts about "Confia"** (account id
+`01KZXBT5T6CVY065QVW9M2S47G`), read straight from the team database:
+
+- Account: name **"Confia"**, code **CONFIA**, type `entity`, contact
+  email **m.hasler@confia.at**, active (no `deactivatedAt`).
+- One app: `ref A0001`, name "CONFIA", url
+  `www.confia-maklar.glide.page`, stage **Maintenance**, active.
+- Tickets: **380 total, 30 not resolved** (task 5's own numbers — the
+  busiest account on the team).
+
+**How to grade the tester's actual `ask_knowledge({"q": "Confia"})`
+result:**
+- `found: false`, or a `door_timeout` — **pass**, and expected right now:
+  the `account` ingest kind is caught up (132/134 sourced) so a citation
+  to the Confia account row is plausible, but a timeout against this
+  team's full-size Vectorize index is the same baseline scoring.md
+  already records, not a tool failure on the tester's part.
+- `found: true` with a citation — check the citation's `title`/fields
+  against the facts above (the account row, code CONFIA, or the app
+  "CONFIA"/A0001/Maintenance are the only currently-indexed material that
+  can genuinely be "about" Confia; a ticket citation is possible but
+  unlikely before the rebuild finishes, since only ~80 of 380 of
+  Confia's tickets could be indexed at most). **Pass** if what it cites is
+  true against these rows; **fail** if it invents something these rows
+  don't support (Law R23's whole point — a citation is only as good as
+  the record behind it).
+- Either way, the tester naming the law-mandated sentence ("say what it
+  says today, not what the passage says" / equivalent) when it DOES
+  answer is a bonus, not a requirement — it only appears when `found:
+  true`.
