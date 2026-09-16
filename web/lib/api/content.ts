@@ -28,7 +28,6 @@ import type {
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
-  KnowledgeAnswer,
   KnowledgeSource,
   RunningTimer,
   Sprint,
@@ -1014,18 +1013,6 @@ export const content = {
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
-    ),
-  /** Ask the knowledge base a question. Answers with the passages plus the sources
-   * they came from (Law R23). BUILD-5 §E (16 Sep 2026): the door RE-READS the
-   * shortlist and COMPOSES the answer by default — costing two of the team's AI
-   * allowance units and needing the assistant right, so a caller without it gets
-   * the passages alone (the door falls back honestly, it never 403s the search).
-   * Pass `read: false` / `compose: false` to ask for less than the default. */
-  askKnowledge: (question: string, accountId?: string | null, opts?: { compose?: boolean; read?: boolean }) =>
-    api<KnowledgeAnswer>(
-      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}${
-        opts?.compose === false ? "&compose=0" : opts?.compose === true ? "&compose=1" : ""
-      }${opts?.read === false ? "&read=0" : opts?.read === true ? "&read=1" : ""}`
     ),
   knowledgeStatus: () =>
     api<{

@@ -211,11 +211,17 @@ export async function payToRead(
  * still gets the material, still spends nothing, and loses nothing it had
  * yesterday.
  *
- * WHY A PARAMETER RATHER THAN ALWAYS. An assistant calling this composes its own
- * reply — that IS R23's design — so writing the answer for it would spend the
- * team's allowance twice for one answer. The Knowledge tab has no assistant of its
- * own, so it asks, every time. There is no switch on the screen: the screen always
- * asks, and the MODEL decides whether a picture belongs in what it writes.
+ * WHY A PARAMETER RATHER THAN ALWAYS-ON-FOR-NOTHING. `compose=1` still spends a
+ * unit and still needs the `agent` right, so a caller without it (or one that
+ * would rather write the reply itself, out of the passages, following R23's own
+ * citation rule) has to be able to ask for less — see
+ * `KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT` below, which is what actually decides
+ * whether "no flag sent" reads as more or as less. BUILD-5 §E (16 Sep 2026) made
+ * `compose=1` (and `read=1`) the default for every caller, assistant tool call
+ * included — the tool's own description (`shared/workers/tool-catalog.ts`) tells
+ * the model to set `compose: false` when it is going to compose the reply
+ * itself, which is the ordinary case; a model that forgets pays for the door's
+ * answer and its own, which is the accepted cost of the safer default.
  *
  * `accountId` is how a screen says WHOSE record the question was asked from; the
  * compartment is derived from it (or from the question), never picked by hand. */
@@ -301,19 +307,21 @@ export async function getKnowledgeShape(request: Request, env: Env): Promise<Res
  * hands it to the SECOND pass only. */
 type RetrieveRead = (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
 
-/** BUILD-5 §E (16 Sep 2026) — READER BY DEFAULT. This door has exactly THREE
- * callers: the Knowledge tab (`askKnowledge`, web/lib/api/content.ts), the
- * assistant's own tool call, and the external MCP surface — the last two are
- * literally ONE call site, the `ask_knowledge` entry in
- * `shared/workers/tool-catalog.ts`, which is what makes capability parity
- * (R9) hold here without a second constant. Every one of the three reaches
- * this same door, so ONE constant here is every caller's default at once,
- * and a caller who wants less still can: send the query literal "0" (or
- * anything that is not "1") for `read` or `compose` and this door honours
- * it — see the two lines below that read it.
+/** BUILD-5 §E (16 Sep 2026) — READER BY DEFAULT. This door's callers are the
+ * assistant's own tool call and the external MCP surface — literally ONE
+ * call site, the `ask_knowledge` entry in `shared/workers/tool-catalog.ts`,
+ * which is what makes capability parity (R9) hold here without a second
+ * constant. (The Knowledge tab never carried a question box of its own —
+ * `askKnowledge` in web/lib/api/content.ts was dead code and was removed the
+ * same day this shipped; story B0296 centralises search through the
+ * assistant instead.) Every caller reaches this same door, so ONE constant
+ * here is every caller's default at once, and a caller who wants less still
+ * can: send the query literal "0" (or anything that is not "1") for `read`
+ * or `compose` and this door honours it — see the two lines below that read
+ * it.
  *
  * WHY THE DEFAULT FLIPPED. The measured cost of the honest shape (COSTS.md
- * "One knowledge question") is ≈$0.0053, a fraction of an agent turn, and
+ * "One knowledge question") is ≈$0.0027, a fraction of an agent turn, and
  * the alternative — a caller that forgets to ask for the reader — silently
  * gets the WEAKER answer (the floor alone deciding, no prose) with nothing
  * on the wire to say so. Opt-out is the safe direction for a decision this
@@ -343,8 +351,7 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   const write = composeParam === null ? KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT : composeParam === "1"
   // RE-READ THE SHORTLIST (BUILD-5 §5-6) — SEPARATE from `compose` above, on
   // purpose: a caller may want the honest, reader-widened decision without
-  // paying for prose too (the Knowledge tab's evidence view, say), or the
-  // reverse. `payToRead` gates and meters itself exactly as `payToWrite` does,
+  // paying for prose too, or the reverse. `payToRead` gates and meters itself exactly as `payToWrite` does,
   // so a question the base cannot even build a shortlist for costs nothing.
   const readParam = queryText(url.searchParams.get("read"), "Read")
   const reread = readParam === null ? KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT : readParam === "1"
@@ -403,9 +410,9 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // what it cost before.
   //
   // Before BUILD-5 §E (16 Sep 2026) the reader was offered only to a caller
-  // passing `read=1`, which `askKnowledge` — the knowledge screen's own call —
-  // never did. So the screen's refusals were the reader's entire best case and
-  // it was never invoked on them. Measured: the three paraphrases the owner
+  // passing `read=1`, which the Knowledge tab's now-removed `askKnowledge`
+  // call never did. So the screen's refusals were the reader's entire best
+  // case and it was never invoked on them. Measured: the three paraphrases the owner
   // named are refused by the floor alone and answered with receipts once
   // something re-reads the shortlist — which is why the reader is the default
   // now rather than an opt-in nobody opted into.

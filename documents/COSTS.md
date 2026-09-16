@@ -417,10 +417,9 @@ cost.
 
 ### BUILD-5 §E — read AND compose are now the DEFAULT shape, 16 Sep 2026
 
-Every caller of `GET /api/content/knowledge/ask` — the Knowledge tab
-(`askKnowledge`, `web/lib/api/content.ts`), the assistant's own tool call, and
-the external MCP surface (the same `ask_knowledge` catalogue entry both of the
-last two reach, `shared/workers/tool-catalog.ts`) — used to leave `read` and
+Every caller of `GET /api/content/knowledge/ask` — the assistant's own tool
+call and the external MCP surface (the same `ask_knowledge` catalogue entry
+both reach, `shared/workers/tool-catalog.ts`) — used to leave `read` and
 `compose` off by default, spending 0 units and getting the plain-floor,
 no-prose answer unless it explicitly asked for more. Measured (§ above): the
 honest shape costs a fraction of a cent and the alternative is a caller that
