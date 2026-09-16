@@ -480,6 +480,21 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   no in-app path to any of them, and the gallery's own comment told the
   next reader it was fine. The app's reachability lived in prose, and
   prose does not fail a build. (`sections-have-a-door`)
+- **A screen's own tab strip stays on top when the screen scrolls (R77).** Not only a
+  collection's; every strip that labels a screen pins. Exemptions live in
+  `TAB_STRIP_PIN_EXEMPT`. (`tab-strips-pin`)
+- **Calendar views carry no sort (R78).** Calendar, week, agenda and timeline views show
+  no sort control; the view's own time order is the order. The client's ruling, 15 Sep
+  2026. Exemptions in `NO_SORT_VIEW_EXEMPT`. (`no-sort-in-calendar-views`)
+- **Staff is picked from a pill row, never a dropdown (R79).** The signed-in user is
+  preselected everywhere a staff member is chosen, and there is no "Nobody" pill.
+  Exemptions in `STAFF_PILL_ROW_EXEMPT`. (`staff-pill-row`)
+- **Rows are a list, never a banded table (R80).** No inner card around a list; "List"
+  means the COLUMN list exactly as Tickets draws it (settled 16 Sep 2026 after Meetings
+  shipped a row-list). (`rows-are-a-list`)
+- **A form carries no hints (R81).** No helper sentence, no explanation under a field;
+  the label is the whole instruction. The client's ruling, 16 Sep 2026. Exemptions in
+  `FORM_HINT_OK`. (`form-carries-no-hints`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 
@@ -558,5 +573,61 @@ Start with **[README.md](README.md)** (the doc map), then:
 - **Deploy order is realtime-FIRST**, then auth → tenancy → content → data-ops → mcp → gateway → portal-gateway. Both gateways go last, for the same reason: each service-binds the domain workers it forwards to. Production is owner-gated (apply new core + team migrations first). See OPERATIONS.md.
 - **Commit messages** end with the Co-Authored-By line. Branch off `main`; don't commit straight to it.
 - **Resetting data:** `node scripts/reset-all.mjs <staging|production|both>` (destructive; schema + migrations survive). Confirm production explicitly.
+- **Never pipe a check.** `npm run check` (lint → tsc → every suite) runs on its own,
+  backgrounded with a log file if it is long; `| tail` or `| grep` hides a failing
+  exit code and once shipped a broken kit tag.
+- **Translations:** `TRANSLATION_CEILING` is 0/0/0. Hand translations go in
+  `shared/i18n-seed.ts`; never edit the generated catalogue; `npm run lang` extracts
+  and prunes.
+- **Team migration numbers are read, never recalled.** Two lines (Alaap's and the
+  UI/UX line) mint `TEAM_MIGRATIONS` against ONE shared staging estate and the robot
+  matches by NAME. Whoever appends a migration runs `git fetch origin` and reads the
+  tail of `workers/tenancy/src/team-schema/migrations.ts` on `origin/main` right
+  before appending, and says the number it chose in its report. A brief never hands a
+  lane a number. If a collision still lands, renumber ours behind the other line's
+  and rename the already-applied rows in each staging team's `_migrations` table
+  (`npx wrangler d1 execute team-<id> --remote --env staging`) before the next robot
+  run.
+- **A deploy with team migrations is three steps.** `npm run deploy:staging` stops at
+  `migrations:check` ("TEAM DATABASES ARE BEHIND"); wait about 75 s for the tenancy
+  worker to propagate; `curl -X POST https://agency-staging.kwapso.app/api/tenancy/admin/migrate-teams -H "x-admin-key: $(security find-generic-password -s kwapso-admin-key -w)"`; then
+  run the chain again. `teamsChecked: 0` means too early, not done. Afterwards prove
+  the change on D1 rather than trusting the ledger.
+- **Deploy credentials:** `cf-exec` does not exist on this machine. In the SAME shell
+  command as the deploy, export `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
+  from `credentials/kwapso_cloudflare_universal_token.json` (keys `account_id` and
+  `kwapso_cloudflare_universal_token`). Never print either value.
+- **A green deploy proves nothing.** After every staging deploy compare the md5 of a
+  local `web/out/_next/static/chunks/*.js` chunk with the served one. "Ready for
+  review" means live on staging with the bundle proven, never "passes check".
+- **Kit tags fork.** Before tagging `kwapso-design`, run `git ls-remote --tags` AND
+  `git branch -r --contains <latest tag>`; a tag minted on a side branch forks the
+  v1.2.x line. Reconcile by merging before minting the next tag, then `node
+  scripts/sync-design.mjs <tag>`, `design-imports.mjs`, `build-screen-builder.mjs`,
+  and `npm run kit:drift` must say IN SYNC. The template strip and inventory belong to
+  Alaap's line; never start them.
+- **Lane discipline.** The planner session plans; lanes execute. A lane spawns no
+  sub-agents, runs every command in the foreground, and never ends its turn waiting on
+  a background run (a background poll never wakes a lane). Lanes own disjoint files,
+  re-read a file before a targeted edit, `cp` a file before mutating it for a
+  proof-of-red, and never run `git checkout --` on a tracked file.
+- **Every client ruling is written down the same session.** UI/UX rulings go into
+  `documents/UI-RULEBOOK.md`; a ruling that is a law also gets RULES.md,
+  `shared/rules/registry.ts` and a check, and `node scripts/rules-index.mjs --check`
+  regenerates `documents/RULES-INDEX.md`. A rule whose only home is a chat log is a
+  rule the next agent breaks.
+- **Decisions need a visual.** Never ask the client to choose from prose; build a
+  side-by-side page and point at it. Suggest the right term proactively (check the
+  glossary and the neighbouring labels). When asked "what is ready", list only what is
+  live on staging, every held item on its own numbered line.
+- **Vocabulary settled 16 Sep 2026.** "Sprint type" = Not started · Audit · Plan ·
+  Build · Validation · Refinements · Enhancement, told apart by ICONS
+  (`shared/sprint-types.ts`); colours belong to STATUS. App status is to be DERIVED
+  from waves and sprints (only Archived is set by hand); the model is pending the
+  client's pick, so app stage pills stay coloured meanwhile. Waves carry an app
+  (`waves.app_id`) and the timeline shows the app's name. Content tabs open next to
+  the current tab, one tab per page, drag to reorder; the assistant strip is
+  conversations · History · "+", with History and "+" layered behind the active tab;
+  the assistant column resizes by dragging an invisible seam with 320/400/520 snaps.
 
 If a request conflicts with a Law of the Base or a locked decision in ARCHITECTURE.md, say so and propose the in-rule way. Don't quietly break the rule.
