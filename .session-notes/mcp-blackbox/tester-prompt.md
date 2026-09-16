@@ -1,24 +1,14 @@
-Connect to a Kwapso workspace over MCP (Model Context Protocol).
+You have a set of tools connected for a Kwapso workspace. Some things you
+try will be refused — that's expected, not a bug to work around.
 
-Endpoint: https://agency-staging.kwapso.app/mcp
-Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
+Your task list is at this absolute path — read it:
 
-Get the bearer token by running this on your own machine first, then use it
-as the `Authorization: Bearer <token>` header on every call:
+    /Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa/.session-notes/mcp-blackbox/tasks.md
 
-    security find-generic-password -s mcp-blackbox-token-kwapso -w
+Work through it one task at a time, top to bottom. Don't skip ahead or
+batch tasks together. Use each tool's own description before you call it
+if the short summary isn't enough to know what it needs.
 
-The team you're connected to is called "Smoke team". You act as a real
-member of it, capped by your role — some things will be refused, that's
-expected and not a bug to work around.
-
-Call `tools/list` first to see what you can do, and `describe_tool` on
-anything whose one-line summary isn't enough before you call it.
-
-Your task list is at `.session-notes/mcp-blackbox/tasks.md` in this
-repository — open and read that file, then work through it one task at a
-time, top to bottom. Don't skip ahead or batch tasks together.
-
-When you're done, write your answers to
-`.session-notes/mcp-blackbox/answers.md` (create it) — one heading per
-task, your answer, and which tool calls you made to get it.
+When you're done, write your answers to `answers.md` in your own working
+folder — one heading per task, your answer, and which tool calls you made
+to get it.

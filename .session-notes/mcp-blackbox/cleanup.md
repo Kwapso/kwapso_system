@@ -10,13 +10,21 @@ look them up: `list_help_tickets({"q":"BLACKBOX-1"})` /
 
 Fixed ids from setup, for reference:
 
-- team: `01M1XA0KFQG1TBKGYWTC2XF3QG` ("Smoke team")
-- role: `01M2N0NENTPTJ21MN2VPM55ZMR` ("Machine tester")
+- team: `01KZWXFD86N0K3RZRBHKMKRWYS` ("Kwapso")
+- role: `01M2N1JJNPDF7KB7XA1T6KH9BF` ("Machine tester")
 - machine-tester member (token owner): `01M2N0N8GFQ042H68AQFWAVR88`
   (`delivered+mcp-blackbox@resend.dev`)
-- token id: see `security find-generic-password -s mcp-blackbox-token-kwapso -w`'s
-  own record, or `list` the owner's tokens (`GET /api/mcp/tokens` as that
-  user) if the id itself was lost
+- token id: `01M2N1JV4Y23M64E6W7SRG6662` (or list the owner's tokens —
+  `GET /api/mcp/tokens` as that user — if this id was lost)
+- test account used for the writes: "PLATINUM" (`01KZXBTAJXJXE3J1GYX7MFYYXB`)
+
+The earlier dry-run sandbox on the Smoke team (see `dry-run/README.md`) is
+already torn down: both of its tokens
+(`01M2N0RF3Z63N569K1CRQH1PYJ`, `01M2N0NSDWD6JJRHKPPH0R0WP2`) were revoked
+when this sandbox moved to the Kwapso team. Its role and member were left
+in place on the Smoke team (harmless scratch data, same team the smoke
+suites already churn) — nothing further to do there unless you want it
+gone too.
 
 ## 1. Archive the ticket (the sandbox token can do this on its own — `help:update`)
 
@@ -31,9 +39,9 @@ on its catalogue. Grant it once, use it, take it back — never leave the
 sandbox more powerful than the test needed it to be.
 
 ```bash
-# as the admin (delivered@resend.dev), via the same test-login flow setup.mjs uses
+# as the admin (alaap@kwapso.com), via the same test-login flow setup.mjs uses
 POST /api/tenancy/roles/permissions
-  { "roleId": "01M2N0NENTPTJ21MN2VPM55ZMR", "value": { …same matrix as setup.mjs, but "inputs": { "read": true, "create": true, "update": true, "delete": true } } }
+  { "roleId": "01M2N1JJNPDF7KB7XA1T6KH9BF", "value": { …same matrix as setup.mjs, but "inputs": { "read": true, "create": true, "update": true, "delete": true } } }
 ```
 
 Then, with the sandbox token:
@@ -54,7 +62,7 @@ door) and call:
 
 ```
 POST /api/mcp/tokens/revoke
-  { "id": "<token-id>" }
+  { "id": "01M2N1JV4Y23M64E6W7SRG6662" }
 ```
 
 Then drop it from the Keychain:
@@ -66,7 +74,7 @@ security delete-generic-password -s mcp-blackbox-token-kwapso
 ## 4. Tear the sandbox down (optional — only if nobody will run this test again)
 
 ```
-POST /api/tenancy/roles/active   { "roleId": "01M2N0NENTPTJ21MN2VPM55ZMR", "active": false }
+POST /api/tenancy/roles/active   { "roleId": "01M2N1JJNPDF7KB7XA1T6KH9BF", "active": false }
 POST /api/tenancy/members/remove { "userId": "01M2N0N8GFQ042H68AQFWAVR88" }
 ```
 

@@ -2,15 +2,27 @@
 // mystery-shopper tester will connect with. Run once against staging by
 // whoever prepares the test; the tester never sees this file.
 //
-// Signs in as the same staging admin the smoke suites use, through the app's
-// own doors (POST /api/tenancy/roles/permissions, /api/tenancy/invites, …) —
-// never a direct database write. Mints the token exactly as
-// scripts/smoke-mcp.mjs does, and stores the secret in the Keychain rather
-// than printing it: a mystery-shopper task list is read by a stranger, and a
-// script whose own output leaks the secret would defeat the point of putting
-// it in the Keychain at all.
+// Signs in through the app's own doors (POST /api/tenancy/roles/permissions,
+// /api/tenancy/invites, …) — never a direct database write. Mints the token
+// exactly as scripts/smoke-mcp.mjs does, and stores the secret in the
+// Keychain rather than printing it: a mystery-shopper task list is read by a
+// stranger, and a script whose own output leaks the secret would defeat the
+// point of putting it in the Keychain at all.
+//
+// PARAMETERISED BY TEAM (2026-09-16, planner's ruling): the first pass built
+// this on staging's scratch "Smoke team" (3 tickets), which cannot reproduce
+// the owner's actual complaint — slow, error-prone runs and reply sizes big
+// enough to crash a chat, against the real Kwapso team's 2,047 tickets / 112
+// sprints / 134 accounts. So the admin login and the target team are both
+// overridable, defaulting to the real Kwapso team on staging. Re-running
+// this against a different team re-uses the same role TITLE and member
+// EMAIL (both are per-team rows, never shared), and re-mints a fresh token
+// into the same Keychain item — the old team's token is a separate row this
+// script does not touch; revoke it yourself if the sandbox is moving for
+// good (see .session-notes/mcp-blackbox/cleanup.md).
 //
 //   node scripts/mcp-blackbox/setup.mjs
+//   BLACKBOX_ADMIN_EMAIL=… BLACKBOX_TEAM_ID=… node scripts/mcp-blackbox/setup.mjs
 //
 // Exits non-zero on failure. Prints the Keychain item name and the token's
 // id/teamId/role on success — never the secret itself.
@@ -22,7 +34,10 @@ import { testLoginKey, NO_KEY_MESSAGE } from "../lib/test-login-key.mjs"
 import { FRONT_DOORS } from "../lib/front-doors.mjs"
 
 const BASE = process.env.SMOKE_BASE || FRONT_DOORS.staging.agency
-const ADMIN_EMAIL = "delivered@resend.dev" // same fixed staging admin the smoke suites use
+// The real Kwapso team on staging, and its own admin — not the smoke-suite
+// scratch team, which is too small to measure anything against (see header).
+const ADMIN_EMAIL = process.env.BLACKBOX_ADMIN_EMAIL || "alaap@kwapso.com"
+const EXPECTED_TEAM_ID = process.env.BLACKBOX_TEAM_ID || "01KZWXFD86N0K3RZRBHKMKRWYS"
 const OWNER_EMAIL = "delivered+mcp-blackbox@resend.dev" // dedicated machine-owner login for THIS sandbox only
 const ROLE_TITLE = "Machine tester"
 const KEYCHAIN_SERVICE = "mcp-blackbox-token-kwapso"
@@ -65,6 +80,9 @@ await api("/api/tenancy/bootstrap", { method: "POST" }, adminCookie)
 const adminActive = await api("/api/tenancy/active", {}, adminCookie)
 const TEAM = adminActive.body?.team
 if (!TEAM?.id) stop("admin has no ready team", adminActive.body)
+if (TEAM.id !== EXPECTED_TEAM_ID)
+  stop(`${ADMIN_EMAIL} is standing in ${TEAM.name} (${TEAM.id}), not the expected team ${EXPECTED_TEAM_ID}`, adminActive.body)
+if (adminActive.body?.role?.title !== "Admin") stop(`${ADMIN_EMAIL} is not Admin on ${TEAM.name}`, adminActive.body?.role)
 console.log(`  team: ${TEAM.name} (${TEAM.id})`)
 
 const ownerCookie = await signIn(OWNER_EMAIL)

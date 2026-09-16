@@ -1,52 +1,49 @@
 # MCP mystery-shopper tasks
 
-You are connected to a Kwapso team over MCP. Work through these ten tasks
-**one at a time, in order**. For each one: call whatever tools you need, then
-write your answer down before moving to the next task. Call `describe_tool`
-on anything whose one-line summary isn't enough — that's what it's for.
+You have a set of tools for a workspace. Work through these ten tasks **one
+at a time, in order**. For each one: call whatever tools you need, then
+write your answer down before moving to the next task. Use whatever your
+tools' own descriptions tell you — ask for more detail on one before you
+call it if the short summary isn't enough.
 
-Don't guess at ids, names or numbers from this document. Every answer must
-come from a tool call you actually made.
+Don't guess at ids, names or numbers. Every answer must come from a tool
+call you actually made.
 
 ---
 
-## 1. The team (read)
+## 1. The workspace (read)
 
-What is this team's display name?
+What is this workspace's display name?
 
 ## 2. Accounts (read)
 
-How many accounts does this team have in total?
+How many accounts does this workspace have in total?
 
-## 3. A ticket by its words (read)
+## 3. Apps (read)
 
-There's a ticket on this team whose description is exactly:
+How many apps does this workspace have in total?
 
-> PORTAL SMOKE · a request from the other company
+## 4. Apps by stage (filtered list)
 
-Find it. What is its `ref` (reference number)?
+How many of those apps are in stage `Maintenance`?
 
-## 4. Tickets by type (filtered list)
+## 5. A client's tickets (filtered list)
 
-How many tickets on this team have `helpType` equal to `question`?
+Find the account named **"Confia"**. How many tickets does it have in
+total, and how many of those are **not** in status `resolved`?
 
-## 5. Tasks that are both important and urgent (filtered list)
+## 6. Sprint → its app (chain)
 
-How many tasks on this team have `important` **and** `urgent` both true?
+Find the sprint with `ref` `S0102`. Which app is it against? What is that
+app's own `ref`, and what stage is it in?
 
-## 6. Account → its to-do (chain)
+## 7. Ticket → its account (chain)
 
-Find the account named **"PORTAL SMOKE · another company"**. Then find the
-to-do (input) that belongs to that account. What is that to-do's `ref`?
-
-## 7. Ticket → its thread (chain)
-
-Find the ticket with `ref` `T0001`. Read its thread. How many replies does
-it have, and what does the first reply's body say?
+Find the ticket with `ref` `T0001`. What account does it belong to?
 
 ## 8. Raise a ticket, then correct it (write)
 
-Raise a new ticket for the account **"PORTAL SMOKE · their company"**:
+Raise a new ticket for the account **"PLATINUM"**:
 - title: `BLACKBOX-1`
 - description: `Mystery-shopper test ticket`
 
@@ -58,7 +55,7 @@ Report the ticket's id and its final description.
 
 ## 9. Raise a to-do (write)
 
-Raise a to-do for the same account, **"PORTAL SMOKE · their company"**:
+Raise a to-do for the same account, **"PLATINUM"**:
 - title: `BLACKBOX-2`
 - detail: `Mystery-shopper test to-do.`
 
@@ -66,11 +63,12 @@ Report the to-do's id.
 
 ## 10. Ask the knowledge base (knowledge)
 
-Ask the knowledge base what it knows about **"another company"**.
+Ask the knowledge base what it knows about **"Confia"**.
 
-Does it find an answer? If so, which ticket does it cite (its `ref` and
-title), and what does it tell you to do with what the passage says versus
-what the live record says today?
+Does it find an answer? If so, what does it cite, and what does it tell
+you to do with what the passage says versus what the live record says
+today? If it doesn't answer, or it times out, say so exactly — that's a
+real result, not a failed task.
 
 ---
 

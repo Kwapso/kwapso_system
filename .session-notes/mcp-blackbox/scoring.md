@@ -11,13 +11,13 @@ transcript carries no explicit boundary).
 
 | # | task | calls made | describe_tool calls | errors | wrong turns | reply bytes (sum) | wall-clock (s) | correct? |
 |---|---|---|---|---|---|---|---|---|
-| 1 | team name | | | | | | | |
+| 1 | workspace name | | | | | | | |
 | 2 | account count | | | | | | | |
-| 3 | ticket ref by description | | | | | | | |
-| 4 | tickets with helpType=question | | | | | | | |
-| 5 | tasks important+urgent | | | | | | | |
-| 6 | account → to-do chain | | | | | | | |
-| 7 | ticket → thread chain | | | | | | | |
+| 3 | app count | | | | | | | |
+| 4 | apps in stage Maintenance | | | | | | | |
+| 5 | Confia's tickets (total + not resolved) | | | | | | | |
+| 6 | sprint → app chain | | | | | | | |
+| 7 | ticket → account chain | | | | | | | |
 | 8 | raise + correct a ticket | | | | | | | |
 | 9 | raise a to-do | | | | | | | |
 | 10 | knowledge question | | | | | | | |
@@ -27,8 +27,14 @@ tool, a filter that doesn't exist, a write attempted before the read that
 should have preceded it, a retry of an identical failed call with no change.
 Not a wrong turn: a `describe_tool` call, a first attempt refused for a
 missing/wrong argument that gets corrected next call, or a legitimate retry
-after `door_timeout` (`ask_knowledge` alone took ~30s at answer-key capture
-time — a timeout-then-retry there is expected, see answer-key.md task 10).
+after `door_timeout` (`ask_knowledge` against this team's real corpus
+genuinely timed out twice in a row at answer-key capture time — a
+timeout-then-retry on task 10 is expected, not a mistake; see
+answer-key.md task 10). Task 5's `list_help_tickets` reply for Confia is
+71,835 bytes on its own at capture — reaching for it first isn't a wrong
+turn (it does answer the "total" half correctly), but a tester who never
+follows up with a narrower `query_records` call for the "not resolved"
+half is paying the full page's bytes for nothing.
 
 **correct?** — compare the tester's stated answer for the task to
 `answer-key.md`. For tasks 8/9 (writes), "correct" means the row actually
