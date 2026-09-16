@@ -543,10 +543,24 @@ export async function sendTriageDigest(
   env: Env,
   teamId: string,
   to: { email: string; name: string }[],
-  digest: { waiting: number; oldestDays: number; onDutyName: string | null; missingTime: string[] }
+  digest: {
+    waiting: number
+    oldestDays: number
+    onDutyName: string | null
+    missingTime: string[]
+    // BUILD-5 §D (16 Sep 2026) — the knowledge base's own unattended failures,
+    // named rather than left to the 90-day error log nobody opens on a quiet
+    // morning. RIDES THE SAME SWITCH as the rest of this mail (`morningDigest`
+    // gates the whole send on `tickets.triage-digest`) for now: a second
+    // automation switch just for this one line is real scope this lane did
+    // not open, and one daily mail a team can turn off is still louder than
+    // the silence it replaces.
+    knowledgeUnhealthy?: { count: number; sample: string[] }
+  }
 ): Promise<void> {
   if (!to.length) return
-  if (digest.waiting === 0 && digest.missingTime.length === 0) return
+  const unhealthy = digest.knowledgeUnhealthy?.count ?? 0
+  if (digest.waiting === 0 && digest.missingTime.length === 0 && unhealthy === 0) return
   try {
     const team = await teamName(env, teamId)
     const lines: string[] = []
@@ -557,6 +571,10 @@ export async function sendTriageDigest(
     if (digest.missingTime.length > 0)
       lines.push(
         `No time was logged last week by: ${digest.missingTime.join(", ")}.`
+      )
+    if (unhealthy > 0)
+      lines.push(
+        `${unhealthy} knowledge ${unhealthy === 1 ? "source" : "sources"} failed to index, including: ${(digest.knowledgeUnhealthy?.sample ?? []).join(", ")}.`
       )
     // STAFF, AND ONLY STAFF — the caller has already subtracted every client
     // login from `to` (see morningDigest), so this is an agency link by the same

@@ -36,6 +36,9 @@ const holder = vi.hoisted(() => ({
   writes: [] as { sql: string; params: unknown[] }[],
   /** when set, every d1Query throws it — the database-is-gone case. */
   dbDown: null as Error | null,
+  /** every call `indexOneSource`'s catch made to the one error seam
+   * (BUILD-5 §D). */
+  recorded: [] as { source: string; place: string; message: string; teamId?: string; userId?: string }[],
 }))
 
 vi.mock("../src/lib/knowledge-vectors", () => ({
@@ -44,6 +47,35 @@ vi.mock("../src/lib/knowledge-vectors", () => ({
   hasVectorStore: () => false,
   searchVectors: async () => [],
 }))
+
+// BUILD-5 §D (16 Sep 2026) — THE ONE ERROR SEAM, forced and observed. `env` in
+// this suite is `{}` (indexOneSource's own contract is never to touch it
+// beyond passing it through to `indexSource`), so the real `recordWorkerError`
+// would throw on `env.DB.prepare` the moment it ran — this mock is what lets
+// the suite prove the seam is CALLED without also having to stand up a core
+// database double just to watch one function get invoked.
+vi.mock("@shared/workers/error-log", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/workers/error-log")>()
+  return {
+    ...actual,
+    recordWorkerError: async (
+      _db: unknown,
+      source: string,
+      place: string,
+      e: unknown,
+      _requestId?: string,
+      who?: { teamId?: string; userId?: string }
+    ) => {
+      holder.recorded.push({
+        source,
+        place,
+        message: e instanceof Error ? e.message : String(e),
+        teamId: who?.teamId,
+        userId: who?.userId,
+      })
+    },
+  }
+})
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
@@ -84,6 +116,7 @@ beforeEach(() => {
   holder.seen.length = 0
   holder.writes.length = 0
   holder.dbDown = null
+  holder.recorded.length = 0
 })
 
 describe("indexOneSource — one document's failure is one document's", () => {
@@ -112,6 +145,33 @@ describe("indexOneSource — one document's failure is one document's", () => {
   it("reports success for a source that indexed, so the tick's count stays true", async () => {
     await expect(indexOneSource(env, cfg, guard, "fine")).resolves.toBe(true)
     expect(holder.writes.some((w) => w.sql.includes("index_error"))).toBe(false)
+    expect(holder.recorded).toEqual([])
+  })
+
+  // BUILD-5 §D (16 Sep 2026) — FORCED FAILURE, WATCHED THROUGH THE SEAM. The
+  // row's own `index_error` column was already covered above; this is the
+  // other half, that the SAME failure also reaches `recordWorkerError` —
+  // which is what makes it show up in the 90-day store and, through
+  // `unhealthySourceSample`, the morning digest's own line naming it. A
+  // failure recorded on the row alone but never through the seam is exactly
+  // the gap this lane closed: a column nobody was watching.
+  it("sends a forced failure through the one error seam, naming the source", async () => {
+    holder.fails.set("awkward", new Error("Vectorize refused that upsert"))
+    await indexOneSource(env, cfg, guard, "awkward")
+    expect(holder.recorded).toHaveLength(1)
+    const [row] = holder.recorded
+    expect(row.source).toBe("content")
+    expect(row.place).toContain("awkward")
+    expect(row.message).toBe("Vectorize refused that upsert")
+    expect(row.teamId).toBe("t")
+    expect(row.userId).toBe("u")
+  })
+
+  it("still records through the seam when Vectorize itself was rate-limited — the row is real either way", async () => {
+    holder.fails.set("busy", new Error("VECTOR_UPSERT_ERROR (code = 40041): Too Many Requests"))
+    await indexOneSource(env, cfg, guard, "busy")
+    expect(holder.recorded).toHaveLength(1)
+    expect(holder.recorded[0].place).toContain("busy")
   })
 
   it("STILL fails loudly when the database itself is gone", async () => {

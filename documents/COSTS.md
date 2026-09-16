@@ -363,6 +363,30 @@ A thinner shortlist costs less on the output side (nothing here scaled cleanly
 with width in the real measurement) but the INPUT figure above is already the
 full 12-passage shape; a 6-passage read's input is roughly proportionally lower.
 
+**CORRECTED 16 Sep 2026 (BUILD-5 §E) — the $0.0035/$0.0072 figures above were
+priced against the WRONG MODEL.** This section's own heading still says "Kimi
+K2.6" because that was true when the 1,221/465-880-token measurement was taken
+— but "(1) The model" at the very top of this file records that
+`READER_TEXT_MODEL` moved to `@cf/meta/llama-4-scout-17b-16e-instruct` the
+SAME day, and nothing below that note was ever re-priced against it. The
+measured TOKEN COUNTS are still the real shipped prompt against a real full
+shortlist and need no new call to reuse; only the PER-TOKEN RATE was stale —
+scout is $0.270/M in and $0.850/M out (`shared/workers/pricing.ts`) against
+kimi's $0.950/M in and $4.000/M out, so the reader is now the CHEAP model's
+price throughout, not the frontier one's:
+
+```
+cost, mean (583 tok out)    1,221 × $0.270/M + 583 × $0.850/M   = $0.00033 + $0.00050 = $0.00083
+cost, measured range        $0.00073 (465 tok out)  to  $0.00109 (880 tok out, widest observed)
+cost, worst case (READER_MAX_TOKENS = 1500, never actually observed)
+                             1,221 × $0.270/M + 1500 × $0.850/M  = $0.00033 + $0.00128 = $0.00161
+```
+
+Roughly a QUARTER of the superseded kimi-priced figure. Every number below this
+line (the four shapes, the two-units line, the monthly projections) is the
+corrected one; the struck figures above are kept only because this file's own
+rule is to show the wrong arithmetic beside the fix, never to delete it.
+
 **`compose=1` — the writer (R23, `llama-4-scout`). Unchanged from the prior figure**:
 
 ```
@@ -370,25 +394,78 @@ composed answer (ANSWER_MAX_TOKENS = 900):
   ~4,000 in × $0.270/M + 900 out × $0.850/M           = $0.0018450
 ```
 
-**FOUR SHAPES A QUESTION CAN TAKE, and the door lets a caller ask for any of them:**
+**FOUR SHAPES A QUESTION CAN TAKE, and the door lets a caller ask for any of them
+— corrected 16 Sep 2026 to the reader's real (scout) price, see above:**
 
 | shape | spend | cost |
 |---|---|---|
 | retrieval only (neither flag) | 0 AI units | ≈ $0.00002 |
-| `read=1` alone | 1 unit | ≈ $0.0035 (measured range $0.0030-$0.0047; up to $0.0072 at the ceiling, not observed) |
-| `compose=1` alone (today's Knowledge tab, and every MCP call before 10 Sep) | 1 unit | ≈ $0.0018 |
-| `read=1` AND `compose=1` (a full "re-read, then write" turn) | **2 units** | ≈ $0.0053 |
+| `read=1` alone | 1 unit | ≈ $0.00083 (measured range $0.00073-$0.00109; up to $0.0016 at the ceiling, not observed) |
+| `compose=1` alone | 1 unit | ≈ $0.0018 |
+| `read=1` AND `compose=1` — **BUILD-5 §E's new DEFAULT shape**, 16 Sep 2026, see below | **2 units** | ≈ **$0.0027** (mean) — $0.0026-$0.0029 measured range, up to $0.0035 at the reader's ceiling |
 
 **TWO UNITS IS CORRECT, NOT A BUG TO FIX.** The allowance is metered in REQUESTS
 (`shared/workers/credits.ts`'s own opening line: "allowance of AI requests"), and
 reading the shortlist
 and writing the answer are two separate model calls whichever door reaches them —
 charging one for both would be under-metering, the exact hole this cost file exists to
-close. Still **2.4× cheaper than an agent turn** even at the most expensive shape
-(`$0.0053` vs `$0.012675` — corrected 2026-09-15 against the agent's current engine,
-see the note at the top of the file; it was `$0.0368` and 6.9× for one day while this
-file still priced the agent against the wrong engine), which is what the two-model
-design intended and remains true with the reader's real (not estimated) cost.
+close. Still **4.7× cheaper than an agent turn** at this shape (`$0.0027` vs
+`$0.012675` — corrected 2026-09-15 against the agent's current engine, see the
+note at the top of the file), which is what the two-model design intended and
+remains true with the reader's real (not estimated, not stale-model-priced)
+cost.
+
+### BUILD-5 §E — read AND compose are now the DEFAULT shape, 16 Sep 2026
+
+Every caller of `GET /api/content/knowledge/ask` — the Knowledge tab
+(`askKnowledge`, `web/lib/api/content.ts`), the assistant's own tool call, and
+the external MCP surface (the same `ask_knowledge` catalogue entry both of the
+last two reach, `shared/workers/tool-catalog.ts`) — used to leave `read` and
+`compose` off by default, spending 0 units and getting the plain-floor,
+no-prose answer unless it explicitly asked for more. Measured (§ above): the
+honest shape costs a fraction of a cent and the alternative is a caller that
+forgot to ask paying nothing and getting the WEAKER answer with nothing on the
+wire to say so. So the default flipped: **`read=1` and `compose=1` now apply
+unless a caller explicitly asks for less** (the literal query value `0`, or
+`read`/`compose: false` on the tool's structured input), behind one constant,
+`KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT` (`workers/content/src/routes/knowledge.ts`).
+R23 is unchanged: the answer still carries its citations, `found` still
+decides in one seam, and a caller asking for less still gets exactly what it
+asked for.
+
+**What this actually costs, per question, under the new default:** ≈$0.0027
+mean, ≈$0.0035 at the reader's (unobserved) ceiling — see the corrected table
+above. A question that would have been free before (neither flag) now costs 2
+AI units; a question that already asked for `compose=1` alone now costs one
+MORE unit (`read`) for a materially more honest answer on the questions a
+plain floor would have wrongly refused (§2, "a question the floor would
+refuse → 1 reader unit").
+
+**WHAT THE ALLOWANCE MUST BE, at the volume the default is actually meant for.**
+Two units a question means the team's daily AI allowance (`AGENT_FREE_DAILY`,
+`shared/workers/credits.ts`) needs at least **200 units/day for a team asking
+100 knowledge questions a day** (100 × 2), before a single agent chat turn or
+process-draft call spends anything else out of the SAME shared allowance
+(`credits.ts`'s own header: "one allowance between all three"). Measured
+against what is actually configured today:
+
+```
+100 questions/day × 2 units       = 200 units/day needed
+PRODUCTION AGENT_FREE_DAILY        = 50   →  refuses by question 26 of the day
+STAGING    AGENT_FREE_DAILY        = 2,000 →  10× headroom past 200
+```
+
+Production's 50/day was sized for `compose=1` alone as the norm (§ "A month,
+per tenant" above) plus ordinary agent chat on the same shared meter — it was
+never sized against a team asking a hundred knowledge questions a day at TWO
+units each, and this default makes that the shape every question now takes.
+A team at that volume runs out of its free daily allowance a quarter of the
+way through the morning and starts spending purchased credits (or is refused,
+credit-less) for the rest — not a bug in this change, but a real consequence
+of it that the allowance was never re-sized for. **Raising
+`AGENT_FREE_DAILY` in production is a product/spend decision for the owner,
+not this lane's to make** — flagged here, with the arithmetic, exactly as
+`read=1`'s own default was flagged before BUILD-5 §E decided it.
 
 ### With the planner — ESTIMATED, not measured, and not yet built
 
@@ -400,20 +477,23 @@ because the shape of the number is a design input, not a report card.
 ```
 IF every question ran the planner:
   read + compose + plan  = 3 AI units/question
-  at the $0.0053 two-unit figure above, a THIRD model call of similar
-  size to the reader's system-prompt-only overhead (no shortlist to read yet —
-  the planner sees only the question) — call it ~400 in / 150 out tokens:
-    400 × $0.950/M + 150 × $4.000/M = $0.00038 + $0.00060 = $0.0010
-  THREE-UNIT TURN  ≈ $0.0063                                    (+19% over two units)
+  at the $0.0027 two-unit figure above (corrected 16 Sep 2026, see BUILD-5 §E),
+  a THIRD model call of similar size to the reader's system-prompt-only
+  overhead (no shortlist to read yet — the planner sees only the question) —
+  call it ~400 in / 150 out tokens, priced at the same cheap model:
+    400 × $0.270/M + 150 × $0.850/M = $0.00011 + $0.00013 = $0.0002
+  THREE-UNIT TURN  ≈ $0.0029                                     (+9% over two units)
 ```
 
-**That ~19% is the number that matters, and it is why the planner ships with a
+**That ~9% is the number that matters (was ~19% against the stale kimi-priced
+reader; the planner's own THIRD call got cheaper along with the reader once
+both are priced at the cheap model), and it is why the planner ships with a
 heuristic fast path (hub condition, 10 Sep 2026): an ordinary, single-topic question
 must never pay for a decomposition it did not need.** Most questions — the whole
 measured corpus of "chatty near-miss" questions this suite's own fixtures use — are one
 topic, one search; only a genuinely multi-hop or ambiguous question needs more than one
 branch. **If the fast path holds, the planner's real-world cost is closer to 0% of
-questions paying the third unit than 100%**, and the $0.0063 figure above is a CEILING
+questions paying the third unit than 100%**, and the $0.0029 figure above is a CEILING
 a caller almost never actually pays — the same shape `MAX_STEPS`'s worst-case agent-turn
 figure ($0.0606, corrected 2026-09-15 — see the note at the top of the file) already is
 against the typical one ($0.012675). Re-measure this the day the planner ships and the
@@ -421,37 +501,35 @@ heuristic's real hit rate is known; until then, treat the ceiling as the number 
 against and the typical case as unknown.
 
 **A MONTHLY PROJECTION, at the same 20,000-questions/month estimate §2's tenant table
-already uses, three ways:**
+already uses — and now against the shape every question actually takes since BUILD-5
+§E made it the default, not a hypothetical:**
 
 | shape everyone used | monthly cost | vs the old ($0.0019/question, $38/mo) figure |
 |---|---|---|
-| retrieval only | $0.40 | −99% (the old figure priced `compose` as always-on; a caller asking for neither flag was never actually this cheap in the old arithmetic) |
-| `compose=1` only (today's real usage) | $36 | −5% (rounding — this is the shape the old figure actually described) |
-| `read=1` + `compose=1`, every question | $107 | **2.8× the old figure** |
-| …if the planner's ceiling were paid by every question too | $127 | **3.3× the old figure** |
+| retrieval only (nobody's real shape any more, kept for scale) | $0.40 | −99% (the old figure priced `compose` as always-on; a caller asking for neither flag was never actually this cheap in the old arithmetic) |
+| `compose=1` only (the shape every question took before 16 Sep 2026) | $36 | −5% (rounding — this is the shape the old figure actually described) |
+| `read=1` + `compose=1`, every question — **the actual default now** | **$54** | **1.4× the old figure** |
+| …if the planner's ceiling were paid by every question too | $58 | 1.5× the old figure |
 
-**The 2.8×/3.3× multipliers are the headline finding of this section** — barely moved
-from the earlier 2.6×/3.2× estimate, because the reader's real per-question cost
-(≈$0.0035 typical) turned out close to the old, wrong $0.0032 estimate: the real INPUT
-token count is about half the character-count guess, which happens to roughly offset
-the real OUTPUT token count being 2-4× the unmeasured 200-token ceiling. They are not
-a reason to withhold the reader (KB-AUDIT.md §3's own measured case — a paraphrase
-refused with the right document as the #1 nearest neighbour — is the more expensive
-failure), but they are the number that should be in front of whoever sets `read=1`'s
-default and decides whether the assistant's own knowledge-base calls should ask for it
-on every turn or only when a first pass refuses. That default is not this lane's to
-set — flagged here so the decision is made with the arithmetic in view rather than
-found later in a bill.
+**1.4×, not the superseded 2.8×.** The earlier $107/$127 projection in this
+section priced the reader at kimi's rate after the reader itself had already
+moved to the cheap model (see the correction above the four-shapes table) — a
+stale multiplier that made the honest shape look roughly twice as expensive as
+it actually is. The corrected number is the one to plan against: making
+`read`+`compose` the default raises the estate's knowledge-question spend by
+about 40%, not close to 3×, and it is still a small line beside the assistant
+replies themselves ($253.50/mo at the same volume, §"A month, per tenant"
+below).
 
-**Still cheaper than an agent turn at every shape, though the margin is no longer
-one number — and it shrank on 2026-09-15, not because retrieval got more expensive but
-because the agent turn it's being measured against did not need pricing against
-kimi-k2.6 any more (see the note at the top of the file).** Against the typical 3-step
-turn (`$0.012675`): retrieval alone is ~634× cheaper, `compose` alone is ~7.0× cheaper,
-`read` alone is ~3.6× cheaper, and the most expensive shape — `read` AND `compose`
-together — is still **2.4× cheaper** (`$0.0053` vs `$0.012675`), or **2.0×** even at the
-planner's own estimated ceiling (`$0.0063`). The margin against the *worst-case* agent
-turn ($0.0606) is correspondingly wider than against the typical one. The two-model
+**Still cheaper than an agent turn at every shape.** Against the typical
+3-step agent turn (`$0.012675`, corrected 2026-09-15 against the agent's
+current engine — see the note at the top of the file): retrieval alone is
+~634× cheaper, `compose` alone is ~7.0× cheaper, `read` alone is now **~15.3×
+cheaper** (was ~3.6× against the stale kimi price), and the most expensive
+shape — `read` AND `compose` together, BUILD-5 §E's new default — is **~4.7×
+cheaper** (`$0.0027` vs `$0.012675`), or **~4.4×** even at the planner's own
+estimated ceiling (`$0.0029`). The margin against the *worst-case* agent turn
+($0.0606) is correspondingly wider than against the typical one. The two-model
 design's core saving holds throughout; what has changed is that "a knowledge
 question" is no longer one number, it is four (five once the planner ships), and the
 caller's own query parameters pick which one applies.
@@ -467,16 +545,24 @@ measurement): 1,000 signups, 500 imports, 20,000 assistant replies per month.
 | …if every reply hit `MAX_STEPS` | 20,000 × $0.0606 | $1,212 |
 | imports | 500 × $0.0116 | $5.80 |
 | signup emails | 1,000 × $0.0004 | $0.40 |
-| knowledge questions (say 20,000) — TODAY'S SHAPE, `compose=1` as the norm | 20,000 × $0.0018 | $36 |
+| knowledge questions (say 20,000) — BUILD-5 §E'S DEFAULT SHAPE, `read=1` AND `compose=1` | 20,000 × $0.0027 | $54 |
 | plan base | — | $5 |
 | everything else (requests, D1, R2, DO) | inside the included allowances at today's volume — see §4 | $0 |
-| | | **≈ $301/month** |
+| | | **≈ $319/month** |
 
 **Corrected 2026-09-15.** This table priced `@cf/moonshotai/kimi-k2.6` at
 **$783/month** for a full extra day after the agent's own engine had reverted
 to `gpt-oss-120b` (14 Sep 2026) — the assistant-replies row is the one that
 moved, from $736 to $253.50, because it is 94% of the bill. See the note at
 the top of the file.
+
+**Corrected again, 16 Sep 2026 (BUILD-5 §E).** The knowledge-questions row
+moved from $36 (`compose=1` alone, the shape every question took before this
+lane) to $54 (`read=1` AND `compose=1`, the new default) — +$18/month at this
+volume, moving the total from $301 to $319. Not the same row this file
+carried between 10 and 16 Sep, which briefly said $107 for this shape at the
+stale kimi-priced reader rate; that number was never real at any point the
+reader itself was actually running scout.
 
 **The knowledge-questions row is one of four possible numbers, not one** — see "With
 the planner" above for the full table (retrieval-only $0.40/mo up to $120/mo if every
