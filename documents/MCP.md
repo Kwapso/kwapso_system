@@ -131,9 +131,8 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 65 of the 184 tools answer on a GET (counted from the live catalogue,
-  10 Sep 2026, after the internal rates AND the account rate card were removed —
-  two rulings an hour apart, nine tools between them), and 183 of the doors in the
+- **Read** — 63 of the 179 tools answer on a GET (counted from the live
+  catalogue, 15 Sep 2026), and 183 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -145,6 +144,31 @@ Today it covers:
     sentence — the history, the reasoning, the worked examples — is on the tool's
     `detail` and comes back from here, by name, when a caller actually needs it.
     Nothing was deleted; ask for it before a call you are unsure of.
+
+    **It reaches all 179, not just the ~two dozen tenancy/content CRUD tools
+    declared once and shared with the agent.** Until 15 Sep 2026 this door
+    looked in `SHARED_TOOLS` only, so the 18 `set_<record>_active` toggles
+    (`set_account_active`, `set_role_active`, and the rest — see `set_record_active`
+    below), the generic `set_record_active` itself, and the 23 MCP-only tools
+    (`whoami`, the CSV exports, the agentic-import batch flow, the AI allowance,
+    the saved conversations, `agent_chat`/`agent_confirm`) all answered
+    `unknown_tool` — a caller reaching for the exact tools this door exists to
+    explain got refused by it instead. Their `summary`/`detail` now live beside
+    `SHARED_TOOLS` in the shared catalogue too
+    (`@shared/workers/mcp-catalog`, and `record-toggles.ts` for the 18), so this
+    door answers for the whole manifest without needing to import the mcp
+    worker's own code.
+
+    **The manifest itself now trims by your live role**, the same way the
+    in-app assistant's own tool list already does: a tool whose write needs a
+    permission your role doesn't hold is left off `tools/list` entirely, not
+    merely refused if you call it. Demote a role and its next `tools/list`
+    shrinks with it; a read tool is never hidden this way (a read carries no
+    single permission to check it against), and neither is `set_record_active`
+    itself (no single gate to name across the eighteen doors it can reach) —
+    both fail open, exactly as the agent's own trimming does. A failed
+    permissions read fails open too: you see the whole catalogue rather than a
+    silently emptied one.
   - **asking, rather than listing** — `describe_module` and `query_records`. One
     read tool over every module a caller may read: `describe_module` answers with
     the fields, their types and an enum's values (including the ones the team
@@ -382,16 +406,20 @@ Today it covers:
   re-imported.
 - **Write, deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
-  - **`set_record_active`, the generic form.** Every `set_<record>_active` tool below
-    (roles, accounts, dropdown values, process maps, and the rest — twenty-one in
-    all) is also reachable through this one tool: `record` names which kind
+  - **`set_record_active`, the generic form.** Two rate-card record kinds stood
+    here once (`internal_rate`, `account_rate`) and were removed on 10 Sep 2026
+    with the rate cards themselves. Every `set_<record>_active` tool below
+    (roles, accounts, dropdown values, process maps, and the rest — eighteen in
+    all, now) is also reachable through this one tool: `record` names which kind
     (`account`, `role`, `dropdown_value`, …), `id` is that record's id (a role takes
     `roleId`, a deliverable also needs `appId`), `active` says which way. Both forms
     stay published side by side — the named ones are the pinned external contract
     (added first, and a script calling `set_account_active` keeps working forever),
     the generic one is for an integration that would rather send one shape for
-    every record kind than remember twenty-one names. Same map, same doors, same
-    confirm rule, either way.
+    every record kind than remember eighteen names. Same map, same doors, same
+    confirm rule, either way. `describe_tool` answers for both forms — the generic
+    one with its own detail, and each named toggle with the record-specific detail
+    that says what switching it off or on really does to that kind of record.
   - the team, `update_team` (rename the team this token is pinned to; needs `teams:update`)
   - roles, `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members, `set_member_role`, `remove_member` (people join via **invite**)
@@ -579,6 +607,20 @@ Today it covers:
   passages, and a line to repeat instead of answering from memory (Law R23). A client
   building an answer out of it should quote the source titles; an answer with no
   citation is the exact failure that law exists to prevent.
+
+  **"What does a record say about X" is `ask_knowledge`'s question, not a list
+  tool's `q`.** A one-liner audit measured on 15 Sep 2026 found a fresh model,
+  offered both, answering a content question by paging a list tool's `q` filter
+  instead — on Haiku and Sonnet alike, every time, because a familiar-sounding
+  `q` beat a compartment it had not yet been told to prefer. So `initialize`'s
+  own `instructions` say the same sentence, up front, before any tool is
+  called, and every list tool whose door parses `q` (`list_help_tickets`,
+  `list_accounts`, `list_stories`, `list_meetings`, `list_todos`,
+  `list_work_logs`, `list_knowledge_sources`, `list_apps`, `list_processes`)
+  repeats it in its own one-line summary: `q` matches a FIELD (a title, a
+  reference, a name); `ask_knowledge` searches what was actually SAID, and
+  refuses honestly — `found:false` — rather than guessing when nothing is
+  close enough.
 - **Bulk create:** the import pipeline, `start_import` → `add_import_file` →
   `plan_import` → `run_import`, and `continue_import` when a run does not come
   home. An import of any size is minutes long, so a dropped connection part way
@@ -1013,3 +1055,23 @@ so that gateway is the only way in. The client portal's gateway does NOT bind th
 mcp worker at all and refuses `/mcp` outright, the machine surface is not on the
 client internet. See ARCHITECTURE.md (the `mcp` row) and DATA-MODEL.md
 (`mcp_tokens` + `sessions.team_pin`).
+
+The catalogue's DATA is split by what a TENANCY door needs to be able to
+answer, not by which worker forwards it. `shared/workers/tool-catalog.ts`
+holds `SHARED_TOOLS`, the ~two dozen tenancy/content CRUD tools the agent and
+this surface both project; `shared/workers/record-toggles.ts` holds
+`RECORD_TOGGLES`, the 18 `set_<record>_active` doors (`summary` + `detail`
+each); `shared/workers/mcp-catalog.ts` holds `MCP_ONLY_TOOLS` (the 23 tools
+that exist only here) and `RECORD_ACTIVE_GENERIC_DESC` (the generic
+`set_record_active`'s own words). All three live in `shared/` — never in one
+worker's `src/` — because `describe_tool` (`workers/tenancy/src/routes/tools.ts`)
+has to reach every one of them without importing another worker's bundle, the
+same reason `SHARED_TOOLS` itself sits in `shared/`. `workers/mcp/src/lib/
+tools.ts` still does the only thing that has to run IN this worker: project
+that data into `McpTool`s, add the routing (`buildBody`/`buildQuery`/`route`)
+the generic toggle needs, and forward each call (`forwardTool`). `tools/list`
+trims by the caller's live role there too, via `heldRights` (a direct read of
+`/api/tenancy/my-permissions`, the same door `my_permissions` forwards to) and
+`keptForRights` (`@shared/workers/tool-gates`) — the identical predicate
+`toolSpecs` (`workers/data-ops/src/lib/tools.ts`) trims the agent's own
+catalogue with, reused rather than reinvented.

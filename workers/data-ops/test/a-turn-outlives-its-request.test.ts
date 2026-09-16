@@ -21,7 +21,10 @@ import { CARRYING_ON_NOTE, CARRY_ON_NUDGE, MAX_SEGMENTS, resumable } from "../sr
 
 const AGENT = readFileSync(join(__dirname, "../src/lib/agent.ts"), "utf8")
 const DOOR = readFileSync(join(__dirname, "../src/routes/agent.ts"), "utf8")
-const MCP = readFileSync(join(__dirname, "../../mcp/src/lib/tools.ts"), "utf8")
+// `agent_chat`'s own declaration (name, schema, buildBody) moved to
+// @shared/workers/mcp-catalog on 15 Sep 2026, so it's the shared file that
+// carries the `continue` forward now, not the mcp worker's own tools.ts.
+const MCP = readFileSync(join(__dirname, "../../../shared/workers/mcp-catalog.ts"), "utf8")
 
 const row = (
   role: AgentMessage["role"],

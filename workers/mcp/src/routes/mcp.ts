@@ -13,11 +13,12 @@ import { GuardError, noteIdentity } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requestId } from "@shared/workers/trace"
 import { brand } from "@shared/brand"
+import { keptForRights } from "@shared/workers/tool-gates"
 
 import type { Env } from "../env"
 import { verifyToken } from "../lib/tokens"
 import { sessionCookieFor } from "../lib/bridge"
-import { forwardTool, getMcpTool, MCP_TOOLS } from "../lib/tools"
+import { forwardTool, getMcpTool, heldRights, MCP_TOOLS } from "../lib/tools"
 
 const PROTOCOL_VERSION = "2025-06-18"
 
@@ -63,24 +64,36 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: `${brand.name}-mcp`, version: "1.0.0" }, // brand-derived; kwapso's value unchanged
-        // The last sentence is load-bearing since 2026-09-08: every tool
-        // description here is ONE LINE, so a client that never calls
-        // describe_tool is reading a quarter of what the catalogue says.
+        // The last two sentences are load-bearing since 2026-09-08 and
+        // 2026-09-15 respectively: every tool description here is ONE LINE, so
+        // a client that never calls describe_tool is reading a quarter of what
+        // the catalogue says — and "what does a record say about X" is a
+        // question ask_knowledge answers honestly (it refuses rather than
+        // guessing when nothing is found), while a plain list tool's own `q`
+        // only matches a field, never a record's prose.
         instructions:
-          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions.",
+          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions. For \"what does a record say about X\", call ask_knowledge rather than a list tool's own q filter — it searches what was actually said, and refuses honestly when nothing is found instead of guessing.",
       })
     case "notifications/initialized":
       return new Response(null, { status: 202 })
     case "ping":
       return rpcResult(id, {})
-    case "tools/list":
+    case "tools/list": {
+      const trace = requestId(request)
+      const cookie = await sessionCookieFor(env, token, trace)
+      // TRIMMED BY THE CALLER'S LIVE ROLE, the same seam the agent's own
+      // catalogue trims with (toolSpecs -> keptForRights) rather than a second
+      // filter invented for this surface: a role missing a tool's write right
+      // never sees that tool named at all, on either machine surface.
+      const held = await heldRights(env, cookie, trace)
       return rpcResult(id, {
-        tools: MCP_TOOLS.map((t) => ({
+        tools: MCP_TOOLS.filter((t) => keptForRights(t.gate, held)).map((t) => ({
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
         })),
       })
+    }
     case "tools/call": {
       const name = String(rpc.params?.name ?? "")
       const tool = getMcpTool(name)

@@ -439,6 +439,11 @@ describe("the screens are reachable", () => {
     for (const f of [
       join(ROOT, "workers", "data-ops", "src", "lib", "tools.ts"),
       join(ROOT, "workers", "mcp", "src", "lib", "tools.ts"),
+      // The 23 MCP-only tools (whoami, the CSV exports, the agentic-import
+      // batch flow, the AI allowance, the assistant bridge) moved here on
+      // 15 Sep 2026 so describe_tool (workers/tenancy) could read them too —
+      // their literal `path:` strings moved with them.
+      join(ROOT, "shared", "workers", "mcp-catalog.ts"),
     ])
       for (const m of read(f).matchAll(/path:\s*"(\/api\/[^"]+)"/g)) toolPaths.add(m[1])
     expect(toolPaths.size, "the tool-path derivation found almost nothing — it has gone blind").toBeGreaterThan(30)

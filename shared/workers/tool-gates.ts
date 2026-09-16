@@ -454,3 +454,19 @@ export function isMoneyWrite(tool: { name: string; write?: boolean }): boolean {
   const gate = TOOL_GATES[tool.name]
   return !!gate && MONEY_MODULES.includes(gate.split(":")[0])
 }
+
+/** WOULD A CALLER HOLDING `held` STILL BE SHOWN A TOOL GATED ON `gate`?
+ *
+ * The exact predicate `toolSpecs` (workers/data-ops/src/lib/tools.ts) filters
+ * the agent's own catalogue with, pulled out here so the MCP surface's
+ * `tools/list` can REUSE it rather than re-derive it — one seam, both
+ * surfaces, so a role missing a right drops a tool identically on both. Fails
+ * OPEN in both directions, for the same reasons `toolSpecs` does: no `held`
+ * (the caller's rights sheet could not be read) keeps everything, and no
+ * declared `gate` (a read, or a write nothing here has classified) keeps the
+ * tool too — an undeclared gate means "nobody has classified this", not
+ * "nobody may call it". */
+export function keptForRights(gate: string | undefined, held?: ReadonlySet<string>): boolean {
+  if (!held) return true
+  return !gate || held.has(gate)
+}

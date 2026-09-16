@@ -70,6 +70,12 @@ export type RecordToggle = {
    * pays for itself on the surface that is billed by the token; on the one that
    * is not, it would only break things. Same map, two projections. */
   summary: string
+  /** The rest of what an outside developer needs, held back from the manifest
+   * the same way a SharedTool's `detail` is (MCP.md §3: a tools/list used to
+   * carry 85,621 characters of prose before summaries were cut to one line).
+   * `describe_tool` on `set_<record>_active` answers with this; a record with
+   * nothing more to say than its summary already does leaves it out. */
+  detail?: string
 }
 
 /** THE ALLOW-LIST OF TOGGLEABLE RECORDS. A record name that is not a key here
@@ -88,6 +94,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive an account (`active: false`) or restore it (`active: true`), never deleted; every record it carries survives.",
+    detail:
+      "Archiving an account is a shelving act, not a removal: its tickets, its stories and sprints, its contacts and every figure computed against it stay exactly where they are, and list_accounts and export_accounts_csv both take an archived filter so an archived one is still findable rather than gone. It only ASKS when switching off, because bringing one back changes nothing anybody has to be warned about. A restored account does not automatically restore anything nested under it that was separately archived — a contact link or a portal login taken down while the account itself was still active stays down until its own toggle is called.",
   },
   // FENCE WRITE (account_links) → both ways. Unlinking takes a company away from
   // a client login; RELINKING hands it straight back.
@@ -102,6 +110,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "always",
     summary:
       "Unlink a contact from an account (`active: false`) or link them back (`active: true`), by the CONTACT LINK's id, get_account returns it. The person's own account is untouched either way.",
+    detail:
+      "This is a FENCE write, which is why it confirms both ways: a contact link is what makes a person's own account (their individual record) reachable from the company account they work at, and unlinking narrows what a client-portal login built on that person can see just as surely as relinking widens it. The contact's own account record, and any portal login built on it, survive the unlink untouched — only the join between the two accounts moves. Relink hands back exactly the same visibility the original link carried, nothing is recomputed.",
   },
   // PRIVILEGE WRITE (portal_users) → both ways: revoking takes sight of a
   // customer's world away, restoring hands it back.
@@ -116,6 +126,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "always",
     summary:
       "Revoke a portal login (`active: false`) or restore it (`active: true`), by the PORTAL ACCESS row's id, get_account and list_portal_access both return it. The login dies; every record stays.",
+    detail:
+      "A PRIVILEGE write: revoking takes away a client contact's ability to sign in and see their own world in the portal, and restoring hands that same sight straight back, so both directions confirm. The person, their account and everything on it are untouched — this switches whether they can currently reach the portal at all, nothing about what they would see once they are in it. A revoked login is not deleted, so restoring it does not re-invite anybody or change the address it signs in with.",
   },
   // PRIVILEGE WRITE (member_roles) → both ways, and the one door that reads
   // `roleId` rather than `id`.
@@ -130,6 +142,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "always",
     summary:
       "Switch a role off (deactivate, holders keep access) or back on (reactivate), never deleted. Takes `roleId`.",
+    detail:
+      "A deactivated role is not the same as removing everybody who holds it: a holder keeps whatever access the role granted until they are individually moved to a different one with set_member_role, so this switch alone changes nothing about who can do what today — it stops the role being offered for NEW assignments and hides it from pickers. Reactivating puts it back on offer exactly as it was, permissions included, because deactivating never touched set_role_permissions' own matrix. Both directions confirm: this is the roles module, and member_roles:update is the same right that can grant permissions in the first place.",
   },
   dropdown_value: {
     binding: "TENANCY",
@@ -142,6 +156,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Switch a dropdown value off (deactivate) or back on (reactivate), never deleted. A value marked as one of the team's defaults refuses to switch off — take the mark off with `set_dropdown_default` first.",
+    detail:
+      "A deactivated value drops out of the picker on every form that offers it, but every record that already carries it keeps reading correctly — a ticket typed 'Billing' before Billing was retired still says Billing, it simply stops being an option going forward. list_dropdown_values shows both states so a deactivated one is still findable. The default-value refusal exists because a group with no default left would leave a form with nothing pre-selected; retire the value first, then move the default to another one in the same group, then this switch is free to run.",
   },
   app: {
     binding: "TENANCY",
@@ -154,6 +170,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive an app (`active: false`) or restore it (`active: true`). Never deleted, its maps, its versions and every saving computed from them stay exactly where they are. An archived app drops out of the value figures.",
+    detail:
+      "An app is what a process map is drawn against, so archiving one is a rollup switch rather than a per-process one: every process, every cut version and every deliverable published on it stays readable through get_process and get_app_impact, it simply stops counting toward the totals a client sees on their portal until it is restored. Restoring puts it back into those totals exactly as it left them, nothing is recomputed from scratch.",
   },
   app_module: {
     binding: "TENANCY",
@@ -166,6 +184,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Switch a module off (`active: false`) or back on (`active: true`). Never deleted: every ticket already filed against it keeps naming it and still reads correctly — it simply stops being offered on the ticket form.",
+    detail:
+      "A MODULE here is what a ticket says it is about (Settings, Documents, Tasks), grouped under an app the same way list_app_modules and create_app_module both name it — it is not the permission module a role right is checked against, a different word for a different thing in the same codebase. Switching one off only changes what a person raising a new ticket is offered; it does not touch the ticket, sprint or story rows that already reference it, and there is nothing to reconcile on restore.",
   },
   process: {
     binding: "TENANCY",
@@ -178,6 +198,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive a process map (`active: false`) or restore it (`active: true`). Never deleted: every version, every step and the whole conversation survive, and an archived map simply stops counting toward the value figures.",
+    detail:
+      "Archiving a process does not touch its cut versions — cut_process_version's history stays exactly as read, and get_process keeps answering for it — it only stops the map counting toward the app's own value figures and read_impact's rollup while it is off. Its connections to other processes (connect_processes) are untouched either way, so a step that used to hand off into an archived map still names it; restoring brings the figure back with nothing to recompute.",
   },
   // `work:update`, not `work:delete` — the work module offers no delete right, and
   // the door says so itself.
@@ -192,6 +214,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "always",
     summary:
       "Switch a wave off, or bring it back (by `id`). Never a delete: the sprints inside it keep their history, and a package a client paid for stays readable.",
+    detail:
+      "A wave is what a client bought — several sprints sold together — so switching it off is closer to withdrawing an offer than tidying a record: every sprint inside it keeps its own dates and price, get_wave keeps answering, and set_sprint_wave still moves sprints in and out of it while it is off. It confirms both ways because a client's own portal reads waves as the package they paid for, and either direction changes what that reads as available.",
   },
   // The client's own organisation. None of the three ever asked, and none of
   // them is an access write, so none of them starts asking now.
@@ -206,6 +230,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "never",
     summary:
       "Switch a department off, or bring it back. `active` false retires it; true restores it. Nothing is deleted — a retired department is still the one an old map was drawn against.",
+    detail:
+      "A department here is the client's own organisation, not ours — list_client_departments and create_client_department name the same table. Retiring one only stops it being offered when a new client_role is created or edited; a role already sitting in it, and any process step priced against a person in it, keeps reading correctly. Neither direction confirms because this is client-side vocabulary, not an access write.",
   },
   client_role: {
     binding: "TENANCY",
@@ -218,6 +244,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "never",
     summary:
       "Switch a role off in the client's own organisation, or bring it back. Nothing is deleted: a retired role is still the one a two-year-old map was drawn against, and deleting it would quietly turn that map's saving into nothing.",
+    detail:
+      "This is the client's job title, not one of our own member roles — the same distinction set_role_active draws on the other side of the fence. A step priced against this role reads it by id rather than by name, so retiring it changes nothing about a figure already computed; it only stops the role being offered when a new client_role is created or a process step is priced against one. The people already sitting in it (set_client_role_person) stay linked either way.",
   },
   client_tool: {
     binding: "TENANCY",
@@ -230,6 +258,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "never",
     summary:
       "Switch a tool off, or bring it back. Nothing is deleted — its price history is what an old map reads to cost itself.",
+    detail:
+      "A client_tool's price is dated (set_client_tool_price files an amount under the day it started being true), and switching the tool itself off touches none of that history — list_client_tool_prices keeps answering for it and a map priced against it on a given day still costs correctly on that day. Retiring only stops it being offered when a new one is priced or a map is built going forward.",
   },
   // MONEY. THERE ARE NO MONEY RECORDS ON THIS TABLE ANY MORE, and the absence is
   // written down rather than left as a gap. Two entries stood here — the agency's
@@ -251,6 +281,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Cancel a meeting (`active: false`) or put it back (`active: true`), by id. Nothing is deleted, the record and its notes survive, because a question like 'didn't we speak in March?' has to stay answerable.",
+    detail:
+      "Cancelling a meeting leaves get_meeting_people, get_meeting_transcript and every work log time already stamped against it exactly as they were — a cancelled meeting can still answer 'what was said' if a transcript was already captured. It only stops the meeting counting as upcoming. There is no set_meeting_held door: whether it happened is read off its own start time, never off this flag.",
   },
   knowledge_source: {
     binding: "CONTENT",
@@ -263,6 +295,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Take a source away from the assistant (`active: false`) or give it back (`active: true`), by id. Nothing is deleted: the row and its history survive, its searchable pieces do not, and the sweep will not quietly re-add a source somebody took away.",
+    detail:
+      "Switching a source off removes its embedded passages from what ask_knowledge can find, so it stops the assistant citing it in a new answer immediately — sync_knowledge's own 15-minute sweep checks this flag before re-indexing anything, which is what stops a source somebody deliberately took away quietly reappearing on the next pass. Switching it back on does not re-embed instantly, the next sweep (or a manual sync_knowledge call) picks it up.",
   },
   // The one door that needs a second id: a deliverable is addressed by the app
   // whose shelf it sits on as well as by itself.
@@ -278,6 +312,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive a deliverable (`active: false`) or put it back (`active: true`). Needs `appId`, the app whose shelf it sits on. Never deleted, and the file behind it is never thrown away either way, restoring one whose bytes had gone would hand back a broken link.",
+    detail:
+      "This is separate from set_deliverable_visibility, and the two do not interact: archiving takes a deliverable off the shelf entirely (staff and client both stop seeing it), while visibility only controls whether a CLIENT may see one that is still active. An archived-but-visible deliverable simply disappears from both views until it is restored, at which point its visibility flag is exactly what it was before archiving.",
   },
   brand_asset: {
     binding: "CONTENT",
@@ -290,6 +326,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive a brand asset, or put it back. The FILE is never deleted either way, restoring an asset whose bytes had been thrown away would hand back a broken link.",
+    detail:
+      "list_brand_assets and export_brand_assets_csv both show archived rows alongside active ones, so an archived asset stays findable — it simply stops being offered wherever the agency picks a logo or a colour off the brand library. There is no separate delete for the underlying file; the bytes only ever go away if the record itself is removed at the storage layer outside this door, which archiving never does.",
   },
   meeting_purpose: {
     binding: "CONTENT",
@@ -302,6 +340,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "off",
     summary:
       "Archive a meeting type, or put it back, never deleted.",
+    detail:
+      "A meeting type (called a meeting purpose in the schema and by create_meeting_purpose, and 'purpose' at the door — the module and the tools stay on that older name the way tickets stays 'help') is what create_meeting and update_meeting offer as the reason for a meeting. Archiving one stops it being offered on a NEW meeting; every meeting already carrying it keeps naming it and reads exactly as before.",
   },
   staff_profile: {
     binding: "CONTENT",
@@ -314,6 +354,8 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     confirm: "always",
     summary:
       "Take a staff profile down, or put it back, never deleted.",
+    detail:
+      "A staff profile is about a colleague, not their team membership — taking one down does not remove them from the team, change their role or revoke anything they can do, it only takes their profile off whatever screen shows the roster. It confirms both ways for the same reason there is no CSV export for this record: what a profile says about a person is the kind of thing that deserves a person's attention before it changes, in either direction.",
   },
 }
 
