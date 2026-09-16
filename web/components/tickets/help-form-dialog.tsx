@@ -1130,8 +1130,11 @@ export function HelpFormDialog({
             {fixedAccount.name}, a ticket can&apos;t be moved to another account.
           </p>
         ) : fixedNoAccount ? (
+          // R81 (16 Sep 2026 ruling): a settled VALUE, not a hint — the app's
+          // own name glued to the same words the picker's placeholder already
+          // uses, never a bare explanatory sentence on its own.
           <p className="text-muted-foreground text-sm" id="help-account">
-            {t("Ours, no account")}
+            {fixedApp?.name} — {t("Ours, no account")}
           </p>
         ) : (
           <RecordPicker

@@ -89,7 +89,9 @@ describe("the ticket form settles the account an app already answers", () => {
         draftKey="help:add:app:app-agency-own"
       />
     )
-    expect(await screen.findByText("Ours, no account")).toBeTruthy()
+    // R81 (16 Sep 2026): the settled text glues the app's own name to the
+    // words, so it reads as a value and not a bare hint sentence.
+    expect(await screen.findByText("Internal tools — Ours, no account")).toBeTruthy()
     // THE DISCRIMINATING CHECK. The untouched PICKER also shows "Ours, no
     // account" as its own placeholder — so the sentence alone proves nothing;
     // what proves the field settled is that there is no control left to open.
