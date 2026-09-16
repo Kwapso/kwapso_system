@@ -90,17 +90,16 @@ to a real client's queue). Correct calls:
 with `list_todos` or `query_records` module `todos` filtered on that
 account.
 
-## 10. Knowledge question — FINAL
+## 10. Knowledge question — FINAL (amended 2026-09-16 per planner)
 
 **Graded against the real team-database rows below, read directly
-(`query_records`/`list_apps`, never `ask_knowledge`) — not against
-whatever `ask_knowledge` happens to return at test time.** The ticket
-knowledge-ingest is still rebuilding as of this writing (~1,343 of 2,065
-tickets left, ~3h at the current rate; every other kind, `account`
-included, is already caught up), so grading this task against a specific
-`ask_knowledge` citation would make the key's correctness depend on
-exactly when the tester runs it. Grading against the underlying facts
-instead does not.
+(`query_records`/`list_apps`, never `ask_knowledge`).** The tester runs
+only after `knowledge_hygiene` reports the base has caught up, and as of
+23:00 the `account` (134 live sources) and `app` (28 sources) knowledge
+kinds are **already fully, currently indexed** — not partial, not a
+moving target. That changes what counts as a pass: the material is
+already in the base, so the answer seam finding nothing is a real miss,
+not an expected outcome.
 
 **Source-of-truth facts about "Confia"** (account id
 `01KZXBT5T6CVY065QVW9M2S47G`), read straight from the team database:
@@ -110,25 +109,24 @@ instead does not.
 - One app: `ref A0001`, name "CONFIA", url
   `www.confia-maklar.glide.page`, stage **Maintenance**, active.
 - Tickets: **380 total, 30 not resolved** (task 5's own numbers — the
-  busiest account on the team).
+  busiest account on the team). Ticket ingest may or may not be fully
+  caught up by test time — a ticket citation is a bonus, not required for
+  a pass; the account/app facts above are what a pass is graded on.
 
-**How to grade the tester's actual `ask_knowledge({"q": "Confia"})`
-result:**
-- `found: false`, or a `door_timeout` — **pass**, and expected right now:
-  the `account` ingest kind is caught up (132/134 sourced) so a citation
-  to the Confia account row is plausible, but a timeout against this
-  team's full-size Vectorize index is the same baseline scoring.md
-  already records, not a tool failure on the tester's part.
-- `found: true` with a citation — check the citation's `title`/fields
-  against the facts above (the account row, code CONFIA, or the app
-  "CONFIA"/A0001/Maintenance are the only currently-indexed material that
-  can genuinely be "about" Confia; a ticket citation is possible but
-  unlikely before the rebuild finishes, since only ~80 of 380 of
-  Confia's tickets could be indexed at most). **Pass** if what it cites is
-  true against these rows; **fail** if it invents something these rows
-  don't support (Law R23's whole point — a citation is only as good as
-  the record behind it).
-- Either way, the tester naming the law-mandated sentence ("say what it
-  says today, not what the passage says" / equivalent) when it DOES
-  answer is a bonus, not a requirement — it only appears when `found:
-  true`.
+**Grade the tester's actual `ask_knowledge({"q": "Confia"})` result as
+one of four outcomes, not pass/fail alone:**
+
+- **PASS** — `found: true`, the cited facts about Confia are correct
+  against the rows above (the account row, code CONFIA, or the app
+  "CONFIA"/A0001/Maintenance), and at least one citation is present.
+- **FAIL** — `found: true` but a cited fact is wrong against the rows
+  above (say which fact, and what it claimed instead) — Law R23's whole
+  point is that a citation is only as good as the record behind it.
+- **MISS** — `found: false`. The account and app material is already
+  fully indexed, so this means the answer seam failed to find something
+  that is actually there — a real miss, not an expected empty result.
+- **INFRASTRUCTURE** (neither pass nor fail, recorded separately with
+  the elapsed time in ms) — `door_timeout`, or any 5xx. Note in
+  scoring.md if this happens: it says something about the surface's
+  reliability under load, independent of whether the tester "got the
+  task right."

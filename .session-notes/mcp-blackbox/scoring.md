@@ -52,7 +52,8 @@ tester reports.
 - Largest single reply (bytes, and which tool):
 - Any reply over 20,000 characters? (Y/N, which one):
 - Wall-clock, first call to last:
-- Tasks correct: `___ / 10`
+- Tasks correct: `___ / 10` (task 10 counts toward this only as PASS/FAIL — an INFRASTRUCTURE outcome is excluded from the denominator, not scored as a miss)
+- Task 10 outcome: `PASS / FAIL / MISS / INFRASTRUCTURE`, elapsed ms if INFRASTRUCTURE:
 
 ## Baseline finding — ask_knowledge on the real corpus (not the tester's fault)
 
@@ -68,13 +69,24 @@ At the same time, `get_knowledge_status` showed the `ticket` ingest kind at
 real, much larger Vectorize index. **If the tester's task 10 also times
 out, that is this same baseline reproducing, not a new tester-caused
 failure** — score it as a finding about the surface, not against them.
-**Task 10 is now FINAL in answer-key.md** — graded against the real
-Confia account/app rows read directly (not against a specific
-`ask_knowledge` reply), so it doesn't depend on when the ticket rebuild
-finishes. A `door_timeout` or `found: false` from the tester's own call
-is a pass, matching this baseline; a `found: true` is graded by checking
-its citation against the source-of-truth facts in answer-key.md, not by
-matching a fixed expected citation.
+**Task 10 is FINAL in answer-key.md, amended 2026-09-16.** The tester runs
+only after `knowledge_hygiene` reports the base caught up, and by then the
+`account` (134 sources) and `app` (28 sources) knowledge kinds are fully,
+currently indexed — not a moving target — so this is graded as one of
+**four** outcomes, not plain pass/fail. In the per-task table's "correct?"
+cell for row 10, write one of:
+
+- **PASS** — `found: true`, cited facts about Confia check out against
+  answer-key.md's account/app rows, at least one citation present.
+- **FAIL** — `found: true` but a cited fact is wrong (say which, in the
+  cell or a footnote).
+- **MISS** — `found: false`. The material is already indexed, so this is
+  a real miss now, not the expected-empty baseline it was earlier today.
+- **INFRASTRUCTURE** — `door_timeout` or any 5xx. Record separately in
+  "Per run" below (not counted toward `Tasks correct: ___/10` either
+  way) with the elapsed ms — this is the same class of finding as the
+  baseline timeouts above, just after the rebuild, so it's worth knowing
+  whether it still happens once the base is caught up.
 
 ## Reading the result
 
