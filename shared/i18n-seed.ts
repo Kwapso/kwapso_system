@@ -115,6 +115,11 @@ export const SEED: Catalogue = {
    * tab: Halloway"), so the verb itself has to say "tab" rather than leave the
    * join to carry that word alone — see `app-shell.tsx`'s `closeLabel` prop. */
   "Close tab": { de: "Tab schließen", es: "Cerrar pestaña", ca: "Tancar pestanya" },
+  /* THE STRIP'S OWN CLOSE-ALL VERB (2026-09-16, kit v1.2.92's own
+   * `BreadcrumbFoldersProps.closeAllLabel`). Announced whole, with no crumb
+   * to join against — it closes every tab but the one she is on, not one
+   * named tab — so it needs no second half the way `"Close tab"` does. */
+  "Close all tabs": { de: "Alle Tabs schließen", es: "Cerrar todas las pestañas", ca: "Tancar totes les pestanyes" },
   Back: { de: "Zurück", es: "Atrás", ca: "Enrere" },
   "Start timer": {
     de: "Zeit starten",

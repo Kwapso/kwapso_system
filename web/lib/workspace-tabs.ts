@@ -473,6 +473,46 @@ export function closeTab(path: string): string | null {
   return landing
 }
 
+/** CLOSE EVERY TAB EXCEPT `keepPath` — Chrome's "close other tabs", under the
+ * app's own name for it ("Close all tabs", the client's own words). The kept
+ * tab is always the one the reader is currently looking at: this store never
+ * asks which tab to spare because there is only ever one candidate — the
+ * caller passes `activePath` (the same value `useActiveTabPath` hands the
+ * strip), never a choice this function makes on its own.
+ *
+ * NO NAVIGATION, NO GUARD, NO DRAFT CHECK — and that is not an omission, it
+ * is the reason this is safe to fire straight from a click. Every OTHER open
+ * tab is a BACKGROUND tab by definition (the kept one is the one in front),
+ * and `closeTab`'s own doc already establishes the load-bearing fact this
+ * shares: "a background tab never navigates — nothing mounted is at risk".
+ * `web/lib/unsaved-changes.ts`'s dirty registry is keyed by a MOUNTED panel,
+ * and only the screen the reader is standing on is ever mounted in this
+ * one-shell app (R37) — so a background tab cannot be holding a draft this
+ * call could destroy, and the kept tab is never touched at all: its position,
+ * its name and the screen under it are exactly what they were a moment ago.
+ *
+ * A NO-OP AT ONE TAB, LIKE THE CEILING'S OWN EVICTION. `tabs.length <= 1`
+ * means there is nothing else to close — the caller (`BreadcrumbFolders`'
+ * own `onCloseAll` gate) already hides the control at exactly this count, so
+ * this guard is the second door rather than the only one, the same belt for
+ * an already-drawn strip that `visitTrail`'s own refusal is for a store with
+ * no scope. */
+export function closeAllTabs(keepPath: string): void {
+  if (!scope || tabs.length <= 1) return
+  const keep = tabs.find((tab) => tab.path === keepPath)
+  // NOT FOUND MEANS REFUSE, NOT GUESS. The caller always passes the tab it is
+  // standing on, which `tabStripState` already proved is a member of `tabs`
+  // before the strip draws a close-all control at all — so this is a
+  // defensive read-back, never a real branch in practice, the same posture
+  // `closeTab` itself takes on an unknown path.
+  if (!keep) return
+  tabs = [keep]
+  recency = [keepPath]
+  activePath = keepPath
+  persist()
+  announce()
+}
+
 /** Drop everything, for every scope. Sign-out only: these are one person's
  * places and a `localStorage` key outlives the session that wrote it, so the
  * next person to use this browser must not inherit a strip of somebody else's

@@ -59,6 +59,7 @@ import type { TaskView, StoryView, InputView } from "@/lib/live-resources"
 import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
+  closeAllTabs,
   closeTab,
   setWorkspaceScope,
   useOpenTabs,
@@ -617,6 +618,16 @@ export function DeepLinkScreen() {
     [currentPath, go, sectionPath]
   )
 
+  // CLOSE ALL TABS — keeps the tab she is standing on, stays active, nothing
+  // else changes about it. `closeAllTabs` never navigates (see its own doc:
+  // every OTHER open tab is a background tab by construction, and only the
+  // one in front can ever be holding a draft), so this is a plain call with
+  // no `guardNavigate` and no `go` — the same shape `closeWorkspaceTab` takes
+  // for a BACKGROUND close, extended to every tab but this one at once.
+  const closeAllWorkspaceTabs = React.useCallback(() => {
+    closeAllTabs(currentPath)
+  }, [currentPath])
+
   // A CSS selector the agent asked us to ring briefly (the traced control).
   const traceHighlight = useTraceRing({ teamId, onTeam, go })
 
@@ -733,6 +744,7 @@ export function DeepLinkScreen() {
         active={active}
         breadcrumbs={stripCrumbs}
         onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+        onCloseAllTabs={showTabSet ? closeAllWorkspaceTabs : undefined}
         activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
         onNavigate={go}
         activePath={currentPath}
@@ -868,6 +880,7 @@ export function DeepLinkScreen() {
       active={active}
       breadcrumbs={stripCrumbs}
       onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+        onCloseAllTabs={showTabSet ? closeAllWorkspaceTabs : undefined}
       activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
       onNavigate={go}
       activePath={currentPath}
