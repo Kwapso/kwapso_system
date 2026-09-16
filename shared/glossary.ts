@@ -128,17 +128,37 @@ export const GLOSSARY = {
   // round-one docs review. The definition is the owner's own (waves.ts header).
   wave: { term: "Wave", def: "A package of sprints sold to one account. Told apart by its name and its dates, nothing else." },
   app: { term: "App", def: "A system we build for an account, the thing with its own address. One goal can need two." },
-  // THE CLIENT'S RULING, 16 Sep 2026, verbatim (she named it while talking about
-  // sprints, but the words she named — Blueprint, Development — belong to THIS
-  // vocabulary, not Sprint type; shared/app-stages.ts's own header carries the
-  // full account): "the sprint types are: not started, audit (this is new), plan
-  // (the old blueprint), build (the old development), validation, refinements
-  // and enhancement (in this order). They will not have colors, but icons.
-  // Let's keep colors for status." Archived is the eighth, unruled, kept as the
-  // one manual "put away" state.
+  // THE CLIENT'S RULING, 16 Sep 2026, verbatim: "the sprint types are: not
+  // started, audit (this is new), plan (the old blueprint), build (the old
+  // development), validation, refinements and enhancement (in this order).
+  // They will not have colors, but icons. Let's keep colors for status." First
+  // read onto App stage (team migration 0097, the day's first pass — the words
+  // she named, Blueprint and Development, happened to be two App stage values
+  // that day) and CORRECTED THE SAME DAY, in her own words: "No, no, no, no,
+  // no. You got this completely wrong. These are the sprint types... status
+  // has a color. It's the sprint types that have an icon. You got that wrong.
+  // Hold this until we define what the status is from the apps." The seven
+  // words moved to Sprint type instead (team migration 0098,
+  // shared/sprint-types.ts), where the icons now live.
+  //
+  // APP STAGE ITSELF STANDS AS 0097 LEFT IT — same eight words, same order —
+  // and its OWN definition is HELD pending a fresh ruling: what an app's
+  // status actually is, and how many stages it has, is not yet decided
+  // (documents/UI-RULEBOOK.md K28 says so for the next reader). The pill goes
+  // back to a coloured dot in the meantime — "status has a color" — never an
+  // icon, which is Sprint type's now.
   appStage: {
     term: "App stage",
-    def: "Where a system has got to: not started, audit, plan, build, validation, refinements, enhancement, or archived.",
+    def: "Where a system has got to. Held pending a fresh status definition; today it is one of eight words, not started through archived.",
+  },
+  // THE SAME CLIENT RULING AS `appStage` ABOVE, landed on the RIGHT vocabulary
+  // the second time: "these are the sprint types... it's the sprint types
+  // that have an icon." Seven words, `shared/sprint-types.ts`'s own order,
+  // each with an icon and no colour — the mirror image of a ticket's or a
+  // story's own status, which has a colour and no icon.
+  sprintType: {
+    term: "Sprint type",
+    def: "What kind of block a sprint is: not started, audit, plan, build, validation, refinements, or enhancement. Icons, never a colour.",
   },
   workLog: { term: "Work log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
   timer: { term: "Timer", def: "A work log still running. Start it in one click; it waits in the header until you stop it." },

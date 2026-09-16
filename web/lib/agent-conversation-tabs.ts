@@ -274,6 +274,27 @@ export function closeAgentTab(id: string): string | null {
   return landing
 }
 
+/** MOVE ONE CONVERSATION TAB, BY POSITION. Wires the kit's `BreadcrumbFolders
+ * onReorder` (client ruling, 16 Sep 2026: "go with the drag order") through
+ * `agent-tab-strip.tsx`, whose own comment on `onReorder` explains why the
+ * indices it hands back name real `tabs` slots directly — History and "+"
+ * are both `closable: false` so the kit never offers them as a source or a
+ * target, and neither exists as a row in this array in the first place.
+ *
+ * Like `reorderTab` in `workspace-tabs.ts`, this never touches `activeId`
+ * (named by `id`, not by position) and is a silent no-op for an index this
+ * store does not hold. */
+export function reorderAgentTab(fromIndex: number, toIndex: number): void {
+  if (fromIndex < 0 || fromIndex >= tabs.length) return
+  const clamped = Math.max(0, Math.min(toIndex, tabs.length - 1))
+  if (clamped === fromIndex) return
+  const next = tabs.slice()
+  const [moved] = next.splice(fromIndex, 1)
+  next.splice(clamped, 0, moved)
+  tabs = next
+  announce()
+}
+
 /** What the store is holding right now — for a caller that needs the fresh
  * list synchronously right after a mutation (`closeAgentTab`'s own return is
  * the LANDING id; the tab record itself is read back through here), and for a

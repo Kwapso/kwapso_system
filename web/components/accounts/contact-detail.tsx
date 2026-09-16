@@ -81,6 +81,7 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useAssignableMembers } from "@/lib/members"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { invalidate, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -155,6 +156,12 @@ export function ContactDetailScreen({
   // back lands on the tab she was reading, and a miss lands on "overview".
   const [tab, setTab] = useRemembered("tab", "overview")
   const [editOpen, setEditOpen] = React.useState(false)
+  // R79's own preselect ruling, the EDIT half: `AccountFormDialog` falls back
+  // to the signed-in user only where the stored `accountManagerId` is itself
+  // empty, and only when this prop is actually handed in — account-detail.tsx
+  // (the account's OWN edit dialog) already does; this is the contact
+  // screen's identical edit dialog for the same record, and was missing it.
+  const myUserId = useSessionUserId()
 
   // WHICH COMPANY THEY WORK FOR, as the picker holds it while somebody decides.
   // `""` is the picker's own "no company" row and the door's `null`. It re-seeds
@@ -628,6 +635,7 @@ export function ContactDetailScreen({
         onOpenChange={setEditOpen}
         draftKey={`contact:edit:${accountId}`}
         members={members}
+        defaultAccountManagerId={myUserId ?? ""}
         initial={{
           accountType: "individual",
           name: account.name,

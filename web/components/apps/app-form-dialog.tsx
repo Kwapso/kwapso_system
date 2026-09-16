@@ -38,7 +38,6 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
-import { AppStageGlyph } from "@/lib/app-stage-icon"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
@@ -93,52 +92,44 @@ const accountField = {
   ...defaultFieldConfig,
   label: "Whose system it is",
   required: false,
-  helpText: "Set once. Leave it blank for one of our own.",
 }
-const stageField = { ...defaultFieldConfig, label: "Stage", required: false, helpText: "Where it has got to." }
+const stageField = { ...defaultFieldConfig, label: "Stage", required: false }
 const logoField = {
   ...defaultFieldConfig,
   label: "Logo",
   required: false,
-  helpText: "The account's own mark. Without one the tile shows the stage.",
 }
-const aboutField = { ...defaultFieldConfig, label: "About", required: false, helpText: "What this system is, in a sentence or two." }
+const aboutField = { ...defaultFieldConfig, label: "About", required: false }
 const contextField = {
   ...defaultFieldConfig,
   label: "Account context",
   required: false,
-  helpText: "The situation it was built into.",
 }
-const solutionField = { ...defaultFieldConfig, label: "Solution", required: false, helpText: "What we did about it." }
+const solutionField = { ...defaultFieldConfig, label: "Solution", required: false }
 const actorsField = {
   ...defaultFieldConfig,
   label: "Key actors",
   required: false,
-  helpText: "Who actually uses it, in their words.",
 }
 const staffField = {
   ...defaultFieldConfig,
   label: "Who is on it",
   required: false,
-  helpText: "Our team. Only they and an admin open this app's page.",
 }
 const leadField = {
   ...defaultFieldConfig,
   label: "Team lead",
   required: false,
-  helpText: "The one who marks work on this app done.",
 }
 const stakeholderField = {
   ...defaultFieldConfig,
   label: "Their contacts",
   required: false,
-  helpText: "The account's own contacts for this system.",
 }
 const mainStakeholderField = {
   ...defaultFieldConfig,
   label: "Main stakeholder",
   required: false,
-  helpText: "Who hears back when a ticket on this app is answered.",
 }
 
 /** The word for nobody. A Select cannot hold an empty string as a value, so the
@@ -386,13 +377,15 @@ export function AppFormDialog({
       {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
           which is how one inventory came to carry "live", "Live" and "in dev" for
           the same three systems.
-          A HORIZONTAL PILL ROW WITH ICONS, not the dropdown — the client's
-          ruling, 16 Sep 2026, over this exact vocabulary: "they will not have
-          colors, but icons." `AppearancePillGroup` (shared/web/
+          A HORIZONTAL PILL ROW, STILL — the shape stays (16 Sep 2026's first
+          pass put it here), but it draws NO ICON any more: her correction the
+          same day moved the icon vocabulary to Sprint type ("it's the sprint
+          types that have an icon") and left App stage's own status HELD
+          pending a fresh definition ("hold this until we define what the
+          status is from the apps") — so this picker offers plain words, no
+          `swatch`, until that ruling lands. `AppearancePillGroup` (shared/web/
           appearance-pill-group.tsx) is the row the Appearance settings pills
-          already draw, its `swatch` slot standing in for a stage's icon here
-          exactly as it stands in for a colour swatch there — reused rather
-          than a second bare-button row hand-rolled beside it.
+          already draw; its `swatch` slot is simply unused here now.
           NO "NOT SAID" PILL — the coordinator's own follow-up, 16 Sep 2026,
           the client's "kill the Nobody-style empties" instinct read for a
           stage: a stage is never blank. A new app defaults to `APP_STAGES[0]`
@@ -412,7 +405,6 @@ export function AppFormDialog({
             ...stages.map((s) => ({
               value: s.value,
               label: t(s.value),
-              swatch: <AppStageGlyph stage={s.value} />,
             })),
             ...(values.stage && !stages.some((s) => s.value === values.stage)
               ? [{ value: values.stage, label: t(values.stage), disabled: true }]
@@ -530,11 +522,7 @@ export function AppFormDialog({
           `role="group"` row of pills with `aria-pressed`, preselected with the
           signed-in user on a new app (`defaultStaffUserId`, above). */}
       <Field config={staffField} shape="group" htmlFor="app-staff" className={fieldSpacing}>
-        {members.length === 0 ? (
-          <p className="text-muted-foreground text-sm" id="app-staff">
-            {t("Nobody on the team yet.")}
-          </p>
-        ) : (
+        {members.length === 0 ? null : (
           <StaffPillPicker
             id="app-staff"
             mode="multi"
@@ -570,11 +558,7 @@ export function AppFormDialog({
       {clientId && (
         <Field config={stakeholderField} shape="group" htmlFor="app-stakeholders" className={fieldSpacing}>
           <div className="flex flex-col gap-2" id="app-stakeholders">
-            {contacts.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {t("Nobody is on this account's books yet.")}
-              </p>
-            ) : (
+            {contacts.length === 0 ? null : (
               sortedOptions(contacts, lang, (c) => c.name).map((c) => (
                 <Label key={c.id} className="flex">
                   <Checkbox

@@ -27,11 +27,15 @@
 //
 // "STATUS" IS THE APP'S OWN STAGE — `AppRow` carries no separate status field
 // (`shared/types.ts`), and `app-detail.tsx`'s own three pills already draw the
-// identical icon+word pill off `app.stage` for the same reason: a stage IS the
-// record's status here, the same way a ticket's `status` and a story's own are
-// theirs. NO DOT — the client's ruling, 16 Sep 2026: "they will not have
-// colors, but icons." `AppStageGlyph` (web/lib/app-stage-icon.tsx) draws the
-// glyph `shared/app-stages.ts`'s own `icon` field names.
+// identical `<Badge variant="status" dot={appStageDotTone(app.stage)}>` off
+// `app.stage` for the same reason: a stage IS the record's status here, the
+// same way a ticket's `status` and a story's own are theirs. A DOT, NOT AN
+// ICON — the client's ruling, 16 Sep 2026, corrected the same day: "status
+// has a color. It's the sprint types that have an icon." The icon vocabulary
+// moved to Sprint type (`shared/sprint-types.ts`); this file's own colour
+// comes back (`appStageDotTone`, `shared/app-stages.ts`), and `AppStageGlyph`
+// (the small file that used to resolve `AppStage.icon` to a glyph) is retired
+// with it.
 //
 // TWO TABS SURVIVE UNCHANGED (8.2's OTHER HALF). Active is everything still
 // being worked on; Inactive is Completed and Archived, which is the only pair
@@ -87,7 +91,6 @@ import { AppFormDialog, type AppFormValues, useAppStages } from "@/components/ap
 import { useAssignableMembers } from "@/lib/members"
 import { useSessionUserId } from "@/lib/use-active-team"
 import { AppMark } from "@/components/apps/app-tiles"
-import { AppStageGlyph } from "@/lib/app-stage-icon"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
@@ -95,7 +98,7 @@ import { useAccountNames } from "@/lib/account-names"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
-import { APP_STAGES, NO_STAGE, appStageIsActive } from "@shared/app-stages"
+import { APP_STAGES, NO_STAGE, appStageDotTone, appStageIsActive } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -194,22 +197,6 @@ function compareApps(
  * kind of line on the other. */
 const GALLERY_MIN_CARD = "12rem"
 
-/** THE STAGE PILL'S OWN GEOMETRY AND GROUND — SUPERSEDED, 16 Sep 2026. The
- * client's ruling the same day retires the coloured dot outright: "they will
- * not have colors, but icons. Let's keep colors for status." So this is no
- * longer `variant="status"` (CH11's dot-carrying pill, whose `--pill-fill`
- * equalling `--card` was the whole cause of the "Development has no
- * background" bug her first sentence, above, was reported against) — it is
- * the kit's plain, neutral `secondary` pill, `--surface-quiet`, which was
- * never the same tone as the two cards this chip sits inside and so never
- * had the invisible-on-its-own-ground failure `status` did. The icon rides
- * where the dot used to (`AppStageGlyph`, web/lib/app-stage-icon.tsx),
- * `size="pill"` unchanged: CH11's 26-tall geometry with an 8px gap between
- * the leading glyph and the word, the same reason the dot needed it. */
-const STAGE_PILL_PROPS = {
-  variant: "secondary" as const,
-  size: "pill" as const,
-}
 
 /** THE GALLERY CARD — client ruling, 15 Sep 2026: "In the gallery, make this
  * a chip, then the title and the subtitle: the name of the account." A kit
@@ -263,8 +250,7 @@ function appGalleryCard(
               stage at all — a chip is a fact about the record, not a blank
               placeholder. */}
           {app.stage && (
-            <Badge {...STAGE_PILL_PROPS}>
-              <AppStageGlyph stage={app.stage} />
+            <Badge variant="status" size="pill" dot={appStageDotTone(app.stage)}>
               {t(app.stage)}
             </Badge>
           )}
@@ -519,13 +505,8 @@ export function AppsScreen({
     const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
     return {
       id: app.id,
-      // Same pill, same reason: `STAGE_PILL_PROPS` (see this file's header,
-      // above `appGalleryCard`) — the Kanban card is `bg-card` too, so the
-      // fill needs the identical `--surface-panel` rebind and `size="pill"`
-      // gap.
       badges: app.stage ? (
-        <Badge {...STAGE_PILL_PROPS}>
-          <AppStageGlyph stage={app.stage} />
+        <Badge variant="status" size="pill" dot={appStageDotTone(app.stage)}>
           {t(app.stage)}
         </Badge>
       ) : undefined,
@@ -546,15 +527,8 @@ export function AppsScreen({
   const boardColumns: KanbanColumn[] = [
     ...stageVocab.map((s) => ({
       id: s.value,
-      // NO DOT (16 Sep 2026 ruling, this file's header) — the icon rides
-      // inside `title` itself, since `KanbanColumn` has no separate glyph
-      // slot and the dot prop only ever drew a colour.
-      title: (
-        <span className="flex items-center gap-1.5">
-          <AppStageGlyph stage={s.value} />
-          {t(s.value)}
-        </span>
-      ),
+      title: t(s.value),
+      dot: appStageDotTone(s.value),
       cards: shown.filter((a) => (a.stage ?? "").trim() === s.value).map(appBoardCard),
     })),
     {

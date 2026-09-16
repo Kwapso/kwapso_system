@@ -102,6 +102,7 @@ export function AgentTabStrip({
   onClose,
   onNew,
   onOpenHistory,
+  onReorder,
 }: {
   tabs: AgentTab[]
   activeId: string | null
@@ -116,6 +117,15 @@ export function AgentTabStrip({
   /** Press the clock tab — opens `agent-history-tab.tsx` in place of the
    * ordinary transcript, same shape as `onNew` opening the picker. */
   onOpenHistory: () => void
+  /** DRAG A CONVERSATION TAB TO A NEW POSITION — the kit's own `onReorder`
+   * (kit v1.2.95, client ruling 16 Sep 2026: "go with the drag order").
+   * `tabs` shares its indices with `items`' leading run byte for byte (the
+   * comment on `tabIndex` above says so), and History/"+" are both
+   * `closable: false` so the kit never offers them as a drag source or a
+   * drop target — meaning every `(fromIndex, toIndex)` this fires names a
+   * real slot in `tabs` directly, no offset to undo. Forwarded straight to
+   * `reorderAgentTab` (`web/lib/agent-conversation-tabs.ts`). */
+  onReorder?: (fromIndex: number, toIndex: number) => void
 }) {
   const t = useT()
 
@@ -139,6 +149,13 @@ export function AgentTabStrip({
         </>
       ),
       href: HISTORY_TAB_HREF,
+      // ICON-ONLY — client, 16 Sep 2026, fifth ruling that day, on staging:
+      // "the assistant strip's two pinned tabs (History clock, "+") render
+      // 128px wide — the same width as a text tab — so they read as big
+      // empty grey blocks." `iconOnly` (kit v1.2.95) drops the kit's 128px
+      // text floor for a tab with no label text, sizing this one to its
+      // clock glyph plus padding instead — see `TAB_ICON_ONLY` in the kit.
+      iconOnly: true,
       // PINNED, LIKE "+" — the client's own ruling, 15 Sep 2026: "I like the
       // history rail tab. Put it before the plus tab", CORRECTED 16 Sep 2026
       // over a screenshot of History pinned ahead of every conversation
@@ -159,6 +176,9 @@ export function AgentTabStrip({
         </>
       ),
       href: NEW_TAB_HREF,
+      // ICON-ONLY — same 16 Sep 2026 fifth ruling as History's own item
+      // above; see that comment.
+      iconOnly: true,
       // NEVER CLOSABLE — the client's own words, "all the time, there is a
       // visible tab [with a plus button]". This is the kit's own opt-out
       // (see the file header); without it this item would grow the identical
@@ -201,6 +221,7 @@ export function AgentTabStrip({
         if (typeof item.key === "string" && item.key !== "new" && item.key !== "history") onClose(item.key)
       }}
       closeLabel={t("Close tab")}
+      onReorder={onReorder}
       onClickCapture={(e: React.MouseEvent) => {
         const a = (e.target as HTMLElement).closest("a")
         if (!a) return

@@ -20,6 +20,9 @@ function wave(over: Partial<Wave> & { id: string; accountId: string }): Wave {
     ref: null,
     name: "Wave",
     accountName: "Acme",
+    appId: null,
+    appName: null,
+    appLogoUrl: null,
     goal: null,
     startsOn: null,
     endsOn: null,
@@ -110,5 +113,29 @@ describe("selectWaves — the Sprint type facet", () => {
     // itself drop either — this proves the two filters are ANDed on one row
     // rather than the sprint-type check silently replacing the others.
     expect(narrowed.map((w) => w.id).sort()).toEqual(["w1", "w2"])
+  })
+})
+
+describe("selectWaves — the App facet (Wave.appId, a real column since team migration 0099)", () => {
+  const w1 = wave({ id: "w1", accountId: "a1", name: "Onboarding", appId: "app1" })
+  const w2 = wave({ id: "w2", accountId: "a1", name: "Rollout", appId: "app2" })
+  const w3 = wave({ id: "w3", accountId: "a1", name: "Unassigned", appId: null })
+  const rows = [w1, w2, w3]
+
+  it("with no appId asked, every wave passes", () => {
+    expect(selectWaves(rows, EMPTY_WAVE_QUERY, []).map((w) => w.id).sort()).toEqual(["w1", "w2", "w3"])
+  })
+
+  it("keeps only the wave whose own appId matches — a plain equality, no sprint read needed", () => {
+    expect(selectWaves(rows, { ...EMPTY_WAVE_QUERY, appId: "app1" }, []).map((w) => w.id)).toEqual(["w1"])
+  })
+
+  it("a wave with no app at all never matches a real appId", () => {
+    expect(selectWaves(rows, { ...EMPTY_WAVE_QUERY, appId: "app1" }, [])).not.toContainEqual(w3)
+  })
+
+  it("composes with the other facets (AND, not OR)", () => {
+    const narrowed = selectWaves(rows, { ...EMPTY_WAVE_QUERY, accountId: "a1", appId: "app2" }, [])
+    expect(narrowed.map((w) => w.id)).toEqual(["w2"])
   })
 })

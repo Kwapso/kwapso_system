@@ -67,7 +67,6 @@ const billableField = {
   ...defaultFieldConfig,
   label: "Billable",
   required: false,
-  helpText: "On unless you say otherwise.",
 }
 
 export function TimeFormDialog({

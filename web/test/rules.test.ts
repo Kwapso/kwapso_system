@@ -5321,6 +5321,7 @@ describe("RULES — the laws of the base", () => {
       "no-sort-in-calendar-views", // R78: web/test/no-sort-in-calendar-views.test.tsx — a real render of <ToolbarRow> proving no <SortControl> draws when its view's active value is calendar/week/agenda, plus the TOOLBAR_CONTROL_OWNERS census over every OTHER file allowed to build its own sort/view pair, or named in NO_SORT_VIEW_EXEMPT
       "staff-pill-row", // R79: web/test/staff-pill-row.test.ts — every <Select>/non-row <RecordPicker> in web/ + web-portal/ fed a staff/member list (traced off useAssignableMembers/assignableMembers/staffedOn + PickablePerson[]-typed locals), or named in STAFF_PILL_ROW_EXEMPT
       "rows-are-a-list", // R80: web/test/rows-are-a-list.test.ts — record-table.tsx read off disk for the banded bg-surface-panel fill, plus every <RecordTable mount across web/ read for a `frame` prop carrying anything but the literal "bare"
+      "form-carries-no-hints", // R81: web/test/form-hints.test.ts — no FieldConfig literal sets a non-empty helpText, no bare <p> hint sits between a form's fields (both over appFiles()), plus a fixture-based red proof of both censuses
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

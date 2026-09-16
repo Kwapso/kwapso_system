@@ -40,7 +40,6 @@ const sourceField = {
   ...defaultFieldConfig,
   label: "A meeting we already hold",
   required: false,
-  helpText: "We read its transcript. Leave it empty and paste the notes instead.",
 }
 const textField = {
   ...defaultFieldConfig,

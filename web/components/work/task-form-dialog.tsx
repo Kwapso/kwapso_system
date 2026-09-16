@@ -78,7 +78,6 @@ const assigneeField = {
   ...defaultFieldConfig,
   label: "Who's doing it",
   required: false,
-  helpText: "Yours unless you say otherwise.",
 }
 const departmentField = { ...defaultFieldConfig, label: "Department", required: false }
 const fileField = { ...defaultFieldConfig, label: "A photo or a file", required: false }
@@ -318,7 +317,6 @@ export function TaskFormDialog({
             ...defaultFieldConfig,
             label: "Account",
             required: asks.required,
-            helpText: asks.required ? "" : "Optional. Leave it off for our own housekeeping.",
           }}
           htmlFor="task-account"
           className={fieldSpacing}

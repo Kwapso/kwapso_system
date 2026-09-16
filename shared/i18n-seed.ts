@@ -1479,7 +1479,6 @@ export const SEED: Catalogue = {
   "Nothing — just show this one": { de: "Nichts – nur diese anzeigen", es: "Nada, solo mostrar esta", ca: "Res, mostra només aquesta"},
   "Only the ones you pick. Nothing else in the folder they sit in.": { de: "Nur die von Ihnen ausgewählten. Nichts anderes aus dem Ordner, in dem sie liegen.", es: "Solo los que elijas. Nada más de la carpeta en la que están.", ca: "Només els que triïs. Res més de la carpeta on són."},
   "Only you, and the assistant when it is answering you.": { de: "Nur Sie – und der Assistent, wenn er Ihnen antwortet.", es: "Solo tú, y el asistente cuando te responde.", ca: "Només tu, i l'assistent quan et respon."},
-  "Optional. Leave it off for our own housekeeping.": { de: "Optional. Für unsere eigene Verwaltung leer lassen.", es: "Opcional. Déjalo en blanco para nuestras tareas internas.", ca: "Opcional. Deixa-ho en blanc per a les nostres tasques internes."},
   "Or paste a link": { de: "Oder Link einfügen", es: "O pega un enlace", ca: "O enganxa un enllaç"},
   "Profile activated.": { de: "Profil aktiviert.", es: "Perfil activado.", ca: "Perfil activat."},
   "Profile deactivated.": { de: "Profil deaktiviert.", es: "Perfil desactivado.", ca: "Perfil desactivat."},
@@ -2014,16 +2013,6 @@ export const SEED: Catalogue = {
     es: "Cada ahorro en este map se mide a partir de hoy, aquí y en el portal propio del cliente. Moverlo cambia esas cifras sin modificar un solo paso.",
     ca: "Cada estalvi en aquest map es mesura a partir d'avui, aquí i al portal propi del client. Moure'l canvia aquestes xifres sense canviar cap pas.",
   },
-  "File this map under an account and their roles can be named here.": {
-    de: "Lege diese map bei einem Kunden ab und seine Rollen können hier benannt werden.",
-    es: "Archiva este map bajo una cuenta y sus roles pueden nombrarse aquí.",
-    ca: "Arxiva aquest map sota un compte i els seus rols es poden nomenar aquí.",
-  },
-  "File this map under an account and their tools can be named here.": {
-    de: "Lege diese map bei einem Kunden ab und seine Werkzeuge können hier benannt werden.",
-    es: "Archiva este map bajo una cuenta y sus herramientas pueden nombrarse aquí.",
-    ca: "Arxiva aquest map sota un compte i les seves eines es poden nomenar aquí.",
-  },
   "Flights and bookings Gmail put there itself.": {
     de: "Flüge und Buchungen, die Gmail dort selbst ablegt.",
     es: "Vuelos y reservas que Gmail coloca allí mismo.",
@@ -2102,11 +2091,6 @@ export const SEED: Catalogue = {
     es: "Es un lado de una división",
     ca: "És un costat d'una divisió",
   },
-  "It leaves the split and moves to the end of the map.": {
-    de: "Es verlässt die Teilung und bewegt sich zum Ende der Karte.",
-    es: "Deja la división y se mueve al final del mapa.",
-    ca: "Abandona la divisió i es mou fins al final del mapa.",
-  },
   "It stops being offered when a sprint is filed, and stays on the record with everything already in it. You can bring it back.": {
     de: "Es wird nicht mehr angeboten, wenn ein Sprint archiviert wird, und bleibt im Datensatz mit allen bereits enthaltenen Informationen. Sie können es zurückholen.",
     es: "Deja de estar disponible cuando se archiva un sprint, y permanece en el registro con todo lo que ya contiene. Puedes recuperarlo.",
@@ -2139,11 +2123,6 @@ export const SEED: Catalogue = {
     de: "Leer lassen, um Ihre Labels aufzulisten",
     es: "Déjalo en blanco para listar tus etiquetas",
     ca: "Deixa en blanc per llistar les teves etiquetes",
-  },
-  "Leave it off and what {brand} already read stays answerable. Only what it reads from now on follows the new answer.": {
-    de: "Lassen Sie es aus und das, was {brand} bereits gelesen hat, bleibt beantwortbar. Nur das, was es ab jetzt liest, folgt der neuen Antwort.",
-    es: "Déjalo desactivado y lo que {brand} ya ha leído sigue siendo respondible. Sólo lo que lea a partir de ahora seguirá la nueva respuesta.",
-    ca: "Deixa-ho desactivat i el que {brand} ja ha llegit continua sent respondible. Només el que llegeixi d'ara endavant seguirà la nova resposta.",
   },
   "Leaving out": { de: "Auslassen", es: "Omitiendo", ca: "Ometent" },
   "Let go of what was already read": {
@@ -2256,11 +2235,6 @@ export const SEED: Catalogue = {
     de: "Nichts verbunden. Ein Prozess, der seine Arbeit an einen anderen übergibt, kann das hier angeben.",
     es: "Nada conectado. Un proceso que entrega su trabajo a otro puede indicarlo aquí.",
     ca: "Res connectat. Un procés que entrega la seva feina a un altre pot dir-ho aquí.",
-  },
-  "Nothing else to add from your Google account.": {
-    de: "Nichts weiter von Ihrem Google‑Konto hinzuzufügen.",
-    es: "Nada más que añadir de tu cuenta de Google.",
-    ca: "Res més a afegir del teu compte de Google.",
   },
   "Nothing has come back from a client yet.": {
     de: "Noch nichts von einem Kunden zurückgekommen.",
@@ -2495,11 +2469,6 @@ export const SEED: Catalogue = {
     es: "Los bloques que indican que estás ausente.",
     ca: "Els blocs que indiquen que estàs absent.",
   },
-  "The call didn't describe any steps.": {
-    de: "Der Anruf hat keine Schritte beschrieben.",
-    es: "La llamada no describió ningún paso.",
-    ca: "La trucada no va descriure cap pas.",
-  },
   "The call didn't name what the work is done in.": {
     de: "Der Anruf hat nicht angegeben, in welchem Umfeld die Arbeit erledigt wird.",
     es: "La llamada no indicó en qué se realiza el trabajo.",
@@ -2660,11 +2629,6 @@ export const SEED: Catalogue = {
     de: "Wofür das Paket ist",
     es: "Para qué es el paquete",
     ca: "Per a què serveix el paquet",
-  },
-  "What they bought, in the words you would say it in. The dates come from the sprints.": {
-    de: "Was sie gekauft haben, in den Worten, in denen Sie es sagen würden. Die Daten stammen aus den Sprints.",
-    es: "Lo que compraron, con las palabras que tú dirías. Las fechas provienen de los sprints.",
-    ca: "El que van comprar, amb les paraules que tu diries. Les dates provenen dels sprints.",
   },
   "What they call it. Its price is set separately, from the day that price started.": {
     de: "Wie sie es nennen. Der Preis wird separat festgelegt, ab dem Tag, an dem der Preis begann.",
@@ -3438,24 +3402,12 @@ export const SEED: Catalogue = {
    * field, was converted and catalogued alone on 8 Sep 2026 to measure the
    * class; its own translation lives in this same block, keyed by its
    * English exactly as `shared/i18n-strings.json` has it. */
-  "The system this work is on. Everything below is narrowed by it.": { de: "Das System, auf das sich diese Arbeit bezieht. Alles darunter wird dadurch eingegrenzt.", es: "El sistema en el que está este trabajo. Todo lo de abajo se filtra por él.", ca: "El sistema en què és aquesta feina. Tot el que hi ha a sota es filtra per aquest."},
-  "A line or two. It is what the reviewer reads before they look.": { de: "Ein bis zwei Zeilen. Das liest der Prüfer, bevor er sich alles ansieht.", es: "Una o dos líneas. Es lo que el revisor lee antes de mirar.", ca: "Una o dues línies. És el que llegeix qui revisa abans de mirar."},
-  "A recording, a page, a document somebody can open.": { de: "Eine Aufnahme, eine Seite, ein Dokument, das sich öffnen lässt.", es: "Una grabación, una página, un documento que alguien pueda abrir.", ca: "Un enregistrament, una pàgina, un document que algú pugui obrir."},
-  "A screenshot, a recording, a document somebody can open.": { de: "Ein Screenshot, eine Aufnahme, ein Dokument, das sich öffnen lässt.", es: "Una captura de pantalla, una grabación, un documento que alguien pueda abrir.", ca: "Una captura de pantalla, un enregistrament, un document que algú pugui obrir."},
-  "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.": { de: "Eine Verzweigung sind zwei mögliche nächste Schritte, und welcher eintritt, hängt von etwas ab. Ein Schritt nach einer Verzweigung führt die beiden Seiten wieder zusammen — es sei denn, Sie sagen, dass er an einer der beiden weitergeht.", es: "Una bifurcación son dos cosas que pueden pasar después, y cuál ocurre depende de algo. Un paso añadido tras una bifurcación reúne otra vez los dos lados, a menos que digas que continúa desde uno de ellos.", ca: "Una bifurcació són dues coses que poden passar després, i quina passa depèn d'alguna cosa. Un pas afegit després d'una bifurcació torna a unir els dos costats, llevat que diguis que continua des d'un d'ells."},
-  "At least one. A screenshot, a recording, a link to the page it changed.": { de: "Mindestens eines. Ein Screenshot, eine Aufnahme, ein Link zur geänderten Seite.", es: "Al menos uno. Una captura de pantalla, una grabación, un enlace a la página que cambió.", ca: "Almenys un. Una captura de pantalla, un enregistrament, un enllaç a la pàgina que ha canviat."},
-  "Blocks on this app that are still running or still to come.": { de: "Blöcke auf dieser App, die noch laufen oder noch bevorstehen.", es: "Bloques de esta app que siguen en marcha o que aún están por venir.", ca: "Blocs d'aquesta app que encara estan en marxa o encara han d'arribar."},
-  "Company number, VAT number, whatever your country asks for.": { de: "Handelsregisternummer, USt-IdNr., was auch immer Ihr Land verlangt.", es: "Número de empresa, NIF/CIF, lo que pida tu país.", ca: "Número d'empresa, NIF, el que demani el teu país."},
   // FOUR NEW STRINGS, 16 Sep 2026, for the story form's process dropdown
   // (story-form-dialog.tsx) and its Type row — R44's ceiling stays where it
   // was, none of these are debt.
   "Add a process": { de: "Einen Prozess hinzufügen", es: "Añadir un proceso", ca: "Afegir un procés"},
   "This changes no process": { de: "Das ändert keinen Prozess", es: "Esto no cambia ningún proceso", ca: "Això no canvia cap procés"},
-  "This app has no processes yet.": { de: "Diese App hat noch keine Prozesse.", es: "Esta aplicación aún no tiene procesos.", ca: "Aquesta aplicació encara no té processos."},
   "Your team has no story types set up yet.": { de: "Ihr Team hat noch keine Story-Typen eingerichtet.", es: "Tu equipo aún no tiene tipos de historia configurados.", ca: "El teu equip encara no té tipus d'història configurats."},
-  "Editable on the Choices screen.": { de: "Bearbeitbar auf der Seite „Optionen“.", es: "Editable en la pantalla de Opciones.", ca: "Editable a la pantalla d'Opcions."},
-  "Every way of working this changes, or tick that it changes none.": { de: "Jede Arbeitsweise, die sich dadurch ändert, oder anhaken, dass sich keine ändert.", es: "Cada forma de trabajar que esto cambia, o marca que no cambia ninguna.", ca: "Cada manera de treballar que això canvia, o marca que no en canvia cap."},
-  "On unless you say otherwise.": { de: "Aktiv, sofern Sie nichts anderes sagen.", es: "Activado, a menos que digas lo contrario.", ca: "Activat, llevat que diguis el contrari."},
   // THE SAME SENTENCE WITH THE EMOJI TAKEN OUT OF IT — client, 2026-09-10
   // (*"also kill emojis!!!"*). The English key moved from "One emoji shown
   // beside this word…" to the line below when `selectable-form-dialog.tsx`
@@ -3463,7 +3415,6 @@ export const SEED: Catalogue = {
   // `optionalMark` shipped; the three translations are the old ones with the
   // same substitution made, so the wording a German reader knows is unchanged
   // apart from the thing being asked for.
-  "A short word or initial shown beside this option, wherever the type appears. Leave it empty for a plain label.": { de: "Ein kurzes Wort oder eine Initiale, die neben dieser Option erscheint, überall wo der Typ auftaucht. Leer lassen für eine einfache Bezeichnung.", es: "Una palabra corta o una inicial que aparece junto a esta opción, allí donde aparezca el tipo. Déjalo vacío para una etiqueta sencilla.", ca: "Una paraula curta o una inicial que apareix al costat d'aquesta opció, allà on aparegui el tipus. Deixa-ho buit per a una etiqueta senzilla."},
   // "MARK" AS A NOUN, WHICH IS WHAT THE FIELD IS. The generated catalogue
   // answers it with the VERB in two of the three — `Markieren` is "to mark" and
   // `Marcar` is "to mark" — which was survivable while one screen said it and
@@ -3472,36 +3423,6 @@ export const SEED: Catalogue = {
   // for a longer name. Seeded here rather than corrected in
   // `shared/i18n-catalogue.ts`, which is generated and says so at the top.
   "Mark": { de: "Kürzel", es: "Distintivo", ca: "Distintiu"},
-  "One. A step done in two systems has a handoff in the middle of it, and that is two steps.": { de: "Eines. Ein Schritt, der in zwei Systemen ausgeführt wird, hat mittendrin eine Übergabe, und das sind zwei Schritte.", es: "Uno. Un paso realizado en dos sistemas tiene un traspaso en medio, y eso son dos pasos.", ca: "Un. Un pas fet en dos sistemes té un traspàs enmig, i això són dos passos."},
-  "Open requests on this app. Most work stands on its own.": { de: "Offene Anfragen zu dieser App. Die meiste Arbeit steht für sich.", es: "Solicitudes abiertas de esta app. La mayoría del trabajo se sostiene por sí solo.", ca: "Sol·licituds obertes d'aquesta app. La majoria del treball es manté per si sol."},
-  "Our team. Only they and an admin open this app's page.": { de: "Unser Team. Nur sie und ein Administrator öffnen die Seite dieser App.", es: "Nuestro equipo. Solo ellos y un administrador abren la página de esta app.", ca: "El nostre equip. Només ells i un administrador obren la pàgina d'aquesta app."},
-  "Set once. Leave it blank for one of our own.": { de: "Einmal festgelegt. Leer lassen für eine unserer eigenen.", es: "Se define una vez. Déjalo en blanco para una de las nuestras.", ca: "Es defineix una vegada. Deixa-ho en blanc per a una de les nostres."},
-  "The account's own contacts for this system.": { de: "Die eigenen Kontakte des Kunden für dieses System.", es: "Los propios contactos de la cuenta para este sistema.", ca: "Els propis contactes del compte per a aquest sistema."},
-  "The account's own mark. Without one the tile shows the stage.": { de: "Das eigene Zeichen des Kunden. Ohne eines zeigt die Kachel die Phase.", es: "La marca propia de la cuenta. Sin ella, la ficha muestra la etapa.", ca: "La marca pròpia del compte. Sense cap, la fitxa mostra l'etapa."},
-  "The company this is for. Their contacts see it in their portal; leave it off for our own questions.": { de: "Das Unternehmen, für das dies ist. Deren Kontakte sehen es in ihrem Portal; für eigene Fragen leer lassen.", es: "La empresa para la que es esto. Sus contactos lo ven en su portal; déjalo vacío para nuestras propias preguntas.", ca: "L'empresa per a la qual és això. Els seus contactes ho veuen al seu portal; deixa-ho buit per a les nostres pròpies preguntes."},
-  "The flat price for this block of work. Leave it at zero if it isn't sold separately.": { de: "Der Festpreis für diesen Arbeitsblock. Bei null lassen, wenn er nicht separat verkauft wird.", es: "El precio fijo de este bloque de trabajo. Déjalo en cero si no se vende por separado.", ca: "El preu fix d'aquest bloc de treball. Deixa'l a zero si no es ven per separat."},
-  "The one who marks work on this app done.": { de: "Wer die Arbeit an dieser App als erledigt markiert.", es: "Quien marca como terminado el trabajo en esta app.", ca: "Qui marca com a acabada la feina d'aquesta app."},
-  "The part of your system this is about. It helps us route it to the right person.": { de: "Der Teil Ihres Systems, um den es geht. Das hilft uns, es an die richtige Person weiterzuleiten.", es: "La parte de tu sistema de la que se trata. Nos ayuda a dirigirlo a la persona adecuada.", ca: "La part del teu sistema de què es tracta. Ens ajuda a adreçar-ho a la persona adequada."},
-  "The person at that account who asked. Not always whoever types it in.": { de: "Die Person bei diesem Kunden, die gefragt hat. Nicht immer, wer es eintippt.", es: "La persona de esa cuenta que lo pidió. No siempre quien lo escribe.", ca: "La persona d'aquell compte que ho ha demanat. No sempre qui ho escriu."},
-  "The role whose hours this takes. It is what prices the saving.": { de: "Die Rolle, deren Stunden das kostet. Das bestimmt den Preis der Ersparnis.", es: "El rol cuyas horas se dedican a esto. Es lo que pone precio al ahorro.", ca: "El rol les hores del qual dedica això. És el que posa preu a l'estalvi."},
-  "The side of the split this step continues. It hangs under that one instead of joining the two back together.": { de: "Die Seite der Verzweigung, die dieser Schritt fortsetzt. Er hängt an dieser Seite, statt die beiden wieder zusammenzuführen.", es: "El lado de la bifurcación que continúa este paso. Queda bajo ese lado en vez de reunir los dos de nuevo.", ca: "El costat de la bifurcació que continua aquest pas. Queda sota aquest costat en lloc de tornar a unir els dos."},
-  "The situation it was built into.": { de: "Die Situation, in die hinein es gebaut wurde.", es: "La situación en la que se construyó.", ca: "La situació en què es va construir."},
-  "The step this one happens INSTEAD of. The two sit side by side in the picture.": { de: "Der Schritt, ANSTELLE dessen dieser hier passiert. Die beiden stehen im Bild nebeneinander.", es: "El paso en cuyo lugar ocurre este. Los dos aparecen uno junto al otro en la imagen.", ca: "El pas en lloc del qual passa aquest. Els dos apareixen l'un al costat de l'altre a la imatge."},
-  "The system this block of work covers.": { de: "Das System, das dieser Arbeitsblock abdeckt.", es: "El sistema que cubre este bloque de trabajo.", ca: "El sistema que cobreix aquest bloc de treball."},
-  "The time you agreed with them, not a measurement.": { de: "Die Zeit, die Sie mit ihnen vereinbart haben, keine Messung.", es: "El tiempo que acordaste con ellos, no una medición.", ca: "El temps que vas acordar amb ells, no una mesura."},
-  "The words that decide it — written the way somebody would say it out loud.": { de: "Die Worte, die darüber entscheiden — geschrieben, wie jemand es laut sagen würde.", es: "Las palabras que lo deciden, escritas tal como alguien las diría en voz alta.", ca: "Les paraules que ho decideixen, escrites tal com algú les diria en veu alta."},
-  "This is emailed to the client and added to the conversation.": { de: "Das wird dem Kunden per E-Mail zugesendet und dem Gespräch hinzugefügt.", es: "Esto se envía al cliente por correo electrónico y se añade a la conversación.", ca: "Això s'envia al client per correu i s'afegeix a la conversa."},
-  "Version 1 is the way they worked before us. Every saving is measured from it.": { de: "Version 1 ist die Art, wie sie vor uns gearbeitet haben. Jede Ersparnis wird daran gemessen.", es: "La versión 1 es cómo trabajaban antes de nosotros. Cada ahorro se mide a partir de ella.", ca: "La versió 1 és com treballaven abans de nosaltres. Cada estalvi es mesura a partir d'ella."},
-  "We read its transcript. Leave it empty and paste the notes instead.": { de: "Wir lesen dessen Abschrift. Leer lassen und stattdessen die Notizen einfügen.", es: "Leemos su transcripción. Déjalo vacío y pega las notas en su lugar.", ca: "En llegim la transcripció. Deixa-ho buit i enganxa les notes en el seu lloc."},
-  "What goes on a contract, if it is not the short name.": { de: "Was auf einem Vertrag steht, falls es nicht der Kurzname ist.", es: "Lo que va en un contrato, si no es el nombre corto.", ca: "El que va en un contracte, si no és el nom curt."},
-  "What this system is, in a sentence or two.": { de: "Was dieses System ist, in ein bis zwei Sätzen.", es: "Qué es este sistema, en una o dos frases.", ca: "Què és aquest sistema, en una o dues frases."},
-  "What we did about it.": { de: "Was wir dagegen unternommen haben.", es: "Qué hicimos al respecto.", ca: "Què vam fer-hi."},
-  "Where it has got to.": { de: "Wo es gerade steht.", es: "En qué punto está.", ca: "En quin punt està."},
-  "Which part of the app it is about, like Settings or Documents. Choose the app first.": { de: "Welcher Teil der App gemeint ist, etwa Einstellungen oder Dokumente. Zuerst die App wählen.", es: "Qué parte de la app es, como Ajustes o Documentos. Elige primero la app.", ca: "Quina part de l'app és, com Configuració o Documents. Tria primer l'app."},
-  "Which system this is about. It is what routes the request and who gets told when it is answered.": { de: "Um welches System es geht. Das bestimmt, wohin die Anfrage geleitet wird und wer benachrichtigt wird, wenn sie beantwortet ist.", es: "De qué sistema se trata. Determina a dónde se dirige la solicitud y a quién se avisa cuando se responde.", ca: "De quin sistema es tracta. Determina on s'adreça la sol·licitud i a qui s'avisa quan es respon."},
-  "Who actually uses it, in their words.": { de: "Wer es tatsächlich nutzt, in deren eigenen Worten.", es: "Quién lo usa de verdad, con sus propias palabras.", ca: "Qui l'utilitza de debò, amb les seves pròpies paraules."},
-  "Who does it. The role's hourly cost is what turns these minutes into money.": { de: "Wer es macht. Der Stundensatz der Rolle verwandelt diese Minuten in Geld.", es: "Quién lo hace. El coste por hora del rol es lo que convierte estos minutos en dinero.", ca: "Qui ho fa. El cost per hora del rol és el que converteix aquests minuts en diners."},
-  "Who hears back when a ticket on this app is answered.": { de: "Wer benachrichtigt wird, wenn ein Ticket zu dieser App beantwortet wird.", es: "Quién recibe la respuesta cuando se contesta un ticket de esta app.", ca: "Qui rep la resposta quan es respon un tiquet d'aquesta app."},
   "Choices": { de: "Optionen", es: "Opciones", ca: "Opcions"},
   /* ── THE CASCADING FILTER ROW (client ruling, 2026-09-09) ────────────────
    * The one sentence the narrowing itself adds. Everything else that ruling
@@ -3568,7 +3489,6 @@ export const SEED: Catalogue = {
   // at 0 and a session that runs the extractor inherits keeping it there,
   // the same way `npm run lang` would for anybody who ran it next.
   "Category": { de: "Kategorie", es: "Categoría", ca: "Categoria" },
-  "Traces to a client ask, or our own upkeep. Editable on the Choices screen.": { de: "Lässt sich auf eine Kundenanfrage oder unsere eigene Pflege zurückführen. Bearbeitbar auf dem Bildschirm „Optionen“.", es: "Se remonta a una petición del cliente o a nuestro propio mantenimiento. Editable en la pantalla Opciones.", ca: "Es remunta a una petició del client o al nostre propi manteniment. Editable a la pantalla Opcions." },
   // THE STORIES TAB STRIP, 15 Sep 2026 — `tasks-screen.tsx`'s own tab words,
   // ported one collection along, plus "Backlog" (the client's own correction
   // over the design proposal's "All" — documents/UI-RULEBOOK.md K entry).
@@ -3791,7 +3711,6 @@ export const SEED: Catalogue = {
   "Why a step takes longer, {reason}": { de: "Warum ein Schritt länger dauert: {reason}", es: "Por qué un paso tarda más: {reason}", ca: "Per què un pas triga més: {reason}" },
   "Withdraw this input": { de: "Diese Angabe zurückziehen", es: "Retirar esta aportación", ca: "Retirar aquesta aportació" },
   "Wrapped": { de: "Abgeschlossen", es: "Finalizado", ca: "Finalitzat" },
-  "You can change this later in Settings.": { de: "Sie können dies später in den Einstellungen ändern.", es: "Puedes cambiar esto más tarde en Ajustes.", ca: "Pots canviar això més tard a Configuració." },
   "Your team": { de: "Ihr Team", es: "Tu equipo", ca: "El teu equip" },
   "Your team has no ticket types set up yet.": { de: "Ihr Team hat noch keine Tickettypen eingerichtet.", es: "Tu equipo aún no tiene tipos de ticket configurados.", ca: "El teu equip encara no té tipus de tiquet configurats." },
   "next": { de: "weiter", es: "siguiente", ca: "següent" },
@@ -3843,8 +3762,6 @@ export const SEED: Catalogue = {
   "Which account": { de: "Welcher Kunde", es: "Qué cuenta", ca: "Quin compte" },
   "Ours, no account": { de: "Unseres, kein Kunde", es: "El nuestro, sin cuenta", ca: "Nostre, sense compte" },
   "Ours, not an account's": { de: "Unseres, nicht das eines Kunden", es: "El nuestro, no de una cuenta", ca: "Nostre, no d'un compte" },
-  "Nobody is on this account's books yet.": { de: "Niemand ist in den Büchern dieses Kunden verzeichnet.", es: "Todavía no hay nadie en los registros de esta cuenta.", ca: "Encara no hi ha ningú als registres d'aquest compte." },
-  "Filing it under an account is how a question about them finds it first.": { de: "Wenn Sie es unter einem Kunden ablegen, wird eine Frage über sie dort zuerst gefunden.", es: "Archivarlo bajo una cuenta es como se encuentra primero una pregunta sobre ellos.", ca: "Arxivar-ho sota un compte és com es troba primer una pregunta sobre ells." },
   "Questions about that account are answered from what is in here. Leave it as ours if the": { de: "Fragen zu diesem Kunden werden aus dem beantwortet, was hier steht. Lassen Sie es als unseres, wenn", es: "Las preguntas sobre esa cuenta se responden con lo que hay aquí. Déjalo como nuestro si el", ca: "Les preguntes sobre aquest compte es responen amb el que hi ha aquí. Deixa-ho com a nostre si el" },
 
   /* ── SETTINGS › TEAM, 2026-09-09, UPDATED 14 Sep 2026 ─────────────────────
@@ -4256,8 +4173,6 @@ export const SEED: Catalogue = {
   "Then I re-read the strongest passages before answering.": { de: "Dann habe ich die stärksten Abschnitte noch einmal gelesen, bevor ich geantwortet habe.", es: "Después releí los pasajes más relevantes antes de responder.", ca: "Després vaig rellegir els fragments més rellevants abans de respondre." },
   "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it.": { de: "Dieser Text wurde aus der Datei ausgelesen und wird daher korrigiert, indem Sie die Datei erneut hinzufügen, statt ihn hier zu überschreiben. Sie können sie weiterhin umbenennen, ihre Ablage ändern und festlegen, wer sie nutzen darf.", es: "Este texto se leyó del archivo, así que se corrige añadiendo el archivo de nuevo, no escribiéndolo aquí encima. Aún puedes renombrarlo, cambiar dónde está archivado y quién puede usarlo.", ca: "Aquest text es va llegir del fitxer, així que es corregeix afegint el fitxer de nou, no escrivint-hi a sobre aquí. Encara el pots reanomenar, canviar on està arxivat i qui el pot fer servir." },
   "This is taking longer than it should.": { de: "Das dauert länger, als es sollte.", es: "Esto está tardando más de lo que debería.", ca: "Això està trigant més del que hauria." },
-  "We'll read this video's captions or transcript when you save it.": { de: "Wir lesen die Untertitel oder das Transkript dieses Videos, sobald Sie es speichern.", es: "Leeremos los subtítulos o la transcripción de este vídeo cuando lo guardes.", ca: "Llegirem els subtítols o la transcripció d'aquest vídeo quan el desis." },
-  "Who can read this follows who has already seen it — it isn't set here.": { de: "Wer dies lesen darf, richtet sich danach, wer es bereits gesehen hat — das wird hier nicht festgelegt.", es: "Quién puede leer esto depende de quién ya lo ha visto — no se define aquí.", ca: "Qui pot llegir això depèn de qui ja ho ha vist — no es defineix aquí." },
   "Working it out": { de: "Denkt nach", es: "Pensando", ca: "Pensant" },
   "Yes, file it under {account}": { de: "Ja, unter „{account}“ ablegen", es: "Sí, archivar bajo «{account}»", ca: "Sí, arxivar sota «{account}»" },
   "captions": { de: "Untertitel", es: "subtítulos", ca: "subtítols" },
@@ -4283,21 +4198,6 @@ export const SEED: Catalogue = {
   "Previous day": { de: "Vorheriger Tag", es: "Día anterior", ca: "Dia anterior" },
   "Previous week": { de: "Vorherige Woche", es: "Semana anterior", ca: "Setmana anterior" },
 
-  /* ── 16 Sep 2026, the "kill Nobody" staff-picker lane. The task assignee
-     field's own `helpText` lost its second clause when it stopped being true
-     ("Yours unless you say otherwise, an unassigned task is a task nobody
-     picks up." -> "Yours unless you say otherwise." — an assignee can no
-     longer be left unset, so the sentence explaining that state was no
-     longer a fact). "Yours" is predicate, agreeing with "To-do" (neuter,
-     "Ein neues To-do" elsewhere in this file) — de: "Ihres". Same vocabulary
-     as "On unless you say otherwise." above ("sofern Sie nichts anderes
-     sagen" / "a menos que digas lo contrario" / "llevat que diguis el
-     contrari"), so the phrase reads the same wherever it recurs. */
-  "Yours unless you say otherwise.": {
-    de: "Ihres, sofern Sie nichts anderes sagen.",
-    es: "Tuya, a menos que digas lo contrario.",
-    ca: "Teva, llevat que diguis el contrari.",
-  },
 
   /* ── 16 Sep 2026, the aside's own drag-to-resize (kit v1.2.91,
      `documents/UI-RULEBOOK.md` L14). ONE new string: `app-shell.tsx`'s

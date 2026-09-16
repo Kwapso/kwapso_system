@@ -39,6 +39,7 @@ import {
 } from "@shared/workers/refs"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
+import { SPRINT_TYPES } from "@shared/sprint-types"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { storedWordColumns } from "@shared/selectable-homes"
 import { TICKET_TYPE_GROUP, TICKET_TYPES, ticketTypeKey } from "@shared/ticket-types"
@@ -311,6 +312,36 @@ const APP_STAGE_OLD_NAMES: Record<string, string[]> = {
  * canonical name always included, so a re-run (already renamed) still
  * matches, the same contract `meetingTypeCandidates` keeps above. */
 const appStageCandidates = (name: string): string[] => [name, ...(APP_STAGE_OLD_NAMES[name] ?? [])]
+
+/** THE SPRINT TYPE GROUP'S OWN NAME. Not one of `SELECTABLE_GROUPS`'s
+ * code-named strings (`shared/sprint-types.ts`'s own header says why), so it
+ * is said once, here, the same way every stored-word rewrite in this file
+ * says its group's name once. */
+const SPRINT_TYPE_GROUP = "Sprint type"
+
+/** THE SPRINT TYPE WORDS THAT MOVE, 16 Sep 2026 (migration 0098) — the
+ * client's own correction of migration 0097's misread (`shared/
+ * sprint-types.ts`'s own header carries the full account): "these are the
+ * sprint types," read here as a rename onto the seven canonical words rather
+ * than a second spelling of one. DIAGNOSTIC IS DELIBERATELY NOT HERE — it
+ * folds into Audit only when Assessment is absent from the team's own
+ * vocabulary, a conditional this simple map cannot express, so migration
+ * 0098's own SQL carries it directly (see the migration itself). Iteration,
+ * Foundation, Data Migration, Process Optimization and Training are not
+ * here either — none renames, all five fold into nothing and are simply
+ * deactivated, never deleted, by the migration's own closing statement.
+ * Validation and Enhancement keep the exact word migration 0098 wants, so
+ * there is nothing to rename for either. */
+const SPRINT_TYPE_OLD_NAMES: Record<string, string[]> = {
+  Plan: ["Planning"],
+  Build: ["Implementation"],
+  Audit: ["Assessment"],
+  Refinements: ["Refinement"],
+}
+/** Every spelling that resolves to one canonical Sprint type — its own
+ * canonical name always included, the same contract `appStageCandidates`
+ * keeps above. */
+const sprintTypeCandidates = (name: string): string[] => [name, ...(SPRINT_TYPE_OLD_NAMES[name] ?? [])]
 
 /** THE WORD "REQUEST" FOLDS INTO, 15 Sep 2026 (migration 0093). Not spelled out
  * again here: `TICKET_TYPES` (shared/ticket-types.ts) is where the four words
@@ -6953,6 +6984,20 @@ SELECT lower(hex(randomblob(16))), r.id, 'all_inputs', r.is_default, r.is_defaul
     // pill (`shared/status-tones.ts`) reads nothing from this file and never
     // did, and nothing here touches them.
     //
+    // CORRECTED THE SAME DAY, RECORDED HERE RATHER THAN REWRITTEN: the
+    // paragraph above was the reading of a ruling that turned out to name a
+    // DIFFERENT vocabulary — "these are the sprint types... status has a
+    // color. It's the sprint types that have an icon." The seven-word icon
+    // set moved to Sprint type (migration 0098, `shared/sprint-types.ts`);
+    // THIS vocabulary's dot comes back (`AppStage.dotTone`, widened past the
+    // six-tone `DotTone` — `shared/app-stages.ts`'s own current header), and
+    // `web/lib/app-stage-icon.tsx` is deleted. This migration's own SQL is
+    // untouched by the correction — it never wrote an icon or a colour to any
+    // column, only the value/mark/position/is_default rewrite above — so
+    // nothing here needed a new migration to fix. `documents/
+    // UI-RULEBOOK.md` K28 carries the fuller account, and says app status
+    // itself is still HELD pending a fresh ruling.
+    //
     // IDEMPOTENT. Every rewrite UPDATE's WHERE matches nothing once the word
     // has already moved; each vocabulary UPDATE's predicate is false once the
     // row is already active, protected, correctly marked, ordered and spelled;
@@ -6995,6 +7040,174 @@ UPDATE selectable_data
  WHERE type = ${sqlString(SELECTABLE_GROUPS.appStage)}
    AND deactivated_at IS NULL
    AND value NOT IN (${APP_STAGES.map((s) => sqlString(s.name)).join(", ")});
+`,
+  },
+  {
+    // THE CLIENT'S CORRECTION, SAME DAY: migration 0097 read her ruling onto
+    // App stage; she said "these are the sprint types," so this migration
+    // moves the exact same seven words, in the exact same order, onto the
+    // "Sprint type" dropdown group instead — `shared/sprint-types.ts`'s own
+    // header carries the full account. App stage (migration 0097) is
+    // untouched by this migration: same eight values, same order, same
+    // `position` column, only its PILL goes back to a coloured dot
+    // (workers/tenancy code never draws a pill; that half is web-only).
+    //
+    // FOUR PLAIN RENAMES (`SPRINT_TYPE_OLD_NAMES`, above): Planning → Plan,
+    // Implementation → Build, Assessment → Audit, Refinement → Refinements.
+    // Validation and Enhancement keep their word outright. "Not started" is
+    // wholly new to this vocabulary — inserted, never renamed from anything.
+    //
+    // ONE CONDITIONAL RENAME, Diagnostic → Audit, ONLY WHEN Assessment IS
+    // ABSENT — two words that used to mean close to the same stage of work,
+    // and only one of them may become the team's live "Audit" row. Checked
+    // and acted on FIRST, in both places a word is stored (`sprints.
+    // sprint_type` and `selectable_data` itself), BEFORE the statement below
+    // that renames Assessment → Audit — a `NOT EXISTS (… value = 'Assessment')`
+    // asked AFTER that rename would always answer true (nothing is spelled
+    // "Assessment" any more) and wrongly fold Diagnostic in behind it too,
+    // leaving two live rows both reading "Audit". Where Assessment IS
+    // present, Diagnostic is left exactly as it is here — un-renamed — and
+    // the closing statement below deactivates it along with every other word
+    // that is not one of the seven, the same "fold into nothing, never
+    // delete" treatment Iteration, Foundation, Data Migration, Process
+    // Optimization and Training all get.
+    //
+    // FIVE FOLD INTO NOTHING: Iteration, Foundation, Data Migration, Process
+    // Optimization, Training — deactivated by the closing statement, never
+    // renamed, never deleted. A sprint already carrying one of these ten
+    // retired or renamed words keeps its own stored word untouched by
+    // anything in this migration except the four plain renames and
+    // Diagnostic's own conditional above — both rewrite `sprints.
+    // sprint_type` in the same statement that rewrites the dropdown row, so
+    // a sprint's own history reads the team's CURRENT spelling rather than
+    // one the vocabulary has already moved on from (the same "remember, then
+    // carry the reference" discipline this file's own ref-alias sections
+    // practise, one column instead of a whole reference).
+    //
+    // POSITION 1..7, THE ORDER SHE DICTATED. `selectable_data.position`
+    // already exists (migration 0097 added it) — this migration is the
+    // second vocabulary to use it, never a second column.
+    //
+    // ICONS REPLACE THE MARK — code-side only (`shared/sprint-types.ts`'s own
+    // `icon` field, resolved in `web/lib/sprint-type-icon.tsx`), never a new
+    // column here. `mark` is still written, for whatever else reads a
+    // vocabulary row's mark (CSV export, the generic Choices screen) — the
+    // same two-letter codes the matching App stage words already carry,
+    // reused rather than invented a second time for the same seven words.
+    //
+    // IDEMPOTENT throughout, the same shape 0097 proves at length: every
+    // rewrite's WHERE matches nothing once the word has already moved; every
+    // vocabulary UPDATE's predicate is false once the row is already active,
+    // protected, correctly marked, ordered and spelled; every INSERT is
+    // guarded `WHERE NOT EXISTS`; the closing deactivate matches nothing once
+    // every non-canonical row is already deactivated.
+    version: "0098_sprint_type_not_started_audit_plan_build_validation_refinements_enhancement",
+    sql: `
+-- DIAGNOSTIC'S CONDITIONAL, FIRST — both tables, both checked against
+-- Assessment's PRE-migration spelling (see this migration's own header for
+-- why the order is load-bearing).
+UPDATE sprints SET sprint_type = ${sqlString("Audit")}
+ WHERE sprint_type = ${sqlString("Diagnostic")}
+   AND NOT EXISTS (SELECT 1 FROM selectable_data WHERE type = ${sqlString(SPRINT_TYPE_GROUP)} AND value = ${sqlString("Assessment")});
+
+UPDATE selectable_data
+   SET value = ${sqlString("Audit")}, position = 2, is_default = 1,
+       deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       updated_at = datetime('now')
+ WHERE type = ${sqlString(SPRINT_TYPE_GROUP)} AND value = ${sqlString("Diagnostic")}
+   AND NOT EXISTS (SELECT 1 FROM selectable_data sd2 WHERE sd2.type = ${sqlString(SPRINT_TYPE_GROUP)} AND sd2.value = ${sqlString("Assessment")});
+
+-- THE FOUR PLAIN RENAMES — sprints.sprint_type first (storedWordColumns'
+-- own table/column pair for this group), so a sprint's own history reads the
+-- CURRENT spelling the moment the dropdown row moves under it.
+${storedWordColumns(SPRINT_TYPE_GROUP)
+  .map((h) =>
+    Object.entries(SPRINT_TYPE_OLD_NAMES)
+      .map(
+        ([canonical, olds]) =>
+          `\nUPDATE ${h.table} SET ${h.column} = ${sqlString(canonical)} WHERE ${h.column} IN (${olds.map((o) => sqlString(o)).join(", ")});`
+      )
+      .join("")
+  )
+  .join("")}
+
+${SPRINT_TYPES.map((s, i) => {
+  const position = i + 1
+  const mark = APP_STAGES.find((a) => a.name === s.name)?.mark ?? null
+  const candidates = sprintTypeCandidates(s.name).map((n) => sqlString(n)).join(", ")
+  return `
+UPDATE selectable_data
+   SET value = ${sqlString(s.name)}, mark = ${sqlString(mark)}, position = ${position},
+       is_default = 1, deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       updated_at = datetime('now')
+ WHERE type = ${sqlString(SPRINT_TYPE_GROUP)}
+   AND value IN (${candidates});
+
+INSERT INTO selectable_data (id, type, value, is_default, mark, position, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SPRINT_TYPE_GROUP)}, ${sqlString(s.name)}, 1, ${sqlString(mark)}, ${position}, datetime('now'), 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data WHERE type = ${sqlString(SPRINT_TYPE_GROUP)} AND value = ${sqlString(s.name)});`
+}).join("\n")}
+
+-- EVERYTHING ELSE UNDER "Sprint type" FOLDS INTO NOTHING — Iteration,
+-- Foundation, Data Migration, Process Optimization, Training, and Diagnostic
+-- where Assessment was already present. Deactivated, never deleted: a sprint
+-- already carrying one of these keeps its own stored word exactly as it is.
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'), deactivator_name = 'System', updated_at = datetime('now')
+ WHERE type = ${sqlString(SPRINT_TYPE_GROUP)}
+   AND deactivated_at IS NULL
+   AND value NOT IN (${SPRINT_TYPES.map((s) => sqlString(s.name)).join(", ")});
+`,
+  },
+  {
+    // WAVES SHOW THE APP — the client's ruling, 16 Sep 2026, on the T3
+    // timeline's left column: "No, now you have the name of the wave. I want
+    // the name of the app." Before this migration a wave's app was DERIVED,
+    // never stored — `waves-screen.tsx#waveApp` walked every live sprint in
+    // the wave and drew a face only when they all agreed on exactly one app,
+    // recomputed on every render. A real column is cheaper to read (one join,
+    // not a scan of the team's sprints per wave) and, more to the point,
+    // SETTABLE: a wave can be sold "for" an app before a single sprint is
+    // planned into it, which the derived answer could never say.
+    //
+    // NULLABLE, ON PURPOSE. A wave with no app named — sold before anybody
+    // decided which system it covers, or one whose sprints touch more than
+    // one app — is exactly as ordinary as a wave with no dates yet
+    // (`waves.starts_on`/`ends_on`, this same table). `ON DELETE` is left
+    // unspecified (SQLite's default, RESTRICT-like via the FK's mere
+    // presence) rather than CASCADE: an app is deactivated, never deleted
+    // (ARCHITECTURE §4), so the row this points at never actually disappears
+    // out from under a wave.
+    //
+    // THE BACKFILL IS IDEMPOTENT AND CONSERVATIVE. It only ever fills a NULL
+    // `app_id` — a value set through the door (this migration's own write
+    // door, `createWave`/`updateWave`) is never overwritten — and it only
+    // fills one where the wave's own LIVE sprints agree on EXACTLY ONE app,
+    // the identical "agree on one, or draw nothing" reading `waveApp` used to
+    // give in the browser. A wave with no sprints, sprints naming no app, or
+    // sprints naming more than one, is left NULL rather than guessed at: the
+    // wrong app on a record is worse than an absent one, the same asymmetry
+    // `shared/app-stages.ts`'s own header argues for a stage nobody has told
+    // the code about. `COUNT(DISTINCT …) = 1` is asked BEFORE the value is
+    // read, in the UPDATE's own WHERE, so the read that follows (`LIMIT 1`)
+    // is already proved to answer one value and not an arbitrary pick among
+    // several.
+    version: "0099_waves_show_the_app",
+    sql: `
+ALTER TABLE waves ADD COLUMN app_id TEXT REFERENCES apps (id);
+CREATE INDEX idx_waves_app ON waves (app_id);
+
+UPDATE waves
+   SET app_id = (
+     SELECT s.app_id FROM sprints s
+      WHERE s.wave_id = waves.id AND s.deactivated_at IS NULL AND s.app_id IS NOT NULL
+      LIMIT 1
+   )
+ WHERE app_id IS NULL
+   AND (
+     SELECT COUNT(DISTINCT s.app_id) FROM sprints s
+      WHERE s.wave_id = waves.id AND s.deactivated_at IS NULL AND s.app_id IS NOT NULL
+   ) = 1;
 `,
   },
 ]

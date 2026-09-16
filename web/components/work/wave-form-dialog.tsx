@@ -39,10 +39,19 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
 
+/** "Nothing chosen" as a real Select value — an empty string is not
+ * selectable, the same shape `sprint-form-dialog.tsx`'s own `NONE` takes. */
+const NONE = "__none__"
+
 export type WaveFormValues = {
   accountId: string
   name: string
   goal: string
+  /** THE SYSTEM THIS PACKAGE COVERS — client ruling, 16 Sep 2026: "I want the
+   * name of the app." Empty string is "not said", the same "nothing chosen"
+   * shape every other optional picker on this form uses; `WaveCollection`
+   * turns that into the tri-state `appId` the door actually reads. */
+  appId: string
 }
 
 // The words on these three reach the screen through `shared/web/field.tsx`,
@@ -51,17 +60,22 @@ export type WaveFormValues = {
 // class of string in the app that cannot be wrapped where it is declared.
 const clientField = { ...defaultFieldConfig, label: "Account", required: true }
 const nameField = { ...defaultFieldConfig, label: "Wave name", required: true }
+const appField = {
+  ...defaultFieldConfig,
+  label: "App",
+  required: false,
+}
 const goalField = {
   ...defaultFieldConfig,
   label: "What the package is for",
   required: false,
-  helpText: "What they bought, in the words you would say it in. The dates come from the sprints.",
 }
 
 export function WaveFormDialog({
   open,
   onOpenChange,
   clients,
+  apps,
   fixedClient,
   initial,
   draftKey,
@@ -71,12 +85,19 @@ export function WaveFormDialog({
   onOpenChange: (open: boolean) => void
   /** The clients a wave can be sold to. Carries each one's face (R35). */
   clients: PickableRecord[]
+  /** EVERY APP ON THE TEAM — narrowed to the wave's own account below, the
+   * same pairing `wave-detail.tsx`'s own "Plan a sprint" picker already
+   * enforces (`apps.filter((a) => a.accountId === wave.accountId)`), because
+   * a wave can only cover a system sold to the same client it was sold to. */
+  apps: (PickableRecord & { accountId: string | null })[]
   /** Opened FROM a client's record, so whose it is is a fact rather than a
    * question — the picker disappears and a sentence takes its place, the same
    * shape the sprint and process forms already use. */
   fixedClient?: { id: string; name: string }
-  /** Present = editing an existing wave (whose it is, is settled). */
-  initial?: { name: string; goal: string }
+  /** Present = editing an existing wave (whose it is, is settled — carried
+   * here rather than re-offered, so the App picker below can still narrow to
+   * the right client's systems). */
+  initial?: { accountId: string; name: string; goal: string; appId: string | null }
   draftKey?: string
   onSubmit: (values: WaveFormValues) => Promise<void>
 }) {
@@ -85,15 +106,23 @@ export function WaveFormDialog({
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
-      accountId: fixedClient?.id ?? "",
+      accountId: initial?.accountId ?? fixedClient?.id ?? "",
       name: initial?.name ?? "",
       goal: initial?.goal ?? "",
+      appId: initial?.appId ?? "",
     },
     open
   )
   const [busy, setBusy] = React.useState(false)
 
   const ready = values.name.trim() !== "" && (editing || values.accountId !== "")
+
+  // THE ONE ACCOUNT THIS FORM KNOWS ABOUT, whichever way it arrived — fixed,
+  // freely picked, or (editing) the wave's own settled one — so the App
+  // picker below narrows the same way whether or not the Account picker is
+  // even on screen.
+  const accountId = fixedClient?.id ?? values.accountId
+  const appsForAccount = apps.filter((a) => a.accountId === accountId)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -104,6 +133,7 @@ export function WaveFormDialog({
         accountId: values.accountId,
         name: values.name.trim(),
         goal: richTextValue(values.goal),
+        appId: values.appId,
       })
       clearDraft()
       onOpenChange(false)
@@ -161,6 +191,34 @@ export function WaveFormDialog({
           placeholder={t("e.g. Onboarding package")}
           disabled={busy}
           autoFocus
+        />
+      </Field>
+      {/* THE APP THIS PACKAGE COVERS — client ruling, 16 Sep 2026: "No, now
+          you have the name of the wave. I want the name of the app." Narrowed
+          to the account above (`appsForAccount`), the same pairing the
+          "Plan a sprint" picker already enforces on the wave's own Sprints
+          tab — offered even with no account chosen yet (an empty list, same
+          as every other account-narrowed picker in this app), never a reason
+          to hide the field outright. THE APP'S OWN LOGO AS THE MARK
+          (`face: true`), the same flag the story form's own App row uses
+          (`story-form-dialog.tsx`), so a system with no logo on file still
+          draws its own initial rather than a blank row. */}
+      <Field config={appField} htmlFor="wave-app" className={fieldSpacing}>
+        <RecordPicker
+          id="wave-app"
+          value={values.appId || NONE}
+          onChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
+          options={sortedOptions(appsForAccount, lang, (a) => a.name).map((a) => ({
+            value: a.id,
+            label: a.name,
+            picture: a.logoUrl,
+            face: true,
+          }))}
+          emptyOption={{ value: NONE, label: t("No app yet") }}
+          placeholder={t("No app yet")}
+          searchPlaceholder={t("Search apps…")}
+          emptyText={t("No app matched.")}
+          disabled={busy}
         />
       </Field>
       <Field config={goalField} htmlFor="wave-goal" className={fieldSpacing}>

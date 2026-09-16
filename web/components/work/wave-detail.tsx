@@ -53,6 +53,7 @@ import {
 import { ApiFailure } from "@/lib/api"
 import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { content as contentApi } from "@/lib/api/content"
 import { sliceKey } from "@/components/work/work-panels"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
@@ -95,9 +96,12 @@ export function WaveDetailScreen({
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   // The client's own systems, for the sprint form's app picker. Same cache the
   // apps screen holds, so opening this tab adds no round trip on a warm app.
-  const appsQ = useCached<{ id: string; name: string; accountId: string | null; active: boolean }[]>(
+  const appsQ = useCached<{ id: string; name: string; accountId: string | null; logoUrl: string | null; active: boolean }[]>(
     appsKey(teamId),
-    () => listFetch.apps(teamId) as Promise<{ id: string; name: string; accountId: string | null; active: boolean }[]>
+    () =>
+      listFetch.apps(teamId) as Promise<
+        { id: string; name: string; accountId: string | null; logoUrl: string | null; active: boolean }[]
+      >
   )
 
   const { can } = usePermissions(teamId)
@@ -476,6 +480,15 @@ export function WaveDetailScreen({
                             {waveDates(s, t, lang)}
                           </p>
                         </div>
+                        {/* THE TYPE, ICON + WORD, NO COLOUR — client ruling,
+                            16 Sep 2026: "they will not have colors, but
+                            icons." Absent where the sprint carries no type. */}
+                        {s.sprintType && (
+                          <Badge variant="secondary" size="pill" className="shrink-0">
+                            <SprintTypeGlyph type={s.sprintType} />
+                            {t(s.sprintType)}
+                          </Badge>
+                        )}
                         {canEdit ? (
                           <Button
                             variant="ghost"
@@ -542,10 +555,15 @@ export function WaveDetailScreen({
         open={editOpen}
         onOpenChange={setEditOpen}
         clients={[]}
+        apps={(appsQ.data ?? []).filter((a) => a.active)}
         draftKey={`wave:edit:${waveId}`}
-        initial={{ name: wave.name, goal: wave.goal ?? "" }}
+        initial={{ accountId: wave.accountId, name: wave.name, goal: wave.goal ?? "", appId: wave.appId }}
         onSubmit={async (v) => {
-          await wavesApi.update({ id: waveId, name: v.name, goal: v.goal || undefined })
+          // `appId` ALWAYS SENT ON EDIT — the door's own tri-state
+          // (`updateWave`'s own header, workers/tenancy/src/lib/waves.ts)
+          // reads an absent key as "leave it alone", and this form always
+          // knows and means the app it is submitting, empty string included.
+          await wavesApi.update({ id: waveId, name: v.name, goal: v.goal || undefined, appId: v.appId || null })
           refresh()
           toast.success(t("Wave updated."))
         }}

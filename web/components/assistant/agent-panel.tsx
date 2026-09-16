@@ -54,6 +54,7 @@ import {
   openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
+  reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
   useActiveAgentTabId,
@@ -735,6 +736,7 @@ export function AgentPanel({
       onClose={handleCloseAgentTab}
       onNew={handleNewAgentTab}
       onOpenHistory={openHistoryTab}
+      onReorder={reorderAgentTab}
     />
   ) : null
 

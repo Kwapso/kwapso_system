@@ -434,10 +434,6 @@ export function KnowledgeFormDialog({
               "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says above and this source is good to go."
             )}
           </p>
-        ) : willReadVideoLink ? (
-          <p className="text-muted-foreground mt-2 text-xs">
-            {t("We'll read this video's captions or transcript when you save it.")}
-          </p>
         ) : null}
       </Field>
       <Field config={filedField} htmlFor="knowledge-filed" className={fieldSpacing}>
@@ -454,9 +450,6 @@ export function KnowledgeFormDialog({
           emptyText={t("No account matched.")}
           disabled={busy}
         />
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t("Filing it under an account is how a question about them finds it first.")}
-        </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
         {/* A MIRRORED source that is CURRENTLY private (nobody else has seen it
@@ -473,12 +466,7 @@ export function KnowledgeFormDialog({
             has seen it (see the file header), never a choice this form makes
             for a mirrored source, so there is nothing to offer a control for. */}
         {mirrored && values.visibility === "private" ? (
-          <div>
-            <p className="text-sm">{t("Only me")}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {t("Who can read this follows who has already seen it — it isn't set here.")}
-            </p>
-          </div>
+          <p className="text-sm">{t("Only me")}</p>
         ) : (
           <Select
             value={values.visibility}
@@ -533,9 +521,6 @@ export function KnowledgeFormDialog({
             emptyText={t("No app matched.")}
             disabled={busy}
           />
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
-          </p>
         </Field>
       )}
     </FormShellDialog>

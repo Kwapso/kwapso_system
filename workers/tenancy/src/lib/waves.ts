@@ -112,6 +112,28 @@ function duplicateOr(e: unknown, name: string): unknown {
   return e
 }
 
+/** AN APP NAMED ON A WAVE MUST BELONG TO THE SAME ACCOUNT — the identical
+ * pairing `wave-detail.tsx`'s own "Plan a sprint" picker already enforces on
+ * screen (it offers only `apps.accountId === wave.accountId`), asserted here
+ * too so a caller cannot associate a wave with a system sold to somebody
+ * else's client. Live apps only: an app deactivated out from under a wave is
+ * a fact the picker should not have offered, never a value this door
+ * silently accepts either. */
+async function assertAppInAccount(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string,
+  accountId: string
+): Promise<void> {
+  const rows = await d1Query<{ account_id: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT account_id FROM apps WHERE id = ${sqlString(appId)} AND deactivated_at IS NULL`
+  )
+  if (!rows.length || rows[0].account_id !== accountId)
+    throw new GuardError(400, "wrong_account", "That app belongs to a different client.")
+}
+
 /* ------------------------------- reading them ------------------------------ */
 
 type WaveRow = {
@@ -120,6 +142,9 @@ type WaveRow = {
   account_id: string
   account_name: string | null
   name: string
+  app_id: string | null
+  app_name: string | null
+  app_logo_url: string | null
   goal: string | null
   starts_on: string | null
   ends_on: string | null
@@ -131,11 +156,18 @@ type WaveRow = {
   editor_name: string | null
 }
 
-const WAVE_COLUMNS = `w.id, w.ref, w.account_id, a.name AS account_name, w.name, w.goal,
+// LEFT JOIN apps — same shape as the accounts join beside it: a wave's own
+// `app_id` is nullable (this file's own header on `createWave`/`updateWave`
+// says why), and an inner join would drop a wave the moment its app was
+// deactivated rather than merely hiding its face.
+const WAVE_COLUMNS = `w.id, w.ref, w.account_id, a.name AS account_name, w.name,
+            w.app_id, ap.name AS app_name, ap.logo_url AS app_logo_url, w.goal,
             w.starts_on, w.ends_on, w.deactivated_at,
             w.created_at, w.creator_name, w.updated_at, w.editor_name,
             (SELECT COUNT(*) FROM sprints s
               WHERE s.wave_id = w.id AND s.deactivated_at IS NULL) AS sprint_count`
+const WAVE_JOINS = `LEFT JOIN accounts a ON a.id = w.account_id
+       LEFT JOIN apps ap ON ap.id = w.app_id`
 
 function toWave(r: WaveRow): Wave {
   return {
@@ -147,6 +179,9 @@ function toWave(r: WaveRow): Wave {
     accountId: r.account_id,
     accountName: r.account_name,
     name: r.name,
+    appId: r.app_id,
+    appName: r.app_name,
+    appLogoUrl: r.app_logo_url,
     goal: r.goal,
     startsOn: r.starts_on,
     endsOn: r.ends_on,
@@ -187,13 +222,18 @@ export async function listWaves(
   guard: MemberGuard,
   scope: AccountScope,
   accountId?: string | null,
-  sprintType?: string | null
+  sprintType?: string | null,
+  appId?: string | null
 ): Promise<Wave[]> {
   const fence = accountScopeClause(scope, "w.account_id")
   const where = [
     fence.sql,
     accountId ? `w.account_id = ${sqlString(accountId)}` : "",
     sprintTypeExistsClause("w.id", sprintType),
+    // CHEAP, UNLIKE THE SPRINT TYPE FACET ABOVE — `app_id` is a real column on
+    // `waves` now (team migration 0099), so this narrows with a plain equality
+    // rather than an `EXISTS` over `sprints`.
+    appId ? `w.app_id = ${sqlString(appId)}` : "",
   ]
     .filter(Boolean)
     .join(" AND ")
@@ -204,7 +244,7 @@ export async function listWaves(
     // the speed of contracts and never with ordinary use. Bounded, not paged.
     `SELECT ${WAVE_COLUMNS}
        FROM waves w
-       LEFT JOIN accounts a ON a.id = w.account_id
+       ${WAVE_JOINS}
       ${where ? `WHERE ${where}` : ""}
       ORDER BY (w.deactivated_at IS NOT NULL),
                COALESCE(w.starts_on, w.created_at) DESC,
@@ -220,7 +260,8 @@ export async function countWaves(
   guard: MemberGuard,
   scope: AccountScope,
   accountId?: string | null,
-  sprintType?: string | null
+  sprintType?: string | null,
+  appId?: string | null
 ): Promise<number> {
   const fence = accountScopeClause(scope, "account_id")
   const where = [
@@ -229,6 +270,7 @@ export async function countWaves(
     // No `w.` alias on this query (bare `waves`), so the EXISTS reaches back
     // to it by the table's own name — the one identifier this statement has.
     sprintTypeExistsClause("waves.id", sprintType),
+    appId ? `app_id = ${sqlString(appId)}` : "",
   ]
     .filter(Boolean)
     .join(" AND ")
@@ -259,7 +301,7 @@ export async function getWave(
     guard.databaseId,
     `SELECT ${WAVE_COLUMNS}
        FROM waves w
-       LEFT JOIN accounts a ON a.id = w.account_id
+       ${WAVE_JOINS}
       WHERE ${where}
       LIMIT 1`
   )
@@ -285,6 +327,7 @@ async function listWaveSprints(
     account_id: string | null
     ref: string | null
     name: string
+    sprint_type: string | null
     starts_on: string | null
     ends_on: string | null
     deactivated_at: string | null
@@ -294,7 +337,9 @@ async function listWaveSprints(
     // R14 hard cap — a package holds a handful of sprints, never a growing feed.
     // `s.ref` rides along: the wave's screen draws each sprint's number in
     // front of its name, the same chip every other sprint face carries.
-    `SELECT s.id, s.wave_id, s.account_id, s.ref, s.name, s.starts_on, s.ends_on, s.deactivated_at
+    // `s.sprint_type` rides along too — the icon+word pill this screen's own
+    // row draws beside each sprint (task A, 16 Sep 2026).
+    `SELECT s.id, s.wave_id, s.account_id, s.ref, s.name, s.sprint_type, s.starts_on, s.ends_on, s.deactivated_at
        FROM sprints s
       WHERE s.wave_id = ${sqlString(waveId)}
       ORDER BY (s.deactivated_at IS NOT NULL), COALESCE(s.starts_on, s.created_at), s.name
@@ -306,6 +351,7 @@ async function listWaveSprints(
     accountId: r.account_id,
     ref: r.ref,
     name: r.name,
+    sprintType: r.sprint_type,
     startsOn: r.starts_on,
     endsOn: r.ends_on,
     active: r.deactivated_at == null,
@@ -396,9 +442,10 @@ export async function createWave(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { accountId: string; name: string; goal: string | null }
+  input: { accountId: string; name: string; goal: string | null; appId?: string | null }
 ): Promise<{ id: string }> {
   assertAccountInScope(scope, input.accountId)
+  if (input.appId) await assertAppInAccount(cfg, guard, input.appId, input.accountId)
   const id = ulid()
   const now = new Date().toISOString()
   // TEAM-wide (shared/workers/refs.ts) — a wave always names an account
@@ -412,9 +459,9 @@ export async function createWave(
     await d1Query(
       cfg,
       guard.databaseId,
-      `INSERT INTO waves (id, ref, account_id, name, goal, ${AUDIT_CREATE})
-       VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sqlString(input.name)},
-               ${sqlString(input.goal)}, ${auditCreateValues(actor, now)})`
+      `INSERT INTO waves (id, ref, account_id, app_id, name, goal, ${AUDIT_CREATE})
+       VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sqlString(input.appId ?? null)},
+               ${sqlString(input.name)}, ${sqlString(input.goal)}, ${auditCreateValues(actor, now)})`
     )
   } catch (e) {
     throw duplicateOr(e, input.name)
@@ -428,25 +475,34 @@ export async function createWave(
   return { id }
 }
 
-/** Rename a wave, or re-word what it is for. The DATES are deliberately not
- * writable: they are the sprints' answer, not a field somebody can type over. */
+/** Rename a wave, re-word what it is for, or say which app it covers. The
+ * DATES are deliberately not writable: they are the sprints' answer, not a
+ * field somebody can type over.
+ *
+ * `appId` IS TRI-STATE, the same "absent key = say nothing" contract
+ * `updateAccount`'s own `accountManagerUserId` keeps (workers/tenancy/src/
+ * routes/accounts.ts): `undefined` (the key was never sent) leaves whatever
+ * is already there; `null` clears it; a string sets it, after the same
+ * same-account check `createWave` runs. */
 export async function updateWave(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { id: string; name: string; goal: string | null }
+  input: { id: string; name: string; goal: string | null; appId?: string | null }
 ): Promise<{ accountId: string }> {
   const accountId = await ownerOf(cfg, guard, "waves", input.id)
   if (!accountId) throw new GuardError(404, "not_found", "That's not there anymore.")
   assertAccountInScope(scope, accountId)
+  if (input.appId) await assertAppInAccount(cfg, guard, input.appId, accountId)
   const now = new Date().toISOString()
+  const appIdSet = input.appId !== undefined ? `app_id = ${sqlString(input.appId)}, ` : ""
   try {
     await d1Query(
       cfg,
       guard.databaseId,
       `UPDATE waves
-          SET name = ${sqlString(input.name)},
+          SET ${appIdSet}name = ${sqlString(input.name)},
               goal = ${sqlString(input.goal)},
               ${auditEditSet(actor, now)}
         WHERE id = ${sqlString(input.id)}`

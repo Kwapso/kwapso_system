@@ -40,6 +40,7 @@ import {
   sprintTypeName,
   useSprintTypes,
 } from "@/components/work/sprint-form-dialog"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
@@ -299,6 +300,19 @@ export function SprintDetailScreen({
       // (the "Cancelled" tier every other put-away record uses).
       chips={
         <>
+          {/* THE TYPE, ICON + WORD, NO COLOUR — the client's ruling, 16 Sep
+              2026: "they will not have colors, but icons." A neutral pill,
+              the same `variant="secondary" size="pill"` ground App stage's
+              own chips draw, never `variant="status"` (that dot stays for
+              STATUS, the pill right after this one). Absent when the sprint
+              carries no type at all — a chip is a fact about the record, not
+              a blank placeholder. */}
+          {sprint.sprintType && (
+            <Badge variant="secondary" size="pill">
+              <SprintTypeGlyph type={sprint.sprintType} />
+              {kindWord}
+            </Badge>
+          )}
           <Badge
             variant="status"
             dot={sprint.completedAt ? "shipped" : sprint.active ? "building" : "archived"}

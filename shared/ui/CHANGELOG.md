@@ -2,6 +2,151 @@
 
 ## Unreleased
 
+### Changed — `BreadcrumbFolders` icon-only tabs no longer render at the 128px text width
+
+Client, 16 Sep 2026, fifth ruling that day, on staging: "validated, but still
+gotta fix the shape! … the assistant strip's two pinned tabs (History clock,
+"+") render 128px wide — the same width as a text tab — so they read as big
+empty grey blocks beside the 162px 'Conversation ×' tab, while the content
+strip's tabs hug their text."
+
+A new per-item flag, `BreadcrumbFoldersItem.iconOnly`, drops `TAB`'s 128px
+text floor (`min-w-0`) and tightens both insets to icon-plus-padding
+(`TAB_ICON_ONLY`: `ps-3` leading, a trailing inset that keeps the shoulder
+curve's own width but drops the label's extra trailing space) instead. The
+folder silhouette behind the tab needed no change at all: `FolderShape`
+measures its own rendered box on every resize rather than stretching a fixed
+path (that file's own "WHY IT MEASURES"), so a narrow tab is not a squashed
+wide one, it is the same shape measured smaller — verified by reading the
+rendered box width in a live page rather than assumed.
+
+Demo: `demo/sections/a-b.tsx`'s `BreadcrumbFolders` workspace-tab-set
+specimen grows two trailing pinned tabs, `History` (`ClockCounterClockwise`)
+and `+` (`Plus`), both `iconOnly closable={false}`, so the strip reads
+`[text tab active][icon tab][icon tab]` exactly as staging showed it.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; the app's
+`agent-tab-strip.tsx` should pass `iconOnly: true` on its own History/+ tabs
+once the tag lands.
+
+### Added — `BreadcrumbFolders` tabs support drag-to-reorder (`onReorder`)
+
+Client ruling, 16 Sep 2026: "go with the drag order." A new `onReorder?:
+(fromIndex: number, toIndex: number) => void` prop makes every tab whose own
+`closable` is not `false` draggable — native HTML5 drag, the same
+`draggable`/`onDragStart`/`onDragOver`/`onDrop`/`onDragEnd` shape
+`kanban.tsx`'s cards already use, reusing motion.css's existing
+`.motion-drag` / `.motion-drag-placeholder` / `.motion-drop-target` classes
+rather than adding a new keyframe. A focused movable tab also takes
+Alt+ArrowLeft / Alt+ArrowRight, moving it to the next or previous movable
+slot and skipping over any pinned one.
+
+A tab with `closable: false` (pinned) is never draggable and never a drop
+target — dragging over one never calls `preventDefault`, so the browser's
+own refusal is what stops a drop there, not a check in this file. That is
+what keeps trailing pinned tabs (History, "+") pinned last with no extra
+bookkeeping: nothing can ever land past them. `<BreadcrumbLink>`'s own `<a>`
+gets `draggable={false}` on a movable tab, since a browser makes a link
+draggable by default (drag to bookmark) and that would otherwise fire before
+the `<li>`'s own `dragstart` ever sees the gesture.
+
+The caller applies the move to its own array — `onReorder` hands back
+positions, exactly as `onClose` already does, never mutating anything
+itself.
+
+Demo: `demo/sections/a-b.tsx`'s workspace-tab-set specimen wires `onReorder`
+to a plain splice (`reorderWithinArray`).
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system;
+`web/lib/workspace-tabs.ts` gains `reorderTab(path, toIndex)` and
+`app-shell.tsx`'s content strip plus `agent-tab-strip.tsx` /
+`agent-conversation-tabs.ts`'s `reorderAgentTab` wire `onReorder` once the
+tag lands.
+
+### Fixed — `Badge`'s `status` variant never drops its neutral fill, in either palette
+
+Client ruling, 16 Sep 2026: "go for the kit fix." Ruling 26's own dark
+clause put the ONE charcoal-dot pill ("in build" / "with us") on a mango
+fill in dark mode; the client's own law elsewhere is "mango is the brand,
+never a status" (ch11), and that clause was the one place this file broke
+it. The `variant: "status", dotTone: "building"` compound variant is
+removed — `variant="status"` now resolves to `--pill-fill`/`--pill-label`
+for every `dotTone`, `building` included, in both palettes — and the two
+tokens that carried the exception, `--pill-fill-building` and
+`--pill-label-building`, are removed from `tokens.css` with it (light block
+and both dark blocks; `foundations/tokens/build-tokens.mjs` confirms no
+drift/orphan/px/selector regression). `--dot-building` itself is unchanged
+(`--foreground`, unrelated to the pill exception — it also feeds Kanban's
+column-header dot) and reads correctly against the now-always-neutral pill
+fill in dark.
+
+Demo: `demo/sections/a-b.tsx`'s "Status pills" panel note updated to say
+what is now true — every tone, both palettes, no dark exception —
+`demo/sheets/token-sheet.tsx` and `verify/accents/page.tsx` no longer
+reference the removed tokens.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; the app's
+`web/components/apps/apps-screen.tsx` drops its `STAGE_PILL_PROPS`
+className override that was patching around the old dark-mode fill (keeping
+`size="pill"`), and any similar override elsewhere.
+
+### Added — `CalendarView` opens a hover preview on an event chip (`renderEventCard`)
+
+Client ruling, 16 Sep 2026: "Is it possible that when I hover over the card
+in the calendar, it expands and I see what it is?" A new
+`renderEventCard?(event, day)` prop wraps every chip AND every span mark
+(the S2 caps and the middle ghost line alike) in the kit's own floating
+preview: a `HoverCard` on a pointer that can hover (`(hover: none)`
+decides), opening 300ms after the pointer arrives or on keyboard focus and
+closing on pointer-leave or Escape — Radix's own default, nothing
+reimplemented — or a `Popover` on a coarse (touch) pointer, since a phone
+has no hover to open it with. The kit draws the frame; the caller returns
+whatever node it wants shown — `record-calendar.tsx`'s own card: title,
+kind, dates and the chip's own tone dot.
+
+On touch the first tap on an unopened preview opens it and goes no further
+(a reader who has not yet seen the card gets no benefit from tapping
+straight through to the full record); a second tap, with the preview
+already open, reaches the chip's own `onClick` (`onSelectEvent`) unchanged.
+
+Returning `undefined`/`null` for a given event renders that chip exactly as
+before; omitting the prop altogether wraps nothing.
+
+Demo: `demo/collections/a-ca.tsx`'s `CalendarView` section grows a
+"renderEventCard" panel wiring two events ("Northgate kickoff", "Alderbrook
+renewal") to a small title/kind/dates card.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system before
+`record-calendar.tsx` can wire it.
+
+### Changed — `ScreenShell`'s bare resize seam draws nothing at rest
+
+Client ruling, 16 Sep 2026: "can we actually not show anything and make it
+so that I can grab the left rail of the assistant, and when I hover over
+there, I see this kind of arrow to move?" `RESIZE_SEAM` (the bare seam added
+for `asideHandleOnOpen={false}` callers, above) no longer paints its 3px
+mark at rest — `before:opacity-0`, revealed only on `hover:`/
+`focus-visible:` — and the hit area widens to the aside's full left edge:
+`w-2` (8px) and `inset-y-0` (the column's full height, not the previous
+fixed 44px band), so a reader can grab anywhere along the edge rather than
+hunting for a short mark's own height. `cursor-col-resize` was already on
+the handle; that IS the "arrow to move" the ruling asked for — the browser's
+native glyph, nothing drawn.
+
+The one caller's own `placement` string drops the `top-1/2 -translate-y-1/2`
+pair the round (non-bare) handle still uses to centre its fixed-height box:
+combined with `inset-y-0`'s `top: 0`, that pair was winning `top` back to
+`50%` while leaving `inset-y-0`'s `bottom: 0` unchallenged, collapsing the
+seam to the ancestor's bottom HALF — caught by reading the rendered box in a
+live page, not by inspection alone. Drag, snap, keyboard stepping and
+double-click reset are unchanged; the global focus ring (tokens.css §8)
+still shows on keyboard focus, since nothing here sets `outline-none`. The
+`asideHandleOnOpen` closed-state opener is untouched.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; no app
+wiring required beyond the existing `asideHandleOnOpen={false}` call site,
+which inherits the new resting/hover behaviour for free.
+
 ### Added — `ScreenShell`'s aside column is resizable: drag the seam, snapping to 320 / 400 / 520
 
 The client's ruling, 16 Sep 2026: *"Is it possible that we can, while using

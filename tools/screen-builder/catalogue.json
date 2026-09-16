@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.91",
-  "sha": "f7e1450ee30edffe4f8b549ad3b056c557b65d82",
+  "tag": "v1.2.96",
+  "sha": "ed7c9a48a021ada459368a69a2639748a6dcd571",
   "syncedAt": "2026-09-16"
  },
- "generatedAt": "2026-09-16T10:34:24.606Z",
+ "generatedAt": "2026-09-16T11:40:59.856Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 317,
   "compositions": 47,
   "icons": 1512,
-  "tokens": 369,
-  "tokenDeclarations": 573,
+  "tokens": 367,
+  "tokenDeclarations": 567,
   "unresolved": 0
  },
  "components": [
@@ -928,7 +928,7 @@
     {
      "file": "components/badge/badge.tsx",
      "name": "badgeVariants",
-     "line": 61,
+     "line": 67,
      "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums",
      "groups": [
       {
@@ -1057,13 +1057,6 @@
       "size": "counter"
      },
      "compound": [
-      {
-       "when": {
-        "variant": "status",
-        "dotTone": "building"
-       },
-       "classes": "bg-[var(--pill-fill-building)] text-[var(--pill-label-building)][&_[data-slot=badge-dot]]:bg-[var(--pill-label-building)]"
-      },
       {
        "when": {
         "variant": "status",
@@ -1456,7 +1449,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "dayCellVariants",
-     "line": 130,
+     "line": 132,
      "base": "flex min-w-0 flex-col gap-[var(--space-1h)] overflow-hidden rounded-[var(--radius)] px-[var(--space-2h)] py-2 text-start transition-colors duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
@@ -1502,7 +1495,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "eventChipVariants",
-     "line": 174,
+     "line": 176,
      "base": "block w-full truncate px-2 text-badge leading-[1.6] font-[var(--font-weight-medium)] text-start",
      "groups": [
       {
@@ -1551,7 +1544,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "spanLineVariants",
-     "line": 500,
+     "line": 518,
      "base": "h-[3px] w-full shrink-0 rounded-pill opacity-55",
      "groups": [
       {

@@ -1111,6 +1111,18 @@ again, which is the only property that matters here.
   for source compatibility, accepts the literal `"bare"` and nothing else,
   and is never read. A view switch that offers this body calls it "List",
   with the kit's `ListBullets` glyph, never "Table".
+- **R81 `form-carries-no-hints`** — a create/edit form shows the label and the
+  control, nothing else. Do not set `helpText` on a `FieldConfig` and do not
+  draw a bare `<p>` explaining a field between two of them; the label already
+  says what the field is. Keep only a validation/refusal message
+  (`text-warning`/`text-destructive`), a placeholder that is the field's own
+  example value, a picker option's own differentiating description, or a
+  field showing the record's own settled value where a control would
+  otherwise be. If a hint genuinely carries something the user cannot know
+  otherwise (an irreversible action's consequence), it belongs in the CONFIRM
+  dialog that asks about the action, never the create/edit form beside it —
+  name the file in `FORM_HINT_OK` (`shared/rules/registry.ts`) with the real
+  reason.
 
 **The words** (the ones that catch every new module, every time)
 

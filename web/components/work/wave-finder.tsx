@@ -33,9 +33,12 @@ import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { RecordMark } from "@shared/web/record-mark"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { NO_SORT_VIEW_VALUES, TOOLBAR_SEARCH_SLOT } from "@/components/deep-link/screen-bits"
-import { sprintTypeLabel, type SprintTypeOption } from "@/components/work/sprint-form-dialog"
+import { sprintTypeName, type SprintTypeOption } from "@/components/work/sprint-form-dialog"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { AppMark } from "@/components/apps/app-tiles"
+import { sortedOptions } from "@shared/web/sorted-options"
 import { useLanguage } from "@shared/web/language"
-import type { Account, Sprint } from "@shared/types"
+import type { Account, AppRow, Sprint } from "@shared/types"
 import type { Wave } from "@shared/waves"
 
 /** THE THREE BODIES the client's 2026-09-15 ruling ("i choose t3") named:
@@ -63,6 +66,10 @@ export type WaveQuery = {
    * and `selectWaves` below mirrors off the sprints already in hand — client
    * ruling, 16 Sep 2026: "I want, in Waves, the filter by sprint type." */
   sprintType: string
+  /** "" = every app. CHEAP, UNLIKE `sprintType` ABOVE — `Wave.appId` is a
+   * real column (team migration 0099), so this narrows with a plain
+   * equality against the rows already in hand, never a sprint scan. */
+  appId: string
   sortBy: WaveOrder
   dir: "asc" | "desc"
 }
@@ -72,6 +79,7 @@ export const EMPTY_WAVE_QUERY: WaveQuery = {
   accountId: "",
   status: "",
   sprintType: "",
+  appId: "",
   sortBy: "newest",
   dir: "desc",
 }
@@ -82,7 +90,11 @@ export const EMPTY_WAVE_QUERY: WaveQuery = {
  * looking for a wave that was never sold. */
 export function waveQueryIsActive(query: WaveQuery): boolean {
   return (
-    query.q.trim() !== "" || query.accountId !== "" || query.status !== "" || query.sprintType !== ""
+    query.q.trim() !== "" ||
+    query.accountId !== "" ||
+    query.status !== "" ||
+    query.sprintType !== "" ||
+    query.appId !== ""
   )
 }
 
@@ -134,6 +146,7 @@ export function selectWaves(rows: Wave[], query: WaveQuery, sprints: Sprint[] = 
     if (query.status === "on" && !w.active) return false
     if (query.status === "off" && w.active) return false
     if (wavesWithType && !wavesWithType.has(w.id)) return false
+    if (query.appId && w.appId !== query.appId) return false
     if (!needle) return true
     // The client's name is searched too: "Hogo" is how somebody looks for the
     // package they sold Hogo, and it is on the row already.
@@ -170,6 +183,13 @@ export function WaveFinder({
    * renders through (R75's `filter-bar.tsx#optionsFor`), so this file
    * declares them in whatever order and never sorts them itself. */
   sprintTypes = [],
+  /** EVERY APP ON THE TEAM — the App facet's options (task C, 16 Sep 2026:
+   * "facet by app if cheap" — cheap here, since `Wave.appId` is a real
+   * column). Defaults to `[]` so a caller that has not touched this facet
+   * (none exist yet) needs no change; an empty list simply offers no App
+   * facet at all (below), the same "nothing to filter by" shape every other
+   * team-vocabulary facet in this file takes. */
+  apps = [],
   resultCount,
   views,
   view,
@@ -182,6 +202,7 @@ export function WaveFinder({
   clients: Account[]
   showClientFilter?: boolean
   sprintTypes?: SprintTypeOption[]
+  apps?: AppRow[]
   resultCount?: number
   /** THE BODIES THIS TAB OFFERS — CH19's third toolbar zone ("search, then
    * filters, then view switcher, then actions pinned right", CH27.13), the
@@ -265,17 +286,51 @@ export function WaveFinder({
     // `useSprintTypes` never returns empty (it falls back to three generic
     // words), so this is never blank, but a team with no real vocabulary at
     // all still gets a working facet rather than one hidden and one shown.
-    {
-      field: "sprintType",
-      label: t("Sprint type"),
-      control: "select" as const,
-      options: sprintTypes.map((o) => ({ value: o.value, label: sprintTypeLabel(o, lang) })),
+    // ORDERED, NOT A→Z (R75's facet escape hatch, `FilterFacet.ordered` —
+    // config.ts) — `sprintTypes` (`useSprintTypes`) is already the team's
+    // own `position`-ordered vocabulary (the same client ruling, 16 Sep
+    // 2026, "in that order"), the identical shape `apps-screen.tsx#stage`
+    // is registered for. Registered in `FACET_ORDER_OK`
+    // (shared/rules/registry.ts). ICON, NOT MARK, on each option — client
+    // ruling, 16 Sep 2026: "they will not have colors, but icons." `label`
+    // is the plain word (`sprintTypeName`, never `sprintTypeLabel`'s own
+    // `mark` prefix, which this facet's own `mark` slot now carries as a
+    // real element instead).
+    { field: "sprintType", label: t("Sprint type"), control: "select" as const, ordered: true,
+      options: sprintTypes.map((o) => ({
+        value: o.value,
+        label: sprintTypeName(o, lang),
+        mark: <SprintTypeGlyph type={o.value} />,
+      })),
     },
+    // APP — task C, 16 Sep 2026: "facet by app if cheap." `Wave.appId` is a
+    // real column (team migration 0099), so this narrows the loaded rows
+    // with a plain equality (`selectWaves`, above) rather than a sprint
+    // scan. Offered only where the team actually has apps to filter by — an
+    // empty list draws no facet at all, never an empty one.
+    ...(apps.length > 0
+      ? [
+          {
+            field: "appId",
+            label: t("App"),
+            control: "select" as const,
+            // EACH ONE WEARING ITS OWN FACE — the same "for accounts include
+            // icon in select components and filters" ruling the Account
+            // facet above already answers, read for an app's own mark
+            // instead of a company's.
+            options: sortedOptions(apps, lang, (a) => a.name).map((a) => ({
+              value: a.id,
+              label: a.name,
+              mark: <AppMark app={a} size="choice" />,
+            })),
+          },
+        ]
+      : []),
   ]
 
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
     facets,
-    values: { accountId: query.accountId, status: query.status, sprintType: query.sprintType },
+    values: { accountId: query.accountId, status: query.status, sprintType: query.sprintType, appId: query.appId },
     // Empty on purpose: every facet carries its own options, so there is
     // nothing for the bar to derive from the rows on screen — and a client
     // whose only wave is filtered out must not vanish from the filter.

@@ -104,7 +104,6 @@ const lastNameField = { ...defaultFieldConfig, label: "Last name", required: tru
 const spineField = {
   ...defaultFieldConfig,
   label: "Background",
-  helpText: "You can change this later in Settings.",
 }
 
 /** The code every agency door answers a client login with (`refusePortalCaller`,

@@ -378,8 +378,7 @@ function StepKind({
   const t = useT()
   const keeping = rows.filter((r) => kept.includes(r.key))
   const leaving = rows.filter((r) => !kept.includes(r.key))
-  if (rows.length === 0)
-    return <p className="text-muted-foreground text-sm">{t("The call didn't describe any steps.")}</p>
+  if (rows.length === 0) return null
 
   const line = (step: DraftStep) => (
     <Row

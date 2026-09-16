@@ -380,9 +380,7 @@ export function GoogleSourceDialog({
 
       {options !== null && (
         <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] bg-surface-panel">
-          {options.length === 0 ? (
-            <p className="text-muted-foreground p-3 text-sm">{t("Nothing found in your Google account.")}</p>
-          ) : (
+          {options.length === 0 ? null : (
             options.map((o) => {
               const picked = chosen.some((i) => i.externalId === o.externalId)
               return (
@@ -461,11 +459,7 @@ export function GoogleSourceDialog({
        * keeping it on screen is what stops somebody submitting three things when
        * they meant four. */}
       <Field config={chosenField} className={fieldSpacing}>
-        {chosen.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {t("Nothing picked yet. Look one up above and tap it.")}
-          </p>
-        ) : (
+        {chosen.length === 0 ? null : (
           <div className="flex flex-wrap gap-1">
             {chosen.map((i) => (
               <button

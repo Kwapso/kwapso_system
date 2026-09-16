@@ -35,16 +35,19 @@ export function waveOneKey(id: string): string {
 }
 
 export const waves = {
-  /** Every wave the caller may see, or one client's, or one carrying a live
-   * sprint of one type (`EXISTS`, the door's own — a wave has no such column).
-   * Bounded (R14), with the door's exact COUNT(*) beside the rows (R16).
-   * Neither filter is sent by the sidebar collection today — it reads the
-   * whole bounded list once and narrows in the browser (wave-finder.tsx's own
-   * header says why) — but the door answers both for any other caller. */
-  list: (params?: { accountId?: string; sprintType?: string }) => {
+  /** Every wave the caller may see, or one client's, one carrying a live
+   * sprint of one type (`EXISTS`, the door's own — a wave has no such column),
+   * or one covering one app (`app_id`, a real column since team migration
+   * 0099 — cheap, unlike the sprint type facet). Bounded (R14), with the
+   * door's exact COUNT(*) beside the rows (R16). None of the three is sent by
+   * the sidebar collection today — it reads the whole bounded list once and
+   * narrows in the browser (wave-finder.tsx's own header says why) — but the
+   * door answers all three for any other caller. */
+  list: (params?: { accountId?: string; sprintType?: string; appId?: string }) => {
     const q = new URLSearchParams()
     if (params?.accountId) q.set("accountId", params.accountId)
     if (params?.sprintType) q.set("sprintType", params.sprintType)
+    if (params?.appId) q.set("appId", params.appId)
     const qs = q.toString()
     return api<{ waves: Wave[]; total: number }>(`/api/tenancy/waves${qs ? `?${qs}` : ""}`)
   },
@@ -56,12 +59,15 @@ export const waves = {
       `/api/tenancy/waves/one?id=${encodeURIComponent(id)}`
     ),
 
-  create: (input: { accountId: string; name: string; goal?: string }) =>
+  create: (input: { accountId: string; name: string; goal?: string; appId?: string }) =>
     api<{ id: string }>("/api/tenancy/waves", { method: "POST", body: JSON.stringify(input) }),
 
   /** The DATES are deliberately not here: they are the sprints' answer, never a
-   * field somebody types over. */
-  update: (input: { id: string; name: string; goal?: string }) =>
+   * field somebody types over. `appId` is TRI-STATE at the door: leave this key
+   * out to keep whatever app the wave already covers, send `""`/`null` to
+   * clear it, or a real id to set it — `undefined` here drops the key
+   * entirely (`JSON.stringify`), which is "leave it alone". */
+  update: (input: { id: string; name: string; goal?: string; appId?: string | null }) =>
     api<{ ok: true }>("/api/tenancy/waves/update", { method: "POST", body: JSON.stringify(input) }),
 
   setActive: (id: string, active: boolean) =>

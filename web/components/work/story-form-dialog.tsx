@@ -117,7 +117,6 @@ const appField = {
   ...defaultFieldConfig,
   label: "App",
   required: true,
-  helpText: "The system this work is on. Everything below is narrowed by it.",
 }
 
 /** THE SAME FIELD WITH NOTHING LEFT TO ASK. When the dialog is opened from an
@@ -134,7 +133,6 @@ const typeField = {
   ...defaultFieldConfig,
   label: "Type",
   required: true,
-  helpText: "Editable on the Choices screen.",
 }
 /** WHERE THIS WORK CAME FROM — client ruling, 15 Sep 2026. Always answered
  * (defaults to Client-requested), so `required` here reads as "always has a
@@ -144,32 +142,27 @@ const categoryField = {
   ...defaultFieldConfig,
   label: "Category",
   required: true,
-  helpText: "Traces to a client ask, or our own upkeep. Editable on the Choices screen.",
 }
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 const sprintField = {
   ...defaultFieldConfig,
   label: "Sprint",
   required: false,
-  helpText: "Blocks on this app that are still running or still to come.",
 }
 const ticketField = {
   ...defaultFieldConfig,
   label: "Tickets",
   required: false,
-  helpText: "Open requests on this app. Most work stands on its own.",
 }
 const processField = {
   ...defaultFieldConfig,
   label: "Processes",
   required: true,
-  helpText: "Every way of working this changes, or tick that it changes none.",
 }
 const fileField = {
   ...defaultFieldConfig,
   label: "Something to show",
   required: false,
-  helpText: "A recording, a page, a document somebody can open.",
 }
 const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required: false }
 
@@ -813,9 +806,6 @@ export function StoryFormDialog({
               ))}
             </SelectContent>
           </Select>
-          {processOptions.length === 0 && (
-            <p className="text-muted-foreground text-sm">{t("This app has no processes yet.")}</p>
-          )}
         </div>
       </Field>
       <Field config={assigneeField} htmlFor="story-assignee" className={fieldSpacing}>

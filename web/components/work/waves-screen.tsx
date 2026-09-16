@@ -65,6 +65,7 @@ import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/t
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
 import { useSprintTypes } from "@/components/work/sprint-form-dialog"
 import { AppMark } from "@/components/apps/app-tiles"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
 import { companiesKey, totalKey, sprintsKey, appsKey, listFetch } from "@/lib/live-resources"
@@ -188,28 +189,39 @@ export function waveWeekWindow(offset: number, t: (s: string) => string, lang: L
  *
  * THE LEFT COLUMN IS THE WAVE'S APP, NOT THE WAVE — client ruling, 16 Sep
  * 2026: "what I want in the left column is the name of the app and the
- * icon." A `Wave` carries no `appId` of its own (`shared/waves.ts`'s own
- * type has none — a wave is sold to an ACCOUNT, and the systems it touches
- * are a fact about the SPRINTS inside it, each of which can name a different
- * app; `sprint-form-dialog.tsx`'s own planner offers every one of the
- * client's apps, unconstrained). So the face this row wears is DERIVED: the
- * app every live sprint in the wave agrees on, when there is exactly one —
- * `waveApp` below. Where the wave has no sprints yet, its sprints name no
- * app, or its sprints disagree, there is no single app to draw, and the row
- * falls back to exactly what it drew before this ruling: its own name, on
- * the initials tile ("A wave without an app shows the wave name with the
- * initials tile" — this brief's own words for the fallback).
+ * icon," and, corrected the same day, over the DERIVED answer this row first
+ * shipped with: "No, now you have the name of the wave. I want the name of
+ * the app." `Wave.appId` (team migration 0099, `shared/waves.ts`) is now a
+ * REAL COLUMN, settable on the wave form, so this row reads it directly
+ * rather than guessing from the sprints inside — `waveApp` below is a plain
+ * lookup against the already-loaded `apps` list (for a live app's own logo),
+ * falling back to the wave's own denormalised `appName`/`appLogoUrl`
+ * (`toWave`, workers/tenancy/src/lib/waves.ts) when the app is not in that
+ * list — deactivated, say, but still named on the wave. Where `appId` is
+ * unset the row falls back to exactly what it drew before this ruling: its
+ * own name, on the initials tile ("A wave without an app shows the wave name
+ * with the initials tile" — this brief's own words for the fallback).
  *
  * THE WAVE'S OWN NAME MOVES TO A SECOND LINE, always, rather than onto the
  * bar itself: see `TimelineRow.sublabel`'s own header
  * (record-timeline.tsx) for why a fixed second line was chosen over a
  * squeeze-dependent label on the bar.
  */
-function waveApp(waveId: string, appIdsByWave: Map<string, Set<string>>, appsById: Map<string, AppRow>): AppRow | null {
-  const ids = appIdsByWave.get(waveId)
-  if (!ids || ids.size !== 1) return null
-  const [only] = ids
-  return appsById.get(only) ?? null
+function waveApp(w: Wave, appsById: Map<string, AppRow>): AppRow | null {
+  if (!w.appId) return null
+  const full = appsById.get(w.appId)
+  if (full) return full
+  // THE APP IS NOT IN THE LOADED (LIVE) LIST — deactivated, most likely —
+  // but the wave still names it. A synthetic, `AppMark`-shaped stand-in built
+  // from the wave's own denormalised fields (`toWave`, workers/tenancy/src/
+  // lib/waves.ts): `AppMark` reads only `logoUrl`, `stage` and `name` off
+  // whatever it is handed, so the fields this repo cannot know here
+  // (`stage`, notably) are `null` rather than guessed at — `AppMark` falls
+  // back to the plain initials tile exactly as it does for any other app
+  // with no stage.
+  return w.appName
+    ? ({ id: w.appId, name: w.appName, logoUrl: w.appLogoUrl, stage: null } as AppRow)
+    : null
 }
 
 export function buildWaveTimelineRows(
@@ -229,16 +241,6 @@ export function buildWaveTimelineRows(
     const list = byWave.get(s.waveId)
     if (list) list.push(s)
     else byWave.set(s.waveId, [s])
-  }
-  // THE APP LOOKUP — off EVERY live sprint in the wave, dated or not (a wave's
-  // app is a fact about what it covers, not about when its work runs), so this
-  // is a second map rather than a re-read of `byWave` above.
-  const appIdsByWave = new Map<string, Set<string>>()
-  for (const s of sprints) {
-    if (!s.waveId || !s.appId || !s.active) continue
-    const set = appIdsByWave.get(s.waveId)
-    if (set) set.add(s.appId)
-    else appIdsByWave.set(s.waveId, new Set([s.appId]))
   }
   const appsById = new Map(apps.map((a) => [a.id, a]))
 
@@ -277,11 +279,20 @@ export function buildWaveTimelineRows(
       if (r.sprint) {
         segments.push({
           id: r.sprint.id,
-          label: r.sprint.name,
+          // THE TYPE'S ICON, BEFORE THE NAME — no colour of its own (client
+          // ruling, 16 Sep 2026: "they will not have colors, but icons"); the
+          // segment's own fill is the sprint's STATE (upcoming/running/
+          // wrapped), a different axis this icon does not touch.
+          label: (
+            <span className="flex min-w-0 items-center gap-1">
+              <SprintTypeGlyph type={r.sprint.sprintType} className="shrink-0" />
+              <span className="min-w-0 truncate">{r.sprint.name}</span>
+            </span>
+          ),
           start: clippedStart,
           span: clippedSpan,
           tone: sprintState(r.sprint, today),
-          title: `${r.sprint.name} · ${formatDate(r.sprint.startsOn, lang)} – ${formatDate(r.sprint.endsOn, lang)}`,
+          title: `${r.sprint.name}${r.sprint.sprintType ? ` · ${r.sprint.sprintType}` : ""} · ${formatDate(r.sprint.startsOn, lang)} – ${formatDate(r.sprint.endsOn, lang)}`,
           onSelect: () => softNavigate(`${basePath}/${w.id}/sprints/${r.sprint!.id}`),
         })
       } else {
@@ -295,7 +306,7 @@ export function buildWaveTimelineRows(
       }
     }
     if (segments.length === 0) continue
-    const app = waveApp(w.id, appIdsByWave, appsById)
+    const app = waveApp(w, appsById)
     timelineRows.push({
       id: w.id,
       label: app ? (
@@ -333,7 +344,11 @@ export function buildWaveTimelineRows(
    inside its wave) already stack for free (`calendar-view.tsx`'s own header).
    ========================================================================= */
 
-export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): CalendarEntry[] {
+export function buildWaveCalendarEntries(
+  rows: Wave[],
+  sprints: Sprint[],
+  t: (s: string) => string
+): CalendarEntry[] {
   const waveIds = new Set(rows.map((w) => w.id))
   const entries: CalendarEntry[] = []
   for (const w of rows) {
@@ -343,6 +358,10 @@ export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): Calen
       day: w.startsOn.slice(0, 10),
       endDay: w.endsOn ? w.endsOn.slice(0, 10) : undefined,
       title: w.name,
+      // THE HOVER CARD'S OWN KIND LINE (kit v1.2.94's `renderEventCard`,
+      // client ruling 16 Sep 2026: "when I hover over the card in the
+      // calendar, it expands and I see what it is?").
+      kind: t("Wave"),
       detail: w.accountName ?? undefined,
       accent: w.id,
     })
@@ -354,6 +373,7 @@ export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): Calen
       day: s.startsOn.slice(0, 10),
       endDay: s.endsOn ? s.endsOn.slice(0, 10) : undefined,
       title: s.name,
+      kind: t("Sprint"),
       detail: s.waveName ?? undefined,
       // The SAME hash as the wave's own entry above — a sprint's chip lands
       // in its wave's own colour, for free, off the identical `accentClass`
@@ -380,6 +400,8 @@ type WaveListRow = {
   name: string
   account: React.ReactNode
   accountName: string
+  app: React.ReactNode
+  appName: string
   sprints: React.ReactNode
   state: React.ReactNode
   start: React.ReactNode
@@ -447,7 +469,8 @@ export function waveListRows(
   rows: Wave[],
   sprints: Sprint[],
   t: (s: string) => string,
-  lang: Language
+  lang: Language,
+  apps: AppRow[] = []
 ): WaveListRow[] {
   const today = isoDay(new Date())
   const byWave = new Map<string, Sprint[]>()
@@ -457,8 +480,10 @@ export function waveListRows(
     if (list) list.push(s)
     else byWave.set(s.waveId, [s])
   }
+  const appsById = new Map(apps.map((a) => [a.id, a]))
   return rows.map((w) => {
     const ws = byWave.get(w.id) ?? []
+    const app = waveApp(w, appsById)
     return {
       id: w.id,
       ref: w.ref,
@@ -474,6 +499,20 @@ export function waveListRows(
           <RecordMark picture={null} name={w.accountName ?? ""} size="choice" />
           <span className="min-w-0 truncate">{w.accountName ?? "—"}</span>
         </span>
+      ),
+      // THE APP COLUMN — client ruling, 16 Sep 2026: "I want the name of the
+      // app." Same `waveApp` lookup the T3 timeline draws its own left column
+      // from (`w.appId`, team migration 0099), so List and Timeline can never
+      // name a different app for the same wave. Blank is ordinary: a wave
+      // sold before anybody named the system it covers.
+      appName: app?.name ?? w.appName ?? "",
+      app: app ? (
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <AppMark app={app} size="choice" />
+          <span className="min-w-0 truncate">{app.name}</span>
+        </span>
+      ) : (
+        "—"
       ),
       sprints: (
         <span className="flex items-center gap-2">
@@ -515,6 +554,7 @@ export function waveListColumns(t: (s: string) => string): TableColumn[] {
   return [
     { key: "name", label: t("Wave") },
     { key: "account", label: t("Account"), searchKey: "accountName" },
+    { key: "app", label: t("App"), searchKey: "appName" },
     { key: "sprints", label: t("Sprints") },
     { key: "start", label: t("Start") },
     { key: "end", label: t("End") },
@@ -611,6 +651,14 @@ export function WaveCollection({
       (!known || known.some((c) => c.id === was.accountId))
         ? was.accountId
         : ""
+    // Revalidated the same way `accountId` is above: `appsQ` carries a real
+    // loading state, so "not loaded yet" and "no longer exists" are two
+    // different answers, not one degraded one.
+    const knownApps = appsQ.data
+    const appId =
+      typeof was.appId === "string" && (!knownApps || knownApps.some((a) => a.id === was.appId))
+        ? was.appId
+        : ""
     return {
       q: typeof was.q === "string" ? was.q : "",
       accountId,
@@ -624,6 +672,7 @@ export function WaveCollection({
       // switched-off client does above: the filter survives and matches
       // nothing, with "Clear all" beside it.
       sprintType: typeof was.sprintType === "string" ? was.sprintType : "",
+      appId,
       sortBy: (["name", "runs", "sprints", "client", "newest"] as const).includes(
         was.sortBy as WaveOrder
       )
@@ -737,8 +786,8 @@ export function WaveCollection({
   const timelineRows =
     weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang, apps) : []
 
-  const calendarEntries = view === "calendar" ? buildWaveCalendarEntries(rows, sprints) : []
-  const listRows = view === "list" ? waveListRows(rows, sprints, t, lang) : []
+  const calendarEntries = view === "calendar" ? buildWaveCalendarEntries(rows, sprints, t) : []
+  const listRows = view === "list" ? waveListRows(rows, sprints, t, lang, apps) : []
   // PLAIN VALUES, NOT `useMemo` — both are cheap array/object literals built
   // from what is already in hand, and a hook here would sit AFTER this
   // component's own early error return above, which is the one thing rules
@@ -817,6 +866,7 @@ export function WaveCollection({
             clients={clients}
             showClientFilter={!accountId}
             sprintTypes={sprintTypes}
+            apps={apps}
             resultCount={rows.length}
             views={tabViews}
             view={view}
@@ -939,9 +989,15 @@ export function WaveCollection({
         open={addOpen}
         onOpenChange={setAddOpen}
         clients={clients}
+        apps={apps}
         draftKey={`wave:add:${teamId}`}
         onSubmit={async (v) => {
-          await wavesApi.create({ accountId: v.accountId, name: v.name, goal: v.goal || undefined })
+          await wavesApi.create({
+            accountId: v.accountId,
+            name: v.name,
+            goal: v.goal || undefined,
+            appId: v.appId || undefined,
+          })
           invalidate(wavesKey(teamId))
           toast.success(t("Wave sold."))
         }}
@@ -951,11 +1007,21 @@ export function WaveCollection({
         open={editing !== null}
         onOpenChange={(open) => (open ? null : setEditing(null))}
         clients={clients}
+        apps={apps}
         draftKey={editing ? `wave:edit:${editing.id}` : undefined}
-        initial={editing ? { name: editing.name, goal: editing.goal ?? "" } : undefined}
+        initial={
+          editing
+            ? { accountId: editing.accountId, name: editing.name, goal: editing.goal ?? "", appId: editing.appId }
+            : undefined
+        }
         onSubmit={async (v) => {
           if (!editing) return
-          await wavesApi.update({ id: editing.id, name: v.name, goal: v.goal || undefined })
+          // `appId` ALWAYS SENT ON EDIT — never `|| undefined` the way `goal`
+          // is above: the door's own tri-state (`updateWave`'s own header,
+          // workers/tenancy/src/lib/waves.ts) reads an ABSENT key as "leave
+          // it alone", and this form always knows and means the app it is
+          // submitting, empty string included (clear it).
+          await wavesApi.update({ id: editing.id, name: v.name, goal: v.goal || undefined, appId: v.appId || null })
           invalidate(wavesKey(teamId))
           invalidate(`activity:record:waves:${editing.id}`)
           toast.success(t("Wave updated."))

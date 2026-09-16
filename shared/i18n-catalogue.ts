@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 802 strings · 3 languages · 1469 of the entries below are hand-written seed.
+// 797 strings · 3 languages · 1412 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -198,7 +198,6 @@ export const CATALOGUE: Catalogue = {
   "Download the list": { de: "Liste herunterladen", es: "Descargar la lista", ca: "Descarregar la llista" },
   "Download to fix": { de: "Zum Beheben herunterladen", es: "Descargar para corregir", ca: "Descarregar per corregir" },
   "Drive": { de: "Laufwerk", es: "Unidad", ca: "Unitat" },
-  "Drop a file here, or": { de: "Ziehen Sie eine Datei hierher oder", es: "Arrastra un archivo aquí, o", ca: "Arrossega un fitxer aquí, o" },
   "Drop your spreadsheets here, or click to choose": { de: "Ziehen Sie Ihre Tabellenkalkulationen hierher oder klicken Sie zum Auswählen", es: "Arrastra tus hojas de cálculo aquí, o haz clic para elegir", ca: "Arrossega els teus fulls de càlcul aquí, o fes clic per triar" },
   "Edit": { de: "Bearbeiten", es: "Editar", ca: "Editar" },
   "Edit profile": { de: "Profil bearbeiten", es: "Editar perfil", ca: "Editar perfil" },
@@ -389,7 +388,6 @@ export const CATALOGUE: Catalogue = {
   "Nobody else is on the invitation.": { de: "Niemand sonst ist in der Einladung.", es: "Nadie más está en la invitación.", ca: "No hi ha ningú més en la invitació." },
   "Nobody is on triage this week": { de: "Niemand ist diese Woche bei der Triage", es: "Nadie está en triage esta semana", ca: "Ningú està en triatge aquesta setmana" },
   "Nobody is on triage this week.": { de: "Niemand ist diese Woche bei der Triage.", es: "Nadie está en triage esta semana.", ca: "Ningú està en triatge aquesta setmana." },
-  "Nobody on the team yet.": { de: "Noch niemand im Team.", es: "Nadie en el equipo todavía.", ca: "Ningú a l'equip encara." },
   "Nobody yet": { de: "Noch niemand", es: "Nadie todavía", ca: "Ningú encara" },
   "Nobody, it is ours": { de: "Niemand, es ist unseres", es: "Nadie, es nuestro", ca: "Ningú, és nostre" },
   "Not a contact now": { de: "Jetzt kein Kontakt", es: "No es un contacto ahora", ca: "No és un contacte ara" },
@@ -405,7 +403,6 @@ export const CATALOGUE: Catalogue = {
   "Nothing attached to this ticket yet.": { de: "Es ist noch nichts an dieses Ticket angehängt.", es: "Nada adjunto a este ticket todavía.", ca: "Res adjunt a aquest tiquet encara." },
   "Nothing attached yet. A screenshot often explains it faster than a paragraph.": { de: "Noch nichts angehängt. Ein Screenshot erklärt es oft schneller als Text.", es: "Nada adjunto todavía. Una captura de pantalla a menudo lo explica más rápido que un párrafo.", ca: "Res adjunt encara. Una captura de pantalla sovint ho explica més ràpid que un paràgraf." },
   "Nothing due today or before.": { de: "Nichts heute oder früher fällig.", es: "Nada vencido hoy o antes.", ca: "Res que venci avui o abans." },
-  "Nothing found in your Google account.": { de: "Nichts in Ihrem Google-Konto gefunden.", es: "Nada encontrado en tu cuenta de Google.", ca: "Res trobat en el teu compte de Google." },
   "Nothing has been done on this app yet.": { de: "Es wurde noch nichts in dieser App getan.", es: "Todavía no se ha hecho nada en esta app.", ca: "Res s'ha fet en aquesta app encara." },
   "Nothing has been raised about this app yet.": { de: "Zu dieser App wurde noch nichts eingereicht.", es: "Nada se ha planteado sobre esta aplicación todavía.", ca: "Res s'ha plantejat sobre aquesta aplicació encara." },
   "Nothing here yet.": { de: "Noch nichts hier.", es: "Nada por aquí todavía.", ca: "Res aquí encara." },
@@ -414,7 +411,6 @@ export const CATALOGUE: Catalogue = {
   "Nothing is open right now.": { de: "Nichts ist derzeit offen.", es: "Nada está abierto ahora mismo.", ca: "No hi ha res obert ara mateix." },
   "Nothing outside the": { de: "Nichts außerhalb der", es: "Nada fuera de", ca: "Res fora del" },
   "Nothing outstanding with a client.": { de: "Nichts Offenstehendes bei einem Kunden.", es: "Nada pendiente con un cliente.", ca: "Res pendent amb un client." },
-  "Nothing picked yet. Look one up above and tap it.": { de: "Noch nichts ausgewählt. Suchen Sie eines oben und wählen Sie es aus.", es: "Nada seleccionado aún. Busca uno arriba y tócalo.", ca: "Res seleccionat encara. Busca-ho més amunt i toca-ho." },
   "Nothing to add up yet. Map a process inside this app, give its steps their times, and the saving appears here.": { de: "Noch nichts aufzurechnen. Erfassen Sie einen Prozess in dieser App, vergeben Sie den Schritten ihre Zeiten, und die Ersparnis wird hier angezeigt.", es: "Nada que sumar todavía. Mapea un proceso dentro de esta aplicación, asigna tiempos a sus pasos, y el ahorro aparece aquí.", ca: "Res per sumar ancora. Mapeja un procés dins d'aquesta aplicació, assigna temps als seus passos, i l'estalvi apareix aquí." },
   "Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.": { de: "Noch nichts anzuzeigen. Sobald wir erfasst haben, wie ein Job früher gemacht wurde und diesen geändert haben, wird die eingesparte Zeit hier angezeigt.", es: "Nada que mostrar todavía. En cuanto hayamos mapeado cómo se solía hacer un trabajo y lo hayamos cambiado, el tiempo que devuelve aparece aquí.", ca: "Res per mostrar ancora. Tan aviat com hem mapat com es feia una feina i l'hem canviat, el temps que recupera apareix aquí." },
   "Nothing written about": { de: "Nichts geschrieben über", es: "Nada escrito sobre", ca: "Res escrit sobre" },
@@ -629,7 +625,6 @@ export const CATALOGUE: Catalogue = {
   "The link": { de: "Der Link", es: "El enlace.", ca: "L'enllaç." },
   "The link on this source isn't a web address we can open safely.": { de: "Der Link dieser Quelle ist keine Webadresse, die wir sicher öffnen können.", es: "El enlace en esta fuente no es una dirección web que podamos abrir de forma segura.", ca: "L'enllaç d'aquesta font no és una adreça web que puguem obrir de forma segura." },
   "The meetings list": { de: "Die Terminliste", es: "La lista de reuniones", ca: "La llista de reunions" },
-  "The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.": { de: "Das Personal in der App kann es lesen, ebenso wie ein Admin. Niemand sonst kann es sehen, und der Assistent wird nicht für andere antworten.", es: "El personal de esa app puede leerlo, y un administrador también. Nadie más lo verá, y el asistente no responderá a nadie más desde aquí.", ca: "El personal d'aquesta aplicació pot llegir-lo, i també un administrador. Ningú més ho veurà, i l'assistent no respondrà a ningú més des d'aquí." },
   "The team": { de: "Das Team", es: "El equipo.", ca: "L'equip." },
   "The work in hand": { de: "Die laufende Arbeit", es: "El trabajo en mano", ca: "El treball en curs" },
   "There is no money figure yet, and here is what it is waiting on.": { de: "Es gibt noch keinen Betrag, und hier ist, worauf es wartet.", es: "Aún no hay cifra de dinero, y aquí es lo que está esperando.", ca: "Encara no hi ha una xifra de diners, i aquí és el que espera." },

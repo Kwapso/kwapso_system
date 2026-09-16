@@ -717,6 +717,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "rows-are-a-list",
     status: "enforced",
   },
+  {
+    id: "R81",
+    dimension: "ui",
+    law: "A FORM CARRIES NO HINTS. The client's ruling, 16 Sep 2026, verbatim: \"You put too many explanations and hints that are not necessary, especially on the forms, on the create and edit. Please, can you delete all of that? I will give you a few examples, but I want you to clean it everywhere. If we need hints, I will tell you explicitly, but by default, there are no explanations, just the choice, text, or the form components.\" Two examples, both `FieldConfig.helpText` sentences: \"The system this work is on. Everything below is narrowed by it.\" (the story form's App field) and \"A recording, a page, a document somebody can open.\" (the story form's and the review dialog's file field). A create/edit form shows the label and the control, nothing else — the label already says what a field is, and a person doing their own trade does not need a sentence under \"App\" explaining that an app is a system. TWO CENSUSES, over the same parsed walk `field-config-keys.test.ts` and R33's `wrapped-strings.test.ts` already stand on (`appFiles()`, scripts/lib/i18n-source.mjs): (1) no object literal SPREADING `...defaultFieldConfig` — the same positional signature `field-config-keys.test.ts` already reads — may set `helpText` to anything but the empty string; (2) no bare `<p>` in a file that renders a form (imports `FormShell`/`FormShellDialog`, R4's own marker) whose entire content is one static `{t(\"…\")}` sentence of three words or more, coloured `text-muted-foreground`. WHAT SURVIVES, on purpose: a validation/refusal message (`text-warning`/`text-destructive`, shown only on a bad state, never `text-muted-foreground`); a placeholder that is the field's own example value; a picker OPTION's own differentiating description (`Choice`'s `description` prop, an `EVENT_KINDS` entry — the choice's own words, telling two options apart, never an explanation of the field); and a field showing the record's own SETTLED VALUE where a control would otherwise be (`settledAppField`'s \"fact, not control\" pattern) — none of those are a hint about how to use the form, they are the form's own words or the form's own data, and the bare-`<p>` census's own \"exactly one static sentence, nothing else interpolated\" shape excludes every one of them by construction (a value display glues text to data and so has more than one child). `Text`/`helpText` on an AUTOMATIONS catalog row (R70, `automation-edit-sheet.tsx`) is a different fact entirely — WHY a protected row cannot be switched, not a field's help text — and sits outside both censuses: it never sets `FieldConfig.helpText` (it reads `a.helpText` off a catalog row) and it renders through `<Text>`, never `<p>`.",
+    why: "TWO MECHANISMS BECAUSE THE CLIENT'S OWN TWO EXAMPLES WERE TWO SHAPES — a `helpText:` property and a bare paragraph — and a law that only caught one of them would have left the other free to grow back exactly the way it did the first time (forty-nine `helpText` hints and a dozen bare-`<p>` captions, found across both front doors, none of them added in one sitting). The `helpText` census is the robust half: a `FieldConfig` is a closed, typed shape (`field-config-keys.test.ts` already proved as much), so a non-empty string on it is unambiguous and the RED PROOF in `web/test/form-hints.test.ts` stands on it. The bare-`<p>` census is deliberately narrower than \"any explanatory-looking paragraph in a form\" would be — an unscoped version flagged loading states (\"Reading what's attached…\"), empty-collection facts (\"Nobody is on this account's books yet.\") and every settled-value display (`fixedApp.name`, \"Current role: X\") as if they were hints, which they are not: a status message and a stated fact are not an explanation of the field, and gutting them would have removed real information the ruling never asked to lose. Requiring the `<p>`'s ENTIRE content to be one static `t(...)` call is what tells the two apart without a hand-kept exemption list: a value display always glues a translated word to a piece of data (`{t(\"For\")} {fixedClient.name}`), which is more than one child, and a status/empty message earns its `text-warning`/`text-destructive` colour or is plainly a loading state — the census reads for the SHAPE a hint actually has, not a guess at its meaning. `FORM_HINT_OK` stayed empty through the inventory that earned this law: every hint found was either a straightforward `helpText` deletion, a bare paragraph with nothing else to say, or — on inspection — already one of the four kept shapes above.",
+    checkId: "form-carries-no-hints",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -777,6 +785,29 @@ export const EMOJI_OK: Record<string, string> = {}
  * twice, and a third card quietly opting out is the drift the law was written
  * against. */
 export const CARD_CHIP_BELOW_OK: Record<string, string> = {}
+
+/** R81 — A FORM CARRIES NO HINTS. Keyed by repo-relative path, and only a
+ * path `web/test/form-hints.test.ts` actually reads. Rot-checked BOTH ways: a
+ * line naming a file that carries no hint the census would otherwise catch
+ * has outlived its subject and fails the build, so the list can only shrink.
+ *
+ * EMPTY, AND EMPTY IS THE GOAL — the client's ruling was blanket ("delete all
+ * of that... clean it everywhere") and named no exception. The one shape this
+ * table exists FOR, if it is ever needed, is her own second clause: a hint
+ * that carries something the user cannot know otherwise (an irreversible
+ * action's consequence) — and even that belongs in the CONFIRM dialog that
+ * asks about the action, never in the create/edit form beside it. Adding a
+ * line to make a red build green is the one use of this list that is never
+ * correct: she has said, in the same sentence, that she will ask explicitly
+ * when a hint is wanted back. */
+export const FORM_HINT_OK: Record<string, string> = {
+  "web/components/work/review-dialog.tsx":
+    "\"Reading what's attached…\" is a LOADING indicator (the attachment list has not " +
+    "answered yet, `shown === null`), not a hint — the same status shape \"Loading…\" " +
+    "draws elsewhere in the app (agent-usage-dialog.tsx, agent-history-tab.tsx). The " +
+    "census cannot tell a loading state from an explanation by shape alone; this line " +
+    "makes the call by hand rather than teaching the check a third colour to special-case.",
+}
 
 /** R64 — WHERE A TEAM-AREA SECTION'S MATERIAL LIVES, now that the section's own
  * screen has no door.
@@ -4149,6 +4180,8 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
  * Rot-checked twice: a path that comes back, or one nothing names any more,
  * turns the build red, so the list can only shrink. */
 export const GONE_ON_PURPOSE: Record<string, string> = {
+  "web/lib/app-stage-icon.tsx":
+    "the small resolver that turned `AppStage.icon` into a real Phosphor glyph, deleted 16 Sep 2026 the same day it shipped — the client's correction of migration 0097's misread moved the icon vocabulary to Sprint type (`web/lib/sprint-type-icon.tsx`) and put App stage's own pill back on a coloured dot, so nothing resolves an `AppStage` icon any more. Team migration 0097's own header (workers/tenancy/src/team-schema/migrations.ts, both the original paragraph and the correction appended beside it) and UI-RULEBOOK.md K28 both name this path precisely BECAUSE it is gone — the correction cannot be told without naming the file it retired.",
   "web/components/choices/selectable-screen.tsx":
     "the module-settings-page-scoped Choices editor (grouped lists + chip walls, `SelectableScope`), retired 15 Sep 2026 when Task B unified it with the general Choices tab's own editor — both now read through `SettingsChoicesPanel`'s `scope` prop (`web/components/screens/settings-choices-panel.tsx`, a `RecordTable`). module-settings-screen.tsx's own header and settings-choices-panel.tsx's own header both name this path precisely BECAUSE it is gone, the same reason role-detail.tsx stays named below; UI-RULEBOOK.md K7 and COMPOSITION-MISMATCHES.md's own virtualization entry are historical measurements of the file while it still drew the screen.",
   "workers/tenancy/src/lib/internal-money.ts":
@@ -4730,11 +4763,17 @@ export const ORDERED_OPTIONS_OK: Record<string, string> = {
     "falls back to the code's own APP_STAGES only when a team has set none. Either way the order is the stage " +
     "sequence: the client's ruling, 16 Sep 2026 (\"not started, audit, plan, build, validation, refinements and " +
     "enhancement, in that order\"), stored as `selectable_data.position` (team migration 0097) and mirrored in " +
-    "`APP_STAGES`' own array order (shared/app-stages.ts). Feeds this file's own AppearancePillGroup stage row now, " +
-    "not the RecordPicker it replaced (16 Sep 2026, the same ruling: icons, no colours) — same array, same reason.",
+    "`APP_STAGES`' own array order (shared/app-stages.ts). Feeds this file's own AppearancePillGroup stage row " +
+    "(16 Sep 2026, the day's first pass; the pill row shape stayed through the same day's correction, which moved " +
+    "the ICON to Sprint type and put App stage's status back on HOLD — `shared/app-stages.ts`'s own current header) " +
+    "— same array, same reason.",
   "web/components/work/sprint-form-dialog.tsx#sprintTypes":
     "useSprintTypes() reads the team's own `selectable_data` rows for \"Sprint type\" — the same team-ordered " +
-    "vocabulary class as app stages above, not a naming list a reader searches by word.",
+    "vocabulary class as app stages above, not a naming list a reader searches by word. The client's ruling, " +
+    "16 Sep 2026 (\"not started, audit, plan, build, validation, refinements and enhancement, in that order\"), " +
+    "first read onto App stage (migration 0097) and corrected the same day onto THIS vocabulary (migration 0098, " +
+    "shared/sprint-types.ts) — stored as `selectable_data.position`. Feeds this file's own AppearancePillGroup " +
+    "type row (icons, no colours, the same correction), not the RecordPicker it replaced.",
   "web/components/work/story-form-dialog.tsx#storyTypes":
     "stories-screen.tsx's own `storyTypes` reads the team's `selectable_data` rows for \"Story type\" — the same " +
     "team-ordered vocabulary class as app stages and sprint types, passed down as a prop.",
@@ -4768,6 +4807,12 @@ export const FACET_ORDER_OK: Record<string, string> = {
     "vocabulary in order without touching `useFilterBar` at all (this file's own header explains why); the Stage " +
     "FILTER facet reaches the same array through the one seam every facet in the app shares, so it needs the flag " +
     "the Board never did.",
+  "web/components/work/wave-finder.tsx#sprintType":
+    "the Sprint type facet reads `sprintTypes` (`useSprintTypes`, sprint-form-dialog.tsx) — the team's own " +
+    "`selectable_data.position`-ordered vocabulary (team migration 0098), the client's ruling 16 Sep 2026 " +
+    "(\"not started, audit, plan, build, validation, refinements and enhancement, in that order\"), first read " +
+    "onto App stage and corrected the same day onto Sprint type — the identical class `apps-screen.tsx#stage` " +
+    "above is registered for, one vocabulary along.",
 }
 
 // ── R77 (tab-strips-pin) ────────────────────────────────────────────────────

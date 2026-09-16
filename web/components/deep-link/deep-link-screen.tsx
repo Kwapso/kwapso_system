@@ -60,6 +60,7 @@ import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
   closeTab,
+  reorderTab,
   setWorkspaceScope,
   useOpenTabs,
   tabStripState,
@@ -617,6 +618,22 @@ export function DeepLinkScreen() {
     [currentPath, go, sectionPath]
   )
 
+  // DRAG A TAB TO A NEW POSITION — client ruling 16 Sep 2026, "go with the
+  // drag order". `openTabs` is exactly the array `stripCrumbs` was built
+  // from, index for index (see `stripCrumbs` above), so `fromIndex`/
+  // `toIndex` off the kit's `onReorder` name real slots in it without this
+  // file re-deriving anything. Reordering never navigates and never touches
+  // `currentPath` — it is purely an arrangement of the strip — so unlike
+  // `closeWorkspaceTab` this needs no `guardNavigate`.
+  const reorderWorkspaceTab = React.useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const moving = openTabs[fromIndex]
+      if (!moving) return
+      reorderTab(moving.path, toIndex)
+    },
+    [openTabs]
+  )
+
   // A CSS selector the agent asked us to ring briefly (the traced control).
   const traceHighlight = useTraceRing({ teamId, onTeam, go })
 
@@ -733,6 +750,7 @@ export function DeepLinkScreen() {
         active={active}
         breadcrumbs={stripCrumbs}
         onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+        onReorderCrumb={showTabSet ? reorderWorkspaceTab : undefined}
         activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
         onNavigate={go}
         activePath={currentPath}
@@ -868,6 +886,7 @@ export function DeepLinkScreen() {
       active={active}
       breadcrumbs={stripCrumbs}
       onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+      onReorderCrumb={showTabSet ? reorderWorkspaceTab : undefined}
       activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
       onNavigate={go}
       activePath={currentPath}

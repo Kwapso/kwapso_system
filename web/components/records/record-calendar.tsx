@@ -147,6 +147,15 @@ export type CalendarEntry = {
   endDay?: string
   /** what the entry says — the record's own name */
   title: string
+  /**
+   * THE RECORD'S OWN KIND — "Ticket", "Story", "Sprint", "Wave" — for the
+   * hover preview's card (kit v1.2.94's `renderEventCard`, client ruling
+   * 16 Sep 2026: "when I hover over the card in the calendar, it expands
+   * and I see what it is?"). Undefined draws a card with no kind line
+   * rather than a blank one — a screen that has not been taught its own
+   * record's kind costs the preview one line, never a wrong guess.
+   */
+  kind?: string
   /** the value the colour is derived from ("" = one neutral colour) */
   accent?: string
   /**
@@ -534,6 +543,16 @@ export function RecordCalendar({
     return map
   }, [entries])
 
+  // BY ID, FOR THE HOVER PREVIEW ALONE — `renderEventCard` below is handed
+  // the kit's own `CalendarEvent`, whose `id` is `entry.id` unchanged
+  // (`buildDayEvents`'s own `id: e.id`), so this is the one lookup back to
+  // the full record `buildDayEvents` already flattened away.
+  const entriesById = React.useMemo(() => {
+    const map = new Map<string, CalendarEntry>()
+    for (const e of entries) map.set(e.id, e)
+    return map
+  }, [entries])
+
   const squares = monthSquares(month)
   const today = dayKey(new Date())
 
@@ -568,6 +587,36 @@ export function RecordCalendar({
       <CalendarDots aria-hidden className="size-4 shrink-0" />
       {emptyText}
     </p>
+  )
+
+  // THE HOVER PREVIEW'S CONTENT — the kit draws the frame (`HoverCard`/
+  // `Popover`, `calendar-view.tsx`'s own `renderEventCard`); this is the
+  // one caller's answer for what goes inside it: title, kind, dates
+  // (start–end for a span, `formatDayKey`'s own single-day form otherwise),
+  // and the chip's own tone dot. `entriesById` never holds `OVERFLOW_ID`
+  // (built off `entries`, never off a drawn chip), so the "+N more" chip
+  // gets no card — hovering it still does nothing, exactly as before.
+  const renderEventCard = React.useCallback(
+    (event: CalendarEvent) => {
+      const entry = entriesById.get(event.id)
+      if (!entry) return null
+      const dates = entry.endDay
+        ? `${formatDayKey(entry.day, lang)} – ${formatDayKey(entry.endDay, lang)}`
+        : formatDayKey(entry.day, lang)
+      const dot = dotClass(entry)
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-2 text-sm font-medium">
+            {dot ? <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-pill ${dot}`} /> : null}
+            <span className="min-w-0 truncate">{entry.title}</span>
+          </span>
+          {entry.kind ? <span className="text-muted-foreground text-xs">{entry.kind}</span> : null}
+          <span className="text-muted-foreground text-xs">{dates}</span>
+          {entry.detail ? <span className="text-muted-foreground text-xs">{entry.detail}</span> : null}
+        </div>
+      )
+    },
+    [entriesById, lang]
   )
 
   return (
@@ -619,6 +668,7 @@ export function RecordCalendar({
         // chip opens; `day.key` is all either door needs, `byDay` does the
         // rest.
         onSelectMore={(day) => setOpenDay(day.key)}
+        renderEventCard={renderEventCard}
         emptyState={emptyState}
         label={t("Calendar")}
       />

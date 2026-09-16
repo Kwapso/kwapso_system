@@ -43,11 +43,17 @@
      "neutral fill, charcoal label, the state lives in the dot. Mango is the
      brand, never a status dot — 'in build' takes charcoal." The six dot
      tones are the six `--dot-*` tokens; ruling 04's portal three reuse them
-     (With us → building, Your answer → review, Done → done). Ruling 26's
-     dark clause (override 10): ONLY the charcoal-dot pill takes the mango
-     fill on dark — `--pill-fill-building` / `--pill-label-building` resolve
-     to the neutral pair in light and to mango/charcoal in dark, so the
-     special case is the token's, not this file's.
+     (With us → building, Your answer → review, Done → done).
+   · THE STATUS FILL NEVER DROPS ITS NEUTRAL FOR ANY TONE — client ruling
+     16 Sep 2026 ("go for the kit fix"), reversing ruling 26's dark clause.
+     That clause put the ONE charcoal-dot pill ("in build" / "with us") on a
+     mango fill in dark mode; the client's own law elsewhere is "mango is
+     never on a status" (ch11), and the clause was the one place this file
+     broke it. The compound variant is gone — `variant="status"` now resolves
+     to `--pill-fill`/`--pill-label` for every `dotTone`, `building` included,
+     in both palettes — and the two tokens that carried the exception
+     (`--pill-fill-building`, `--pill-label-building`) are gone from
+     tokens.css with it; nothing here reaches for them any more.
 
    RENDERING CONTEXT
    No `"use client"`. No hook, no state, no browser API, no event handler.
@@ -167,26 +173,6 @@ const badgeVariants = cva(
       },
     },
     compoundVariants: [
-      /* Ruling 26's dark clause, read narrowly (override 10): the
-         charcoal-dot pill — "in build" / "with us" — is the ONE pill that
-         takes an accent fill on dark. The tokens hold the flip (identical to
-         the neutral pair in light, mango/charcoal in dark), so this line is
-         palette-free. */
-      {
-        variant: "status",
-        dotTone: "building",
-        /* …AND THE DOT WITH IT, 7 Sep 2026. `--dot-building` used to BE
-           charcoal in dark, so this pill got a legible dot for free and the
-           token carried the pill's requirement for every other surface. The
-           board's bare dot on paper measured 1.02 under that arrangement, so
-           the token went back to `--foreground` and the debt lands here,
-           where it is one pill rather than every consumer. `--pill-label-
-           building` is the charcoal this pill already sets for its words, so
-           the dot and the label cannot drift apart. */
-        class:
-          "bg-[var(--pill-fill-building)] text-[var(--pill-label-building)] " +
-          "[&_[data-slot=badge-dot]]:bg-[var(--pill-label-building)]",
-      },
       /* CH11 draws the Archived pill's label in tertiary ink — the one status
          whose words go quiet along with its dot. */
       { variant: "status", dotTone: "archived", class: "text-ink-tertiary" },

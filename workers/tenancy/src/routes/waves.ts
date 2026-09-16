@@ -70,21 +70,29 @@ function sprintTypeFilter(request: Request): string | null {
   return queryText(new URL(request.url).searchParams.get("sprintType"), "Sprint type") || null
 }
 
+/** WHICH APP, off the query string — the App facet (team migration 0099
+ * makes `waves.app_id` a real column, so this narrows with a plain equality
+ * at `listWaves`/`countWaves` rather than the Sprint type facet's `EXISTS`). */
+function appFilter(request: Request): string | null {
+  return queryText(new URL(request.url).searchParams.get("appId"), "App") || null
+}
+
 /* ------------------------------- reading them ------------------------------ */
 
-/** GET /api/tenancy/waves?accountId=&sprintType= — every wave this caller may
- * see, optionally narrowed to one client and/or to waves holding a live
- * sprint of one type. */
+/** GET /api/tenancy/waves?accountId=&sprintType=&appId= — every wave this
+ * caller may see, optionally narrowed to one client, to waves holding a live
+ * sprint of one type, and/or to the one app they cover. */
 export async function getWaves(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   const scope = await agencyScope(cfg, guard)
   const accountId = accountFilter(request)
   const sprintType = sprintTypeFilter(request)
+  const appId = appFilter(request)
   // These are independent reads — one wait, not 2.
   const [waves, total] = await Promise.all([
-    listWaves(cfg, guard, scope, accountId, sprintType),
+    listWaves(cfg, guard, scope, accountId, sprintType, appId),
     // R16: the badge shows the door's exact COUNT(*), never the list's length.
-    countWaves(cfg, guard, scope, accountId, sprintType),
+    countWaves(cfg, guard, scope, accountId, sprintType, appId),
   ])
   return json({ waves, total })
 }
@@ -110,12 +118,14 @@ export async function postCreateWave(request: Request, env: Env): Promise<Respon
     accountId?: unknown
     name?: unknown
     goal?: unknown
+    appId?: unknown
   }>(request, env, "work", "create")
   const scope = await agencyScope(cfg, guard)
   const accountId = requireText(body.accountId, "Client", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   const goal = optionalText(body.goal, "What it's for", TEXT_LIMITS.long) ?? null
-  const { id } = await createWave(cfg, guard, scope, actor, { accountId, name, goal })
+  const appId = optionalText(body.appId, "App", TEXT_LIMITS.short) ?? null
+  const { id } = await createWave(cfg, guard, scope, actor, { accountId, name, goal, appId })
   await publishChange(env, guard.teamId, "waves", id, "add", accountId)
   return json({ id })
 }
@@ -131,12 +141,19 @@ export async function postUpdateWave(request: Request, env: Env): Promise<Respon
     id?: unknown
     name?: unknown
     goal?: unknown
+    appId?: unknown
   }>(request, env, "work", "update")
   const scope = await agencyScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   const goal = optionalText(body.goal, "What it's for", TEXT_LIMITS.long) ?? null
-  const { accountId } = await updateWave(cfg, guard, scope, actor, { id, name, goal })
+  // TRI-STATE, the same shape `updateAccount`'s own `accountManagerUserId`
+  // takes (workers/tenancy/src/routes/accounts.ts): absent key = leave the
+  // app it already covers alone; present = the validated id, or `null` to
+  // clear it.
+  const cleanAppId = optionalText(body.appId, "App", TEXT_LIMITS.short)
+  const appId = "appId" in body ? (cleanAppId ?? null) : undefined
+  const { accountId } = await updateWave(cfg, guard, scope, actor, { id, name, goal, appId })
   await publishChange(env, guard.teamId, "waves", id, "edit", accountId)
   return json({ ok: true })
 }

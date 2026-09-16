@@ -57,19 +57,16 @@ const noteField = {
   ...defaultFieldConfig,
   label: "What you did",
   required: true,
-  helpText: "A line or two. It is what the reviewer reads before they look.",
 }
 const fileField = {
   ...defaultFieldConfig,
   label: "Something to show",
   required: true,
-  helpText: "At least one. A screenshot, a recording, a link to the page it changed.",
 }
 const linkField = {
   ...defaultFieldConfig,
   label: "Or paste a link",
   required: false,
-  helpText: "A recording, a page, a document somebody can open.",
 }
 
 export function ReviewDialog({
@@ -226,9 +223,7 @@ export function ReviewDialog({
               Listed first because it is what the door will count. */}
           {shown === null ? (
             <p className="text-muted-foreground text-sm">{t("Reading what's attached…")}</p>
-          ) : shown.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("Nothing attached yet.")}</p>
-          ) : (
+          ) : shown.length === 0 ? null : (
             <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
               {shown.map((a) => (
                 <li key={a.id} className="flex items-center gap-2 px-3 py-2">

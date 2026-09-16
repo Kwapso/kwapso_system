@@ -46,13 +46,11 @@ const roleField = {
   ...defaultFieldConfig,
   label: "Who does it",
   required: false,
-  helpText: "The role whose hours this takes. It is what prices the saving.",
 }
 const baselineField = {
   ...defaultFieldConfig,
   label: "Name for how it worked before",
   required: false,
-  helpText: "Version 1 is the way they worked before us. Every saving is measured from it.",
 }
 
 export function ProcessFormDialog({

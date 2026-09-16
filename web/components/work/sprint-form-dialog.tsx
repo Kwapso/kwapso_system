@@ -44,6 +44,9 @@ import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
+import { SPRINT_TYPES } from "@shared/sprint-types"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 
 export type SprintFormValues = {
   name: string
@@ -63,12 +66,11 @@ export type SprintFormValues = {
 /** "Nothing chosen" as a real Select value — an empty string is not selectable. */
 const NONE = "__none__"
 
-/** The two SCOPE names the delivery catalogue has no word of its own for. A
- * "blueprint" is a PRICED PLANNING sprint, not a type (.plans/BUILD-1 §3), so it
- * is a price on a Planning row and not an option here. These are a FALLBACK and
- * nothing more — what the picker offers before the team's own vocabulary has
- * loaded, so an empty dropdown never greets somebody on a cold cache. */
-const FALLBACK_SPRINT_TYPES = ["Planning", "Iteration", "Implementation"]
+/** `SPRINT_TYPES`' own seven names — what the picker offers before the team's
+ * own vocabulary has loaded (or a team has retired the lot), so a cold cache
+ * never draws an empty pill row. The client's ruling, 16 Sep 2026: "not
+ * started, audit, plan, build, validation, refinements, enhancement." */
+const FALLBACK_SPRINT_TYPES = SPRINT_TYPES.map((s) => s.name)
 
 /** ONE SPRINT TYPE, as the app reads it — the word, the mark somebody
  * recognises it by, the label a German client reads, and how long a block of
@@ -134,7 +136,6 @@ const appField = {
   ...defaultFieldConfig,
   label: "App",
   required: false,
-  helpText: "The system this block of work covers.",
 }
 const goalField = { ...defaultFieldConfig, label: "What it's for", required: false }
 const startField = { ...defaultFieldConfig, label: "Starts", required: false }
@@ -143,7 +144,6 @@ const priceField = {
   ...defaultFieldConfig,
   label: "Price sold",
   required: false,
-  helpText: "The flat price for this block of work. Leave it at zero if it isn't sold separately.",
 }
 
 /** What an EDIT form opens with. Money arrives in whole cents (the shape the rest
@@ -279,24 +279,31 @@ export function SprintFormDialog({
           autoFocus
         />
       </Field>
-      <Field config={typeField} htmlFor="sprint-type" className={fieldSpacing}>
-        <RecordPicker
-          id="sprint-type"
+      {/* A HORIZONTAL PILL ROW WITH ICONS, not the dropdown — the client's
+          ruling, 16 Sep 2026: "they will not have colors, but icons." The
+          same `AppearancePillGroup` row `app-form-dialog.tsx` draws for App
+          stage, its `swatch` slot carrying the type's own icon
+          (`shared/sprint-types.ts`, resolved in `web/lib/
+          sprint-type-icon.tsx`) in place of a colour swatch.
+          A RETIRED VALUE STILL SHOWS, INERT — the same "tell the truth about
+          what is stored, don't offer it again" shape `app-form-dialog.tsx`
+          gives its own stage picker for a word migration 0098 retired. */}
+      <Field config={typeField} shape="group" htmlFor="sprint-type" className={fieldSpacing}>
+        <AppearancePillGroup
+          options={[
+            { value: NONE, label: t("Not said") },
+            ...sprintTypes.map((option) => ({
+              value: option.value,
+              label: sprintTypeName(option, lang),
+              swatch: <SprintTypeGlyph type={option.value} />,
+            })),
+            ...(values.sprintType && !sprintTypes.some((o) => o.value === values.sprintType)
+              ? [{ value: values.sprintType, label: sprintTypeName({ value: values.sprintType, mark: null, nameDe: null, standardDays: null }, lang), disabled: true }]
+              : []),
+          ]}
           value={values.sprintType || NONE}
-          onChange={(v) => setValues((s) => ({ ...s, sprintType: v === NONE ? "" : v }))}
-          options={sprintTypes.map((option) => ({
-            value: option.value,
-            label: sprintTypeLabel(option, lang),
-            hint: option.standardDays === null ? undefined : `${option.standardDays} days`,
-            // The glyph was ON this object the whole time and stopped one line
-            // short of the picker (R35) — the sprints screen draws it, the
-            // dialog that chooses the same type drew a word.
-            mark: option.mark,
-          }))}
-          emptyOption={{ value: NONE, label: t("Not said") }}
-          placeholder={t("Not said")}
-          searchPlaceholder={t("Search types…")}
-          emptyText={t("Nothing matched.")}
+          onValueChange={(v) => setValues((s) => ({ ...s, sprintType: v === NONE ? "" : v }))}
+          ariaLabel={t(typeField.label)}
           disabled={busy}
         />
       </Field>

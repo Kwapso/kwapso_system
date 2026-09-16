@@ -362,6 +362,7 @@ export function AppShell({
   breadcrumbs,
   onNavigate,
   onCloseCrumb,
+  onReorderCrumb,
   activeCrumbIndex,
   activePath,
 }: {
@@ -377,6 +378,14 @@ export function AppShell({
    * a mark riding inside it, so this callback fires from a genuine click or
    * keypress on that button and needs no interception. */
   onCloseCrumb?: (closeKey: string) => void
+  /** DRAG A TAB TO A NEW POSITION — the kit's own `onReorder`
+   * (`BreadcrumbFolders`, kit v1.2.95, client ruling 16 Sep 2026: "go with
+   * the drag order"). Given only alongside `onCloseCrumb`, same reason: a
+   * plain trail has no order for a reader to change. `(fromIndex, toIndex)`
+   * are positions in `breadcrumbs`, forwarded straight through — this file
+   * has no opinion about what moving a tab means, only about drawing a
+   * strip that can be dragged. */
+  onReorderCrumb?: (fromIndex: number, toIndex: number) => void
   /** WHICH CRUMB IN `breadcrumbs` IS THE TAB BEING LOOKED AT — the kit's own
    * `activeIndex` (`BreadcrumbFoldersProps`, v1.2.59), forwarded untouched.
    * Given only alongside `onCloseCrumb`, for the same reason and never
@@ -1588,6 +1597,10 @@ export function AppShell({
                  `shared/i18n-seed.ts`. Harmless to pass when `onClose` is
                  absent — the kit draws no close button to announce it with. */
               closeLabel={t("Close tab")}
+              /* DRAG-TO-REORDER, forwarded straight through from this file's
+                 own `onReorderCrumb` prop (see its doc). `undefined` on every
+                 ordinary trail, same guard as `onClose`. */
+              onReorder={onReorderCrumb}
               /* NO `foldAfter` ANY MORE. It used to be the only lever this
                  file had for "do not fold a set of open tabs into a `···`
                  menu" — passing the set's own ceiling so nothing could ever

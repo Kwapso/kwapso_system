@@ -332,11 +332,7 @@ export function GoogleScopeDialog({
 
           {options !== null && (
             <div className="flex max-h-56 flex-col overflow-y-auto rounded-[var(--radius)] bg-surface-panel">
-              {options.filter((o) => !alreadyNamed.some((s) => s.externalId === o.externalId)).length === 0 ? (
-                <p className="text-muted-foreground p-3 text-sm">
-                  {t("Nothing else to add from your Google account.")}
-                </p>
-              ) : (
+              {options.filter((o) => !alreadyNamed.some((s) => s.externalId === o.externalId)).length === 0 ? null : (
                 options
                   .filter((o) => !alreadyNamed.some((s) => s.externalId === o.externalId))
                   .map((o) => {
@@ -453,9 +449,6 @@ export function GoogleScopeDialog({
             disabled={busy}
           />
         </Choice>
-        <p className="text-muted-foreground mt-1.5 text-xs">
-          {t("Leave it off and what {brand} already read stays answerable. Only what it reads from now on follows the new answer.", BRAND)}
-        </p>
       </Field>
     </FormShellDialog>
   )

@@ -57,7 +57,6 @@ const moduleField = (required: boolean) => ({
   ...defaultFieldConfig,
   label: "What is it about?",
   required,
-  helpText: "The part of your system this is about. It helps us route it to the right person.",
 })
 
 export function RaiseTicketDialog({

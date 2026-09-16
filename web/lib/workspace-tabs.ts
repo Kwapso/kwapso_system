@@ -553,6 +553,38 @@ export function closeTab(path: string): string | null {
   return landing
 }
 
+/** MOVE ONE TAB, BY POINTER (its own `path`), TO A NEW ARRAY POSITION.
+ *
+ * Wires the kit's `BreadcrumbFolders onReorder` (client ruling, 16 Sep 2026:
+ * "go with the drag order") into this store's own array — `app-shell.tsx`'s
+ * content strip passes `(fromIndex, toIndex) => reorderTab(tabs[fromIndex]
+ * .path, toIndex)`, so the store still moves by identity rather than by the
+ * index a stale render captured, the same reason `closeTab` takes a `path`
+ * and not a position.
+ *
+ * RECENCY IS UNTOUCHED. A drag is the reader's OWN act of arranging the
+ * strip, not a visit — `touch()` is not called here — so reordering a tab
+ * neither protects it from the next `MAX_OPEN_TABS` eviction nor exposes
+ * another tab to it. `activePath` needs no adjustment either: it names a
+ * tab by `path`, never by position, so a move under it is invisible to it.
+ *
+ * A `path` this store does not hold, or a `toIndex` already equal to where
+ * it sits, is a silent no-op — the same "nothing to do" shape `closeTab`
+ * gives an unknown path (`at < 0`), rather than a thrown error over a race
+ * with a tab that closed mid-drag. */
+export function reorderTab(path: string, toIndex: number): void {
+  const from = tabs.findIndex((tab) => tab.path === path)
+  if (from < 0) return
+  const clamped = Math.max(0, Math.min(toIndex, tabs.length - 1))
+  if (clamped === from) return
+  const next = [...tabs]
+  const [moved] = next.splice(from, 1)
+  next.splice(clamped, 0, moved)
+  tabs = next
+  persist()
+  announce()
+}
+
 /** Drop everything, for every scope. Sign-out only: these are one person's
  * places and a `localStorage` key outlives the session that wrote it, so the
  * next person to use this browser must not inherit a strip of somebody else's

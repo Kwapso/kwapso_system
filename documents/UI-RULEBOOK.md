@@ -37,8 +37,8 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L14)
-- [3. Detail screens](#3-detail-screens) (D1 to D13)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L15)
+- [3. Detail screens](#3-detail-screens) (D1 to D15)
 - [4. Collections](#4-collections) (K1 to K27)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
@@ -574,6 +574,8 @@ visible (it never hides), toggling the assistant state. The assistant itself clo
 from its own tab close action (kit v1.2.85 `asideHandleOnOpen`,
 `web/components/shell/app-shell.tsx`). This removes ambiguity about what the edge gesture does.
 
+**Assistant strip icon-only tabs (16 Sep 2026):** *"validated, but still gotta fix the shape!"* — client. Icon-only pinned tabs size to the icon, with no 128px text floor (kit v1.2.95 `iconOnly`).
+
 ### L9: every section on the team area's strip has a door, or names the screen that took its place
 
 **The rule.** A section that lives on the team area's own strip (`TEAM_SECTIONS` in
@@ -744,8 +746,14 @@ column before this ruling. `web/lib/aside-width.ts` persists the chosen width pe
 the signed-in person's id the same way `workspace-tabs.ts` scopes a shared device's open
 tabs — wired in `app-shell.tsx`.
 
+**Assistant width design (16 Sep 2026):** *"can we actually not show anything and make it so that I can grab the left rail of the assistant, and when I hover over there, I see this kind of arrow to move?"* — client. The seam draws nothing at rest; the aside's left edge is the grab area; hover shows the col-resize arrow; snaps and keyboard navigation are unchanged (kit v1.2.93, `RESIZE_SEAM` in screen-shell.tsx).
+
 **Law.** None registered — `shared/ui/compositions/templates/screen-shell.tsx` carries the
 drag/snap/keyboard mechanism; `web/test/aside-width.test.ts` pins the app-side persistence.
+
+### L15: tab strips reorder by drag or keyboard, and pinned tabs stay fixed
+
+**The rule.** *"go with the drag order"* — client, 16 Sep 2026. Content and assistant tab strips reorder by pointer drag or Alt+Arrow keys; pinned History and "+" tabs never move (kit v1.2.95 `onReorder`, workspace-tabs.ts `reorderTab`, agent-conversation-tabs.ts `reorderAgentTab`).
 
 ---
 
@@ -1059,6 +1067,8 @@ derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value
 ### D15: a calendar span within a detail screen uses S2's horizontal gutters
 
 **The rule.** The client's ruling, 16 Sep 2026: *"calendar spans = S2 start-and-end caps."* A calendar drawn inside a detail screen (where it appears — the Waves timeline, the Sprints view, the Inputs week, the Stories week) applies the same horizontal gutter that S2 sets for the detail screen's own horizontal extent: `px-4 sm:px-6 lg:px-10` on the calendar container, so its left and right edges align with the detail screen's own content, and the calendar grid or day cells do not over-extend into the gutter dead space. The calendar component itself (`RecordCalendar` or `RecordTimeline`) inherits these class restrictions from its container, not from the detail shell's own S2 rule — the component can be reused in other contexts where S2 does not apply.
+
+**Calendar hover card (16 Sep 2026):** *"when I hover over the card in the calendar, it expands and I see what it is"* — client. Hover (300 ms) or focus opens a card with title, kind, dates; tap on touch (kit v1.2.94 `renderEventCard`, record-calendar.tsx).
 
 **Not a law.** This is a layout consistency decision recorded here for the next reader, same as K24's Calendar span implementation (shipped start-day-only on 15 Sep; spans since v1.2.90, 16 Sep).
 
@@ -2111,6 +2121,62 @@ reasoning lives:
    switched-off wave draws `archived` directly, the tone every other
    deactivated record in the app wears, winning over the temporal read.
 
+**Amendment 2, 16 Sep 2026 — a wave's app is STORED, not derived.** The client,
+over the shipped amendment 1 above, read the DERIVED left column back to the
+coordinator and corrected it: *"No, now you have the name of the wave. I want
+the name of the app."* Amendment 1's `waveApp` answered "the one app every
+live sprint in the wave agrees on, when there is exactly one" — recomputed on
+every render, never settable, and wrong the moment a wave was sold before any
+sprint was planned into it. Team migration **0099** replaces the guess with a
+real column:
+
+1. **`waves.app_id`**, nullable, `REFERENCES apps (id)`, plus `idx_waves_app`.
+   Nullable is ordinary — a wave sold before anybody decided which system it
+   covers is exactly as normal as one with no dates yet.
+2. **Backfilled once, idempotently, conservatively.** A wave's `app_id` is
+   filled from its own LIVE sprints only where they agree on EXACTLY one app —
+   the same "agree on one, or draw nothing" reading amendment 1's `waveApp`
+   gave in the browser, now computed once in SQL rather than on every render.
+   A value already set (through the door) is never overwritten; a wave whose
+   sprints disagree, or have none, is left `NULL` rather than guessed at.
+3. **The door carries it end to end.** `Wave` (`shared/waves.ts`) gains
+   `appId`/`appName`/`appLogoUrl`, joined in on every read
+   (`workers/tenancy/src/lib/waves.ts`, `LEFT JOIN apps` beside the existing
+   accounts join). `createWave` accepts `appId` (optional, validated against
+   the SAME account the wave is sold to — `assertAppInAccount`, the identical
+   pairing `wave-detail.tsx`'s own "Plan a sprint" picker already enforces on
+   screen). `updateWave` takes it TRI-STATE, the same "absent key = leave it
+   alone" contract `updateAccount`'s own `accountManagerUserId` already keeps:
+   omit `appId` to leave the wave's app untouched, send `null`/empty to clear
+   it, send an id to set it.
+4. **The wave form gets an App picker** (`wave-form-dialog.tsx`) — a
+   `RecordPicker` narrowed to the selected/fixed account's own apps, the
+   app's own logo as the mark (`face: true`, the identical flag the story
+   form's own App row uses), no "Not said" pill withheld — an app is a real
+   optional field here, unlike App stage.
+5. **The T3 timeline's left column reads `wave.appId` directly.** `waveApp`
+   (`waves-screen.tsx`) is now a plain lookup against the loaded `apps` list
+   for a live app's logo, falling back to the wave's own denormalised
+   `appName`/`appLogoUrl` when the app is not in that list (deactivated, most
+   likely) — never a scan of the team's sprints. Unset `appId` falls back to
+   exactly what the row drew before amendment 1: the wave's own name, on the
+   initials tile.
+6. **The All list gets an App column**, the same `AppMark` + name pairing the
+   Account column already draws, searchable off the resolved app's name.
+7. **A Facet by app**, offered only where the team has apps to filter by —
+   cheap, since `Wave.appId` is a real column: `selectWaves` narrows with a
+   plain equality (`w.appId === query.appId`), no sprint scan, unlike the
+   Sprint type facet beside it.
+8. **MCP/agent parity (R19/R22).** `list_waves` gains `appId` as a third query
+   filter; `create_wave` and `update_wave` both gain `appId` in their body
+   schema and `buildBody`, `update_wave`'s through `sent()` so an empty string
+   still clears it over the machine surface the same way it does through the
+   form.
+
+**Law.** [R19](../RULES.md), [R22](../RULES.md). The rest of this amendment is
+recorded here for the next reader rather than independently checked, the same
+footing amendment 1 and the entry above it stand on.
+
 ### K25: Inputs — the third Accounts tab, three server views, no Mine tab
 
 **The rule.** What we are waiting on a client for gets its own sidebar page,
@@ -2380,30 +2446,33 @@ gains a `narrow` declaration on `all_stories:read` — `shared/workers/query-gra
 the matrix), [R53](../RULES.md), [R78](../RULES.md) (`no-sort-in-calendar-views`
 — Week), [R80](../RULES.md) (`rows-are-a-list`).
 
-### K28: App stage — Not started · Audit · Plan · Build · Validation · Refinements · Enhancement · Archived, in that order
+### K28: Sprint type is the seven with icons; App stage's status is HELD
 
-**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"the sprint types are: not started, audit (this is new), plan (the old blueprint), build (the old development), validation, refinements and enhancement (in this order). They will not have colors, but icons. Let's keep colors for status."*
+**The rule, and the correction.** The client's ruling, 16 Sep 2026, verbatim: *"the sprint types are: not started, audit (this is new), plan (the old blueprint), build (the old development), validation, refinements and enhancement (in this order). They will not have colors, but icons. Let's keep colors for status."* The first pass read this onto `shared/app-stages.ts` (team migration 0097) — she said "sprint types," and the two words she named, Blueprint and Development, happened to be two of App stage's own eight values that day, which is what made the misread possible. **Her own correction, the same day, verbatim:** *"No, no, no, no, no. You got this completely wrong. These are the sprint types... status has a color. It's the sprint types that have an icon. You got that wrong. Hold this until we define what the status is from the apps."* And on Waves, the same conversation: *"No, now you have the name of the wave. I want the name of the app."* (K24's own amendment below carries that half.)
 
-**She said "sprint types"; the words she named are App stage.** Confirmed read-only against staging before this shipped: "Blueprint" and "Development" exist nowhere in the `Sprint type` vocabulary, seeded or live — that group holds Planning, Iteration and the ten-row `SPRINT_TYPE_CATALOGUE` (Assessment, Diagnostic, Process Optimization, Data Migration, Foundation, Implementation, Validation, Refinement, Training, Enhancement), none of them either word. Both words are two of the eight `App stage` values instead (`shared/app-stages.ts`), on staging, that day. The coordinator's ruling, same day: apply her list to `shared/app-stages.ts`'s own vocabulary, not Sprint type, and say so here for the next reader.
+**So there are two vocabularies in this entry, not one, and they resolve in opposite directions.**
 
-**The final order, with its icon (Phosphor names, `@shared/ui/foundations/icons`, verified against the kit's own art):**
+**Sprint type (the seven words, with their icons) — `shared/sprint-types.ts`, team migration 0098.**
 
-| # | Stage | Icon | Was |
+| # | Sprint type | Icon | Old word it replaces |
 |---|---|---|---|
-| 1 | Not started | `Circle` | Not started (unchanged) |
-| 2 | Audit | `MagnifyingGlass` | new |
-| 3 | Plan | `Compass` | Blueprint (renamed) |
-| 4 | Build | `Hammer` | Development (renamed) |
-| 5 | Validation | `CheckCircle` | new |
-| 6 | Refinements | `Sliders` | new |
-| 7 | Enhancement | `TrendUp` | new |
-| 8 | Archived | `Archive` | Archived (unchanged, kept active — see below) |
+| 1 | Not started | `Circle` | new to this vocabulary |
+| 2 | Audit | `MagnifyingGlass` | Assessment (renamed); Diagnostic too, only when Assessment is absent |
+| 3 | Plan | `Compass` | Planning (renamed) |
+| 4 | Build | `Hammer` | Implementation (renamed) |
+| 5 | Validation | `CheckCircle` | Validation (kept) |
+| 6 | Refinements | `Sliders` | Refinement (renamed) |
+| 7 | Enhancement | `TrendUp` | Enhancement (kept) |
 
-Documentation, Iteration, Maintenance and Completed are retired (deactivated in the vocabulary, never deleted — an app already sitting in one of those four keeps that exact word). **Archived is not in her seven and nothing in the ruling touches it:** `apps` carries no separate archive flag, only the generic `deactivated_at` every table gets, so putting a system away has only ever been this one stage — it keeps its place, active, last, the one manual "put away" state.
+Iteration, Foundation, Data Migration, Process Optimization and Training fold into nothing — deactivated, never deleted; a sprint already carrying one of the ten old catalogue words (`SPRINT_TYPE_CATALOGUE`, `workers/tenancy/src/team-schema/seed.ts`) keeps that exact word. Diagnostic's fold is CONDITIONAL, the one genuine branch in the migration: it becomes Audit only when no live row is still spelled Assessment (so the two do not collide into one row); where Assessment is present, Diagnostic deactivates alongside the rest. `selectable_data.position` (the column 0097 added) now carries 1..7 for these rows too — the second vocabulary to use it, never a second column — and `sprints.sprint_type` is rewritten wherever a stored word actually renamed, so a sprint's own history reads the team's current spelling.
 
-The vocabulary is seeded and migrated (`shared/selectable-homes.ts` registers `App stage` as `{ table: "apps", column: "stage" }`; team migration **0097** renames Blueprint → Plan and Development → Build on both the dropdown row and every `apps.stage` value that held them, inserts the missing five protected, deactivates the four retired names, and adds `selectable_data.position` — the column this vocabulary needed and did not have — set 1..8 in this exact order). Drawn in any picker or list by the team's own live vocabulary order (`position`, R75's `ORDERED_OPTIONS_OK` entry for `app-form-dialog.tsx#stages`), with the icon per stage assigned in code (`shared/app-stages.ts`'s own `icon` field, resolved in `web/lib/app-stage-icon.tsx`) — never a data column, the same pattern `shared/story-types.ts` carries for the five story types. No dot, no colour, on the gallery chip, the board card chip, the detail head pill, the board-by-stage column heads, or the app form's own stage picker (now a horizontal icon pill row, `AppearancePillGroup`, not the dropdown). The colour stays on **status** elsewhere in the app (a ticket's, a story's), never on a stage.
+Drawn as an icon + word on a NEUTRAL pill, no colour, everywhere a sprint's type shows: the sprint form's own picker (`AppearancePillGroup`, a horizontal pill row, `sprint-form-dialog.tsx`), the sprint detail head, each sprint row on its wave's own Sprints tab, the T3 timeline's segment label and tooltip, and the Waves screen's Sprint type facet. Icons resolved in `web/lib/sprint-type-icon.tsx`, the same split `shared/app-stages.ts` uses for its own mark. Ordinal, not A→Z: registered in R75's `ORDERED_OPTIONS_OK` (`sprint-form-dialog.tsx#sprintTypes`) and `FACET_ORDER_OK` (`wave-finder.tsx#sprintType`).
 
-**Not a law.** Like K26's type-icon binding, this is a vocabulary and icon-code decision recorded here for the next reader rather than independently checked. The eight protected rows are created by migration; `shared/ui/` carries the icons; no rule census enforces the exact order because the ordering IS the gating rule through `position` + `PROTECTED` and the migration order itself.
+**App stage — `shared/app-stages.ts`, UNCHANGED by this correction.** The eight words and their order stand exactly as migration 0097 left them (Not started · Audit · Plan · Build · Validation · Refinements · Enhancement · Archived, `selectable_data.position` 1..8) — that half of 0097 was never in question, only which vocabulary its ICON belonged to. **The pill goes back to a coloured DOT** — "status has a color" — never an icon, on the gallery chip, the board card chip, the board-by-stage column heads, and the detail head pill. `AppStage.dotTone` (widened past `Badge`'s own six `DotTone` names to also reach the four `PriorityTone` names, the same combined union `record-calendar.tsx`'s `EntryDotTone` already takes) assigns each of the eight stages a distinct dot — Not started `blocked`, Audit `review`, Plan `purple`, Build `building`, Validation `orange`, Refinements `shipped`, Enhancement `done`, Archived `archived`. **One pair shares an actual pixel: `shipped`/`done` (Refinements/Enhancement) both resolve to `--kw-forest`** — the kit's closed palette (R32) has exactly SEVEN distinct hues across all ten named dot tones, and eight stages cannot each take a hue that does not exist; every other stage below takes a hue none of its seven siblings wears. `AppStageGlyph`/`web/lib/app-stage-icon.tsx` are deleted; the app form's own stage picker keeps its pill row (`AppearancePillGroup`, unchanged in shape) but draws no icon and no colour — a plain word row — because the pill CONTROL survived the correction even though its glyph did not.
+
+**App STATUS ITSELF IS HELD.** The eight words above are not a fresh, considered answer to "what is an app's status" — only the set 0097 happened to leave behind when its icon moved elsewhere. Her own words: *"hold this until we define what the status is from the apps."* A follow-up ruling — what app status means, how many stages it has, and whether it should be inherited from the app's own waves and sprints rather than typed by hand — is still owed, and an artifact is being drawn for it. Until it lands, `shared/app-stages.ts` keeps the 0097 shape and this entry's dot mapping is the interim answer, not the final one.
+
+**Not a law.** Like K26's type-icon binding, this is a vocabulary and icon-code decision recorded here for the next reader rather than independently checked. The seven Sprint type rows and the eight App stage rows are each created by their own migration; `shared/ui/` carries the icons and the dot tokens; no rule census enforces either exact order because the ordering IS the gating rule, through `position` + `PROTECTED` and each migration's own order.
 
 ### K29: Meetings — the List view, and emojis stripped from titles
 
@@ -2774,6 +2843,8 @@ shared with Choices — **protected** renders as ink (inverse), **active** rende
 A row in the Automations list opens a DETAIL sheet showing the automation (chip above title,
 Edit pencil top-right like a record head, description, module), and tapping Edit swaps the
 same sheet to the form mode for editing.
+
+**Badge status fill (16 Sep 2026):** *"go for the kit fix"* — client. The `status` variant never drops its neutral fill; the dark-mode "building → mango" clause is gone (kit v1.2.96).
 
 ### B12: settings changes preview first and apply on Save, through the pinned bar
 
@@ -3147,11 +3218,76 @@ the account manager field, an app's staff checklist and lead, and a ticket's
 `HelpStakeholders` add control were four more dropdowns/checklists this ruling converted
 the same day.
 
+**Reiterated, 16 Sep 2026, verbatim:** *"By default, every time they have to assign it to
+someone, it needs to preselect the active user. For example, on the add story, it should
+preselect the active user at the bottom."* An audit of every create form with a staff field
+(task, story, account manager, an app's lead/staff) against every one of its call sites
+found the four dialogs themselves already correct — including the story form's own
+assignee, which already sits at the bottom of the form and already opens on the signed-in
+user — but one CALL SITE had never been wired: `contact-detail.tsx`'s own
+`<AccountFormDialog>` (the contact screen's edit dialog for the same account record
+`account-detail.tsx`'s edit dialog already gets right) opened with no
+`defaultAccountManagerId` at all, so an account with no manager on file opened this dialog
+with nobody selected. Fixed the same day, and held down by a second census,
+`web/test/staff-preselect-call-sites.test.ts`, over the CALL SITES rather than the dialogs'
+own bodies: every `<TaskFormDialog>`/`<StoryFormDialog>`/`<AccountFormDialog>`/`<AppFormDialog>`
+mount in `web/` must pass its dialog's `default*Id` prop. Three forms an assignment-shaped
+field was checked for and genuinely has none — a ticket (routed through Triage's own
+on-duty pick, already an action row this law exempts), a to-do/Input (addressed to a
+client's account, never to a team member) and a meeting (no staff-attendee field at all) —
+are out of this law's population, not a gap in it.
+
 **Law.** [R79](../RULES.md) (`staff-pill-row`). A static census, `web/test/staff-pill-row.test.ts`:
 no `<Select>` and no `<RecordPicker>` without `layout="row"`, on either front door, may be
 fed a staff/member list (traced off `useAssignableMembers`/`assignableMembers`/`staffedOn`,
 or a value typed `PickablePerson[]`) — including through a local picker-factory closure,
 whose own JSX never names the list by its caller's variable.
+
+---
+
+### F12: a form carries no hints
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"You put too many explanations
+and hints that are not necessary, especially on the forms, on the create and edit. Please,
+can you delete all of that? I will give you a few examples, but I want you to clean it
+everywhere. If we need hints, I will tell you explicitly, but by default, there are no
+explanations, just the choice, text, or the form components."* Her two named examples were
+both `FieldConfig.helpText` sentences: *"The system this work is on. Everything below is
+narrowed by it."* (the story form's App field) and *"A recording, a page, a document
+somebody can open."* (the story form's and the review dialog's file field). A create/edit
+form shows the label and the control, nothing else — the label already says what a field
+is.
+
+- No `FieldConfig` object (`{ ...defaultFieldConfig, … }`) may set a non-empty `helpText`.
+- No bare `<p>` sitting between a form's fields may hold one static explanatory sentence
+  (`{t("…")}`, three words or more, `text-muted-foreground`).
+
+**What survives, on purpose.** A validation/refusal message, shown only on a bad state
+(`text-warning`/`text-destructive`, never `text-muted-foreground`); a placeholder that is
+the field's own example value; a picker option's own differentiating description (`Choice`'s
+`description` prop, telling two options apart — the choice's own words, not an explanation
+of the field); and a field showing the record's own settled value where a control would
+otherwise be (the "fact, not control" pattern — [F5](#f5-a-field-is-label-left-requirement-right-control-below)'s
+own shape, one line with nothing to choose). A loading indicator ("Reading what's
+attached…") is a status, not a hint, and is named in `FORM_HINT_OK` rather than taught to
+the census as a fourth colour to special-case.
+
+**What it costs.** Forty-nine `helpText` hints and a dozen bare-paragraph captions came out
+across both front doors in one sweep — an account's own contacts panel that read "Nobody is
+on this account's books yet.", a knowledge source picker that read "Nothing found in your
+Google account.", a process step's Role field that explained why it had no roles to offer.
+None of it was wrong information; all of it was a sentence the label and the empty control
+already said without words.
+
+**Law.** [R81](../RULES.md) (`form-carries-no-hints`). Two static censuses,
+`web/test/form-hints.test.ts`, over the same `appFiles()` walk R33's
+`wrapped-strings.test.ts` stands on: no `FieldConfig` literal sets a non-empty `helpText`,
+and no file that renders a form (imports `FormShell`/`FormShellDialog`) draws a bare `<p>`
+whose entire content is one static translated sentence. `FORM_HINT_OK`
+(`shared/rules/registry.ts`) is the reasoned, rot-checked way out — empty, and meant to
+stay that way, except for the one shape her own ruling names as a real exception: a hint
+carrying something the user cannot know otherwise belongs in the CONFIRM dialog that asks
+about the action, never the create/edit form beside it.
 
 ---
 
@@ -4678,16 +4814,16 @@ strip's z-index the way it censuses e.g. R63's pinned toolbar.
 
 ## Rule index
 
-**152 rules.**
+**154 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L14 (14) |
+| 2. Page layout and width | L1 to L15 (15) |
 | 3. Detail screens | D1 to D15 (15) |
 | 4. Collections | K1 to K30 (30) |
 | 5. Buttons and actions | B1 to B14 (14) |
-| 6. Forms and dialogs | F1 to F11 (11) |
+| 6. Forms and dialogs | F1 to F12 (12) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |

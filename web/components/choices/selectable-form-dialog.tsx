@@ -100,7 +100,6 @@ const markField = {
   ...defaultFieldConfig,
   label: "Mark",
   required: false,
-  helpText: "A short word or initial shown beside this option, wherever the type appears. Leave it empty for a plain label.",
 }
 
 export function SelectableFormDialog({

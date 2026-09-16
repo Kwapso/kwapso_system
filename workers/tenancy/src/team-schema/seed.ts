@@ -22,6 +22,7 @@ import { TICKET_TYPE_GROUP, TICKET_TYPES } from "@shared/ticket-types"
 import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
+import { SPRINT_TYPES } from "@shared/sprint-types"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { MeetingTypeIcon } from "@shared/meeting-icons"
 
@@ -296,21 +297,36 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   { type: "Ticket status", value: "In progress" },
   { type: "Ticket status", value: "Ready" },
   { type: "Ticket status", value: "Resolved" },
-  // THE SPRINT TYPES: the two SCOPE ch.02 names that the delivery catalogue has
-  // no word of its own for, and then the catalogue itself. A "blueprint" is a
-  // PRICED PLANNING sprint, not a type (BUILD-1 §3), so it is a price on a
-  // Planning row rather than a value here.
+  // THE SEVEN SPRINT TYPES — Not started, Audit, Plan, Build, Validation,
+  // Refinements, Enhancement, in that order. Client ruling, 16 Sep 2026,
+  // first read onto App stage (migration 0097) and corrected the same day:
+  // "these are the sprint types" — `shared/sprint-types.ts`'s own header
+  // carries the full account, and team migration 0098 carries the same
+  // rewrite to a team that already exists. A newborn team and a migrated one
+  // offer the same seven words, in the same order (`position`, 1-based, the
+  // identical shape the App stages below already take), and either can add
+  // an eighth on its own Dropdown values screen.
   //
-  // The ten catalogue rows are the old `programs` table — the ways this agency
-  // actually runs an engagement, each with its mark, its German name, what the
-  // block includes and how long it normally runs. Implementation appears in both
-  // SCOPE's three and the catalogue's ten, so it is listed ONCE and the
-  // catalogue's richer row is the one that survives. Editable like every other
-  // dropdown value: this is a starting vocabulary, not an enum, and a team that
-  // runs three kinds of sprint retires the rest on its own screen.
-  { type: "Sprint type", value: "Planning" },
-  { type: "Sprint type", value: "Iteration" },
-  ...SPRINT_TYPE_CATALOGUE.map((t) => ({ type: "Sprint type", ...t })),
+  // THE OLD TWELVE-WORD CATALOGUE (Planning, Iteration, and the ten-row
+  // `SPRINT_TYPE_CATALOGUE` — Assessment, Diagnostic, Process Optimization,
+  // Data Migration, Foundation, Implementation, Validation, Refinement,
+  // Training, Enhancement) no longer seeds a newborn team. It is still
+  // exported — an existing team's migration 0098 reads it to know which old
+  // word renames onto which new one, and a team already using one of these
+  // words on a live sprint keeps that exact word (deactivate, never delete).
+  ...SPRINT_TYPES.map((s, i) => ({
+    type: "Sprint type",
+    value: s.name,
+    // THE SAME TWO-LETTER MARK THE MATCHING APP STAGE WORD CARRIES — the
+    // seven names coincide (the misread that named this vocabulary onto App
+    // stage first), so the mark is reused rather than invented a second
+    // time for the same word. Not drawn anywhere any more (icons replace it,
+    // `shared/sprint-types.ts`'s own `icon` field), kept only because a
+    // dropdown row's `mark` column is general-purpose and other surfaces
+    // (CSV export, the generic Choices screen) still read it.
+    mark: APP_STAGES.find((a) => a.name === s.name)?.mark ?? null,
+    position: i + 1,
+  })),
   // Display-only labels for the four story states. The states the code trusts
   // are STORY_STATUSES in shared/types.ts — rewording a row here can never move
   // a story, exactly as with the ticket labels above.

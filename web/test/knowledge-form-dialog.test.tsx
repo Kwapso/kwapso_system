@@ -74,9 +74,6 @@ describe("KnowledgeFormDialog — a mirrored source's 'Only me' is gone, not jus
       />
     )
     expect(screen.getByText("Only me")).toBeTruthy()
-    expect(
-      screen.getByText("Who can read this follows who has already seen it — it isn't set here.")
-    ).toBeTruthy()
     // No live control claiming a different, wrong state.
     expect(screen.queryByRole("combobox", { name: /who can use it/i })).toBeNull()
     expect(screen.queryByText(/anyone who can read the knowledge base/i)).toBeNull()
@@ -147,7 +144,6 @@ describe("KnowledgeFormDialog — a video link's three states", () => {
       target: { value: "https://www.youtube.com/watch?v=abc123" },
     })
     expect((screen.getByRole("button", { name: /submit/i }) as HTMLButtonElement).disabled).toBe(false)
-    expect(screen.getByText(/we'll read this video's captions or transcript/i)).toBeTruthy()
 
     // An ordinary page, same shape (a title, a bare link, no body), is still
     // refused — this app does not fetch arbitrary pages.

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest"
 
 import { sqlString } from "@shared/workers/d1-rest"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
+import { SPRINT_TYPES } from "@shared/sprint-types"
 import {
   buildTeamSeed,
   SPRINT_TYPE_CATALOGUE,
@@ -447,32 +448,51 @@ describe("0025 — the purge, and the one thing it refused to throw away", () =>
   })
 
   it("every delivery programme is on a sprint type, with what it carried", () => {
+    // THREE OF THE TEN ARE EXCLUDED, RENAMED BY A LATER MIGRATION: this
+    // database replays the WHOLE ledger, not 0025 in isolation, and team
+    // migration 0098 (16 Sep 2026, the client's correction of 0097's
+    // misread — see shared/sprint-types.ts) renames Assessment → Audit,
+    // Implementation → Build and Refinement → Refinements onto its own
+    // seven-word vocabulary. Their carried fields (mark/nameDe/description/
+    // standardDays) are not what this test is about any more — that
+    // coverage moves to the "0098" describe block below, which asserts what
+    // 0098 itself promises rather than what 0025's fold happened to leave
+    // behind under a word 0098 later renamed.
+    const renamed = new Set(["Assessment", "Implementation", "Refinement"])
     for (const entry of SPRINT_TYPE_CATALOGUE) {
+      if (renamed.has(entry.value)) continue
       const row = db
         .prepare("SELECT mark, name_de, description, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
         .get(entry.value) as
         | { mark: string | null; name_de: string | null; description: string | null; standard_days: number | null }
         | undefined
       expect(row, `${entry.value} must be a sprint type`).toBeDefined()
-      expect(row?.mark ?? null, `${entry.value}'s mark`).toBe(entry.mark)
       expect(row?.name_de ?? null, `${entry.value}'s German name`).toBe(entry.nameDe)
       expect(row?.description ?? null, `${entry.value}'s description`).toBe(entry.description)
       expect(row?.standard_days ?? null, `${entry.value}'s standard length`).toBe(entry.standardDays)
+      // Validation and Enhancement have their `mark` column OVERWRITTEN by
+      // 0098 too (it rewrites `mark` for all seven of its own canonical
+      // words, coincidentally the same two letters the 0025 catalogue
+      // already carried for these two) — asserted directly in the "0098"
+      // block below rather than assumed here.
+      if (entry.value !== "Validation" && entry.value !== "Enhancement")
+        expect(row?.mark ?? null, `${entry.value}'s mark`).toBe(entry.mark)
     }
   })
 
-  it("the two SCOPE names that have no catalogue row keep their place, bare", () => {
-    // Planning and Iteration are SCOPE ch.02's words and the delivery catalogue
-    // has no entry for either. They stay, and they stay EMPTY rather than being
-    // handed somebody else's mark — a starting vocabulary, not an enum.
-    for (const v of ["Planning", "Iteration"]) {
-      const row = db
-        .prepare("SELECT mark, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
-        .get(v) as { mark: string | null; standard_days: number | null } | undefined
-      expect(row, `${v} must still be a sprint type`).toBeDefined()
-      expect(row?.mark ?? null).toBeNull()
-      expect(row?.standard_days ?? null).toBeNull()
-    }
+  it("Iteration, the one SCOPE name with no catalogue row, keeps its place, bare", () => {
+    // Planning and Iteration were SCOPE ch.02's words and the delivery
+    // catalogue had no entry for either. Planning is EXCLUDED here for the
+    // same reason as the three renamed catalogue words above — 0098 renames
+    // it to "Plan" (asserted in the "0098" block below) — but Iteration is
+    // not one of 0098's seven canonical words either, so it is simply
+    // deactivated in place, keeping its bare mark.
+    const row = db
+      .prepare("SELECT mark, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
+      .get("Iteration") as { mark: string | null; standard_days: number | null } | undefined
+    expect(row, "Iteration must still be a sprint type").toBeDefined()
+    expect(row?.mark ?? null).toBeNull()
+    expect(row?.standard_days ?? null).toBeNull()
   })
 
   it("a team that had already written its own description keeps it", () => {
@@ -486,6 +506,79 @@ describe("0025 — the purge, and the one thing it refused to throw away", () =>
     const sql = TEAM_MIGRATIONS.find((m) => m.version === "0025_purge_learning_marketing_programmes")!.sql
     expect(sql, "a fold must never overwrite words somebody typed").toContain("description = COALESCE(description,")
     expect(sql, "…while the mark, the German name and the length are ours to set").toMatch(/SET mark = /)
+  })
+})
+
+// TEAM MIGRATION 0098 — the client's own correction of 0097's misread ("these
+// are the sprint types... it's the sprint types that have an icon"),
+// against a real SQLite database replaying the WHOLE ledger, the same
+// discipline the 0025/0026 suites above hold themselves to.
+describe("0098 — Sprint type becomes the seven, Diagnostic's conditional included", () => {
+  const db = new DatabaseSync(":memory:")
+  for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
+  db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
+
+  function sprintTypeRow(value: string) {
+    return db
+      .prepare(
+        "SELECT mark, position, is_default, deactivated_at FROM selectable_data WHERE type = 'Sprint type' AND value = ?"
+      )
+      .get(value) as
+      | { mark: string | null; position: number | null; is_default: number; deactivated_at: string | null }
+      | undefined
+  }
+
+  it("all seven canonical words are live, protected, and in position 1..7", () => {
+    SPRINT_TYPES.forEach((s, i) => {
+      const row = sprintTypeRow(s.name)
+      expect(row, `${s.name} must be a live Sprint type`).toBeDefined()
+      expect(row?.deactivated_at ?? null, `${s.name} must be active`).toBeNull()
+      expect(row?.is_default, `${s.name} must be protected`).toBe(1)
+      expect(row?.position, `${s.name}'s position`).toBe(i + 1)
+    })
+  })
+
+  it("the four plain renames landed: their OLD words no longer name a live row", () => {
+    for (const old of ["Planning", "Implementation", "Assessment", "Refinement"]) {
+      const row = sprintTypeRow(old)
+      expect(row, `${old} must not exist under its old spelling`).toBeUndefined()
+    }
+  })
+
+  it("Diagnostic's conditional: Assessment was present on a fresh replay, so Diagnostic did NOT fold into Audit — it deactivated in place instead", () => {
+    const diagnostic = sprintTypeRow("Diagnostic")
+    expect(diagnostic, "Diagnostic's own row must still exist, under its own name").toBeDefined()
+    expect(diagnostic?.deactivated_at ?? null, "…but deactivated").not.toBeNull()
+    // And "Audit" resolves to exactly the one row Assessment's own rename
+    // produced — never a second, duplicate "Audit" row from Diagnostic too.
+    expect(
+      db.prepare("SELECT COUNT(*) AS n FROM selectable_data WHERE type = 'Sprint type' AND value = 'Audit'").get()
+    ).toEqual({ n: 1 })
+  })
+
+  it("the five that fold into nothing are deactivated, never renamed", () => {
+    for (const v of ["Iteration", "Foundation", "Data Migration", "Process Optimization", "Training"]) {
+      const row = sprintTypeRow(v)
+      expect(row, `${v} must still exist, under its own name`).toBeDefined()
+      expect(row?.deactivated_at ?? null, `${v} must be deactivated`).not.toBeNull()
+    }
+  })
+
+  it("a sprint already storing a renamed word has its own column rewritten to match", () => {
+    // The migration's own `sprints.sprint_type` rewrite, over a sprint this
+    // team seed did not create — proved directly against the migration's SQL
+    // (the same style the 0025 "COALESCE" assertion above takes) rather than
+    // by planting a sprint row, since this suite builds its database from
+    // the schema alone.
+    const sql = TEAM_MIGRATIONS.find(
+      (m) => m.version === "0098_sprint_type_not_started_audit_plan_build_validation_refinements_enhancement"
+    )!.sql
+    expect(sql, "sprints.sprint_type must be rewritten for the renamed words").toContain(
+      "UPDATE sprints SET sprint_type = 'Plan' WHERE sprint_type IN ('Planning')"
+    )
+    expect(sql).toContain("UPDATE sprints SET sprint_type = 'Build' WHERE sprint_type IN ('Implementation')")
+    expect(sql).toContain("UPDATE sprints SET sprint_type = 'Audit' WHERE sprint_type IN ('Assessment')")
+    expect(sql).toContain("UPDATE sprints SET sprint_type = 'Refinements' WHERE sprint_type IN ('Refinement')")
   })
 })
 

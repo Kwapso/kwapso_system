@@ -42,6 +42,21 @@ export type Wave = {
   accountId: string
   accountName: string | null
   name: string
+  /** THE SYSTEM IT COVERS — client ruling, 16 Sep 2026: "I want the name of
+   * the app." Team migration 0099. Null is ordinary: a wave can be sold
+   * before anybody decides which app it covers, or its sprints can touch more
+   * than one, and neither is a gap to fill in a hurry. Settable at create and
+   * edit (`createWave`/`updateWave`, `workers/tenancy/src/lib/waves.ts`);
+   * backfilled once, on existing waves, from the one app every LIVE sprint in
+   * the wave agreed on, if there was exactly one. */
+  appId: string | null
+  appName: string | null
+  /** The app's own logo, read alongside for the timeline's left column (an
+   * `AppMark`-shaped face) — never derived from `appId` a second time on the
+   * client. Null is ordinary: most apps carry no logo, and the mark falls
+   * back to the stage tile the same way `AppMark` already does everywhere
+   * else a `Wave` is not involved. */
+  appLogoUrl: string | null
   /** What the package is for, in the team's own words. */
   goal: string | null
   /** DERIVED from the sprints inside it and STORED — see the header. Null until
@@ -75,6 +90,11 @@ export type WaveSprint = {
    * Null on a sprint with no client, like every other kind's. */
   ref: string | null
   name: string
+  /** THE ICON + WORD PILL wave-detail.tsx draws beside each row — no colour
+   * (client ruling, 16 Sep 2026: "they will not have colors, but icons"),
+   * resolved through `shared/sprint-types.ts` / `web/lib/sprint-type-icon.tsx`.
+   * Null is ordinary: a sprint can carry no type. */
+  sprintType: string | null
   startsOn: string | null
   endsOn: string | null
   active: boolean

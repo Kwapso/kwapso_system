@@ -111,44 +111,37 @@ const minutesField = {
   ...defaultFieldConfig,
   label: "Minutes it takes, each time",
   required: true,
-  helpText: "The time you agreed with them, not a measurement.",
 }
 const runsField = { ...defaultFieldConfig, label: "How often it happens", required: true }
 const roleField = {
   ...defaultFieldConfig,
   label: "Role",
   required: false,
-  helpText: "Who does it. The role's hourly cost is what turns these minutes into money.",
 }
 const toolField = {
   ...defaultFieldConfig,
   label: "Tool",
   required: false,
-  helpText: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
 }
 const shapeField = {
   ...defaultFieldConfig,
   label: "Where does this step sit?",
   required: false,
-  helpText: "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.",
 }
 const armField = {
   ...defaultFieldConfig,
   label: "It carries on from",
   required: false,
-  helpText: "The side of the split this step continues. It hangs under that one instead of joining the two back together.",
 }
 const insteadField = {
   ...defaultFieldConfig,
   label: "It is an alternative to",
   required: false,
-  helpText: "The step this one happens INSTEAD of. The two sit side by side in the picture.",
 }
 const branchField = {
   ...defaultFieldConfig,
   label: "This way is taken when",
   required: false,
-  helpText: "The words that decide it — written the way somebody would say it out loud.",
 }
 const loopField = { ...defaultFieldConfig, label: "Sends the work back to", required: false }
 
@@ -422,11 +415,7 @@ export function StepFormDialog({
               ))}
             </SelectContent>
           </Select>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            {t("File this map under an account and their roles can be named here.")}
-          </p>
-        )}
+        ) : null}
       </Field>
 
       {/* THE TOOL — one, by ruling. */}
@@ -464,11 +453,7 @@ export function StepFormDialog({
               </InAppLink>
             )}
           </div>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            {t("File this map under an account and their tools can be named here.")}
-          </p>
-        )}
+        ) : null}
       </Field>
 
       {/* THE SHAPE OF THE WORK, asked as ONE question instead of three fields a
@@ -539,13 +524,6 @@ export function StepFormDialog({
               )}
             </SelectContent>
           </Select>
-          {detaching && (
-            /* Detaching needs a position of its own and takes the end of the
-               map — SAID before it happens, never discovered after. */
-            <p className="text-muted-foreground mt-1 text-xs">
-              {t("It leaves the split and moves to the end of the map.")}
-            </p>
-          )}
         </Field>
       )}
 

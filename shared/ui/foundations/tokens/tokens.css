@@ -1198,32 +1198,27 @@
   --avatar-ring:  0.15625rem;  /* 2.5 */
   --dot-presence: 0.8125rem;   /* 13  */
 
-  /* ---- Status pill (kit ruling 26) -------------------------------------
+  /* ---- Status pill (kit ruling 26, ruling 26's dark clause REVERSED
+     16 Sep 2026) -----------------------------------------------------------
      Ruling 26, verbatim: "Neutral pill, charcoal label, coloured dot — the
      dot names the state, the label always says it in words. Mango is the
-     brand, not a status: 'in build' and 'with us' take a charcoal dot. On
-     dark the pill takes the accent fill with a charcoal label and a charcoal
-     dot."
+     brand, not a status: 'in build' and 'with us' take a charcoal dot."
 
      `--pill-fill` is ch11's drawn `background: var(--card)` — the OTHER
      paper tone from the `var(--sheet)` panel the pill sits on. No border on
      any coloured pill; colour is the whole treatment.
 
-     THE DARK CLAUSE. A charcoal dot cannot be seen on an unlit pill, so the
-     ONE pill whose dot is charcoal — "in build" / "with us" — is the pill the
-     last sentence of the ruling is about: on dark it takes the accent fill,
-     and its label and dot are charcoal against it. Every other stage keeps
-     the neutral pill and its own coloured dot, because voiding "coloured dot"
-     for the whole family in dark would void the ruling's own first sentence.
-     Which accent the fill is, and whether the clause is meant to reach every
-     stage rather than this one, is the open question in GAPS-TRACK1.md STA-1;
-     mango is used here because the sentence it follows is about mango and
-     because mango is the one accent that does not move between the two
-     palettes (ch02).                                                        */
+     RULING 26 ALSO SAID "on dark the pill takes the accent fill" for the one
+     charcoal-dot pill ("in build" / "with us"), and `--pill-fill-building` /
+     `--pill-label-building` carried that as a dark-mode override to mango /
+     charcoal. The client's 16 Sep 2026 ruling reverses it, verbatim "go for
+     the kit fix": the status fill never drops its neutral for any tone, in
+     either palette — mango is a brand fill and never a status, no exception.
+     Those two tokens are gone; `badge.tsx`'s `status` variant resolves to
+     `--pill-fill` / `--pill-label` for every `dotTone` now, `building`
+     included. */
   --pill-fill:           var(--card);
   --pill-label:          var(--foreground);
-  --pill-fill-building:  var(--pill-fill);   /* light: the same neutral pill */
-  --pill-label-building: var(--pill-label);
   --dot-shipped:  var(--kw-forest);
   --dot-building: var(--foreground);   /* "in build" / "with us" — charcoal */
   --dot-review:   var(--info);
@@ -1733,27 +1728,24 @@
     --hair-strong-inverse:  rgba(26, 25, 24, .20);
 
     --pill-fill:            var(--kw-unlit-raised);
-    --pill-fill-building:   var(--kw-mango);     /* ruling 26, dark clause */
-    --pill-label-building:  var(--kw-charcoal);
     --dot-shipped:          var(--kw-forest-lift);
     --dot-blocked:          var(--kw-poppy-lift);
     --dot-done:             var(--kw-forest-lift);
-    /* CORRECTED 7 Sep 2026. Charcoal was right for the ONE surface this token was
-       written for, and invisible on the one it reached later. Ruling 26's dark
-       clause puts a `building` dot on a MANGO pill, where charcoal is the only
-       legible ink — and GAPS-TRACK1 STA-2 recorded, as the justification, that
-       "nothing in the kit consumes the six `--dot-*` tokens" outside that pill.
-       `Kanban`'s column header does now: a bare 7px dot on `--surface-panel`,
-       where charcoal measured 1.02. That is the client's "status (th header) have
-       no color associated" — what an invisible dot looks like, described honestly.
-
-       SO THE PILL BECOMES THE EXCEPTION, NOT THE TOKEN. This returns to the value
-       `docs/TOKENS.md` has documented all along (`--foreground`, 17.06 on the
-       panel), and `badge.tsx`'s `variant="status"` + `building` compound variant
-       now paints its own dot `--pill-label-building` — the charcoal that pill
-       already uses for its label, stated beside the fill it has to survive. A
-       token tuned for one context and consumed bare in another is the failure;
-       the fix names the context that is special. */
+    /* CORRECTED 7 Sep 2026, AND STILL RIGHT AFTER 16 SEP 2026's REVERSAL.
+       Charcoal was right for the ONE surface this token was written for, and
+       invisible on the one it reached later — GAPS-TRACK1 STA-2 recorded, as
+       the justification, that "nothing in the kit consumes the six `--dot-*`
+       tokens" outside the status pill. `Kanban`'s column header does now: a
+       bare 7px dot on `--surface-panel`, where charcoal measured 1.02. That
+       is the client's "status (th header) have no color associated" — what
+       an invisible dot looks like, described honestly. So this returns to
+       the value `docs/TOKENS.md` has documented all along (`--foreground`,
+       17.06 on the panel). `badge.tsx`'s `variant="status"` now paints its
+       dot from this token UNCONDITIONALLY — the 16 Sep 2026 ruling removed
+       the one compound variant that used to repaint it, along with the
+       mango pill fill that repaint existed to survive — and `--foreground`
+       is light-on-dark, which reads fine against the neutral
+       `--pill-fill` this dot now always sits on. */
     --dot-building:         var(--foreground);
   }
 }
@@ -1938,27 +1930,24 @@
   --hair-strong-inverse:  rgba(26, 25, 24, .20);
 
   --pill-fill:            var(--kw-unlit-raised);
-  --pill-fill-building:   var(--kw-mango);     /* ruling 26, dark clause */
-  --pill-label-building:  var(--kw-charcoal);
   --dot-shipped:          var(--kw-forest-lift);
   --dot-blocked:          var(--kw-poppy-lift);
   --dot-done:             var(--kw-forest-lift);
-  /* CORRECTED 7 Sep 2026. Charcoal was right for the ONE surface this token was
-     written for, and invisible on the one it reached later. Ruling 26's dark
-     clause puts a `building` dot on a MANGO pill, where charcoal is the only
-     legible ink — and GAPS-TRACK1 STA-2 recorded, as the justification, that
-     "nothing in the kit consumes the six `--dot-*` tokens" outside that pill.
-     `Kanban`'s column header does now: a bare 7px dot on `--surface-panel`,
-     where charcoal measured 1.02. That is the client's "status (th header) have
-     no color associated" — what an invisible dot looks like, described honestly.
-
-     SO THE PILL BECOMES THE EXCEPTION, NOT THE TOKEN. This returns to the value
-     `docs/TOKENS.md` has documented all along (`--foreground`, 17.06 on the
-     panel), and `badge.tsx`'s `variant="status"` + `building` compound variant
-     now paints its own dot `--pill-label-building` — the charcoal that pill
-     already uses for its label, stated beside the fill it has to survive. A
-     token tuned for one context and consumed bare in another is the failure;
-     the fix names the context that is special. */
+  /* CORRECTED 7 Sep 2026, AND STILL RIGHT AFTER 16 SEP 2026's REVERSAL.
+     Charcoal was right for the ONE surface this token was written for, and
+     invisible on the one it reached later — GAPS-TRACK1 STA-2 recorded, as
+     the justification, that "nothing in the kit consumes the six `--dot-*`
+     tokens" outside the status pill. `Kanban`'s column header does now: a
+     bare 7px dot on `--surface-panel`, where charcoal measured 1.02. That
+     is the client's "status (th header) have no color associated" — what
+     an invisible dot looks like, described honestly. So this returns to
+     the value `docs/TOKENS.md` has documented all along (`--foreground`,
+     17.06 on the panel). `badge.tsx`'s `variant="status"` now paints its
+     dot from this token UNCONDITIONALLY — the 16 Sep 2026 ruling removed
+     the one compound variant that used to repaint it, along with the
+     mango pill fill that repaint existed to survive — and `--foreground`
+     is light-on-dark, which reads fine against the neutral
+     `--pill-fill` this dot now always sits on. */
   --dot-building:         var(--foreground);
 }
 

@@ -233,7 +233,6 @@ export function KnowledgeUploadDialog({
           ) : (
             <>
               <UploadSimple className="text-muted-foreground size-5" aria-hidden />
-              <p className="text-muted-foreground text-sm">{t("Drop a file here, or")}</p>
               <Button
                 type="button"
                 variant="secondary"
@@ -272,9 +271,6 @@ export function KnowledgeUploadDialog({
           emptyText={t("No account matched.")}
           disabled={busy}
         />
-        <p className="text-muted-foreground mt-1 text-xs">
-          {t("Filing it under an account is how a question about them finds it first.")}
-        </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-file-visibility" className={fieldSpacing}>
         <Select
@@ -312,9 +308,6 @@ export function KnowledgeUploadDialog({
             emptyText={t("No app matched.")}
             disabled={busy}
           />
-          <p className="text-muted-foreground mt-1 text-xs">
-            {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
-          </p>
         </Field>
       )}
     </FormShellDialog>

@@ -71,7 +71,7 @@ import {
   totalKey,
   impactKey,
 } from "@/lib/live-resources"
-import { AppStageGlyph } from "@/lib/app-stage-icon"
+import { appStageDotTone } from "@shared/app-stages"
 import { AppMark } from "@/components/apps/app-tiles"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -593,12 +593,11 @@ export function AppDetailScreen({
       // in the order the client read off the screenshot.
       chips={
         <>
-          {/* NO DOT (16 Sep 2026 ruling: "they will not have colors, but
-              icons") — the same neutral, icon-led pill apps-screen.tsx draws
-              for this exact fact off this exact field. */}
+          {/* THE DOT, BACK — client ruling, 16 Sep 2026, corrected the same
+              day: "status has a color." The identical pill apps-screen.tsx
+              draws for this exact fact off this exact field. */}
           {app.stage && (
-            <Badge variant="secondary" size="pill">
-              <AppStageGlyph stage={app.stage} />
+            <Badge variant="status" size="pill" dot={appStageDotTone(app.stage)}>
               {app.stage}
             </Badge>
           )}

@@ -2511,14 +2511,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_waves",
     summary:
-      "The packages clients have bought — several sprints sold together. `accountId` and `sprintType` narrow. Dates are derived from sprints inside.",
+      "The packages clients have bought. `accountId`, `sprintType` and `appId` narrow. Dates are derived from sprints inside.",
     detail:
-      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's, and `sprintType` narrows to waves holding a live sprint of one type, as the team spells it. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
+      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's, `sprintType` narrows to waves holding a live sprint of one type as the team spells it, and `appId` narrows to the one system a wave covers. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves",
-    schema: obj({ accountId: S, sprintType: S }),
+    schema: obj({ accountId: S, sprintType: S, appId: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["accountId", "sprintType"])
+      for (const k of ["accountId", "sprintType", "appId"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -2538,23 +2538,28 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_wave",
     summary:
-      "Sell a wave: `accountId`, `name`, `goal`. It carries no price. Sprints go in afterwards with set_sprint_wave, and the wave's dates follow them.",
+      "Sell a wave: `accountId`, `name`, `goal`, `appId`. No price. Sprints go in afterwards with set_sprint_wave.",
     detail:
-      "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for. It carries NO price — what a wave costs is deliberately out of this module's first version. Sprints are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
+      "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for, and `appId` is the one system it covers, if any — it must belong to the same account. It carries NO price — what a wave costs is deliberately out of this module's first version. Sprints are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves",
-    schema: obj({ accountId: S, name: S, goal: S }, ["accountId", "name"]),
-    buildBody: (i) => ({ accountId: str(i, "accountId"), name: str(i, "name"), goal: opt(i, "goal") }),
+    schema: obj({ accountId: S, name: S, goal: S, appId: S }, ["accountId", "name"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      name: str(i, "name"),
+      goal: opt(i, "goal"),
+      appId: opt(i, "appId"),
+    }),
     agent: { write: true, confirm: false, summarize: (i) => `Sell the wave "${str(i, "name")}"` },
   },
   {
     name: "update_wave",
     summary:
-      "Rename a wave by `id`, or re-word its `goal`. Never its dates: those are derived from the sprints in it.",
+      "Rename a wave by `id`, re-word its `goal`, or set/clear which app it covers (`appId`). Never its dates.",
     detail:
-      "Rename a wave (by `id`) or re-word what it is for. Never its dates: those are derived from the sprints in it, and a date somebody typed would disagree with the sprints the moment one moved.",
+      "Rename a wave (by `id`), re-word what it is for, or say which app it covers (`appId`, must belong to the same account — empty clears it). Never its dates: those are derived from the sprints in it, and a date somebody typed would disagree with the sprints the moment one moved.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/update",
-    schema: obj({ id: S, name: S, goal: S }, ["id", "name"]),
-    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), goal: sent(i, "goal") }),
+    schema: obj({ id: S, name: S, goal: S, appId: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), goal: sent(i, "goal"), appId: sent(i, "appId") }),
     agent: { write: true, confirm: false, summarize: (i) => `Rename the wave to "${str(i, "name")}"` },
   },
   {

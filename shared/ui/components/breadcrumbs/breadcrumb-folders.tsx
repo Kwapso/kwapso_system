@@ -420,6 +420,22 @@ const TAB = cn(
   "[&_svg:not([data-slot=folder-shape])]:shrink-0",
 );
 
+/**
+ * ICON-ONLY TABS — 16 Sep 2026 fifth ruling. Applied alongside `TAB` (never
+ * instead of it) on any crumb whose item sets `iconOnly: true`; see that
+ * field's own doc. `min-w-0` drops `TAB`'s 128px text floor, and the two
+ * insets tighten to icon-plus-padding: `ps-3` leading (was `ps-5`) and a
+ * trailing inset that keeps the shoulder curve's own width
+ * (`--folder-shoulder`, unchanged) but drops the extra `--space-3h` `TAB`
+ * reserves for a label's own trailing padding, down to `--space-2`. The
+ * folder shoulder is a fixed-length curve in brand units (`folder.tsx`'s own
+ * law: "Only FLAT runs take the width and the height"), so narrowing the box
+ * around it does not slant or stretch it.
+ */
+const TAB_ICON_ONLY = cn(
+  "min-w-0 ps-[var(--space-3)] pe-[calc(var(--folder-shoulder)_+_var(--space-2))]",
+);
+
 /* An ancestor: the rest fill, 13/300 in secondary ink, hovering to the active
    WEIGHT ONLY — REVERSED 2026-09-03. `hover:no-underline` is still the ONE
    thing suppressed on `BreadcrumbLink` — its underline is `.kw-link`'s, drawn
@@ -716,6 +732,20 @@ export interface BreadcrumbFoldersItem extends BreadcrumbsItem {
    * rather than guessing. See `formatCloseLabel`.
    */
   closeLabel?: string;
+  /**
+   * NO LABEL TEXT — an icon alone (History's clock, the "+" new-tab control).
+   * Client ruling 16 Sep 2026, fixing a regression the pinned-tab pattern
+   * exposed on staging: "the assistant strip's two pinned tabs … render
+   * 128px wide — the same width as a text tab — so they read as big empty
+   * grey blocks." `TAB`'s 128px floor exists so a text label never crushes
+   * into the shoulder curve; an icon has no such risk, so `iconOnly: true`
+   * drops that floor and tightens the tab's own insets to icon-plus-padding
+   * (`TAB_ICON_ONLY`) instead. Only the BOX changes — the folder silhouette
+   * behind it (`CrumbShape`/`FolderShape`) measures its own rendered size on
+   * every resize rather than stretching a fixed path, so it draws correctly
+   * narrow with no change of its own; see that file's "WHY IT MEASURES".
+   */
+  iconOnly?: boolean;
 }
 
 export interface BreadcrumbFoldersProps
@@ -848,6 +878,32 @@ export interface BreadcrumbFoldersProps
    * disabled. Keyboard-reachable, `Enter`/`Space` fire it natively, no ring
    * to write (tokens.css §8 already rings it).
    */
+  /**
+   * DRAG-TO-REORDER — client ruling 16 Sep 2026 ("go with the drag order").
+   * Given, every tab whose own `closable` is not `false` becomes draggable
+   * (native HTML5 drag, the same pattern `kanban.tsx` uses for its cards —
+   * `draggable`, `onDragStart`/`onDragOver`/`onDrop`/`onDragEnd`, the
+   * `.motion-drag` / `.motion-drag-placeholder` / `.motion-drop-target`
+   * classes motion.css already ships, no new keyframe here) and a focused
+   * tab also picks up a keyboard door: Alt+ArrowLeft / Alt+ArrowRight moves
+   * it one movable slot in that direction.
+   *
+   * `fromIndex`/`toIndex` are positions in the `items` array the caller
+   * passed — the caller applies the move (an array splice, typically),
+   * exactly as `onClose` hands back an index rather than mutating anything
+   * itself.
+   *
+   * A tab with `closable: false` (pinned) is never draggable and never a
+   * drop target — dragging over one does not call `preventDefault`, so the
+   * browser's own refusal is what stops a drop there, not a check in this
+   * file's drop handler. A pinned tab therefore never moves and nothing
+   * ever lands between it and the strip's end, which is what keeps trailing
+   * pinned tabs (History, "+") pinned last with no extra bookkeeping.
+   *
+   * Omitted, no tab is draggable and no `onKeyDown` is added — byte-
+   * identical to the strip before this feature existed.
+   */
+  onReorder?: (fromIndex: number, toIndex: number) => void;
   onCurrentActivate?: () => void;
   /**
    * The accessible name for the button `onCurrentActivate` turns the live
@@ -962,10 +1018,39 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       onCurrentActivate,
       currentActivateLabel,
       currentActivateExpanded,
+      onReorder,
       ...props
     },
     ref,
   ) => {
+    /* DRAG STATE FOR `onReorder` — the index currently picked up, and the
+       index currently under the pointer as a drop target. Both `null` at
+       rest, which is also every render where `onReorder` is not given (the
+       handlers below are never attached, so these never change). */
+    const [carryingIndex, setCarryingIndex] = React.useState<number | null>(null);
+    const [dropTargetIndex, setDropTargetIndex] = React.useState<number | null>(null);
+
+    const isMovable = React.useCallback(
+      (index: number) => onReorder !== undefined && items[index]?.closable !== false,
+      [items, onReorder],
+    );
+
+    /* THE KEYBOARD DOOR — Alt+ArrowLeft/Right on a focused movable tab moves
+       it to the next or previous MOVABLE slot, skipping over any pinned tab
+       rather than swapping into its place (a pinned tab is never a landing
+       spot, same rule the drag handlers enforce). */
+    const moveByKeyboard = React.useCallback(
+      (fromIndex: number, direction: -1 | 1) => {
+        if (!onReorder || !isMovable(fromIndex)) return;
+        let toIndex = fromIndex + direction;
+        while (toIndex >= 0 && toIndex < items.length && !isMovable(toIndex)) {
+          toIndex += direction;
+        }
+        if (toIndex < 0 || toIndex >= items.length) return;
+        onReorder(fromIndex, toIndex);
+      },
+      [items.length, isMovable, onReorder],
+    );
     /* THE STRIP'S OWN NODE, KEPT SEPARATELY FROM `ref`. `ref` above is the
        forwarded `<nav>` — `Breadcrumb`'s own root — and the thing that needs
        scrolling is the `<ol>` one level in, the same node `STRIP`'s
@@ -1360,6 +1445,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                  type intact, not a second lookup. */
               const item = items[entry.index];
               const closable = onClose !== undefined && (item.closable ?? true);
+              const movable = isMovable(entry.index);
 
               return (
                 <BreadcrumbItem
@@ -1374,7 +1460,78 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                      when `activeIndex` points outside the array — and it is
                      what the scroll effect above brings into view. */
                   ref={live ? liveRef : undefined}
-                  className={cn("shrink-0", closable && "group relative")}
+                  draggable={movable}
+                  data-dragging={carryingIndex === entry.index ? "true" : undefined}
+                  data-drop-target={
+                    dropTargetIndex === entry.index && carryingIndex !== entry.index ? "true" : undefined
+                  }
+                  onDragStart={
+                    movable
+                      ? (event) => {
+                          event.dataTransfer.setData("text/plain", String(entry.index));
+                          event.dataTransfer.effectAllowed = "move";
+                          setCarryingIndex(entry.index);
+                        }
+                      : undefined
+                  }
+                  onDragEnd={
+                    movable
+                      ? () => {
+                          setCarryingIndex(null);
+                          setDropTargetIndex(null);
+                        }
+                      : undefined
+                  }
+                  /* A PINNED TAB (`movable` false) GETS NEITHER HANDLER, so
+                     the browser never sees `preventDefault` over it and a
+                     `drop` event never fires there — the "never a drop
+                     target" rule from a refusal rather than a check. */
+                  onDragOver={
+                    movable
+                      ? (event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          if (dropTargetIndex !== entry.index) setDropTargetIndex(entry.index);
+                        }
+                      : undefined
+                  }
+                  onDrop={
+                    movable
+                      ? (event) => {
+                          event.preventDefault();
+                          const raw = event.dataTransfer.getData("text/plain");
+                          const fromIndex = raw === "" ? NaN : Number(raw);
+                          setCarryingIndex(null);
+                          setDropTargetIndex(null);
+                          if (!Number.isNaN(fromIndex) && fromIndex !== entry.index) {
+                            onReorder?.(fromIndex, entry.index);
+                          }
+                        }
+                      : undefined
+                  }
+                  onKeyDown={
+                    movable
+                      ? (event) => {
+                          if (!event.altKey) return;
+                          if (event.key === "ArrowLeft") {
+                            event.preventDefault();
+                            moveByKeyboard(entry.index, -1);
+                          } else if (event.key === "ArrowRight") {
+                            event.preventDefault();
+                            moveByKeyboard(entry.index, 1);
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "shrink-0",
+                    closable && "group relative",
+                    movable && "motion-drag cursor-grab",
+                    carryingIndex === entry.index && "motion-drag-placeholder",
+                    dropTargetIndex === entry.index &&
+                      carryingIndex !== entry.index &&
+                      "motion-drop-target",
+                  )}
                 >
                   {live ? (
                     onCurrentActivate ? (
@@ -1411,6 +1568,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                           TAB_LIVE,
                           "cursor-pointer",
                           closable && TAB_CLOSABLE,
+                          item.iconOnly && TAB_ICON_ONLY,
                         )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
@@ -1418,7 +1576,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                       </button>
                     ) : (
                       <BreadcrumbPage
-                        className={cn(TAB, TAB_LIVE, closable && TAB_CLOSABLE)}
+                        className={cn(TAB, TAB_LIVE, closable && TAB_CLOSABLE, item.iconOnly && TAB_ICON_ONLY)}
                       >
                         <CrumbShape fill={FILL_LIVE} />
                         {entry.item.label}
@@ -1434,7 +1592,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                        one current location and it is the live tab. */
                     <BreadcrumbPage
                       aria-current={undefined}
-                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary", closable && TAB_CLOSABLE)}
+                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary", closable && TAB_CLOSABLE, item.iconOnly && TAB_ICON_ONLY)}
                     >
                       <CrumbShape fill={FILL_REST} />
                       {entry.item.label}
@@ -1442,10 +1600,18 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                   ) : (
                     <BreadcrumbLink
                       href={entry.item.href}
+                      /* Browsers make an `<a>` draggable by default (drag to
+                         bookmark / open in a new tab); left alone that fires
+                         its OWN dragstart before the `<li>` ever sees one,
+                         hijacking `onReorder`'s gesture. Suppressed only when
+                         this tab actually is one, so a read-only trail's
+                         links keep their ordinary browser behaviour. */
+                      draggable={movable ? false : undefined}
                       className={cn(
                         TAB,
                         TAB_REST,
                         closable && TAB_CLOSABLE,
+                        item.iconOnly && TAB_ICON_ONLY,
                         /* THE WEIGHT PREVIEW SURVIVES REACHING FOR THE ×.
                            `TAB_REST`'s hover is written on the link, and the
                            close button is laid OVER the link rather than

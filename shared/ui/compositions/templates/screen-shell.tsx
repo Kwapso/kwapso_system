@@ -2040,7 +2040,7 @@ const CARD_JOINED = "md:rounded-ss-none";
    makes a raised part the shell was handed (an `Alert`, a `StatusStepper`)
    stop painting this region's own colour. `--pill-fill` is still written by
    hand: it is not one of §8's relational tokens, and adding it there is a
-   change to ruling 26's `--pill-fill-building` that nobody has asked for. */
+   change to the status pill's own token that nobody has asked for. */
 const BODY = cn(
   "min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-raised",
   "[--pill-fill:var(--surface-panel)]",
@@ -2351,21 +2351,31 @@ const HANDLE_HIT = cn(
  * THE BARE RESIZE SEAM — `EdgeHandle`'s `bare` branch, for the one caller
  * that suppresses the round handle's close-on-click with `asideHandleOnOpen
  * ={false}` while still wanting the drag this ruling adds (see that prop's
- * own doc, and `EdgeHandleResize`'s). No mango fill, no icon, no shadow —
- * the client's own "we don't need this [circle]" ruling was about exactly
- * that visual weight, and a bare seam does not reintroduce it. A thin
- * vertical mark instead, matching the shell-redesign spec's own "3px edge
- * handles": `--ink-tertiary` at rest, lifting on hover/focus so a reader
- * scanning the seam for a drag handle can find it, never mango (mango means
- * a pressable ACTION with a destination, and this seam's press does not
- * navigate anywhere). The hit target is taller and wider than the mark
- * itself, same target-size reasoning `HANDLE_HIT`'s own header states.
+ * own doc, and `EdgeHandleResize`'s). No mango fill, no icon, no shadow, and
+ * — per the client's 16 Sep 2026 ruling on this exact seam ("can we actually
+ * not show anything and make it so that I can grab the left rail of the
+ * assistant, and when I hover over there, I see this kind of arrow to
+ * move?") — no mark AT REST either: the previous always-on 3px tertiary bar
+ * is gone. The seam draws NOTHING until a reader's pointer finds it; hover
+ * (and keyboard focus, so the affordance is not mouse-only) reveals a
+ * hairline in its place and the row's own `cursor-col-resize` on the whole
+ * hit area is the "arrow to move" the client asked for — the browser's
+ * native col-resize glyph, not a drawn icon, so there is nothing here for
+ * `bare ? null : icon` to skip. The hit area itself is the aside's full
+ * left edge: `w-2` (8px, this ruling's own number) and `inset-y-0` (the
+ * column's full height), wider than the mark it reveals so a reader does
+ * not have to land a pointer on a hairline to find the drag start —
+ * `HANDLE_HIT`'s own target-size reasoning, same idea, new number because
+ * this seam has no circle to be at least as big as. Keyboard users still
+ * get the global focus ring (tokens.css §8 rings every control at once;
+ * this button adds no `outline-none` to suppress it), so the seam is
+ * discoverable without a mouse even though nothing is painted at rest.
  */
 const RESIZE_SEAM = cn(
-  "absolute z-10 flex w-3 items-center justify-center",
-  "h-11 rounded-pill border-0 bg-transparent p-0",
-  "before:block before:h-6 before:w-[3px] before:rounded-pill before:bg-ink-tertiary before:opacity-55",
-  "before:transition-[opacity,background-color] before:duration-[var(--duration-colour)] before:ease-kwapso",
+  "absolute inset-y-0 z-10 flex w-2 items-center justify-center",
+  "rounded-none border-0 bg-transparent p-0",
+  "before:block before:h-6 before:w-[3px] before:rounded-pill before:bg-ink-tertiary before:opacity-0",
+  "before:transition-opacity before:duration-[var(--duration-colour)] before:ease-kwapso",
   "hover:before:opacity-100 focus-visible:before:opacity-100",
 );
 
@@ -5568,7 +5578,16 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 icon={null}
                 onToggle={toggleAside}
                 bare
-                placement="pointer-events-auto max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
+                /* NO `top-1/2 -translate-y-1/2` HERE, UNLIKE THE ROUND
+                   HANDLE ABOVE. That pair vertically centres a FIXED-height
+                   box (`HANDLE_HIT`'s h-11) inside its positioned ancestor;
+                   `RESIZE_SEAM` is `inset-y-0` instead — today's ruling's
+                   own "full height" — so centring it as well would win the
+                   `top` property back off `inset-y-0`'s `top: 0` and leave
+                   `bottom: 0` unchallenged, collapsing the seam to the
+                   ancestor's BOTTOM half. Measured, not guessed: this file's
+                   own review caught it rendering at exactly half height. */
+                placement="pointer-events-auto max-[45rem]:hidden end-[var(--shell-gutter)]"
                 resize={asideResizeControls}
               />
             )}

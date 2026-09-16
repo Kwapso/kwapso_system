@@ -108,6 +108,8 @@ import { cn } from "../../lib/utils";
 import { Button } from "../button/button";
 import { Skeleton } from "../skeleton/skeleton";
 import { CollectionRegister } from "../collection-frame/collection-frame";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "../hover-card/hover-card";
+import { Popover, PopoverAnchor, PopoverContent } from "../popover/popover";
 import {
   CaretLeft,
   CaretRight,
@@ -416,6 +418,22 @@ export interface CalendarViewProps
   /** Picking an event. Given, every chip becomes a real button. */
   onSelectEvent?: (event: CalendarEvent, day: CalendarDay) => void;
   /**
+   * THE HOVER PREVIEW — client ruling 16 Sep 2026 ("when I hover over the
+   * card in the calendar, it expands and I see what it is?"). Given, every
+   * chip AND every span mark (caps and the middle ghost line alike) becomes
+   * a trigger for the kit's own floating preview: a `HoverCard` on a pointer
+   * that can hover (opens after 300ms, and on keyboard focus — Radix does
+   * both, so a keyboard-only reader can reach it too), or a `Popover` on a
+   * coarse (touch) pointer, since a phone has no hover to open it with.
+   * The KIT draws the frame — surface, radius, shadow, the open/close
+   * mechanics — the CALLER draws the content: this returns whatever node
+   * the caller wants shown (a title, a kind, a date range, a tone dot —
+   * `record-calendar.tsx`'s own card). Returning `undefined`/`null` for a
+   * given event renders that chip exactly as if this prop were absent.
+   * Absent altogether, no chip is wrapped and behaviour is unchanged.
+   */
+  renderEventCard?: (event: CalendarEvent, day: CalendarDay) => React.ReactNode;
+  /**
    * Opening the more-line. Given, "+N more" becomes a real button, exactly
    * as `onSelectEvent` makes a chip one. Handed the day and the events the
    * cell did not show — `events.slice(maxEvents)`, in the caller's order —
@@ -521,6 +539,97 @@ function eventChipBody(event: CalendarEvent): React.ReactNode {
       />
       <span className="min-w-0 truncate">{event.label}</span>
     </React.Fragment>
+  );
+}
+
+/**
+ * Is the pointer this reader is using coarse (touch), or fine (mouse/
+ * trackpad)? `(hover: none)` is the standard way to ask — a device with no
+ * hover capability. SSR-safe: `false` for the server render and the first
+ * client paint (a mouse is the safer default to assume before we know
+ * better — it draws the HoverCard, which also opens on focus, so a
+ * keyboard reader loses nothing either way), corrected in a layout effect
+ * before the browser paints anything the reader could act on, and kept live
+ * across a hybrid device folding a keyboard on or a mouse plugging in.
+ */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = React.useState(false);
+  React.useLayoutEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia("(hover: none)");
+    setCoarse(query.matches);
+    const handleChange = (event: MediaQueryListEvent) => setCoarse(event.matches);
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
+  return coarse;
+}
+
+/**
+ * THE HOVER-PREVIEW WRAPPER — `renderEventCard`'s own mechanics, shared by
+ * every chip and span mark below rather than copied at each call site. On a
+ * pointer that can hover it is a plain `HoverCard`: opens 300ms after the
+ * pointer arrives or on keyboard focus, closes on pointer-leave or Escape,
+ * all of it Radix's own default (nothing here reimplements it) — the
+ * child's own `onClick` (`onSelectEvent`, when the caller wired it) is
+ * untouched, because hovering and clicking are different gestures on this
+ * device and do not compete.
+ *
+ * On a COARSE pointer there is no hover to open it with, so the same
+ * content opens on tap instead (`Popover`, anchored rather than triggered —
+ * `PopoverAnchor` adds no click handling of its own, so there is only ONE
+ * place deciding what a tap does, not two racing handlers). The first tap
+ * on an unopened preview opens it and goes no further; the reader has not
+ * seen the card yet, so sending them straight into the full record would
+ * make the preview this ruling asked for pointless on the one device that
+ * needs it most. A second tap, with the preview already open, reaches the
+ * child's own `onClick` unchanged — a deliberate repeat press, same as
+ * before this feature existed.
+ */
+function EventPreview({
+  event,
+  day,
+  renderEventCard,
+  children,
+}: {
+  event: CalendarEvent;
+  day: CalendarDay;
+  renderEventCard?: (event: CalendarEvent, day: CalendarDay) => React.ReactNode;
+  children: React.ReactElement<{ onClick?: (e: React.MouseEvent) => void }>;
+}): React.ReactElement {
+  const coarse = useCoarsePointer();
+  const [open, setOpen] = React.useState(false);
+  const card = renderEventCard?.(event, day);
+
+  if (!card) return children;
+
+  if (!coarse) {
+    return (
+      <HoverCard openDelay={300}>
+        <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+        <HoverCardContent>{card}</HoverCardContent>
+      </HoverCard>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        {React.cloneElement(children, {
+          onClick: (e: React.MouseEvent) => {
+            if (!open) {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(true);
+              return;
+            }
+            setOpen(false);
+            children.props.onClick?.(e);
+          },
+        })}
+      </PopoverAnchor>
+      <PopoverContent>{card}</PopoverContent>
+    </Popover>
   );
 }
 
@@ -749,6 +858,7 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
       formatDaySummary = (_day, count) => `${count} event${count === 1 ? "" : "s"}`,
       onSelectDay,
       onSelectEvent,
+      renderEventCard,
       onSelectMore,
       agenda,
       onSelectItem,
@@ -963,9 +1073,8 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                             // rather than `eventChipBody`'s dot-plus-label.
                             if (event.span?.position === "middle") {
                               const lineClass = cn(spanLineVariants({ tone: event.tone }));
-                              return onSelectEvent ? (
+                              const line = onSelectEvent ? (
                                 <button
-                                  key={event.id}
                                   type="button"
                                   title={event.title}
                                   aria-label={event.title}
@@ -976,12 +1085,16 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                                   className={cn(lineClass, "cursor-pointer")}
                                 />
                               ) : (
-                                <span key={event.id} title={event.title} className={lineClass} />
+                                <span title={event.title} className={lineClass} />
+                              );
+                              return (
+                                <EventPreview key={event.id} event={event} day={day} renderEventCard={renderEventCard}>
+                                  {line}
+                                </EventPreview>
                               );
                             }
-                            return onSelectEvent ? (
+                            const chip = onSelectEvent ? (
                               <button
-                                key={event.id}
                                 type="button"
                                 title={event.title}
                                 onClick={(e) => {
@@ -994,12 +1107,16 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                               </button>
                             ) : (
                               <span
-                                key={event.id}
                                 title={event.title}
                                 className={eventChipClass(event)}
                               >
                                 {eventChipBody(event)}
                               </span>
+                            );
+                            return (
+                              <EventPreview key={event.id} event={event} day={day} renderEventCard={renderEventCard}>
+                                {chip}
+                              </EventPreview>
                             );
                           })}
                           {hidden > 0 ? (

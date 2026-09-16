@@ -32,6 +32,9 @@ function wave(over: Partial<Wave> & { id: string; accountId: string }): Wave {
     ref: null,
     name: "Wave",
     accountName: "Acme",
+    appId: null,
+    appName: null,
+    appLogoUrl: null,
     goal: null,
     startsOn: null,
     endsOn: null,
@@ -178,51 +181,68 @@ describe("buildWaveTimelineRows — one bar per wave, cut into its own sprints",
     expect(seg.tone).toBe("running")
   })
 
-  // THE LEFT COLUMN IS THE WAVE'S APP — client, 16 Sep 2026: "what I want in
-  // the left column is the name of the app and the icon." These pin the
-  // DERIVATION (which app, if any, resolves for a wave) off `sublabel`,
-  // which is a plain string here (the wave's own name, moved off the top
-  // line) rather than a rendered node — cheap to assert without mounting
-  // anything. `row.label` itself (the mark + name JSX `AppMark`/`RecordMark`
-  // draws) is not separately rendered here: both branches call the same two
-  // kit-backed components every other row/list cell in this file already
-  // does, with no new logic of their own to protect.
-  it("every live sprint names the same app: that app's row resolves, and the wave's name moves to `sublabel`", () => {
-    const w = wave({ id: "w5", accountId: "a1", name: "Onboarding package", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
+  // THE LEFT COLUMN IS THE WAVE'S APP — client, 16 Sep 2026, corrected the
+  // same day: "No, now you have the name of the wave. I want the name of the
+  // app." `Wave.appId` (team migration 0099) is the SOURCE OF TRUTH now, a
+  // real column rather than a guess derived from the sprints inside — these
+  // pin that off `sublabel`, a plain string here (the wave's own name, moved
+  // off the top line) rather than a rendered node. `row.label` itself (the
+  // mark + name JSX `AppMark`/`RecordMark` draws) is not separately rendered
+  // here: both branches call the same two kit-backed components every other
+  // row/list cell in this file already does, with no new logic of their own
+  // to protect.
+  it("appId set and the app is in the loaded list: that app's row resolves, and the wave's name moves to `sublabel`", () => {
+    const w = wave({
+      id: "w5",
+      accountId: "a1",
+      name: "Onboarding package",
+      appId: "app1",
+      startsOn: windowStart,
+      endsOn: addDays(windowStart, 5),
+    })
     const sprints: Sprint[] = [
-      sprint({ id: "s5", name: "Build", waveId: "w5", appId: "app1", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+      sprint({ id: "s5", name: "Build", waveId: "w5", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
     ]
     const apps = [app({ id: "app1", name: "Padelbase" })]
     const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", apps)
     expect(rows[0]!.sublabel).toBe("Onboarding package")
   })
 
-  it("no sprint names an app at all: no sublabel — the fallback IS the wave's own name, on top", () => {
-    const w = wave({ id: "w6", accountId: "a1", name: "No app yet", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
+  it("appId unset: no sublabel — the fallback IS the wave's own name, on top", () => {
+    const w = wave({ id: "w6", accountId: "a1", name: "No app yet", appId: null, startsOn: windowStart, endsOn: addDays(windowStart, 5) })
     const sprints: Sprint[] = [
-      sprint({ id: "s6", name: "Discovery", waveId: "w6", appId: null, startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+      sprint({ id: "s6", name: "Discovery", waveId: "w6", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
     ]
     const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
     expect(rows[0]!.sublabel).toBeUndefined()
   })
 
-  it("two sprints name two DIFFERENT apps: no single face resolves, no sublabel", () => {
-    const w = wave({ id: "w7", accountId: "a1", name: "Multi-system package", startsOn: windowStart, endsOn: addDays(windowStart, 20) })
-    const sprints: Sprint[] = [
-      sprint({ id: "s7a", name: "Build A", waveId: "w7", appId: "app1", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
-      sprint({ id: "s7b", name: "Build B", waveId: "w7", appId: "app2", startsOn: addDays(windowStart, 10), endsOn: addDays(windowStart, 20) }),
-    ]
-    const apps = [app({ id: "app1", name: "Padelbase" }), app({ id: "app2", name: "Hogo CRM" })]
-    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", apps)
-    expect(rows[0]!.sublabel).toBeUndefined()
+  it("appId set but the app is not in the loaded (live) list: falls back to the wave's own denormalised name/logo", () => {
+    const w = wave({
+      id: "w7",
+      accountId: "a1",
+      name: "Legacy package",
+      appId: "app-gone",
+      appName: "Retired System",
+      appLogoUrl: null,
+      startsOn: windowStart,
+      endsOn: addDays(windowStart, 20),
+    })
+    const rows = buildWaveTimelineRows([w], [], win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
+    expect(rows[0]!.sublabel).toBe("Legacy package")
   })
 
-  it("a switched-off sprint's app does not count — a wave that lost its only sprint has no app either", () => {
-    const w = wave({ id: "w8", accountId: "a1", name: "Wrapped", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
-    const sprints: Sprint[] = [
-      sprint({ id: "s8", name: "Old build", waveId: "w8", appId: "app1", active: false, startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
-    ]
-    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
+  it("appId set, no denormalised appName, and the app is not in the loaded list: no sublabel", () => {
+    const w = wave({
+      id: "w8",
+      accountId: "a1",
+      name: "Wrapped",
+      appId: "app-gone",
+      appName: null,
+      startsOn: windowStart,
+      endsOn: addDays(windowStart, 5),
+    })
+    const rows = buildWaveTimelineRows([w], [], win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
     expect(rows[0]!.sublabel).toBeUndefined()
   })
 })
@@ -253,7 +273,7 @@ describe("buildWaveCalendarEntries — waves and sprints as S2 spans", () => {
   it("one entry per wave and one per sprint, each carrying endDay, sharing one accent", () => {
     const w = wave({ id: "w1", accountId: "a1", name: "Padelbase v2", startsOn: "2026-09-01", endsOn: "2026-10-09" })
     const s = sprint({ id: "s1", name: "Onboarding", waveId: "w1", waveName: "Padelbase v2", startsOn: "2026-09-01", endsOn: "2026-09-11" })
-    const entries = buildWaveCalendarEntries([w], [s])
+    const entries = buildWaveCalendarEntries([w], [s], t)
     const waveEntry = entries.find((e) => e.id === "w:w1")!
     const sprintEntry = entries.find((e) => e.id === "s:w1:s1")!
     expect(waveEntry.day).toBe("2026-09-01")
@@ -274,14 +294,14 @@ describe("buildWaveCalendarEntries — waves and sprints as S2 spans", () => {
 
   it("a wave or sprint with no end date carries no endDay — expandEntry reads it as a one-day span", () => {
     const w = wave({ id: "w1", accountId: "a1", startsOn: "2026-09-01", endsOn: null })
-    const entries = buildWaveCalendarEntries([w], [])
+    const entries = buildWaveCalendarEntries([w], [], t)
     expect(entries[0]!.endDay).toBeUndefined()
   })
 
   it("a sprint belonging to a wave outside the given rows is left off the grid", () => {
     const w = wave({ id: "w1", accountId: "a1", startsOn: "2026-09-01", endsOn: "2026-09-10" })
     const s = sprint({ id: "s9", name: "Elsewhere", waveId: "w9", startsOn: "2026-09-02", endsOn: "2026-09-03" })
-    const entries = buildWaveCalendarEntries([w], [s])
+    const entries = buildWaveCalendarEntries([w], [s], t)
     expect(entries.some((e) => e.id.includes("s9"))).toBe(false)
   })
 })
@@ -296,9 +316,9 @@ describe("waveListRows / waveListColumns — R80's shape", () => {
     expect(rows[0]!.accountName).toBe("Hogo")
   })
 
-  it("declares exactly the six columns the brief names, Wave first", () => {
+  it("declares exactly the seven columns the brief names, Wave first — App added task C, 16 Sep 2026", () => {
     const cols = waveListColumns(t)
-    expect(cols.map((c) => c.key)).toEqual(["name", "account", "sprints", "start", "end", "state"])
+    expect(cols.map((c) => c.key)).toEqual(["name", "account", "app", "sprints", "start", "end", "state"])
   })
 })
 
