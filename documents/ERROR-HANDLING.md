@@ -120,6 +120,15 @@ environment (staging and production errors never mix), cross-team by design
   own configuration by name, so a cleared secret is a row rather than a person's
   request failing. Nobody watches the watchers if every cron on the estate dies
   at once; that is written down rather than hidden.
+- **A knowledge source's index failure is both a row and a seam (BUILD-5 §D,
+  16 Sep 2026).** `indexOneSource` (`workers/content/src/lib/knowledge.ts`)
+  writes `knowledge_sources.index_error` on the row AND calls
+  `recordWorkerError` with the source's id in `place` — before this the
+  column was the only trace, so a failing source was invisible to the
+  90-day store and to anybody who was not looking at that one row. Content's
+  own morning digest (`sendTriageDigest`, `workers/content/src/lib/notify.ts`)
+  now names a few unhealthy sources by title (`unhealthySourceSample`) when
+  there are any, riding the same per-team send as the triage backlog line.
 - **BOUNDED per caller (2026-08-11, core migration `0019_error_log_bound`):**
   `MAX_ERROR_LOGS_PER_HOUR` (120) rows per bucket per trailing hour, where a
   bucket is `COALESCE(user_id, source)`, the person whose browser beaconed it,

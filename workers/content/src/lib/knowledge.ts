@@ -2603,6 +2603,19 @@ export async function indexOneSource(
         WHERE id = ?`,
       [reason.slice(0, 300), sourceId]
     )
+    // BUILD-5 §D (16 Sep 2026) — THE ONE ERROR SEAM (ERROR-HANDLING.md), not
+    // just the column. `index_error` on the row is what a screen and the
+    // revisit pass read; this is what makes the SAME failure reach the
+    // 90-day store and — through it — the morning digest's own line naming
+    // the source (`unhealthySourceSample`, sendTriageDigest). Before this the
+    // only trace of an index failure was a column nobody was watching and a
+    // console line Cloudflare keeps for about a week. `recordWorkerError`
+    // never throws (its own contract), so this costs the caller nothing on
+    // the unhappy path it is already on.
+    await recordWorkerError(env.DB, "content", `knowledge/index (${sourceId})`, e, undefined, {
+      teamId: guard.teamId,
+      userId: guard.userId,
+    })
     return false
   }
 }
@@ -2680,6 +2693,23 @@ export const UNHEALTHY_INDEX_SQL = `index_error IS NOT NULL AND (
  * tally, which is the number this whole law exists to stop anyone reading
  * again. Excludes deactivated rows: a retired source has nothing left to
  * fix and showing it as outstanding work is its own small dishonesty. */
+/** THE NAMES BESIDE THE COUNT — what makes the morning digest's alarm line say
+ * something a person can act on rather than just a number (BUILD-5 §D, 16 Sep
+ * 2026). Bounded to a small literal (R14): the digest names a FEW, not the
+ * whole unhealthy set, oldest `updated_at` first — the same ordering
+ * `revisitUnhealthySources` retries in, so the names in the mail are the ones
+ * the cron is about to try next. */
+export async function unhealthySourceSample(cfg: D1Rest, guard: MemberGuard, limit = 3): Promise<string[]> {
+  const rows = await d1Query<{ title: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT title FROM knowledge_sources
+      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL})
+      ORDER BY updated_at ASC LIMIT ${limit}`
+  )
+  return rows.map((r) => r.title)
+}
+
 export async function unhealthySourceCount(cfg: D1Rest, guard: MemberGuard): Promise<number> {
   const rows = await d1Query<{ n: number }>(
     cfg,
