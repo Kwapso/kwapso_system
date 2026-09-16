@@ -22,8 +22,8 @@
 // tools.ts` still does the actual forwarding (`forwardTool`) and still owns
 // `MCP_TOOLS`, the manifest tenancy never needs to see the whole of.
 
-import { N, obj, S } from "@shared/workers/tool-args"
-import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
+import { N, obj, S } from "./tool-args"
+import { RECORD_TOGGLES } from "./record-toggles"
 
 export type McpOnlyTool = {
   name: string
