@@ -173,7 +173,18 @@ const dayCellVariants = cva(
    ------------------------------------------------------------------------- */
 const eventChipVariants = cva(
   [
-    "block w-full truncate rounded-pill px-2",
+    // NO `rounded-pill` IN THE BASE — S2's start/end caps (2026-09-16) need
+    // to draw ONE rounding directive per chip, never `rounded-pill` layered
+    // under a directional override: `tailwind-merge`'s own `rounded` group
+    // (extended in `lib/utils.ts` with `pill`/`select`/`bar`) does not know
+    // `rounded-s-pill` and `rounded-e-pill` are the SAME corners as
+    // `rounded-pill`, so the two survive side by side in the class list and
+    // which one paints is left to the generated stylesheet's own rule order
+    // — unverified and not a thing to depend on. `sort-control.tsx` already
+    // settled this the same way: `directionVariants` and `fieldVariants`
+    // each own exactly one rounding string, never two. `spanCapClass` below
+    // is this file's one rounding directive, applied at every call site.
+    "block w-full truncate px-2",
     // Ruling 02 lifts the kit's 10 to the badge step.
     "text-badge leading-[1.6] font-[var(--font-weight-medium)]",
     "text-start",
@@ -260,6 +271,40 @@ export interface CalendarEvent {
   dot?: CalendarEventDot;
   /** Accessible name, where the visible label is an abbreviation. */
   title?: string;
+  /**
+   * THIS DAY'S PLACE IN A MULTI-DAY RECORD — S2 "start-and-end caps", client
+   * ruling 16 Sep 2026 ("for calendar, I choose S2"). Absent, an event is an
+   * ordinary one-day chip, exactly as before. Given, `position` decides the
+   * day's own MARK instead of the ordinary pill: `start` and `end` still
+   * draw a chip — capped (a real pill corner) on the edge that is this
+   * record's own boundary, flat on the edge that runs into the next day's
+   * mark — and `middle` draws no chip at all, only a thin GHOST LINE in the
+   * event's own `tone`, at low alpha, because a grid cell has room for three
+   * or four marks and a twelve-day sprint cannot spend one chip per day of
+   * itself. `only` is a one-day span: an ordinary chip, both corners capped,
+   * i.e. this file's plain pill — kept as its own name rather than folded
+   * into "absent" so a caller that always sets `endDay` never has to special-
+   * case the one-day case itself (`record-calendar.tsx`'s `expandEntry` is
+   * the one place that decides which of the four a day gets).
+   *
+   * `id` NAMES THE SPAN, not the day — every day of one record shares the
+   * same `span.id` (this file uses the record's own `CalendarEvent.id`,
+   * unchanged). It exists for STACKING: two different records that both
+   * touch one cell each draw their own line, in `events` order, the same
+   * flex column a cap chip already sits in — nothing here reads `span.id`
+   * for that (array order already keeps them apart); it is carried so a
+   * future caller that needs to tell two lines in one cell apart (a hover
+   * highlight across a span's own days, say) has the fact to read rather
+   * than re-deriving it from two lines that otherwise look identical.
+   *
+   * WEEK WRAP IS NOT THIS FILE'S JOB. This component does no date maths (the
+   * file header says so) — a middle day at a row's own first or last column
+   * draws its line exactly like any other middle day, because it is handed
+   * one `CalendarDay` at a time and never asked to know it sits at a row
+   * edge. The caller's own day-by-day walk is what makes the line reappear
+   * on the next row.
+   */
+  span?: { id: string; position: "start" | "middle" | "end" | "only" };
 }
 
 export interface CalendarDay {
@@ -413,15 +458,58 @@ export interface CalendarViewProps
   label?: string;
 }
 
-/** 27.25's chip when it carries a dot; the cva chip otherwise. */
+/**
+ * ONE rounding directive for an event chip — see `eventChipVariants`'s own
+ * header for why this is never combined with a second one. `start` caps the
+ * record's own boundary edge and flattens the edge that runs into the next
+ * day's ghost line; `end` is the mirror; every other case (no `span`, or
+ * `position: "only"`) is the ordinary full pill. Logical sides throughout,
+ * so this mirrors for free under `dir="rtl"` — matching `sort-control.tsx`'s
+ * own `rounded-s-pill rounded-e-none` / `rounded-e-pill rounded-s-none` pair.
+ */
+function spanCapClass(event: CalendarEvent): string {
+  const position = event.span?.position;
+  if (position === "start") return "rounded-s-pill rounded-e-none";
+  if (position === "end") return "rounded-e-pill rounded-s-none";
+  return "rounded-pill";
+}
+
+/** 27.25's chip when it carries a dot; the cva chip otherwise. Never called
+ * for a `middle`-position span day — see `spanLineClass` below, the ghost
+ * line that draws instead. */
 function eventChipClass(event: CalendarEvent): string {
   return event.dot !== undefined
     ? cn(
-        "flex w-full min-w-0 items-center gap-1.5 rounded-pill bg-card px-2",
+        "flex w-full min-w-0 items-center gap-1.5 bg-card px-2",
+        spanCapClass(event),
         "text-badge leading-[1.6] text-start font-[var(--font-weight-medium)] text-foreground",
       )
-    : cn(eventChipVariants({ tone: event.tone }));
+    : cn(eventChipVariants({ tone: event.tone }), spanCapClass(event));
 }
+
+/**
+ * THE GHOST LINE — a `middle`-position span day's own mark, in place of a
+ * chip: the record's own `tone`, at low alpha, thin enough that three or
+ * four of them (one span's line plus a same-day chip, or two overlapping
+ * spans' own lines) still fit the cell's `maxEvents` column without
+ * crowding it the way a full-height chip per day would. Its own small `cva`
+ * rather than a class strung onto `eventChipVariants`, because a line shares
+ * only the FILL with a chip — none of the padding, the text sizing or the
+ * truncation apply to a mark with no label.
+ */
+const spanLineVariants = cva(["h-[3px] w-full shrink-0 rounded-pill opacity-55"], {
+  variants: {
+    tone: {
+      quiet: "bg-surface-panel",
+      brand: "bg-surface-brand",
+      info: "bg-info",
+      success: "bg-success",
+      destructive: "bg-destructive",
+      inverse: "bg-surface-inverse",
+    },
+  },
+  defaultVariants: { tone: "brand" },
+});
 
 function eventChipBody(event: CalendarEvent): React.ReactNode {
   if (event.dot === undefined) return event.label;
@@ -483,9 +571,16 @@ function CompactDaySummary({
   onSelectDay?: (day: CalendarDay) => void;
   formatDaySummary: (day: CalendarDay, count: number) => string;
 }) {
-  const shown = events.slice(0, MOBILE_MAX_DOTS);
-  const hidden = events.length - shown.length;
-  const summary = formatDaySummary(day, events.length);
+  // A `middle`-position span day gets no dot — S2's own rule, client ruling
+  // 16 Sep 2026: "the dot on the start and end days only." A dot with no
+  // label already carries less information than a chip; a dot for a day
+  // that is merely somewhere INSIDE a span (already marked by the ghost line
+  // at `sm:` and up) would be a mark with nothing new to say, on a screen
+  // that has the least room to spend on one.
+  const dotEligible = events.filter((event) => event.span?.position !== "middle");
+  const shown = dotEligible.slice(0, MOBILE_MAX_DOTS);
+  const hidden = dotEligible.length - shown.length;
+  const summary = formatDaySummary(day, dotEligible.length);
 
   const dots = (
     <span aria-hidden="true" className="flex flex-wrap items-center gap-1">
@@ -857,8 +952,34 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                         />
 
                         <span className="hidden min-w-0 flex-col gap-1 sm:flex">
-                          {shown.map((event) =>
-                            onSelectEvent ? (
+                          {shown.map((event) => {
+                            // A `middle`-position span day draws the ghost
+                            // line — S2's own shape, this file's header and
+                            // `spanLineVariants`'s own doc — never a chip.
+                            // Still a button when `onSelectEvent` is given
+                            // (every day of a span opens the same record),
+                            // just with no visible label to put inside it,
+                            // so the accessible name comes off `event.title`
+                            // rather than `eventChipBody`'s dot-plus-label.
+                            if (event.span?.position === "middle") {
+                              const lineClass = cn(spanLineVariants({ tone: event.tone }));
+                              return onSelectEvent ? (
+                                <button
+                                  key={event.id}
+                                  type="button"
+                                  title={event.title}
+                                  aria-label={event.title}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onSelectEvent(event, day);
+                                  }}
+                                  className={cn(lineClass, "cursor-pointer")}
+                                />
+                              ) : (
+                                <span key={event.id} title={event.title} className={lineClass} />
+                              );
+                            }
+                            return onSelectEvent ? (
                               <button
                                 key={event.id}
                                 type="button"
@@ -879,8 +1000,8 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                               >
                                 {eventChipBody(event)}
                               </span>
-                            ),
-                          )}
+                            );
+                          })}
                           {hidden > 0 ? (
                             onSelectMore ? (
                               <button

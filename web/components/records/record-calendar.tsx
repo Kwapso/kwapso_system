@@ -117,6 +117,16 @@ import type { PriorityTone } from "@shared/departments"
  * one place they are combined, for the one field that has to accept either. */
 export type EntryDotTone = DotTone | PriorityTone
 
+/** The kit's own four span positions, read off `CalendarEvent` itself rather
+ * than retyped — a fifth position the kit ever grows arrives here for free
+ * and a typo fails the build instead of silently drawing nothing. */
+type SpanPosition = NonNullable<CalendarEvent["span"]>["position"]
+
+/** ONE RECORD, ON ONE DAY OF ITS OWN SPAN — `expandEntry`'s own output shape,
+ * named once so `buildDayEvents` and `RecordCalendar`'s own `byDay` do not
+ * each retype it and risk drifting apart. */
+export type DayPlacement = { day: string; entry: CalendarEntry; position: SpanPosition }
+
 /** ONE RECORD, on a calendar. The screens map their own rows to this, which is
  * why three collections that share no columns share one calendar. */
 export type CalendarEntry = {
@@ -124,6 +134,17 @@ export type CalendarEntry = {
   id: string
   /** the day it sits on, as `YYYY-MM-DD` (lexical order is chronological order) */
   day: string
+  /**
+   * THE LAST DAY OF A MULTI-DAY RECORD, `YYYY-MM-DD` — S2 "start-and-end
+   * caps", client ruling 16 Sep 2026: "for calendar, I choose S2." Absent,
+   * `day` is the whole record, exactly as before. Given (and later than
+   * `day`), `expandEntry` below walks every LOCAL day from `day` to `endDay`
+   * inclusive and hands the kit's `CalendarView` one `CalendarEvent` per day,
+   * each carrying the day's own `span.position` — a chip on `day` and on
+   * `endDay`, a thin ghost line on every day between. Waves and sprints are
+   * this field's first callers (`waves-screen.tsx`'s `buildWaveCalendarEntries`).
+   */
+  endDay?: string
   /** what the entry says — the record's own name */
   title: string
   /** the value the colour is derived from ("" = one neutral colour) */
@@ -245,6 +266,50 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
+/** Parse a `YYYY-MM-DD` into local parts, or `null` for anything else — never
+ * throws on a malformed key, matching `formatDayKey`'s own defensiveness. */
+function parseDayKey(key: string): Date | null {
+  const [y, m, d] = key.split("-").map(Number)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+  return new Date(y, m - 1, d)
+}
+
+/** A malformed or backwards `endDay` cannot flood a month with placements —
+ * this is the ceiling `expandEntry` walks up to, a year of days, which is
+ * already an order of magnitude past any real wave or sprint. */
+const MAX_SPAN_DAYS = 366
+
+/** ONE RECORD'S SPAN, WALKED DAY BY DAY — S2's own contract (see
+ * `CalendarEntry.endDay`). `entry.day` to `entry.endDay` inclusive, in LOCAL
+ * calendar days (never a 24h increment — `dayKey`'s own header says why),
+ * each day paired with the `span.position` the kit's `CalendarView` reads:
+ * `start` on the first day, `end` on the last, `middle` on every day between.
+ * A one-day entry (no `endDay`, an `endDay` equal to `day`, a malformed pair,
+ * or a backwards range) is `only` — this file's ordinary one-day chip, never
+ * a special case a caller has to test for itself. */
+// Exported for `web/test/record-calendar-span.test.ts` alone — every real
+// caller reaches this through `RecordCalendar`'s own `byDay`, never
+// directly; the "ONE CALENDAR" law is about the kit's `calendar-view`, not
+// about this file's own internals staying private.
+export function expandEntry(e: CalendarEntry): DayPlacement[] {
+  if (!e.endDay || e.endDay === e.day) return [{ day: e.day, entry: e, position: "only" }]
+  const from = parseDayKey(e.day)
+  const to = parseDayKey(e.endDay)
+  if (!from || !to || to < from) return [{ day: e.day, entry: e, position: "only" }]
+  const days: string[] = []
+  for (const cursor = new Date(from); cursor <= to && days.length < MAX_SPAN_DAYS; cursor.setDate(cursor.getDate() + 1)) {
+    days.push(dayKey(cursor))
+  }
+  if (days.length <= 1) return [{ day: e.day, entry: e, position: "only" }]
+  return days.map(
+    (day, i): DayPlacement => ({
+      day,
+      entry: e,
+      position: i === 0 ? "start" : i === days.length - 1 ? "end" : "middle",
+    })
+  )
+}
+
 /** A day key as the sentence a person reads, through the ONE shared formatter.
  *
  * The three lines in the middle are the reason this is a function: the language
@@ -336,29 +401,42 @@ const OVERFLOW_ID = "__overflow__"
  * So the overflow is a real chip too, and `onSelectEvent` tells it apart from a
  * record by its id. It takes today's tone too, for the same reason the day's
  * OTHER entries do: a "+N more" on today's square is still today's square.
+ *
+ * TAKES PLACEMENTS, NOT ENTRIES, since S2 (client ruling 16 Sep 2026): one
+ * day's own array is `expandEntry`'s output for every record that touches
+ * this day, each already carrying the `position` the kit's ghost line and
+ * capped chips read. A `middle`-position placement gets no dot and no label
+ * markup at all — the kit draws the ghost line off `event.span` alone and
+ * never reads `event.label` for it (`calendar-view.tsx`'s own header) — so
+ * this file spends no work building one; `e.title` still rides along as the
+ * kit's tooltip/accessible-name source for that line.
  */
 function buildDayEvents(
-  entries: CalendarEntry[],
+  placements: DayPlacement[],
   maxPerDay: number,
   t: (english: string, vars?: Vars) => string,
   isToday: boolean
 ): CalendarEvent[] {
   const tone = isToday ? "inverse" : "quiet"
   const dotRing = isToday ? " shadow-[var(--hairline-ink)]" : ""
-  const shown = entries.slice(0, maxPerDay)
-  const hidden = entries.length - shown.length
-  const events: CalendarEvent[] = shown.map((e) => ({
+  const shown = placements.slice(0, maxPerDay)
+  const hidden = placements.length - shown.length
+  const events: CalendarEvent[] = shown.map(({ entry: e, position }) => ({
     id: e.id,
     title: e.title,
     tone,
-    label: (
-      <span className="flex min-w-0 items-center gap-1">
-        {dotClass(e) ? (
-          <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${dotClass(e)}${dotRing}`} />
-        ) : null}
-        <span className="min-w-0 truncate">{e.title}</span>
-      </span>
-    ),
+    span: { id: e.id, position },
+    label:
+      position === "middle" ? (
+        e.title
+      ) : (
+        <span className="flex min-w-0 items-center gap-1">
+          {dotClass(e) ? (
+            <span aria-hidden className={`size-1.5 shrink-0 rounded-pill ${dotClass(e)}${dotRing}`} />
+          ) : null}
+          <span className="min-w-0 truncate">{e.title}</span>
+        </span>
+      ),
   }))
   if (hidden > 0) {
     events.push({ id: OVERFLOW_ID, tone, label: t("+{n} more", { n: hidden }) })
@@ -440,12 +518,18 @@ export function RecordCalendar({
   // dialog IS the overflow, so there is no second way to be looking at a day.
   const [openDay, setOpenDay] = React.useState<string | null>(null)
 
+  // EVERY DAY A RECORD TOUCHES, NOT JUST `entry.day` — S2 (client ruling
+  // 16 Sep 2026): `expandEntry` walks `day`…`endDay` once per entry, so a
+  // twelve-day sprint lands twelve placements here, one per day, each
+  // knowing its own `position`. A one-day entry still costs exactly one.
   const byDay = React.useMemo(() => {
-    const map = new Map<string, CalendarEntry[]>()
+    const map = new Map<string, DayPlacement[]>()
     for (const e of entries) {
-      const list = map.get(e.day)
-      if (list) list.push(e)
-      else map.set(e.day, [e])
+      for (const placement of expandEntry(e)) {
+        const list = map.get(placement.day)
+        if (list) list.push(placement)
+        else map.set(placement.day, [placement])
+      }
     }
     return map
   }, [entries])
@@ -453,7 +537,12 @@ export function RecordCalendar({
   const squares = monthSquares(month)
   const today = dayKey(new Date())
 
-  const dayEntries = openDay ? (byDay.get(openDay) ?? []) : []
+  // THE DAY DIALOG LISTS A SPAN ONCE. It only ever reads ONE day's own
+  // placements (`byDay.get(openDay)`), and a record contributes at most one
+  // placement to any single day — `expandEntry` never emits two — so a
+  // twelve-day sprint reads here exactly like a one-day task: one row, on
+  // the day the dialog is actually open on.
+  const dayEntries = openDay ? (byDay.get(openDay) ?? []).map((p) => p.entry) : []
 
   // THE GRID'S OWN CELLS. Never `onSelectDay` — see the file header on nested
   // buttons — so a cell stays a plain `<div>` and only its chips, the overflow

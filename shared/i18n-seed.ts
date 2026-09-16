@@ -1260,7 +1260,6 @@ export const SEED: Catalogue = {
   "Search reasons…": { de: "Gründe durchsuchen…", es: "Buscar motivos…", ca: "Cercar motius…"},
   "Search roles…": { de: "Rollen durchsuchen…", es: "Buscar roles…", ca: "Cercar rols…"},
   "Search sprints…": { de: "Sprints durchsuchen…", es: "Buscar sprints…", ca: "Cercar sprints…"},
-  "Search stages…": { de: "Phasen durchsuchen…", es: "Buscar etapas…", ca: "Cercar etapes…"},
   "Search types…": { de: "Typen durchsuchen…", es: "Buscar tipos…", ca: "Cercar tipus…"},
   "Search versions…": { de: "Versionen durchsuchen…", es: "Buscar versiones…", ca: "Cercar versions…"},
   "Search what we handed over…": { de: "Übergebenes durchsuchen…", es: "Buscar lo que entregamos…", ca: "Cercar el que hem lliurat…"},
@@ -4298,5 +4297,19 @@ export const SEED: Catalogue = {
     de: "Ihres, sofern Sie nichts anderes sagen.",
     es: "Tuya, a menos que digas lo contrario.",
     ca: "Teva, llevat que diguis el contrari.",
+  },
+
+  /* ── 16 Sep 2026, the aside's own drag-to-resize (kit v1.2.91,
+     `documents/UI-RULEBOOK.md` L14). ONE new string: `app-shell.tsx`'s
+     `asideResizeLabel`, the accessible name for the bare resize seam this
+     app draws in place of the kit's round handle (`asideHandleOnOpen=
+     {false}`'s own branch — that handle's `asideOpenLabel`/`asideCloseLabel`
+     do not apply to a control with no open/close meaning). Same vocabulary
+     as "Close the assistant" above — the noun stays "assistant"/"Assistent"/
+     "asistente"/"assistent", never a synonym. */
+  "Resize the assistant": {
+    de: "Größe des Assistenten ändern",
+    es: "Cambiar el tamaño del asistente",
+    ca: "Canviar la mida de l'assistent",
   },
 }

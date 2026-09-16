@@ -68,6 +68,17 @@ export interface AppearancePillOption {
   /** A small colour mark before the word — omitted where there is no colour
    * to show (Size). */
   swatch?: React.ReactNode
+  /** THIS ONE PILL is inert — never a real choice, only a truthful account of
+   * what is already stored. Added 16 Sep 2026 for a record whose value has
+   * fallen out of its own vocabulary (an app stage a migration retired): the
+   * pill still SHOWS the word rather than hiding it (a picker that silently
+   * dropped the stored value would look like the record had none), but a
+   * click on it does nothing — the same "no dead-end empty state" instinct
+   * the client's own "kill the Nobody option" ruling carries, read for a
+   * value rather than an absence. Independent of the group's own `disabled`
+   * (a busy form), so one stale pill can be inert while every live one stays
+   * pickable. */
+  disabled?: boolean
 }
 
 export function AppearancePillGroup({
@@ -91,15 +102,16 @@ export function AppearancePillGroup({
     <div role="radiogroup" aria-label={ariaLabel} className={cn("flex flex-wrap gap-1.5", className)}>
       {options.map((option) => {
         const selected = option.value === value
+        const inert = disabled || option.disabled === true
         return (
           <button
             key={option.value}
             type="button"
             role="radio"
             aria-checked={selected}
-            disabled={disabled}
+            disabled={inert}
             onClick={
-              onValueChange === undefined || selected
+              onValueChange === undefined || selected || inert
                 ? undefined
                 : () => {
                     onValueChange(option.value)
@@ -112,7 +124,7 @@ export function AppearancePillGroup({
               // the same token a `border-border` utility would have painted.
               "shadow-[var(--hairline)]",
               "text-sm text-foreground",
-              disabled && "cursor-not-allowed opacity-60",
+              inert && "cursor-not-allowed opacity-60",
               // Override 33's own ring — the selection mark every option card
               // in this panel already carries, so a pressed pill and a
               // ringed card read as the same state. Replaces the resting

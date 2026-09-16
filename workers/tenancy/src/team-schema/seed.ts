@@ -171,7 +171,9 @@ export type Actor = { id: string; email: string; name: string }
  * optional fields are the enrichment 0025 folded onto the sprint types — a mark,
  * the German label, the sentence that explains the block, and how long one
  * normally runs. Absent on every other group, which is the honest shape: a file
- * type has no standard length. */
+ * type has no standard length. `position` is 0097's own column — set only on the
+ * App stage rows below, which is the one starting vocabulary with an order the
+ * client ruled rather than one the alphabet already gives for free. */
 export type DefaultSelectable = {
   type: string
   value: string
@@ -179,6 +181,7 @@ export type DefaultSelectable = {
   nameDe?: string | null
   description?: string | null
   standardDays?: number | null
+  position?: number | null
 }
 
 export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
@@ -346,13 +349,16 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // department implies (shared/departments.ts).
   ...TASK_DEPARTMENTS.map((d) => ({ type: SELECTABLE_GROUPS.department, value: d.name })),
   // WHERE AN APP HAS GOT TO — the eight stages the agency already uses, each
-  // with the mark it recognises the stage by. Same shape as the departments
-  // above and the sprint types before them: a newborn team and a team upgraded
-  // by migration 0029 offer the same eight words, and either can add a ninth on
-  // its own Dropdown values screen. The active/inactive answer each stage
-  // implies is not here, because a dropdown row has nowhere to put it — it
-  // lives beside the vocabulary in shared/app-stages.ts.
-  ...APP_STAGES.map((s) => ({ type: SELECTABLE_GROUPS.appStage, value: s.name, mark: s.mark })),
+  // with the mark it recognises the stage by and its own position. Same shape
+  // as the departments above and the sprint types before them: a newborn team
+  // and a team upgraded by migration 0097 offer the same eight words, in the
+  // same order, and either can add a ninth on its own Dropdown values screen.
+  // The active/inactive answer each stage implies is not here, because a
+  // dropdown row has nowhere to put it — it lives beside the vocabulary in
+  // shared/app-stages.ts. POSITION IS 1-BASED, `APP_STAGES`' own array order —
+  // the client's ruling, 16 Sep 2026, "in that order" — so a newborn team never
+  // needs the migration to draw its stages correctly.
+  ...APP_STAGES.map((s, i) => ({ type: SELECTABLE_GROUPS.appStage, value: s.name, mark: s.mark, position: i + 1 })),
   // WHAT KIND OF THING WE HANDED OVER — the five words a deliverable's card
   // shows in small caps. Same shape and same reason as the stages above: a
   // newborn team and a team upgraded by migration 0036 offer the same starting
@@ -427,8 +433,8 @@ export function buildTeamSeed(
   // migrations and this seed into SQLite and fails on any repeated (type, value).
   for (const item of DEFAULT_SELECTABLE) {
     statements.push(
-      `INSERT INTO selectable_data (id, type, value, is_default, mark, name_de, description, standard_days, created_at, creator_id, creator_email, creator_name)
-SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${sqlString(item.mark ?? null)}, ${sqlString(item.nameDe ?? null)}, ${sqlString(item.description ?? null)}, ${item.standardDays == null ? "NULL" : item.standardDays}, ${a([])}
+      `INSERT INTO selectable_data (id, type, value, is_default, mark, name_de, description, standard_days, position, created_at, creator_id, creator_email, creator_name)
+SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${sqlString(item.mark ?? null)}, ${sqlString(item.nameDe ?? null)}, ${sqlString(item.description ?? null)}, ${item.standardDays == null ? "NULL" : item.standardDays}, ${item.position == null ? "NULL" : item.position}, ${a([])}
  WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(item.type)} AND s.value = ${sqlString(item.value)});`
     )
   }

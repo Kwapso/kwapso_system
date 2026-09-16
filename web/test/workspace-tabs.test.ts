@@ -32,6 +32,7 @@ import {
   setWorkspaceScope,
   visitTrail,
   tabStripState,
+  type OpenTab,
 } from "@/lib/workspace-tabs"
 
 const ME = "user1:team1"
@@ -332,6 +333,80 @@ describe("nothing is recorded unless somebody asks", () => {
     // if it did — so a phone session accumulates nothing rather than filling a
     // set up invisibly behind a strip that never draws it.
     expect(strip()).toEqual([])
+  })
+})
+
+describe("duplicate prevention — the client's ruling, 16 Sep 2026", () => {
+  it("clicking the same tab twice activates it, does not open a duplicate", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    expect(strip()).toEqual(["Apps"])
+    expect(activeTabPathSnapshot()).toBe("/apps")
+
+    // She clicks "Apps" again — the sidebar was showing it, she clicked it again
+    visitTrail(at(["/apps", "Apps"]))
+    expect(strip()).toEqual(["Apps"])
+    expect(activeTabPathSnapshot()).toBe("/apps")
+    expect(openTabsSnapshot()).toHaveLength(1)
+  })
+
+  it("/apps and /apps/ are treated as the same tab — trailing slash is ignored", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    expect(strip()).toEqual(["Apps"])
+
+    // If the path arrives with a trailing slash, it activates the existing tab
+    // rather than opening a new one
+    visitTrail(at(["/apps/", "Apps"]))
+    expect(strip()).toEqual(["Apps"])
+    expect(openTabsSnapshot()).toHaveLength(1)
+    expect(activeTabPathSnapshot()).toBe("/apps")
+  })
+
+  it("a tab reached with a ?tab= parameter activates the existing tab", () => {
+    visitTrail(at(["/settings", "Settings"]))
+    expect(strip()).toEqual(["Settings"])
+
+    // Navigating to the same screen with a ?tab= parameter should activate
+    // the existing tab, not open a new one, because ?tab= affects the screen's
+    // inner state but not the tab identity
+    visitTrail(at(["/settings?tab=choices", "Settings"]))
+    expect(strip()).toEqual(["Settings"])
+    expect(openTabsSnapshot()).toHaveLength(1)
+  })
+
+  it("reload with persisted duplicates dedupes them, keeping the first", () => {
+    // Simulate a persisted state with duplicates (this would only happen if the
+    // app was shut down while holding path variations)
+    const duplicatedState: OpenTab[] = [
+      { path: "/apps", label: "Apps" },
+      { path: "/apps/", label: "Apps (slash)" },
+      { path: "/tickets", label: "Tickets" },
+      { path: "/tickets/", label: "Tickets (slash)" },
+    ]
+    localStorage.setItem("ss-open-tabs:user1:team1", JSON.stringify(duplicatedState))
+
+    // Reset the scope to force a re-read from storage
+    setWorkspaceScope(null)
+    setWorkspaceScope(ME)
+
+    // The duplicates should be collapsed, keeping only the first of each canonical key
+    expect(openTabsSnapshot()).toHaveLength(2)
+    expect(paths()).toEqual(["/apps", "/tickets"])
+    expect(strip()).toEqual(["Apps", "Tickets"])
+  })
+
+  it("sidebar opening /apps/A1 and then clicking /apps twice treats /apps as already open", () => {
+    // Start by opening a specific app from the sidebar
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    expect(strip()).toEqual(["Apps", "APP-1"])
+
+    // Now go back to Apps
+    visitTrail(at(["/apps", "Apps"]))
+    expect(activeTabPathSnapshot()).toBe("/apps")
+
+    // Click Apps again — should not open a duplicate
+    visitTrail(at(["/apps", "Apps"]))
+    expect(strip()).toEqual(["Apps", "APP-1"])
+    expect(openTabsSnapshot()).toHaveLength(2)
   })
 })
 

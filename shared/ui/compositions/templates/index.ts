@@ -98,7 +98,15 @@
    derived title step, the identity chips, the bare figure strip and the
    declared footer. `ScreenSpine` is exported beside it because a route that
    sets a spine should not have to reach into the module for its type. */
-export { ScreenShell, RAIL_WIDTH, ASIDE_WIDTH } from "./screen-shell";
+export {
+  ScreenShell,
+  RAIL_WIDTH,
+  ASIDE_WIDTH,
+  ASIDE_WIDTH_MIN,
+  ASIDE_WIDTH_MAX,
+  ASIDE_WIDTH_DEFAULT,
+  ASIDE_WIDTH_SNAP_POINTS,
+} from "./screen-shell";
 export type { ScreenShellProps, ScreenSpine } from "./screen-shell";
 
 /* 0a · MainScreen — DEPRECATED. A mapping from a collection screen's old prop

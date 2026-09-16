@@ -31,6 +31,7 @@ type Row = {
   name_de: string | null
   description: string | null
   standard_days: number | null
+  position: number | null
   /** Selected by the single-row door only — `undefined` on a list row, which is
    * how `toValue` tells the two apart (see DETAIL_COLUMNS). */
   created_at?: string | null
@@ -38,7 +39,7 @@ type Row = {
   creator_name?: string | null
 }
 
-const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days"
+const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days, position"
 
 /** THE SINGLE-ROW COLUMN LIST — `COLUMNS` plus the audit block the record footer
  * shows. Deliberately not folded into `COLUMNS`: the list door answers a
@@ -61,6 +62,7 @@ function toValue(r: Row): SelectableValue {
     nameDe: r.name_de ?? null,
     description: r.description ?? null,
     standardDays: r.standard_days ?? null,
+    position: r.position ?? null,
     // Absent on a list row, present on a detail one — the two doors select
     // different columns on purpose (see DETAIL_COLUMNS).
     ...(r.created_at === undefined
@@ -73,13 +75,23 @@ function toValue(r: Row): SelectableValue {
  * type then value (the UI groups by `type`). Deactivated values ARE returned (each
  * carries `active`), exactly like a retired role: the manager shows them greyed with
  * an Activate button, and form pickers filter to `active`. This is what makes a
- * deactivated value reachable to reactivate (never hidden, never a dead end). */
+ * deactivated value reachable to reactivate (never hidden, never a dead end).
+ *
+ * WITHIN A TYPE, A ROW WITH A `position` SORTS BY IT; ONE WITHOUT FALLS BACK TO
+ * A→Z. `COALESCE(position, 999999)` — a group nobody has ordered (every group
+ * but App stage, team migration 0097) has every row NULL, so they all fall to
+ * the same tail value and the trailing `value ASC` is what actually sorts them,
+ * unchanged from before this column existed. A group that HAS been given an
+ * order (1..8, never 999999) always sorts ahead of one that has not, which
+ * cannot happen within one type today but is the honest answer if it ever did. */
 export async function listSelectable(cfg: D1Rest, guard: MemberGuard): Promise<SelectableValue[]> {
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
     // R14 hard cap — never unbounded; move to real paging before this bites.
-    `SELECT ${COLUMNS} FROM selectable_data ORDER BY type ASC, (deactivated_at IS NULL) DESC, value ASC LIMIT ${LIST_HARD_CAP}`,
+    `SELECT ${COLUMNS} FROM selectable_data
+      ORDER BY type ASC, (deactivated_at IS NULL) DESC, COALESCE(position, 999999) ASC, value ASC
+      LIMIT ${LIST_HARD_CAP}`,
     []
   )
   return rows.map(toValue)

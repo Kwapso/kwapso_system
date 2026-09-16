@@ -27,9 +27,11 @@
 //
 // "STATUS" IS THE APP'S OWN STAGE — `AppRow` carries no separate status field
 // (`shared/types.ts`), and `app-detail.tsx`'s own three pills already draw the
-// identical `<Badge variant="status" dot={appStageDotTone(app.stage)}>` off
-// `app.stage` for the same reason: a stage IS the record's status here, the
-// same way a ticket's `status` and a story's own are theirs.
+// identical icon+word pill off `app.stage` for the same reason: a stage IS the
+// record's status here, the same way a ticket's `status` and a story's own are
+// theirs. NO DOT — the client's ruling, 16 Sep 2026: "they will not have
+// colors, but icons." `AppStageGlyph` (web/lib/app-stage-icon.tsx) draws the
+// glyph `shared/app-stages.ts`'s own `icon` field names.
 //
 // TWO TABS SURVIVE UNCHANGED (8.2's OTHER HALF). Active is everything still
 // being worked on; Inactive is Completed and Archived, which is the only pair
@@ -85,6 +87,7 @@ import { AppFormDialog, type AppFormValues, useAppStages } from "@/components/ap
 import { useAssignableMembers } from "@/lib/members"
 import { useSessionUserId } from "@/lib/use-active-team"
 import { AppMark } from "@/components/apps/app-tiles"
+import { AppStageGlyph } from "@/lib/app-stage-icon"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
@@ -92,7 +95,7 @@ import { useAccountNames } from "@/lib/account-names"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, impactKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
-import { APP_STAGES, NO_STAGE, appStageDotTone, appStageIsActive } from "@shared/app-stages"
+import { APP_STAGES, NO_STAGE, appStageIsActive } from "@shared/app-stages"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -191,60 +194,21 @@ function compareApps(
  * kind of line on the other. */
 const GALLERY_MIN_CARD = "12rem"
 
-/** THE STAGE PILL'S OWN GEOMETRY AND GROUND — client feedback, 16 Sep 2026,
- * verbatim: "show me the different colors for the pills for the status, and
- * make sure that there is a space between the color dot and the name. Make
- * sure that all the pills have a background, because currently development
- * does not. All of them should have the same color background. What changes
- * is the color of their dot."
- *
- * `size="pill"` — the default `<Badge>` geometry is `size="counter"` (the
- * 20-tall COUNT chip, no `gap-*` of its own at all), never CH11's 26-tall
- * STATUS PILL (`--control-height-pill`, `gap-2` between the dot and the
- * label). Both call sites below left `size` unset, so the dot sat flush
- * against the word — a missing kit token, not a missing space character.
- *
- * `bg-surface-panel` — why a call-site override is needed at all, and why it
- * is not a `Badge`/token bug alone: `variant="status"`'s own fill,
- * `--pill-fill`, is `var(--card)` (`shared/ui/foundations/tokens/tokens.css`),
- * because the kit's CH11 draws the status pill on `--sheet`, "the OTHER paper
- * tone from the panel it sits on" (badge.tsx's own header). Both cards this
- * chip renders inside — the Gallery's `<Card variant="raised">` and the
- * Board's Kanban card — are THEMSELVES `bg-card` (`card.tsx`'s own comment:
- * "off-beige over soft paper"), so `--pill-fill` paints the exact colour of
- * the card underneath it, in both palettes (`--pill-fill` tracks `--card`
- * byte-for-byte, tokens.css §7). A background that equals its own container
- * is `card.tsx`'s own documented failure mode ("`--card` box on the page
- * draws nothing at all") one layer further in, and it was invisible on every
- * stage, not only "Development" — a coloured dot beside it read as "a chip is
- * there" for the other five; `building`'s dot is `--foreground` (near the
- * label's own ink), so it was the one stage with nothing left to read.
- * `record-chrome.tsx`'s `IDENTITY_ROW` already rebinds the identical pill to
- * `--surface-panel` for the record head, for the identical reason (that row
- * sits on the page, not a card); this is the same fix for the two surfaces
- * this file owns, done at the call site rather than inside `Card`/`Kanban`
- * (kit components neither this lane nor this change touches).
- *
- * ONE FLAT GROUND FOR EVERY STAGE — the client's own second sentence. A KIT
- * bug, still OPEN as of 16 Sep 2026: ruling 26's dark clause puts the ONE
- * tone this app actually uses most, `building` ("Development"/
- * "Documentation"/"Iteration"), on a mango fill with a charcoal label and dot
- * in dark mode — the one stage whose pill changes colour at all, which is
- * exactly why `text-foreground` is named here rather than left to the
- * badge's own `--pill-label`: this className wins over whatever `badge.tsx`
- * computes internally (a caller's `className` is merged last, `cn()`'s own
- * contract), so it gives every stage the identical ground and ink regardless
- * of what the kit does with `building` underneath. The right fix is still to
- * retire `shared/ui/components/badge/badge.tsx`'s `status`+`building`
- * compound variant at the source — this call-site override is the visible
- * fix, not a substitute for that one — but it is a kit change, gated on a
- * second kit lane's own tag (v1.2.90) landing first; UI-RULEBOOK.md K23's
- * amendment, 16 Sep 2026, has the open item.
- */
+/** THE STAGE PILL'S OWN GEOMETRY AND GROUND — SUPERSEDED, 16 Sep 2026. The
+ * client's ruling the same day retires the coloured dot outright: "they will
+ * not have colors, but icons. Let's keep colors for status." So this is no
+ * longer `variant="status"` (CH11's dot-carrying pill, whose `--pill-fill`
+ * equalling `--card` was the whole cause of the "Development has no
+ * background" bug her first sentence, above, was reported against) — it is
+ * the kit's plain, neutral `secondary` pill, `--surface-quiet`, which was
+ * never the same tone as the two cards this chip sits inside and so never
+ * had the invisible-on-its-own-ground failure `status` did. The icon rides
+ * where the dot used to (`AppStageGlyph`, web/lib/app-stage-icon.tsx),
+ * `size="pill"` unchanged: CH11's 26-tall geometry with an 8px gap between
+ * the leading glyph and the word, the same reason the dot needed it. */
 const STAGE_PILL_PROPS = {
-  variant: "status" as const,
+  variant: "secondary" as const,
   size: "pill" as const,
-  className: "bg-surface-panel text-foreground",
 }
 
 /** THE GALLERY CARD — client ruling, 15 Sep 2026: "In the gallery, make this
@@ -298,7 +262,12 @@ function appGalleryCard(
               `app.stage` for the same reason. Absent when an app carries no
               stage at all — a chip is a fact about the record, not a blank
               placeholder. */}
-          {app.stage && <Badge {...STAGE_PILL_PROPS} dot={appStageDotTone(app.stage)}>{t(app.stage)}</Badge>}
+          {app.stage && (
+            <Badge {...STAGE_PILL_PROPS}>
+              <AppStageGlyph stage={app.stage} />
+              {t(app.stage)}
+            </Badge>
+          )}
           <CardTitle className="text-sm">{app.name}</CardTitle>
           {/* THE SUBTITLE — the account name (this function's own header,
               above, on why R72 does not forbid it here). */}
@@ -432,7 +401,12 @@ export function AppsScreen({
   }))
   const facets: FilterFacet[] = [
     { field: "accountId", label: t("Account"), control: "select", options: clientOptions },
-    { field: "stage", label: t("Stage"), control: "select", options: stageOptions },
+    // ORDERED, NOT A→Z (R75's facet escape hatch, `FilterFacet.ordered` —
+    // config.ts) — `stageOptions` is already `APP_STAGES`' own order
+    // (`.filter()` above preserves it), the client's ruling 16 Sep 2026, and
+    // `useFilterBar` would otherwise alphabetize it like every other facet.
+    // Registered in `FACET_ORDER_OK` (shared/rules/registry.ts).
+    { field: "stage", label: t("Stage"), control: "select", options: stageOptions, ordered: true },
   ]
   const sortOptions = APP_SORTS.map((o) => ({ ...o, label: t(o.label) }))
 
@@ -550,7 +524,8 @@ export function AppsScreen({
       // fill needs the identical `--surface-panel` rebind and `size="pill"`
       // gap.
       badges: app.stage ? (
-        <Badge {...STAGE_PILL_PROPS} dot={appStageDotTone(app.stage)}>
+        <Badge {...STAGE_PILL_PROPS}>
+          <AppStageGlyph stage={app.stage} />
           {t(app.stage)}
         </Badge>
       ) : undefined,
@@ -571,8 +546,15 @@ export function AppsScreen({
   const boardColumns: KanbanColumn[] = [
     ...stageVocab.map((s) => ({
       id: s.value,
-      title: t(s.value),
-      dot: appStageDotTone(s.value),
+      // NO DOT (16 Sep 2026 ruling, this file's header) — the icon rides
+      // inside `title` itself, since `KanbanColumn` has no separate glyph
+      // slot and the dot prop only ever drew a colour.
+      title: (
+        <span className="flex items-center gap-1.5">
+          <AppStageGlyph stage={s.value} />
+          {t(s.value)}
+        </span>
+      ),
       cards: shown.filter((a) => (a.stage ?? "").trim() === s.value).map(appBoardCard),
     })),
     {

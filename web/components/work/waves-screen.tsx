@@ -321,9 +321,16 @@ export function buildWaveTimelineRows(
 }
 
 /* ============================================================================
-   CALENDAR — waves and sprints as day chips (start-day chip only) through
-   `RecordCalendar`, the app's one door into the kit's month grid. See this
-   file's own report on why a multi-day span was descoped this round.
+   CALENDAR — waves and sprints as spans through `RecordCalendar`, the app's
+   one door into the kit's month grid. S2 "start-and-end caps" (client ruling
+   16 Sep 2026) replaces the start-day-chip-only shape this section used to
+   draw: a wave with `endsOn` now hands `endDay` too, so `record-calendar.tsx`'s
+   `expandEntry` walks its own days and caps both ends — a package that runs
+   three weeks reads as three weeks on the grid, not as one chip on the day it
+   was sold. A sprint does the same INSIDE its own wave's month: its `endDay`
+   is its own `endsOn`, never clipped to the wave's — S2 draws whatever range
+   it is handed, one span per record, and two overlapping spans (a sprint
+   inside its wave) already stack for free (`calendar-view.tsx`'s own header).
    ========================================================================= */
 
 export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): CalendarEntry[] {
@@ -334,6 +341,7 @@ export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): Calen
     entries.push({
       id: `w:${w.id}`,
       day: w.startsOn.slice(0, 10),
+      endDay: w.endsOn ? w.endsOn.slice(0, 10) : undefined,
       title: w.name,
       detail: w.accountName ?? undefined,
       accent: w.id,
@@ -344,6 +352,7 @@ export function buildWaveCalendarEntries(rows: Wave[], sprints: Sprint[]): Calen
     entries.push({
       id: `s:${s.waveId}:${s.id}`,
       day: s.startsOn.slice(0, 10),
+      endDay: s.endsOn ? s.endsOn.slice(0, 10) : undefined,
       title: s.name,
       detail: s.waveName ?? undefined,
       // The SAME hash as the wave's own entry above — a sprint's chip lands

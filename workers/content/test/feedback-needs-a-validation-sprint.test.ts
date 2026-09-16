@@ -104,7 +104,7 @@ beforeEach(() => {
   db().exec(`DELETE FROM sprints`)
   db().exec(
     `INSERT INTO apps (id, account_id, name, stage, created_at, creator_id)
-     VALUES ('${OTHER_APP}', '${IDS.victimAccount}', 'Bergman invoicing', 'Development', '${day(-60)}', '${IDS.staffUser}');`
+     VALUES ('${OTHER_APP}', '${IDS.victimAccount}', 'Bergman invoicing', 'Build', '${day(-60)}', '${IDS.staffUser}');`
   )
 })
 

@@ -177,6 +177,21 @@ export function AgentTabStrip({
   const tabIndex = activeId ? tabs.findIndex((tab) => tab.id === activeId) : -1
   const activeIndex = historyActive ? tabs.length : tabIndex >= 0 ? tabIndex : -1
 
+  // WHY THE ACTIVE TAB STILL PAINTS ABOVE HISTORY AND "+" EVEN THOUGH IT
+  // USUALLY SITS BEFORE THEM. This strip is the one place in the app where
+  // the live crumb is routinely NOT the last item — the opposite shape from
+  // `app-shell.tsx`'s content trail, whose active crumb is always the
+  // trail's own last one. `breadcrumb-folders.tsx` does not lift the live
+  // tab by DOM order at all any more (it stopped doing that on 2026-09-06,
+  // for the content strip's own identical complaint): `TAB_LIVE` is `z-[1]`
+  // and `TAB_REST` is `z-0`, keyed to `entry.index === activeCrumb` — i.e.
+  // to `activeIndex` above — never to position. So an active tab ahead of
+  // History/"+" in the DOM still paints over their grey fill, the client's
+  // own words on a screenshot of the opposite (16 Sep 2026): "make sure the
+  // history tab and + are behind!" `activeIndex` reaching the kit correctly
+  // IS the whole mechanism — see `agent-tab-strip.test.tsx`'s "stacking"
+  // describe block, which renders this exact shape and reads the z-index
+  // class back off each crumb rather than trusting this comment.
   return (
     <BreadcrumbFolders
       items={items}

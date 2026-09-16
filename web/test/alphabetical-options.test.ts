@@ -59,7 +59,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { ORDERED_OPTIONS_OK } from "@shared/rules/registry"
+import { FACET_ORDER_OK, ORDERED_OPTIONS_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const ROOT = join(HERE, "..", "..") // repo root
@@ -121,8 +121,13 @@ describe("RULES — R75, the options a person picks from are A→Z", () => {
     ).toMatch(/import\s*\{\s*sortedOptions\s*\}\s*from\s*"@shared\/web\/sorted-options"/)
     expect(
       src,
-      'R75 — filter-bar.tsx\'s `facetOptionList` must read `sortedOptions(optionsFor(f), lang)` — sorting the result of `optionsFor` (which already carries the declared/derived and gated/narrowed logic) is what makes every facet in the app alphabetical without touching a single `filterFacets` declaration'
-    ).toMatch(/const facetOptionList = sortedOptions\(optionsFor\(f\), lang\)/)
+      'R75 — filter-bar.tsx\'s `facetOptionList` must read `f.ordered ? optionsFor(f) : sortedOptions(optionsFor(f), lang)` — ' +
+        "every facet is alphabetical by default (sorting the result of `optionsFor`, which already carries the " +
+        "declared/derived and gated/narrowed logic) without touching a single `filterFacets` declaration, and the ONLY " +
+        "way out is `FilterFacet.ordered` (config.ts), a flag a facet declaration sets and pairs with a reasoned line " +
+        "in `FACET_ORDER_OK` (shared/rules/registry.ts) — the sibling escape hatch to `ORDERED_OPTIONS_OK` below, for a " +
+        "facet rather than a hand-rolled picker."
+    ).toMatch(/const facetOptionList = f\.ordered \? optionsFor\(f\) : sortedOptions\(optionsFor\(f\), lang\)/)
   })
 
   it("alphabetical-options: roles-matrix.tsx's own module rows are named directly", () => {
@@ -131,6 +136,59 @@ describe("RULES — R75, the options a person picks from are A→Z", () => {
       src,
       "R75 — roles-matrix.tsx's moduleColumns must open with sortedOptions(sheets[0]?.perms.modules …) — this list builds a kit row config rather than a <SelectItem>, so it is invisible to the derived census below and is read directly instead, the same move R74 makes for Home's own import tile"
     ).toMatch(/sortedOptions\(sheets\[0\]\?\.perms\.modules/)
+  })
+
+  it("alphabetical-options: every FilterFacet.ordered flag is registered in FACET_ORDER_OK, both ways", () => {
+    // POSITIONAL, the same shape the picker census below uses: a `FilterFacet`
+    // declaration in this codebase is written as one object literal on one
+    // line (`{ field: "…", label: …, control: …, ordered: true }`), so
+    // `field:\s*"([^"]+)"` on the SAME LINE as `ordered:\s*true` is read as
+    // the pair a `FACET_ORDER_OK` entry names. A facet declared instead as a
+    // multi-line literal would not be found here — the same honestly-scoped
+    // limitation clause iii above states for roles-matrix.tsx, read for this
+    // law's other escape hatch.
+    const declared: { rel: string; field: string }[] = []
+    let filesScanned = 0
+    for (const f of sourceFiles([WEB, WEB_PORTAL, SHARED_WEB], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      const src = stripComments(f.source)
+      for (const line of src.split("\n")) {
+        if (!/\bordered\s*:\s*true\b/.test(line)) continue
+        const m = /\bfield\s*:\s*"([^"]+)"/.exec(line)
+        if (m) declared.push({ rel: f.rel, field: m[1] })
+      }
+    }
+    expect(
+      filesScanned,
+      "R75 — the FilterFacet.ordered census walked no files at all. The scan is blind — fix it before trusting the result"
+    ).toBeGreaterThan(50)
+
+    const usedKeys = new Set<string>()
+    const offenders: string[] = []
+    for (const d of declared) {
+      const key = `${d.rel}#${d.field}`
+      if (key in FACET_ORDER_OK) usedKeys.add(key)
+      else
+        offenders.push(
+          `${key}: FilterFacet.ordered is set with no matching line in FACET_ORDER_OK (shared/rules/registry.ts) — ` +
+            `name "${key}" there with the real reason this facet's order is not alphabetical, or remove the flag`
+        )
+    }
+    expect(
+      offenders,
+      `R75 — every FilterFacet.ordered flag is registered, with a reason:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(FACET_ORDER_OK).filter((k) => !usedKeys.has(k))
+    expect(
+      stale,
+      `these FACET_ORDER_OK entries match no ordered: true facet any more — the flag was removed, or the entry's key ` +
+        `no longer matches the declaration — delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
   })
 
   it("alphabetical-options: every hand-rolled option list is sorted, or named in ORDERED_OPTIONS_OK", () => {

@@ -128,6 +128,18 @@ export const GLOSSARY = {
   // round-one docs review. The definition is the owner's own (waves.ts header).
   wave: { term: "Wave", def: "A package of sprints sold to one account. Told apart by its name and its dates, nothing else." },
   app: { term: "App", def: "A system we build for an account, the thing with its own address. One goal can need two." },
+  // THE CLIENT'S RULING, 16 Sep 2026, verbatim (she named it while talking about
+  // sprints, but the words she named — Blueprint, Development — belong to THIS
+  // vocabulary, not Sprint type; shared/app-stages.ts's own header carries the
+  // full account): "the sprint types are: not started, audit (this is new), plan
+  // (the old blueprint), build (the old development), validation, refinements
+  // and enhancement (in this order). They will not have colors, but icons.
+  // Let's keep colors for status." Archived is the eighth, unruled, kept as the
+  // one manual "put away" state.
+  appStage: {
+    term: "App stage",
+    def: "Where a system has got to: not started, audit, plan, build, validation, refinements, enhancement, or archived.",
+  },
   workLog: { term: "Work log", def: "One row of time: who, what they worked on, and how long, in whole seconds." },
   timer: { term: "Timer", def: "A work log still running. Start it in one click; it waits in the header until you stop it." },
   triage: { term: "Triage", def: "The first read of a new ticket. Answer it, or split it into stories." },

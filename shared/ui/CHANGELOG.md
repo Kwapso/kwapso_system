@@ -2,6 +2,111 @@
 
 ## Unreleased
 
+### Added — `ScreenShell`'s aside column is resizable: drag the seam, snapping to 320 / 400 / 520
+
+The client's ruling, 16 Sep 2026: *"Is it possible that we can, while using
+the app, adjust the width of the assistant? If possible, make me an artifact
+of how this could look."* Four variations were mocked (`verify/decisions.html`'s
+sibling assistant-width artifact); her answer, choosing from them: *"A — drag
+the seam, with B's three widths as its snap points."*
+
+`ScreenShellProps` grows `asideWidth?: number` (px, controlled),
+`defaultAsideWidth = ASIDE_WIDTH_DEFAULT` (400, the uncontrolled seed and the
+double-click reset target), `onAsideWidthChange?: (px: number) => void`,
+`asideMinWidth = ASIDE_WIDTH_MIN` (320) and `asideMaxWidth = ASIDE_WIDTH_MAX`
+(520) — the exact controlled/uncontrolled shape `asideOpen`/`defaultAsideOpen`/
+`onAsideOpenChange` already sets, so a caller that never wires any of them
+renders byte-identical to before (`ASIDE_WIDTH`, the old fixed 23.75rem, stays
+the literal `min()` falls back to; only how it reaches the cascade changed —
+see that constant's own doc). Four new exported constants carry the numbers:
+`ASIDE_WIDTH_MIN`, `ASIDE_WIDTH_MAX`, `ASIDE_WIDTH_DEFAULT`,
+`ASIDE_WIDTH_SNAP_POINTS`.
+
+The existing inner-edge `EdgeHandle` becomes the drag control: pointer
+capture, `cursor-col-resize`, a live `${px}px` readout beside the handle
+while it is pressed, arrow keys stepping ±16px and Home/End jumping to
+`min`/`max` on the focused handle, and a double-click resetting to 400. A
+drag that RELEASES within a small tolerance of one of the three snap points
+(320/400/520) lands on it exactly; released elsewhere, the exact pixel value
+stays. A plain click that never moved the pointer still closes the column —
+`dragMoved`, read once per gesture and cleared, is what tells a drag and a
+click apart on the one element both now live on. Below `md` the aside is
+already a bottom-sheet overlay and none of this applies.
+
+The pixel value reaches the render tree through one CSS custom property,
+`--aside-width`, set once on the aside dock and read by both the motion
+layer's `--motion-column-size` and the panel's own `w-`, which are STATIC
+Tailwind arbitrary-value strings (`w-[var(--aside-width)]`) referencing a
+variable rather than a value baked into the class name at build time — the
+two existing viewport-relative caps either side of each `min()`
+(`calc(100vw-var(--shell-gutter)*2)`, `40vw`) are unchanged, so a wide drag
+on a narrow window is still bounded by the same mechanism that already
+protected the content column.
+
+FOR THE CALLER THAT SUPPRESSES THE ROUND HANDLE'S CLOSE-ON-CLICK
+(`asideHandleOnOpen={false}`, 2026-09-15's own ruling removing a redundant
+mid-edge close circle): the round handle's open branch stays suppressed —
+the client's "we don't need this [circle]" still stands — but a new BARE
+resize seam (`RESIZE_SEAM`: a thin 3px mark, no glyph, no mango fill,
+matching the shell-redesign spec's own "3px edge handles") renders in its
+place whenever the aside is open, so today's ruling reaches that caller too
+without reintroducing the visual weight the earlier ruling removed. It never
+calls `onToggle`.
+
+Demo: `demo/shapes/templates-0.tsx`'s `screen-shell` section gets a new
+"asideWidth" panel, live and draggable — one uncontrolled at the 400 default,
+one with `asideHandleOnOpen={false}` showing the bare seam.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso-system before the
+app can use it (`shared/ui/` there is vendored and pinned).
+
+### Added — `CalendarView` draws a multi-day record as a span: S2 "start-and-end caps"
+
+The client's ruling, 16 Sep 2026: *"In the calendar, we should see sprints
+lasting multiple days, so maybe we need to redesign this component… for
+calendar, I choose S2, Start-and-end caps."* Before this, `CalendarEvent`
+belonged to exactly one `CalendarDay` — a twelve-day sprint got one chip, on
+one date, indistinguishable from a one-day task, and nothing on the grid said
+it had been running for a week and a half already (the artifact at
+`verify/decisions.html`'s sibling calendar-spans page walks the three
+concrete failures this produced in a real September–October mock).
+
+`CalendarEvent` gains `span?: { id: string; position: "start" | "middle" |
+"end" | "only" }`, read per DAY, exactly as every other field on this type
+— the component still does no date maths and holds no calendar (the file's
+own long-standing law). `start` and `end` still draw a chip, capped (a real
+pill corner) on the record's own boundary edge and flattened on the edge
+that runs into the next day's mark — `rounded-s-pill rounded-e-none` /
+`rounded-e-pill rounded-s-none`, the same directional-rounding idiom
+`sort-control.tsx` already uses, and deliberately never combined with a bare
+`rounded-pill` in one class list (`tailwind-merge`'s `rounded` group does
+not know the two conflict — measured, not assumed; see `eventChipVariants`'s
+own header). `middle` draws no chip at all: a thin ghost line
+(`spanLineVariants`, a small `cva` of its own) in the event's own `tone`, at
+low alpha, thin enough that a twelve-day span still fits the cell's ordinary
+`maxEvents` column. `only` is a one-day span — an ordinary chip, both
+corners capped — kept as its own name so a caller that always sets an end
+day never special-cases the one-day case itself. Overlap of two spans in one
+cell stacks for free: each is one more item in the cell's existing flex
+column, in `events` order. Week wrap is not this file's job either — a
+`middle` day at a row's own first or last column is handed one `CalendarDay`
+like any other and draws its line the same way; the caller's own day-by-day
+walk is what makes it reappear on the next row.
+
+THE COMPACT (below-`sm:`) DOTS SHOW ONLY THE START AND END, same ruling: a
+`middle`-position event is filtered out of `CompactDaySummary`'s dot count
+entirely — a dot with no label already carries less than a chip, and a dot
+for "somewhere inside a span" has nothing new to say on the screen with the
+least room to spend on one.
+
+Demo: `demo/collections/a-ca.tsx`'s `calendar-view` section gets a new S2
+panel — two overlapping September spans, one crossing the week boundary at
+13/14 to prove the wrap needs nothing special, the other nested inside it to
+prove the stack.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso-system before the
+app can use it (`shared/ui/` there is vendored and pinned).
+
 ### Added — `Badge` and `Kanban` get four priority tones: red, orange, purple, blue
 
 The client's ruling, 2026-09-15, over the consuming app's Tasks table:

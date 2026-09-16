@@ -505,7 +505,7 @@ describe("the word the owner actually said reaches the field it means", () => {
   it("`app` reaches `appId`", async () => {
     db().exec(`
       INSERT INTO apps (id, account_id, name, url, stage, tool_cost_cents_per_month, created_at, creator_id)
-        VALUES ('APP_ALIAS_TEST', 'A_FLU', 'Flu portal', 'https://flu.example', 'Development', 0, '2026-01-01', '${IDS.staffUser}');
+        VALUES ('APP_ALIAS_TEST', 'A_FLU', 'Flu portal', 'https://flu.example', 'Build', 0, '2026-01-01', '${IDS.staffUser}');
       UPDATE help SET app_id = 'APP_ALIAS_TEST' WHERE id = 'T1';
     `)
     const { status, body } = await ask(

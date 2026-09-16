@@ -152,6 +152,25 @@ export const MAX_TAB_LABEL_CHARS = 80
 /*                                 the store                                  */
 /* -------------------------------------------------------------------------- */
 
+/** Canonical key for a tab path, used to detect duplicates.
+ *
+ * Normalizes paths by stripping trailing slashes and ALL query parameters.
+ * Query parameters like `?tab=` affect a screen's inner state (which tab is
+ * active within the page) but do not define different tabs — they are both the
+ * same page. Query parameters like `?panel`, `?confirm`, `?id` open dialogs,
+ * which are ephemeral and not tab-state either. So the canonical key is the
+ * path itself, without trailing slashes or any query string.
+ *
+ * This ensures that clicking `/apps`, `/apps/`, `/apps?tab=x`, and navigating
+ * to the same place from different entry points all activate the same tab. */
+function canonicalTabKey(path: string): string {
+  // Remove everything after and including the query string
+  const pathname = path.split("?")[0]
+
+  // Remove trailing slash, preserving the root
+  return pathname.replace(/\/$/, "") || "/"
+}
+
 /** WHOSE TABS, IN WHICH TEAM. Both halves matter and for different reasons.
  *
  * The TEAM is in the key because every path in the set is pinned to one team —
@@ -193,6 +212,17 @@ let scope: string | null = null
  * position is a fact about when — and, since 16 Sep 2026, WHERE — it was
  * opened, never about when it was last looked at. */
 let tabs: OpenTab[] = []
+
+/** CANONICAL KEYS FOR DUPLICATE DETECTION. Maps canonical key (normalized path)
+ * to the actual path of the first tab that opened with that key. When a new tab
+ * is visited with a canonical key that already exists, it activates the
+ * existing tab rather than opening a new one. This prevents duplicates from
+ * trailing slashes, certain query parameters, or other path variations that
+ * represent the same page.
+ *
+ * THE CLIENT'S RULING, 16 SEP 2026: "make sure I cannot have the same tab 2
+ * times". */
+let canonicalKeys: Map<string, string> = new Map()
 
 /** WHICH TAB IS BEING LOOKED AT — the fact `activeIndex` asks for, sent to the
  * strip as a POSITION the caller computes (`tabs.findIndex` against this),
@@ -290,7 +320,39 @@ function persist(): void {
 export function setWorkspaceScope(next: string | null): void {
   if (scope === next) return
   scope = next
-  tabs = next ? readPersisted() : NOTHING
+  let persisted = next ? readPersisted() : NOTHING
+
+  // MIGRATE PERSISTED STATE: collapse duplicates on load.
+  // Two tabs with the same canonical key are a sign the app was closed while
+  // holding a path variation (e.g., a tab reached via `/apps` and another via
+  // `/apps/`). Keep the FIRST and drop the rest.
+  if (persisted.length > 1) {
+    const seenCanonical = new Set<string>()
+    const deduped: OpenTab[] = []
+    for (const tab of persisted) {
+      const key = canonicalTabKey(tab.path)
+      if (!seenCanonical.has(key)) {
+        seenCanonical.add(key)
+        deduped.push(tab)
+      }
+    }
+    if (deduped.length < persisted.length) {
+      persisted = deduped
+      // Persist the deduplicated set immediately so the clean version survives
+      // a reload.
+      tabs = persisted
+      persist()
+    }
+  }
+
+  tabs = persisted
+  // REBUILD THE CANONICAL KEY MAP from the deduplicated tabs.
+  canonicalKeys = new Map()
+  for (const tab of tabs) {
+    const key = canonicalTabKey(tab.path)
+    canonicalKeys.set(key, tab.path)
+  }
+
   // SEED RECENCY AND THE ACTIVE TAB FROM THE ORDER ALREADY ON DISK — see
   // `recency`'s own comment for why that order is not a guess. The persisted
   // array becomes the first recency ranking, oldest to newest, and its last
@@ -355,19 +417,29 @@ export function visitTrail(trail: OpenTab[]): void {
 
   const put = (entry: OpenTab, activate: boolean) => {
     const label = trim(entry.label)
-    const at = next.findIndex((tab) => tab.path === entry.path)
-    if (at >= 0) {
-      // Already open — POSITION NEVER MOVES, full stop. Its NAME is refreshed
-      // either way, which is the only moment the app knows a record's current
-      // name for free and a tab showing last week's title is the one
-      // staleness a visit can fix. RECENCY is refreshed only when this is the
-      // tab being activated: an ancestor merely walked through on the way to
-      // one does not itself count as "just looked at" — same rule as before
-      // `activeIndex` existed, just read off `recency` instead of off `next`.
-      next[at] = { path: entry.path, label: label || next[at].label }
-      if (activate) touch(entry.path)
-      return
+    const canonical = canonicalTabKey(entry.path)
+
+    // Check if this canonical key is already open. If so, activate the EXISTING
+    // tab rather than opening a new one — the client's ruling: "make sure I
+    // cannot have the same tab 2 times, for example I have already apps opened,
+    // if I click there again, reopen the opened tab."
+    const existingPath = canonicalKeys.get(canonical)
+    if (existingPath) {
+      const at = next.findIndex((tab) => tab.path === existingPath)
+      if (at >= 0) {
+        // Already open — POSITION NEVER MOVES, full stop. Its NAME is refreshed
+        // either way, which is the only moment the app knows a record's current
+        // name for free and a tab showing last week's title is the one
+        // staleness a visit can fix. RECENCY is refreshed only when this is the
+        // tab being activated: an ancestor merely walked through on the way to
+        // one does not itself count as "just looked at" — same rule as before
+        // `activeIndex` existed, just read off `recency` instead of off `next`.
+        next[at] = { path: existingPath, label: label || next[at].label }
+        if (activate) touch(existingPath)
+        return
+      }
     }
+
     // New — inserted immediately AFTER the tab she was standing on a moment
     // ago, never appended to the far right. THE CLIENT'S RULING, 16 SEP 2026,
     // verbatim: "when opening a new tab, do not open it on the very right,
@@ -400,6 +472,7 @@ export function visitTrail(trail: OpenTab[]): void {
     const afterIndex = activePath ? next.findIndex((tab) => tab.path === activePath) : -1
     const insertAt = afterIndex >= 0 ? afterIndex + 1 : next.length
     next.splice(insertAt, 0, { path: entry.path, label })
+    canonicalKeys.set(canonical, entry.path)
     touch(entry.path)
   }
 
@@ -456,6 +529,13 @@ export function closeTab(path: string): string | null {
   const wasActive = path === activePath
   const next = [...tabs.slice(0, at), ...tabs.slice(at + 1)]
   tabs = next.length === 0 ? NOTHING : next
+
+  // Remove from canonical keys map
+  const canonical = canonicalTabKey(path)
+  if (canonicalKeys.get(canonical) === path) {
+    canonicalKeys.delete(canonical)
+  }
+
   const ri = recency.indexOf(path)
   if (ri >= 0) recency.splice(ri, 1)
   persist()
@@ -484,6 +564,7 @@ export function closeTab(path: string): string | null {
  * is loaded. */
 export function forgetOpenTabs(): void {
   tabs = NOTHING
+  canonicalKeys.clear()
   recency = []
   activePath = null
   scope = null

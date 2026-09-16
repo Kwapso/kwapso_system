@@ -249,19 +249,33 @@ describe("waveState — planned/running/done, off the wave's own dates", () => {
   })
 })
 
-describe("buildWaveCalendarEntries — waves and sprints as day chips", () => {
-  it("one chip per wave and one per sprint, each on its own start day, sharing one accent", () => {
+describe("buildWaveCalendarEntries — waves and sprints as S2 spans", () => {
+  it("one entry per wave and one per sprint, each carrying endDay, sharing one accent", () => {
     const w = wave({ id: "w1", accountId: "a1", name: "Padelbase v2", startsOn: "2026-09-01", endsOn: "2026-10-09" })
     const s = sprint({ id: "s1", name: "Onboarding", waveId: "w1", waveName: "Padelbase v2", startsOn: "2026-09-01", endsOn: "2026-09-11" })
     const entries = buildWaveCalendarEntries([w], [s])
     const waveEntry = entries.find((e) => e.id === "w:w1")!
     const sprintEntry = entries.find((e) => e.id === "s:w1:s1")!
     expect(waveEntry.day).toBe("2026-09-01")
+    // S2 (16 Sep 2026 ruling): the wave's own end reaches the grid too, so
+    // record-calendar.tsx's expandEntry can draw the whole package as a
+    // span rather than a single start-day chip.
+    expect(waveEntry.endDay).toBe("2026-10-09")
     expect(sprintEntry.day).toBe("2026-09-01")
+    // A sprint's own endDay is its own endsOn — never clipped to the wave's,
+    // since S2 draws whatever range it is handed and two overlapping spans
+    // (a sprint inside its wave) already stack.
+    expect(sprintEntry.endDay).toBe("2026-09-11")
     expect(sprintEntry.detail).toBe("Padelbase v2")
     // Same hash, same colour — the wave's own chip and its sprint's chip
     // land in the same accent for free.
     expect(sprintEntry.accent).toBe(waveEntry.accent)
+  })
+
+  it("a wave or sprint with no end date carries no endDay — expandEntry reads it as a one-day span", () => {
+    const w = wave({ id: "w1", accountId: "a1", startsOn: "2026-09-01", endsOn: null })
+    const entries = buildWaveCalendarEntries([w], [])
+    expect(entries[0]!.endDay).toBeUndefined()
   })
 
   it("a sprint belonging to a wave outside the given rows is left off the grid", () => {

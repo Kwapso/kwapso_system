@@ -124,6 +124,63 @@ describe("AgentTabStrip", () => {
       expect(screen.getByRole("link", { name: "Conversation" })).toBeTruthy()
     })
   })
+
+  describe("stacking — the active tab paints above its pinned neighbours (client ruling, 16 Sep 2026)", () => {
+    // Her screenshot, verbatim account: "Conversation ×" (active, FIRST) then
+    // the clock tab then "+" — and the pinned pair's grey fill covering the
+    // active tab's right edge. `agent-tab-strip.tsx` places every open
+    // conversation ahead of History and "+" (see this file's own header), so
+    // the active tab is very often the LEFTMOST one here, the opposite shape
+    // from the main content strip (whose active crumb is always the trail's
+    // own last one). Proven wrong at the source rather than assumed fixed:
+    // `breadcrumb-folders.tsx` keys each tab's z-index to whether IT is live
+    // (`TAB_LIVE`, `z-[1]`) or not (`TAB_REST`, `z-0`) — never to DOM
+    // position — so this reads the actual rendered class list, the same
+    // discipline the portal and "look" tests above already hold, rather than
+    // trusting the mechanism's own comment.
+    const activeFirst: AgentTab[] = [
+      { id: "a", threadId: "t-a", scope: "everything", label: "Conversation" },
+    ]
+
+    /** The one kit element each crumb draws (never more than one: this strip
+     * passes no `onCurrentActivate`, so a live crumb is always
+     * `BreadcrumbPage`, never the current-activate `<button>`). Read its
+     * z-index utility off the actual `className`, not off a role query —
+     * History and "+" are both `role="link"` and the active crumb is not a
+     * link at all, so a single, slot-based lookup covers all three. */
+    const zUtility = (li: Element): string | undefined => {
+      const control = li.querySelector('[data-slot="breadcrumb-link"], [data-slot="breadcrumb-page"]')
+      expect(control, "every crumb draws exactly one breadcrumb-link/breadcrumb-page").toBeTruthy()
+      return Array.from(control!.classList).find((c) => c === "z-0" || c === "z-[1]")
+    }
+
+    it("the active conversation tab (index 0) carries TAB_LIVE's z-[1]; History and \"+\" carry TAB_REST's z-0", () => {
+      render(<AgentTabStrip {...baseProps()} tabs={activeFirst} activeId="a" />)
+      const items = document.querySelectorAll('[data-slot="breadcrumb-item"]')
+      // Conversation (active) · History · "+" — nothing else in this strip.
+      expect(items).toHaveLength(3)
+      const [conversation, history, plus] = Array.from(items)
+      expect(zUtility(conversation), "the active tab, first in the DOM, is still TAB_LIVE").toBe("z-[1]")
+      expect(zUtility(history), "the pinned History tab, trailing in the DOM, is TAB_REST").toBe("z-0")
+      expect(zUtility(plus), "the pinned \"+\" tab, trailing in the DOM, is TAB_REST").toBe("z-0")
+      // z-[1] > z-0 regardless of paint order, which is the whole mechanism:
+      // an active tab ahead of its neighbours in the DOM still paints over
+      // them, exactly as the main content strip's own (always-last) active
+      // crumb already does over ITS neighbours.
+    })
+
+    it("still holds with a second, background conversation tab open", () => {
+      render(<AgentTabStrip {...baseProps()} activeId="a" />)
+      const items = document.querySelectorAll('[data-slot="breadcrumb-item"]')
+      // Conversation (active) · Beringer (background) · History · "+".
+      expect(items).toHaveLength(4)
+      const [conversation, beringer, history, plus] = Array.from(items)
+      expect(zUtility(conversation)).toBe("z-[1]")
+      expect(zUtility(beringer), "a background conversation tab is TAB_REST too").toBe("z-0")
+      expect(zUtility(history)).toBe("z-0")
+      expect(zUtility(plus)).toBe("z-0")
+    })
+  })
 })
 
 // MOUNTED THROUGH THE KIT'S OWN SLOT — the client's ruling, 15 Sep 2026, over

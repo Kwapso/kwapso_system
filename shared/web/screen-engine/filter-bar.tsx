@@ -679,7 +679,15 @@ function useFilterBar<T>({
         // is a display concern read the same way for every facet in the app,
         // so it is applied once, here, rather than at every `filterFacets`
         // declaration — a facet declared tomorrow inherits it for free.
-        const facetOptionList = sortedOptions(optionsFor(f), lang)
+        // `f.ordered` IS THE ESCAPE HATCH — a facet whose list is a PIPELINE
+        // rather than a naming vocabulary (`FilterFacet.ordered`'s own doc,
+        // config.ts), registered in `FACET_ORDER_OK` (shared/rules/
+        // registry.ts) the same way a hand-rolled picker registers in
+        // `ORDERED_OPTIONS_OK` — a flag with no matching registry line is
+        // still a silent exception, so the one caller that sets it (apps'
+        // own Stage facet, 16 Sep 2026) carries the reason there and not
+        // only here.
+        const facetOptionList = f.ordered ? optionsFor(f) : sortedOptions(optionsFor(f), lang)
         // THE MARK RIDES BESIDE THE WORD, NEVER INSTEAD OF IT — client ask,
         // 2026-09-06: "in filter type i want to see the colored dot / on
         // filter app i wanna see the icon of the app". `FacetOption.mark`
