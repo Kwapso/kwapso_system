@@ -8,58 +8,54 @@ turns, no task over 5 calls.** Read the two caveats below before trusting
 that "0 errors" as a statement about the sandbox role, or task 10's FAIL
 as a statement about tonight's knowledge base.
 
-## The claimed rerun made no calls — task 10 is measured against a
-## mid-rebuild base, and the tester prompt needs a fix
+## Retraction: there was no rerun — task 10's real context, and a same-day spot check
 
-The planner released the tester session for a second pass at 00:07 UTC
-(02:07 local) and it reported "done" at 00:10 UTC. Checked, read-only,
-three ways:
+An earlier version of this section claimed a second, call-free "rerun."
+**Retracted** — the planner had converted local time to UTC with the
+wrong offset (this Mac is IST, UTC+5:30, not UTC+2); the 00:07–00:10 UTC
+window handed to me for that check was never the release window. The
+16 calls at 20:21–20:24 UTC are the one and only run (the sandbox
+token's separate 17:24 UTC row is the setup-verification probe, as
+already noted elsewhere in this report). The three-way check itself
+(`mcp_call_log` window, `answers.md` mtime, transcript tail) was sound
+and is worth keeping as a general practice — see `tester-prompt.md` —
+but there was nothing to catch this time.
 
-1. **`mcp_call_log`, any token, any tool, 23:55–00:20 UTC**: zero rows.
-2. **`answers.md`'s mtime**: `2026-09-16T20:24:36Z` — the exact tail of
-   the FIRST run's own call window (last call completed 20:24:13Z), never
-   touched again. If a second pass had written anything, the mtime would
-   sit in the 00:07–00:10 UTC band; it doesn't.
-3. **The tester's own transcript, session `local_484dbc5e-ef19-40c3-bbf0-21f5e59ea32d`,
-   rows at or after 00:07 UTC**: zero. The transcript's last row of any
-   kind is `2026-09-16T20:24:53Z`.
+**Task 10's real context.** The run's one `ask_knowledge` call landed at
+20:24:13 UTC. At that moment the team database was already caught up —
+the `ticket` ingest that was mid-rebuild earlier in the day finished at
+20:15 UTC, nine minutes before the call — but the VECTOR INDEX itself
+was still carrying roughly 35% dead ids at the search's own `topK=20`;
+the rebuild that cleared those didn't finish until 20:59 UTC, 35 minutes
+after the call. So task 10's FAIL was measured against a D1 that had the
+right rows but a Vectorize index that hadn't yet caught up to them.
 
-All three agree: **the "rerun" made no calls.** The session had already
-completed the tasks once; asked to run again, it answered from its own
-memory of the first pass rather than touching any tool — which is
-exactly why `answers.md` came back byte-identical to the first run's
-output and nothing shows up later in either the transcript or the
-ledger. A session that has already done the tasks cannot be rerun
-honestly: it can always satisfy "write your answers" without calling
-anything, because it already knows the answers.
+**Spot check, this session, read-only, after the rebuild** — same
+question, same tool (`ask_knowledge`'s `{"q":...}` is a confirmed
+pure pass-through to `GET /api/content/knowledge/ask` with its
+read+compose defaults, so this is the same call the tester made):
 
-**Consequence for task 10's grade.** Every number in this report — task
-10's FAIL included — was measured at the FIRST run's real call, 20:24:13
-UTC, 16 September. Per the planner: at that time the knowledge base's
-`ticket` ingest kind was still mid-rebuild (~35% done), and a separate
-check has since found ~35% of the vector ids that search was returning
-were dead. The amended answer-key's own grading basis ("the account/app
-kinds are already fully, currently indexed... not a moving target") was
-written to describe the base as of a LATER point in the evening, not as
-of 20:24 UTC when the only real call actually landed. So task 10's FAIL
-stands as a measurement of what `ask_knowledge` returned at 20:24 UTC,
-but it cannot be read as a measurement of the retrieval seam against
-tonight's caught-up base — the index it queried may itself have been
-incomplete or carrying stale ids at that moment, which is a plausible
-alternate explanation for finding #4's "the passage-level search pulled
-nothing from either indexed source" alongside the speculative
-chunking-quality explanation already given there.
+```
+ask_knowledge({"q": "What do we know about Confia?"})
+```
 
-**Fix — `tester-prompt.md` and the runbook that launches it.** A rerun
-needs a session that has never seen these tasks before. Add to
-`tester-prompt.md`: *"Use a brand-new session with no prior context for
-this run — a session that has already completed these tasks must not be
-reused for a second pass; asked to redo them, it can answer from memory
-of the first run without calling any tool, and nothing will show that it
-did."* The person running the test should also confirm a fresh
-session's `mcp_call_log` activity actually falls inside the expected
-window before trusting its `answers.md`, the same three-way check done
-above — an unmoved `answers.md` mtime is the cheapest tell.
+Result, `checkedAt` `2026-09-16T22:01:15.287Z` (well after the 20:59 UTC
+rebuild): **identical in every load-bearing respect to the original
+20:24 UTC run** — `found: true`, `answer: null`, one citation, the same
+ticket (`T3507`, score `0.002`), the same `records` entry correctly
+naming the CONFIA app without ever surfacing it as a passage or
+citation. No account or app source is found or cited now either.
+
+**This does not change the grade** (per the planner's instruction, and
+because a grade should reflect what the tester actually saw, not a later
+re-run of mine) — but it does change which explanation in finding #4
+below is more likely. The dead-id theory predicted this would clear once
+the index caught up; it didn't. That points back toward finding #4's
+other, chunking-quality explanation: the `account`/`app` knowledge kinds
+may simply not carry enough free text per source to ever clear the
+passage-level relevance floor against a bare entity-name question, dead
+ids or not. Still not fully traced — see finding #4 for what's still
+open.
 
 ## Before the ranked list: the run didn't test what it meant to
 

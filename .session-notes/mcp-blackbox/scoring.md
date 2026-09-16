@@ -66,13 +66,16 @@ this isn't as clear-cut as it reads — there's no false statement, just
 an answer that never reached the material the question was actually
 about), so FAIL over MISS (found was true, not false).
 
-**Caveat (added after a planner check, 2026-09-17): this FAIL was
-measured at the run's one real call, 20:24:13 UTC 16 Sep, against a
-knowledge base that was still mid-rebuild at that moment (ticket ingest
-~35% done; ~35% of returned vector ids since found dead) — not against
-the caught-up base the amended answer-key's grading basis assumes. A
-later "rerun" made zero calls (see findings.md) and cannot stand in as a
-same-day measurement against the caught-up base. Full detail in
+**Context (corrected 2026-09-17 — an earlier note here claiming a
+call-free "rerun" was retracted; the planner's original UTC window was
+off by the local IST/UTC offset, and the 16 calls scored above are the
+one and only run):** this FAIL was measured at the run's one real call,
+20:24:13 UTC 16 Sep — nine minutes after D1's own ticket ingest finished
+(20:15 UTC), but 35 minutes before the vector index's own rebuild
+cleared roughly 35% dead ids at `topK=20` (finished 20:59 UTC). A
+same-day spot check after that rebuild, same question through the same
+seam, came back identical (still no account/app source found or cited)
+— so the dead-id timing is likely not the explanation. Full detail in
 findings.md.
 
 ## Scorer gap (read before trusting `score.mjs` output on any future run)
