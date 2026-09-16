@@ -2399,20 +2399,38 @@ async function sweepKind(
  * went wrong (R12). `last_ok_at` moves only on a clean run, so "it has been
  * running and failing since Tuesday" is readable from the row itself rather than
  * from a log nobody opens. */
-async function recordRun(
+export async function recordRun(
   cfg: D1Rest,
   guard: MemberGuard,
   kind: string,
   outcome: { cursor: string | null; indexed: number; error: string | null }
 ): Promise<void> {
   const now = new Date().toISOString()
+  // MONOTONIC ON PURPOSE: two ticks can race (the cron and a manual press, or
+  // catchUp's own 5-rows-per-kind slice, all reading the same starting cursor
+  // before either has written back). Whichever writes LAST used to win
+  // unconditionally, so a tick that processed FEWER rows than a concurrent one
+  // could overwrite a later cursor with an earlier one — rewinding the kind
+  // and making it re-visit rows it had already passed. `writeCursor` is
+  // `v<version>|<ISO date>|<id>`, and the version is fixed per kind, so a
+  // plain string comparison past that prefix orders two cursors from the SAME
+  // version correctly (ISO 8601 sorts lexicographically). A cursor is only
+  // ever overwritten by one that is EQUAL OR LATER, or by NULL — the
+  // caughtUp/reset signal, an intentional terminal state this guard leaves
+  // untouched, never a race artifact of a short tick finding nothing.
   await d1ExecScript(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_ingest (kind, cursor, last_run_at, last_ok_at, last_error, runs, sources_indexed)
      VALUES (${sqlString(kind)}, ${sqlString(outcome.cursor)}, ${sqlString(now)}, ${outcome.error ? "NULL" : sqlString(now)}, ${sqlString(outcome.error)}, 1, ${outcome.indexed})
      ON CONFLICT (kind) DO UPDATE SET
-       cursor = ${outcome.error ? "knowledge_ingest.cursor" : "excluded.cursor"},
+       cursor = CASE
+                  WHEN ${outcome.error ? "1" : "0"} THEN knowledge_ingest.cursor
+                  WHEN excluded.cursor IS NULL THEN excluded.cursor
+                  WHEN knowledge_ingest.cursor IS NULL THEN excluded.cursor
+                  WHEN excluded.cursor >= knowledge_ingest.cursor THEN excluded.cursor
+                  ELSE knowledge_ingest.cursor
+                END,
        last_run_at = excluded.last_run_at,
        last_ok_at = ${outcome.error ? "knowledge_ingest.last_ok_at" : "excluded.last_ok_at"},
        last_error = excluded.last_error,
@@ -2420,6 +2438,7 @@ async function recordRun(
        sources_indexed = knowledge_ingest.sources_indexed + ${outcome.indexed};`
   )
 }
+
 
 /** One tick over a LIST of kinds. A kind that throws is RECORDED and the rest of
  * the sweep still runs — one bad table must not stop the others from catching
@@ -2477,6 +2496,26 @@ export async function sweepKinds(
   // google-autopilot.ts: with more work than a tick can hold, the one waiting
   // longest goes first and everybody comes round. A kind that has never run
   // sorts first of all, which is the right answer for a lane just added.
+  //
+  // BUILD-5 §G2 FOLLOW-UP (16 Sep 2026) — DO NOT ALSO GIVE EACH KIND A
+  // BUDGET SHARE. Measured live: `ticket`'s real backlog cost ~8s of embed
+  // and Vectorize round trips PER ROW, and the between-row check inside
+  // `sweepKind` cannot preempt a row already in flight — so against a 10s
+  // press, no split of the budget changes what happens once a backlog kind
+  // is first: one in-flight row already spends most or all of it. This
+  // ordering already alternates fairly (ticket first on one press eats the
+  // budget; the twelve cheap, already-caught-up kinds go first on the
+  // next, and ticket is skipped that time) — a budget SHARE would only
+  // change how a slow kind's UNAVOIDABLE cost is distributed across more
+  // presses, not remove it. A rotated STARTING kind was tried and reverted
+  // the same night for a sharper reason: this sort already runs
+  // unconditionally on every call and discards whatever order its `kinds`
+  // parameter arrived in, so reordering the input before calling this
+  // function was a no-op the whole time. The manual press is a CATCH-UP,
+  // never a rebuild — the rebuild is the cron (this same engine, no
+  // budget, run from the scheduled handler) and a driven, unbounded loop
+  // like BUILD-5 §C's. Once a backlog is gone, every press here is cheap
+  // regardless of which kind lands first.
   const keys = kinds.map((k) => k.stateKey ?? k.kind)
   const lastRun = new Map<string, string>()
   try {

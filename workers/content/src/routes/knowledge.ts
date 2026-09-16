@@ -997,7 +997,9 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
   // `caughtUp` below is already honest about whatever the budget cut short,
   // so "press again" is a correct instruction the response itself supports,
   // exactly like the Google sync door's own "a press is a nudge, not a
-  // backfill".
+  // backfill". `sweepAll` already sweeps in oldest-run-first order (its own
+  // header explains why) — see that comment for why a SEPARATE reordering
+  // here was tried and reverted the same night.
   const results = await sweepAll(env, cfg, guard, undefined, { budgetMs: KNOWLEDGE_SYNC_PRESS_BUDGET_MS })
   // THE REVISIT PASS — what the ordinary sweep's forward-only cursor cannot
   // do on its own (`revisitUnhealthySources`'s own header). Rides this same

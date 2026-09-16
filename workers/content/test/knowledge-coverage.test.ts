@@ -1191,7 +1191,22 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // new code OUTSIDE every per-kind reader, so the digest moved — no kind's
 // TEXT changed (neither the readers nor the shared text helpers were
 // touched), only the orchestration around when and how much a sweep runs.
-const SHARED_DIGEST = "bf60722eddc8137b"
+// Moved again the same day (BUILD-5 §G2 follow-up): `recordRun`'s cursor
+// write is now monotonic (a CASE guard against a concurrent tick rewinding
+// it) — a real, code-confirmed bug, independently verified not to be that
+// night's actual bottleneck. Orchestration, outside every per-kind reader;
+// no kind's TEXT changed and no textVersion moved.
+//
+// Moved a THIRD time within the hour, down again: a first attempt at the
+// same starvation problem (`rotatedKindOrder`, reordering a budgeted
+// press's kind list before calling `sweepKinds`) was built, tested, and
+// reverted the same night — `sweepKinds` already re-sorts its own `kinds`
+// parameter by `lastRunAt` unconditionally, discarding whatever order it
+// receives, so the reordering was a complete no-op and its own unit tests
+// never caught that because none of them routed the result through the
+// real caller. See the comment above `sweepKinds`' existing ordering for
+// why a per-kind budget share was considered and rejected instead.
+const SHARED_DIGEST = "e2b81897a336dc08"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
