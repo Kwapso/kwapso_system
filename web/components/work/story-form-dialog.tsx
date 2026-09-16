@@ -321,7 +321,21 @@ export function StoryFormDialog({
     open
   )
   const [busy, setBusy] = React.useState(false)
-  const appId = fixedApp ? fixedApp.id : values.appId
+  // T3651/T3655 — the app is also a settled fact when the STORY arrives via a
+  // ticket: `fixedTicket` names a real request, and that request is already
+  // filed against one app (`tickets` carries it per row, same as `apps` gives
+  // a name for it below). Without this, only the app's OWN screen resolved
+  // `appId`, so opening this same dialog from a ticket left it blank until
+  // somebody picked one by hand — the exact gap T3651 reported ("shows
+  // processes from every app" from a ticket, "only 3" from the app itself, one
+  // dialog answering the same question two different ways depending on where
+  // it was opened).
+  const ticketApp = fixedTicket
+    ? (tickets.find((tk) => tk.id === fixedTicket.id)?.appId ?? null)
+    : null
+  const derivedApp =
+    fixedApp ?? (ticketApp ? apps.find((a) => a.id === ticketApp) : undefined)
+  const appId = derivedApp ? derivedApp.id : values.appId
   // THE THREE NARROWED LISTS. Everything with no app at all stays offered: an
   // unfiled sprint or a request nobody attributed yet is still a legitimate
   // answer, and hiding it would make the form unable to describe the data.
@@ -540,11 +554,11 @@ export function StoryFormDialog({
     >
       {/* FIRST, and everything below is narrowed by it (CHECKLIST 6.1). */}
       <Field
-        config={fixedApp ? settledAppField : appField}
+        config={derivedApp ? settledAppField : appField}
         htmlFor="story-app"
         className={fieldSpacing}
       >
-        {fixedApp ? (
+        {derivedApp ? (
           // A FACT, NOT A CONTROL — time-form-dialog.tsx's words, and its shape:
           // the panel and padding are what make this read as a filled answer
           // rather than a hint under the label. It used to be bare muted text,
@@ -554,7 +568,7 @@ export function StoryFormDialog({
             id="story-app"
             className="bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm"
           >
-            {fixedApp.name}
+            {derivedApp.name}
           </p>
         ) : (
           picker(

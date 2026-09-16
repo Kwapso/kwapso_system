@@ -6997,6 +6997,49 @@ UPDATE selectable_data
    AND value NOT IN (${APP_STAGES.map((s) => sqlString(s.name)).join(", ")});
 `,
   },
+  {
+    // T3653, "New tickets/stories created without a serial number/ID." The
+    // FIRST diagnosis (16 Sep 2026, morning) read this as an UPDATE-side gap:
+    // `createTicket`/`createStory` mint a reference only when `accountId` is
+    // truthy at birth, so a row named a client only after birth (naming a
+    // client on a ticket that had none; re-pointing a story at a ticket/app
+    // that now has one) kept `ref` NULL for ever — proved on staging, ticket
+    // 01M2MWDFKHGPPAXS0QJTFC6MYT carries `account_id` and `ref IS NULL` today.
+    // A first fix minted inline inside `updateTicket`/`updateStory` and R55
+    // (`web/test/refs-match-the-formula.test.ts`, "only the one mint writes a
+    // reference, and nothing updates one in place") correctly refused it —
+    // that law has no reasoned-exemption registry, on purpose.
+    //
+    // THE OWNER'S RULING, SAME DAY: the `accountId` gate at CREATE is itself
+    // the bug, not a rule the update path failed to honour. It is a holdover
+    // from the account-CODED shape ("BERG-T0412"), where an account was a
+    // structural input to the string and no account meant nothing to build
+    // one from; migration 0059 (31 Aug 2026) dropped the account code from
+    // the format, `nextTeamRef` has taken no `accountId` since, and the gate
+    // in `createTicket`/`createStory` outlived the reason it existed for by
+    // one day — the "a client quotes it" comment that used to sit on those
+    // lines is dated 1 Sep, after 0059 landed, and was a rationalisation
+    // rather than an independent constraint (git log on both lines). Every
+    // ticket and story gets a number now, account or not, minted at CREATE —
+    // which is the one act R55 always allowed — so the update path needs no
+    // minting logic and the "named later" gap cannot recur for any row
+    // created from here on.
+    //
+    // THIS MIGRATION BACKFILLS EVERY EXISTING ROW THE OLD GATE LEFT NUMBERLESS
+    // — `ref IS NULL`, account or not — the same one-time act 0068 already
+    // performs for the account-coded shape, and the only act R55 permits.
+    //
+    // ONE STATEMENT PER KIND (never a UNION — the compound-SELECT ceiling
+    // `appAndWaveNumberSql`'s header explains), oldest-`created_at`-first,
+    // counted up from the same "never below the rows, never below the counter"
+    // high-water mark 0068/0072 already established, through the same
+    // plan-then-read-back scratch table 0072 uses (`_numbering_0072`'s own
+    // comment: "a window function seating rows in the table it is writing to
+    // has no defined answer"). IDEMPOTENT: a second run finds nothing left
+    // with `ref IS NULL`.
+    version: "0098_every_ticket_and_story_gets_a_number",
+    sql: mintMissingTicketStoryRefsSql(),
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for
@@ -7436,5 +7479,69 @@ SELECT '${wave}', MAX(${refNumberSql("ref")}) + 1
     ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
 
 DROP TABLE _numbering_0072;
+`
+}
+
+/** 0098's SQL — see the migration's own header, above in TEAM_MIGRATIONS, for
+ * the T3653 account and why the population is every `ref IS NULL` row,
+ * account or not, now that `createTicket`/`createStory` mint unconditionally.
+ * Same shape as the waves half of `appAndWaveNumberSql`, immediately above: a
+ * high-water mark that can only rise, a plan seated in its own scratch table
+ * (a window function cannot see the table it is about to write — 0072's own
+ * lesson), one UPDATE per table reading its answer back out, then the counter
+ * raised to match. */
+function mintMissingTicketStoryRefsSql(): string {
+  const targets: { table: string; kind: TeamRefKind }[] = [
+    { table: TEAM_REF_TABLES.ticket, kind: TEAM_REF_KINDS.ticket },
+    { table: TEAM_REF_TABLES.story, kind: TEAM_REF_KINDS.story },
+  ]
+
+  const perTable = targets
+    .map(
+      ({ table, kind }) => `
+-- ${table} · kind ${kind} ── every row with no number, account or not ───────
+WITH mark AS (
+  SELECT MAX(hw) AS hw FROM (
+    SELECT COALESCE((SELECT MAX(${refNumberSql("ref")}) FROM ${table}
+                       WHERE ref = ${canonicalRefSql(kind, "ref")}), 0) AS hw
+    UNION ALL SELECT COALESCE((SELECT next_no - 1 FROM team_ref_counters WHERE kind = '${kind}'), 0)
+  )
+),
+seated AS (
+  SELECT id, (SELECT hw FROM mark) + ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) AS n
+    FROM ${table} WHERE ref IS NULL
+)
+INSERT INTO _numbering_0098 (entity_table, row_id, becomes)
+SELECT '${table}', id, ${canonicalRefSql(kind, "n")} FROM seated;
+
+UPDATE ${table}
+   SET ref = (SELECT becomes FROM _numbering_0098
+               WHERE entity_table = '${table}' AND row_id = ${table}.id)
+ WHERE ref IS NULL
+   AND id IN (SELECT row_id FROM _numbering_0098 WHERE entity_table = '${table}');
+
+INSERT INTO team_ref_counters (kind, next_no)
+SELECT '${kind}', MAX(${refNumberSql("ref")}) + 1
+  FROM ${table} WHERE ref = ${canonicalRefSql(kind, "ref")}
+ HAVING COUNT(*) > 0
+    ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
+`
+    )
+    .join("\n")
+
+  return `
+-- Dropped at the end of this migration, so no schema census ever sees it;
+-- \`IF NOT EXISTS\` plus \`DELETE\` on entry so a run that died half way is a
+-- re-run and not a wedge. No column here is called \`ref\`, on purpose — that
+-- is the name R55's schema scan looks for.
+CREATE TABLE IF NOT EXISTS _numbering_0098 (
+  entity_table TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  becomes TEXT NOT NULL,
+  PRIMARY KEY (entity_table, row_id)
+);
+DELETE FROM _numbering_0098;
+${perTable}
+DROP TABLE _numbering_0098;
 `
 }

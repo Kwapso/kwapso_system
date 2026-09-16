@@ -249,18 +249,22 @@ describe("the reference number the client quotes", () => {
     expect(row(second).ref).toBe("T0002")
   })
 
-  it("is null with no account, but no longer needs the account's own code", async () => {
-    // The agency's own question: no account, so nobody to quote it to. A
-    // number nobody can quote would look like it meant something. This half
-    // is unchanged by the 2026-08-31 ruling.
+  it("is minted with no account too, and needs no account's own code either (T3653, 16 Sep 2026 ruling)", async () => {
+    // The agency's own question: no account, nobody to quote it to YET — and
+    // the owner's ruling is that it gets a number anyway. Gating the mint on
+    // an account was a holdover from the account-CODED shape, where an
+    // account was a structural input to the string; the 2026-08-31 ruling
+    // already dropped the code from the string, and this half of the old gate
+    // just outlived the reason it existed for. Every ticket gets a number now.
     const ours = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", { description: "Our own internal question" })
     ))[0]
-    expect(row(ours).ref).toBeNull()
+    expect(row(ours).ref).toBe("T0001")
 
-    // A client with NO short code at all still gets a reference now — the
+    // A client with NO short code at all still gets a reference too — the
     // string no longer embeds the account's code, so there is nothing left
-    // for an absent one to block.
+    // for an absent one to block. Continues the SAME counter as the ticket
+    // above, one sequence per kind regardless of account.
     db().exec(`UPDATE accounts SET code = NULL WHERE id = '${IDS.victimAccount}';`)
     const uncoded = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", {
@@ -268,7 +272,7 @@ describe("the reference number the client quotes", () => {
         accountId: IDS.victimAccount,
       })
     ))[0]
-    expect(row(uncoded).ref).toBe("T0001")
+    expect(row(uncoded).ref).toBe("T0002")
   })
 
   it("two tickets raised at the same instant never take the same number", async () => {

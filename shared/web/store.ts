@@ -436,10 +436,20 @@ function loadShared<T>(key: string, fetcher: () => Promise<T>, force: boolean): 
     const running = inFlight.get(key) as Promise<T> | undefined
     if (running) return running
   }
-  const p = fetcher().then((value) => {
+  const p: Promise<T> = fetcher().then((value) => {
     // Stored by the ONE request, not once per joiner — so a patched row is not
     // overwritten N times and `notify` fires against a settled cache.
-    store(key, value)
+    //
+    // ONLY IF THIS IS STILL THE CURRENT REQUEST (T3654's other half). A forced
+    // load REPLACES the map entry (the comment above this function), but
+    // replacing the map does nothing to the OLDER promise already in flight —
+    // it keeps running and still resolves. Two requests for one key settle in
+    // whichever order the network hands them back, not the order they were
+    // sent, so the older one can land AFTER the newer one and had nothing
+    // stopping it from overwriting a fresh answer with a stale one. Every
+    // caller who awaited THIS promise still gets its value; only the WRITE
+    // into the shared cache is conditional on nobody having superseded it.
+    if (inFlight.get(key) === p) store(key, value)
     return value
   })
   inFlight.set(key, p)
@@ -519,7 +529,16 @@ export function useCached<T>(
       try {
         const value = await loadShared(key, fetcherRef.current, force)
         if (!aliveRef.current) return
-        setData(value)
+        // THE CACHE'S OWN ANSWER, NOT WHATEVER THIS CALL AWAITED (T3654's third
+        // half). `loadShared`'s guard stops a superseded request from
+        // overwriting the SHARED cache, but this call still awaited its OWN
+        // promise start to finish and would otherwise `setData` straight from
+        // it regardless — painting the stale answer into THIS hook's state
+        // even though the cache correctly refused to hold it. `fresh(key)` is
+        // what the race actually settled on; fall back to `value` only for the
+        // moment right after a genuinely fresh store, before eviction could
+        // ever have touched it.
+        setData((fresh(key)?.value as T | undefined) ?? value)
         setError(null)
       } catch (e) {
         if (aliveRef.current) setError(e)
@@ -556,6 +575,22 @@ export function useCached<T>(
   // clobbered by a full-list GET (the subscriber refetching), defeating the whole
   // "patch the one row, never refetch the collection" goal. Only a cache MISS
   // (an `invalidate` cleared the key) falls through to a real refetch.
+  //
+  // FORCED (T3654). Every caller that reaches this branch got here because
+  // `invalidate`/`invalidatePrefix` just deleted the key — every other `notify`
+  // in this file follows a `store()`, which leaves `fresh(key)` non-null and
+  // takes the branch above instead. So this is never "whatever's cached is
+  // fine", it is always "something changed, and this subscriber needs the
+  // answer that reflects it" — `loadShared`'s own header names the shape:
+  // an unforced `load()` here can JOIN an older in-flight request for the same
+  // key (the panel's own revalidate-on-mount, still in flight) and paint ITS
+  // answer once it lands, which predates the write. Proved live on staging: an
+  // app's own Tickets tab created a ticket, the invalidated refetch fired and
+  // the door answered with the new row first, and the screen kept showing the
+  // stale list until a remount forced a real request. `force: true` is
+  // `loadShared`'s documented way out — it starts its own request and replaces
+  // whatever the shared slot held, so this can never paint an answer older
+  // than the change that caused it.
   const sync = React.useCallback(() => {
     if (!key) return
     const entry = fresh(key)
@@ -565,7 +600,7 @@ export function useCached<T>(
         setLoading(false)
       }
     } else {
-      void load()
+      void load(true)
     }
   }, [key, load])
 
