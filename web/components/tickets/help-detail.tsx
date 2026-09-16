@@ -1220,6 +1220,12 @@ export function HelpDetailScreen({
           // the file silently.
           const madeId = await createStoryFrom(teamId, { ...v, ticketId: helpId }, t)
           invalidate(sliceKey("stories-ticket", helpId))
+          // T3652 — the story is also filed against whichever app the form's
+          // own (editable, since there is no `fixedApp` here) App field named.
+          // Nothing else in this dialog's cache touches that app's own Stories
+          // tab, so a story raised from here sat correctly in the door and
+          // never patched the one screen a person would check it against.
+          if (v.appId) invalidate(sliceKey("stories-app", v.appId))
           return madeId
         }}
       />

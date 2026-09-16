@@ -882,13 +882,17 @@ export async function createStory(
   // reads it — a story that exists for a moment with no number is a story
   // somebody screenshots with no number.
   //
-  // TEAM-wide now (shared/workers/refs.ts), gated on `accountId` the same way
-  // a ticket's is: internal work with nobody to quote it gets no number.
+  // UNGATED ON `accountId` (T3653, 16 Sep 2026 ruling) — help.ts's `createTicket`
+  // carries the full argument at its own mint: the accountId gate was a
+  // holdover from the account-coded shape, outlived the reason it existed for
+  // once migration 0059 dropped the account code from the format, and left a
+  // story raised with no client silently unnumbered until somebody named one
+  // later. Every story gets a number, account or not.
   //
   // AFTER the wave and on its own line, because minting is a WRITE: run beside a
   // check that fails and it burns a number out of the sequence a client quotes
   // (the rule parallel.ts states for exactly this call).
-  const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.story) : null
+  const ref = await nextTeamRef(cfg, guard, TEAM_REF_KINDS.story)
 
   await d1ExecScript(
     cfg,

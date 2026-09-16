@@ -1674,7 +1674,12 @@ export const TEAM_RESOURCES: Record<
     // family of keys the ping cannot name, dropped by prefix. A derived cache
     // has no row to patch, and only the entry somebody is actually looking at is
     // re-read.
-    slicePrefix: [HELP_DASHBOARD_PREFIX, "tickets-account-of:", RECORD_MAP_PREFIX],
+    // T3654/T3652 — an app's OWN Tickets tab is exactly this shape too
+    // (`sliceKey("tickets-app", appId)`, work-panels.tsx's `AppTicketsPanel`)
+    // and had no line here, so a ticket raised from anywhere ELSE than that
+    // exact panel's own dialog never reached a viewer sitting on it — reload
+    // was the only refetch. Same reasoning as the account slice one line up.
+    slicePrefix: [HELP_DASHBOARD_PREFIX, "tickets-account-of:", "tickets-app-of:", RECORD_MAP_PREFIX],
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the
@@ -1788,9 +1793,15 @@ export const TEAM_RESOURCES: Record<
       insightsKey(t),
       ...recordCountDeps("stories"),
     ],
-    // …and the relationship map's picture of anything standing beside this
-    // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
-    slicePrefix: RECORD_MAP_PREFIX,
+    // …and every per-record slice of the backlog — an app's, a ticket's and a
+    // sprint's own Stories tab (`sliceKey("stories-app"|"stories-ticket"|
+    // "stories-sprint", …)`), plus the relationship map's picture of anything
+    // standing beside this row. The ping cannot name any of those keys, see
+    // RECORD_MAP_PREFIX — and T3652 is this same gap: a story written from a
+    // TICKET's Related-stories tab only ever invalidated that ticket's own
+    // slice (help-detail.tsx), so the very app it was filed against never
+    // heard, and its Stories tab stayed on whatever it had loaded before.
+    slicePrefix: ["stories-app-of:", "stories-ticket-of:", "stories-sprint-of:", RECORD_MAP_PREFIX],
   },
   // A sprint has a list of its own, and its rows carry counts of the stories
   // inside it — so a sprint ping patches the sprint row and leaves the backlog

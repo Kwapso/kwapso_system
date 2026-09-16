@@ -386,10 +386,23 @@ export function HelpFormDialog({
   React.useEffect(() => {
     if (!open) setPending([])
   }, [open])
-  // WHICH CLIENT THE CONTACT LIST BELONGS TO — the one already on the ticket, or
-  // the one being picked. Read from the same door the account screen reads, so
-  // "who is a contact here" has one answer in the app.
-  const chosenAccountId = initial?.accountId ?? (values.accountId === NONE ? null : values.accountId)
+  // T3655 — "when raising tickets or stories on any record from inside its
+  // parent record… it does not make sense to select the app or the account."
+  // The APP already answers this: every app has exactly one owning account
+  // (or none, if it's the agency's own), so opening this form FROM an app
+  // makes the account a fact about where you are standing, same as the app
+  // itself — never a second question. `undefined` here means "not opened from
+  // an app, or its row hasn't loaded yet"; once `fixedAppRow` resolves, its
+  // `accountId` is the settled answer even when that answer is null.
+  const fixedAppRow = fixedApp ? appsQ.data?.find((a) => a.id === fixedApp.id) : undefined
+  const appAccountResolved = !!fixedApp && fixedAppRow !== undefined
+  // WHICH CLIENT THE CONTACT LIST BELONGS TO — the one already on the ticket,
+  // the one the fixed app settles, or the one being picked. Read from the same
+  // door the account screen reads, so "who is a contact here" has one answer
+  // in the app.
+  const chosenAccountId =
+    initial?.accountId ??
+    (appAccountResolved ? (fixedAppRow?.accountId ?? null) : values.accountId === NONE ? null : values.accountId)
   // WHICH APP THE MODULE LIST BELONGS TO — the one pinned by the screen this
   // form was opened from, or the one being picked.
   const chosenAppId = fixedApp?.id ?? (values.appId === NONE ? null : values.appId)
@@ -443,9 +456,22 @@ export function HelpFormDialog({
   // it. Its NAME now comes from the account's own record rather than from a page
   // of the list: the detail is already being read for the contacts below it, and
   // a company past page one used to be shown to its own ticket as "this account".
+  //
+  // T3655 — same treatment for the app's OWN account, once `appAccountResolved`
+  // says the app's row has answered. `detailQ` already reads whichever id
+  // `chosenAccountId` names, so the app's account name arrives through the
+  // exact seam the ticket's own fixed account already used.
   const fixedAccount = initial?.accountId
     ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this account") }
-    : null
+    : appAccountResolved && fixedAppRow?.accountId
+      ? { id: fixedAppRow.accountId, name: detailQ.data?.account.name ?? t("this account") }
+      : null
+  // T3655's OTHER settled answer — the app is ours, so the account question is
+  // answered "none" rather than left open. No id to show, so it is not folded
+  // into `fixedAccount` above; the picker's own words for this state
+  // (`t("Ours, no account")`) are reused rather than a new sentence invented
+  // for the same fact (R34).
+  const fixedNoAccount = appAccountResolved && !fixedAppRow?.accountId
 
   /* ── THE TYPE CHIPS ────────────────────────────────────────────────────────
      CLIENT, 2026-09-07: "The type: I also don't want it as a dropdown, but I
@@ -994,9 +1020,11 @@ export function HelpFormDialog({
         // this is the value that can never be a surprise.
         accountId: fixedAccount
           ? fixedAccount.id
-          : values.accountId === NONE
+          : fixedNoAccount
             ? undefined
-            : values.accountId,
+            : values.accountId === NONE
+              ? undefined
+              : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId === NONE ? undefined : values.appId,
         moduleId: values.moduleId === NONE ? undefined : values.moduleId,
         // WHAT THE ROW SHOWS IS WHAT GETS SENT — `raisedByValue`, which is what
@@ -1100,6 +1128,10 @@ export function HelpFormDialog({
         {fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="help-account">
             {fixedAccount.name}, a ticket can&apos;t be moved to another account.
+          </p>
+        ) : fixedNoAccount ? (
+          <p className="text-muted-foreground text-sm" id="help-account">
+            {t("Ours, no account")}
           </p>
         ) : (
           <RecordPicker
