@@ -17,15 +17,31 @@
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
 import { readsInternalMoney } from "@shared/workers/money-taint"
-import { B, checkArgTypes, enumOf, N, obj, S, str } from "@shared/workers/tool-args"
+import { B, checkArgTypes, enumOf, obj, S, str } from "@shared/workers/tool-args"
 import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
+import { MCP_ONLY_TOOLS, RECORD_ACTIVE_GENERIC_DESC } from "@shared/workers/mcp-catalog"
 import type { Env } from "../env"
 
 export type McpTool = {
   name: string
   description: string
+  /** What `describe_tool` hands back on request — the rest of what a
+   * SharedTool's `detail` already carries for a projected tool, declared here
+   * for the tools that exist ONLY on this surface (`@shared/workers/mcp-catalog`,
+   * `@shared/workers/record-toggles`), so tenancy's own describe door can read
+   * it without importing this worker's `src`. */
+  detail?: string
+  /** The WRITE permission this tool needs, exactly as `TOOL_GATES` would answer
+   * for its own canonical name — carried here rather than re-derived from
+   * `name` at filter time, because a shared tool's MCP name can differ from the
+   * canonical one `TOOL_GATES` is keyed by (`create_invite` is `invite_member`'s
+   * gate lookup). `tools/list` filters on this with the SAME `keptForRights`
+   * predicate `toolSpecs` (workers/data-ops) filters the agent's catalogue
+   * with — undefined for a read, or for `set_record_active` (no single gate to
+   * name across twenty-one doors), which both mean "never hidden by role". */
+  gate?: string
   inputSchema: Record<string, unknown>
   binding: "AUTH" | "TENANCY" | "CONTENT" | "DATAOPS"
   method: "GET" | "POST"
@@ -62,6 +78,7 @@ function toMcpTool(s: SharedTool): McpTool {
     // Restore the developer permission hint external MCP clients relied on ("… Needs
     // member_roles:create."); the door still enforces it regardless.
     description: (gate ? `${s.summary} Needs ${gate}.` : s.summary) + pause,
+    gate,
     inputSchema: s.schema,
     binding: s.binding,
     method: s.method,
@@ -75,250 +92,22 @@ function toMcpTool(s: SharedTool): McpTool {
  * the scripted agentic-import batch flow, the AI allowance, the saved conversations, and
  * the assistant bridge (metered like any chat turn). The agent needs none of them — it
  * runs inside the app, where the screen already knows who the caller is, what they may
- * do, and what the allowance says. A machine client has no screen. */
-const MCP_ONLY: McpTool[] = [
-  {
-    name: "whoami",
-    description: "The token's owner + the team this token is pinned to.",
-    inputSchema: obj({}),
-    binding: "AUTH",
-    method: "GET",
-    path: "/api/auth/me",
-  },
-  {
-    name: "my_permissions",
-    description:
-      "What this token may DO in its team: the caller's own access rights, module by module (read / create / edit / delete). whoami says who and where; this says what. Every door re-checks the same rights on every call, so this is how a client knows before it asks instead of learning from a 403.",
-    inputSchema: obj({}),
-    binding: "TENANCY",
-    method: "GET",
-    path: "/api/tenancy/my-permissions",
-  },
-  {
-    name: "get_team",
-    description:
-      "The pinned team's own record, its name, when it was created and by whom. The read half of update_team.",
-    inputSchema: obj({}),
-    binding: "TENANCY",
-    method: "GET",
-    path: "/api/tenancy/team-meta",
-  },
-  // ---- exports (READ right; the same full-field CSVs the Export buttons serve) ----
-  {
-    name: "export_roles_csv",
-    description: "Every member role as CSV, full fields incl. the flattened permission matrix.",
-    inputSchema: obj({}),
-    binding: "TENANCY",
-    method: "GET",
-    path: "/api/tenancy/roles/export",
-  },
-  {
-    name: "export_dropdown_values_csv",
-    // R19 — the door grew a `groups` filter on 11 Sep 2026 (each module's
-    // settings page exports its own vocabulary), so this tool exposes AND
-    // forwards it. R27 — every backticked word below is this tool's own
-    // argument or a column the CSV really carries.
-    description:
-      "Every dropdown value as CSV (full fields + audit), one row per option. Narrow it to named groups with `groups`, comma-separated and spelled exactly as the group is (\"Ticket type,Story type\") — leave it out for the team's whole vocabulary. Naming a group the team has no rows in is not an error, it answers with the header and nothing under it. The columns lead with the import format, so a file exported here goes straight back in through the importer.",
-    inputSchema: obj({ groups: S }),
-    binding: "TENANCY",
-    method: "GET",
-    path: "/api/tenancy/selectable/export",
-    buildQuery: (i) => (i.groups ? `?groups=${encodeURIComponent(String(i.groups))}` : ""),
-  },
-  // The agency's own housekeeping. Each is the READ half of an import target, so
-  // a file exported here goes straight back in through the importer — which is
-  // what makes the legacy migration reversible while it is still being checked.
-  {
-    name: "export_brand_assets_csv",
-    description: "The whole brand library as CSV (full fields + audit).",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/brand-assets/export",
-  },
-  {
-    name: "export_meeting_purposes_csv",
-    description: "Every meeting purpose as CSV, with its department (full fields + audit).",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/delivery/purposes/export",
-  },
-  {
-    name: "export_accounts_csv",
-    description:
-      "Every account you can see as CSV, companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME seven filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `archived` ('yes' or 'no'), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot), `parentId`, `manager` (a staff member's user id), `country` (an exact match against the team's Country vocabulary). Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR, a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
-    inputSchema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, manager: S, country: S }),
-    binding: "TENANCY",
-    method: "GET",
-    path: "/api/tenancy/accounts/export",
-    buildQuery: (i) => {
-      const q: string[] = []
-      for (const key of ["q", "type", "archived", "portal", "parentId", "manager", "country"])
-        if (typeof i[key] === "string" && i[key]) q.push(`${key}=${encodeURIComponent(String(i[key]))}`)
-      return q.length ? `?${q.join("&")}` : ""
-    },
-  },
-  // ---- the agentic import (plan is METERED on the app's own daily AI allowance) ----
-  {
-    name: "list_import_targets",
-    description:
-      "What this team may import into: every active import target, with the table key you pass to get_import_sample. Read this before building a file, the catalogue is per-team, and an owner can switch a target off.",
-    inputSchema: obj({}),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/import/targets",
-  },
-  {
-    name: "get_import_sample",
-    description:
-      "A sample CSV for one import target (`tableKey` from list_import_targets): the column headers the importer expects, plus one example row. It is a template, no team data in it.",
-    inputSchema: obj({ tableKey: S }, ["tableKey"]),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/import/sample",
-    buildQuery: (i) => `?tableKey=${encodeURIComponent(String(i.tableKey ?? ""))}`,
-  },
-  {
-    name: "start_import",
-    description:
-      "Start a file import: opens a batch. Add files with add_import_file, then plan_import, then run_import.",
-    inputSchema: obj({}),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/import/batch",
-    buildBody: () => ({}),
-  },
-  {
-    name: "add_import_file",
-    description: "Attach one CSV (text) to an import batch.",
-    inputSchema: obj({ batchId: S, name: S, csv: S }, ["batchId", "csv"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/import/batch/file",
-    buildBody: (i) => ({ batchId: i.batchId, name: i.name ?? "file.csv", csv: i.csv }),
-  },
-  {
-    name: "plan_import",
-    description:
-      "Build the import plan (which table each file feeds, column mapping, dependency order, rows that will be skipped + why). Uses one AI request from the team's quota.",
-    inputSchema: obj({ batchId: S }, ["batchId"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/import/batch/plan",
-    buildBody: (i) => ({ batchId: i.batchId }),
-  },
-  {
-    name: "run_import",
-    // R22 — the door grew an optional `groups` scope on 11 Sep 2026, so this
-    // tool offers the door's whole contract rather than a narrower one. R27 —
-    // every backticked word below is this tool's own argument or another tool's
-    // name.
-    description:
-      "Run a PLANNED import in dependency order. Writes through the same gated doors the screens use (full audit trail); returns the per-row report. `groups` narrows the run to named dropdown groups, which is what a module's own settings page sends when somebody imports from there: a row in any other group is skipped with a reason instead of written, and a file that feeds anything but dropdown values is refused outright. Leave it out to run the plan as `plan_import` built it.",
-    inputSchema: obj({ batchId: S, groups: { type: "array", items: S, maxItems: 8 } }, ["batchId"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/import/batch/confirm",
-    buildBody: (i) => ({ batchId: i.batchId, groups: i.groups }),
-  },
-  {
-    name: "continue_import",
-    // R27 keeps this honest: a backticked name here must be this tool's own
-    // argument, a field ITS door reads or answers with, or another tool's name.
-    // The place a dead run stopped is real but it is `get_import`'s field, not
-    // this door's — so it is described in words and named by the tool that
-    // actually carries it.
-    description:
-      "Pick up an import that did not finish. A run that dies part way leaves its batch marked running, remembering which table it was inside and how many of that table's rows were done — get_import shows that. This continues from there instead of starting again, which is what re-running the file would do and would write every finished row a second time. It takes the same `batchId` as run_import and answers with the same `report`, covering the whole import rather than this leg, and the same optional `groups` scope — which is NOT remembered from the run being picked up, so a resume that leaves it out finishes the file unnarrowed. Refused when there is nothing to pick up. Up to eleven rows either side of the interruption may be written twice; the report says where it resumed.",
-    inputSchema: obj({ batchId: S, groups: { type: "array", items: S, maxItems: 8 } }, ["batchId"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/import/batch/continue",
-    buildBody: (i) => ({ batchId: i.batchId, groups: i.groups }),
-  },
-  {
-    name: "list_imports",
-    description: "The team's import history (who ran what, when, totals).",
-    inputSchema: obj({}),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/import/batches",
-  },
-  {
-    name: "get_import",
-    description:
-      "One import batch in full (by `id`): its files, the plan, which table each file feeds, the column mapping, the rows that will be skipped and why, and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one of the team's assistant credits, so a client that lost a plan_import answer should come here first.",
-    inputSchema: obj({ id: S }, ["id"]),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/import/batch",
-    buildQuery: (i) => `?id=${encodeURIComponent(String(i.id ?? ""))}`,
-  },
-  // ---- the in-app assistant, over MCP (metered like any chat turn) ----
-  {
-    name: "get_ai_allowance",
-    description:
-      "How many assistant credits this team has left (the free daily ones plus any an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets, this is how a client sees that coming instead of discovering it. Needs agent:read.",
-    inputSchema: obj({}),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/agent/usage",
-  },
-  {
-    name: "list_ai_usage",
-    description:
-      "Where the allowance went: the team's AI usage trail, newest first, one row per assistant turn. `limit` caps how many rows come back (default 50, most 200). Other members' prompts are redacted. Needs agent:read.",
-    inputSchema: obj({ limit: N }),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/agent/usage-log",
-    buildQuery: (i) => (Number.isFinite(Number(i.limit)) ? `?limit=${Number(i.limit)}` : ""),
-  },
-  {
-    name: "list_agent_threads",
-    description: "The caller's own saved assistant conversations (newest first). Needs agent:read.",
-    inputSchema: obj({}),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/agent/threads",
-  },
-  {
-    name: "get_agent_thread",
-    description:
-      "One saved conversation's messages, oldest first (by `id` from list_agent_threads), what was asked, what the assistant answered, and which actions it took. Needs agent:read.",
-    inputSchema: obj({ id: S }, ["id"]),
-    binding: "DATAOPS",
-    method: "GET",
-    path: "/api/data-ops/agent/thread",
-    buildQuery: (i) => `?id=${encodeURIComponent(String(i.id ?? ""))}`,
-  },
-  {
-    name: "agent_chat",
-    description:
-      "Talk to the team's assistant, it can answer from live data or act (as the token's owner, capped by their permissions). If it proposes a guarded action, call agent_confirm with the returned threadId. `sources` narrows which doors the assistant may read the KNOWLEDGE BASE through for this whole conversation — a list of any of: meetings, mail, drive, chat, records, articles. It is ENFORCED rather than suggested: the named set is put onto every retrieval the assistant makes on this turn, so a door left out cannot be read from however the assistant phrases its own call. Leave it off and it reads all of them, which is the normal case. A reply whose outcome says it is still carrying on ran out of its request before it ran out of work: call again with the same `threadId` and `continue` true (the `message` is ignored then) and it carries on from the results it already saved, up to four requests in all.",
-    inputSchema: obj({ message: S, threadId: S, sources: { type: "array" }, continue: { type: "boolean" } }, ["message"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/agent/chat",
-    buildBody: (i) => ({
-      message: i.message,
-      ...(i.threadId ? { threadId: i.threadId } : {}),
-      ...(Array.isArray(i.sources) && i.sources.length ? { sources: i.sources } : {}),
-      ...(i.continue === true ? { continue: true } : {}),
-    }),
-  },
-  {
-    name: "agent_confirm",
-    description: "Approve (or decline) the action(s) the assistant proposed on a thread.",
-    inputSchema: obj({ threadId: S, approve: { type: "boolean" } }, ["threadId", "approve"]),
-    binding: "DATAOPS",
-    method: "POST",
-    path: "/api/data-ops/agent/confirm",
-    buildBody: (i) => ({ threadId: i.threadId, approve: i.approve === true }),
-  },
-]
+ * do, and what the allowance says. A machine client has no screen.
+ *
+ * DECLARED IN `@shared/workers/mcp-catalog` (name, summary, detail, wiring) — this
+ * just projects the `summary` onto the manifest `description` and carries `detail`
+ * through for `describe_tool`, exactly as `toMcpTool` does for a SharedTool below. */
+const MCP_ONLY: McpTool[] = MCP_ONLY_TOOLS.map((t) => ({
+  name: t.name,
+  description: t.summary,
+  detail: t.detail,
+  inputSchema: t.inputSchema,
+  binding: t.binding,
+  method: t.method,
+  path: t.path,
+  buildBody: t.buildBody,
+  buildQuery: t.buildQuery,
+}))
 
 /** The MCP's full catalog: every shared endpoint (projected) + the MCP-only tools. */
 /** SWITCHING A RECORD OFF, OR BACK ON — twenty-one tools, generated from the
@@ -354,6 +143,8 @@ const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([reco
       (e.confirm === "never"
         ? ""
         : " Destructive or access-widening: confirm with a person before calling this."),
+    detail: e.detail,
+    gate,
     inputSchema: obj(
       e.needsAppId
         ? { [e.idField]: S, appId: S, active: B }
@@ -388,20 +179,8 @@ const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([reco
  * declared once in `@shared/workers/record-toggles`, projected twice. */
 const RECORD_ACTIVE_GENERIC: McpTool = {
   name: "set_record_active",
-  description:
-    "Switch a record off, or back on, across every record kind this surface also " +
-    "publishes as named tools (set_account_active, set_role_active, …) — this is the same operation, " +
-    "generic. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, " +
-    "app, app_module, process, wave, client_department, client_role, client_tool, " +
-    "meeting, knowledge_source, deliverable, brand_asset, meeting_purpose " +
-    "or staff_profile. `id` is that record's id — except a role, which takes `roleId` — and a " +
-    "deliverable also needs `appId`. `active` false switches it off (archive, deactivate, revoke, " +
-    "cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED, and " +
-    "calling it twice changes nothing the second time. Each kind needs its own module's right — see " +
-    "the matching set_<kind>_active tool's description for its exact gate. Destructive or " +
-    "access-widening for SOME record kinds, never for others: confirm with a person before calling " +
-    "this unless you already know the kind you are calling it for is one of the ones that runs straight " +
-    "through.",
+  description: RECORD_ACTIVE_GENERIC_DESC.summary,
+  detail: RECORD_ACTIVE_GENERIC_DESC.detail,
   // `record` is an ENUM, not a bare string: an unrecognised kind used to
   // type-check fine and fall through to the CANONICAL door below, so a ticket id
   // sent with record:"ticket" reached the ACCOUNTS archive door. checkArgTypes
@@ -591,4 +370,38 @@ export async function forwardTool(
       }),
     }
   return { ok: res.ok, text: raw }
+}
+
+/** THE CALLER'S OWN RIGHTS, for `tools/list` to trim by — the same door
+ * `my_permissions` forwards to (`GET /api/tenancy/my-permissions`), read here
+ * directly rather than through a second tool lookup, and turned into the
+ * `module:right` shape `keptForRights` (and `toolSpecs`, the agent's own
+ * caller) already expects.
+ *
+ * FAILS OPEN, on purpose and for the SAME reason `rightsSheet` does on the
+ * agent's side: a caller whose sheet could not be read must see the whole
+ * manifest, never a silently emptied one — a permissions read that fails is
+ * not evidence of anything, and guessing "nothing" from it would be a second,
+ * harsher refusal riding on top of whatever already went wrong. */
+export async function heldRights(env: Env, cookie: string, traceId: string): Promise<Set<string> | undefined> {
+  try {
+    const res = await forwardToDoor(env.TENANCY, {
+      path: "/api/tenancy/my-permissions",
+      method: "GET",
+      cookie,
+      traceId,
+      origin: "mcp",
+      timeoutMs: DOOR_TIMEOUT_MS,
+    })
+    if (!res.ok) return undefined
+    const body = (await res.json()) as { permissions?: Record<string, Record<string, boolean>> }
+    const permissions = body.permissions
+    if (!permissions) return undefined
+    const held = new Set<string>()
+    for (const [module, rights] of Object.entries(permissions))
+      for (const [right, allowed] of Object.entries(rights)) if (allowed) held.add(`${module}:${right}`)
+    return held
+  } catch {
+    return undefined
+  }
 }

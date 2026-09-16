@@ -28,6 +28,7 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { teamContext } from "@shared/workers/gating"
 import { queryText } from "@shared/workers/validate"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { describeMcpOnly, mcpOnlyToolNames } from "@shared/workers/mcp-catalog"
 import type { Env } from "../env"
 
 /** HOW MANY NEAR NAMES A REFUSAL OFFERS (R14: a hard cap, and a small one). It
@@ -46,7 +47,16 @@ const NEAR_CAP = 5
  * Answers `summary` (the one line the manifest carries) and `detail` (everything
  * that used to be in it). A tool short enough never to have been trimmed has no
  * `detail` and says so with `trimmed` false, rather than repeating itself.
- */
+ *
+ * REACHES ALL 179 TOOLS, not just the ~two dozen tenancy/content CRUD ones
+ * `SHARED_TOOLS` declares. The 18 `set_<record>_active` toggles, the generic
+ * `set_record_active`, and the 23 MCP-only tools (whoami, the CSV exports, the
+ * agentic-import batch flow, the AI allowance, the assistant bridge) used to
+ * answer "unknown tool" here — they exist only in the mcp worker's own
+ * catalogue, which this tenancy door cannot import (`shared/` is the one thing
+ * that crosses a worker boundary in this codebase). `@shared/workers/mcp-catalog`
+ * declares their `summary`/`detail` in shared/ for exactly that reason, the same
+ * seam `SHARED_TOOLS` itself already uses. */
 export async function getToolDescribe(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await refusePortalCaller(cfg, guard)
@@ -54,11 +64,13 @@ export async function getToolDescribe(request: Request, env: Env): Promise<Respo
   if (!name) return fail(400, "invalid_input", "A tool name is required.")
 
   const found = SHARED_TOOLS.find((t) => t.name === name || t.mcpName === name)
-  if (!found) {
+  const mcpOnly = found ? undefined : describeMcpOnly(name)
+  if (!found && !mcpOnly) {
     // Named, not just refused: a model handed "there is nothing called that"
     // asks the same question again, and a model handed the nearest three names
     // corrects itself in the same turn.
-    const near = SHARED_TOOLS.map((t) => t.name)
+    const allNames = [...SHARED_TOOLS.map((t) => t.name), ...mcpOnlyToolNames()]
+    const near = allNames
       .filter((n) => n.includes(name) || name.includes(n.split("_")[0]))
       .slice(0, NEAR_CAP)
     return fail(
@@ -69,10 +81,12 @@ export async function getToolDescribe(request: Request, env: Env): Promise<Respo
     )
   }
 
+  const summary = found ? found.summary : mcpOnly!.summary
+  const detail = found ? found.detail : mcpOnly!.detail
   return json({
-    tool: found.name,
-    summary: found.summary,
-    trimmed: !!found.detail,
-    ...(found.detail ? { detail: found.detail } : {}),
+    tool: found ? found.name : name,
+    summary,
+    trimmed: !!detail,
+    ...(detail ? { detail } : {}),
   })
 }
