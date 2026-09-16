@@ -166,11 +166,6 @@ const DOOR_ORDERED: Record<string, string> = {
     "with no header to click. The cell is real (`formatDate`) and the column " +
     "is real, but neither the door nor the browser ever compares it."
   ),
-  end: (
-    "Waves' own List, the identical reasoning `start` carries one line up — " +
-    "the same `waveListColumns`, the same missing `sort` key, the same " +
-    "toolbar-owned order."
-  ),
   due: (
     "Inputs (web/components/accounts/inputs-screen.tsx). The identical " +
     "`deadline`/`start` shape: the screen's `<PagedFind>` passes " +

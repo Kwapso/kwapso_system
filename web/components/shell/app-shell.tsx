@@ -535,13 +535,11 @@ export function AppShell({
   const assistantOpen = useAgentOpen()
   // THE ASSISTANT COLUMN'S WIDTH IS GONE. "Let's forget about the resize.
   // It's a disaster. Remove it." — the client's ruling, 16 Sep 2026 evening.
-  // `web/lib/aside-width.ts` (the drag's CONTROLLED half: `asideWidth`,
-  // `onAsideWidthChange`, the per-person `ss-aside-width:*` persistence) is
-  // deleted outright, not just unwired here — the aside is one fixed width
-  // from the kit again, same as before variation A shipped. One line of
-  // cleanup survives it: a browser that dragged the seam before this ruling
-  // still holds the old key, and nothing reads it any more to clear it on
-  // its own behalf.
+  // The aside-width store was deleted (the drag's CONTROLLED half was removed),
+  // and the aside is one fixed width from the kit again, same as before variation A
+  // shipped. One line of cleanup survives it: a browser that dragged the seam before
+  // this ruling still holds the old `ss-aside-width:*` key in localStorage, and
+  // nothing reads it any more to clear it on its own behalf.
   React.useEffect(() => {
     try {
       const doomed: string[] = []
@@ -1545,7 +1543,7 @@ export function AppShell({
            forget about the resize. It's a disaster. Remove it." Variation A
            ("drag the seam", ruled earlier the same day) and its whole
            app-side half — the CONTROLLED `asideWidth`/`onAsideWidthChange`
-           pair, the per-person `web/lib/aside-width.ts` store, and
+           pair, the per-person width persistence store, and
            `asideResizeLabel`'s own accessible name for the seam — are
            deleted rather than merely unwired: nothing here passes any of
            the three, so the aside goes back to the kit's own single fixed

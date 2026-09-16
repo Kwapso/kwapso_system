@@ -77,16 +77,6 @@ function departmentMark(name: string | null | undefined): DepartmentStyle | null
   return TASK_DEPARTMENTS.find((d) => d.name === name) ?? null
 }
 
-/** The department's own Phosphor icon name (kebab-case, resolved to a
- * component through `iconComponent()` on the web side) — the client's own
- * answer to what a department wears now instead of a colour: "What they have
- * is an icon." `null` for a department the code has never met, the same
- * "reads as itself, draws no glyph" answer every other closed-vocabulary icon
- * lookup in this app gives (`storyTypeIconName`, `sprintTypeIcon`). */
-export function departmentIconName(name: string | null | undefined): string | null {
-  return departmentMark(name)?.icon ?? null
-}
-
 /** The department's mark as a CHARACTER, for the places a mark has to be text —
  * a table cell, a select option, a row title. Each is the nearest plain glyph to
  * the icon the agency chose (paper aeroplane, folder, code brackets, star,

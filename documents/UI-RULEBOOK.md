@@ -757,15 +757,15 @@ lands on it exactly, and a drag that releases elsewhere keeps the exact pixel va
 The content column keeps its own minimum width regardless: the aside's existing viewport
 caps (`max-w-[calc(100vw-var(--shell-gutter)*2)]`, `lg:max-w-[40vw]`) still hold, so a wide
 drag on a narrow window is capped by the same mechanism that already protected the content
-column before this ruling. `web/lib/aside-width.ts` persists the chosen width per person in
-`localStorage` (try/catch, matching `web/lib/agent-open.ts`'s own defensiveness), scoped by
-the signed-in person's id the same way `workspace-tabs.ts` scopes a shared device's open
-tabs — wired in `app-shell.tsx`.
+column before this ruling. The aside-width store and its per-person persistence were deleted
+on 16 Sep 2026; previously this persisted the chosen width in `localStorage` (try/catch,
+matching `web/lib/agent-open.ts`'s own defensiveness), scoped by the signed-in person's id
+the same way `workspace-tabs.ts` scopes a shared device's open tabs.
 
 **Assistant width design (16 Sep 2026):** *"can we actually not show anything and make it so that I can grab the left rail of the assistant, and when I hover over there, I see this kind of arrow to move?"* — client. The seam draws nothing at rest; the aside's left edge is the grab area; hover shows the col-resize arrow; snaps and keyboard navigation are unchanged (kit v1.2.93, `RESIZE_SEAM` in screen-shell.tsx).
 
 **Law.** None registered — `shared/ui/compositions/templates/screen-shell.tsx` carries the
-drag/snap/keyboard mechanism; `web/test/aside-width.test.ts` pins the app-side persistence.
+drag/snap/keyboard mechanism; app-side persistence testing was deleted on 16 Sep 2026.
 
 ### L15: tab strips reorder by drag or keyboard, and pinned tabs stay fixed
 
