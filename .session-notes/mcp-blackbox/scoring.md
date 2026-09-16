@@ -54,6 +54,25 @@ tester reports.
 - Wall-clock, first call to last:
 - Tasks correct: `___ / 10`
 
+## Baseline finding — ask_knowledge on the real corpus (not the tester's fault)
+
+Captured 2026-09-16, ~12:06–12:07 UTC (staging), by this setup — before any
+tester touched the sandbox:
+
+- `ask_knowledge({"q": "What is Confia, and what work has been done for them?"})` → `door_timeout` (no answer within 30s).
+- `ask_knowledge({"q": "Confia"})`, retried immediately after → `door_timeout` again.
+
+At the same time, `get_knowledge_status` showed the `ticket` ingest kind at
+76→81 of 2,065 sourced (climbing slowly, `lastRunAt` `2026-09-16T12:05:19Z`)
+— `knowledge_hygiene`'s rebuild was actively running against this team's
+real, much larger Vectorize index. **If the tester's task 10 also times
+out, that is this same baseline reproducing, not a new tester-caused
+failure** — score it as a finding about the surface, not against them.
+Task 10 stays PENDING until the planner confirms the rebuild has caught
+up; re-run `ask_knowledge({"q": "Confia"})` at that point and record
+whatever comes back in answer-key.md before scoring the tester's own
+attempt.
+
 ## Reading the result
 
 This measures the MCP surface's usability to a cold caller with no repo
