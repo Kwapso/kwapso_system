@@ -83,11 +83,44 @@ BOOTSTRAP.md stands the whole thing up from zero.
   commands now open with `npm run lang:check` and REFUSE on a stale catalogue, so a
   ship can no longer carry a sentence nobody translated or a language nobody speaks.
   The check is a second apart and fails before the two-minute build rather than after it.
-- deploy_staging_command: npm run deploy:staging (root; runs `account:check`, then `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → **migrations:check** → content → data-ops → mcp → gateway → portal-gateway, staging names)
-- deploy_production_command: npm run deploy:production (root; `account:check` then `lang:check` first, then the same eight-worker realtime-first order with `migrations:check` between tenancy and content, production names)
+- deploy_staging_command: **npm run ship:staging** (root; `scripts/deploy-from-worktree.mjs staging` — see "Deploying from a clean worktree" below. It resolves `origin/main`, checks it out into an isolated worktree, dry-run bundles all eight workers, then runs `npm run deploy:staging` FROM THAT WORKTREE: `account:check`, then `lang:check`, then `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → **migrations:check** → content → data-ops → mcp → gateway → portal-gateway, staging names)
+- deploy_production_command: **npm run ship:production** (root; `scripts/deploy-from-worktree.mjs production` — same worktree/lock/dry-run wrapper, then `npm run deploy:production` FROM THAT WORKTREE: `account:check` then `lang:check` first, then the same eight-worker realtime-first order with `migrations:check` between tenancy and content, production names)
+- `npm run deploy:staging` / `npm run deploy:production` still exist and are what the wrapper runs — they build and deploy from WHATEVER TREE THEY ARE RUN IN, with no worktree or lock of their own. Never run them directly against the primary checkout; that is the fault below. They stay useful as the thing the wrapper calls, and for BOOTSTRAP's from-scratch, nobody-else-is-touching-this-repo-yet cold start.
 - github_remote: origin (https://github.com/Kwapso/kwapso_system.git — renamed from
   `kwapso_cpaa` on 2026-08-26; GitHub redirects the old URL, but the remote and every
   reference below point at the live name directly)
+
+## Deploying from a clean worktree (16 Sep 2026)
+
+**Why.** Three lanes merged into main in the primary checkout on 16 Sep 2026 and each
+ran the ship path from it. A merge rewrote files under a running `esbuild` mid-deploy
+and production deployed two of eight workers on a tree that matched no commit at all —
+not the pre-merge state, not the post-merge state. `npm run deploy:staging` /
+`deploy:production` build and deploy from whatever is on disk in the checkout they run
+in; that is fine when exactly one person is working, and it is a race the moment a
+second shell can touch the same files mid-build. `npm run ship:staging` /
+`ship:production` (`scripts/deploy-from-worktree.mjs`) close that: they resolve
+`origin/main` to one SHA, check that exact commit out into an isolated, detached
+worktree (`.worktrees/deploy`, git-ignored, recreated at the start of every run and
+removed at the end), and run the whole existing deploy chain from there. A merge
+landing on main while the deploy is running cannot touch a worktree that is already
+checked out at a fixed commit — there is nothing left on disk for it to race with. Both
+`ship:*` commands print the SHA they are deploying at the start and again at the end,
+so a run always says which commit actually shipped.
+
+**The lock.** Only one deploy runs at a time, project-wide: `.worktrees/deploy.lock` is
+created with the exclusive `wx` open flag, which the filesystem makes atomic, so two
+`ship:*` runs racing to start can never both believe they hold it. The second one
+refuses immediately with a plain sentence naming who holds the lock, the SHA and
+target they are deploying, and how long ago they started — it does not wait, retry, or
+poll for the lock to free, because looping on a lock is how one stuck run becomes two.
+A lock older than 30 minutes is almost certainly a crashed process, but the script never
+removes one on its own; it reports the age instead and leaves removing it (`rm
+.worktrees/deploy.lock`) to a person who has actually confirmed nothing is running.
+Before either chain touches a real worker, every one of the eight is bundled with
+`wrangler deploy --dry-run` from the worktree, so a resolve error anywhere aborts the
+whole run before a single worker is uploaded — `npm run check` runs no wrangler at all,
+so this is the first thing in the ship path that actually invokes it.
 
 ## Reset config
 

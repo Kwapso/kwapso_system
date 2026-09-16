@@ -34,6 +34,8 @@
     "smoke:staging": "node scripts/smoke-staging.mjs",
     "smoke:portal": "node scripts/smoke-portal.mjs",
     "smoke:mcp": "node scripts/smoke-mcp.mjs",
+    "ship:staging": "node scripts/deploy-from-worktree.mjs staging",
+    "ship:production": "node scripts/deploy-from-worktree.mjs production",
     "walk:mobile": "node scripts/walk-mobile.mjs"
   },
   "devDependencies": {

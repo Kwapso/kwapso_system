@@ -77,6 +77,7 @@ import { ResolveDialog, type ResolveFormValues } from "@/components/tickets/reso
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
+import { invalidateFindsOf } from "@/components/records/paged-find"
 import { TicketStages } from "@/components/tickets/ticket-stages"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
@@ -1220,6 +1221,18 @@ export function HelpDetailScreen({
           // the file silently.
           const madeId = await createStoryFrom(teamId, { ...v, ticketId: helpId }, t)
           invalidate(sliceKey("stories-ticket", helpId))
+          // T3654 — the resting key alone is not what this panel reads from;
+          // see invalidateFindsOf's own header (paged-find.tsx).
+          invalidateFindsOf(sliceKey("stories-ticket", helpId))
+          // T3652 — the story is also filed against whichever app the form's
+          // own (editable, since there is no `fixedApp` here) App field named.
+          // Nothing else in this dialog's cache touches that app's own Stories
+          // tab, so a story raised from here sat correctly in the door and
+          // never patched the one screen a person would check it against.
+          if (v.appId) {
+            invalidate(sliceKey("stories-app", v.appId))
+            invalidateFindsOf(sliceKey("stories-app", v.appId)) // T3654
+          }
           return madeId
         }}
       />

@@ -1901,16 +1901,24 @@ export async function createTicket(
   // reads it — a ticket that exists for a moment with no number is a ticket
   // somebody screenshots with no number.
   //
-  // GATED ON `accountId`, not on the team-wide counter: the reference is TEAM
-  // wide now (no account-code prefix, shared/workers/refs.ts), but "the number
-  // a client quotes" still needs a client. The agency's own question, with no
-  // account, gets no reference — same answer as before, for the same reason.
+  // UNGATED ON `accountId` (T3653, 16 Sep 2026 ruling). This used to mint only
+  // when a client was named — a holdover from the account-coded shape
+  // ("BERG-T0412"), where an account was a structural input to the STRING
+  // itself and no account meant there was nothing to build one from. Migration
+  // 0059 dropped the account code from the format entirely: `nextTeamRef` takes
+  // no `accountId` and never has, since the string is a bare team-wide counter.
+  // So the gate outlived the reason it existed for by one day (0059 landed
+  // 31 Aug, the accountId-gated rewrite of this line is dated 1 Sep) and ran on
+  // for two weeks as a policy choice nobody had actually decided — "every
+  // ticket and story gets a number," account or not, is the owner's own
+  // story, and a ticket raised today with no client silently never got one
+  // until somebody named one later, which is the whole of T3653.
   //
   // ON ITS OWN LINE, AFTER THE WAVES, because it is the one preflight step that
   // WRITES: it mints the next number in the sequence a client quotes. Run beside
   // a check that fails and it would burn a reference nobody ever sees — the rule
   // parallel.ts states for exactly this call.
-  const ref = accountId ? await nextTeamRef(cfg, guard, TEAM_REF_KINDS.ticket) : null
+  const ref = await nextTeamRef(cfg, guard, TEAM_REF_KINDS.ticket)
   // WHO IS RAISING IT decides whether the wording is still the account's. A
   // ticket a STAFF member types is locked the instant it exists: the first staff
   // touch has already happened — it is us. A client's own question stays theirs

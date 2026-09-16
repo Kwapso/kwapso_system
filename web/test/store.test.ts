@@ -56,6 +56,43 @@ describe("primeCache + useCached + invalidate", () => {
     })
     await waitFor(() => expect(result.current.data).toEqual([{ id: "new" }]))
   })
+
+  // T3654: "a newly created ticket looks like it didn't save until you tab
+  // away and back." Two requests for one key, one issued at mount and still in
+  // flight, the other fired by `invalidate()` right after a write commits —
+  // and they can settle in either order.
+  it("invalidate while the mount's own fetch is still in flight paints the fresh answer, never the stale one it raced (T3654)", async () => {
+    const key = freshKey()
+    let resolveMount!: (rows: Row[]) => void
+    const mountFetch = new Promise<Row[]>((res) => {
+      resolveMount = res
+    })
+    let calls = 0
+    const { result } = renderHook(() =>
+      useCached<Row[]>(key, () => {
+        calls++
+        return calls === 1 ? mountFetch : Promise.resolve([{ id: "fresh" }])
+      })
+    )
+    // The mount's own revalidate-on-mount fetch is in flight; nothing has
+    // resolved yet, so there is nothing in the cache to paint.
+    expect(result.current.data).toBeUndefined()
+
+    // The write commits and the screen that made it calls invalidate() — the
+    // cache-miss branch must start a REAL second request, not join the first.
+    await act(async () => {
+      invalidate(key)
+    })
+    await waitFor(() => expect(result.current.data).toEqual([{ id: "fresh" }]))
+
+    // The stale mount fetch finally answers, well after the fresh one landed.
+    // It must not be allowed to overwrite what invalidate() already painted.
+    await act(async () => {
+      resolveMount([{ id: "stale" }])
+      await Promise.resolve()
+    })
+    expect(result.current.data).toEqual([{ id: "fresh" }])
+  })
 })
 
 describe("patchRow", () => {
