@@ -1183,7 +1183,11 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // so this fired correctly; no word any kind SAYS changed (that repair is
 // `person`'s own textVersion bump, in READER_DIGESTS above), so no other
 // textVersion moved.
-const SHARED_DIGEST = "cbe20c64c650ec57"
+// Moved 16 Sep 2026 (BUILD-5 §G1/§G2): catchUpWithBudget and the sweepKinds
+// budget check are new code OUTSIDE every per-kind reader, so the digest
+// moved — no kind's TEXT changed (neither the readers nor the shared text
+// helpers were touched), only the orchestration around when a sweep runs.
+const SHARED_DIGEST = "3348b12e5f9461cd"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

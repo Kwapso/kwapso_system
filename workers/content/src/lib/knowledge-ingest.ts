@@ -54,6 +54,7 @@ import { AGENCY_COMPARTMENT, accountCompartment, indexOneSource, indexableText }
 import { buildSummary } from "./knowledge-summary"
 import { contentHash, plainText } from "./knowledge-text"
 import { logActivity } from "@shared/workers/activity"
+import { afterResponse } from "@shared/workers/parallel"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { brand } from "@shared/brand"
 
@@ -2397,14 +2398,36 @@ async function recordRun(
  * The list is a parameter, and that is the whole of the separation between the
  * sweep the CRON runs and the one a PERSON runs: same engine, same resumability,
  * same failure record, two sets of kinds. See sweepAll below for why the second
- * set cannot be reached from a schedule. */
+ * set cannot be reached from a schedule.
+ *
+ * BUILD-5 §G2 (16 Sep 2026) — `opts.budgetMs`, checked BETWEEN kinds, never
+ * mid-kind. Measured during BUILD-5 §C's rebuild: `POST
+ * /api/content/knowledge/sync` (this engine, called with every kind and no
+ * budget) never answered at all — three real presses each timed out after
+ * 180 seconds. Unlike G1's read path this call cannot simply be raced and
+ * abandoned, because its whole job is to tell the caller how far it got; the
+ * fix has to be an honest stop INSIDE the loop, with real, reportable results
+ * for the kinds it reached. A kind the budget never reaches is still a row in
+ * the response — `caughtUp: false`, nothing read, nothing indexed — so "press
+ * again" is a correct instruction and not a guess, and the per-kind rotation
+ * above means the NEXT press starts with whichever kind waited longest,
+ * including the ones this press never got to.
+ *
+ * `opts.now` is injected (defaults to `Date.now`) so sync-press-budget.test.ts
+ * can prove the stop-between-kinds behaviour deterministically. Omitting
+ * `budgetMs` (the cron's own call, and every existing caller) keeps the
+ * unbounded shape exactly as it was — this is opt-in, not a new ceiling on
+ * everybody. */
 export async function sweepKinds(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   kinds: IngestKind[],
-  limit = INGEST_SOURCES_PER_TICK
+  limit = INGEST_SOURCES_PER_TICK,
+  opts: { budgetMs?: number; now?: () => number } = {}
 ): Promise<SweepResult[]> {
+  const now = opts.now ?? Date.now
+  const deadline = opts.budgetMs !== undefined ? now() + opts.budgetMs : Infinity
   const results: SweepResult[] = []
   // OLDEST-SWEPT FIRST, so no kind is permanently starved by the one in front.
   //
@@ -2437,6 +2460,14 @@ export async function sweepKinds(
   )
   for (const kind of ordered) {
     const stateKey = kind.stateKey ?? kind.kind
+    // BETWEEN KINDS, NEVER MID-KIND — the whole point being that a kind
+    // already in flight keeps its own real result rather than being cut off
+    // with nothing to show. `caughtUp: false` is the honest answer: this
+    // press did not reach it, so it is NOT known to be caught up.
+    if (now() >= deadline) {
+      results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: false })
+      continue
+    }
     try {
       results.push(await sweepKind(env, cfg, guard, kind, limit))
     } catch (e) {
@@ -2468,6 +2499,16 @@ export async function sweepKinds(
  * backfill a history. When nothing has changed it is two keyed reads per kind
  * and no model call at all. */
 const CATCH_UP_PER_KIND = 5
+
+/** BUILD-5 §G2 (16 Sep 2026) — how long ONE PRESS of "bring it up to date"
+ * (`POST /api/content/knowledge/sync`) may spend inside `sweepAll` before it
+ * has to stop between kinds and answer with whatever it got — see
+ * `sweepKinds`'s own header for the measurement (three real presses, 180s
+ * each, no answer at all) and why a row-count cap alone was not the fix.
+ * Generous next to `CATCHUP_BUDGET_MS` on purpose: this door's whole point is
+ * to make real progress a person can see, not just avoid a hang — but still
+ * comfortably under any HTTP client's own timeout. */
+export const KNOWLEDGE_SYNC_PRESS_BUDGET_MS = 10_000
 
 /** BRING THE INDEX UP TO DATE BEFORE ANSWERING — the mechanism behind "no manual
  * sync button, no periodic syncs; everything is quick, everything is silent,
@@ -2512,6 +2553,49 @@ export async function catchUp(env: Env, cfg: D1Rest, guard: MemberGuard): Promis
   return results.reduce((n, r) => n + r.indexed, 0)
 }
 
+/** BUILD-5 §G1 (16 Sep 2026) — A PERSON ASKING A QUESTION MUST NEVER WAIT FOR
+ * THE SWEEP. This file's own header says catch-up work is "RESUMABLE, BOUNDED,
+ * AND NEVER ON THE REQUEST PATH" — `catchUp` above has been on the request
+ * path since the day it shipped, which was invisible at ordinary volumes
+ * (a handful of changed rows, a fraction of a second) and became UNUSABLE the
+ * moment the base was deep in a real backlog: measured during BUILD-5 §C's
+ * rebuild, a single retrieval-only question took 95 SECONDS, because
+ * `CATCH_UP_PER_KIND` rows are swept for EVERY kind, synchronously, before a
+ * single passage is returned.
+ *
+ * Freshness is the cron's job every fifteen minutes; the owner chose accuracy
+ * over speed, but 95 seconds is unusable, and an answer from a base one tick
+ * stale is still accurate and cited. So catch-up gets a small time budget — a
+ * couple of seconds at most — and the door answers with whatever the base
+ * already holds once that budget is spent.
+ *
+ * THE WORK IS NOT ABANDONED. A bare `Promise.race` that just drops the loser
+ * would throw away real progress (the swept rows, the advanced cursors) every
+ * time the budget is hit — the exact case a heavy backlog hits on EVERY
+ * question, so the base would never actually catch up between cron ticks.
+ * Instead the real work is handed to `afterResponse` (this worker's own
+ * waitUntil seam, `@shared/workers/parallel.ts`) so it keeps running after
+ * the response is sent — same effect as a cron tick, just triggered by a
+ * question instead of a clock.
+ *
+ * `run` is injected, defaulting to the real `catchUp`, purely so
+ * catchup-budget.test.ts can prove the race/defer behaviour deterministically
+ * without standing up the sweep engine — that engine's own correctness is
+ * knowledge-catchup-records.test.ts's job, not this one's. */
+export const CATCHUP_BUDGET_MS = 2_000
+
+export async function catchUpWithBudget(
+  request: Request,
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  opts: { budgetMs?: number; run?: () => Promise<number> } = {}
+): Promise<void> {
+  const work = (opts.run ?? (() => catchUp(env, cfg, guard)))()
+  await Promise.race([work, new Promise<void>((resolve) => setTimeout(resolve, opts.budgetMs ?? CATCHUP_BUDGET_MS))])
+  afterResponse(request, work)
+}
+
 /**
  * One tick over every kind THIS APP OWNS THE ROWS OF — what the 15-minute cron
  * sweeps, and what a person pressing "bring it up to date" sweeps.
@@ -2531,9 +2615,10 @@ export async function sweepAll(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
-  limit = INGEST_SOURCES_PER_TICK
+  limit = INGEST_SOURCES_PER_TICK,
+  opts: { budgetMs?: number; now?: () => number } = {}
 ): Promise<SweepResult[]> {
-  return sweepKinds(env, cfg, guard, INGEST_KINDS, limit)
+  return sweepKinds(env, cfg, guard, INGEST_KINDS, limit, opts)
 }
 
 /** What the sweep has done so far, per kind — the screen's "is it in step?" row
