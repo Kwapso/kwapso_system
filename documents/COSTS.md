@@ -288,6 +288,25 @@ against an import. What has NOT changed is the share that is preamble: it was ro
 90% of a short turn and is now roughly 70%, because the floor is the system prompt
 (6,662 tokens) plus the core tools, and neither of those is per-question waste.
 
+### One MCP call — the trace row
+
+Every call over `/mcp` (`tools/call`) now writes one row to `mcp_call_log` (db/core
+0031, 16 Sep 2026) — token id, tool name, ok or refused, when. One D1 write, off the
+caller's clock (`afterResponse`, so it costs no latency either):
+
+```
+1 call = 1 D1 row written
+
+10,000 calls/day × 30       = 300,000 rows/month
+300,000 / 1,000,000 × $1.00 = $0.09/month, ONCE the 50M included rows/month are spent
+```
+
+At 10,000 calls/day this is 0.6% of the Workers Paid plan's included 50,000,000
+row-writes/month — priced here because COSTS.md prices everything that writes, not
+because it moves the bill. The retention sweep (§4, `MCP_CALL_LOG_RETENTION_DAYS = 90`)
+bounds the TABLE; nothing here bounds the RATE beyond the caller-budget ceiling
+`callerHasBudget` already applies to every `/mcp` request.
+
 ### One signup
 
 One login-code email; the D1 writes and Worker requests sit far inside the plan.
@@ -801,7 +820,8 @@ measurement, and the numbers above are the first reading.
 D1 has real, enforced retention, swept nightly and bounded, reporting its own ceiling as
 an error row when it cannot catch up — and, since 7 Sep 2026, naming the TABLE it failed
 on rather than reporting a count of zero that reads exactly like a quiet night:
-`ERROR_LOG_RETENTION_DAYS = 90`, `AUTH_RETENTION_HOURS = 24`.
+`ERROR_LOG_RETENTION_DAYS = 90`, `AUTH_RETENTION_HOURS = 24`, and, since 16 Sep 2026,
+`MCP_CALL_LOG_RETENTION_DAYS = 90` for `mcp_call_log` (§2 has the write cost).
 
 R2 has no retention by age and will not have one, for the reason in the lifecycle bullet
 above. What it now has on staging is the multipart-abort rule, which is a lifecycle

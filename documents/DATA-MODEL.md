@@ -15,7 +15,7 @@ scroll, so: the two tiers, in order.
 **GLOBAL core** (`kwapso-core`, reached by `env.DB`), identity and billing across teams:
 `users` · `teams` · `team_members` · `email_change_logs` · `account_activity` ·
 `importable_databases` · `agent_usage` · `agent_credits` · `credit_grants` · `agent_usage_log` ·
-`mcp_tokens` · `error_logs` · the sharding machinery, `team_module_databases` +
+`mcp_tokens` · `mcp_call_log` · `error_logs` · the sharding machinery, `team_module_databases` +
 `team_module_moves` + `db_alerts` + `db_growth` (where a module lives, the mover's
 resumable ledger, and the size + rate watch) ·
 `selectable_data_types` (the one still to build) ·
@@ -301,6 +301,22 @@ from the app. Verified on EVERY /mcp request. The same migration adds **`session
 a token is PINNED to the token's team (auth answers /me with the pinned team;
 short-lived, never slid), so a token can never act outside the team it was
 created for.
+
+### mcp_call_log. KEEP (BUILT 2026-09-16, GLOBAL, `db/core/0031`)
+
+Every MCP call leaves one row — reads included, which is the half `origin: "mcp"`
+on the team's own activity row never sees, a read mutates nothing there. Real
+data: `id`, `token_id` (→ `mcp_tokens`), `user_id`, `tool_name`, `ok` (1/0 — the
+door answered, or refused/errored/timed out), `trace_id` (the same id
+`routes/mcp.ts` mints per request and forwards to the door — the link a failed
+call's own `error_logs.request_id` joins on, so this table never duplicates
+what a write already logs on the team's own `activity` row), `created_at`.
+CALLER-PRIVATE, the same reviewed class `mcp_tokens` itself is: no
+`publishChange`, no live listener, read back on demand from Settings → Access
+tokens, per token, paged (R14, `GROWING_COLLECTIONS.mcpCallLog`) with an exact
+count (R16). Swept nightly past **`MCP_CALL_LOG_RETENTION_DAYS` = 90**
+(`shared/workers/retention.ts`) — diagnostics a token's owner might read weeks
+later, not an audit block that stays forever.
 
 ### error_logs. KEEP (BUILT 2026-07-03, GLOBAL, `db/core/0012`)
 Purpose: the central error store (ERROR-HANDLING.md), one row per UNEXPECTED

@@ -13,7 +13,7 @@ import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 // (R16): a badge shows the server COUNT(*), never rows.length, so whoever pulls
 // a list primes its total in the same round-trip.
 
-import { content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi, mcp as mcpApi, tenancy } from "@/lib/api"
 // THE COLLECTION'S WHOLE SORT VOCABULARY, so the per-tab rule below SUBTRACTS
 // from the one list rather than holding a second copy of it. One-way: that file
 // knows nothing about tabs and must not learn.
@@ -421,6 +421,15 @@ export const listFetch = {
     contentApi.staffProfiles().then((r) => {
       primeCache(totalKey("staff_profiles", teamId), r.total)
       return r.profiles
+    }),
+  // R14: one token's own call log — token id, tool name, ok/refused, when
+  // (db/core 0031). Keyed by TOKEN rather than team: the settings screen opens
+  // one token's history at a time, on demand.
+  mcpCalls: (tokenId: string) =>
+    mcpApi.calls(tokenId).then((r) => {
+      primeCache(totalKey("mcp-calls", tokenId), r.total)
+      primeCache(cursorKey(mcpCallsKey(tokenId)), r.nextCursor)
+      return r.calls
     }),
 }
 
@@ -2114,4 +2123,13 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
 /** The one cache key the Google settings card lives in. */
 export function googleKey(teamId: string): string {
   return `google:${teamId}`
+}
+
+/** One token's own call log (db/core 0031) — keyed by TOKEN, not team: the
+ * screen opens one token's history at a time, on demand. CALLER-PRIVATE, the
+ * same reviewed class the token row itself is (routes/tokens.ts) — nothing
+ * writes this row through `publishChange`, so it earns no line in
+ * `TEAM_RESOURCES` above; the screen simply re-reads it each time it opens. */
+export function mcpCallsKey(tokenId: string): string {
+  return `mcp-calls:${tokenId}`
 }

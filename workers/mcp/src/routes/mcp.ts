@@ -12,11 +12,13 @@ import { fail, json } from "@shared/workers/http"
 import { GuardError, noteIdentity } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requestId } from "@shared/workers/trace"
+import { afterResponse } from "@shared/workers/parallel"
 import { brand } from "@shared/brand"
 import { keptForRights } from "@shared/workers/tool-gates"
 
 import type { Env } from "../env"
 import { verifyToken } from "../lib/tokens"
+import { insertCall } from "../lib/call-log"
 import { sessionCookieFor } from "../lib/bridge"
 import { forwardTool, getMcpTool, heldRights, MCP_TOOLS } from "../lib/tools"
 
@@ -102,6 +104,14 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
       const trace = requestId(request)
       const cookie = await sessionCookieFor(env, token, trace)
       const out = await forwardTool(env, tool, input, cookie, trace)
+      // EVERY CALL LEAVES ONE ROW (db/core 0031) — reads included, which is the
+      // half `origin: "mcp"` on the team's own activity row never sees, because a
+      // read mutates nothing. OFF THE CALLER'S CLOCK: the answer above is already
+      // decided, so the write happens after the response is handed back, the same
+      // pattern `logActivity`/`publishChange` already ride (shared/workers/
+      // parallel.ts) — a logging hiccup here must never turn a working tool call
+      // into a slower one.
+      afterResponse(request, insertCall(env, token.id, token.user_id, tool.name, out.ok, trace))
       return rpcResult(id, {
         content: [{ type: "text", text: out.text }],
         isError: !out.ok,

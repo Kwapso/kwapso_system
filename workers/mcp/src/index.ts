@@ -15,6 +15,8 @@
 //   POST /api/mcp/tokens         -> create one (label; pinned to the CURRENT team;
 //                                   the secret is returned ONCE)
 //   POST /api/mcp/tokens/revoke  -> revoke one of the caller's own tokens
+//   GET  /api/mcp/tokens/calls   -> one token's own call log, paged (?tokenId=,
+//                                   ?cursor=) — token id, tool name, ok/refused, when
 //   GET  /api/mcp/health
 //
 // THE LIVE-SYNC SEAM (CACHING.md "Every mutation publishes"): the token routes are
@@ -42,7 +44,7 @@ import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { handleMcp } from "./routes/mcp"
-import { getTokens, postToken, postRevoke } from "./routes/tokens"
+import { getCalls, getTokens, postToken, postRevoke } from "./routes/tokens"
 
 /**
  * Every door on this worker, tagged with the class it answers to.
@@ -70,6 +72,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // Caller-private token rows: see the note on this table.
   "POST /api/mcp/tokens": { handler: postToken, kind: "housekeeping" },
   "POST /api/mcp/tokens/revoke": { handler: postRevoke, kind: "housekeeping" },
+  // One token's own call log (db/core 0031) — caller-private in the same way,
+  // read-only, so it needs no publish of its own.
+  "GET /api/mcp/tokens/calls": { handler: getCalls, kind: "read" },
 }
 
 export default {
