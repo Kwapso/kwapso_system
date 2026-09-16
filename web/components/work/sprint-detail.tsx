@@ -44,6 +44,7 @@ import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
+import { invalidateFindsOf } from "@/components/records/paged-find"
 import { OverviewList } from "@/components/records/overview-list"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { useSessionUserId } from "@/lib/use-active-team"
@@ -447,6 +448,7 @@ export function SprintDetailScreen({
           // story created, no error, and nothing in R2 to recover from.
           const madeId = await createStoryFrom(teamId, { ...v, sprintId }, t)
           invalidate(sliceKey("stories-sprint", sprintId))
+          invalidateFindsOf(sliceKey("stories-sprint", sprintId)) // T3654 — see paged-find.tsx's own note
           return madeId
         }}
       />

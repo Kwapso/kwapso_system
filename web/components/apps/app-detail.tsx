@@ -47,6 +47,7 @@ import {
   StoriesPanel,
   sliceKey,
 } from "@/components/work/work-panels"
+import { invalidateFindsOf } from "@/components/records/paged-find"
 import { DeliverablesPanel } from "@/components/apps/deliverables-panel"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/apps/app-money-panel"
@@ -814,6 +815,12 @@ export function AppDetailScreen({
           // has something to hang on (help-form-dialog's own note says why).
           const { id } = await contentApi.createHelp(v)
           invalidate(sliceKey("tickets-app", appId))
+          // T3654 — `sliceKey` alone is the resting key; this panel's
+          // `<PagedFind>` carries `fixed={{appId}}`, which makes it ALWAYS
+          // "active" (see invalidateFindsOf's own header), so the rows on
+          // screen actually live under a `find:`-prefixed key this never
+          // touched. Proved live: the badge moved, the row never did.
+          invalidateFindsOf(sliceKey("tickets-app", appId))
           invalidate(helpKey(teamId, "all"))
           toast.success(t("Ticket raised."))
           return id
@@ -853,6 +860,7 @@ export function AppDetailScreen({
             notes: v.notes || undefined,
           })
           invalidate(sliceKey("meetings-app", appId))
+          invalidateFindsOf(sliceKey("meetings-app", appId)) // T3654 — see the ticket dialog's own note above
           invalidate(meetingsKey(teamId))
           toast.success(t("It's in Meetings."))
         }}
@@ -878,6 +886,7 @@ export function AppDetailScreen({
             roleName: v.roleName || undefined,
           })
           invalidate(sliceKey("processes-app", appId))
+          invalidateFindsOf(sliceKey("processes-app", appId)) // T3654 — see the ticket dialog's own note above
           invalidate(impactKey(teamId))
           // The money is computed from this map's role, so the panel that shows
           // it has to be told a priced map just appeared.
@@ -897,6 +906,7 @@ export function AppDetailScreen({
         onSubmit={async (v) => {
           await createSprintFrom(teamId, v, t)
           invalidate(sliceKey("sprints-app", appId))
+          invalidateFindsOf(sliceKey("sprints-app", appId)) // T3654 — see the ticket dialog's own note above
         }}
       />
       <StoryFormDialog
@@ -920,6 +930,7 @@ export function AppDetailScreen({
           // the file silently.
           const madeId = await createStoryFrom(teamId, v, t)
           invalidate(sliceKey("stories-app", appId))
+          invalidateFindsOf(sliceKey("stories-app", appId)) // T3654 — see the ticket dialog's own note above
           return madeId
         }}
       />

@@ -82,7 +82,7 @@ import { cursorKey } from "@/lib/live-resources"
 import { TOOLBAR_SEARCH_SLOT, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
-import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { invalidatePrefix, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRemembered } from "@shared/web/remembered"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
@@ -147,6 +147,32 @@ function findKeyFor(listKey: string, query: FindQuery): string {
     .map((k) => `${k}=${query[k]}`)
     .join("&")
   return `find:${listKey}:${asked}`
+}
+
+/** T3654 — the half of the bug that had nothing to do with a race. A caller
+ * that creates a row and calls `invalidate(listKey)` believes it just told
+ * this list to refetch — and for a PLAIN `<PagedFind>` (nothing in `fixed`)
+ * it does, because `active` is false at rest and rows come from `restingData`
+ * (the `listKey` itself). But every NESTED panel that narrows to its own
+ * record — an app's own Tickets/Stories/Processes/Sprints/Meetings tab, a
+ * ticket's Related stories, a sprint's own stories — passes a non-empty
+ * `fixed` (`{appId}`, `{ticketId}`…), which folds straight into `query`
+ * (above), so `active` is ALWAYS true there and rows ALWAYS come from
+ * `findKeyFor(listKey, query)` instead — a DIFFERENT, query-shaped key
+ * `invalidate(listKey)` was never going to touch. Proved live on staging:
+ * badge went 25→26, the row never appeared, a hard reload was the only fix —
+ * exactly the report ("only refreshes on tab switch").
+ *
+ * `query` always carries `fixed`'s own fields at minimum, so the ONE stable
+ * thing about every `findKey` this list can ever produce is the prefix
+ * `find:<listKey>:` — the same "the ping/write cannot name every derived key,
+ * drop the family by prefix" shape R15's `slicePrefix` already uses one layer
+ * up, applied here to the LOCAL, same-tab, zero-refetch case CACHING.md rule 7
+ * asks for. Exported so every creation dialog that already calls
+ * `invalidate(sliceKey(...))` on one of these nested lists can drop this
+ * beside it without knowing `find:` is PagedFind's own word to spell. */
+export function invalidateFindsOf(listKey: string): void {
+  invalidatePrefix(`find:${listKey}:`)
 }
 
 export function PagedFind<T>({
