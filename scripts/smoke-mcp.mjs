@@ -56,9 +56,17 @@ const SECOND_TEAM = "MCP smoke second team"
 const redact = (v) => String(v).replace(/kwapso_mcp_[0-9a-f]+/gi, "kwapso_mcp_<redacted>")
 
 let failures = 0
+let skipped = 0
 const ok = (name, cond, detail = "") => {
   console.log(`${cond ? "PASS" : "FAIL"} ${name}${cond ? "" : ` — ${redact(detail)}`}`)
   if (!cond) failures++
+}
+/** A proof this run cannot make, for a reason that is a fact about the
+ * environment rather than a bug — never counted as a pass, never counted as a
+ * failure, and always visible as its own line and its own tally. */
+const skip = (name, reason) => {
+  console.log(`SKIP ${name} — ${reason}`)
+  skipped++
 }
 /** A setup step the later checks depend on: report and stop, don't cascade. */
 const stop = (why, detail = "") => {
@@ -224,17 +232,34 @@ if (!owner) {
 if (!owner?.userId) stop("the machine owner is not a member of the admin's team")
 ok("machine owner is a member of the admin's team, on the small role", true)
 
-// Their OWN team — the one the token must never be able to reach into.
+// Their OWN team — the one the token must never be able to reach into. Every
+// proof below that needs a SECOND team is conditioned on this: TEAM_CREATION_CLOSED
+// (shared/product.ts) is a deliberate, product-wide rule — "this app runs as
+// one team" — and on a build where it is on, the door refuses the self-heal
+// below with `team_creation_closed` rather than a transient error. That is not
+// a fixture bug to route around; it is the fixture's OWN assumption (an
+// account can always get itself a second team) meeting a rule that postdates
+// it. So this is a fact about the environment, checked once, and every
+// downstream proof that needs `second` is skipped rather than run against a
+// team that does not exist — a skip prints as SKIP and is never counted as a
+// pass or a failure.
 const ownerTeams = await api("/api/tenancy/teams", {}, ownerCookie)
 let second = (ownerTeams.body?.teams ?? []).find((t) => t.id !== TEAM.id)
+let teamCreationClosed = false
 if (!second) {
   // Self-healing: an account that was invited before it ever bootstrapped has no
   // team of its own. Create one ONCE so the pinning proof has a second team.
   const made = await api("/api/tenancy/teams", { method: "POST", body: JSON.stringify({ name: SECOND_TEAM }) }, ownerCookie)
-  second = made.body?.team ?? (await api("/api/tenancy/teams", {}, ownerCookie)).body?.teams?.find((t) => t.id !== TEAM.id)
+  if (made.body?.error === "team_creation_closed") {
+    teamCreationClosed = true
+    console.log("SKIPPED: one-team pinning proof, team creation is closed product-wide")
+  } else {
+    second = made.body?.team ?? (await api("/api/tenancy/teams", {}, ownerCookie)).body?.teams?.find((t) => t.id !== TEAM.id)
+    if (!second?.id) stop("the machine owner has no second team — the one-team proof needs one", JSON.stringify(made.body))
+  }
 }
-if (!second?.id) stop("the machine owner has no second team — the one-team proof needs one")
-ok("machine owner also belongs to a second team of their own", second.id !== TEAM.id)
+if (teamCreationClosed) skip("machine owner belongs to a second team of their own", "team creation is closed product-wide")
+else ok("machine owner also belongs to a second team of their own", second.id !== TEAM.id)
 
 /* ============================================================================ *
  * 3 · Mint the token, exactly as a person does in Settings → Access tokens
@@ -265,10 +290,17 @@ if (!SECRET || !tokenId) stop("no token to test with")
 // From here on the HUMAN stands in their OWN team, where they are Admin. Every
 // remaining token check therefore runs while the person behind the token has
 // MORE rights somewhere else — which is exactly the confusion a pinned token
-// must not make.
-const moved = await api("/api/tenancy/switch-team", { method: "POST", body: JSON.stringify({ teamId: second.id }) }, ownerCookie)
-ok("machine owner has walked into their own team", moved.body?.team?.id === second.id, JSON.stringify(moved.body?.team))
-ok("…where they are an Admin", moved.body?.role?.title === "Admin", JSON.stringify(moved.body?.role))
+// must not make. Skipped whole when there is no second team to walk into: the
+// owner stays standing in TEAM, which the token is pinned to anyway, so every
+// OTHER token proof below (steps 4 onward) still runs for real.
+if (teamCreationClosed) {
+  skip("machine owner has walked into their own team", "team creation is closed product-wide")
+  skip("…where they are an Admin", "team creation is closed product-wide")
+} else {
+  const moved = await api("/api/tenancy/switch-team", { method: "POST", body: JSON.stringify({ teamId: second.id }) }, ownerCookie)
+  ok("machine owner has walked into their own team", moved.body?.team?.id === second.id, JSON.stringify(moved.body?.team))
+  ok("…where they are an Admin", moved.body?.role?.title === "Admin", JSON.stringify(moved.body?.role))
+}
 
 /* ============================================================================ *
  * 4 · Connect over the gateway exactly as an outside tool would
@@ -375,7 +407,10 @@ section("pinned to one team")
 {
   const who = await callTool(SECRET, "whoami")
   ok("the token still reports the team it was pinned to", who.data?.user?.currentTeamId === TEAM.id, String(who.data?.user?.currentTeamId))
-  ok("…not the team its owner is currently signed into", who.data?.user?.currentTeamId !== second.id, String(who.data?.user?.currentTeamId))
+  if (teamCreationClosed)
+    skip("…not the team its owner is currently signed into", "team creation is closed product-wide — the owner never left TEAM")
+  else
+    ok("…not the team its owner is currently signed into", who.data?.user?.currentTeamId !== second.id, String(who.data?.user?.currentTeamId))
 
   // Data-level, not just an id: the admin is a member of the pinned team and of
   // no other, so seeing them proves which database answered.
@@ -541,5 +576,6 @@ await api("/api/tenancy/switch-team", { method: "POST", body: JSON.stringify({ t
 await api("/api/auth/logout", { method: "POST" }, ownerCookie)
 await api("/api/auth/logout", { method: "POST" }, adminCookie)
 
-console.log(failures ? `\nMCP SMOKE FAILED (${failures})` : "\nMCP SMOKE PASSED")
+const skipNote = skipped ? ` (${skipped} skipped)` : ""
+console.log(failures ? `\nMCP SMOKE FAILED (${failures})${skipNote}` : `\nMCP SMOKE PASSED${skipNote}`)
 process.exit(failures ? 1 : 0)
