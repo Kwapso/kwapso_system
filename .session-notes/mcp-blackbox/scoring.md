@@ -7,20 +7,77 @@ match rows to the ten tasks by reading them in order (the tester works one
 task at a time, so the calls cluster in task order even though the
 transcript carries no explicit boundary).
 
+**SCORED 2026-09-17**, tester session `mcp_blackbox_tester`
+(`local_484dbc5e-ef19-40c3-bbf0-21f5e59ea32d`), transcript exported via
+`export_transcript` and run through `score.mjs`. **Reply-byte column is
+CORRECTED, not the scorer's raw output** — see "Scorer gap" below;
+`score.mjs`'s own auto-scored table undercounts three calls by 40–60x
+because the harness truncates any oversized tool reply into a short
+pointer message before it ever reaches the transcript `score.mjs` reads.
+Corrected sizes came from the pointer message's own stated character
+count (e.g. "result (71,419 characters across 1 line)") cross-checked
+against the harness's saved `tool-results/*.txt` files, which are the
+verbatim replies.
+
+**Also corrected: which token actually ran this.** `mcp_call_log` (core
+DB, staging) shows all 16 calls landing under token `01M284X2D7SG3GF30A80YNEXFX`
+("kwapso_02", owned by `alaap@kwapso.com`, full Admin rights on Kwapso) —
+**not** the narrow "Machine tester" sandbox token
+`01M2N1JV4Y23M64E6W7SRG6662` that `setup.mjs` minted and `cleanup.md`
+names. See findings.md's lead finding for why, and what this means for
+reading "0 errors" below.
+
 ## Per-task
 
-| # | task | calls made | describe_tool calls | errors | wrong turns | reply bytes (sum) | wall-clock (s) | correct? |
+| # | task | calls made | describe_tool calls | errors | wrong turns | reply bytes (sum, corrected) | wall-clock (s) | correct? |
 |---|---|---|---|---|---|---|---|---|
-| 1 | workspace name | | | | | | | |
-| 2 | account count | | | | | | | |
-| 3 | app count | | | | | | | |
-| 4 | apps in stage Maintenance | | | | | | | |
-| 5 | Confia's tickets (total + not resolved) | | | | | | | |
-| 6 | sprint → app chain | | | | | | | |
-| 7 | ticket → account chain | | | | | | | |
-| 8 | raise + correct a ticket | | | | | | | |
-| 9 | raise a to-do | | | | | | | |
-| 10 | knowledge question | | | | | | | |
+| 1 | workspace name | 2 | 0 | 0 | 0 | 644 | 2.8 | ✅ "Kwapso" |
+| 2 | account count | 1 | 0 | 0 | 0 | 41,956 | 5.9 | ✅ 134 |
+| 3 | app count | 1 | 0 | 0 | 0 | 17,154 | 6.3 | ✅ 28 |
+| 4 | apps in stage Maintenance | 0 (reused task 3's reply) | 0 | 0 | 0 | 0 | 0 | ✅ 11 (hand-counted across the 28 rows already in hand; re-verified live, still 11) |
+| 5 | Confia's tickets (total + not resolved) | 2 | 0 | 0 | 0 | **76,543** (4,699 + 71,844 true) | 27.3 | ✅ 380 total / 30 not resolved |
+| 6 | sprint → app chain | 2 | 1 | 0 | 0 | 5,466 | 29.5 | ✅ A0028 "ERP Kennogroup", Not started |
+| 7 | ticket → account chain | 2 | 0 | 0 | 0 | 1,240 | 15.2 | ✅ Amstella |
+| 8 | raise + correct a ticket | 4 | 0 | 0 | 0 | **131,728** (983 + 65,167 true + 65,178 true + 400) | 37.0 | ✅ verified independently (id `01M2NY75A14629CX7MCQQE6H0W`, final description exact) |
+| 9 | raise a to-do | 1 | 0 | 0 | 0 | 648 | 6.7 | ✅ verified independently (id `01M2NY7Z291WCDHZD39NJZSR24`) |
+| 10 | knowledge question | 1 | 0 | 0 | 0 | 1,690 | 11.9 | ❌ FAIL — see below |
+
+**No task took more than 5 calls** — the run was call-efficient (16 calls
+total, 4 the most on any one task, task 8). The waste is entirely in
+per-call BYTES on two tasks, not call count: task 8's two write calls
+(create/update) cost 130,345 bytes between them to report back one
+ticket's id and description, and task 5's `list_help_tickets` cost 71,844
+bytes to answer a question fully answerable from its own `byStatus`
+aggregate (which was already in the same reply, uncounted bytes and all).
+
+**Task 10 grading** (four-outcome scheme, amended answer-key.md): `found:
+true`, `answer: null`, one citation — a ticket ("Filtern nach Beginn
+eines Vertrages", T3507, score 0.002, the router's own relevance floor)
+— nothing about Confia the account or CONFIA the app. The route's
+record-level pass (a separate, coarser search — `records` in the raw
+reply) correctly names the CONFIA app as the relevant record, but the
+passage-level search that actually produces citations pulled nothing
+from either the account or app source, despite the answer-key stating
+both are fully, currently indexed. Graded **FAIL**, not PASS: the key is
+explicit that "the account/app facts... are what a pass is graded on"
+and a ticket citation is "a bonus, not required for a pass" — here the
+bonus is all there is. Nothing cited is factually wrong (which is why
+this isn't as clear-cut as it reads — there's no false statement, just
+an answer that never reached the material the question was actually
+about), so FAIL over MISS (found was true, not false).
+
+## Scorer gap (read before trusting `score.mjs` output on any future run)
+
+The transcript's own `tool_result.content` is NOT the tool's real reply
+once the harness truncates it — it's a fixed ~1,650-byte pointer
+("Error: result (N characters...) exceeds maximum allowed tokens...
+saved to <file>"). `score.mjs` counts THAT string's bytes, not the
+original reply's. This run: `list_accounts` (uncapped, 41,956 bytes,
+correctly counted) looked like the largest reply and the only one over
+20,000 characters in the auto-scored output; the true answer is `list_help_tickets`
+at 71,844 bytes, and there are FOUR oversized replies, not one
+(`list_accounts` 41,956; `list_help_tickets` 71,844; `create_help_ticket`
+65,167; `update_help_ticket` 65,178). See findings.md's scorer-fix entry.
 
 **wrong turns** — a call that couldn't possibly answer the task: the wrong
 tool, a filter that doesn't exist, a write attempted before the read that
@@ -45,15 +102,15 @@ tester reports.
 
 ## Per run
 
-- Total MCP calls:
-- Total `describe_tool` calls:
-- Total errors:
-- Total bytes returned (sum of every tool reply):
-- Largest single reply (bytes, and which tool):
-- Any reply over 20,000 characters? (Y/N, which one):
-- Wall-clock, first call to last:
-- Tasks correct: `___ / 10` (task 10 counts toward this only as PASS/FAIL — an INFRASTRUCTURE outcome is excluded from the denominator, not scored as a miss)
-- Task 10 outcome: `PASS / FAIL / MISS / INFRASTRUCTURE`, elapsed ms if INFRASTRUCTURE:
+- Total MCP calls: **16**
+- Total `describe_tool` calls: **1** (before task 6's first `query_records` — appropriate use, not waste)
+- Total errors: **0** (confirmed against `mcp_call_log`: all 16 rows `ok=1`)
+- Total bytes returned (sum of every tool reply, corrected): **277,069** (score.mjs's own uncorrected total was 79,834 — a 3.5x undercount)
+- Largest single reply: **71,844 bytes** (`list_help_tickets`, task 5) — score.mjs's own uncorrected answer was `list_accounts` at 41,956
+- Any reply over 20,000 characters? **YES — four**: `list_accounts` (41,956), `list_help_tickets` (71,844), `create_help_ticket` (65,167), `update_help_ticket` (65,178)
+- Wall-clock, first call to last: **142.5s**
+- Tasks correct: **9 / 10** (task 10 is FAIL, not INFRASTRUCTURE, so it counts in the denominator)
+- Task 10 outcome: **FAIL** — `found: true`, one citation (an unrelated ticket, relevance score 0.002), no account/app fact cited; see per-task table above.
 
 ## Baseline finding — ask_knowledge on the real corpus (not the tester's fault)
 
