@@ -47,6 +47,7 @@
 import {
   AUTH_RETENTION_HOURS,
   ERROR_LOG_RETENTION_DAYS,
+  MCP_CALL_LOG_RETENTION_DAYS,
   RETENTION_DELETE_CAP,
   RETENTION_PASSES_PER_TICK,
 } from "./limits"
@@ -113,6 +114,18 @@ const SWEEPS: { table: string; sql: string; args: (cutoff: string, now: string) 
     sql: boundedDelete("error_logs", "at < ?"),
     args: (_cutoff, now) => [
       new Date(new Date(now).getTime() - ERROR_LOG_RETENTION_DAYS * 86_400_000).toISOString(),
+      RETENTION_DELETE_CAP,
+    ],
+  },
+  {
+    // ITS OWN WINDOW TOO, for the same reason error_logs gets one: a call log row
+    // is diagnostics a token's owner might read weeks later, not an audit block
+    // (MCP.md's own precedent — a token row lives 90 days and is then re-issued
+    // rather than kept forever). MCP_CALL_LOG_RETENTION_DAYS names it once.
+    table: "mcp_call_log",
+    sql: boundedDelete("mcp_call_log", "created_at < ?"),
+    args: (_cutoff, now) => [
+      new Date(new Date(now).getTime() - MCP_CALL_LOG_RETENTION_DAYS * 86_400_000).toISOString(),
       RETENTION_DELETE_CAP,
     ],
   },

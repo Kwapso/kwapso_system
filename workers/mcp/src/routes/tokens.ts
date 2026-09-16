@@ -2,13 +2,14 @@
 // token itself. See routes/mcp.ts for why these are exported functions in a
 // routes/ folder rather than arms of a switch.
 
-import { fail, json } from "@shared/workers/http"
+import { fail, json, pagedJson } from "@shared/workers/http"
 import { GuardError, whoAmI } from "@shared/workers/gating"
-import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { requireText, TEXT_LIMITS, queryText } from "@shared/workers/validate"
 import { requestId } from "@shared/workers/trace"
 
 import type { Env } from "../env"
 import { createToken, listTokens, revokeToken } from "../lib/tokens"
+import { countCalls, listCalls } from "../lib/call-log"
 import { dropCachedSession } from "../lib/bridge"
 import { requireStaff } from "../lib/staff"
 
@@ -68,6 +69,27 @@ export async function postToken(request: Request, env: Env): Promise<Response> {
     // `saveRolePermissions` had until 6 Sep 2026. The rows are already in hand.
     tokens: summaries(await listTokens(env, user.id)),
   })
+}
+
+/** The signed-in caller's OWN CALL LOG for one of their own tokens — token id,
+ * tool name, ok or refused, when (db/core 0031). GROWING (R14): paged by key,
+ * never a hard cap, with the exact bounded count (R16) beside it. Fenced by
+ * `userId` in the SQL itself, not merely by trusting the `tokenId` the caller
+ * sent — the same shape `revokeToken` already fences with, so a token id that
+ * belongs to somebody else answers with an empty page rather than their trail. */
+export async function getCalls(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env)
+  const { searchParams } = new URL(request.url)
+  const tokenId = requireText(searchParams.get("tokenId"), "Token", TEXT_LIMITS.short)
+  const cursor = queryText(searchParams.get("cursor"), "Cursor") ?? null
+  const [page, counted] = await Promise.all([
+    listCalls(env, tokenId, user.id, cursor),
+    countCalls(env, tokenId, user.id),
+  ])
+  return pagedJson(
+    "calls",
+    { rows: page.rows, total: counted.total, hasMore: page.hasMore, nextCursor: page.nextCursor }
+  )
 }
 
 export async function postRevoke(request: Request, env: Env): Promise<Response> {

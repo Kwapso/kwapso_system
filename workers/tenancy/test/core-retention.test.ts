@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest"
 import {
   AUTH_RETENTION_HOURS,
   ERROR_LOG_RETENTION_DAYS,
+  MCP_CALL_LOG_RETENTION_DAYS,
   RETENTION_DELETE_CAP,
   RETENTION_PASSES_PER_TICK,
 } from "../../../shared/workers/limits"
@@ -42,6 +43,14 @@ function coreDb() {
   // missing table would be swallowed by the per-table catch and the assertions
   // about it would pass against nothing.
   db.exec(/CREATE TABLE error_logs[\s\S]*?\);/.exec(migration("0012_error_logs.sql"))![0])
+  // …and mcp_call_log (0031), same reason — every `.failed` assertion in this
+  // file would otherwise fail against a table the harness never created, not
+  // against the rows it is actually testing.
+  db.exec(
+    /CREATE TABLE mcp_call_log[\s\S]*?\n\);/
+      .exec(migration("0031_mcp_call_log.sql"))![0]
+      .replace(/ REFERENCES \w+ \(id\)/g, "")
+  )
   const now = new Date().toISOString()
   db.prepare("INSERT INTO users (id, email, created_at, updated_at) VALUES ('U1','u@example.com',?,?)").run(now, now)
   return db
@@ -88,9 +97,15 @@ function harness() {
     db
       .prepare("INSERT INTO error_logs (id, at, source, place, message) VALUES (?,?,?,?,?)")
       .run(`e${seq++}`, at, "content", "GET /x", "boom")
+  const call = (createdAt: string) =>
+    db
+      .prepare(
+        "INSERT INTO mcp_call_log (id, token_id, user_id, tool_name, ok, trace_id, created_at) VALUES (?,?,?,?,?,?,?)"
+      )
+      .run(`m${seq++}`, "tok1", "U1", "whoami", 1, `trace${seq}`, createdAt)
   const count = (table: string) =>
     (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n
-  return { db, code, send, session, errorLog, count, sweep: () => sweepCoreRetention(binding(db)) }
+  return { db, code, send, session, errorLog, call, count, sweep: () => sweepCoreRetention(binding(db)) }
 }
 
 describe("the sweep takes what is spent and leaves what is live", () => {
@@ -201,6 +216,17 @@ describe("the sweep does bounded work, and says when it did not finish", () => {
 
     expect(report.deleted.error_logs).toBe(1)
     expect(h.count("error_logs"), "recent diagnostics survive").toBe(1)
+  })
+
+  it("takes MCP call-log rows past 90 days, and leaves recent ones", async () => {
+    const h = harness()
+    h.call(ago(24 * (MCP_CALL_LOG_RETENTION_DAYS + 1)))
+    h.call(ago(24 * 3)) // last week's calls are still what the owner reads on Settings
+
+    const report = await h.sweep()
+
+    expect(report.deleted.mcp_call_log).toBe(1)
+    expect(h.count("mcp_call_log"), "recent calls survive").toBe(1)
   })
 
   it("a run with room to spare does not claim it was capped", async () => {

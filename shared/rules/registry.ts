@@ -3382,6 +3382,16 @@ export const GROWING_COLLECTIONS: Record<
     pagerKey: "accountsKey(",
     why: "every company AND every person an agency works with is a row here — a contact list that only grows, so a ceiling would eventually become a refusal to answer",
   },
+  mcpCallLog: {
+    lib: "workers/mcp/src/lib/call-log.ts",
+    fn: "listCalls",
+    routes: "workers/mcp/src/routes/tokens.ts",
+    rowsKey: "calls",
+    webKey: "mcpCallsKey(",
+    pagerFile: "components/team/access-tokens.tsx",
+    pagerKey: "mcpCallsKey(",
+    why: "every MCP call leaves one row — a busy integration adds hundreds a day and the table only ever grows, so a hard cap would eventually hide a token's own recent calls from the person trying to audit them",
+  },
   // THE TEAM-WIDE `scope=team` ENTRY USED TO LIVE HERE, and it was already a
   // ghost by the time `member-screen.tsx` moved onto the generic (table, id)
   // path (14 Sep 2026, this file's `RECORD_TABS_SINGLE_PANEL` note). The

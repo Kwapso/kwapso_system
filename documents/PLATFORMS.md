@@ -23,7 +23,7 @@ code. A port = back these five with the target platform's primitives.
 
 | # | Pillar | What the Kwapso System uses (Cloudflare) | The one seam file to swap |
 |---|--------|-------------------------------|----------------------------|
-| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) for TEAM data — plus 159 raw `env.DB.prepare(…)` sites in 30 files for the CORE database, which has no adapter (see below) |
+| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) for TEAM data — plus 162 raw `env.DB.prepare(…)` sites in 31 files for the CORE database, which has no adapter (see below) |
 | 2 | **The live layer** | the `TeamChannel` **Durable Object** fans out change pings | `shared/workers/realtime.ts` (`publishChange`), the ONLY broadcast seam |
 | 3 | **Compute** | **8 Workers** behind two public gateways (one per front end) | each `workers/*` + the gateway router (the shape ports; the runtime swaps) |
 | 4 | **File storage** | **R2**, keyed per team | the R2 `.put/.get` calls in `content` + `gateway` (`/media/*`) |
@@ -48,7 +48,7 @@ that one seam and the 8 workers keep working unchanged.
 exactly right for the per-team databases: every statement against them goes
 through `d1Query` / `d1ExecScript`, and `web/test/rules.test.ts` holds it there.
 The GLOBAL core database is reached a different way — `env.DB.prepare(…).bind(…)`,
-Cloudflare's raw D1 binding API — at **159 call sites across 30 production files** —
+Cloudflare's raw D1 binding API — at **162 call sites across 31 production files** —
 auth, tenancy, content, data-ops and mcp — with no adapter of any kind between
 them and the platform.
 
@@ -58,7 +58,7 @@ quoted. A port that rewrote `d1-rest.ts` and expected the workers to keep workin
 would find identity, sessions, teams, memberships, invites, the error log, the
 usage ledgers, the token desk and the sharding tables all still speaking D1
 directly. Every effort band in §2 understates pillar 1 by that work — it is
-mechanical rather than clever (one adapter, then a codemod over 159 sites), but
+mechanical rather than clever (one adapter, then a codemod over 162 sites), but
 it is days, and it is days nobody had counted.
 
 The count is derivable, so it is DERIVED rather than remembered: the three
