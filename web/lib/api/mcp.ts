@@ -12,9 +12,10 @@
 // the day it lands.
 
 import type {
+  McpCall,
   McpTokenSummary,
 } from "@shared/types"
-import { api, post } from "@shared/web/api"
+import { api, enc, post, type PagedResponse } from "@shared/web/api"
 
 /** The MCP front desk (personal access tokens; the /mcp endpoint itself is for
  * machines with a Bearer token, not this session client). */
@@ -30,4 +31,9 @@ export const mcp = {
     }>("/api/mcp/tokens", post({ label })),
   revokeToken: (id: string) =>
     api<{ ok: true; tokens: McpTokenSummary[] }>("/api/mcp/tokens/revoke", post({ id })),
+  /** R14: one PAGE of a token's own call log, newest first. */
+  calls: (tokenId: string, cursor?: string | null) =>
+    api<PagedResponse<{ calls: McpCall[] }>>(
+      `/api/mcp/tokens/calls?tokenId=${enc(tokenId)}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+    ),
 }

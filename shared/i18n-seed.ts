@@ -4223,4 +4223,27 @@ export const SEED: Catalogue = {
     es: "Cambiar el tamaño del asistente",
     ca: "Canviar la mida de l'assistent",
   },
+
+  /* ── 16 Sep 2026, the per-token call log on Settings → Access tokens
+     (db/core 0031, web/components/team/access-tokens.tsx's `TokenCallLog`).
+     Seven strings, hand-translated here rather than left for the ceiling to
+     ratchet up (CLAUDE.md: "TRANSLATION_CEILING is 0/0/0"). */
+  "Calls": { de: "Aufrufe", es: "Llamadas", ca: "Trucades" },
+  "See this token's calls": {
+    de: "Aufrufe dieses Tokens ansehen",
+    es: "Ver las llamadas de este token",
+    ca: "Veure les trucades d'aquest testimoni",
+  },
+  "Couldn't load this token's calls.": {
+    de: "Die Aufrufe dieses Tokens konnten nicht geladen werden.",
+    es: "No se pudieron cargar las llamadas de este token.",
+    ca: "No s'han pogut carregar les trucades d'aquest testimoni.",
+  },
+  "No calls yet.": { de: "Noch keine Aufrufe.", es: "Aún no hay llamadas.", ca: "Encara no hi ha trucades." },
+  // "Tool" already has a seed entry above (the client-tool sense, kept as the
+  // English loanword) — this screen's column header reuses that same string
+  // and inherits it rather than adding a second, conflicting entry.
+  "Result": { de: "Ergebnis", es: "Resultado", ca: "Resultat" },
+  "Ok": { de: "Ok", es: "Ok", ca: "Ok" },
+  "Refused": { de: "Verweigert", es: "Rechazada", ca: "Rebutjada" },
 }

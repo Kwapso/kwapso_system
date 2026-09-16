@@ -1047,6 +1047,16 @@ export type McpTokenSummary = {
   revokedAt: string | null
 }
 
+/** One row of a token's own call log (db/core 0031) — token id, tool name, ok or
+ * refused, when. Every MCP call leaves one, reads included. */
+export type McpCall = {
+  id: string
+  toolName: string
+  ok: boolean
+  traceId: string
+  createdAt: string
+}
+
 /** One action the agent proposes that needs the user's confirmation before it runs.
  * `summary` is the one-line label; `details` is the PAYLOAD behind it — the body
  * the gated door will receive, in plain lines (shared/workers/confirm-payload.ts).

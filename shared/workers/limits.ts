@@ -849,6 +849,13 @@ export const MCP_TOKEN_TTL_DAYS = 90
  * could bury a live token past the cap and never be able to revoke it again. */
 export const MAX_ACTIVE_MCP_TOKENS_PER_USER = 10
 
+/** How long a call-log row (mcp_call_log, db/core 0031) survives before the
+ * nightly sweep takes it — the SAME number a token itself lives for
+ * (MCP_TOKEN_TTL_DAYS), and named separately anyway: a token's own lifetime and
+ * its trail's retention window answer two different questions and happen to
+ * agree today, which is not a reason to make one constant answer both. */
+export const MCP_CALL_LOG_RETENTION_DAYS = 90
+
 /** THE ONE numeric env-var parse. Two bugs of the same family live in the obvious
  * spellings, in opposite directions:
  *   • `Number(env.X) || DEFAULT` turns a deliberate **0** into the default — set

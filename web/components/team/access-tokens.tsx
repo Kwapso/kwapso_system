@@ -31,18 +31,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Prohibit, Copy } from "@shared/ui/foundations/icons"
+import { Prohibit, Copy, ClockCounterClockwise } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@shared/ui/components/table/table"
 
-import type { McpTokenSummary } from "@shared/types"
+import type { McpCall, McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
 import { formatActivityWhen, formatDate } from "@shared/web/format"
-import { useCached, primeCache } from "@shared/web/store"
+import { formatCount } from "@shared/web/format-count"
+import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { LoadMore } from "@/components/records/load-more"
+import { listFetch, mcpCallsKey, totalKey } from "@/lib/live-resources"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a
@@ -100,6 +104,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
   // The show-once secret, displayed right after a create (until dismissed).
   const [secret, setSecret] = React.useState<string | null>(null)
   const [revoking, setRevoking] = React.useState<McpTokenSummary | null>(null)
+  const [viewingCalls, setViewingCalls] = React.useState<McpTokenSummary | null>(null)
 
   async function create() {
     if (!label.trim() || busy) return
@@ -263,35 +268,51 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                     ? ` · ${t("expired {date}", { date: formatDate(token.expiresAt, lang) })}`
                     : ` · ${t("works until {date}", { date: formatDate(token.expiresAt, lang) })}`}
               </span>
-              {!token.revokedAt && (
-                <div className="flex items-center gap-2">
-                  {/* Copy the connect prompt for any AI. The secret can't be re-read,
-                   * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
-                   * Label collapses to icon-only below sm (narrow-screen rule).
-                   * Nothing to set up with an expired token — make a new one. */}
-                  {!hasExpired(token) && (
+              <div className="flex items-center gap-2">
+                {/* Every call this token has made — reads included, not just
+                 * writes (the activity feed only ever hears from a write). Shown
+                 * for a revoked token too: its trail is exactly what somebody
+                 * checks right after revoking one they think leaked. */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setViewingCalls(token)}
+                  className="gap-1"
+                  title={t("See this token's calls")}
+                >
+                  <ClockCounterClockwise className="size-3.5" aria-hidden />
+                  <span className="hidden sm:inline">{t("Calls")}</span>
+                </Button>
+                {!token.revokedAt && (
+                  <>
+                    {/* Copy the connect prompt for any AI. The secret can't be re-read,
+                     * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
+                     * Label collapses to icon-only below sm (narrow-screen rule).
+                     * Nothing to set up with an expired token — make a new one. */}
+                    {!hasExpired(token) && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN", t)}
+                        className="gap-1"
+                        title={t("Copy setup instructions for any AI")}
+                      >
+                        <Copy className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">{t("Instructions")}</span>
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN", t)}
-                      className="gap-1"
-                      title={t("Copy setup instructions for any AI")}
+                      onClick={() => setRevoking(token)}
+                      className="text-destructive hover:text-destructive gap-1"
                     >
-                      <Copy className="size-3.5" aria-hidden />
-                      <span className="hidden sm:inline">{t("Instructions")}</span>
+                      <Prohibit className="size-3.5" aria-hidden />
+                      <span className="hidden sm:inline">{t("Revoke")}</span>
                     </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setRevoking(token)}
-                    className="text-destructive hover:text-destructive gap-1"
-                  >
-                    <Prohibit className="size-3.5" aria-hidden />
-                    <span className="hidden sm:inline">{t("Revoke")}</span>
-                  </Button>
-                </div>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           ))
         )}
@@ -464,6 +485,88 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* One token's own call log — every MCP call, reads included: which tool,
+       * ok or refused, when. A record view, so it slides in like everything
+       * else (R59) rather than centring like the revoke warning above it. */}
+      <Sheet open={!!viewingCalls} onOpenChange={(o) => !o && setViewingCalls(null)}>
+        <SheetContent side="right" className="w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)]">
+          {viewingCalls && <TokenCallLog token={viewingCalls} />}
+        </SheetContent>
+      </Sheet>
     </section>
+  )
+}
+
+/** The table of ONE token's calls (R14: paged; R16: the exact count through
+ * `formatCount`). Its own component so the hooks below only run while the sheet
+ * that needs them is actually open. */
+function TokenCallLog({ token }: { token: McpTokenSummary }) {
+  const { t } = useLanguage()
+  const key = mcpCallsKey(token.id)
+  const callsQ = useCached<McpCall[]>(key, () => listFetch.mcpCalls(token.id))
+  const total = useCachedValue<number>(totalKey("mcp-calls", token.id))
+  const calls = callsQ.data ?? []
+  return (
+    <div className="flex flex-col gap-4 p-6">
+      <DialogTitle>{t("Calls")}</DialogTitle>
+      <DialogDescription>
+        {token.label}
+        {total ? ` · ${formatCount(total)}` : ""}
+      </DialogDescription>
+      {callsQ.error ? (
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load this token's calls.") }}
+          action={
+            <Button variant="secondary" onClick={() => callsQ.refresh()}>
+              {t("Try again")}
+            </Button>
+          }
+        />
+      ) : callsQ.data === undefined ? (
+        <Skeleton variant="list" lines={4} />
+      ) : calls.length === 0 ? (
+        <CollectionEmptyState title={t("No calls yet.")} />
+      ) : (
+        <>
+          <Table aria-label={t("Calls")}>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t("Tool")}</TableHead>
+                <TableHead>{t("Result")}</TableHead>
+                <TableHead>{t("When")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {calls.map((c) => (
+                <TableRow key={c.id} className="hover:bg-transparent">
+                  <TableCell className="font-mono text-xs">{c.toolName}</TableCell>
+                  <TableCell>
+                    {c.ok ? (
+                      <Badge variant="secondary" className="text-badge">
+                        {t("Ok")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-destructive text-badge">
+                        {t("Refused")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {formatActivityWhen(c.createdAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <LoadMore
+            listKey={mcpCallsKey(token.id)}
+            fetchPage={(cursor) => mcp.calls(token.id, cursor).then((r) => ({ rows: r.calls, nextCursor: r.nextCursor }))}
+          />
+        </>
+      )}
+    </div>
   )
 }
