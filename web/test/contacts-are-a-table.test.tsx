@@ -267,6 +267,37 @@ describe("the Portal column (client ruling, 16 Sep 2026)", () => {
     expect(screen.queryByText("Portal")).toBeNull()
     expect(screen.queryByText("No portal")).toBeNull()
   })
+
+  // HER FOLLOW-UP, 16 Sep 2026 EVENING, verbatim: "For contacts, portal: no
+  // portal, same as with automations. Let's switch the design to the color
+  // dot. Portal: make it green, and no portal: gray." A FILLED pill (
+  // `variant="success"`/`"secondary"`) used to draw this column; both states
+  // now draw `variant="status"` with a solid dot instead — the kit stamps
+  // `data-dot` on the badge itself only when a dot is actually drawn, so its
+  // presence and value are the proof the call site moved off the old fill,
+  // not just that the words are unchanged.
+  it("draws green for a live grant and grey for none — a dot, not a fill", async () => {
+    draw()
+    await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
+    const rowFor = (name: string) =>
+      Array.from(document.querySelectorAll("tbody tr")).find((tr) => tr.textContent?.includes(name))
+    // MARTA HOLDS A LIVE GRANT — green, her exact word ("make it green"),
+    // the kit's `shipped` tone (`--dot-shipped`, forest).
+    expect(
+      rowFor("Marta Bergman")?.querySelector('[data-slot="badge"][data-dot="shipped"]'),
+      "Portal must carry the green (shipped) dot, not a filled success pill"
+    ).toBeTruthy()
+    // INES AND TOMAS BOTH READ "No portal" — grey, her exact word ("no
+    // portal: gray"), the kit's `archived` tone (`--dot-archived`).
+    expect(
+      rowFor("Ines Ortiz")?.querySelector('[data-slot="badge"][data-dot="archived"]'),
+      "No portal must carry the grey (archived) dot, not a filled secondary pill"
+    ).toBeTruthy()
+    expect(
+      rowFor("Tomas Roig")?.querySelector('[data-slot="badge"][data-dot="archived"]'),
+      "an absent hasPortalLogin reads the identical grey dot as a real no"
+    ).toBeTruthy()
+  })
 })
 
 describe("All · In portal", () => {

@@ -295,7 +295,13 @@ export function AddButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" onClick={onClick} aria-label={label} disabled={disabled}>
+        {/* R84, 16 Sep 2026 client ruling — "only mango buttons on the title
+            level… the others black." A toolbar's own create button, wherever
+            it sits, is not the title, so it is the kit's black (`inverse`)
+            now, not mango. This SUPERSEDES UI-RULEBOOK B14's "the CREATE
+            button is mango… the one mango control in a toolbar row": that
+            ruling is retired by this one, on the same eleven call sites. */}
+        <Button variant="inverse" size="icon" onClick={onClick} aria-label={label} disabled={disabled}>
           {icon ?? <Plus className="size-4" />}
         </Button>
       </TooltipTrigger>

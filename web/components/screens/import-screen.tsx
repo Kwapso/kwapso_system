@@ -320,7 +320,8 @@ export function ImportScreen({
               answer — start again — is the one that duplicates every row the
               dead run already wrote. */}
           {resumable && (
-            <Button onClick={() => void run(true)}>
+            // R84 — an error-state action, not a title component, so black.
+            <Button variant="inverse" onClick={() => void run(true)}>
               <ArrowClockwise className="size-3.5" />
               {t("Carry on from where it stopped")}
             </Button>

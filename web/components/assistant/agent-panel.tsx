@@ -1402,7 +1402,7 @@ export function AgentPanel({
                 >
                   {t("Not now")}
                 </Button>
-                <Button size="sm" onClick={() => void chat.resolve(true)} disabled={chat.busy}>
+                <Button variant="inverse" size="sm" onClick={() => void chat.resolve(true)} disabled={chat.busy}>
                   {t("Go ahead")}
                 </Button>
               </div>

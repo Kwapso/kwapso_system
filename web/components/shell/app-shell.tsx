@@ -119,7 +119,6 @@ import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot, AgentDockTabsSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
-import { useAsideWidth, setAsideWidth, setAsideWidthScope } from "@/lib/aside-width"
 
 /** A list with at least one thing in it, said in the type.
  *
@@ -534,17 +533,27 @@ export function AppShell({
   // or shared with the panel's other presentation. One flag, two readers, never
   // two answers.
   const assistantOpen = useAgentOpen()
-  // THE ASSISTANT COLUMN'S WIDTH — variation A "drag the seam", client
-  // ruling 16 Sep 2026. `asideWidth` is CONTROLLED the same way `asideOpen`
-  // is above, and for the identical reason: something outside the kit has
-  // to persist it, and per PERSON rather than per device (`web/lib/aside-
-  // width.ts`'s own header says why the scoping differs from the open
-  // flag's). The scope effect keys off `userId`, computed above, the same
-  // fact `deep-link-screen.tsx` already reads to scope the open-tabs store.
+  // THE ASSISTANT COLUMN'S WIDTH IS GONE. "Let's forget about the resize.
+  // It's a disaster. Remove it." — the client's ruling, 16 Sep 2026 evening.
+  // `web/lib/aside-width.ts` (the drag's CONTROLLED half: `asideWidth`,
+  // `onAsideWidthChange`, the per-person `ss-aside-width:*` persistence) is
+  // deleted outright, not just unwired here — the aside is one fixed width
+  // from the kit again, same as before variation A shipped. One line of
+  // cleanup survives it: a browser that dragged the seam before this ruling
+  // still holds the old key, and nothing reads it any more to clear it on
+  // its own behalf.
   React.useEffect(() => {
-    setAsideWidthScope(userId)
-  }, [userId])
-  const asideWidth = useAsideWidth()
+    try {
+      const doomed: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith("ss-aside-width:")) doomed.push(key)
+      }
+      for (const key of doomed) localStorage.removeItem(key)
+    } catch {
+      /* private mode / storage blocked — nothing to clear either way. */
+    }
+  }, [])
   // THE TRAIL, AS ONE ARRAY, BECAUSE TWO THINGS READ IT. The strip itself and
   // the DEPTH the shell derives the title's step from have to be the same
   // fact; `breadcrumbs` is optional at the prop, so it is normalised once here
@@ -1532,24 +1541,15 @@ export function AppShell({
            it is still this app's only way back into a column that renders
            nothing while closed (see "SHUT MEANS ABSENT" above). */
         asideHandleOnOpen={false}
-        /* THE DRAG — variation A, client ruling 16 Sep 2026, with variation
-           B's three sizes as its snap points (320/400/520, the kit's own
-           defaults — this app narrows neither `asideMinWidth` nor
-           `asideMaxWidth`). CONTROLLED, the same shape `asideOpen` two props
-           up already takes, and persisted the same way through a sibling
-           module store: `web/lib/aside-width.ts` (per PERSON, not per
-           device — see that file's own header for why the scoping departs
-           from `agent-open.ts`'s). BECAUSE `asideHandleOnOpen` IS `false`
-           ABOVE, the round handle's own drag never mounts here — the kit's
-           bare resize seam (`RESIZE_SEAM`, no glyph, no mango fill) is what
-           this app actually draws for the drag, exactly the element the
-           2026-09-15 ruling above left in its place; `asideResizeLabel` is
-           its one accessible name (the round handle's `asideOpenLabel`/
-           `asideCloseLabel` do not apply to a control with no open/close
-           meaning of its own). */
-        asideWidth={asideWidth}
-        onAsideWidthChange={setAsideWidth}
-        asideResizeLabel={t("Resize the assistant")}
+        /* THE DRAG IS GONE — client ruling, 16 Sep 2026 evening: "Let's
+           forget about the resize. It's a disaster. Remove it." Variation A
+           ("drag the seam", ruled earlier the same day) and its whole
+           app-side half — the CONTROLLED `asideWidth`/`onAsideWidthChange`
+           pair, the per-person `web/lib/aside-width.ts` store, and
+           `asideResizeLabel`'s own accessible name for the seam — are
+           deleted rather than merely unwired: nothing here passes any of
+           the three, so the aside goes back to the kit's own single fixed
+           width, exactly as it was before this ruling existed. */
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
              stated at the kit's own `breadcrumb` prop: no buttons, no pills,

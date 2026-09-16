@@ -5,8 +5,8 @@
 // `Department` dropdown group (SELECTABLE_GROUPS.department, the same group a
 // meeting purpose already pick-or-creates into), so a team adds or retires one on
 // the Dropdown values screen without a deploy — the owner's answer to c1. What
-// lives HERE is the part a dropdown row cannot carry: the mark and the colour the
-// agency already chose for each of the five in the app they are leaving, and the
+// lives HERE is the part a dropdown row cannot carry: the mark the agency
+// already chose for each of the five in the app they are leaving, and the
 // SECOND QUESTION each one asks.
 //
 // The names and marks are read off the legacy data (glide/data/
@@ -16,43 +16,75 @@
 // Operations, Support) carried no colour and no icon, which is what "the five"
 // means.
 //
-// THE COLOURS ARE THE CHART SERIES, NOT THE LEGACY HEXES. Each of the five
-// arrived carrying a hex the old app had chosen (#F4C600, #6738E8, #B1E847,
-// #f584e3, #C497FE) and none of the five was one of kwapso's own colours, so a
-// department dot was the one mark on screen that did not belong to this app's
-// palette — and five literals in a shared file is exactly the shape UI-RULEBOOK
-// C10 refuses, because a theme change cannot reach them. A department is a MARK,
-// and C6 says a mark comes from the chart series, so the five now resolve
-// through `--chart-1` to `--chart-5`: the same five colours the pulse charts and
-// every other categorical mark in the app already draw from. The order is the
-// legacy order, so a department keeps the same dot from one release to the next.
+// A DEPARTMENT HAS NO COLOUR — client ruling, 16 Sep 2026 evening, verbatim:
+// "The departments have no color, so remove it from here. What they have is an
+// icon." REMOVED HERE: `DepartmentStyle.color`, which used to resolve each of
+// the five through `--chart-1` to `--chart-5` (the same five colours the pulse
+// charts and every other categorical mark in the app draw from) — earlier still,
+// each had carried a legacy hex (#F4C600, #6738E8, #B1E847, #f584e3, #C497FE),
+// none of them one of kwapso's own colours. GREPPED BEFORE DELETING: nothing
+// outside this file ever read `.color` off a `DepartmentStyle` or off
+// `TASK_DEPARTMENTS` — the one caller that ever passed a department into a
+// colour-hash (`accent: r.department` on the Tasks calendar,
+// `web/components/work/tasks-screen.tsx`) never actually painted with it,
+// because that calendar's own `dotTone` (the task's PRIORITY colour) always
+// wins over the department hash when both are given — so removing this field
+// changes no pixel. That dead wiring is removed too, in the same change.
+//
+// WHAT SURVIVES IS THE ICON, unchanged in shape, corrected in name: `icon`
+// was typed as "a lucide icon name" from before the 2026-09-03 Phosphor swap
+// (CLAUDE.md's own icon rule) and was never actually wired to a real glyph —
+// only `departmentGlyph` below, a plain Unicode character, drew anything.
+// Retyped to the kit's own kebab-case Phosphor spelling (phosphor.dev),
+// verified by hand against the kit's generated art (`shared/ui/foundations/
+// icons/PaperPlaneTilt.svg`, `Folder.svg`, `Code.svg`, `Star.svg`,
+// `Rocket.svg` all exist there) — the same verification `shared/story-types.ts`
+// and `shared/sprint-types.ts` each record for their own icon vocabularies,
+// and the same shape: a plain string, because this file is compiled by every
+// worker (the team seed reads `TASK_DEPARTMENTS`) and `shared/ui/` is DOM-only,
+// so even a type-only import of a `.tsx` module fails there (TS6142).
+// `departmentIconName`, below, resolves a department's word to this string;
+// the web side resolves the string to a component through the existing seam,
+// `iconComponent()` (`shared/web/screen-engine/icon.tsx`) — the same door
+// `storyTypeChip` (`web/components/work/stories-screen.tsx`) already uses for
+// story type's own closed, five-entry icon map.
 //
 // A department a team invents itself is a first-class value with no mark and no
 // second question — `departmentMark` answers null and `departmentAsks` answers
 // "nothing else", which is the honest reading of a word the code has never met.
 
-/** One of the five the agency already runs on: its name, its mark, its colour. */
+/** One of the five the agency already runs on: its name, its mark. No colour —
+ * see this file's own header, 16 Sep 2026 evening. */
 export type DepartmentStyle = {
   name: string
-  /** a lucide icon name, the nearest equivalent of the legacy mark */
-  icon: "send" | "folder" | "code" | "star" | "rocket"
-  /** the colour of the small dot beside the name, as a CSS value that resolves
-   * through the theme — one of the five chart-series tokens, never a literal. */
-  color: string
+  /** the kit's own Phosphor name (phosphor.dev), kebab-case — resolved to a
+   * real component through `iconComponent()` on the web side, never imported
+   * here (see this file's own header for why). */
+  icon: "paper-plane-tilt" | "folder" | "code" | "star" | "rocket"
 }
 
 export const TASK_DEPARTMENTS: DepartmentStyle[] = [
-  { name: "Sales", icon: "send", color: "var(--chart-1)" },
-  { name: "Admin", icon: "folder", color: "var(--chart-2)" },
-  { name: "Production", icon: "code", color: "var(--chart-3)" },
-  { name: "Marketing", icon: "star", color: "var(--chart-4)" },
-  { name: "Business", icon: "rocket", color: "var(--chart-5)" },
+  { name: "Sales", icon: "paper-plane-tilt" },
+  { name: "Admin", icon: "folder" },
+  { name: "Production", icon: "code" },
+  { name: "Marketing", icon: "star" },
+  { name: "Business", icon: "rocket" },
 ]
 
-/** The mark and colour for a department, or null for one a team invented. */
+/** The mark for a department, or null for one a team invented. */
 function departmentMark(name: string | null | undefined): DepartmentStyle | null {
   if (!name) return null
   return TASK_DEPARTMENTS.find((d) => d.name === name) ?? null
+}
+
+/** The department's own Phosphor icon name (kebab-case, resolved to a
+ * component through `iconComponent()` on the web side) — the client's own
+ * answer to what a department wears now instead of a colour: "What they have
+ * is an icon." `null` for a department the code has never met, the same
+ * "reads as itself, draws no glyph" answer every other closed-vocabulary icon
+ * lookup in this app gives (`storyTypeIconName`, `sprintTypeIcon`). */
+export function departmentIconName(name: string | null | undefined): string | null {
+  return departmentMark(name)?.icon ?? null
 }
 
 /** The department's mark as a CHARACTER, for the places a mark has to be text —
@@ -64,7 +96,7 @@ function departmentMark(name: string | null | undefined): DepartmentStyle | null
 export function departmentGlyph(name: string | null | undefined): string {
   const mark = departmentMark(name)
   if (!mark) return ""
-  if (mark.icon === "send") return "➤"
+  if (mark.icon === "paper-plane-tilt") return "➤"
   if (mark.icon === "folder") return "▤"
   if (mark.icon === "code") return "⟨⟩"
   if (mark.icon === "star") return "★"

@@ -115,7 +115,7 @@ export function AskTheAssistant({
           placeholder={context ? t("Ask about this record…") : t("Ask the knowledge base")}
           aria-label={t("Ask the knowledge base")}
         />
-        <Button type="submit" disabled={!question.trim()} className="shrink-0 gap-1">
+        <Button type="submit" variant="inverse" disabled={!question.trim()} className="shrink-0 gap-1">
           <MagnifyingGlass className="size-4" aria-hidden />
           {t("Ask")}
         </Button>

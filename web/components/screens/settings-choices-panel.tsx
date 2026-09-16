@@ -562,6 +562,16 @@ export function SettingsChoicesPanel({
             defaultDir: "asc",
           } satisfies TableColumn,
         ]),
+    // THE DETAILS COLUMN — client ruling, 16 Sep 2026 evening: "add … an
+    // in-between column with details or info or whatever, and include this
+    // from each case." `shapeChoicesTable` (deep-link/shape.tsx) is what
+    // decides what a row's own type carries; this column only draws the
+    // cell it already built. No `sort`/`searchKey` — the same shape the
+    // `actions` column below takes, and for the same reason: the cell is a
+    // decoration (an icon, a dot, a duration), never a fact this table
+    // orders or searches by. R82: value + module + details + status +
+    // actions is five columns, one under the six-column ceiling.
+    { key: "details", label: t("Details") },
     {
       key: "status",
       label: t("Status"),

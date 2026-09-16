@@ -147,13 +147,14 @@ export function InstallPrompt() {
             <Button variant="ghost" onClick={dismiss}>
               {t("Not now")}
             </Button>
+            {/* R84 — a sheet footer, not a title component, so black. */}
             {hasNative ? (
-              <Button onClick={() => void install()} className="gap-1">
+              <Button variant="inverse" onClick={() => void install()} className="gap-1">
                 <Download className="size-4" />
                 {t("Install")}
               </Button>
             ) : iosSafari ? (
-              <Button onClick={dismiss}>{t("Got it")}</Button>
+              <Button variant="inverse" onClick={dismiss}>{t("Got it")}</Button>
             ) : null}
           </SheetFooter>
         </div>

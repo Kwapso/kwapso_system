@@ -144,7 +144,8 @@ export function EmailChangeDialog({
                 autoFocus
               />
             </Field>
-            <Button type="submit" disabled={busy || !email.trim()}>
+            {/* R84 — a dialog's Submit, not a title component, so black. */}
+            <Button type="submit" variant="inverse" disabled={busy || !email.trim()}>
               {busy ? <Spinner /> : null}
               {busy ? t("Sending…") : t("Email me a code")}
             </Button>

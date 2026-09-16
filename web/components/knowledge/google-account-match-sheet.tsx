@@ -79,7 +79,8 @@ export function GoogleAccountMatchSheet({
           <Button variant="secondary" onClick={onDecline}>
             {t("Not this one")}
           </Button>
-          <Button onClick={onConfirm}>
+          {/* R84 — a sheet footer, not a title component, so black. */}
+          <Button variant="inverse" onClick={onConfirm}>
             {t("Yes, file it under {account}", { account: accountName })}
           </Button>
         </SheetFooter>

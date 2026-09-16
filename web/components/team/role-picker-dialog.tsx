@@ -154,7 +154,9 @@ export function RolePickerDialog({
         </RadioGroup>
 
         <SheetFooter>
+          {/* R84 — a dialog's Save, not a title component, so black. */}
           <Button
+            variant="inverse"
             onClick={() => void save()}
             disabled={busy || !selected}
           >

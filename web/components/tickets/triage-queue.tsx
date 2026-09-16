@@ -956,12 +956,16 @@ export function TriageQueue({
                      one, and it sat among three sharper things looking like the
                      odd one out rather than the distinct one.
 
-                     `inverse` is the loudest tone that is NOT the brand: mango
-                     is spoken for by the create button beside it and by Accept
-                     on the card, and the kit rules one brand fill per view. It
-                     also suits what the control does — it appears only after a
-                     decision, and it takes that decision back. If it reads too
-                     heavy in use, `secondary` is one word away. */
+                     `inverse` is the loudest tone that is NOT the brand — chosen
+                     when mango was still spoken for by the create button beside
+                     it and by Accept on the card (the kit's own §2.5, one brand
+                     fill per view). R84, 16 Sep 2026, retired that reasoning:
+                     neither neighbour is mango any more, mango lives only in the
+                     title now. `inverse` stays anyway, and stays the right
+                     choice on its own terms — it also suits what the control
+                     does, appearing only after a decision to take that decision
+                     back. If it reads too heavy in use, `secondary` is one word
+                     away. */
                   variant="inverse"
                   size="sm"
                   disabled={busy}
@@ -1214,11 +1218,18 @@ export function TriageQueue({
                     "Assign" and filed the ticket without asking is worse than
                     the single "Accept" it replaces.
 
-                    IT IS STILL THE ONE MANGO ON THE CARD. The kit rules one per
-                    view and this is it; the picker row below no longer competes
-                    for it, which is the other half of the same evening's ruling
-                    (record-picker.tsx's own header: the chosen chip is black
-                    now, because mango meant "chosen" in two places at once).
+                    IT USED TO BE THE ONE MANGO ON THE CARD, under the kit's own
+                    §2.5 ("one brand fill per view") — the picker row below no
+                    longer competed for it, which was the other half of the
+                    same evening's ruling (record-picker.tsx's own header: the
+                    chosen chip is black now, because mango meant "chosen" in
+                    two places at once). R84, 16 Sep 2026, retires that whole
+                    convention: "only mango buttons on the title level… the
+                    others black." A queue card is not the title, so this is
+                    the kit's black (`inverse`) now, same as the Undo button
+                    below it — no colour is left to disambiguate a card's
+                    "main" action from any other, and none is needed: rank on
+                    a card was never carried by colour alone.
 
                     DISABLED WHILE A READINESS GAP STANDS, whichever verb it is
                     wearing: the DOOR refuses the move (shared/triage-
@@ -1226,6 +1237,7 @@ export function TriageQueue({
                     button here would be a button that fails. */}
                 {canTriage && (
                   <Button
+                    variant="inverse"
                     size="sm"
                     disabled={busy || current.missing.length > 0}
                     title={current.missing.length > 0 ? gapsSentence(current) : undefined}

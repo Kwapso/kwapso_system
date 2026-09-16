@@ -1027,7 +1027,14 @@ export function TasksScreen({
       day: (r.dueOn as string).slice(0, 10),
       // NO REFERENCE PREFIX — see the same note on the list row above.
       title: r.title,
-      accent: r.department ?? "",
+      // NO `accent` — a department is never a colour (client ruling, 16 Sep
+      // 2026 evening, `shared/departments.ts`'s own header). This used to
+      // hash the task's department into the calendar's chart-N dot fallback
+      // (`dotClass`, record-calendar.tsx), but never actually painted with
+      // it: `dotTone` below is always set for a task (every priority has one,
+      // `PRIORITY_DOT_TONE` is total), and `dotTone` wins over `accent`
+      // whenever both are given — so the department hash was dead the day it
+      // shipped, and removing it changes no pixel.
       // THE PRIORITY COLOUR CIRCLE — `CalendarEntry.dotTone` (record-calendar.tsx),
       // set from the same lookup the table chip and the board column head both
       // read (`PRIORITY_DOT_TONE`, `shared/departments.ts`), so all three faces

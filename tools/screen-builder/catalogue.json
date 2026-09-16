@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.99",
-  "sha": "97a486dcda4b9c292d4ec617ca38a523d8fe4943",
+  "tag": "v1.2.100",
+  "sha": "a598a4ae3e9bda5f9c63eefa72801f48a3a07c73",
   "syncedAt": "2026-09-16"
  },
- "generatedAt": "2026-09-16T15:06:29.287Z",
+ "generatedAt": "2026-09-16T18:08:36.401Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -9386,10 +9386,6 @@
    "exports": [
     "RAIL_WIDTH",
     "ASIDE_WIDTH",
-    "ASIDE_WIDTH_MIN",
-    "ASIDE_WIDTH_MAX",
-    "ASIDE_WIDTH_DEFAULT",
-    "ASIDE_WIDTH_SNAP_POINTS",
     "ScreenShell"
    ]
   },

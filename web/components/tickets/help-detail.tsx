@@ -818,8 +818,12 @@ export function HelpDetailScreen({
           every piece of work is done and only the telling is left, and never on a
           ticket already answered. The panel is where the words are written,
           because the door refuses without them (5.6). */}
+      {/* R84, 16 Sep 2026 — "only mango buttons on the title level." This
+          button sits in the tab panel body, not in RecordScreen's own
+          `actions` row (the title), so it is black now — B1's own primary
+          slot for a ticket detail is superseded on colour, not on rank. */}
       {canEdit && ticket.status === "ready" && (
-        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
+        <Button variant="inverse" disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
           <PaperPlaneTilt className="size-3.5" />
           {t("Answer and close")}
         </Button>

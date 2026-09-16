@@ -111,7 +111,10 @@ export function TicketRating({ ticketId, resolved }: { ticketId: string; resolve
               key={score}
               type="button"
               size="sm"
-              variant={chosen ? "default" : "secondary"}
+              // R84 — this card carries no title component, so "chosen" reads
+              // as the kit's black (inverse) rather than mango; the same
+              // convention record-picker.tsx's own chosen chip already uses.
+              variant={chosen ? "inverse" : "secondary"}
               disabled={sending}
               // A score on its own is a complete rating (0067). Pressing a face
               // when there is nothing to add SENDS — the comment box below is
@@ -147,7 +150,8 @@ export function TicketRating({ ticketId, resolved }: { ticketId: string; resolve
             disabled={sending}
           />
           <div className="flex justify-end">
-            <Button type="button" size="sm" disabled={sending} onClick={() => void say(picked, words)}>
+            {/* R84 — not a title component. */}
+            <Button type="button" variant="inverse" size="sm" disabled={sending} onClick={() => void say(picked, words)}>
               <PaperPlaneTilt className="size-3.5" />
               {sending ? t("Sending…") : t("Send")}
             </Button>

@@ -103,7 +103,8 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
                 autoFocus
               />
             </Field>
-            <Button type="submit" size="lg" className="w-full" disabled={busy || !email}>
+            {/* R84 — no title component on a sign-in screen, so black. */}
+            <Button type="submit" variant="inverse" size="lg" className="w-full" disabled={busy || !email}>
               {busy ? <Spinner /> : null}
               {t("Email me a code")}
             </Button>

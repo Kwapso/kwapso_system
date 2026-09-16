@@ -219,25 +219,45 @@ describe("R70 — every automation is visible, and one that cannot be switched s
       `R70 — the Choices ${part} no longer resolves its fill through AUTOMATION_STATUS_VARIANT`
     ).toBe(true)
 
-    // 2 · THE AUTOMATIONS TABLE'S OWN STATUS BADGE DRAWS FROM THE SAME MAP —
-    // `module-automations.tsx`'s `RecordTable` column (`status: <Badge
-    // variant={AUTOMATION_STATUS_VARIANT[status]}>`), the table-shaped sibling
-    // of the Choices badge above and the more honest comparison since both
-    // are now a computed fill rather than a literal: two elements reading the
-    // SAME constant cannot disagree about a colour, which is what "one
-    // concept, one colour, on two pages" now means structurally rather than
-    // as a string match.
+    // 2 · THE AUTOMATIONS TABLE'S OWN STATUS BADGE DREW FROM THE SAME MAP,
+    //     UNTIL THE CLIENT'S 16 Sep 2026 EVENING RULING MOVED IT TO A DOT —
+    // verbatim: "let's change the full color pill to also be a dot. Inactive
+    // gets gray, and active gets green." `module-automations.tsx`'s
+    // `RecordTable` column now reads `status: <Badge variant="status"
+    // dot={AUTOMATION_STATUS_DOT[status]}>` — a SEPARATE map
+    // (`automation-edit-sheet.tsx`, beside the untouched
+    // `AUTOMATION_STATUS_VARIANT` the Choices half below still reads) — so
+    // Automations and Choices no longer share one fill; they share nothing
+    // any more except the WORD, which part 1 above still proves. This is the
+    // deliberate divergence this file's own comment already named ("worth
+    // its own pass, not this one") landing for real, not a parity this
+    // check can still make.
     const table = stripComments(read(join(WEB, "components/screens/module-automations.tsx")))
     expect(
-      /<Badge[^>]*variant=\{AUTOMATION_STATUS_VARIANT\[/.test(table),
-      "R70 — module-automations.tsx no longer draws its own status column through AUTOMATION_STATUS_VARIANT; re-read whether the Choices/Automations colour parity this check proves still holds"
+      /<Badge[^>]*variant="status"[^>]*dot=\{AUTOMATION_STATUS_DOT\[/.test(table),
+      "R70 — module-automations.tsx no longer draws its own status column as a dot through AUTOMATION_STATUS_DOT; re-read the 16 Sep 2026 evening ruling (\"change the full color pill to also be a dot\") before changing this pattern"
     ).toBe(true)
+    // THE OLD FILL IS GONE FROM THIS FILE — a stray `AUTOMATION_STATUS_VARIANT`
+    // import here would mean two colour sources compete for the same cell.
+    expect(
+      table.includes("AUTOMATION_STATUS_VARIANT"),
+      "R70 — module-automations.tsx must not import the old filled-pill map any more; it reads AUTOMATION_STATUS_DOT only"
+    ).toBe(false)
 
     // 3 · THE EDIT SHEET STILL SAYS THE WORD, ONCE, IN THE UNSWITCHABLE
     //     BRANCH — the ORIGINAL R70 subject (an automation nobody can turn
     //     off wears the same WORD a protected choice does), unaffected by the
     //     colour change above: this is about the SENTENCE, not the fill.
     const screen = stripComments(read(join(WEB, "components/screens/automation-edit-sheet.tsx")))
+    // THE SHEET'S OWN DETAIL HEAD DRAWS THE SAME DOT — the coordinator's
+    // "list row, the sheet head and every other place the automation status
+    // is drawn." Read alongside the table's own assertion above: two call
+    // sites reading one constant is the same "cannot disagree about a
+    // colour" proof R70 always stood on, now over `AUTOMATION_STATUS_DOT`.
+    expect(
+      /<Badge[^>]*variant="status"[^>]*dot=\{AUTOMATION_STATUS_DOT\[/.test(screen),
+      "R70 — the automation edit sheet's own detail head no longer draws its status chip as a dot through AUTOMATION_STATUS_DOT"
+    ).toBe(true)
     const said = screen.split(says).length - 1
     expect(
       said,

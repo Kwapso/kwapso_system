@@ -50,10 +50,16 @@
 // Team › Members and Contacts (1280px) measured 44 against 20. The census
 // below is still correct and stays as written — it catches a DIFFERENT
 // double-payment (a wrapping column) that is a real, distinct fault. The
-// card-padding fault is fixed once, in `web/app/globals.css`
-// (`.pinned-strip + [data-slot="card"]`, zeroing both `[data-slot=
+// card-padding fault was fixed once, in `web/app/globals.css`
+// (`.pinned-strip + [data-slot="card"]`, first zeroing both `[data-slot=
 // "card-content"]`'s real `padding-top` and the R63 `--pinned-lead` property
-// that reproduces it while a toolbar is pinned), and proved in
+// that reproduces it while a toolbar is pinned) — AND AMENDED AGAIN THE SAME
+// EVENING, once flush-zero itself proved to be the wrong number: the client,
+// on seeing it live, "I'm not happy about this... can we do an in-between
+// with what it was and what it is now?" Both properties now pay the card's
+// own remainder of a new token, `--toolbar-lead-gap` (`--space-7`, 32px) —
+// `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))`, 12px, on top of
+// the strip's own 20 — rather than zero, proved in
 // `web/test/toolbar-lead-gap-card.test.tsx`, this file's own sibling.
 
 import { join } from "node:path"

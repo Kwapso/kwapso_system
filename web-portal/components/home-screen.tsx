@@ -128,7 +128,8 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
 
       <TimeGivenBack />
 
-      <Button size="lg" className="w-full" onClick={() => setRaising(true)}>
+      {/* R84 — this button is not inside CollectionHeading's own title row, so black. */}
+      <Button variant="inverse" size="lg" className="w-full" onClick={() => setRaising(true)}>
         <Plus className="size-3.5" />
         {t("Ask us something")}
       </Button>

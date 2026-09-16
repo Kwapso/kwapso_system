@@ -818,7 +818,6 @@ const RECORD_MARK_BOX =
   "[&>span]:size-full"
 
 export function RecordScreen({
-  cover,
   mark,
   recordNumber,
   collectionLabel,
@@ -840,23 +839,17 @@ export function RecordScreen({
   errorAction,
 }: {
   /**
-   * THE COVER BAND — C1, client ruling, 16 Sep 2026: "For the cover, let's
-   * try C1. I want this for accounts and members." A full-width image band
-   * ABOVE the whole head below — B1's mark-inline-with-the-title (the `mark`
-   * prop's own doc, next) stays exactly as it is; the band sits a level
-   * above it, not beside it. Forwarded straight to the kit's own `banner`
-   * slot (`shared/ui/compositions/templates/record-chrome.tsx`) — the ONE
-   * node that composition already draws above everything else inside the
-   * body pane, for exactly this reason (that file's own doc: "ruling 35
-   * requires the picture to be above every word on the page… `hero` sits
-   * UNDER the identity row… one region too low"). Nothing here builds the
-   * band itself — `RecordCoverBand` (shared/web/record-mark.tsx) is the one
-   * component every caller reaches for, so the box, the top radius, the
-   * fixed height and the quiet no-cover tint can never drift between an
-   * account's screen and a member's. Absent on every OTHER record: the
-   * ruling names two kinds, not "everywhere".
+   * THERE IS NO `cover` PROP HERE ANY MORE. C1, the client's own choice from
+   * a mocked artifact on 16 Sep 2026 ("For the cover, let's try C1. I want
+   * this for accounts and members"), shipped a full-width image band above
+   * this component's head, forwarded to the kit's `banner` slot and built
+   * from `RecordCoverBand` (shared/web/record-mark.tsx). The same session,
+   * she reversed it outright: "I changed my mind. Let's remove this
+   * completely." The band, the prop, and both callers' wiring (an account's
+   * screen and a member's) are gone; `staff_profiles.cover_url` (migration
+   * 0102) is NOT reverted — a migration never is — so the column sits unread
+   * behind nothing, exactly as `record-mark.tsx`'s own header now says.
    */
-  cover?: React.ReactNode
   /**
    * THE MARK COMES BACK, NARROWLY — CLIENT RULING, 2026-09-15, verbatim: "For
    * cover and logo, I choose B1. Apply this on apps, accounts, and team
@@ -1259,10 +1252,12 @@ export function RecordScreen({
           is now the only thing a scrolled record screen pins. */}
       <RecordChrome
         className={`${FOOTER_TO_BOTTOM} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
-        /* THE COVER BAND, C1 — the kit's own `banner` slot, the one node it
-           draws above everything else in the body pane. See the `cover`
-           prop's own doc above for the ruling and why this is the slot. */
-        banner={cover}
+        /* NO `banner` HANDED TO THE KIT — THE COVER BAND IS REMOVED, 16 Sep
+           2026 ("I changed my mind. Let's remove this completely."). `cover`
+           is no longer a prop on this component at all — see the removal
+           note in this function's own prop-type block, immediately above
+           `mark`'s doc below — so nothing is left to hand the kit's
+           `banner` slot. */
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
            HEADER TOO", this file's header comment. `headerMark` (the local
            variable that used to fold `leading`/`mark` together) is deleted;

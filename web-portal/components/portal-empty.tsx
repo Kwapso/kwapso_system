@@ -85,7 +85,9 @@ export function PortalEmpty({
         </p>
       ) : null}
       {act ? (
-        <Button className="mt-3 gap-1" onClick={act.onClick}>
+        // R84 — an empty state's "add the first" is not inside a title
+        // component, so black now.
+        <Button variant="inverse" className="mt-3 gap-1" onClick={act.onClick}>
           <Plus className="size-3.5" />
           {act.label}
         </Button>

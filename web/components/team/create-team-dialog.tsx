@@ -120,7 +120,8 @@ export function CreateTeamDialog({
           </Field>
         </form>
         <SheetFooter>
-          <Button type="submit" form="create-team-form" disabled={busy || !name.trim()}>
+          {/* R84 — a dialog's Create, not a title component, so black. */}
+          <Button type="submit" variant="inverse" form="create-team-form" disabled={busy || !name.trim()}>
             {busy ? <Spinner /> : null}
             {busy ? t("Creating…") : t("Create team")}
           </Button>

@@ -131,6 +131,39 @@
 }
 
 /* ============================================================================
+   THE WHOLE VISIBLE GAP ABOVE A TOOLBAR, ON EVERY SCREEN (R83, amended a
+   second time, 16 Sep 2026 evening).
+   ============================================================================
+   The client, that evening, verbatim: "I'm not happy about this. It doesn't
+   look good. Can we do an in-between with what it was and what it is now?
+   Also, make sure it's the same on every page. I don't understand how task
+   was 52 and setting and contacts were 44. It should be the fucking same
+   everywhere."
+
+   ONE token now settles both halves of that sentence. `--toolbar-lead-gap`
+   is the WHOLE visible distance from a tab strip's own bottom edge to a
+   toolbar's first pixel — the in-between she asked for, between the old
+   per-breakpoint ladder (44/52px, `CardContent`'s own `p-4`/
+   `lg:p-[var(--space-7)]` inset, below) and the flush-zero this law's first
+   amendment shipped (20px, the strip's own `pb-[var(--tab-content-gap)]`
+   alone, also below). `--space-7` (2rem, 32px) is the nearest step ON the
+   scale to that midpoint — and it is an exact step, not a guess: the scale's
+   own note a few lines up says so verbatim ("p-8 is 32px, which is --space-7
+   here"), so the "no 32 on the scale" case this token's own first draft
+   feared never applies — `--space-6` is 24px, a card inset, not 32.
+
+   THE CARD PAYS ONLY THE REMAINDER, NEVER THE WHOLE NUMBER TWICE. A card
+   that follows a tab strip owes its leading toolbar `--toolbar-lead-gap`
+   MINUS what the strip already paid (`--tab-content-gap`, 20px) — 12px, not
+   32 and not 0 — so the two payments together read as one 32px distance
+   rather than 20 plus a second, unrelated number. See the rule below,
+   `.pinned-strip + [data-slot="card"]`, for where that arithmetic lives.
+   ========================================================================= */
+:root {
+  --toolbar-lead-gap: var(--space-7);
+}
+
+/* ============================================================================
    WHAT A PINNED TOOLBAR PINS BELOW (R63).
    ============================================================================
    Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be on
@@ -206,31 +239,29 @@
 }
 
 /* ============================================================================
-   THE CARD OWES NO SECOND LEADING GAP WHEN THE STRIP ALREADY PAID ONE
-   (R83, amended 16 Sep 2026).
+   THE CARD PAYS ONLY THE REMAINDER OF --toolbar-lead-gap, NEVER THE WHOLE
+   INSET AND NEVER ZERO (R83, amended a second time, 16 Sep 2026 evening).
    ============================================================================
-   The client's ruling, verbatim: "reduce the spacing above ALL TOOLBARS. i
-   want it exactly as its currently below, make it like that above." R83's
-   first pass concluded `--tab-content-gap` and `--toolbar-content-gap` "were
-   already equal … and every screen but one spent each exactly once" — true of
-   the TOKEN and incomplete about the SCREEN. That pass only ever measured the
-   wrapping `gap-*`/`space-y-*` census (waves-screen.tsx's stray outer `gap-6`);
-   it never measured the space PAST the strip's own padding, where a
-   `<CollectionCard>` sits.
+   First pass: "reduce the spacing above ALL TOOLBARS ... make it like that
+   above [as below]." Fixed by zeroing the card's own leading inset outright,
+   so above = below = 20px, the strip's own `pb-[var(--tab-content-gap)]`
+   alone — proved correct on 16 Sep 2026 afternoon, MEASURED ON STAGING: Tasks
+   (1600px) had read 52px above its toolbar against 20px below; Settings ›
+   Team › Members and Contacts (1280px) had read 44px against 20px, both from
+   `CardContent`'s own leading `p-4`/`lg:p-[var(--space-7)]` inset paying a
+   SECOND, unrelated number on top of the strip's correct one.
 
-   MEASURED ON STAGING, 16 Sep 2026, on the common shape — a tab strip
-   (`renderFolderTabs`) directly above a `<CollectionCard>` whose first child
-   is a pinned toolbar (`data-slot="toolbar-row-pin"`): Tasks (1600px) read
-   52px above the toolbar against 20px below it; Settings › Team › Members and
-   Contacts (1280px) read 44px above against 20px below. The strip pays its
-   own `pb-[var(--tab-content-gap)]` (20px, correct) and then `CardContent`'s
-   own leading inset (`p-4`/`lg:p-[var(--space-7)]`, 16 or 32px more) pays a
-   SECOND, unrelated number before the toolbar's own content starts — the
-   identical shape R49 already forbids for the row's own TRAILING margin, one
-   edge over.
+   THAT AFTERNOON FIX WAS ITSELF WRONG BY THE CLIENT'S OWN LATER WORD, THAT
+   EVENING: "I'm not happy about this. It doesn't look good. Can we do an
+   in-between with what it was and what it is now?" Flush-zero was never the
+   target, only the easiest way to prove the double-payment was gone — the
+   in-between she asked for is `--toolbar-lead-gap` (32px, defined above),
+   and the card's own job is to pay exactly what the strip has not already
+   paid: `--toolbar-lead-gap` minus `--tab-content-gap` (12px), not the old
+   16/32 ladder and not the afternoon's 0.
 
-   THE STRIP ALREADY PAYS THE WHOLE VISIBLE GAP, so a card that follows one
-   owes its leading toolbar nothing beyond it. `CollectionCard`
+   THE STRIP ALREADY PAYS PART OF THE VISIBLE GAP, so a card that follows one
+   owes its leading toolbar only the difference. `CollectionCard`
    (`web/components/deep-link/screen-bits.tsx`) is the one component that
    boxes a toolbar-led collection, and every call site reaches it only through
    a `renderFolderTabs(...)` call in the same gapless column
@@ -239,25 +270,24 @@
    card's own preceding sibling. Derived off that adjacency, never off a prop
    a call site has to remember to pass.
 
-   TWO THINGS TO ZERO, NOT ONE. `CardContent`'s own real, rendered
+   TWO THINGS TO MOVE TOGETHER, NOT ONE. `CardContent`'s own real, rendered
    `padding-top` is what pushes the toolbar's static position down; a
    negative top margin on the toolbar cannot out-run it. R63's own
    `--pinned-lead` `mt`/`pt` pair (`PINNED_TOOLBAR`, shared/web/pinned-chrome.ts)
    only CANCELS a lead at rest, it does not remove one — so leaving
-   `--pinned-lead` at the card's old 16/32 ladder while this rule zeroed the
-   real padding would pull the toolbar UP PAST the card's own top edge and
-   into the strip above it. So both halves of the same number move together.
-   This costs R63's "peek" nothing: with nothing left for the card to
-   contribute above the toolbar at rest, there is nothing to reveal once it
-   pins either — the toolbar's own `::before` still draws the container's
-   rounded top corner at `--pinned-chrome-h`, flush under the strip, exactly
-   as it sits at rest. */
+   `--pinned-lead` at a different number from the real padding would pull the
+   toolbar to the wrong place the moment it pins: past the card's own top
+   edge if `--pinned-lead` ran ahead of the padding, or short of the strip
+   above it if `--pinned-lead` ran behind. Both halves of the same number
+   move together, always the identical `calc()`, so a pinned toolbar reveals
+   exactly the 12px the card was already contributing at rest — R63's own
+   "peek" — and nothing else. */
 .pinned-strip + [data-slot="card"] {
-  --pinned-lead: 0px;
+  --pinned-lead: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
 }
 
 .pinned-strip + [data-slot="card"] > [data-slot="card-content"] {
-  padding-top: 0px;
+  padding-top: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
 }
 
 /* WHAT IS BEHIND A CONTAINER THAT INSETS A PINNED TOOLBAR (R63, part 4).

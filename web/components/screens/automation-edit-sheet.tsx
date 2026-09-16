@@ -54,17 +54,48 @@
 //
 // ── THE STATUS CHIP'S COLOUR ─────────────────────────────────────────────────
 //
-// The client, the same session, over the automations table: *"make sure that
-// each status has a different color because right now active and protected
-// look the same."* `AUTOMATION_STATUS_VARIANT` below is the one derivation —
-// `ModuleAutomations`' own table column imports it rather than keeping a
-// second copy, so the word and the fill can never drift apart between the
-// list and this panel's own detail head. Kit variants only (R32): `inverse`
-// (ink) for Protected — the strongest fill, for the row nobody can change —
-// `success` for Active, and `outline` — the kit's one uncoloured variant —
-// for Inactive, which reads as quiet rather than merely dimmed opacity.
-// `variant="default"` (mango) is deliberately not one of the three: badge.tsx's
-// own law is that the brand fill is never a status.
+// The client, 2026-09-15, over the automations table: *"make sure that each
+// status has a different color because right now active and protected look
+// the same."* Two rulings later, both 16 Sep 2026, landed as FILLS —
+// `AUTOMATION_STATUS_VARIANT` below (still live, see next section) went
+// `inverse`/`success`/`outline`, then Inactive's own follow-up swapped
+// `outline` for `secondary` ("make sure that the status 'inactive' for the
+// automations also has a background… the pill"). THE THIRD RULING, SAME
+// EVENING, REPLACED THE WHOLE APPROACH: *"For automations, let's change the
+// full color pill to also be a dot. Inactive gets gray, and active gets
+// green."* — and, the same breath, *"All dots are always solid, not
+// rings."* So the status chip this panel's own detail head draws (below) and
+// `ModuleAutomations`' own list column no longer read a FILL at all: both
+// read `AUTOMATION_STATUS_DOT`, a `Record<AutomationStatus, DotTone>`, and
+// draw `<Badge variant="status" dot={…}>` — the same shape the ticket detail
+// head's own stage chip draws (`help-detail.tsx`'s retired status pill,
+// `helpStatusDotTone`) and `shared/status-tones.ts`'s own style, kept local
+// here rather than added to that file because `AutomationStatus` is not
+// `HelpStatus`/`StoryStatus` and this map has exactly one reader pair.
+//
+//   on (Active)     → `shipped` — green (`--dot-shipped`, `--kw-forest`),
+//                      her word exactly.
+//   off (Inactive)  → `archived` — grey (`--dot-archived`,
+//                      `--ink-disabled`), her word exactly.
+//   protected       → `building` — charcoal (`--dot-building`,
+//                      `--foreground`). SHE DID NOT NAME THIS ONE: the
+//                      ruling above gives Active and Inactive their colours
+//                      and says nothing about Protected. `building` is this
+//                      change's own suggestion — the same tone the ticket/
+//                      story status maps already use for "in build, no
+//                      colour of its own" — chosen because it is the one
+//                      lifecycle tone left that is neither green nor grey
+//                      and reads as neutral-strong rather than a fourth
+//                      invented hue (R32, the closed palette). Flag this for
+//                      her the next time status colours come up.
+//
+// `AUTOMATION_STATUS_VARIANT` IS NOT DELETED — it still has two readers
+// outside this change's own scope: the Choices table's own status cell
+// (`deep-link/shape.tsx#shapeChoicesTable`) and the internal automations
+// panel (`team/internal-screens.tsx`), neither of which this ruling named.
+// Both keep the filled-pill look unchanged; the divergence from Automations'
+// own new dot is the SAME kind of gap this file already carried on purpose
+// (see the next paragraph, unchanged) — "worth its own pass, not this one."
 //
 // NOT THE SAME COLOUR THE CHOICES TABLE DRAWS FOR ITS OWN "Protected" (
 // deep-link/shape.tsx, `variant="secondary"`) — read as a separate, narrower
@@ -114,6 +145,7 @@ import { Switch } from "@shared/ui/components/switch/switch"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { Text } from "@shared/ui/components/typography/typography"
 import { toast } from "@shared/ui/components/sonner/sonner"
+import type { DotTone } from "@shared/app-stages"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { Icon } from "@shared/web/screen-engine/icon"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -129,13 +161,31 @@ import {
   type AutomationStatus,
 } from "@shared/automations"
 
-/** THE ONE STATUS→FILL DERIVATION — see this file's header. `ModuleAutomations`
- * imports this rather than keeping its own copy, so the table and this
- * panel's detail head can never disagree about what colour a word is. */
-export const AUTOMATION_STATUS_VARIANT: Record<AutomationStatus, "inverse" | "success" | "outline"> = {
+/** THE FILLED-PILL DERIVATION — SUPERSEDED FOR THIS SCREEN, STILL LIVE FOR
+ * TWO OTHERS. See this file's own header ("THE STATUS CHIP'S COLOUR") for
+ * the 16 Sep 2026 ruling that moved Automations' own status chip to a dot
+ * (`AUTOMATION_STATUS_DOT`, below). This map is UNCHANGED and still exported
+ * because `deep-link/shape.tsx#shapeChoicesTable` and
+ * `team/internal-screens.tsx` both still read it — neither was named in the
+ * dot ruling, and removing their import would be an unrelated redesign no
+ * one asked for in this pass. */
+export const AUTOMATION_STATUS_VARIANT: Record<AutomationStatus, "inverse" | "success" | "secondary"> = {
   protected: "inverse",
   on: "success",
-  off: "outline",
+  off: "secondary",
+}
+
+/** THE DOT DERIVATION — the client's ruling, 16 Sep 2026: "let's change the
+ * full color pill to also be a dot. Inactive gets gray, and active gets
+ * green." See this file's own header for the full account, including that
+ * she did not name Protected's tone (`building` is this change's own
+ * suggestion). `ModuleAutomations`' own table column imports this rather
+ * than keeping a second copy, so the list row and this panel's own detail
+ * head can never disagree about which dot a status wears. */
+export const AUTOMATION_STATUS_DOT: Record<AutomationStatus, DotTone> = {
+  protected: "building",
+  on: "shipped",
+  off: "archived",
 }
 
 type FormValues = { title: string; description: string }
@@ -344,7 +394,7 @@ export function AutomationEditSheet({
         <div className="flex flex-col gap-2 px-6 pt-6 pb-4 shadow-[var(--hairline-over)]">
           <div className="flex flex-wrap items-end gap-4">
             <div className="min-w-0 flex-1">
-              <Badge variant={AUTOMATION_STATUS_VARIANT[status]} className="mb-2 w-fit shrink-0">
+              <Badge variant="status" dot={AUTOMATION_STATUS_DOT[status]} className="mb-2 w-fit shrink-0">
                 {STATUS_LABEL[status]}
               </Badge>
               <DialogTitle className="block text-4xl">{name}</DialogTitle>

@@ -39,6 +39,11 @@ import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
 import type { MeetingTypeIcon } from "@shared/meeting-icons"
 import { translator, type Language } from "@shared/i18n"
+import { sprintTypeIcon } from "@shared/sprint-types"
+import { storyTypeIconName } from "@shared/story-types"
+import { appStageDotTone } from "@shared/app-stages"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import type {
   Account,
   ActivityItem,
@@ -676,17 +681,27 @@ export function shapeAccountsList(
  *
  * "add a column to show if they are in the portal or not" — `hasPortalLogin`,
  * read straight off the row (`workers/tenancy/src/lib/accounts.ts`'s own
- * header has the door half). A kit `Badge`, the same shape `status` draws on
- * `shapeAccountsList` above: `success` for a live grant, `secondary` for none,
- * never a hex (R32). `null` (no `portal_users:read`) reads exactly like
- * `false` here — `contacts-screen.tsx` only spreads this column onto the
- * table's own field list when the caller holds that right in the first place,
- * so a caller ever asked to shape a `null` row already could not see the
- * column it would have rendered in. `lang`, not the hook's own `t`: this file
- * has no React tree to call `useLanguage()` from (`shapeAccountsList`'s
- * header, a few hundred lines up, makes the identical argument), so the
- * caller hands the language and a `translator(lang)` is built here, same as
- * there. */
+ * header has the door half). ORIGINALLY a filled `Badge`, the same shape
+ * `status` still draws on `shapeAccountsList` above (`success` for a live
+ * grant, `secondary` for none) — REPLACED THE SAME SESSION, her own
+ * follow-up: *"For contacts, portal: no portal, same as with automations.
+ * Let's switch the design to the color dot. Portal: make it green, and no
+ * portal: gray."* (and, the same breath, "All dots are always solid, not
+ * rings.") So this column now draws `<Badge variant="status" dot="shipped">`
+ * for a live grant and `dot="archived">` for none — green and grey, her
+ * exact words, never a hex (R32) — the identical shape the ticket detail
+ * head's own stage chip and `automation-edit-sheet.tsx`'s own status dot
+ * (`AUTOMATION_STATUS_DOT`, added the same session) already draw. `status`
+ * on `shapeAccountsList` above is UNCHANGED and still a filled pill — a
+ * different column on a different table, not named in this ruling.
+ * `null` (no `portal_users:read`) reads exactly like `false` here —
+ * `contacts-screen.tsx` only spreads this column onto the table's own field
+ * list when the caller holds that right in the first place, so a caller ever
+ * asked to shape a `null` row already could not see the column it would have
+ * rendered in. `lang`, not the hook's own `t`: this file has no React tree
+ * to call `useLanguage()` from (`shapeAccountsList`'s header, a few hundred
+ * lines up, makes the identical argument), so the caller hands the language
+ * and a `translator(lang)` is built here, same as there. */
 export function shapeContactsTable(contacts: Account[], lang: Language = "en"): ScreenData {
   const t = translator(lang)
   return {
@@ -758,9 +773,9 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // honest "not shown as a live login" answer once it is.
       portal:
         a.hasPortalLogin === true ? (
-          <Badge variant="success">{t("Portal")}</Badge>
+          <Badge variant="status" dot="shipped">{t("Portal")}</Badge>
         ) : (
-          <Badge variant="secondary">{t("No portal")}</Badge>
+          <Badge variant="status" dot="archived">{t("No portal")}</Badge>
         ),
     })),
   }
@@ -965,7 +980,79 @@ export type ChoiceGroupHome = {
  * that stood beside it is GONE: it asked a question Status now already
  * answers, and keeping both would let a reader filter "Active" and
  * "Protected" as if a row could be excluded from one by matching the other,
- * which the invariant above makes impossible. */
+ * which the invariant above makes impossible.
+ *
+ * ── THE DETAILS COLUMN — 16 SEP 2026 EVENING ────────────────────────────────
+ *
+ * The client's ruling, verbatim: *"regarding the fact that some Choices
+ * components can have more properties, for example, meeting types have
+ * department, but sprint types have duration. Why don't you add, everywhere
+ * where you have Choices on the module and on the general, an in-between
+ * column with details or info or whatever, and include this from each case."*
+ *
+ * WHAT ACTUALLY CARRIES AN EXTRA FACT, checked against the code rather than
+ * assumed from her example: her own instance — a meeting type's department —
+ * is NOT one of these rows at all. "Meeting type" is `meeting_purposes`
+ * (`MeetingTypesPanel`, web/components/team/internal-screens.tsx), a
+ * bespoke module read through `contentApi.meetingPurposes()`, not a
+ * `selectable_data` type, so it never reaches `SelectableScreen` or this
+ * table — its own Department column already exists there, on its own
+ * screen. No `selectable_data` type carries a department today, so the
+ * Details cell below has no department case: adding one would be dead code
+ * for a fact nothing in this table has. What DOES carry an extra fact,
+ * confirmed against `SelectableValue` and the three code-owned vocabularies
+ * that enrich it (`shared/sprint-types.ts`, `shared/story-types.ts`,
+ * `shared/app-stages.ts`):
+ *
+ *   • Sprint type — an ICON (`sprintTypeIcon`, matched by the row's own
+ *     word) and a DURATION (`v.standardDays`, a real column the list door
+ *     already selects — `COLUMNS` in workers/tenancy/src/lib/selectable.ts).
+ *   • Story type — an ICON only (`storyTypeIconName`), no duration is ever
+ *     seeded for it — `standardDays` is a generic column on every type, but
+ *     only Sprint type rows are ever written with one.
+ *   • App stage — a DOT TONE only (`appStageDotTone`), the same tone
+ *     `apps-screen.tsx`'s own stage pill already draws.
+ *   • Ticket type already draws its colour in the VALUE cell above
+ *     (`ChoiceGroupHome.colour`) — repeating it here would be the same fact
+ *     twice, so Ticket type's Details cell is empty on purpose.
+ *   • Every other type (Department, Industry, Country, Brand asset
+ *     category, Deliverable kind, and the three "labels" groups) carries
+ *     nothing beyond its word — an honest empty cell, no dash, no hint
+ *     (R81's own rule, read here for a table cell rather than a form). */
+function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>): React.ReactNode {
+  if (v.type === "Sprint type") {
+    const hasIcon = sprintTypeIcon(v.value) !== ""
+    const days = v.standardDays
+    if (!hasIcon && days === null) return null
+    return (
+      <span className="inline-flex min-w-0 items-center gap-2">
+        {hasIcon && <SprintTypeGlyph type={v.value} size={14} className="text-muted-foreground shrink-0" />}
+        {days !== null && (
+          <Badge variant="secondary" className="shrink-0">
+            {t("{days} days", { days })}
+          </Badge>
+        )}
+      </span>
+    )
+  }
+  if (v.type === "Story type") {
+    const iconName = storyTypeIconName(v.value)
+    return iconName ? <Icon name={iconName} className="text-muted-foreground size-4 shrink-0" /> : null
+  }
+  if (v.type === SELECTABLE_GROUPS.appStage) {
+    const tone = appStageDotTone(v.value)
+    // A DOT NEVER RENDERS WITHOUT A LABEL (the kit's own ruling 04) — the
+    // stage's own word is the only label there is, so it repeats here
+    // beside its colour, the same pairing `apps-screen.tsx` already draws.
+    return tone ? (
+      <Badge variant="status" dot={tone}>
+        {v.value}
+      </Badge>
+    ) : null
+  }
+  return null
+}
+
 export function shapeChoicesTable(
   values: SelectableValue[],
   groupHome: Map<string, ChoiceGroupHome>,
@@ -1021,6 +1108,10 @@ export function shapeChoicesTable(
         // so it cannot share a key with a node column any more than search
         // or sort can.
         moduleSegment: segment,
+        // THE DETAILS COLUMN — see this function's own header, "THE DETAILS
+        // COLUMN". `null` for every type with nothing beyond its word, which
+        // `record-table.tsx` renders as a genuinely empty cell, not a dash.
+        details: choiceDetailsCell(v, t),
         // ── SAME WORD, SAME COLOUR AS AUTOMATIONS — 15 Sep 2026 ─────────────
         // The coordinator's own ruling: Choices' three-way status
         // (Protected/Active/Inactive) and Automations' own three-way

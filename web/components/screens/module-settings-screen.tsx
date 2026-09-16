@@ -357,9 +357,11 @@ export type ModuleSettingsPage = {
  * ONE SECTION PER PAGE, EVEN WHERE A MODULE OWNS TWO GROUPS — Accounts owns
  * Industry and Country, Apps owns App stage and Deliverable kind. A section is
  * a whole `SettingsChoicesPanel` (scoped), and that panel is a `RecordTable`
- * (R63 pins its toolbar to the top of the scroll) plus a mango `AddButton`
- * (the kit rules one per view). Two of them stacked would pin two bars to one
- * edge and draw two brand fills. Since 15 Sep 2026 the two groups share ONE
+ * (R63 pins its toolbar to the top of the scroll) plus an `AddButton` — black
+ * now, not mango, since R84 (16 Sep 2026) confined the brand fill to the
+ * title component and a toolbar's own create button is never that. Two of
+ * them stacked would still pin two bars to one edge, which is reason enough
+ * on its own to keep it to one. Since 15 Sep 2026 the two groups share ONE
  * flat table rather than two named blocks — the scoped Module column is
  * dropped (settings-choices-panel.tsx's own header: redundant once the page's
  * own tab already says which module), so "Industry" and "Country" rows sit

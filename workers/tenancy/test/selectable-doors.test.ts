@@ -50,6 +50,13 @@ const staff = { kind: "staff" as const }
 // reason by accident.
 const VALUE_ID = "01JVALUE0000000000000000"
 
+// A SECOND ROW, a Sprint type carrying a `standard_days` — the Choices
+// screen's own Details column (settings-choices-panel.tsx, deep-link/
+// shape.tsx) reads `standardDays` off the LIST door's response, and this is
+// the fixture that proves the door still hands it over rather than a value
+// nobody exercises.
+const SPRINT_VALUE_ID = "01JSPRINT000000000000000"
+
 beforeEach(() => {
   const db = new DatabaseSync(":memory:")
   for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
@@ -58,6 +65,10 @@ beforeEach(() => {
       (id, type, value, is_default, mark, created_at, creator_id, creator_email, creator_name)
     VALUES ('${VALUE_ID}', 'Ticket type', 'Voucher query', 1, '🎫',
             '2026-05-01T09:00:00.000Z', 'U1', 'ana@kwapso.com', 'Ana');
+    INSERT INTO selectable_data
+      (id, type, value, is_default, standard_days, created_at, creator_id, creator_email, creator_name)
+    VALUES ('${SPRINT_VALUE_ID}', 'Sprint type', 'Discovery sprint', 0, 5,
+            '2026-09-16T09:00:00.000Z', 'U1', 'ana@kwapso.com', 'Ana');
   `)
   holder.db = db
 })
@@ -96,6 +107,20 @@ describe("the dropdown-value doors run against a real schema", () => {
     expect(seeded, "the list must contain the row the fixture wrote").toBeTruthy()
     expect(seeded?.value).toBe("Voucher query")
     expect(seeded?.createdAt, "the list must not pay for columns no row in it asks for").toBeUndefined()
+  })
+
+  // THE CHOICES SCREEN'S DETAILS COLUMN (settings-choices-panel.tsx, 16 Sep
+  // 2026 evening) reads `standardDays` straight off THIS door's response —
+  // `COLUMNS` in `../src/lib/selectable.ts` already selects `standard_days`,
+  // and this is the proof that a Sprint type row's duration actually reaches
+  // the LIST read rather than sitting in the column with nothing asking for
+  // it.
+  it("the LIST read serves a sprint type's own duration (standardDays)", async () => {
+    const values = await listSelectable(cfg, guard)
+    const sprint = values.find((v) => v.id === SPRINT_VALUE_ID)
+    expect(sprint, "the list must contain the sprint type row the fixture wrote").toBeTruthy()
+    expect(sprint?.type).toBe("Sprint type")
+    expect(sprint?.standardDays).toBe(5)
   })
 
   it("the COUNT read works", async () => {

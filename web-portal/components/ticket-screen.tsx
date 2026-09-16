@@ -340,8 +340,10 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           <span className="text-muted-foreground text-xs">
             {t("{name} will see this", { name: brand.name })}
           </span>
+          {/* R84 — the composer is not a title component, so black. */}
           <Button
             type="button"
+            variant="inverse"
             size="sm"
             disabled={!draft.trim() || sending}
             onClick={() => void send()}

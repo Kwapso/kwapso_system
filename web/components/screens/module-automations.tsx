@@ -43,10 +43,11 @@
 // should then show the edit screen on the same slide in."* So the sheet is
 // now TWO faces sharing one open state — see `automation-edit-sheet.tsx`'s
 // own header for the split, the status chip's colour derivation
-// (`AUTOMATION_STATUS_VARIANT`, imported here for the table's own column
-// below), and why a Protected row's reason is now one press further than
-// R70's own text once promised (the file that owns that trade-off, not this
-// one).
+// (`AUTOMATION_STATUS_DOT`, imported here for the table's own column below —
+// a dot since the client's 16 Sep 2026 follow-up, see that file's own
+// header for the full account), and why a Protected row's reason is now one
+// press further than R70's own text once promised (the file that owns that
+// trade-off, not this one).
 //
 // ── WHY IT IS A TABLE AND NOT A SECTION ANY MORE ────────────────────────────
 //
@@ -94,7 +95,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { tenancy } from "@/lib/api"
 import { RecordTable, type TableColumn, type TableRowData } from "@/components/records/record-table"
-import { AutomationEditSheet, AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"
+import { AutomationEditSheet, AUTOMATION_STATUS_DOT } from "@/components/screens/automation-edit-sheet"
 import {
   AUTOMATIONS,
   automationOverride,
@@ -211,22 +212,23 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
       ),
       moduleText: moduleTitle(a.segment),
       moduleSegment: a.segment,
-      // A DIFFERENT FILL PER STATUS — client ruling, 2026-09-15: "make sure
-      // that each status has a different color because right now active and
-      // protected look the same." It used to be one `variant="secondary"`
-      // for all three, Inactive merely dimmed by an opacity class — which is
-      // exactly the fault: Active and Protected read as the identical quiet
-      // chip. `AUTOMATION_STATUS_VARIANT` (automation-edit-sheet.tsx, which
-      // this sheet's own detail head imports the same constant from) is the
-      // one derivation, kit Badge variants only (R32): `inverse` for
-      // Protected, `success` for Active, `outline` — the kit's one
-      // uncoloured variant — for Inactive, read as quiet rather than merely
-      // dimmed. NOT the Choices table's own badge (deep-link/shape.tsx,
-      // `variant="secondary"` for both of its states) — that screen is out
-      // of this ruling's scope (shape.tsx is read-only reference for this
-      // change) and carries the identical undifferentiated-badge fault this
-      // ruling fixes here; worth its own pass, not this one.
-      status: <Badge variant={AUTOMATION_STATUS_VARIANT[status]}>{statusWord}</Badge>,
+      // A DOT PER STATUS — the client's third ruling on this chip, 16 Sep
+      // 2026, verbatim: "let's change the full color pill to also be a dot.
+      // Inactive gets gray, and active gets green." (Same evening: "All dots
+      // are always solid, not rings.") Two rulings earlier this cell drew a
+      // filled pill (`AUTOMATION_STATUS_VARIANT`); this one replaces it with
+      // the SAME shape the ticket detail head's own stage chip draws,
+      // `<Badge variant="status" dot={…}>`. `AUTOMATION_STATUS_DOT`
+      // (automation-edit-sheet.tsx, which this sheet's own detail head
+      // imports the same constant from) is the one derivation: `shipped`
+      // (green) for Active, `archived` (grey) for Inactive — both her exact
+      // words — and `building` (charcoal) for Protected, which she did not
+      // name; that file's own header says so and flags it for her next
+      // pass. NOT the Choices table's own badge (deep-link/shape.tsx, still
+      // a filled `variant="secondary"`/`"success"`/`"inverse"` pill through
+      // the untouched `AUTOMATION_STATUS_VARIANT`) — that screen is out of
+      // this ruling's scope, same as before.
+      status: <Badge variant="status" dot={AUTOMATION_STATUS_DOT[status]}>{statusWord}</Badge>,
       statusText: statusWord,
       statusState: status,
     }

@@ -263,9 +263,13 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // — the bare `/t/<teamId>`, a description block carrying Created / Created by
   // / Last updated and an Edit action, and the first tab on the team area's own
   // strip. What it was FOR was "the team, as a record". What the client wanted
-  // was the team's PEOPLE and their RIGHTS, which is Settings › Team now, in two
-  // containers on one page — so the overview was a destination whose whole job
-  // was to be a stop on the way to the two things anybody actually opened.
+  // was the team's PEOPLE and their RIGHTS, which is Settings › Members and
+  // Settings › Roles now — two top-level tabs since the 2026-09-16 evening
+  // correction (settings-screen.tsx's own header has both rulings; they were
+  // one combined "Team" tab, then briefly a "Team" tab with a nested
+  // Members/Roles strip, before landing here) — so the overview was a
+  // destination whose whole job was to be a stop on the way to the two things
+  // anybody actually opened.
   //
   // A BOOKMARK TO IT STILL WORKS AND LANDS WHERE THE TEAM LIVES NOW.
   // `/t/<teamId>` is not a 404 and is not a dead screen: `module-content.tsx`'s
@@ -273,7 +277,14 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // answer to "where did this go" — the address a person saved still opens the
   // material they saved it for. It is a REDIRECT rather than a second mount of
   // the tab, because two addresses drawing one screen is how a screen ends up
-  // with two behaviours.
+  // with two behaviours. `?tab=team` NAMES NO TAB `tabsConfig` DECLARES ANY
+  // MORE (settings-screen.tsx's own `tabsConfig` has "members"/"roles", never
+  // "team") — the screen keeps it alive as an ALIAS for "members"
+  // (`resolveTeamAlias`, settings-screen.tsx), so this redirect and the other
+  // doors that still write `?tab=team` (this file's own `MovedToTeamTab` note
+  // below, the two legacy shims at web/app/members/page.tsx and
+  // web/app/roles/page.tsx) keep working without each needing to be
+  // re-pointed at the word for the tab it actually opens.
   //
   // The team RECORD did not stop existing, only its screen: its name and logo
   // are edited on /kwapso (the agency's own Details tab, which is the team
@@ -294,25 +305,31 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // survived was the ROUTES themselves, independent of that list.
   //
   // `placement: "contextual"` because that is the shape these three now have:
-  // reached (if at all) from a button on Settings › Team, never a tab of their
-  // own. None of the three is reached by a LITERAL navigation ending at its
-  // segment — the one link left, on a member's card, is
+  // reached (if at all) from a button on Settings › Members, never a tab of
+  // their own. None of the three is reached by a LITERAL navigation ending at
+  // its segment — the one link left, on a member's card, is
   // `/t/${teamId}/members/${userId}`, which does not end at `/members` any
   // more than `/dropdowns/${v.id}` counted as a door to `/dropdowns` (R64
   // clause v) — so all three are doorless and SECTION_HOSTED_ELSEWHERE
-  // (shared/rules/registry.ts) says where each one's material actually lives.
-  // web/components/deep-link/module-content.tsx sends every one of these
-  // routes to Settings › Team now (`MovedToTeamTab`) rather than drawing a
-  // page; the member's own record at /t/<teamId>/members/<userId> is the one
-  // survivor, because that is the screen Settings › Team's members gallery
-  // actually links to and where change-role/remove really happen.
+  // (shared/rules/registry.ts) says where each one's material actually
+  // lives — "Settings › Members"/"Settings › Roles" since the 2026-09-16
+  // evening split, not the single "Settings › Team" those lines named before
+  // it (that prose string is the one edit this lane's brief allowed outside
+  // its own file set). web/components/deep-link/module-content.tsx still
+  // sends every one of these routes to `/settings?tab=team` (`MovedToTeamTab`)
+  // rather than drawing a page — outside this lane's ownership, so it rides
+  // the `?tab=team` alias (settings-screen.tsx's `resolveTeamAlias`) rather
+  // than being re-pointed at `?tab=members` directly; the member's own record
+  // at /t/<teamId>/members/<userId> is the one survivor, because that is the
+  // screen Settings › Members' own gallery actually links to and where
+  // change-role/remove really happen.
   // `countCacheKey` DROPPED FROM ALL THREE, 2026-09-14, alongside the
   // placement change above: it existed to badge a tab on the (now-deleted)
   // team-area strip and to arbitrate against a `<CollectionHeading>` on the
   // (now-deleted) collection screen — R16 ii's own census
   // (web/test/rules.test.ts) reads every `countCacheKey` row not placed
   // "tab" and requires exactly that heading to exist somewhere. Members'
-  // count is still shown, by hand, on Settings › Team
+  // count is still shown, by hand, on Settings › Members
   // (web/components/team/members-gallery.tsx's own `formatCount` call) —
   // that screen was never built on the generic collection engine this field
   // feeds, so keeping the key here would be a second, unconsulted opinion

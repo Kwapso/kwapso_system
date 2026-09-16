@@ -320,6 +320,12 @@ function SubmitButton({ submit }: { submit: SubmitConfig }) {
   return (
     <Button
       type="submit"
+      // R84, 16 Sep 2026 — "only mango buttons on the title level… the others
+      // black." A form's Submit is never inside a title component (it sits in
+      // the dialog's own footer, one region below), so the "one mango control
+      // on the screen" this comment used to name is now the kit's black:
+      // charcoal fill, off-beige label.
+      variant="inverse"
       loading={submit.busy}
       loadingLabel={submit.loadingLabel ?? t("Submitting…")}
       disabled={submit.disabled}

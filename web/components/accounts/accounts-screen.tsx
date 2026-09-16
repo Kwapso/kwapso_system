@@ -85,6 +85,56 @@
 // `collection-filters.ts` cannot spell its options and this screen fills them
 // in, from the SAME "selectable:all" cache the account form already reads
 // (R56: one door, whichever screen asks first).
+//
+// ── THE STRIP BECOMES STATUS, 16 SEP 2026 — "keep active, inactive, and all" ─
+//
+// Second client ruling, same evening as the Settings › Team split above it in
+// this session, verbatim: "For account status, let's keep active, inactive,
+// and all." Companies · All — the ENTITY-TYPE strip the 14 Sep brief above
+// built — is retired outright and replaced by a STATUS strip: Active ·
+// Inactive · All, in that order, default tab Active. Nothing about entity
+// type is asked for any more: unlike Companies (which fixed `type: "entity"`),
+// none of the three new tabs narrows by type at all, so an individual account
+// (a sole trader) shows up on Active/Inactive/All exactly as a company does —
+// the type-vs-status distinction the old strip drew is simply gone from this
+// screen's tabs.
+//
+// THE STATUS FACET GOES, THE TABS REPLACE IT — her own words, parenthetical
+// but exact: "(the status filter goes, the tabs replace it)". The "Status"
+// facet (`{ field: "archived", label: "Status", options: ACCOUNT_STATUS }`,
+// `web/lib/collection-filters.ts`) is NOT this lane's to edit —
+// `collection-filters.ts` is outside settings-screen.tsx/accounts-screen.tsx/
+// pages.ts/screens.ts, the only files this lane owns — so it is dropped at
+// THIS screen's own call site instead, by filtering `translatedFacets`'
+// return array for `field !== "archived"` before it reaches `<PagedFind>`.
+// The declaration itself still exists in that file and is now unreferenced by
+// this screen; a lane that owns collection-filters.ts can delete the
+// now-dead `{ field: "archived", … }` entry and, if nothing else reads it,
+// `ACCOUNT_STATUS` beside it.
+//
+// MANAGER AND COUNTRY STAY — her own words: "filters manager and country
+// stay". Neither changes shape; only Status leaves the facet list.
+//
+// THREE EXACT COUNTS (R16), NOT TWO. The door already returns an exact
+// `total` for whatever query was actually asked (`listAccounts`'s own
+// `counted`, `workers/tenancy/src/lib/accounts.ts`) — which is what "All"
+// badges, unconditionally, exactly as it always did (the `total` prop this
+// screen already received). Active and Inactive need a total EACH, badged
+// simultaneously, on tabs somebody may not have pressed yet — the same "two
+// tab badges, and they are a different question from `total`" argument that
+// door file makes for `entityTotal`/`individualTotal` beside the rows. Rather
+// than asking `workers/tenancy/src/lib/accounts.ts` (a worker file, also
+// outside this lane's four owned files) to grow a THIRD always-computed
+// total, this screen asks the SAME `tenancy.accounts()` door a second time,
+// with `archived: "yes"` and nothing else narrowing it, and reads that
+// response's own exact `total` (`inactiveTotalQ`, below) — the identical
+// `AccountFilters.archived` parameter the retired Status facet used to send,
+// just asked once, unconditionally, rather than only when a reader had
+// picked "Archived" from a dropdown. Active is DERIVED — `total -
+// inactiveTotal` — rather than a third door call: every account is exactly
+// one of the two (deactivate, never delete — there is no third pile), so the
+// arithmetic is exact whenever both operands are, and a caller who wants to
+// audit the assumption can watch the two badges sum to All's own.
 
 import * as React from "react"
 
@@ -120,7 +170,7 @@ import { shapeAccountsList } from "@/components/deep-link/shape"
 import { assignableMembers } from "@/lib/members"
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
-import { accountsKey } from "@/lib/live-resources"
+import { accountsKey, totalKey } from "@/lib/live-resources"
 import { tenancy } from "@/lib/api"
 import type { Can } from "@/lib/perms"
 import type { Account, TeamMember } from "@shared/types"
@@ -267,7 +317,6 @@ export function AccountsScreen({
   accountsQ,
   membersQ,
   total,
-  entityTotal,
   recipe,
   rights,
   can,
@@ -279,14 +328,31 @@ export function AccountsScreen({
   lang: Language
   go: (path: string, q?: Record<string, string>) => void
   sectionPath: string
-  /** `ctx.query.tab` — Companies/All, exactly as today. */
+  /** `ctx.query.tab` — Active/Inactive/All since 16 Sep 2026 (this file's own
+   * header, "THE STRIP BECOMES STATUS"), replacing the retired Companies/All
+   * entity-type pair. Anything else (unset, or the retired `"companies"`
+   * value an old link might still carry) falls through to "active" — the
+   * client's own default. */
   tab: string | undefined
   accountsQ: { data: Account[] | undefined; error: unknown }
   /** the cached members list the account-manager chip resolves off (R56). */
   membersQ: { data: TeamMember[] | undefined }
-  /** the exact server totals (R16) — every account, and companies alone. */
+  /** the exact server total (R16) for EVERY account, any status, any type —
+   * what "All" badges, unconditionally. Active/Inactive get their own exact
+   * totals from `inactiveTotalQ` below rather than a second prop, so this
+   * screen owns fetching them rather than asking its caller (outside this
+   * lane's four owned files) to grow a matching pair. */
   total: number | undefined
-  entityTotal: number | undefined
+  /** THE RETIRED COMPANIES/ALL STRIP'S OWN COUNT — still sent by this
+   * screen's one caller (`web/components/deep-link/collection-content.tsx`,
+   * outside this lane's four owned files: settings-screen.tsx,
+   * accounts-screen.tsx, pages.ts, screens.ts), still typed here so that
+   * caller keeps compiling, no longer READ anywhere below since the
+   * 16 Sep 2026 status-tab ruling retired the entity-type strip this number
+   * used to badge. A lane that owns collection-content.tsx (and the
+   * `totals.accountsEntity` it reads off `web/lib/live-resources.ts`) can
+   * drop the prop and its door-side companion once nothing types against it. */
+  entityTotal?: number | undefined
   recipe: ScreenRecipe
   rights: ScreenRights
   can: Can
@@ -310,17 +376,57 @@ export function AccountsScreen({
   // a fetch against.
   const vocabularyQ = useCached("selectable:all", () => tenancy.selectable().then((r) => r.values))
 
+  // THE INACTIVE TAB'S OWN EXACT COUNT (R16) — the door's own `total` for a
+  // read narrowed to `archived: "yes"` and nothing else, the SAME parameter
+  // (and the same exactness) the retired Status facet used to send, just
+  // asked unconditionally rather than only behind an opened dropdown. Cached
+  // by team (R56: one door, once — a tab switch never re-asks this), off
+  // `totalKey` (`web/lib/live-resources.ts`) so this reads the app's own
+  // naming convention for a collection's supplementary total rather than a
+  // one-off string. See this file's header, "THREE EXACT COUNTS (R16), NOT
+  // TWO", for why this is a client-side fetch rather than a third
+  // always-computed field on the door's own response.
+  const inactiveTotalQ = useCached(totalKey("accounts-inactive", teamId), () =>
+    tenancy.accounts({ archived: "yes" }).then((r) => r.total)
+  )
+  // ACTIVE IS DERIVED, NOT FETCHED — `total` (every account, unconditional)
+  // minus the inactive count above. Every account is exactly one of the two
+  // (deactivate, never delete: there is no third pile), so this is exact
+  // whenever both operands have loaded, and it costs no third door read.
+  const activeTotal =
+    total !== undefined && inactiveTotalQ.data !== undefined ? total - inactiveTotalQ.data : undefined
+
   if (accountsQ.error) return <Skeleton variant="list" lines={4} />
   const loaded = accountsQ.data === undefined ? null : accountsQ.data
 
-  const accountTab = tab === "all" ? "all" : "companies"
+  // ACTIVE · INACTIVE · ALL, BY STATUS — client ruling, 16 Sep 2026, verbatim:
+  // "For account status, let's keep active, inactive, and all." Replaces the
+  // entity-type Companies/All pair (this file's header has the whole
+  // account). DEFAULT "active" — her own word — so anything else unrecognised
+  // (unset, or a bookmark still carrying the retired `?tab=companies`) falls
+  // through to it rather than to a value this strip no longer offers.
+  const accountTab = tab === "all" ? "all" : tab === "inactive" ? "inactive" : "active"
   const accountsBadge = formatCount(total)
   const accountTabs = [
     {
-      value: "companies",
-      label: t("Companies"),
-      icon: "building",
-      badge: formatCount(entityTotal),
+      value: "active",
+      label: t("Active"),
+      // `TAB_ICONS["active"]`/`["inactive"]` (shared/web/screen-engine/
+      // tabs-view.tsx: "check-circle" / "prohibit") already resolve these two
+      // values and that table wins over anything a call site passes — the
+      // same "spelled out anyway so the two agree on the page rather than by
+      // accident" the Modules/Automations tabs in settings-screen.tsx keep
+      // for their own already-resolved glyphs. `apps-screen.tsx`'s own
+      // Active/Inactive pair spells the identical two values the same way.
+      icon: "check-circle",
+      badge: formatCount(activeTotal),
+      badgeVariant: "" as const,
+    },
+    {
+      value: "inactive",
+      label: t("Inactive"),
+      icon: "prohibit",
+      badge: formatCount(inactiveTotalQ.data),
       badgeVariant: "" as const,
     },
     { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
@@ -375,8 +481,30 @@ export function AccountsScreen({
           defaultSort="name"
           restingEmpty={loaded !== null && loaded.length === 0}
           restingLoading={loaded === null}
-          fixed={accountTab === "all" ? undefined : { type: "entity" }}
-          facets={translatedFacets("accounts", t, { manager: managerOptions, country: countryOptions })}
+          // BY STATUS, NOT BY TYPE — `archived` replaces the retired
+          // `{ type: "entity" }` Companies narrowing; "all" fixes nothing, as
+          // it always did. `AccountFilters.archived` (`workers/tenancy/src/
+          // lib/accounts.ts`) is the same "yes"/"no" pair the retired Status
+          // facet sent — this screen still asks the door the identical
+          // question, only from the tab strip's own fixed narrowing now
+          // rather than from an open-ended filter control.
+          fixed={
+            accountTab === "all"
+              ? undefined
+              : { archived: accountTab === "inactive" ? "yes" : "no" }
+          }
+          // THE STATUS FACET IS GONE HERE, THE TABS REPLACE IT — her own
+          // parenthetical, verbatim, next to the status-tab ruling above. The
+          // declaration (`{ field: "archived", … }`,
+          // `web/lib/collection-filters.ts`) is not dropped at its source —
+          // that file is outside this lane's four owned files — so it is
+          // filtered out of `translatedFacets`' own return array at THIS call
+          // site instead: manager and country pass through untouched (her
+          // own "filters manager and country stay"), archived never reaches
+          // `<PagedFind>`'s facet row.
+          facets={translatedFacets("accounts", t, { manager: managerOptions, country: countryOptions }).filter(
+            (f) => f.field !== "archived"
+          )}
           fetchPage={(query, cursor) =>
             tenancy
               .accounts({ ...query, cursor })
@@ -385,7 +513,11 @@ export function AccountsScreen({
           tabs={{
             config: { ...defaultTabsConfig, tabs: accountTabs },
             value: accountTab,
-            onValueChange: (v) => go(sectionPath, v === "companies" ? {} : { tab: v }),
+            // "active" IS DEFAULT (her ruling), so a press back onto it omits
+            // `tab` from the URL entirely — the same "default tab has no
+            // query param" shape the retired Companies tab used, now pointed
+            // at the new default instead of the old one.
+            onValueChange: (v) => go(sectionPath, v === "active" ? {} : { tab: v }),
           }}
           view={{
             views: [

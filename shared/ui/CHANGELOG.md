@@ -2,6 +2,130 @@
 
 ## Unreleased
 
+### Removed — `ScreenShell`'s assistant resize feature, entirely: the aside is back to one fixed width
+
+Client, 16 Sep 2026, evening, on the shipped build: *"Let's forget about the
+resize. It's a disaster. Remove it."* The whole feature two rulings earlier
+the same day had added — drag the seam, snap to 320/400/520 — is gone, not
+disabled: the invisible `RESIZE_SEAM` grab and its hover-reveal
+`cursor-col-resize` arrow, the pointer/keyboard drag logic on `EdgeHandle`
+(`dragMoved`/`dragStart`, `nextWidth`, the pointer-down/move/up handlers, the
+live width readout, the `role="slider"` wiring), and the whole
+`asideWidth`/`defaultAsideWidth`/`onAsideWidthChange`/`asideMinWidth`/
+`asideMaxWidth`/`asideResizeLabel` API on `ScreenShellProps`. The four
+constants that governed it — `ASIDE_WIDTH_MIN`, `ASIDE_WIDTH_MAX`,
+`ASIDE_WIDTH_DEFAULT`, `ASIDE_WIDTH_SNAP_POINTS` — and the two functions that
+computed against them (`clampAsideWidth`, `snapAsideWidth`) are deleted, not
+kept unused.
+
+THE COLUMN RETURNS TO **ONE FIXED WIDTH: `ASIDE_WIDTH`, `23.75rem`** — the
+same 380px-at-the-16px-reference measure the shell drew before the resize
+ruling ever touched this file (ch19's own floating-card `max-width`,
+confirmed against `git log`/this file's own history rather than assumed).
+The `--aside-width` custom property the drag wrote every frame is gone with
+it; `--motion-column-size` and the panel's own `w-` both read the literal
+`23.75rem` again, exactly as they did before 2026-09-16.
+
+EVERYTHING ELSE ABOUT THE ASIDE IS UNTOUCHED, on the same instruction: open
+and close (`asideOpen`/`onAsideOpenChange`, the round `EdgeHandle`, the
+narrow bottom sheet), `asideTabs` (pinned tabs at the strip's own trailing
+end), and `onCloseAll` (close-all) all render exactly as they did before
+today. `asideHandleOnOpen={false}` also still suppresses the round handle's
+OPEN branch exactly as it did before the resize ruling reused that branch
+for the bare seam — with the seam gone, that caller's slot draws nothing
+again, which is what it did before 2026-09-16 too.
+
+New `compositions/templates/check-screen-shell.mjs` — REWRITTEN rather than
+deleted, per the brief: it used to pin which edge the (now-removed) seam sat
+on; it now asserts the opposite, that no working trace of the resize
+feature (every constant, prop and CSS custom property above, matched as a
+declaration/call-site shape so it cannot fire on this changelog entry's own
+prose) has come back, and that `ASIDE_WIDTH` is still the literal
+`"23.75rem"`. Wired into `npm run check`, unchanged from before.
+
+Files: `compositions/templates/screen-shell.tsx`,
+`compositions/templates/check-screen-shell.mjs`,
+`compositions/templates/index.ts` (drops the four retired exports),
+`demo/shapes/templates-0.tsx` (drops the "asideWidth" demo panel; keeps a
+trimmed `asideHandleOnOpen=false` panel, since that prop is untouched).
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
+### Fixed — `BreadcrumbFolders` inactive tabs no longer paint over the active tab's shoulders, mid-drag, even when the active tab is only SHIFTED
+
+Client, 16 Sep 2026, evening, over a screenshot of the compact assistant
+strip: *"the shape is not behind. That's wrong. The inactive tabs are
+overlapping."* — the same defect a same-day pass had believed closed: the
+STATIC pair (`TAB_REST`'s `z-0` / `TAB_LIVE`'s `z-[1]`, on the inner
+link/button `CrumbShape` draws inside) and the DYNAMIC lift on the tab
+actually held (`draggedEl.style.zIndex = "2"`, in `onTabPointerDown`) were
+both genuinely correct for the cases they were checked against — case 7/8's
+own `zOrder` reads confirm it, unchanged, still `"1"`/`"0"` at rest.
+
+THE GAP WAS ONE NEITHER READING COULD SEE: `onTabPointerMove`'s own
+`drag.others.forEach` writes a bare `style.transform` onto every OTHER
+movable tab a drag has moved past — active or not, held or not — with no
+z-index at all. A `transform` alone is its own stacking context regardless
+of `z-index` (`auto` included), so the instant the LIVE tab is merely
+SHIFTED out of a neighbour's way — never dragged, never under the pointer —
+its own `z-[1]`, on the link, is sealed inside a stacking context the
+strip's shared comparison can no longer see into; the outer comparison then
+treats the whole shifted `<li>` as one opaque box at the "auto" level, tied
+on DOM order against a later, untransformed sibling — and a pinned tab
+(History, "+") is *always* later, by design. That DOM-order tie is exactly
+"the inactive tab in front", reproduced without the active tab ever being
+the one a reader is dragging.
+
+FIXED BY MOVING THE AUTHORITATIVE NUMBER FROM THE BUTTON TO THE `<li>` — the
+element that owns the whole silhouette, shoulders included, not only the
+label drawn inside it. `BreadcrumbItem`'s own className (the render, per
+tab) now carries `live ? "z-[1]" : "z-0"` itself, unconditionally, on every
+tab, normal and `iconOnly` alike. A `<li>` here is a flex item of
+`BreadcrumbList`'s own `<ol>` (`STRIP`'s `flex`), so `z-index` applies to it
+exactly as if it were `position: relative` (CSS Flexbox) — no `position` of
+its own needed — and because this number lives on the CLASS rather than an
+inline style, it is never cleared or trapped by the bare `transform`
+`onTabPointerMove` writes: it stays explicit and numeric through every
+shift, dragged or not, so the outer comparison is always a real 1-vs-0,
+never a DOM-order tie-break standing in for one. The existing inline
+`draggedEl.style.zIndex = "2"` (the tab actually HELD) is unchanged and
+still wins over both, since 2 beats 1.
+
+PINNED TABS AT THE END KEEP THEIR PLACE, CONFIRMED. `isMovable()` is
+`onReorder !== undefined && items[index]?.closable !== false` — unrelated to
+this fix and untouched by it — so History/"+" (`closable: false`) are still
+never draggable and never a drop slot; `movableRange()` still stops the
+contiguous run at the first pinned neighbour on either side. This is the
+v1.2.98 ruling, reconfirmed rather than re-argued: a pinned tab at the END
+stays fixed there through every gesture this fix touches.
+
+VERIFIED IN `verify/breadcrumb-folder/`, red proved before green (a copy of
+the fix disabled, `cp`'d back after): the STATIC `zOrder` reading grows
+`liveLi`/`restLi`, reading the `<li>` itself
+(`[data-slot="breadcrumb-item"]`) rather than the link/button inside it —
+the previous lane's own reading, kept, plus the one the bug actually lived
+in. A new host, `tabset-shift-probe` (`Puller`, `Active` — the live tab,
+never held — `Filler`, then pinned `H`/`+`), and
+`measureShiftedSiblingZOrder` drag `Puller` past `Active`'s own midpoint
+with a real synthetic pointer gesture, confirm `Active`'s `<li>` picks up a
+genuine, non-identity `transform` (`activeReallyShifted`, so the check
+proves something rather than passing vacuously), and read `shiftedActiveLiZ`
+against the trailing pinned tab's `shiftedHistoryLiZ` while that transform
+is in effect — `"1" > "0"`, at the `<li>`, mid-shift. Disabling the fix (a
+scratch copy, restored after, never `git checkout --`) reproduces exactly
+the client's own defect: both read `"auto"` and the check fails. This
+harness's own known limitation — `document.elementFromPoint` reads `null`
+here regardless of overlap, per this file's own header — is why the proof
+is the rect+z-index pair the file's existing `dragOverlapZOrder` probe
+already established as sufficient under CSS's own stacking rules, extended
+to the element the fix actually moved the number to.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`,
+`verify/breadcrumb-folder/page.tsx`.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system. No app
+wiring changes.
+
 ### Fixed — check-unsaved-changes-bar reads class literals directly; no comment stripping (the consuming app forbids re-typed stripper regexes)
 
 ### Changed — `BreadcrumbFolders` drag-to-reorder now follows the pointer, Chrome's own model

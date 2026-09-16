@@ -970,72 +970,25 @@ import { SHAPE_HEADING_SIZE, type ScreenDensity, type ShapeState } from "../stat
 export const RAIL_WIDTH = "13rem";
 
 /**
- * THE ASSISTANT COLUMN'S FIXED MEASURE — kept for a caller that never wires
- * `asideWidth` (below), so every existing consumer of this shell renders
- * byte-identical to before 2026-09-16. 380px at the 16px reference — ch19's
- * own floating card `max-width`, reused rather than a second number, so the
- * docked and floating placements of ch27.10's single composition never read
- * as two widths.
+ * THE ASSISTANT COLUMN'S ONE FIXED MEASURE. 380px at the 16px reference —
+ * ch19's own floating card `max-width`, reused rather than a second number,
+ * so the docked and floating placements of ch27.10's single composition
+ * never read as two widths.
  *
- * "LOGGED AS OWED: a client ruling on the docked width would replace this"
- * used to stand here. It did, 2026-09-16: *"Is it possible that we can,
- * while using the app, adjust the width of the assistant?"* — answered by
- * `asideWidth` et al below, variation A "drag the seam" with variation B's
- * three sizes as its snap points. This constant survives as the DEFAULT one
- * of those three snap points, `ASIDE_WIDTH_DEFAULT`, which is not quite this
- * same number (400 against 380) — see that constant's own doc for why the
- * snap points are round pixel numbers rather than this rem literal.
+ * IT IS FIXED AGAIN, 16 Sep 2026, AND THAT IS A REVERSAL RATHER THAN A FIRST
+ * DRAFT. A same-day ruling briefly made this column resizable — drag the
+ * seam, snap to 320/400/520 — and shipped it. The client's own verdict on
+ * the shipped build, later the same day, verbatim: *"Let's forget about the
+ * resize. It's a disaster. Remove it."* Every trace of that feature —
+ * `RESIZE_SEAM`, its hover-reveal arrow, the drag/keyboard/snap logic, the
+ * `asideWidth`/`defaultAsideWidth`/`onAsideWidthChange`/`asideMinWidth`/
+ * `asideMaxWidth`/`asideResizeLabel` props, and the four `ASIDE_WIDTH_*`
+ * constants that governed them — is gone, and this constant is once again
+ * the ONLY number the column's width answers to; nothing here reads a prop.
+ * Open/close, pinned tabs (`asideTabs`) and close-all (`onCloseAll`) are
+ * untouched — the ruling was about the resize alone.
  */
 export const ASIDE_WIDTH = "23.75rem";
-
-/** The drag's floor, in pixels — variation A's own artifact: "520 is the max
- * precisely because past it the content card would drop under its own floor
- * — the drag simply stops there," and 320 is that same argument's other end,
- * variation B's own "Narrow". */
-export const ASIDE_WIDTH_MIN = 320;
-
-/** The drag's ceiling, in pixels — see `ASIDE_WIDTH_MIN`'s own doc; variation
- * B's own "Wide". Past this the existing viewport-relative caps
- * (`max-w-[calc(100vw-var(--shell-gutter)*2)]`, `lg:max-w-[40vw]`) still
- * protect the content column, unchanged by this feature. */
-export const ASIDE_WIDTH_MAX = 520;
-
-/** The uncontrolled seed and the double-click reset target — the MIDDLE of
- * the three snap points below, variation B's own "Regular". A round 400,
- * not `ASIDE_WIDTH`'s 380: the ruling's own three sizes are 320/400/520, and
- * 400 is the number it gives — not a rounding of the old fixed measure. */
-export const ASIDE_WIDTH_DEFAULT = 400;
-
-/** Variation B's own three sizes, folded into A as MAGNETIC snap points — a
- * drag that releases within `ASIDE_WIDTH_SNAP_TOLERANCE` of one of these
- * lands on it exactly; a drag that releases elsewhere keeps the exact pixel
- * value the pointer found. Exported so an app that draws its own width
- * indicator (a segmented control mirroring the drag, say) reads the same
- * three numbers this file snaps to, rather than retyping them. */
-export const ASIDE_WIDTH_SNAP_POINTS = [ASIDE_WIDTH_MIN, ASIDE_WIDTH_DEFAULT, ASIDE_WIDTH_MAX] as const;
-
-/** The "small magnetic range" the brief asks for — close enough that landing
- * near a snap point on purpose always catches, far enough that the free
- * middle of the drag (say, 440) is never accidentally pulled to 400. */
-const ASIDE_WIDTH_SNAP_TOLERANCE = 12;
-
-/** `px`, clamped to `[min, max]` and rounded — the one place a width this
- * file computes (a drag delta, a keyboard step, a reset) is made safe before
- * it reaches state or a caller's `onAsideWidthChange`. */
-function clampAsideWidth(px: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, Math.round(px)));
-}
-
-/** A drag that RELEASES within the tolerance of one of `ASIDE_WIDTH_SNAP_
- * POINTS` lands on it exactly. Called once, at pointer-up — never during the
- * drag itself, which stays fluid so the live readout never jumps ahead of
- * the pointer. */
-function snapAsideWidth(px: number): number {
-  for (const point of ASIDE_WIDTH_SNAP_POINTS) {
-    if (Math.abs(px - point) <= ASIDE_WIDTH_SNAP_TOLERANCE) return point;
-  }
-  return px;
-}
 
 /**
  * The spines 26.02 offers in Settings · Appearance — now called Background
@@ -1235,49 +1188,6 @@ export interface ScreenShellProps
    * nothing offered in trade, so this is opt-out, not a deletion.
    */
   asideHandleOnOpen?: boolean;
-  /**
-   * THE COLUMN'S OWN WIDTH, IN PIXELS — variation A "drag the seam", client
-   * ruling 16 Sep 2026: *"A — drag the seam, with B's three widths as its
-   * snap points."* (the artifact mocked four ways to make the aside
-   * resizable; A was chosen, with variation B's three fixed sizes folded in
-   * as A's own snap points rather than the only three choices).
-   *
-   * CONTROLLED WHEN GIVEN, exactly the `asideOpen` / `onAsideOpenChange`
-   * pattern two props up — `defaultAsideWidth` seeds the uncontrolled value
-   * the same way `defaultAsideOpen` does, and every change, dragged or
-   * keyed, is reported through `onAsideWidthChange` either way. Clamped to
-   * `asideMinWidth`/`asideMaxWidth` on every read, so a caller that hands
-   * this a stale or out-of-range number cannot draw a column past either
-   * floor.
-   *
-   * ONLY THE OPEN ASIDE'S OWN `EdgeHandle` READS THIS — see that component's
-   * `resize` prop below. Below `md` the aside is a bottom sheet; width does
-   * not apply there and this prop is inert.
-   */
-  asideWidth?: number;
-  /** The uncontrolled starting value, for the application to restore — the
-   * middle of the three snap points, `ASIDE_WIDTH_DEFAULT` (400), unless the
-   * caller seeds a different one. */
-  defaultAsideWidth?: number;
-  /** Reported on every width change, dragged, keyed, or reset, controlled or
-   * not — the app's own mirror of `onAsideOpenChange`. */
-  onAsideWidthChange?: (px: number) => void;
-  /** The accessible name for the BARE resize seam only (`asideHandleOnOpen
-   * ={false}`'s own branch, `EdgeHandle`'s `bare`) — the round handle keeps
-   * `asideOpenLabel`/`asideCloseLabel` for its own open/close meaning, which
-   * a bare seam does not have. */
-  asideResizeLabel?: string;
-  /** The drag's floor. `ASIDE_WIDTH_MIN` (320) unless the caller narrows it
-   * further — never wider than `asideMaxWidth`. */
-  asideMinWidth?: number;
-  /** The drag's ceiling. `ASIDE_WIDTH_MAX` (520) unless the caller widens it
-   * further — the point past which the content column would drop under its
-   * own floor on a laptop-width screen (the artifact's own reasoning for the
-   * number). The content column's protection past THIS number is the
-   * existing viewport-relative cap below (`max-w-[calc(100vw-var(--shell-
-   * gutter)*2)]`, `lg:max-w-[40vw]`), unchanged by this feature — a wide
-   * drag on a narrow window was already bounded before today. */
-  asideMaxWidth?: number;
   /**
    * ── THE NODE THAT STANDS ON THE ASSISTANT'S ROW, AT ITS LEADING SIDE.
    * CLIENT-ORDERED 2026-09-07, and the whole sentence is the specification:
@@ -2347,68 +2257,6 @@ const HANDLE_HIT = cn(
   "[&_svg]:pointer-events-none [&_svg]:size-[var(--icon-button)] [&_svg]:shrink-0",
 );
 
-/**
- * THE BARE RESIZE SEAM — `EdgeHandle`'s `bare` branch, for the one caller
- * that suppresses the round handle's close-on-click with `asideHandleOnOpen
- * ={false}` while still wanting the drag this ruling adds (see that prop's
- * own doc, and `EdgeHandleResize`'s). No mango fill, no icon, no shadow, and
- * — per the client's 16 Sep 2026 ruling on this exact seam ("can we actually
- * not show anything and make it so that I can grab the left rail of the
- * assistant, and when I hover over there, I see this kind of arrow to
- * move?") — no mark AT REST either: the previous always-on 3px tertiary bar
- * is gone. The seam draws NOTHING until a reader's pointer finds it; hover
- * (and keyboard focus, so the affordance is not mouse-only) reveals a
- * hairline in its place and the row's own `cursor-col-resize` on the whole
- * hit area is the "arrow to move" the client asked for — the browser's
- * native col-resize glyph, not a drawn icon, so there is nothing here for
- * `bare ? null : icon` to skip. The hit area itself is the aside's full
- * left edge: `w-2` (8px, this ruling's own number) and `inset-y-0` (the
- * column's full height), wider than the mark it reveals so a reader does
- * not have to land a pointer on a hairline to find the drag start —
- * `HANDLE_HIT`'s own target-size reasoning, same idea, new number because
- * this seam has no circle to be at least as big as. Keyboard users still
- * get the global focus ring (tokens.css §8 rings every control at once;
- * this button adds no `outline-none` to suppress it), so the seam is
- * discoverable without a mouse even though nothing is painted at rest.
- */
-const RESIZE_SEAM = cn(
-  "absolute inset-y-0 z-10 flex w-2 items-center justify-center",
-  "rounded-none border-0 bg-transparent p-0",
-  "before:block before:h-6 before:w-[3px] before:rounded-pill before:bg-ink-tertiary before:opacity-0",
-  "before:transition-opacity before:duration-[var(--duration-colour)] before:ease-kwapso",
-  "hover:before:opacity-100 focus-visible:before:opacity-100",
-);
-
-/**
- * DRAG-TO-RESIZE, HANDED TO THE ASIDE'S OWN OPEN HANDLE — variation A "drag
- * the seam", client ruling 2026-09-16. `value`/`min`/`max` are the caller's
- * current clamped width; `onLiveChange` fires continuously while a drag or a
- * key press moves the value (the caller's own state, so the live readout and
- * the panel's own width track the pointer with no delay); `onCommit` fires
- * once, at the end of a gesture (pointer-up or a keyboard step), with the
- * value ALREADY SNAPPED to the nearest of the three magnetic points where
- * one is close enough (`snapAsideWidth`, a `ScreenShell`-level concern kept
- * out of this file so a caller with different snap points could reuse the
- * handle without it); `onReset` is the double-click, back to the middle
- * snap point.
- *
- * ON THE NON-BARE (round) HANDLE, a double-click is also two plain clicks —
- * each toggles `open` (since neither one moved the pointer), netting back to
- * the state it started in before `onReset` fires on the third event. The
- * bare seam (`asideHandleOnOpen={false}`'s own branch) never calls
- * `onToggle` at all, so it has no such flicker; a kit consumer that keeps
- * the round handle's click-to-close inherits this exactly as the artifact's
- * own prototype did.
- */
-interface EdgeHandleResize {
-  value: number;
-  min: number;
-  max: number;
-  onLiveChange: (px: number) => void;
-  onCommit: (px: number) => void;
-  onReset: () => void;
-}
-
 interface EdgeHandleProps {
   /** Which column it belongs to. Published as `data-edge` for the harness. */
   edge: "rail" | "aside";
@@ -2421,8 +2269,7 @@ interface EdgeHandleProps {
    * assistant's own brand mark, constant across states) or the rail's own
    * `CaretLineRight` / `CaretLineLeft` pair, flipped by the caller's current
    * state — see "THE ICON DIFFERS BY EDGE" in the file header. Always
-   * `aria-hidden`; the accessible name is `label`, not the glyph. Ignored
-   * when `bare` (below) is true — a bare handle draws no glyph at all.
+   * `aria-hidden`; the accessible name is `label`, not the glyph.
    */
   icon: React.ReactNode;
   onToggle: () => void;
@@ -2432,130 +2279,9 @@ interface EdgeHandleProps {
    * side, so the mirror is free in RTL.
    */
   placement: string;
-  /**
-   * GIVEN ONLY ON THE ASIDE'S OWN OPEN HANDLE, turns a plain click-to-close
-   * button into a horizontal resize slider too — pointer-captured while
-   * dragging, `cursor-col-resize`, a live width readout beside it while a
-   * drag is in flight, the three magnetic snap points at release, arrow
-   * keys stepping ±16px and Home/End jumping to `min`/`max` on the focused
-   * handle, and a double-click resetting to the middle snap point. A plain
-   * click that never moved the pointer still calls `onToggle` — see the
-   * `dragMoved` ref below for how a drag and a click tell themselves apart
-   * on the one element both live on.
-   */
-  resize?: EdgeHandleResize;
-  /**
-   * BARE — no glyph, no mango fill, no click-to-toggle: a thin resize-only
-   * seam, for the one caller that suppresses the round handle's CLOSE
-   * affordance with `asideHandleOnOpen={false}` while still wanting the NEW
-   * drag affordance this ruling adds. See `asideHandleOnOpen`'s own doc:
-   * that prop was never about hiding the column's inner edge outright, only
-   * about not offering a second way to close it — and a resize handle
-   * closes nothing. Requires `resize`; `onToggle` is never called.
-   */
-  bare?: boolean;
 }
 
-/** The keyboard step, in pixels — one `EdgeHandleResize.onCommit` per press,
- * already clamped by the caller (`ScreenShell` reads `resize.min`/`max`
- * through the same `clampAsideWidth` a drag uses). Round enough to feel
- * deliberate, small enough that ten presses do not overshoot the 200px span
- * between two snap points. */
-const ASIDE_RESIZE_KEY_STEP = 16;
-
-/** How far a pointer has to move, in either axis's own px, before a
- * press-and-release counts as a DRAG rather than a CLICK. Below this the
- * gesture is a plain click (`onToggle` fires, exactly as before this
- * feature); at or above it the click that follows pointer-up is swallowed
- * (`dragMoved.current`, read once and reset in `handleClick`). */
-const ASIDE_RESIZE_DRAG_THRESHOLD = 3;
-
-function EdgeHandle({ edge, open, label, icon, onToggle, placement, resize, bare }: EdgeHandleProps) {
-  // WHICH GESTURE THIS PRESS TURNS OUT TO BE. A ref, not state — it is read
-  // and cleared inside the SAME synchronous click/pointerup pair a browser
-  // fires for one physical press, and a re-render between them would only
-  // cost a wasted paint no user could see.
-  const dragMoved = React.useRef(false);
-  const dragStart = React.useRef({ x: 0, value: 0 });
-
-  /**
-   * ONE FORMULA, BOTH DIRECTIONS OF A DRAG — pointermove (live, unsnapped)
-   * and pointerup (final, about to be snapped) both need "how far did the
-   * pointer travel, turned into a width", so both call this rather than two
-   * copies of the same arithmetic drifting apart.
-   *
-   * RTL-SAFE THOUGH UNUSED (the file header's own "RTL — safe, and unused"
-   * note applies here too): the aside sits at the INLINE-END edge, so its
-   * inner (content-facing) edge is its START side in LTR and its END side in
-   * RTL. Dragging that inner edge TOWARD the window's centre always widens
-   * the column, in either direction — `getComputedStyle(...).direction`
-   * decides which raw pointer delta means "toward the centre" rather than
-   * this file assuming LTR.
-   */
-  function nextWidth(target: HTMLElement, clientX: number): number {
-    if (!resize) return 0;
-    const rtl = getComputedStyle(target).direction === "rtl";
-    const dx = (dragStart.current.x - clientX) * (rtl ? -1 : 1);
-    return clampAsideWidth(dragStart.current.value + dx, resize.min, resize.max);
-  }
-
-  const handlePointerDown = !resize
-    ? undefined
-    : (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (e.button !== 0 && e.pointerType === "mouse") return;
-        dragMoved.current = false;
-        dragStart.current = { x: e.clientX, value: resize.value };
-        e.currentTarget.setPointerCapture(e.pointerId);
-      };
-
-  const handlePointerMove = !resize
-    ? undefined
-    : (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-        if (Math.abs(e.clientX - dragStart.current.x) >= ASIDE_RESIZE_DRAG_THRESHOLD) dragMoved.current = true;
-        resize.onLiveChange(nextWidth(e.currentTarget, e.clientX));
-      };
-
-  const endDrag = !resize
-    ? undefined
-    : (e: React.PointerEvent<HTMLButtonElement>) => {
-        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-        e.currentTarget.releasePointerCapture(e.pointerId);
-        if (dragMoved.current) resize.onCommit(snapAsideWidth(nextWidth(e.currentTarget, e.clientX)));
-      };
-
-  const handleClick = () => {
-    // A DRAG THAT MOVED SWALLOWS THE CLICK A BROWSER FIRES AFTER POINTERUP
-    // REGARDLESS — the one place `dragMoved` is read AND cleared, so the
-    // next physical press starts clean. `bare` never toggles at all: it has
-    // no open/close meaning of its own (see the prop's own doc).
-    if (dragMoved.current) {
-      dragMoved.current = false;
-      return;
-    }
-    if (!bare) onToggle();
-  };
-
-  const handleKeyDown = !resize
-    ? undefined
-    : (e: React.KeyboardEvent<HTMLButtonElement>) => {
-        if (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") {
-          e.preventDefault();
-          const next =
-            e.key === "Home"
-              ? resize.min
-              : e.key === "End"
-                ? resize.max
-                : clampAsideWidth(
-                    resize.value + (e.key === "ArrowRight" ? ASIDE_RESIZE_KEY_STEP : -ASIDE_RESIZE_KEY_STEP),
-                    resize.min,
-                    resize.max
-                  );
-          resize.onLiveChange(next);
-          resize.onCommit(next);
-        }
-      };
-
+function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandleProps) {
   return (
     <button
       type="button"
@@ -2563,48 +2289,11 @@ function EdgeHandle({ edge, open, label, icon, onToggle, placement, resize, bare
       data-edge={edge}
       data-state={open ? "open" : "shut"}
       aria-label={label}
-      aria-expanded={bare ? undefined : open}
-      {...(resize
-        ? {
-            role: "slider" as const,
-            "aria-orientation": "horizontal" as const,
-            "aria-valuemin": resize.min,
-            "aria-valuemax": resize.max,
-            "aria-valuenow": resize.value,
-            "aria-valuetext": `${resize.value}px`,
-          }
-        : {})}
-      onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onKeyDown={handleKeyDown}
-      onDoubleClick={resize ? () => resize.onReset() : undefined}
-      className={cn(bare ? RESIZE_SEAM : HANDLE_HIT, resize && "group cursor-col-resize", placement)}
+      aria-expanded={open}
+      onClick={onToggle}
+      className={cn(HANDLE_HIT, placement)}
     >
-      {bare ? null : icon}
-      {resize ? (
-        // THE LIVE READOUT — shown while the handle is pressed (`group-
-        // active`), which is exactly a drag's own duration under pointer
-        // capture. An `aria-valuetext` already carries the number for every
-        // OTHER moment, keyboard included, so a visible pill only while
-        // pressed is not a second copy of the same fact sitting on screen at
-        // rest. Positioned off the handle's own trailing edge so it never
-        // covers the pointer.
-        <span
-          aria-hidden="true"
-          data-slot="screen-shell-handle-readout"
-          className={cn(
-            "pointer-events-none absolute top-1/2 start-full ms-2 -translate-y-1/2 whitespace-nowrap rounded-pill",
-            "bg-[var(--popover)] px-2 py-1 text-badge tabular-nums text-foreground shadow-[var(--shadow-overlay)]",
-            "opacity-0 transition-opacity duration-[var(--duration-colour)] ease-kwapso",
-            "group-active:opacity-100",
-          )}
-        >
-          {resize.value}px
-        </span>
-      ) : null}
+      {icon}
     </button>
   );
 }
@@ -3569,12 +3258,6 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       asideOpenLabel = "Open the assistant",
       asideCloseLabel = "Close the assistant",
       asideHandleOnOpen = true,
-      asideWidth,
-      defaultAsideWidth = ASIDE_WIDTH_DEFAULT,
-      onAsideWidthChange,
-      asideMinWidth = ASIDE_WIDTH_MIN,
-      asideMaxWidth = ASIDE_WIDTH_MAX,
-      asideResizeLabel = "Resize the assistant",
       asideLead,
       navGroups,
       navCurrent,
@@ -3684,40 +3367,6 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       const next = !isAsideOpen;
       if (asideOpen === undefined) setSelfAsideOpen(next);
       onAsideOpenChange?.(next);
-    };
-
-    // THE COLUMN'S WIDTH — variation A, client ruling 2026-09-16. Controlled
-    // exactly like `isAsideOpen` two blocks up: `selfAsideWidth` seeds from
-    // `defaultAsideWidth` and is read only where `asideWidth` was never
-    // given. Clamped on EVERY read (a controlled caller's own number is
-    // trusted no further than an uncontrolled one), so a stale prop can
-    // never draw a column outside `asideMinWidth`/`asideMaxWidth`.
-    const [selfAsideWidth, setSelfAsideWidth] = React.useState(() =>
-      clampAsideWidth(defaultAsideWidth, asideMinWidth, asideMaxWidth)
-    );
-    const committedAsideWidth = clampAsideWidth(asideWidth ?? selfAsideWidth, asideMinWidth, asideMaxWidth);
-    // LIVE, DURING A DRAG OR A KEY PRESS ONLY (`EdgeHandleResize.onLiveChange`)
-    // — falls back to the committed width the instant nothing is moving it,
-    // so the motion layer and the panel's own `w-[var(--aside-width)]` never
-    // have to know a drag happened at all; they always just read "the
-    // width". `null` rather than `committedAsideWidth` as the reset value so
-    // a caller's own re-render mid-drag (a message arriving in the thread,
-    // say) cannot stomp the live value with a stale committed one.
-    const [liveAsideWidth, setLiveAsideWidth] = React.useState<number | null>(null);
-    const asideWidthPx = liveAsideWidth ?? committedAsideWidth;
-    const commitAsideWidth = (px: number) => {
-      const next = clampAsideWidth(px, asideMinWidth, asideMaxWidth);
-      setLiveAsideWidth(null);
-      if (asideWidth === undefined) setSelfAsideWidth(next);
-      onAsideWidthChange?.(next);
-    };
-    const asideResizeControls: EdgeHandleResize = {
-      value: asideWidthPx,
-      min: asideMinWidth,
-      max: asideMaxWidth,
-      onLiveChange: setLiveAsideWidth,
-      onCommit: commitAsideWidth,
-      onReset: () => commitAsideWidth(ASIDE_WIDTH_DEFAULT),
     };
 
     /* THE DEFAULT RAIL, and it has to be computed rather than a default
@@ -4969,17 +4618,6 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               "max-[45rem]:start-0 max-[45rem]:z-[5]",
               "max-[45rem]:pb-0 max-[45rem]:ps-0 max-[45rem]:pe-0",
             )}
-            /* `--aside-width` — THE ONE PLACE THE DRAG'S CURRENT PIXEL VALUE
-               ENTERS THE CASCADE. Set here, on the dock, so it inherits down
-               to both readers below: the collapse wrapper's own
-               `--motion-column-size` arithmetic and the panel's own `w-`.
-               An inline CUSTOM PROPERTY rather than an inline `width`
-               anywhere, because Tailwind's arbitrary-value classes there
-               (`w-[var(--aside-width)]`, `[--motion-column-size:min(var(
-               --aside-width),…)]`) are STATIC strings — this is what keeps
-               them scannable at build time while the VALUE they reference
-               still changes every frame of a drag. */
-            style={{ "--aside-width": `${asideWidthPx}px` } as React.CSSProperties}
           >
             {/* ── THE NARROW SCRIM — "make the 15% stay visible dut darkened
                 (like in desktop when we open slide in)". CLIENT-ORDERED
@@ -5146,23 +4784,16 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                    that does not exist once the column stopped docking. So the
                    overlay takes the width it can have — the viewport less the
                    ground's own gutter on each side — and stops at 23.75rem,
-                   which is still ch19's one stated assistant measure.
-
-                   `var(--aside-width)` REPLACES THE 23.75rem LITERAL,
-                   2026-09-16 (variation A, "drag the seam"). The literal
-                   still names the DEFAULT (`ASIDE_WIDTH` above), only how it
-                   reaches this expression changed: the dock (one level up)
-                   sets `--aside-width` from the current drag/keyboard/
-                   uncontrolled state, this custom property inherits down to
-                   it unchanged, and the two viewport caps either side of the
-                   `min()` are UNTOUCHED — a caller that never wires
-                   `asideWidth` gets exactly `min(400px, …)` where it used to
-                   get `min(23.75rem, …)`, the same 20px difference from the
-                   old fixed measure the new `ASIDE_WIDTH_DEFAULT` doc
-                   explains, and every existing consumer's own drag is a
-                   no-op it never triggers. */
-                "[--motion-column-size:min(var(--aside-width),calc(100vw-var(--shell-gutter)*2))]",
-                "lg:[--motion-column-size:min(var(--aside-width),40vw)]",
+                   which is still ch19's one stated assistant measure — the
+                   literal `ASIDE_WIDTH` names, once again the only number
+                   this expression reads. A same-day 2026-09-16 ruling briefly
+                   routed this through a `var(--aside-width)` custom property
+                   the dock set from a live drag; the client's own reversal
+                   the same day ("Let's forget about the resize. It's a
+                   disaster. Remove it.") retired that property along with
+                   the drag it carried — see `ASIDE_WIDTH`'s own doc. */
+                "[--motion-column-size:min(23.75rem,calc(100vw-var(--shell-gutter)*2))]",
+                "lg:[--motion-column-size:min(23.75rem,40vw)]",
               )}
               data-state={isAsideOpen ? "open" : "closed"}
               inert={!isAsideOpen}
@@ -5182,14 +4813,10 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                    of the same value and cannot disagree. */
                 data-state={isAsideOpen ? "open" : "closed"}
                 className={cn(
-                  "flex w-[var(--aside-width)] min-h-0 flex-none flex-col overflow-y-auto",
-                  /* THE TWIN OF THE CUSTOM PROPERTY ABOVE. Same two values,
-                     same two breakpoints; they are written next to each other
-                     so a change to one is an obvious omission in the other.
-                     UNCHANGED BY THE DRAG, 2026-09-16: these two caps are
-                     exactly what keeps a wide drag from pushing the content
-                     column under its own floor on a narrow window — see
-                     `asideMaxWidth`'s own doc on `ScreenShellProps`. */
+                  "flex w-[23.75rem] min-h-0 flex-none flex-col overflow-y-auto",
+                  /* THE TWIN OF THE EXPRESSION ABOVE. Same two values, same
+                     two breakpoints; they are written next to each other so
+                     a change to one is an obvious omission in the other. */
                   "max-w-[calc(100vw-var(--shell-gutter)*2)] lg:max-w-[40vw]",
 
                   /* ── AND BELOW 45rem IT IS A BOTTOM SHEET. The client's own
@@ -5203,7 +4830,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                      would still be perfect and the destination still wrong.
 
                      `inset-x-0` + `bottom-0` + `w-full` AND ALL THREE ARE
-                     NEEDED. `w-[var(--aside-width)]` above is still in the cascade, and
+                     NEEDED. `w-[23.75rem]` above is still in the cascade, and
                      an absolutely positioned box with `left: 0; right: 0` and
                      a stated width is over-constrained — the reading-start
                      inset wins and the sheet comes out 356.25 wide against a
@@ -5549,71 +5176,23 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
                     : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
                 )}
-                /* DRAG-TO-RESIZE ONLY WHILE OPEN — 2026-09-16, variation A.
-                   Shut, there is no column to resize and this handle is a
-                   plain click-to-open button, exactly as before. */
-                resize={isAsideOpen ? asideResizeControls : undefined}
               />
             )}
 
-            {/* THE BARE RESIZE SEAM — 2026-09-16, variation A, for the one
-               caller that passed `asideHandleOnOpen={false}` (above) to drop
-               the round handle's OPEN branch and its redundant close-on-
-               click, per the 2026-09-15 ruling that block quotes. That
-               ruling was about the CLOSE affordance, not about resizing —
-               today's ruling adds resizing, and this app has no other way
-               to reach it, so the drag survives here even where the round
-               handle does not: same `EdgeHandleResize`, same snap points,
-               same keyboard, rendered `bare` (no glyph, no mango fill — see
-               `RESIZE_SEAM`'s own doc for why that is the right visual
-               weight for a control the client asked to see LESS of, not
-               more). Same `max-[45rem]:hidden` as the round OPEN handle
-               above, for the identical reason: below the sheet breakpoint
-               there is no inline edge to grab. */}
-            {!asideHandleOnOpen && isAsideOpen && (
-              <EdgeHandle
-                edge="aside"
-                open={isAsideOpen}
-                label={asideResizeLabel}
-                icon={null}
-                onToggle={toggleAside}
-                bare
-                /* NO `top-1/2 -translate-y-1/2` HERE, UNLIKE THE ROUND
-                   HANDLE ABOVE. That pair vertically centres a FIXED-height
-                   box (`HANDLE_HIT`'s h-11) inside its positioned ancestor;
-                   `RESIZE_SEAM` is `inset-y-0` instead — today's ruling's
-                   own "full height" — so centring it as well would win the
-                   `top` property back off `inset-y-0`'s `top: 0` and leave
-                   `bottom: 0` unchallenged, collapsing the seam to the
-                   ancestor's BOTTOM half. Measured, not guessed: this file's
-                   own review caught it rendering at exactly half height. */
-                /* `start-0`, NOT `end-[var(--shell-gutter)]` — CORRECTED
-                   2026-09-16, SAME DAY, SECOND RULING ON THIS EXACT SEAM.
-                   The first pass shipped this seam at the dock's END inset,
-                   copied from the round handle's own CLOSE-button placement
-                   two blocks up — the aside COLUMN's outer edge, one gutter
-                   short of the window. The client looked at the shipped
-                   build and corrected it: "you put it on the right edge. I
-                   want it on the left one, the one that's between the
-                   assistant and the main content." The dock's containing
-                   block is the `screen-shell-aside-dock` element, which pays
-                   an UNCONDITIONAL `ps-[var(--shell-gutter)]` (see that
-                   element's own class list) — the gutter strip between the
-                   content card and this column — so `start-0` (the padding
-                   edge, same value the pre-circle "bar" used successfully;
-                   see the aside dock's own header block, "THIS IS WHERE THE
-                   CIRCLE GENUINELY CHANGED THE GEOMETRY") lands this 8px
-                   seam exactly on the dock's card-facing edge: the seam
-                   SHARED WITH THE MAIN CONTENT, not the screen edge. Unlike
-                   the END side, the START gutter never grows a second,
-                   conditional padding to step past, so no offset is needed
-                   to clear it — `start-0` already IS the column's true
-                   start edge. Nothing on the right/screen edge carries this
-                   seam any more. */
-                placement="pointer-events-auto max-[45rem]:hidden start-0"
-                resize={asideResizeControls}
-              />
-            )}
+            {/* THE BARE RESIZE SEAM IS GONE. Client, 16 Sep 2026, on the
+               shipped build: "Let's forget about the resize. It's a
+               disaster. Remove it." A same-day pair of rulings had put a
+               `RESIZE_SEAM` here — an invisible drag handle, hover-reveal
+               arrow, snap points — as the one thing `asideHandleOnOpen=
+               {false}` still drew in this slot once the round handle's OPEN
+               branch was suppressed. Nothing replaces it: a caller with
+               `asideHandleOnOpen={false}` now draws NOTHING in this
+               position when the column is open, exactly as it did before
+               2026-09-16 — that prop was never about hiding the edge
+               outright, only about not offering a second CLOSE control, and
+               removing the resize leaves nothing else here to draw. See
+               `ASIDE_WIDTH`'s own doc for the rest of what this ruling
+               removed. */}
 
             {/* THE ASSISTANT'S ROW, FILLED — the client's timer, or whatever
                 the next caller needs beside the one control that is always in

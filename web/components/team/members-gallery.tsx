@@ -82,16 +82,22 @@
 //   sort     nothing, and this screen is named in TOOLBAR_SORT_EXEMPT with the
 //            reason: a gallery of a team's people has no order to offer that
 //            a reader would ask for
-//   actions  Invites (secondary, carrying its count) then the mango `+`
+//   actions  Invites (secondary, carrying its count) then the `+` (AddButton)
 //   empty    the collection's own raw row count being zero (R50)
 //
-// ── THE ONE MANGO ON THIS TAB IS THE `+`, AND IT IS HERE ────────────────────
+// ── THE `+` WAS THE ONE MANGO ON THIS TAB; NOW IT IS BLACK ──────────────────
 //
-// The kit rules one mango per view (shared/ui/docs/RULES.md §2.5). This tab has
-// two things somebody creates — a member and a role — and the mango goes to the
-// member, because inviting a person is what a Team tab is FOR. "New role" beside
-// the roles matrix is a quiet button; the argument, and the client's reversal
-// that settled it, are written up in web/components/team/roles-matrix.tsx.
+// Until R84 (16 Sep 2026, "only mango buttons on the title level… the others
+// black") the kit's own §2.5 ("one mango per view", shared/ui/docs/RULES.md)
+// governed this tab: it has two things somebody creates — a member and a
+// role — and the mango went to the member, because inviting a person is what
+// a Team tab is FOR; "New role" beside the roles matrix stayed a quiet
+// button. R84 retires the colour half of that ruling app-wide — `AddButton`
+// (screen-bits.tsx) is `variant="inverse"` everywhere now, this toolbar
+// included, because a toolbar is never the title component — but not the
+// RANK: the member still owns the one create action this tab offers through
+// its own `+`, "New role" is still the quiet one beside it, and the argument
+// for that split is written up in web/components/team/roles-matrix.tsx.
 //
 // ── A CARD IS A DOOR, AND IT OPENS A FULL SCREEN ───────────────────────────
 //

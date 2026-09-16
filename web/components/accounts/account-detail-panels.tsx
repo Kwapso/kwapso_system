@@ -395,7 +395,8 @@ export function PortalAccessPanel({
         }
         actions={
           canGrant && (
-            <Button size="sm" onClick={onGrant} className="gap-1">
+            // R84 — a toolbar action, not a title component, so black.
+            <Button variant="inverse" size="sm" onClick={onGrant} className="gap-1">
               <Key className="size-4" />
               {t("Give access")}
             </Button>

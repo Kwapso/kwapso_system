@@ -3538,7 +3538,6 @@ export const SEED: Catalogue = {
   "Deactivate this profile?": { de: "Dieses Profil deaktivieren?", es: "¿Desactivar este perfil?", ca: "Vols desactivar aquest perfil?" },
   "Decide": { de: "Entscheiden", es: "Decidir", ca: "Decidir" },
   "Earlier": { de: "Früher", es: "Antes", ca: "Abans" },
-  "End": { de: "Ende", es: "Fin", ca: "Fi" },
   "Every meeting they're in will show here once one is arranged.": { de: "Jeder Termin, an dem sie beteiligt sind, erscheint hier, sobald einer vereinbart ist.", es: "Aquí aparecerá cada reunión en la que participen, en cuanto se organice una.", ca: "Aquí apareixerà cada reunió en què participin, quan se n'organitzi una." },
   "Every ticket about them will show here once one is raised.": { de: "Jedes Ticket zu ihnen erscheint hier, sobald eines eingereicht wird.", es: "Aquí aparecerá cada ticket sobre ellos, en cuanto se cree uno.", ca: "Aquí apareixerà cada tiquet sobre ells, quan se'n creï un." },
   "Everyone": { de: "Alle", es: "Todos", ca: "Tots" },
@@ -4102,6 +4101,13 @@ export const SEED: Catalogue = {
   "No choices match what you're looking for.": { de: "Keine Optionen passen zu Ihrer Suche.", es: "Ninguna opción coincide con lo que buscas.", ca: "Cap opció coincideix amb el que busques." },
   "Couldn't load the choices.": { de: "Optionen konnten nicht geladen werden.", es: "No se pudieron cargar las opciones.", ca: "No s'han pogut carregar les opcions." },
 
+  /* ── THE DETAILS COLUMN, 16 Sep 2026 evening — the client's ruling on
+     `settings-choices-panel.tsx`'s own header, "THE DETAILS COLUMN": an
+     in-between column showing what a choice's own type carries beyond its
+     word (a sprint type's icon + duration, an app stage's dot). */
+  "Details": { de: "Details", es: "Detalles", ca: "Detalls" },
+  "{days} days": { de: "{days} Tage", es: "{days} días", ca: "{days} dies" },
+
   /* ── THE MEETING-TYPES ADAPTER (Task C, 15 Sep 2026) — new strings
      `MeetingTypesPanel`/`MeetingTypeFormDialog` say (web/components/team/
      internal-screens.tsx), hand-seeded rather than left for the generator.
@@ -4210,19 +4216,6 @@ export const SEED: Catalogue = {
   "Previous week": { de: "Vorherige Woche", es: "Semana anterior", ca: "Setmana anterior" },
 
 
-  /* ── 16 Sep 2026, the aside's own drag-to-resize (kit v1.2.91,
-     `documents/UI-RULEBOOK.md` L14). ONE new string: `app-shell.tsx`'s
-     `asideResizeLabel`, the accessible name for the bare resize seam this
-     app draws in place of the kit's round handle (`asideHandleOnOpen=
-     {false}`'s own branch — that handle's `asideOpenLabel`/`asideCloseLabel`
-     do not apply to a control with no open/close meaning). Same vocabulary
-     as "Close the assistant" above — the noun stays "assistant"/"Assistent"/
-     "asistente"/"assistent", never a synonym. */
-  "Resize the assistant": {
-    de: "Größe des Assistenten ändern",
-    es: "Cambiar el tamaño del asistente",
-    ca: "Canviar la mida de l'assistent",
-  },
 
   /* ── 16 Sep 2026, the per-token call log on Settings → Access tokens
      (db/core 0031, web/components/team/access-tokens.tsx's `TokenCallLog`).

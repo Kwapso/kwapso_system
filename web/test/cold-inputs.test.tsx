@@ -215,6 +215,51 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     expect(cells[5], "the received date").not.toBe("—")
   })
 
+  it("the Waiting badge is orange regardless of days waited, Overdue stays red — client ruling, 16 Sep 2026 evening: \"For inputs waiting, let's use orange\"", async () => {
+    // A row waiting two days and a row waiting three weeks: before this
+    // ruling the badge graded quiet-then-amber at the seven-day mark, which
+    // is exactly the split this test proves is gone.
+    const recentlyRaised: Todo = { ...ONE_WAITING, createdAt: new Date(Date.now() - 2 * 86400000).toISOString() }
+    const longWaiting: Todo = {
+      ...ONE_WAITING,
+      id: "td3",
+      ref: "BERG-I0003",
+      createdAt: new Date(Date.now() - 20 * 86400000).toISOString(),
+    }
+
+    door = [recentlyRaised]
+    counts = { waiting: 1, overdue: 0, received: 0 }
+    draw("waiting")
+    await waitFor(() => expect(screen.queryByText(/Send us your brand logo/)).toBeTruthy())
+    let row = Array.from(document.querySelectorAll("tbody tr")).find((tr) =>
+      tr.textContent?.includes("Send us your brand logo")
+    )
+    expect(
+      row?.querySelector('[data-slot="badge"]')?.className,
+      "under a week, still orange, not the old quiet grey"
+    ).toContain("bg-warning")
+
+    cleanup()
+    door = [longWaiting]
+    draw("waiting")
+    await waitFor(() => expect(screen.queryByText(/Send us your brand logo/)).toBeTruthy())
+    row = Array.from(document.querySelectorAll("tbody tr")).find((tr) =>
+      tr.textContent?.includes("Send us your brand logo")
+    )
+    expect(row?.querySelector('[data-slot="badge"]')?.className, "past a week, still orange").toContain(
+      "bg-warning"
+    )
+
+    cleanup()
+    door = [recentlyRaised]
+    draw("overdue")
+    await waitFor(() => expect(screen.queryByText(/Send us your brand logo/)).toBeTruthy())
+    row = Array.from(document.querySelectorAll("tbody tr")).find((tr) =>
+      tr.textContent?.includes("Send us your brand logo")
+    )
+    expect(row?.querySelector('[data-slot="badge"]')?.className, "Overdue stays red").toContain("bg-destructive")
+  })
+
   it("a genuinely empty Waiting tab offers the create act; Received offers none", async () => {
     door = []
     counts = { waiting: 0, overdue: 0, received: 0 }

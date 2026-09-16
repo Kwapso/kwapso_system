@@ -124,14 +124,25 @@ function inputSortOptions(t: (s: string) => string): SortOption[] {
 /** THE WAITING BADGE — days since the input was RAISED (`createdAt`), never
  * since its due date: an input with no due date at all still waits, and the
  * client's own word is "waiting", not "late". Blank on Received (the row has
- * finished waiting) — through the kit's own Badge tones, never a bespoke
- * colour: quiet under a week, `warning` past it, `destructive` on the
- * Overdue tab (the door has already decided the row is overdue; this reads
- * that fact rather than re-deriving it from a date in the browser). */
+ * finished waiting, and `receivedOn` carries that column's own fact instead —
+ * there is no third tone to draw here since nothing green-coded renders on
+ * this tab at all) — through the kit's own Badge tones, never a bespoke
+ * colour.
+ *
+ * ONE TONE PER STATE, NOT A DAY THRESHOLD — client ruling, 16 Sep 2026
+ * evening, verbatim: "For inputs waiting, let's use orange." This used to
+ * grade the Waiting tab itself, quiet (`secondary`) under a week and only
+ * `warning` past it — a second, undocumented tier her sentence does not
+ * make room for. The STATE is what carries the colour now, same as Overdue's
+ * `destructive` already did and still does (the door has already decided the
+ * row is overdue; this reads that fact rather than re-deriving it from a
+ * date in the browser) — every Waiting row is `warning` (kit `--warning`,
+ * the orange token), regardless of how many days it has been waiting; the
+ * day count itself still prints, inside the same orange pill. */
 function waitingBadge(todo: Todo, view: InputView, t: (s: string, vars?: Record<string, unknown>) => string) {
   if (todo.completedAt) return null
   const days = Math.max(0, Math.floor((Date.now() - new Date(todo.createdAt).getTime()) / 86400000))
-  const tone = view === "overdue" ? "destructive" : days > 7 ? "warning" : "secondary"
+  const tone = view === "overdue" ? "destructive" : "warning"
   return (
     <Badge variant={tone} size="pill">
       {t("{count} days", { count: days })}

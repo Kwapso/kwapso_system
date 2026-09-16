@@ -1141,6 +1141,18 @@ again, which is the only property that matters here.
   staying outside that wrapper in the screen's real outer gap. A file that
   cannot draw it this way is named in `TOOLBAR_LEAD_GAP_EXEMPT`
   (`shared/rules/registry.ts`) with the real reason.
+- **R84 `mango-in-title-only`** — mango (`<Button variant="default">`, stated
+  or left off) is confined to your module's own title component:
+  `CollectionHeading`'s `action` prop on the main screen, `RecordScreen`'s
+  `actions` prop on a bespoke detail (or, on a recipe-driven one, the fields
+  `renderDetail` hands to the kit's `RecordDetail`). Your toolbar's own create
+  button, every dialog's Save/Create, a sheet's footer, a card, an empty
+  state's "Add the first" and every other form button are `variant="inverse"`
+  instead — never mango, never omitted (the component's own default IS
+  mango). A `<Button>` your module puts outside the title component with a
+  computed `variant` that could resolve to mango needs a real, reasoned line
+  in `MANGO_OUTSIDE_TITLE_OK` (`shared/rules/registry.ts`), keyed by file and
+  enclosing function.
 
 **The words** (the ones that catch every new module, every time)
 

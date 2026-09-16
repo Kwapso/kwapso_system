@@ -104,8 +104,10 @@ export function AddLinkDialog({
           >
             {t("Cancel")}
           </Button>
+          {/* R84 — a dialog's Save/Submit is not inside a title component, so black. */}
           <Button
             type="submit"
+            variant="inverse"
             size="lg"
             className="flex-1 sm:order-1 sm:flex-none"
             disabled={busy || !ready}

@@ -17,6 +17,7 @@ import {
   openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
+  reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
   useActiveAgentTabId,
@@ -237,5 +238,69 @@ describe("openAgentTabForThread — a history row was picked", () => {
       openAgentTabForThread("srv-thread-9", "Beringer tickets")
     })
     expect(result.current).toBe(false)
+  })
+})
+
+// DRAG-TO-REORDER, THE STORE'S OWN HALF — client ruling, 16 Sep 2026: "go
+// with the drag order." `agent-tab-strip.test.tsx` proves the kit's pointer
+// gesture actually reaches this function and that History/"+" never carry
+// the drag handle at all (they hold no row here to begin with — see this
+// file's own header on why neither is a `tabs` entry); this is the data-only
+// half, the same shape `workspace-tabs.ts`'s own `reorderTab` is never given
+// a position outside its array either.
+describe("reorderAgentTab — client ruling, 16 Sep 2026 (\"go with the drag order\")", () => {
+  /** Three real conversation tabs, in order — never History or "+", which
+   * this store does not carry a row for at all. */
+  function threeTabs(): string[] {
+    let a = ""
+    let b = ""
+    let c = ""
+    act(() => {
+      a = openNewAgentTab()
+      pickAgentTabScope(a, "everything", "Ashworth")
+      b = openNewAgentTab()
+      pickAgentTabScope(b, "everything", "Beringer")
+      c = openNewAgentTab()
+      pickAgentTabScope(c, "everything", "Chalmers")
+    })
+    return [a, b, c]
+  }
+
+  it("moves the dragged tab to its new slot and keeps every other tab in order", () => {
+    const [a, b, c] = threeTabs()
+    act(() => {
+      reorderAgentTab(0, 2) // drag Ashworth past Beringer and Chalmers
+    })
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([b, c, a])
+  })
+
+  it("a reorder among conversations sticks — activeId names the tab, never its position", () => {
+    const [a, , c] = threeTabs()
+    act(() => {
+      activateAgentTab(a)
+    })
+    act(() => {
+      reorderAgentTab(0, 2) // Ashworth (active) moves to the far end
+    })
+    const { result } = renderHook(() => useActiveAgentTabId())
+    // Still Ashworth's own id, wherever it now sits in the strip.
+    expect(result.current).toBe(a)
+    expect(agentTabsSnapshot().at(-1)?.id).toBe(a)
+    expect(agentTabsSnapshot()[0]?.id).not.toBe(c) // sanity: c did move up
+  })
+
+  it("is a no-op for an index this store does not hold — the strip's pinned History/\"+\" positions included", () => {
+    const [a, b, c] = threeTabs()
+    act(() => {
+      reorderAgentTab(-1, 1) // an out-of-range source, same guard `fromIndex` gets everywhere else
+    })
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([a, b, c])
+    act(() => {
+      // `tabs.length` and past it are exactly the slots History and "+" draw
+      // in `agent-tab-strip.tsx` — this store clamps rather than reading
+      // past its own array, so a stray index that size can never land here.
+      reorderAgentTab(0, 99)
+    })
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([b, c, a])
   })
 })

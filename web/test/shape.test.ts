@@ -11,11 +11,13 @@ import type {
 import { describe, expect, it } from "vitest"
 import React from "react"
 
+import type { SelectableValue } from "@shared/types"
 import {
   HELP_STATUS,
   INVITE_STATUS,
   shapeAccountsList,
   shapeActivity,
+  shapeChoicesTable,
   shapeContactsTable,
   shapeHelpList,
   shapeInviteDetail,
@@ -23,6 +25,7 @@ import {
   shapeMeetingsList,
   shapeMembersList,
   shapeRolesList,
+  type ChoiceGroupHome,
 } from "@/components/deep-link/shape"
 
 /* ------------------------------ fixtures ------------------------------ */
@@ -576,6 +579,90 @@ describe("shapeMeetingsList", () => {
     const rows = shapeMeetingsList([meeting({ id: "m1", title: "Standup" })], "en").rows
     expect(rows?.[0].client).toBe("Ours")
     expect(React.isValidElement(rows?.[0].accountCell)).toBe(true)
+  })
+})
+
+/* -------------------------------- choices -------------------------------- */
+
+const selectableValue = (over: Partial<SelectableValue> & { id: string; type: string; value: string }): SelectableValue => ({
+  isDefault: false,
+  active: true,
+  mark: null,
+  nameDe: null,
+  description: null,
+  standardDays: null,
+  position: null,
+  ...over,
+})
+
+const choicesGroupHome: Map<string, ChoiceGroupHome> = new Map([
+  ["Sprint type", { segment: "work", title: "Work" }],
+  ["Story type", { segment: "work", title: "Work" }],
+  ["App stage", { segment: "apps", title: "Apps" }],
+  ["Industry", { segment: "accounts", title: "Accounts" }],
+])
+
+describe("shapeChoicesTable", () => {
+  // THE DETAILS COLUMN — client ruling, 16 Sep 2026 evening (this function's
+  // own header, "THE DETAILS COLUMN"). Sprint type is the one type that
+  // carries BOTH an icon (shared/sprint-types.ts, matched by the row's own
+  // word) and a duration (`standardDays`, a real column).
+  it("draws the icon for a sprint type row that has one, and the door's own duration", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "s1", type: "Sprint type", value: "Build", standardDays: 5 })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].details), "a sprint type with a known word draws a node").toBe(true)
+  })
+
+  // A BARE TYPE — one `selectable_data` carries no code-owned enrichment for
+  // (Industry, here) — draws a genuinely empty cell: no dash, no placeholder,
+  // the same "carries nothing" answer R81 gives a form field.
+  it("draws nothing for a type the Details column has no case for", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "i1", type: "Industry", value: "Hospitality" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(rows?.[0].details).toBeNull()
+  })
+
+  // A SPRINT TYPE ROW WHOSE WORD THE CODE HAS NEVER MET (a team's own
+  // rename) carries no icon and, absent a duration too, draws nothing —
+  // `sprintTypeIcon` returns "" rather than throwing, and the cell reads
+  // that the same way it reads any other type with nothing to show.
+  it("draws nothing for a sprint type row the icon vocabulary has never met, with no duration either", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "s2", type: "Sprint type", value: "Retro" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(rows?.[0].details).toBeNull()
+  })
+
+  // A STORY TYPE ROW draws its own icon only — no duration column is ever
+  // read for it, so the fixture's `standardDays: null` (the default) is
+  // never in question here.
+  it("draws the icon for a story type row that has one", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "t1", type: "Story type", value: "Bug" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].details)).toBe(true)
+  })
+
+  // AN APP STAGE ROW draws the same dot tone `apps-screen.tsx`'s own stage
+  // pill already draws — a node, not a bare string, because a dot never
+  // renders without its label (the kit's own ruling 04).
+  it("draws the dot tone for an app stage row", () => {
+    const rows = shapeChoicesTable(
+      [selectableValue({ id: "a1", type: "App stage", value: "Build" })],
+      choicesGroupHome,
+      "en"
+    ).rows
+    expect(React.isValidElement(rows?.[0].details)).toBe(true)
   })
 })
 

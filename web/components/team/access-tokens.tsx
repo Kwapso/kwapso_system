@@ -413,7 +413,9 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 <Copy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
               </Button>
               <div className="flex flex-wrap justify-end gap-2">
+                {/* R84 — a sheet footer, not a title component, so black. */}
                 <Button
+                  variant="inverse"
                   onClick={() => {
                     setSecret(null)
                     setCreateOpen(false)

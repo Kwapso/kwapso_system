@@ -413,7 +413,6 @@ type WaveListRow = {
   sprints: React.ReactNode
   state: React.ReactNode
   start: React.ReactNode
-  end: React.ReactNode
   // An index signature — `RecordTable<T extends TableRowData>` constrains T
   // to `Record<string, unknown>`, which a plain object type only satisfies
   // structurally with one of these.
@@ -542,7 +541,6 @@ export function waveListRows(
         </span>
       ),
       start: formatDate(w.startsOn, lang) || "—",
-      end: formatDate(w.endsOn, lang) || "—",
       // A COLOURED PILL, ALWAYS — client, 16 Sep 2026: "make status a
       // colored pill." Deactivated wins over the temporal read (a wave that
       // ran to its own end date and was then switched off is switched off,
@@ -561,26 +559,27 @@ export function waveListRows(
   })
 }
 
-/** SIX COLUMNS, NEVER SEVEN (R82 — `table-column-budget`, UI-RULEBOOK N1: "at
- * most … six in a table row … it does not get squeezed onto the end"). The
- * App fact lives inside the Account cell's own second line
- * (`waveListRows` above) rather than claiming a column of its own — the
- * eighth-turned-seventh column the client's 16 Sep 2026 ruling almost grew
- * here, which is exactly the shape this law now catches before it ships
- * again. */
+/** FIVE COLUMNS, HER EXACT ORDER (client ruling, 16 Sep 2026, verbatim: "1.
+ * Wave 2. Status 3. Sprints 4. Start 5. Account") — a tightening of R82's own
+ * six-column ceiling (`table-column-budget`, UI-RULEBOOK N1: "at most … six
+ * in a table row … it does not get squeezed onto the end"), not a fresh
+ * breach of it: End is DROPPED outright rather than moved, and the App fact
+ * still lives inside the Account cell's own second line (`waveListRows`
+ * above) rather than claiming a column of its own — the eighth-turned-seventh
+ * column the same day's ruling almost grew here, which is exactly the shape
+ * R82 now catches before it ships again. */
 export function waveListColumns(t: (s: string) => string): TableColumn[] {
   return [
     { key: "name", label: t("Wave") },
-    { key: "account", label: t("Account"), searchKey: "accountName" },
-    { key: "sprints", label: t("Sprints") },
-    { key: "start", label: t("Start") },
-    { key: "end", label: t("End") },
     // "Status", not "State" — the word every other column header in this app
     // already uses for the identical fact (accounts-screen.tsx,
     // task-detail.tsx, wave-finder.tsx's own filter facet), already fully
     // translated. R34's own argument: a word already means this, so this
     // column does not invent a second one for it.
     { key: "state", label: t("Status") },
+    { key: "sprints", label: t("Sprints") },
+    { key: "start", label: t("Start") },
+    { key: "account", label: t("Account"), searchKey: "accountName" },
   ]
 }
 

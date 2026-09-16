@@ -166,7 +166,8 @@ export function WaitingOnYou() {
                 <Paperclip className="size-3.5" />
                 {t("Send a file")}
               </Button>
-              <Button size="sm" className="gap-1" disabled={busy === todo.id} onClick={() => complete(todo.id)}>
+              {/* R84 — a list row's action, not a title component, so black. */}
+              <Button variant="inverse" size="sm" className="gap-1" disabled={busy === todo.id} onClick={() => complete(todo.id)}>
                 <Check className="size-3.5" />
                 {busy === todo.id ? t("Saving…") : t("Done")}
               </Button>

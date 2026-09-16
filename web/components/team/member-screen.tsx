@@ -107,19 +107,18 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, UserMinus, UserSwitch } from "@shared/ui/foundations/icons"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
-import { invalidate, primeCache, useCached } from "@shared/web/store"
-import { RecordCoverBand, RecordMark } from "@shared/web/record-mark"
+import { invalidate, primeCache } from "@shared/web/store"
+import { RecordMark } from "@shared/web/record-mark"
 import { staffFullName } from "@shared/staff-name"
 import { useT } from "@shared/web/language"
-import type { StaffProfile, TeamMember, TeamRole } from "@shared/types"
+import type { TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import { RecordActionsMenu, RecordScreen, type RecordAction } from "@/components/records/record-chrome"
 import { MemberHead } from "@/components/team/member-head"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
-import { ApiFailure, content, tenancy } from "@/lib/api"
-import { staffProfilesKey, totalKey } from "@/lib/live-resources"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { reportError } from "@shared/web/log"
 
@@ -155,10 +154,12 @@ export function MemberScreen({
   // THE HEAD'S OWN EDIT PENCIL — client ruling, 2026-09-15: "make the pencil
   // button visible." Lifted here rather than left as `StaffPanel`'s own local
   // state so the SAME `StaffProfileDialog` opens whether a reader presses the
-  // pencil beside "Change role" (the visible affordance she asked for, in the
-  // actions row every other record's edit pencil sits in — record-chrome.tsx,
+  // pencil in the actions row (the visible affordance she asked for, in the
+  // same row every other record's edit pencil sits in — record-chrome.tsx,
   // account-detail.tsx, contact-detail.tsx) or the one still beside "Profile"
   // below: one dialog, two doors onto it, never two competing edit surfaces.
+  // "Change role" no longer sits beside it on the row (see below) — the
+  // pencil's own neighbour is now only the ⋯ menu.
   const [editProfile, setEditProfile] = React.useState(false)
   const name = staffFullName(member)
 
@@ -236,24 +237,28 @@ export function MemberScreen({
   // and against what she asks to KEEP (Remove, "wherever it lives today: menu
   // or button"), the button she means is "Remove from team": the one she is
   // naming by what it does ("for [removing someone from] team"), not by its
-  // exact copy. So it comes OFF the row — the row keeps exactly "Change role"
-  // and the new pencil, matching every other record head (account-detail.tsx,
-  // contact-detail.tsx: one text button, one icon button, then the overflow) —
-  // and Remove moves into the SAME `RecordActionsMenu` those screens already
-  // reach for, its destructive styling and its confirm both untouched. The
-  // recipe itself (`members.remove`, gate and all) is unchanged; only which
-  // component reads it moved.
+  // exact copy. So it comes OFF the row and moves into the SAME
+  // `RecordActionsMenu` those screens already reach for, its destructive
+  // styling and its confirm both untouched. The recipe itself
+  // (`members.remove`, gate and all) is unchanged; only which component
+  // reads it moved.
   //
-  // THE SAME MENU, GROWN A SECOND ENTRY — client ruling, 2026-09-16, verbatim:
-  // "Move the change rule [Change role] also to the three buttons." "Also":
-  // the button on the row stays (`buttonActions` below still carries
-  // `members.changeRole`, untouched), and the ⋯ menu that already held Remove
-  // now offers the same act a second way — the identical pattern the row
-  // itself already carries for the pencil and `StaffProfileDialog` ("one
-  // dialog, two doors onto it", above). Same handler, same recipe action
-  // (`onAction("members.changeRole")` opens the same `RolePickerDialog`),
-  // never a second door.
-  const buttonActions = recipe.actions.filter((a) => a.id !== "members.remove")
+  // "CHANGE ROLE" JOINS IT THERE TOO — client ruling, 2026-09-16, verbatim,
+  // over a screenshot of the row still carrying its own "Change role" button
+  // NEXT TO the ⋯ menu that already held it a second way: "why is it then two
+  // times? Keep only the button on the three buttons, not behind the edit. It
+  // should only be on the three buttons." The 2026-09-16 SESSION BEFORE THIS
+  // ONE had added "Change role" to the ⋯ menu ALONGSIDE the row's own button
+  // — read at the time as "also," which is exactly the "two times" this
+  // ruling corrects. `buttonActions` below now excludes BOTH recipe actions:
+  // neither ever renders as a row button again, and B15 (UI-RULEBOOK)
+  // records the settled shape — Change role lives ONLY inside the three-dot
+  // menu, beside Remove, sharing the identical handler
+  // (`onAction("members.changeRole")` still opens the same `RolePickerDialog`
+  // — never a second door).
+  const buttonActions = recipe.actions.filter(
+    (a) => a.id !== "members.remove" && a.id !== "members.changeRole"
+  )
   const changeRoleRecipeAction = recipe.actions.find((a) => a.id === "members.changeRole")
   const changeRoleGate = changeRoleRecipeAction ? gateState(rights, changeRoleRecipeAction.gate) : "hidden"
   const changeRoleMenuActions: RecordAction[] =
@@ -289,36 +294,17 @@ export function MemberScreen({
   // promise a door that isn't there.
   const canEditProfile = Boolean(rights.staff_profiles?.read && rights.staff_profiles?.update)
 
-  // THE COVER BAND'S OWN PICTURE — C1, client ruling, 16 Sep 2026: "For the
-  // cover, let's try C1. I want this for accounts and members." A member's
-  // cover lives on `staff_profiles`, not on `TeamMember` (`member`, above) —
-  // the same table `StaffPanel` (rendered inside this screen's own
-  // `children`, below) already reads, through the identical cache key
-  // (`staffProfilesKey`). R56: the store dedupes a repeated key, so this is
-  // NOT a second network read — whichever of this hook and `StaffPanel`'s own
-  // mounts first pays for the one request, the other joins it. Gated the same
-  // way `canEditProfile` above already is: no `staff_profiles:read` right, no
-  // read at all — a member without that right on their own team still opens
-  // this page, and the head must not open a door for them the app has
-  // already decided they cannot pass.
-  const mayReadProfile = Boolean(rights.staff_profiles?.read)
-  const profilesQ = useCached<StaffProfile[]>(mayReadProfile ? staffProfilesKey(teamId) : null, () =>
-    content.staffProfiles().then((r) => {
-      primeCache(totalKey("staff_profiles", teamId), r.total)
-      return r.profiles
-    })
-  )
-  const coverUrl = profilesQ.data?.find((p) => p.userId === member.userId)?.coverUrl
-
   return (
     <>
       <RecordScreen
-        // THE COVER BAND — C1, same ruling as the picture below. Full-width,
-        // above the whole head (the B1 mark stays exactly as it is);
-        // `RecordCoverBand` draws the fixed-height band with or without a
-        // picture — a quiet tinted surface when nothing is set, never a hole
-        // and never placeholder text (record-mark.tsx's own doc).
-        cover={<RecordCoverBand picture={coverUrl} />}
+        // NO COVER BAND — C1 shipped 16 Sep 2026 ("For the cover, let's try
+        // C1. I want this for accounts and members.") and was reversed the
+        // same session: "I changed my mind. Let's remove this completely."
+        // `RecordScreen` no longer takes a `cover` prop at all
+        // (record-chrome.tsx's own removal note), so this screen no longer
+        // opens the `staff_profiles` read it used only to feed that band —
+        // `StaffPanel` (rendered inside this screen's own `children`, below)
+        // still reads that table for its own reasons, untouched.
         // THE AVATAR, INLINE LEFT OF THE TITLE — B1, client ruling 2026-09-15:
         // "For cover and logo, I choose B1. Apply this on apps, accounts, and
         // team members." record-chrome.tsx's own `mark` prop doc has the

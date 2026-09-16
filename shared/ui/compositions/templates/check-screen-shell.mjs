@@ -1,26 +1,41 @@
 #!/usr/bin/env node
 /* ============================================================================
-   THE ASIDE SEAM CHECK — pins which edge carries the assistant's bare
-   resize seam, run by `npm run check` beside the token/icon/book checks.
+   THE ASIDE RESIZE ROT CHECK — run by `npm run check` beside the token/icon/
+   book checks.
 
-   WHY THIS EXISTS. The seam (`RESIZE_SEAM` in `screen-shell.tsx`, the
-   invisible 8px grab edge with the hover `cursor-col-resize` arrow) shipped
-   on the aside dock's END inset — the assistant column's outer edge, one
-   gutter short of the window. The client's ruling, 16 Sep 2026: "you put it
-   on the right edge. I want it on the left one, the one that's between the
-   assistant and the main content." The fix moved the one `placement` string
-   on the BARE `EdgeHandle` call (the one rendered only when
-   `!asideHandleOnOpen && isAsideOpen`) from `end-[var(--shell-gutter)]` to
-   `start-0` — the dock's own card-facing padding edge, the seam actually
-   shared with the main content.
+   WHAT THIS USED TO BE. A same-day 2026-09-16 pair of rulings had put a
+   resizable assistant column into this file: `RESIZE_SEAM`, a hover-reveal
+   drag handle on the aside's inner edge, 320/400/520 snap points, and the
+   `asideWidth`/`defaultAsideWidth`/`onAsideWidthChange`/`asideMinWidth`/
+   `asideMaxWidth`/`asideResizeLabel` props that drove them. This script used
+   to pin which edge that seam sat on (`start-0`, not `end-`), after the
+   client corrected its placement once already that day.
 
-   A regressive edit — someone "fixing" a lint warning, a copy-paste of the
-   round handle's own (deliberately END-anchored) placement two blocks up,
-   a merge that resolves the wrong way — would put the seam back on the
-   window edge with no visual difference in a quick review, because the
-   seam paints nothing at rest. This script reads the source text directly
-   (no DOM, no build step) so that regression fails `npm run check` instead
-   of waiting for the next client screenshot.
+   WHY IT IS DIFFERENT NOW. The client's own verdict on the shipped build,
+   later the same day, verbatim: *"Let's forget about the resize. It's a
+   disaster. Remove it."* The seam, its drag/keyboard/snap logic and every
+   prop that controlled it were removed outright — the aside is back to ONE
+   fixed width, `ASIDE_WIDTH` (`23.75rem`, unchanged since before the resize
+   ever existed). A check that still asserted the seam's PLACEMENT would pass
+   trivially once the seam no longer exists at all, which is not the same as
+   asserting the ruling — "remove it" — actually held. So this script now
+   asserts the opposite of what it used to: that every CODE SHAPE the resize
+   feature introduced is absent from this file. A regression that
+   reintroduces any of it — a revert, a bad merge, a well-meaning "let's
+   bring back drag resize" PR that does not also remove this check — fails
+   `npm run check` instead of waiting for the next client screenshot.
+
+   WHY THESE ARE DECLARATION/USAGE SHAPES, NOT BARE WORDS. This file's own
+   house style documents removed features by NAME, in prose, at length —
+   `ASIDE_WIDTH`'s own doc above names `RESIZE_SEAM` and every retired prop
+   to say what it replaced. A bare substring search (`"asideWidth"` anywhere
+   in the file) would fail on that prose the day it was written, which is
+   backwards: the rot this check exists to catch is the CODE coming back, not
+   the sentence that explains why it will not. Every pattern below is
+   therefore shaped like the declaration or call-site syntax the feature
+   actually needs to function — `export const ASIDE_WIDTH_MIN`, `asideWidth?:`
+   as a prop signature, `-[var(--aside-width)]` as a Tailwind arbitrary value —
+   none of which a sentence in a comment has a reason to spell.
    ========================================================================= */
 
 import fs from "node:fs";
@@ -31,53 +46,64 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.join(HERE, "screen-shell.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
+const rel = path.relative(process.cwd(), FILE);
 
-// NOT "THE BARE RESIZE SEAM" alone — that string also opens `RESIZE_SEAM`'s
-// own doc comment, much earlier in the file (the constant's definition, not
-// the JSX call site). This phrase is unique to the JSX comment that sits
-// directly above the `EdgeHandle` call this check pins.
-const ANCHOR = "THE BARE RESIZE SEAM — 2026-09-16, variation A, for the one";
-const anchorIndex = src.indexOf(ANCHOR);
+// Each pattern is a working CODE SHAPE the resize feature needs — a
+// declaration, a prop signature, or a call-site — not a bare identifier, so
+// this cannot fire on the historical prose that names these things while
+// explaining their removal (see the header above).
+const FORBIDDEN = [
+  { name: "ASIDE_WIDTH_MIN", pattern: /\bexport const ASIDE_WIDTH_MIN\b/ },
+  { name: "ASIDE_WIDTH_MAX", pattern: /\bexport const ASIDE_WIDTH_MAX\b/ },
+  { name: "ASIDE_WIDTH_DEFAULT", pattern: /\bexport const ASIDE_WIDTH_DEFAULT\b/ },
+  { name: "ASIDE_WIDTH_SNAP_POINTS", pattern: /\bexport const ASIDE_WIDTH_SNAP_POINTS\b/ },
+  { name: "ASIDE_WIDTH_SNAP_TOLERANCE", pattern: /\bconst ASIDE_WIDTH_SNAP_TOLERANCE\b/ },
+  { name: "ASIDE_RESIZE_KEY_STEP", pattern: /\bconst ASIDE_RESIZE_KEY_STEP\b/ },
+  { name: "ASIDE_RESIZE_DRAG_THRESHOLD", pattern: /\bconst ASIDE_RESIZE_DRAG_THRESHOLD\b/ },
+  { name: "clampAsideWidth(...)", pattern: /\bfunction clampAsideWidth\b/ },
+  { name: "snapAsideWidth(...)", pattern: /\bfunction snapAsideWidth\b/ },
+  { name: "the RESIZE_SEAM constant", pattern: /\bconst RESIZE_SEAM\b/ },
+  { name: "the EdgeHandleResize interface", pattern: /\binterface EdgeHandleResize\b/ },
+  { name: "EdgeHandle's resize prop", pattern: /\bresize\?:\s*EdgeHandleResize\b/ },
+  { name: "EdgeHandle's bare prop", pattern: /\bbare\?:\s*boolean\b/ },
+  { name: "ScreenShellProps.asideWidth", pattern: /\basideWidth\?:\s*number\b/ },
+  { name: "ScreenShellProps.defaultAsideWidth", pattern: /\bdefaultAsideWidth\?:\s*number\b/ },
+  { name: "ScreenShellProps.onAsideWidthChange", pattern: /\bonAsideWidthChange\?:/ },
+  { name: "ScreenShellProps.asideResizeLabel", pattern: /\basideResizeLabel\?:\s*string\b/ },
+  { name: "ScreenShellProps.asideMinWidth", pattern: /\basideMinWidth\?:\s*number\b/ },
+  { name: "ScreenShellProps.asideMaxWidth", pattern: /\basideMaxWidth\?:\s*number\b/ },
+  { name: "the --aside-width custom property in a Tailwind arbitrary value", pattern: /-\[var\(--aside-width\)\]/ },
+  { name: "the --aside-width inline style", pattern: /["']--aside-width["']\s*:/ },
+];
 
-if (anchorIndex === -1) {
-  console.error(`FAIL screen-shell seam check: could not find the ${JSON.stringify(ANCHOR)} block in ${FILE}.`);
-  process.exit(1);
-}
-
-// The EdgeHandle call this comment introduces is a few hundred characters
-// below the anchor; 4000 is generous headroom without risking a match
-// against some unrelated, later `placement=` literal.
-const window_ = src.slice(anchorIndex, anchorIndex + 4000);
-
-const placementMatch = window_.match(/placement="([^"]*)"/);
-
-if (!placementMatch) {
-  console.error(`FAIL screen-shell seam check: no placement=\"...\" found after the ${JSON.stringify(ANCHOR)} anchor.`);
-  process.exit(1);
-}
-
-const placement = placementMatch[1];
 const findings = [];
 
-if (!/\bstart-0\b/.test(placement)) {
-  findings.push(
-    `the bare resize seam's placement is ${JSON.stringify(placement)} — missing \`start-0\`. ` +
-      "The seam must sit on the aside dock's START inset (the card-facing edge, " +
-      "shared with the main content), per the client's 16 Sep 2026 ruling.",
-  );
+for (const { name, pattern } of FORBIDDEN) {
+  if (pattern.test(src)) {
+    findings.push(
+      `${name} is back in ${rel} — the resize feature was ruled out ("Let's forget about the ` +
+        'resize. It\'s a disaster. Remove it.", 16 Sep 2026) and every working trace of it must stay gone.',
+    );
+  }
 }
 
-if (/\bend-/.test(placement)) {
+// THE ASIDE'S OWN WIDTH IS BACK TO THE ONE FIXED LITERAL. Checked positively
+// — not just "the resize is gone" but "the fixed measure is actually there"
+// — because a regression that deletes the feature AND the fallback would
+// pass every check above while drawing a column of width `undefined`.
+if (!/export const ASIDE_WIDTH = "23\.75rem";/.test(src)) {
   findings.push(
-    `the bare resize seam's placement is ${JSON.stringify(placement)} — carries an \`end-\` inset. ` +
-      "That is the window/screen edge, the edge the client explicitly rejected " +
-      '("you put it on the right edge... I want it on the left one").',
+    `ASIDE_WIDTH is not the literal "23.75rem" in ${rel} — that is the fixed width the shell used ` +
+      "before the resize feature (and now, again, permanently).",
   );
 }
 
 if (findings.length > 0) {
-  console.error("FAIL screen-shell seam check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
+  console.error("FAIL screen-shell resize rot check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
 }
 
-console.log(`OK screen-shell seam check: the bare resize seam is pinned to \`${placement}\` (the aside's START edge).`);
+console.log(
+  "OK screen-shell resize rot check: no working trace of the removed resize feature; " +
+    'ASIDE_WIDTH is the one fixed "23.75rem" measure.',
+);

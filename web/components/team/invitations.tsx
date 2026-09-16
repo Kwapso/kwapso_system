@@ -102,7 +102,9 @@ export function InvitationsPanel({ refresh }: { refresh: () => Promise<void> }) 
         title: inv.teamName,
         subtitle: "Invited to join this team.",
         trailing: (
+          // R84 — a list row's own action, not a title component, so black.
           <Button
+            variant="inverse"
             size="sm"
             onClick={() => void accept(inv)}
             disabled={accepting !== null}

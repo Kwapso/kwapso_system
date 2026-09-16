@@ -102,10 +102,6 @@ export {
   ScreenShell,
   RAIL_WIDTH,
   ASIDE_WIDTH,
-  ASIDE_WIDTH_MIN,
-  ASIDE_WIDTH_MAX,
-  ASIDE_WIDTH_DEFAULT,
-  ASIDE_WIDTH_SNAP_POINTS,
 } from "./screen-shell";
 export type { ScreenShellProps, ScreenSpine } from "./screen-shell";
 

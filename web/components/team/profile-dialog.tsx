@@ -149,8 +149,10 @@ export function ProfileDialog({
           </Field>
         </form>
         <SheetFooter>
+          {/* R84 — a dialog's Save, not a title component, so black. */}
           <Button
             type="submit"
+            variant="inverse"
             form="profile-form"
             disabled={busy || !firstName.trim() || !lastName.trim()}
           >

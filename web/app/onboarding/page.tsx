@@ -464,8 +464,10 @@ export default function OnboardingPage() {
               />
             </Field>
 
+            {/* R84 — no title component on an onboarding step, so black. */}
             <Button
               type="submit"
+              variant="inverse"
               className="w-full"
               disabled={busy || !firstName.trim() || !lastName.trim()}
             >

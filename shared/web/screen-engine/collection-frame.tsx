@@ -105,7 +105,15 @@ function createActionButton(action: CollectionCreateAction, className?: string) 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" onClick={action.onCreate} aria-label={action.label} className={className}>
+        {/* R84, 16 Sep 2026 — a toolbar's own create button is not inside a
+            title component, so it is black now, not mango. */}
+        <Button
+          variant="inverse"
+          size="icon"
+          onClick={action.onCreate}
+          aria-label={action.label}
+          className={className}
+        >
           {action.icon}
         </Button>
       </TooltipTrigger>
@@ -288,7 +296,9 @@ export function CollectionEmptyState({
       {(create || importer || clear) && (
         <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
           {create && (
-            <Button onClick={create} className="gap-1">
+            // R84, 16 Sep 2026 — "Add the first" sits in the genuinely-empty
+            // body, never inside a title component, so it is black now.
+            <Button variant="inverse" onClick={create} className="gap-1">
               <Plus className="size-4" />
               {createLabel ?? t("Add the first")}
             </Button>

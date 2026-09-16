@@ -511,7 +511,37 @@ const TAB_ICON_ONLY = cn(
    1` does — only `auto` does not — so the silhouette's `-z-10` stays inside
    its own tab and cannot fall behind whatever the strip was dropped onto.
    That is the promise `CrumbShape`'s own comment makes, and it survives the
-   change unaltered. */
+   change unaltered.
+
+   THIS PAIR IS NO LONGER THE ONLY PLACE THE NUMBER IS WRITTEN — 16 Sep 2026,
+   second correction on this exact silhouette. The `<li>` (`BreadcrumbItem`,
+   the render below) now carries the identical `z-0`/`z-[1]` itself, and that
+   is not a decorative echo. AT REST, WITH NOTHING TRANSFORMED ANYWHERE IN THE
+   STRIP, this pair alone was always sufficient — the reasoning two paragraphs
+   up holds and the client's own screenshot of the STATIC compact strip could
+   not be reproduced against it (measured, not assumed). What breaks it is a
+   TRANSFORM landing on a sibling `<li>` that carries no z-index of its own:
+   `onTabPointerMove`, below, slides every tab a drag has moved past —
+   active or not, dragged or not — by writing a bare `style.transform`
+   straight onto that `<li>`. A transformed element is its own stacking
+   context regardless of its `z-index` (`auto` included), so the MOMENT the
+   live tab is merely shifted out of a dragged neighbour's way, its `z-[1]`
+   here on the link stops competing in the strip's shared context at all —
+   it is sealed inside the `<li>`'s new, unnumbered context, which the OUTER
+   comparison then treats as one opaque box at the "auto" level, tied to
+   every other untransformed rest tab by DOM order alone. A pinned tab drawn
+   AFTER the live one — History, "+", both trailing by design — wins that
+   tie every time: the exact "inactive tab in front of the active one"
+   defect, now reachable without ever dragging the active tab itself. The
+   `<li>`'s own explicit class-level number is what closes it: a flex item
+   of `STRIP`'s `<ol>` takes `z-index` as if positioned (CSS Flexbox), so
+   writing `z-0`/`z-[1]` there needs no `position` of its own, is never
+   touched by a transform (a separate property), and never touched by the
+   one inline `zIndex` the drag handlers DO write (only on the tab actually
+   held) — so it stays explicit and numeric through every shift, and the
+   outer comparison is always a real 1-vs-0, never a DOM-order tie standing
+   in for one. See the `<li>`'s own class list, and `onTabPointerMove`'s
+   comment, for the rest of this. */
 const TAB_REST = cn(
   "z-0",
   "text-ink-secondary font-[var(--font-weight-light)]",
@@ -1322,7 +1352,31 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
            against a `z-0` neighbour — with room held below the card's own
            `z-[2]` (a DOM-order tie there, nav before card, still resolves to
            the card, so a horizontal drag still never paints over content).
-           Cleared with everything else on release, in `releaseTransforms`. */
+           Cleared with everything else on release, in `releaseTransforms`.
+
+           THIS INLINE `"2"` WAS NOT THE WHOLE FIX — 16 Sep 2026, third
+           correction on this exact silhouette, over a screenshot of the
+           STATIC compact strip (no drag in progress at all): "the inactive
+           tabs are overlapping [the active one]." This handler only ever
+           lifts the tab actually held; `onTabPointerMove` below ALSO writes
+           a bare `style.transform` onto every OTHER tab a drag moves past —
+           active or not — with no accompanying z-index, and a transform
+           alone creates a stacking context. So the live tab, merely
+           SHIFTED (never dragged, never touched here), lost its own
+           `z-[1]` the instant it moved: sealed inside a new, unnumbered
+           context, tied on DOM order against a later, untransformed pinned
+           tab, and losing — "inactive in front", reachable without this
+           tab ever being the one under the pointer. The `<li>`'s own class-
+           level `z-0`/`z-[1]` (this render's own className, above the
+           switch on `live`) is what actually closes it: a number that lives
+           on the class rather than an inline style is never cleared or
+           escaped by the plain `transform` `onTabPointerMove` writes, so
+           the shifted tab stays explicitly ranked through the whole
+           gesture. This `"2"` still matters on top of that — it is what
+           lets the HELD tab beat even the live tab's own `z-[1]` while it
+           is being dragged, which the class-level pair alone would not
+           do (1 vs 1 is a DOM-order tie, and the held tab is not always
+           later in DOM). */
         draggedEl.style.zIndex = "2";
       },
       [onReorder, isMovable, movableRange],
@@ -1330,7 +1384,16 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
 
     /* TRACK. Every call is one `pointermove`; nothing here waits for a
        frame, because a dragged tab that lags the pointer by even one frame
-       is exactly the "confusing" `onReorder`'s own ruling is about. */
+       is exactly the "confusing" `onReorder`'s own ruling is about.
+
+       EVERY OTHER TAB THIS GESTURE SHIFTS (below, `drag.others.forEach`)
+       gets a bare `style.transform` and NO inline z-index — deliberately:
+       the `<li>`'s own class-level `z-0`/`z-[1]` (the render's className,
+       above) is what has to hold the shifted tab's rank now, precisely
+       because a transform alone would otherwise seal whatever z-index the
+       INNER link carries into a context this outer comparison cannot see
+       into. See that class's own comment, and `onTabPointerDown`'s, for
+       the failure this replaced. */
     const onTabPointerMove = React.useCallback((event: React.PointerEvent<HTMLLIElement>) => {
       const drag = dragRef.current;
       if (!drag || event.pointerId !== drag.pointerId) return;
@@ -1872,6 +1935,45 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                   }
                   className={cn(
                     "shrink-0",
+                    // THE SILHOUETTE'S OWN STACKING AUTHORITY LIVES HERE, ON
+                    // THE `<li>` — NOT ONLY ON THE INNER LINK/BUTTON. Client,
+                    // 16 Sep 2026, over a screenshot of the compact assistant
+                    // strip: "the inactive tabs' shape appears in front of
+                    // the active one. That's wrong. It should be behind."
+                    // `TAB_REST`/`TAB_LIVE`'s own `z-0`/`z-[1]` (below, on the
+                    // link) already answer this AT REST WITH NO TRANSFORM
+                    // ANYWHERE IN THE STRIP — that inner z-index escapes this
+                    // `<li>` (which carries no z-index of its own here) and
+                    // compares directly against every other tab's inner
+                    // z-index in the strip's own stacking context, no matter
+                    // how deep the DOM nesting, PROVIDED nothing between the
+                    // link and that shared context ever becomes a stacking
+                    // context itself. Something does: `onTabPointerMove`
+                    // writes a bare `style.transform` onto every tab a drag
+                    // carries PAST — the active tab included, whether or not
+                    // it is the one being dragged — and a transformed element
+                    // is a NEW stacking context by itself, `z-index: auto` or
+                    // not. That traps the shifted tab's inner `z-[1]` inside
+                    // a box the outer context now sees as one opaque unit at
+                    // the "auto" level, tied on DOM order alone against any
+                    // LATER, untransformed rest tab — which is exactly the
+                    // "inactive in front of active" defect, reproduced by a
+                    // drag that never touches the active tab directly. A
+                    // `<li>` is a flex item of `BreadcrumbList`'s own `<ol>`
+                    // (`STRIP`'s `flex`), so `z-index` applies to it exactly
+                    // as if it were `position: relative` — CSS Flexbox §z-
+                    // index — with no `position` needed on this element for
+                    // that alone. Written here as a CLASS (never touched by
+                    // the drag handlers, which only ever write `transform`
+                    // and, on the one currently held, an inline `zIndex`),
+                    // this number cannot be trapped: it stays explicit and
+                    // numeric on every tab, transformed or not, dragged or
+                    // shifted or neither, so the outer comparison is always a
+                    // real 1-vs-0 rather than a DOM-order tie-break in
+                    // disguise. `onTabPointerDown`'s own inline
+                    // `style.zIndex = "2"` on the tab actually held still
+                    // wins over both — see that handler's comment.
+                    live ? "z-[1]" : "z-0",
                     closable && "group relative",
                     // `touch-action: none` ONLY on a movable tab, and only
                     // because it is one: without it a touch drag along the

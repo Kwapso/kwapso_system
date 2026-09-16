@@ -21,8 +21,25 @@
 // (closed) is `shipped`; "Maintenance" (still live, still healthy) is `done`.
 //
 // THE TIERING IS THE SAME SHAPE AS APP-STAGES.TS, READ ACROSS BOTH TRACKS:
-//   archived  — nothing has happened yet (App's "Not started"; a ticket just
-//               raised and unread; a story nobody has picked up).
+//   blocked   — nothing has happened yet, and RED — a ticket just raised and
+//               unread, a story nobody has picked up. AMENDED 16 SEP 2026
+//               EVENING, client ruling, verbatim: "let's do red for: apps
+//               not started, tickets new, stories open." The six-value
+//               `DotTone` this file returns has no literal named `red` (that
+//               spelling is `PriorityTone`'s, `shared/departments.ts`) — the
+//               red hue is `blocked`'s: `--dot-blocked` and `--dot-red` both
+//               resolve to `--kw-poppy`/`--destructive` (`shared/ui/
+//               foundations/tokens/tokens.css`), the same pairing `shared/
+//               app-stages.ts`'s own header states for its own eight. So
+//               "the red tone" for a `HelpStatus`/`StoryStatus` IS `blocked`
+//               — the same tone this file's tail note already keeps defined
+//               for the "stuck on somebody outside the team" reading, now
+//               with a second, unrelated caller the same way `shipped`/
+//               `done` already share one hex for two meanings below. This
+//               also makes `new`/`open` agree, literally, with App's own
+//               "Not started" (`APP_STAGES[0].dotTone`, already `blocked`)
+//               rather than only rhyming with it in tier the way the two
+//               used to before this ruling.
 //   review    — a person needs to look at it, or has just started to (App's
 //               "Blueprint", still being scoped; a ticket somebody has read
 //               but not yet scheduled; a story somebody has asked to be
@@ -35,13 +52,25 @@
 //               story closed but nobody has told the client).
 //   shipped   — closed out, successfully (App's "Completed"; a ticket that
 //               has been answered; a story the reviewer signed off).
-//   blocked   — stuck on somebody OUTSIDE the team, and the one tone this
-//               file uses that app-stages.ts never needed, because an app
-//               has nobody to wait on but the team itself.
+//   archived  — put away, done with. NOTHING IN THIS FILE ASSIGNS IT ANY
+//               MORE as of the same 16 Sep 2026 ruling — the client's other
+//               half of it, verbatim: "let's always assign gray to
+//               archived", read together with the red sentence above, is
+//               what MOVED `new`/`open` off this tone rather than leaving
+//               them grey: grey is for a record that really is archived
+//               (App's own `Archived` stage still reads it, unchanged), not
+//               for one that merely has not started. The tone stays in the
+//               `DotTone` union and in `Badge`'s own six — a `HelpStatus` or
+//               `StoryStatus` that is archived in the ordinary English sense
+//               does not exist today, so nothing here claims it, the same
+//               "defined, nothing here returns it" shape `blocked` itself
+//               used to be in (below) before this same ruling gave it back
+//               a caller.
 //
-// NOTHING IN THIS FILE ANSWERS `blocked` ANY MORE, AND THE TIER IS STILL NOT
-// DEAD — read this before deleting it. It lost its last answer in two steps, and
-// both were the client's.
+// NOTHING IN THIS FILE ANSWERED `blocked` FOR A WHILE, AND THE TIER WAS NEVER
+// DEAD — read this before assuming a tone with no caller is safe to delete.
+// It lost its last answer in two steps, both the client's, and got a new one
+// in a third.
 //
 //   7 Sep 2026 — she retired `awaiting_validation`, the stage where she had not
 //   said yes yet (shared/types.ts, `HELP_STATUSES`, carries her sentence). The
@@ -55,13 +84,23 @@
 //   should have no color". The ticket board's column heads were that function's
 //   only caller, so it is gone too (the note where it stood says the rest).
 //
-// `blocked` therefore remains a TONE this file defines and nothing here returns:
-// it is one of the kit's six, `DOT_TONE_FILL` on the tickets screen still maps
-// it because that map is a total `Record<DotTone, …>` on purpose, and the
-// DEFINITION is what the next multi-stage lifecycle will need. The tier never
-// depended on the stage, which is why it survives it intact: "stuck on somebody
-// OUTSIDE the team" described `awaiting_validation` and describes the waiting
-// predicate at least as exactly.
+//   16 Sep 2026 EVENING — the red ruling quoted above gave `blocked` a caller
+//   again, `HELP_STATUS_DOT_TONE.new` and `STORY_STATUS_DOT_TONE.open`, for a
+//   reading that has nothing to do with "stuck on somebody outside the team":
+//   a ticket just raised has nobody to be stuck on yet. Two unrelated
+//   meanings sharing one tone is not new to this file — `shipped`/`done`
+//   already do it for the same reason a six-tone kit is asked to colour more
+//   than six ideas — so this is the third caller-count change to `blocked`
+//   in this file's life (an answer, then none, then a different answer), not
+//   a fourth tone hiding behind the same name.
+//
+// `blocked` was, for nine days, a TONE this file defined and nothing here
+// returned — `DOT_TONE_FILL` on the tickets screen still mapped it in that
+// window only because that map is a total `Record<DotTone, …>` on purpose.
+// The "stuck on somebody OUTSIDE the team" reading is unchanged and still
+// exactly what `awaiting_validation` meant and what the waiting predicate
+// means now; it is simply no longer the only reason this file hands the tone
+// out.
 import type { DotTone } from "./app-stages"
 import type { HelpStatus, StoryStatus } from "./types"
 
@@ -77,8 +116,11 @@ import type { HelpStatus, StoryStatus } from "./types"
  * web/components/tickets/ticket-stages.tsx), so a retired stage needs no row here and
  * adding one back would re-open the `Record` to a word no chip can be handed. */
 const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
-  // Raised, nobody has read it yet — the "Not started" tier.
-  new: "archived",
+  // Raised, nobody has read it yet — the "Not started" tier, RED since the
+  // 16 Sep 2026 evening ruling quoted at the top of this file ("tickets
+  // new" is one of her three). `blocked` is the tone that carries red in
+  // this six-value union — see that ruling's own paragraph for the hex.
+  new: "blocked",
   // Read and sorted, not yet scheduled — the "somebody is looking at this"
   // tier, same as an app still being scoped.
   triaged: "review",
@@ -126,8 +168,11 @@ export function helpStatusDotTone(status: HelpStatus): DotTone {
 /** A STORY'S FOUR STAGES → THE CHIP'S DOT. Same `Record` shape, same reason:
  * a fifth `StoryStatus` fails here rather than rendering silently. */
 const STORY_STATUS_DOT_TONE: Record<StoryStatus, DotTone> = {
-  // Written down, nobody has started — the "Not started" tier.
-  open: "archived",
+  // Written down, nobody has started — the "Not started" tier, RED since the
+  // 16 Sep 2026 evening ruling quoted at the top of this file ("stories
+  // open" is the third of her three). `blocked` carries red in this
+  // six-value union — see that ruling's own paragraph for the hex.
+  open: "blocked",
   // A timer started on it.
   in_progress: "building",
   // "Ready for review" was pressed — literally the tone's own name.

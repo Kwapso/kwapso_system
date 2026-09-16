@@ -194,6 +194,94 @@ describe("AgentTabStrip", () => {
 // actually lands there: render the real kit composition with this app's real
 // strip as its `asideTabs` and read the aside's own DOM, rather than trusting
 // either file's comments.
+// DRAG-TO-REORDER — client ruling, 16 Sep 2026, the second of the day on the
+// kit's `BreadcrumbFolders`: "go with the drag order" (native HTML5 first),
+// corrected the same day to Chrome's own pointer-driven model ("Research and
+// implement that", quoted in full in that file's own `onReorder` doc). Kit
+// v1.2.95 added the prop; `agent-tab-strip.tsx` forwards it straight through
+// (`onReorder={onReorder}` on `BreadcrumbFolders`) and marks History/"+"
+// `closable: false` — the SAME field the kit's own `isMovable` gate reads
+// (`items[index]?.closable !== false`), so proving `closable: false` here (as
+// the tests above already do, at the close-button level) is proving the drag
+// gate too, not a second fact to separately pin.
+describe("drag-to-reorder — client ruling, 16 Sep 2026 (\"go with the drag order\")", () => {
+  it("only conversation tabs carry the kit's drag handle; History and \"+\" never do", () => {
+    render(<AgentTabStrip {...baseProps()} onReorder={vi.fn()} />)
+    const items = document.querySelectorAll('[data-slot="breadcrumb-item"]')
+    // Conversation (a) · Beringer (b) · History · "+" — nothing else here.
+    expect(items).toHaveLength(4)
+    const [a, b, history, plus] = Array.from(items)
+    expect(a.className, "a real conversation tab is a drag source").toMatch(/motion-drag/)
+    expect(b.className, "so is a background conversation tab").toMatch(/motion-drag/)
+    expect(history.className, "the pinned History tab is never a drag source").not.toMatch(/motion-drag/)
+    expect(plus.className, "neither is the pinned \"+\"").not.toMatch(/motion-drag/)
+  })
+
+  it("with no onReorder given, nothing in the strip carries the drag handle", () => {
+    render(<AgentTabStrip {...baseProps()} />)
+    const items = document.querySelectorAll('[data-slot="breadcrumb-item"]')
+    for (const item of Array.from(items)) {
+      expect(item.className).not.toMatch(/motion-drag/)
+    }
+  })
+
+  it("dragging a conversation tab past its neighbour reorders the conversations, and the move never reaches History/\"+\"'s slots", () => {
+    const onReorder = vi.fn()
+    const three: AgentTab[] = [
+      { id: "a", threadId: "t-a", scope: "everything", label: "Conversation" },
+      { id: "b", threadId: "t-b", scope: "record", label: "Beringer", recordLabel: "Beringer" },
+      { id: "c", threadId: "t-c", scope: "everything", label: "Chalmers" },
+    ]
+    render(<AgentTabStrip {...baseProps()} tabs={three} onReorder={onReorder} />)
+
+    // jsdom lays out nothing at all — the kit's own drag maths reads
+    // `getBoundingClientRect`, so the geometry it needs is stubbed by hand.
+    // a · b · c · History · "+", 100px tabs with a 10px seam between them;
+    // History and "+" are never actually read (`movableRange` stops the walk
+    // at the first pinned neighbour, index 2), so their numbers here are
+    // arbitrary.
+    const items = Array.from(document.querySelectorAll('[data-slot="breadcrumb-item"]')) as HTMLLIElement[]
+    expect(items).toHaveLength(5)
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, width, top: 0, bottom: 0, height: 0, x: left, y: 0, toJSON: () => ({}) }) as DOMRect
+    const lefts = [0, 110, 220, 330, 400]
+    const widths = [100, 100, 100, 60, 60]
+    items.forEach((li, i) => {
+      vi.spyOn(li, "getBoundingClientRect").mockReturnValue(rect(lefts[i], widths[i]))
+    })
+    const strip = items[0].closest("ol")
+    expect(strip, "BreadcrumbList renders an <ol>, which is what the kit measures the run against").toBeTruthy()
+    vi.spyOn(strip as HTMLOListElement, "getBoundingClientRect").mockReturnValue(rect(0, 500))
+    // jsdom implements neither of these (a real engine gap the kit's own
+    // pick-up handler already guards with a try/catch) — a bare stub is
+    // enough to let the gesture actually start.
+    const draggedEl = items[0] as unknown as {
+      setPointerCapture: (id: number) => void
+      releasePointerCapture: (id: number) => void
+      hasPointerCapture: (id: number) => boolean
+    }
+    draggedEl.setPointerCapture = () => {}
+    draggedEl.releasePointerCapture = () => {}
+    draggedEl.hasPointerCapture = () => true
+
+    fireEvent.pointerDown(items[0], { button: 0, pointerId: 1, clientX: 50 })
+    fireEvent.pointerMove(items[0], { pointerId: 1, clientX: 165 })
+    fireEvent.pointerUp(items[0], { pointerId: 1, clientX: 165 })
+
+    expect(onReorder).toHaveBeenCalledTimes(1)
+    const [fromIndex, toIndex] = onReorder.mock.calls[0] as [number, number]
+    expect(fromIndex).toBe(0)
+    // A REAL MOVE AMONG CONVERSATIONS, AND NOTHING PAST THEM. `movableRange`
+    // never lets the run reach History (index 3) or "+" (index 4) — the
+    // strongest proof of that is algebraic, not a pixel-perfect one: `toIndex`
+    // is `min + target`, where `target` counts only the OTHER tabs in the
+    // movable run (here, at most Beringer and Chalmers), so it can never
+    // name a pinned tab's slot regardless of how far the pointer travels.
+    expect(toIndex).toBeGreaterThan(0)
+    expect(toIndex).toBeLessThan(three.length)
+  })
+})
+
 describe("AgentTabStrip mounted as ScreenShell's asideTabs", () => {
   it("the aside draws exactly one tab strip — the app's own, never the kit's fixed one nested beside it", () => {
     const { container } = render(

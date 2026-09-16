@@ -808,7 +808,25 @@ kept tab).
 
 ### L17: the assistant resizes from its own left edge, never the screen's right one
 
-**The rule.** The client's ruling, 16 Sep 2026, verbatim, over the shipped seam: *"Okay,
+> **SUPERSEDED, 16 Sep 2026, EVENING — THE RESIZE FEATURE ITSELF IS GONE.** The client's
+> ruling, verbatim, over the shipped build: *"Let's forget about the resize. It's a
+> disaster. Remove it."* Not disabled — removed: the kit's `ScreenShellProps` drops the
+> whole `asideWidth`/`defaultAsideWidth`/`onAsideWidthChange`/`asideMinWidth`/
+> `asideMaxWidth`/`asideResizeLabel` API, the invisible `RESIZE_SEAM` grab and its
+> hover-reveal `cursor-col-resize` arrow, `EdgeHandle`'s drag logic
+> (`dragMoved`/`dragStart`/`nextWidth`, the pointer/keyboard wiring, the `role="slider"`),
+> and the four constants + two functions that governed it (`ASIDE_WIDTH_MIN/MAX/DEFAULT/
+> SNAP_POINTS`, `clampAsideWidth`, `snapAsideWidth`) — deleted, not kept unused. The aside
+> column is back to **one fixed width, `ASIDE_WIDTH` = `23.75rem`** (kit v1.2.100) — the
+> same measure the shell drew before L14 ever touched this file. Everything else about the
+> aside (open/close, `asideTabs`, `onCloseAll`, `asideHandleOnOpen={false}`) is untouched.
+> This rule's own correction (which edge the seam sat on) no longer applies to anything —
+> there is no seam. L14's snap-point ruling is retired with it. Kit's own
+> `compositions/templates/check-screen-shell.mjs` was REWRITTEN, not deleted: it now
+> asserts no trace of the resize feature has come back and that `ASIDE_WIDTH` is still the
+> literal `"23.75rem"`.
+
+**The rule, as it stood before 16 Sep 2026 evening.** The client's ruling, 16 Sep 2026, verbatim, over
 that's the behavior I want, but right now you put it on the right edge. I want it on the
 left one, the one that's between the assistant and the main content, obviously."* The
 draggable seam L14 describes is the assistant column's own left/start edge — the boundary
@@ -849,6 +867,46 @@ folder shape may not overlap the active tab's edge and read as sitting in front 
 (`TAB_LIVE`/`TAB_REST`), not a registry law here — `web/test/agent-tab-strip.test.tsx`
 asserts the active tab carries the higher z-index in both the content and the assistant
 strip's compact form.
+
+**AMENDED 16 Sep 2026, evening, kit v1.2.100 — the fix above was correct and incomplete.**
+The client's ruling, verbatim, over a screenshot of the compact assistant strip, after the
+first fix had shipped: *"the shape is not behind. That's wrong. The inactive tabs are
+overlapping."* The STATIC pair (`TAB_REST`'s `z-0` / `TAB_LIVE`'s `z-[1]`, on the inner
+link/button `CrumbShape` draws inside) was genuinely correct for the cases it was checked
+against and stayed correct. The gap neither reading could see: `onTabPointerMove`'s own
+`drag.others.forEach` writes a bare `style.transform` onto every OTHER movable tab a drag
+has moved past — active or not — with no z-index of its own, and a `transform` alone
+creates its own stacking context regardless of `z-index`. So the instant the active tab is
+merely SHIFTED out of a dragged neighbour's way (never itself dragged, never under the
+pointer), its `z-[1]` — on the link — is sealed inside a stacking context the strip's own
+comparison can no longer see into, and the outer comparison falls back to DOM order against
+a later, untransformed sibling — a pinned tab (History, "+") is *always* later, by design.
+That DOM-order tie is "the inactive tab in front," reproduced without the active tab ever
+being the one a reader drags. **Fixed by moving the authoritative number from the button to
+the `<li>`** — the element that owns the whole silhouette, shoulders included:
+`BreadcrumbItem`'s own className now carries `live ? "z-[1]" : "z-0"` directly, on every
+tab, so the number survives a bare `transform` no matter which sibling it sits on. Proved
+red-then-green in `verify/breadcrumb-folder/` (`tabset-shift-probe`): a real synthetic drag
+shifts the active tab without holding it, and the `<li>`'s own z (not the link's) is read
+against a trailing pinned tab's — `"1" > "0"` mid-shift, where it used to tie at `"auto"`.
+
+### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Recreate the drag behavior on
+the assistant. However, you can only drag chats, not the history or the plus. They are
+always at the far right."* L18's Chrome-style pointer drag (follow the pointer 1:1, no
+easing, neighbours slide live to open the drop slot) is wired onto `AgentTabStrip`
+(`web/components/assistant/agent-tab-strip.tsx`) through the kit's own `onReorder` prop —
+the same mechanism the content strip already uses, not a second one. Only a real
+conversation tab is a drag source or a landing slot; the pinned History clock and the "+"
+both carry `closable: false`, which the kit's own `movableRange()` already reads to stop
+the contiguous movable run at the first pinned neighbour — so they need no bookkeeping of
+their own to stay put. History sits immediately left of "+", and both sit last, trailing
+every conversation tab, on both ends of any drag.
+
+**Law.** None registered — the drag mechanism itself is the kit's (L18's own account and
+test); `web/test/agent-tab-strip.test.tsx` pins History/"+" as non-draggable, always-last
+tabs on the assistant strip specifically.
 
 ---
 
@@ -1169,19 +1227,76 @@ derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value
 
 ### D16: a record's cover is a band above the head, on accounts and members
 
-**The rule.** The client's ruling, 16 Sep 2026, choosing from a mocked artifact: *"For the
-cover, let's try C1. I want this for accounts and members."* A cover band renders above the
-B1 head (the record's mark inline with the title) on an account's and a member's own detail
-screen: a fixed-height band, `object-cover` (R60 — never shrunk to fit), a quiet tint fill
-and no placeholder image when the record carries no cover.
+> **RETIRED, 16 Sep 2026, same session.** The client's ruling, verbatim, reversing her own
+> C1 pick above: *"I changed my mind. Let's remove this completely."* The cover band is gone
+> from both screens — `RecordScreen`/`RecordChrome` no longer take a `cover` prop at all
+> (`record-chrome.tsx`'s own removal note), and neither `account-detail.tsx` nor
+> `member-screen.tsx` renders one above the head any more. **What stays:** migration 0102's
+> `staff_profiles.cover_url` column, and the accounts table's own equivalent — the data
+> survives even though no head band reads it that way, and `account-detail.tsx`'s
+> pre-existing Overview-tab `RecordCover` still reads `account.coverUrl` lower on the page,
+> unrelated to this ruling. Nothing else about B1 (the record's mark inline with the title,
+> client ruling 2026-09-15, applied on apps, accounts and team members) is touched — that
+> stands on its own and is not what got removed here.
 
-**The mechanism.** `RecordCoverBand`, drawn through the kit's own banner slot. Set the same
-way the logo/avatar already is, from the record's own edit door — no separate upload
-surface. `staff_profiles.cover_url` is added by migration 0102; the accounts table's own
-equivalent column follows the same shape.
+**The rule, as it stood before removal.** The client's ruling, 16 Sep 2026, choosing from a
+mocked artifact: *"For the cover, let's try C1. I want this for accounts and members."* A
+cover band renders above the B1 head (the record's mark inline with the title) on an
+account's and a member's own detail screen: a fixed-height band, `object-cover` (R60 —
+never shrunk to fit), a quiet tint fill and no placeholder image when the record carries no
+cover.
 
-**Law.** None registered — the band and the migration are the mechanism; nothing censuses
-it yet.
+**The mechanism, as it stood.** `RecordCoverBand`, drawn through the kit's own banner slot.
+Set the same way the logo/avatar already is, from the record's own edit door — no separate
+upload surface. `staff_profiles.cover_url` was added by migration 0102; the accounts
+table's own equivalent column followed the same shape.
+
+**Law.** None registered — the band was never censused, and neither is its absence.
+
+### D17: a status colour means one thing everywhere, dots are always solid, and a department is told apart by an icon, never a hue
+
+**The rule.** Five of the client's own rulings, 16 Sep 2026, verbatim, read together as one
+palette: *"let's always assign gray to archived."* *"let's do red for: apps not started,
+tickets new, stories open."* *"For inputs waiting, let's use orange."* *"The departments
+have no color, so remove it from here. What they have is an icon."* *"All dots are always
+solid, not rings."* `shared/status-tones.ts` is the one file that answers "which of
+`Badge`'s six dot tones does this status get" for the ticket (seven stages) and story (four)
+lifecycles, read alongside `shared/app-stages.ts` for an app's own stages — never a bespoke
+colour picked per screen. One meaning per hue, across every lifecycle this app colours:
+**red** (`blocked`) — nothing has happened yet (an app not started, a ticket just raised, a
+story nobody has picked up); **orange** — booked in and waiting on somebody (an input the
+account owes us draws the kit's own `warning` badge tone, `inputs-screen.tsx`'s
+`waitingBadge`, the same orange as `--dot-orange` even though it is spelled through the
+Badge tone rather than a `DotTone` literal); **charcoal** (`building`) — actively under way;
+**sky** (`review`) — needs a look; **purple** — validation; **green** (`shipped`/`done`) —
+finished, closed out or still live and healthy; **grey** (`archived`) — put away, done with,
+and ONLY for a record that is really archived, never for one that merely has not started. A department
+(`shared/departments.ts`) carries none of these — `DepartmentStyle.color` is deleted, not
+merely unread, and a department is told apart by its own Phosphor icon
+(`departmentIconName`) instead. Every dot this app draws is a solid fill
+(`Badge`'s own `DOT_FILL`, `size-[var(--dot-status)] rounded-pill`) — never a ring, never an
+outline standing in for a status.
+
+**Where this reaches today.** `HELP_STATUS_DOT_TONE`/`STORY_STATUS_DOT_TONE`
+(`shared/status-tones.ts`) resolve `new`/`open` to `blocked` (red) and archived states to
+`archived` (grey); `inputs-screen.tsx`'s `waitingBadge` resolves the Waiting view to
+`warning` (orange), Overdue to `destructive`; `shared/departments.ts` exposes `icon` only,
+no colour; every dot Badge renders (`variant="status"`) is a filled circle by construction —
+there is no ring variant to reach for by mistake.
+
+**Not yet ruled.** `shared/app-stages.ts`'s own eight-rung app-status ladder is mid-redesign
+(see CLAUDE.md's "Vocabulary settled 16 Sep 2026" note — App status is pending the client's
+final pick and is derived from waves/sprints except Archived, which is still set by hand).
+Of the rung colours discussed with her, **Not started (red), Validation (purple),
+Refinements (blue), Live (green) and Archived (grey) are RULED**; **Planned (orange) and In
+audit / In plan / In build (all charcoal) are PROPOSED, not yet built** — named here so the
+next reader does not re-litigate the ruled half or silently ship the proposed half as if she
+had signed off on it.
+
+**Law.** None registered — `shared/status-tones.ts` and `shared/departments.ts` are the
+mechanism; R32 (`closed-palette`) already forbids a hex/Tailwind-ramp literal standing in
+for either, which is the adjacent check that would catch a colour reintroduced by the back
+door.
 
 ---
 
@@ -2608,6 +2723,17 @@ the same as the Account and Role columns beside it.
 **Law.** None registered — a column addition to an existing `<RecordTable>`, held to R82's
 six-column ceiling like any other (see K32).
 
+**AMENDED, 16 Sep 2026, same day — the column is a dot, not a full pill.** Read together
+with the automations ruling below (B11): *"For contacts, portal: no portal, same as with
+automations. Let's switch the design to the color dot. Portal: make it green, and no
+portal: gray."* — and, the same breath, *"All dots are always solid, not rings."* The
+Portal column now draws `<Badge variant="status" dot="shipped">` (green, "Portal") for a
+live grant and `<Badge variant="status" dot="archived">` (grey, "No portal") for none
+(`shapeContactsTable`, `web/components/deep-link/shape.tsx`) — the same shape the
+automations status cell below moved to, and the same D17 tone table (`shipped` = green,
+`archived` = grey). Still unsortable, still gated on `portal_users:read`, still one column
+of the six.
+
 ### K32: a table row holds at most six columns — the seventh goes on a second line, never squeezed onto the end
 
 **The rule.** The client's ruling, 16 Sep 2026, over the Waves List view: *"the right side
@@ -2635,6 +2761,15 @@ column list built by `.map()` over a config array (Tasks, Stories, Contacts' own
 object literals at all, and its own ceiling is the recipe's `fields` array.
 
 **Law.** [R82](../RULES.md) (`table-column-budget`), `web/test/table-column-budget.test.ts`.
+
+**AMENDED, 16 Sep 2026, same day — the final column order, named exactly.** The client's
+ruling, verbatim, over the fixed List view: *"this is the order of the columns that I want:
+1. Wave 2. Status 3. Sprints 4. Start 5. Account."* `waveListColumns`
+(`web/components/work/waves-screen.tsx`) now returns exactly those five, in that order —
+Wave, Status, Sprints, Start, Account — one under the six-column ceiling with room to
+spare. **End is dropped** (the sixth column the pre-fix table also carried is gone rather
+than kept and squeezed); **App still rides the Account cell's own second line** the way
+this rule's own fix above already prescribed, never a column of its own.
 
 ### K33: the gap above a toolbar equals the gap below it — the tab strip and its card share one gapless column
 
@@ -2666,6 +2801,37 @@ named in `TOOLBAR_LEAD_GAP_EXEMPT` with the real reason.
 
 **Law.** [R83](../RULES.md) (`toolbar-lead-gap`), `web/test/toolbar-lead-gap.test.ts`.
 **AMENDED 16 Sep 2026, same day, measured on staging:** the wrapper census above was not the whole gap — a `<CollectionCard>` hosting a toolbar as its first child ALSO spent `CardContent`'s own leading inset on top of the strip's `pb-[var(--tab-content-gap)]`. Tasks measured 52px above the toolbar against 20px below; Settings › Team › Members and Contacts measured 44px above against 20px below. Fixed once in `web/app/globals.css`: `.pinned-strip + [data-slot="card"]` zeroes both the card's real `padding-top` and the R63 `--pinned-lead` property together, so above = below = 20px on every screen. Proved by `web/test/toolbar-lead-gap-card.test.tsx`.
+
+**AMENDED A SECOND TIME, 16 Sep 2026, evening, by the client's own reaction to the
+flush-zero fix.** Her ruling, verbatim: *"I'm not happy about this. It doesn't look good.
+Can we do an in-between with what it was and what it is now? Also, make sure it's the same
+on every page. I don't understand how task was 52 and setting and contacts were 44. It
+should be the fucking same everywhere."* Flush-zero (above = below = 20px) proved the
+double-payment was gone and was never itself the target — the law now is: **above a
+toolbar = `--toolbar-lead-gap` (32px, the scale's own `--space-7`) on every screen; below =
+20px (`--toolbar-content-gap`, untouched)**, the in-between she asked for. One new token,
+`--toolbar-lead-gap: var(--space-7)` (`web/app/globals.css`, beside `--tab-content-gap`/
+`--toolbar-content-gap`). The strip above a toolbar still pays `--tab-content-gap` (20px) as
+its own trailing padding; the card pays only what is left,
+`calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` (12px), on both
+`[data-slot="card-content"]`'s real `padding-top` and the R63 `--pinned-lead` property
+beside it — the same two-halves-together reasoning as the first amendment, now paying a
+remainder rather than zero. `web/test/toolbar-lead-gap-card.test.tsx` proves the token, the
+exact `calc()` on both properties, and every `renderFolderTabs(` call site the rule
+reaches, off the disk rather than a hand-typed list.
+
+### K34: the Accounts collection strip is Active · Inactive · All, defaulting to Active
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"For account status, let's keep
+active, inactive, and all."* The Accounts collection's own tab strip narrows to exactly
+those three — Active, Inactive, All — the same three-state shape (a partition, its
+complement, and the unfiltered whole) other collections in the app already draw, opening on
+**Active** by default. Held to the same `{ field: "archived", label: "Status", options:
+ACCOUNT_STATUS }` facet the strip already read from (`accounts-screen.tsx`), so a filter a
+reader sets elsewhere in the app agrees with the strip rather than arguing with it.
+
+**Law.** None registered — a tab-strip content change on an existing `TabsView` mounting,
+held to the library-tabs rule (R3) like any other.
 
 ---
 
@@ -3025,6 +3191,19 @@ A row in the Automations list opens a DETAIL sheet showing the automation (chip 
 Edit pencil top-right like a record head, description, module), and tapping Edit swaps the
 same sheet to the form mode for editing.
 
+**AMENDED, 16 Sep 2026, same evening — the filled pill above is a dot now.** The client's
+ruling, verbatim: *"For automations, let's change the full color pill to also be a dot.
+Inactive gets gray, and active gets green."* Read the same session as *"All dots are always
+solid, not rings."* The Automations list's status cell (`module-automations.tsx`'s own row
+mapper) now draws `<Badge variant="status" dot={AUTOMATION_STATUS_DOT[status]}>` in place of
+the filled `AUTOMATION_STATUS_VARIANT` pill: `shipped` (green) for Active, `archived` (grey)
+for Inactive — both her exact words — and `building` (charcoal) for Protected, which she did
+not name (flagged in `automation-edit-sheet.tsx`'s own header for her next pass, and see
+D17). **This is scoped to the Automations LIST only** — the Choices table's own status cell
+(`deep-link/shape.tsx`) still draws the untouched filled pill through
+`AUTOMATION_STATUS_VARIANT`, a different screen, out of this ruling's reach. K31's Contacts
+Portal column moves to the identical dot shape the same session; see K31's own amendment.
+
 **Badge status fill (16 Sep 2026):** *"go for the kit fix"* — client. The `status` variant never drops its neutral fill; the dark-mode "building → mango" clause is gone (kit v1.2.96).
 
 **Re-explained, 16 Sep 2026, pending her validation.** Both the Automations tab and the
@@ -3171,22 +3350,35 @@ written beside it.
 
 ### B14: a toolbar button is always a filled circle; the CREATE button is mango; the gear and every other icon button are beige
 
-**The rule.** *"The settings gear should never be mango. Make it with a beige background."*
+> **SUPERSEDED ON COLOUR, 16 Sep 2026 evening — the CREATE button is black now, not
+> mango.** The client's ruling, verbatim: *"Let's revisit the rule of only one mango
+> button per screen. Only mango buttons on the title level. Title means the title
+> component on top. Only those can be mango, the others black."* A toolbar is never
+> the title component (see B17), so `AddButton` (`web/components/deep-link/
+> screen-bits.tsx`) draws `variant="inverse"` now — the SAME beige-adjacent black
+> the settings gear already used, not the mango this section's own next paragraph
+> describes. The SHAPE below (filled circle, gear and every other icon button
+> `secondary`) is unchanged; only the CREATE button's colour moved, from the
+> library's bare `default` to `inverse`. Registered as R84.
+
+**The rule, as it stood before 16 Sep 2026.** *"The settings gear should never be mango.
+Make it with a beige background."*
 — client, 15 Sep 2026, over a screenshot of Tasks' heading where the gear was drawn with the
 default mango fill. The CREATE button ("`+`" `AddButton`, `web/components/deep-link/screen-bits.tsx`)
-is the one mango control in a toolbar row (`buttonVariants({ size: "icon" })`, the library's
+was the one mango control in a toolbar row (`buttonVariants({ size: "icon" })`, the library's
 bare `default`). The settings gear and every other toolbar icon button draw `variant:
 "secondary"` — the beige filled circle (`--btn-secondary-fill`), the same background the
 member page's pencil edit button uses. Every gear mount (module headings, Team toolbar) draws
 through this one function (`ModuleSettingsGear`,
 `web/components/screens/module-settings-screen.tsx`), so fixing the one function fixes every
-toolbar it appears on at once. Never two mango controls in one row.
+toolbar it appears on at once.
 
-**Law.** Not yet a registry check (`TAB_STRIP_PIN_EXEMPT`'s own caution applies here too — a
-census over every icon-only `<Button>`/`buttonVariants` call in the app, keyed to whether it
-sits inside a toolbar, is a real derivation to build rather than a rule stated once and
-trusted). Written down so the next toolbar icon button is built to this shape from the start,
-and so a reviewer has the client's own sentence to check a screenshot against.
+**Law.** R84 (`mango-in-title-only`), `web/test/mango-title-only.test.ts` — the CREATE
+button's own colour is covered there now. The gear/beige shape one paragraph up is still not
+a registry check of its own, for the same reason it never was (a census over every icon-only
+`<Button>`/`buttonVariants` call, keyed to whether it sits inside a toolbar, would need to
+derive a shape rather than a colour): written down so the next toolbar icon button is built
+to this shape from the start.
 
 ### B15: on a member's head, Change role sits in the same three-dot menu as Remove
 
@@ -3199,16 +3391,113 @@ not the row.
 
 **Law.** None registered.
 
-### B16: Settings › Team splits into a Members tab and a Roles tab
+**AMENDED, 16 Sep 2026, same day — the row's own "Change role" button was a second copy of
+the same act.** The client's ruling, verbatim, over a screenshot of the row still carrying
+its own "Change role" button NEXT TO the ⋯ menu that already held it a second way: *"why is
+it then two times? Keep only the button on the three buttons, not behind the edit. It
+should only be on the three buttons."* A prior session had added "Change role" to the
+three-dot menu ALONGSIDE the row's own button rather than instead of it — read at the time
+as "also," which is exactly the "two times" this rules out. `member-screen.tsx`'s
+`buttonActions` now excludes BOTH `members.remove` and `members.changeRole` from the row;
+neither ever renders as a row button again, and both live only in the ⋯ menu, sharing the
+identical handlers the row buttons used to call. D13's own head **edit pencil** (the record's
+generic edit affordance, unrelated to Change role) is untouched by this correction — "not
+behind the edit" names what she does NOT want duplicated, not what should be removed.
 
-**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"In settings, split into tabs:
-members and roles. Roles deserve their own tab."* Settings › Team draws through the library
-`TabsView`, the same shape B11's Automations/Choices tabs already draw, with Members and
-Roles as two tabs rather than one combined page — each carries its own count badge, R16's
-exact-count rule applied per tab the way B10's own module settings tabs already do.
+### B16: Settings' top-level strip is Appearance · Members · Roles · Integrations · Modules · Automations · Choices
 
-**Law.** None registered — a `TabsView` split, held to the library-tabs rule (R3) like any
+**The rule, as it stood before 16 Sep 2026, evening.** The client's ruling, verbatim: *"In
+settings, split into tabs: members and roles. Roles deserve their own tab."* The first build
+read this as a NESTED strip — a "Team" tab still on the outer row, with Members/Roles one
+level down inside it.
+
+**AMENDED, same evening — that reading was wrong.** Her correction, verbatim: *"You got this
+wrong. I don't want two tabs under Team. Let's replace Team on the top level of tabs with
+Members and Roles."* "Team" comes OFF the outer strip entirely, and Members and Roles take
+its place, in that order — never a nested strip under either (`no-handrolled-toggles` stays
+satisfied the same way: nothing replaces the strip that is gone, because Members and Roles
+simply ARE two of the doors on `tabsConfig`). The outer row goes from five tabs to seven:
+**Appearance · Members · Roles · Integrations · Modules · Automations · Choices**. Each
+panel still owns its own reads, toolbar and dialogs; each of Members/Roles carries its own
+R16 count directly on the outer strip. `?tab=team` is kept as an ALIAS, landing on Members —
+a saved link or a stale remembered tab still opens the screen rather than rendering nothing.
+This screen is still the only door to member management (change role, remove a member,
+revoke a pending invite — R64, `sections-have-a-door`); "This team," the list that used to
+link into the team area's own screens, is gone (2026-09-14), and those screens are reached
+only from here now.
+
+**Law.** None registered — a `TabsView` reshape, held to the library-tabs rule (R3) like any
 other collection tab strip.
+
+### B17: mango lives only in the title component; every other button is black
+
+**The rule.** The client's ruling, 16 Sep 2026 evening, verbatim: *"Let's revisit the rule
+of only one mango button per screen. Only mango buttons on the title level. Title means the
+title component on top. Only those can be mango, the others black."* This retires B14's own
+"the CREATE button is mango" (marked superseded above) and every other mango control this
+app had scattered across a screen on the strength of the vendored kit's own "one mango per
+view" (`shared/ui/docs/RULES.md` §2.5) — that rule capped the COUNT; this one restricts the
+POSITION.
+
+**The title component, named.** On a COLLECTION screen it is `CollectionHeading`
+(`web/components/records/collection-heading.tsx` and `web-portal/components/
+collection-heading.tsx` — same name, same shape on both front doors: the display-m heading
+plus its own `action` prop, the screen's one door, deliberately not the toolbar's). On a
+bespoke RECORD DETAIL it is `RecordScreen`'s own `actions` prop
+(`web/components/records/record-chrome.tsx`, B1: "at most one primary and one secondary
+button" share the title's own row). On the five recipe-driven details (`team.detail`,
+`members.detail`, `invites.detail`, `brand.detail`, `purposes.detail`) it is the kit's own
+`RecordDetail`/`RecordChrome` (`shared/web/screen-engine/screen-renderer.tsx`). Everywhere
+else — a toolbar's own create button, a dialog's Save/Create, a sheet's footer, a card, an
+empty state's "Add the first," a form — is `variant="inverse"`, the kit's own black
+(charcoal fill, off-beige label), the same tone `recordNumber`'s "the black chip is always
+the ID" already uses.
+
+**What moved, in one sweep:** the three shared seams — `FormShell`'s `SubmitButton`, every
+form on either front door; `screen-bits.tsx`'s `AddButton`, every toolbar create button
+(B14, above); `collection-frame.tsx`'s `createActionButton`/`CollectionEmptyState`, every
+collection's icon create button and its "Add the first" — and twenty-seven individual
+dialogs, sheets, list rows, cards and forms across both front doors.
+
+**Law.** R84 (`mango-in-title-only`), `web/test/mango-title-only.test.ts` — a static census
+over every `<Button variant="default">` (stated or omitted, the kit's own mango default),
+walked for an ancestor named `CollectionHeading`, `RecordScreen`, `RecordDetail` or
+`RecordChrome` (through a JSX prop's own initializer too, so a Button handed to a title
+component through `action={…}` still counts), or named in `MANGO_OUTSIDE_TITLE_OK` with the
+real reason.
+
+### B18: every Choices table carries a Details column between Name/Module and Status
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"regarding the fact that some
+Choices components can have more properties, for example, meeting types have department, but
+sprint types have duration. Why don't you add, everywhere where you have Choices on the
+module and on the general, an in-between column with details or info or whatever, and
+include this from each case."* Both the global Choices table (Settings › Choices) and a
+module's own scoped Choices mounting (`settings-choices-panel.tsx`, one component, B11) gain
+a **Details** column, sitting between Value/Module and Status — a decoration, never a fact
+the table sorts or searches by, the same shape its neighbour `actions` column already takes.
+`shapeChoicesTable` (`web/components/deep-link/shape.tsx`) decides what a row's own type
+carries; the column only draws the cell already built:
+
+- **Sprint type** — the type's own icon (`sprintTypeIcon`) plus its DURATION
+  (`v.standardDays`, a real column the list door already reads) — the client's own example.
+- **Story type** — an icon only (`storyTypeIconName`); no duration is ever seeded for a
+  story type, so the column does not invent one.
+- **App stage** — a dot TONE only (`appStageDotTone`), the same tone D17 tabulates, never a
+  colour of its own.
+- **Meeting type** — carries its department in its OWN table already (K30's own Department
+  column), so it is out of this ruling's reach rather than a second, duplicate Details cell.
+- Any Choices type this file has not yet met draws no Details cell — adding one for a type
+  that does not exist yet would be dead code, not a decoration.
+
+R82's own ceiling still holds: Value + Module + Details + Status + actions is five columns
+on the global table, one under six, and Details is dropped along with Module wherever a
+scoped mounting already narrows to one module (its own tab strip names it).
+
+**Law.** [R82](../RULES.md) (`table-column-budget`) governs the column COUNT as it does any
+table; the Details cell's own CONTENT is not separately censused — `shapeChoicesTable` is
+the one seam, so a fifth Choices type reaching for its own ad hoc cell elsewhere would be
+the shape to watch for.
 
 ---
 
@@ -5085,15 +5374,15 @@ Accounts screen is retired. What replaces it is pending her pick from a follow-u
 
 ## Rule index
 
-**168 rules.**
+**173 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L19 (19) |
-| 3. Detail screens | D1 to D16 (16) |
-| 4. Collections | K1 to K33 (33) |
-| 5. Buttons and actions | B1 to B16 (16) |
+| 2. Page layout and width | L1 to L20 (20) |
+| 3. Detail screens | D1 to D17 (17) |
+| 4. Collections | K1 to K34 (34) |
+| 5. Buttons and actions | B1 to B18 (18) |
 | 6. Forms and dialogs | F1 to F15 (15) |
 | 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
@@ -5135,6 +5424,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R77 | [D3](#d3-the-header-and-tabs-stick) | R78 | [K20](#k20-calendar-views-carry-no-sort) |
 | R79 | [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected) | R80 | [K22](#k22-rows-are-a-list-never-a-banded-table) |
 | R82 | [K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end) | R83 | [K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column) |
+| R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | | |
 
 ### The seven files that carry most of it
 

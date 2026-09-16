@@ -70,7 +70,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail, AppRow } from "@shared/types"
 import { type SavingsView } from "@shared/workers/savings"
-import { RecordCover, RecordCoverBand, RecordMark } from "@shared/web/record-mark"
+import { RecordCover, RecordMark } from "@shared/web/record-mark"
 import { AccountFormDialog, type AccountFormValues } from "@/components/accounts/account-form-dialog"
 import { ContactsPanel, type PanelActions } from "@/components/accounts/account-detail-panels"
 import {
@@ -655,13 +655,13 @@ export function AccountDetailScreen({
 
   return (
     <RecordScreen
-      // THE COVER BAND — C1, client ruling, 16 Sep 2026: "For the cover,
-      // let's try C1. I want this for accounts and members." Full-width,
-      // above the whole head below (the B1 mark next to it is untouched);
-      // `RecordCoverBand` draws the fixed-height band with or without a
-      // picture — a quiet tinted surface when `account.coverUrl` is unset,
-      // never a hole and never placeholder text (record-mark.tsx's own doc).
-      cover={<RecordCoverBand picture={account.coverUrl} />}
+      // NO COVER BAND — C1 shipped 16 Sep 2026 ("For the cover, let's try
+      // C1. I want this for accounts and members.") and was reversed the
+      // same session: "I changed my mind. Let's remove this completely."
+      // `RecordScreen` no longer takes a `cover` prop at all
+      // (record-chrome.tsx's own removal note); `account.coverUrl` is still
+      // read, by the pre-existing Overview-tab `RecordCover` further down
+      // this file, unrelated to this ruling.
       // THE CLIENT'S OWN LOGO, INLINE LEFT OF THE TITLE — B1, client ruling
       // 2026-09-15: "For cover and logo, I choose B1. Apply this on apps,
       // accounts, and team members." record-chrome.tsx's own `mark` prop doc

@@ -310,7 +310,8 @@ export function RecordAttachments<R extends AttachmentRow>({
                         {t("Replace the file")}
                       </Button>
                     )}
-                    <Button size="sm" disabled={busy} onClick={() => void saveEdit(a)} className="shrink-0 gap-1">
+                    {/* R84 — a row's inline action, not a title component, so black. */}
+                    <Button variant="inverse" size="sm" disabled={busy} onClick={() => void saveEdit(a)} className="shrink-0 gap-1">
                       <Check className="size-3.5" />
                       {t("Save")}
                     </Button>
@@ -450,7 +451,8 @@ export function RecordAttachments<R extends AttachmentRow>({
                 className="w-64"
                 disabled={busy}
               />
-              <Button size="sm" disabled={busy} onClick={() => void addLink()} className="gap-1">
+              {/* R84 — inline form action, not a title component, so black. */}
+              <Button variant="inverse" size="sm" disabled={busy} onClick={() => void addLink()} className="gap-1">
                 <Plus className="size-3.5" />
                 {t("Submit")}
               </Button>
