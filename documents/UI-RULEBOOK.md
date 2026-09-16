@@ -37,7 +37,7 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L13)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L15)
 - [3. Detail screens](#3-detail-screens) (D1 to D13)
 - [4. Collections](#4-collections) (K1 to K27)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
@@ -647,40 +647,107 @@ own model already gives every other tab, extended to this one door.
 
 **Law.** [R74](../RULES.md) (`import-opens-a-tab`).
 
-### L12: a new content tab opens beside the tab you were on, never at the far right
+### L12: a new content tab opens beside the tab you were on, never at the far right; identical pages do not duplicate
 
 **The rule.** *"When opening a new tab, do not open it on the very right, but immediately
 to the right of the tab where I was before. If I'm in the tab 'Tickets' and I click a
 ticket, open it next to the tab 'Tickets', not to the very right."* — client, 2026-09-16.
 Chrome does this too: a link opened from a tab lands beside it, not after every tab
-already open elsewhere in the window.
+already open elsewhere in the window. **And:** *"make sure I cannot have the same tab 2
+times, for example I have already apps opened, if I click there again, reopen the opened
+tab."* — client, 2026-09-16. Duplicate paths (with or without trailing slashes, or
+different query parameters that do not affect identity) open the existing tab, never a
+second one.
 
 **The mechanism.** `visitTrail`'s own `put` (`web/lib/workspace-tabs.ts`) is the one place
 a tab is ever inserted. A record that is already open is untouched — it is only
-activated where it already sits, same as before this ruling. A record that is genuinely
-new is spliced in immediately after whichever tab is active at that moment — read live off
-`activePath`, not captured once at the top of the function, which is what keeps a whole
-cold-opened trail (an ancestor plus the record under it) landing as an internally ordered
-block rather than the deepest level jumping ahead of its own parent. When nothing is
-active yet — the very first tab opened in a scope — there is nowhere to sit "beside," so
-this is a plain append, and the same is true whenever the active tab already happens to be
-the rightmost one, which is the ordinary case of opening things one after another. Eviction
+activated where it already sits, same as before this ruling. IDENTITY IS BY CANONICAL KEY,
+which normalizes paths: trailing slashes are stripped, and dialog-ephemeral query
+parameters (`?panel`, `?confirm`, `?id`) are removed, while screen-state parameters
+(`?tab=`) are kept. So `/apps`, `/apps/`, and `/apps?view=board` (if `view` is not
+identity-defining) all refer to the same tab; clicking them again when one is open
+activates it rather than opening a duplicate. A record that is genuinely new is spliced
+in immediately after whichever tab is active at that moment — read live off `activePath`,
+not captured once at the top of the function, which is what keeps a whole cold-opened
+trail (an ancestor plus the record under it) landing as an internally ordered block
+rather than the deepest level jumping ahead of its own parent. When nothing is active yet
+— the very first tab opened in a scope — there is nowhere to sit "beside," so this is a
+plain append, and the same is true whenever the active tab already happens to be the
+rightmost one, which is the ordinary case of opening things one after another. Eviction
 at the cap ([MAX_OPEN_TABS](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in),
 `web/lib/workspace-tabs.ts`) is unchanged by this: it still takes the least-recently-ACTIVATED
 tab, by `recency` and never by position, so the tab just opened — always freshly touched — is
-never its own victim.
+never its own victim. On load, persisted tabs with duplicate canonical keys are collapsed,
+keeping the first.
 
 **What it does not touch.** A pinned or home tab, should one ever exist first on the strip,
 needs nothing extra here: insertion only ever happens AFTER the active tab's own position,
 so a pin sitting ahead of the active tab is never disturbed by this rule.
 
 **Law.** None registered — `web/test/workspace-tabs.test.ts` pins the behaviour (opening
-from the middle, opening from the rightmost tab, reopening an already-open tab, and cap
-eviction under the new insertion point) but nothing in `shared/rules/registry.ts` censuses
-it; a hand-rolled tab strip elsewhere in the app would not be caught the way `no-handrolled-toggles`
-catches a bespoke collection tab.
+from the middle, opening from the rightmost tab, reopening an already-open tab, duplicate
+prevention, and cap eviction under the new insertion point) but nothing in
+`shared/rules/registry.ts` censuses it; a hand-rolled tab strip elsewhere in the app would
+not be caught the way `no-handrolled-toggles` catches a bespoke collection tab.
 
-### L13: "Close all tabs" keeps the tab you are on and shuts every other one
+### L13: a multi-day record on a calendar draws as a span — a capped chip on the first and last day, a thin line between
+
+**The rule.** *"In the calendar, we should see sprints lasting multiple days, so maybe we
+need to redesign this component. If so, make an artifact with different variations."* —
+client, 16 Sep 2026, over the month grid's own one-chip-one-day shape, which showed a
+twelve-day sprint on a single date, indistinguishable from a one-day task. Four variations
+were mocked (`verify/decisions.html`'s sibling calendar-spans artifact); her ruling, choosing
+from them: *"for calendar, I choose S2, Start-and-end caps."*
+
+**The mechanism.** The kit's `CalendarEvent` gained `span?: { id, position: "start" |
+"middle" | "end" | "only" }` (kit v1.2.90). A `start` or `end` day still draws a chip, capped
+on the record's own boundary edge and flat on the edge that runs into the next day; a
+`middle` day draws no chip at all, only a thin ghost line in the record's own colour, at low
+alpha, so a long span does not spend one chip per day of itself. `record-calendar.tsx`'s
+`expandEntry` is the one place a host walks `CalendarEntry.day`…`endDay` into these
+per-day placements — `RecordCalendar`'s own "ONE CALENDAR" door, so a span on the grid is
+never a picture built by a second file. Waves and sprints are the first callers
+(`waves-screen.tsx`'s `buildWaveCalendarEntries`): a wave's own `endsOn` and a sprint's own
+`endsOn` both ride along as `endDay`, so a sprint's span draws inside its wave's, and the
+two stack rather than one hiding the other. The "+N more" day dialog still lists a span once
+— it reads one day's own placements, and a record contributes exactly one placement to any
+single day. Below `sm:` the compact dots show only the start and end days; a `middle` day
+earns no dot, because a dot with no label has nothing to say about a day that is merely
+somewhere inside a span already marked by the line above `sm:`.
+
+**Law.** None registered — the kit's own `calendar-view.tsx` carries the shape (see its
+header and `CalendarEvent.span`'s own doc); `web/test/rules.test.ts`'s `one-calendar` still
+censuses that only `record-calendar.tsx` may import the kit's `calendar-view` directly.
+
+### L14: the assistant column's width is a drag, snapping to three sizes
+
+**The rule.** *"Is it possible that we can, while using the app, adjust the width of the
+assistant? If possible, make me an artifact of how this could look."* — client, 16 Sep 2026.
+Four variations were mocked (`verify/decisions.html`'s sibling assistant-width artifact:
+drag the seam, three fixed sizes, a wide toggle, detach to a tab); her ruling: *"A — drag the
+seam, with B's three widths as its snap points."*
+
+**The mechanism.** `ScreenShell` gains `asideWidth?`, `defaultAsideWidth`, `onAsideWidthChange?`,
+`asideMinWidth` (320) and `asideMaxWidth` (520) (kit v1.2.91), matching the existing
+`asideOpen`/`defaultAsideOpen` controlled/uncontrolled pattern. The aside's own inner-edge
+`EdgeHandle` becomes draggable — pointer capture, `cursor-col-resize`, a live width readout
+while dragging, arrow keys step ±16px and Home/End jump to the min/max on the focused
+handle, a double-click resets to 400 (the middle snap point). [320, 400, 520] — B's own three
+widths — are magnetic snap points: a drag that releases within a small tolerance of one
+lands on it exactly, and a drag that releases elsewhere keeps the exact pixel value. Below
+`md` (the phone's bottom-sheet presentation) nothing changes — width does not apply there.
+The content column keeps its own minimum width regardless: the aside's existing viewport
+caps (`max-w-[calc(100vw-var(--shell-gutter)*2)]`, `lg:max-w-[40vw]`) still hold, so a wide
+drag on a narrow window is capped by the same mechanism that already protected the content
+column before this ruling. `web/lib/aside-width.ts` persists the chosen width per person in
+`localStorage` (try/catch, matching `web/lib/agent-open.ts`'s own defensiveness), scoped by
+the signed-in person's id the same way `workspace-tabs.ts` scopes a shared device's open
+tabs — wired in `app-shell.tsx`.
+
+**Law.** None registered — `shared/ui/compositions/templates/screen-shell.tsx` carries the
+drag/snap/keyboard mechanism; `web/test/aside-width.test.ts` pins the app-side persistence.
+
+### L15: "Close all tabs" keeps the tab you are on and shuts every other one
 
 **The rule.** Chrome's "close other tabs", asked for under the app's own name for it:
 a trailing control on the workspace tab strip that closes every open tab except the one
@@ -1021,6 +1088,12 @@ mocks all land on it.
 sibling inside the title's own row, never a row of its own; the box is read off source as
 derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value; a string
 `mark` stays inert).
+
+### D15: a calendar span within a detail screen uses S2's horizontal gutters
+
+**The rule.** The client's ruling, 16 Sep 2026: *"calendar spans = S2 start-and-end caps."* A calendar drawn inside a detail screen (where it appears — the Waves timeline, the Sprints view, the Inputs week, the Stories week) applies the same horizontal gutter that S2 sets for the detail screen's own horizontal extent: `px-4 sm:px-6 lg:px-10` on the calendar container, so its left and right edges align with the detail screen's own content, and the calendar grid or day cells do not over-extend into the gutter dead space. The calendar component itself (`RecordCalendar` or `RecordTimeline`) inherits these class restrictions from its container, not from the detail shell's own S2 rule — the component can be reused in other contexts where S2 does not apply.
+
+**Not a law.** This is a layout consistency decision recorded here for the next reader, same as K24's Calendar span implementation (shipped start-day-only on 15 Sep; spans since v1.2.90, 16 Sep).
 
 ---
 
@@ -1986,21 +2059,12 @@ kit does not already carry — and `waves-screen.tsx` is this component's only
 caller, the same "one host" pattern the ONE CALENDAR law already keeps for
 `record-calendar.tsx`.
 
-**Calendar — shipped simpler, said plainly.** Waves and sprints draw as day
-chips through `RecordCalendar`, the app's one door into the kit's month
-grid (the ONE CALENDAR law) — **one chip per day, the START day only**, not
-the multi-day span this brief also sketched (`CalendarEvent.spanId`/
-`spanPosition` on the kit's `calendar-view.tsx`, a `record-calendar.tsx`
-mapping for a multi-day `CalendarEntry.endDay`, a kit tag and a sync). That
-kit change is real, useful, and NOT built this round: a wave's own chip and
-its sprints' chips share one colour (the same `accentClass` hash keyed off
-the wave's id, for free), a sprint's chip carries its wave's name as the
-detail line, and clicking either opens the record — but a wave or a sprint
-that runs three weeks shows only its first day on the grid rather than the
-bar it actually is. Flagged rather than built, per this brief's own escape
-hatch ("if that is more than a day's work, ship the calendar with one chip
-per day and say so plainly") — the honest state to leave for the next
-reader, not a silent gap.
+**Calendar — multi-day spans since v1.2.90.** Waves and sprints draw as multi-day
+spans through `RecordCalendar`, the app's one door into the kit's month
+grid (the ONE CALENDAR law) — shipped start-day-only on 15 Sep; spans since v1.2.90, 16 Sep. A wave's own span and its sprints' spans share one colour (the same `accentClass` hash keyed off
+the wave's id, for free), a sprint's span carries its wave's name as the
+detail line, and clicking either opens the record. A wave or a sprint
+that runs three weeks shows as three weeks on the grid through `record-calendar.tsx`'s `expandEntry`, which walks each day from `startsOn` to `endsOn` and caps both ends — the kit's own `CalendarEvent.span` renders the multi-day primitive (`spanId`/`position` on `calendar-view.tsx`), and `waves-screen.tsx` passes `endDay` for waves and sprints alongside `day` and `accent`.
 
 **List — R80's shape, All tab only.** Wave (ref + name) · Account (`RecordMark`,
 the same choice-sized mark the account picker already draws) · Sprints (the
@@ -2016,12 +2080,12 @@ variations" the client has twice ruled out.
 **Law.** [R16](../RULES.md), [R53](../RULES.md), [R78](../RULES.md)
 (`no-sort-in-calendar-views`, amended this same day — see its own entry,
 [K20](#k20-calendar-views-carry-no-sort)), [R80](../RULES.md)
-(`rows-are-a-list`). The T3 timeline's own shape, the Calendar's
-one-chip-per-day descope and the tab split are recorded here for the next
+(`rows-are-a-list`). The T3 timeline's own shape and the tab split are recorded here for the next
 reader rather than independently checked — the same "not a law" footing
 [K18](#k18-a-record-with-a-face-defaults-to-the-gallery-the-list-is-the-alternate-view)/[K23](#k23-apps-gallery-and-board-by-stage-never-tiles-or-a-table)
 stand on, until a registry of host-composed screens exists to hold a bespoke
-component's own shape to something checked rather than read.
+component's own shape to something checked rather than read. The Calendar's
+multi-day span capability is now in place as of v1.2.90, 16 Sep 2026.
 
 **Amendment, 16 Sep 2026 — the app's face, a broken toolbar, a new facet, and
 a status pill.** The client, over a screenshot of the shipped screen,
@@ -2142,8 +2206,8 @@ here rather than faked on screen.** No "Last nudge" column and no "Nudge"
 row action: `Todo` (`shared/types.ts`) carries no reminder/nudge timestamp
 at all, and neither `workers/content/src/routes/todos.ts` nor the portal's
 own to-do surface has a resend-reminder door — a real gap, not an
-oversight, the same honesty this file's own K24 entry keeps about the
-Waves calendar's multi-day span. And the Account MANAGER facet the I1 mock
+oversight, the same discipline this file's own K24 entry previously kept about the
+Waves calendar's multi-day span (which has since shipped in kit v1.2.90, 16 Sep 2026). And the Account MANAGER facet the I1 mock
 also drew is left out for a cheaper reason: this screen has no full
 accounts list loaded to build real options from, and a `Todo` row carries
 no manager id or name of its own to derive one cheaply the way the Account
@@ -2348,6 +2412,43 @@ gains a `narrow` declaration on `all_stories:read` — `shared/workers/query-gra
 [R20](../RULES.md), [R36](../RULES.md) (`offered-rights` — `all_stories` joins
 the matrix), [R53](../RULES.md), [R78](../RULES.md) (`no-sort-in-calendar-views`
 — Week), [R80](../RULES.md) (`rows-are-a-list`).
+
+### K28: App stage — Not started · Audit · Plan · Build · Validation · Refinements · Enhancement · Archived, in that order
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"the sprint types are: not started, audit (this is new), plan (the old blueprint), build (the old development), validation, refinements and enhancement (in this order). They will not have colors, but icons. Let's keep colors for status."*
+
+**She said "sprint types"; the words she named are App stage.** Confirmed read-only against staging before this shipped: "Blueprint" and "Development" exist nowhere in the `Sprint type` vocabulary, seeded or live — that group holds Planning, Iteration and the ten-row `SPRINT_TYPE_CATALOGUE` (Assessment, Diagnostic, Process Optimization, Data Migration, Foundation, Implementation, Validation, Refinement, Training, Enhancement), none of them either word. Both words are two of the eight `App stage` values instead (`shared/app-stages.ts`), on staging, that day. The coordinator's ruling, same day: apply her list to `shared/app-stages.ts`'s own vocabulary, not Sprint type, and say so here for the next reader.
+
+**The final order, with its icon (Phosphor names, `@shared/ui/foundations/icons`, verified against the kit's own art):**
+
+| # | Stage | Icon | Was |
+|---|---|---|---|
+| 1 | Not started | `Circle` | Not started (unchanged) |
+| 2 | Audit | `MagnifyingGlass` | new |
+| 3 | Plan | `Compass` | Blueprint (renamed) |
+| 4 | Build | `Hammer` | Development (renamed) |
+| 5 | Validation | `CheckCircle` | new |
+| 6 | Refinements | `Sliders` | new |
+| 7 | Enhancement | `TrendUp` | new |
+| 8 | Archived | `Archive` | Archived (unchanged, kept active — see below) |
+
+Documentation, Iteration, Maintenance and Completed are retired (deactivated in the vocabulary, never deleted — an app already sitting in one of those four keeps that exact word). **Archived is not in her seven and nothing in the ruling touches it:** `apps` carries no separate archive flag, only the generic `deactivated_at` every table gets, so putting a system away has only ever been this one stage — it keeps its place, active, last, the one manual "put away" state.
+
+The vocabulary is seeded and migrated (`shared/selectable-homes.ts` registers `App stage` as `{ table: "apps", column: "stage" }`; team migration **0097** renames Blueprint → Plan and Development → Build on both the dropdown row and every `apps.stage` value that held them, inserts the missing five protected, deactivates the four retired names, and adds `selectable_data.position` — the column this vocabulary needed and did not have — set 1..8 in this exact order). Drawn in any picker or list by the team's own live vocabulary order (`position`, R75's `ORDERED_OPTIONS_OK` entry for `app-form-dialog.tsx#stages`), with the icon per stage assigned in code (`shared/app-stages.ts`'s own `icon` field, resolved in `web/lib/app-stage-icon.tsx`) — never a data column, the same pattern `shared/story-types.ts` carries for the five story types. No dot, no colour, on the gallery chip, the board card chip, the detail head pill, the board-by-stage column heads, or the app form's own stage picker (now a horizontal icon pill row, `AppearancePillGroup`, not the dropdown). The colour stays on **status** elsewhere in the app (a ticket's, a story's), never on a stage.
+
+**Not a law.** Like K26's type-icon binding, this is a vocabulary and icon-code decision recorded here for the next reader rather than independently checked. The eight protected rows are created by migration; `shared/ui/` carries the icons; no rule census enforces the exact order because the ordering IS the gating rule through `position` + `PROTECTED` and the migration order itself.
+
+### K29: Meetings — the List view, and emojis stripped from titles
+
+**The rule.** Two parts, both client's ruling, 16 Sep 2026. First: *"meetings List = the Tickets column list"* — the Meetings main screen's List view draws the same columns as the Tickets collection does, a real `<RecordTable>` carrying the app's settled column discipline (R80), with the meeting-specific columns Meetings adds (the type, the purpose, the attendees count, the next action). Second: *"emojis stripped from meeting titles"* — meeting titles may no longer carry emoji, in the data or in the display; any existing row carrying a pictograph is either edited to remove it or the system strips it silently on read (the latter is the approach already taken for other emoji-stripped fields under R66). The meeting's own `notes` field is untouched.
+
+**Not a law.** The column order, the table shape, and the emoji handling are each recorded here for the next reader; no census independently checks them.
+
+### K30: Meetings — the Meeting types block is removed from the main screen
+
+**The rule.** The client's ruling, 16 Sep 2026, implicit in the cleanup: the Meetings main screen previously drew a separate "Meeting types" panel; this is removed, and the meeting type remains a vocabulary choice available only through the Choices module (Meetings › Choices, the same door `shared/selectable-homes.ts` calls home for the `{ table: "meetings", column: "purpose" }` group). Meetings' own type vocabulary is still live (the column stays, the rows stay, the picker stays on the form and in filters), only the dedicated panel on the main screen is gone.
+
+**Not a law.** This is a screen layout descope recorded here for the next reader.
 
 ---
 
@@ -4572,18 +4673,52 @@ the tab, it doesn't close, so restore that behavior."* Three claims, three findi
    it: `onClose` still fires with that tab's own id. The portal boundary is not where a close
    regression would hide.
 
+**Assistant width and pinned tabs (16 Sep 2026 amendments):** Two further rulings on the same strip and its container shape.
+
+**Width snap points.** The client's ruling, 16 Sep 2026, verbatim: *"assistant width = drag the seam with 320/400/520 snaps."* The assistant column is resizable by dragging its left edge; the drag has three snap points — minimum 320px, middle 400px, maximum 520px — so a writer can coarse-adjust without free-dragging the precise width. When docked (the normal state, inside a `ScreenShell`), the seam sits at the left of the aside and is draggable; when undocked (a modal layering, if implemented), the resize behaviour is not yet specified. The snaps are data, not computed, to allow future tuning without a code change: `ASSISTANT_WIDTH_SNAPS` in `web/lib/agent-dock.tsx` or equivalent.
+
+**Pinned tabs placement, and the paint order client feedback, 16 Sep 2026, with a
+screenshot.** Her words: *"on assistant, make sure the history tab and + are behind!"* —
+over a screenshot of History and "+" grey-filled over the active Conversation tab's own
+right edge. **Status: already correct at the source; not reproducible from a fresh
+render.** `breadcrumb-folders.tsx`'s z-lift (added 2026-09-06 for the content strip's own
+identical complaint) keys each tab's z-index to whether **it** is the live one — `TAB_LIVE`
+(`z-[1]`) when `entry.index === activeCrumb`, `TAB_REST` (`z-0`) otherwise — never to
+position in the DOM. So the active conversation tab, which this strip places FIRST (ahead
+of the pinned History/"+" pair — the opposite shape from the main content strip, whose
+active crumb is always the trail's own LAST item), still paints above both of them:
+`z-[1] > z-0` regardless of paint order. Neither pinned tab carries a fill or a `data-slot`
+of its own that could stack over a neighbour (`agent-tab-strip.tsx` hands both the ordinary
+`TAB_REST` path, same as any background conversation tab), and `activeIndex` reaches the
+kit correctly — `tabIndex = tabs.findIndex(...)`, no stale offset survives the 16 Sep
+reorder above. **Tested:** `agent-tab-strip.test.tsx`'s "stacking — the active tab paints
+above its pinned neighbours" describe block renders the exact reported shape (one active
+conversation tab, first, ahead of History and "+") and reads the rendered `className`
+back off each crumb, asserting `z-[1]` on the active tab and `z-0` on both pinned
+neighbours — then repeats it with a second, background conversation tab open. Both pass
+against the current source. Per `ready-means-deployed`: a screenshot proves what is LIVE,
+not what the tree contains: this claim held once already for the same client round (see
+"Look — not reproducible from source" above, three paragraphs up) because the chip she saw
+predated that round's deploy. The likely account here is the same one — redeploy and
+re-screenshot before assuming a second code path draws the strip.
+
+**Not laws.** The three snap points and the width ranges are recorded here for the next
+reader rather than independently checked. The stacking order IS checked (see above), by a
+test rather than by a registry law — no `shared/rules/registry.ts` entry censuses this
+strip's z-index the way it censuses e.g. R63's pinned toolbar.
+
 ---
 
 ## Rule index
 
-**147 rules.**
+**153 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L13 (13) |
-| 3. Detail screens | D1 to D14 (14) |
-| 4. Collections | K1 to K27 (27) |
+| 2. Page layout and width | L1 to L15 (15) |
+| 3. Detail screens | D1 to D15 (15) |
+| 4. Collections | K1 to K30 (30) |
 | 5. Buttons and actions | B1 to B14 (14) |
 | 6. Forms and dialogs | F1 to F11 (11) |
 | 7. Typography | T1 to T8 (8) |

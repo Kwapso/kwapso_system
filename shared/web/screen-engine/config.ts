@@ -273,6 +273,17 @@ export interface FilterFacet {
    * adoption exists to end, so the unused one went rather than being ported. */
   control: "select" | "range"
   options?: FacetOption[]
+  /** THIS FACET'S OPTIONS ARE ALREADY IN THE RIGHT ORDER — R75's escape hatch
+   * for a `FilterFacet`, the sibling of `ORDERED_OPTIONS_OK` (the picker
+   * half). `useFilterBar` (filter-bar.tsx) alphabetizes every facet's options
+   * by default (R75's own "first half" seam, `sortedOptions(optionsFor(f),
+   * lang)`) — this is the one way out, for a facet whose list is a PIPELINE
+   * rather than a naming vocabulary (the same class R75 already carves out
+   * for a picker: a status sequence, a size scale). `true` ONLY when the
+   * matching `path#field` key is reasoned in `FACET_ORDER_OK`
+   * (shared/rules/registry.ts) — a flag with no registry line is a silent
+   * exception nobody can audit, the exact shape R75 exists to close. */
+  ordered?: boolean
   /** THE FACET THIS ONE HANGS OFF — client ruling, 2026-09-09, on a screenshot
    * of her own tickets toolbar reading Client "Any client", App "Kwapso Portal"
    * and, underneath, "Nothing matched. Try fewer words, or clear the filters."

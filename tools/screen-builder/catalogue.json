@@ -2,18 +2,18 @@
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
   "tag": "v1.2.92",
-  "sha": "e87ed45959ba62b0fc17c236aa374ddbdeb6cec5",
+  "sha": "72024ee620d13a93cf685dee23beddbafee710ea",
   "syncedAt": "2026-09-16"
  },
- "generatedAt": "2026-09-16T10:52:39.730Z",
+ "generatedAt": "2026-09-16T11:05:11.107Z",
  "counts": {
   "components": 120,
   "hooks": 2,
   "withVariants": 43,
   "withoutVariants": 77,
-  "cvaSites": 52,
-  "variantGroups": 79,
-  "variantOptions": 260,
+  "cvaSites": 53,
+  "variantGroups": 80,
+  "variantOptions": 266,
   "typedEnumProps": 43,
   "typedBooleanProps": 317,
   "compositions": 47,
@@ -1503,7 +1503,7 @@
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "eventChipVariants",
      "line": 174,
-     "base": "block w-full truncate rounded-pill px-2 text-badge leading-[1.6] font-[var(--font-weight-medium)] text-start",
+     "base": "block w-full truncate px-2 text-badge leading-[1.6] font-[var(--font-weight-medium)] text-start",
      "groups": [
       {
        "name": "tone",
@@ -1547,6 +1547,57 @@
      "compound": [],
      "unresolved": [],
      "usedBy": []
+    },
+    {
+     "file": "components/calendar-view/calendar-view.tsx",
+     "name": "spanLineVariants",
+     "line": 500,
+     "base": "h-[3px] w-full shrink-0 rounded-pill opacity-55",
+     "groups": [
+      {
+       "name": "tone",
+       "options": [
+        {
+         "name": "quiet",
+         "classes": "bg-surface-panel",
+         "note": null
+        },
+        {
+         "name": "brand",
+         "classes": "bg-surface-brand",
+         "note": null
+        },
+        {
+         "name": "info",
+         "classes": "bg-info",
+         "note": null
+        },
+        {
+         "name": "success",
+         "classes": "bg-success",
+         "note": null
+        },
+        {
+         "name": "destructive",
+         "classes": "bg-destructive",
+         "note": null
+        },
+        {
+         "name": "inverse",
+         "classes": "bg-surface-inverse",
+         "note": null
+        }
+       ]
+      }
+     ],
+     "defaults": {
+      "tone": "brand"
+     },
+     "compound": [],
+     "unresolved": [],
+     "usedBy": [
+      "CalendarView"
+     ]
     }
    ],
    "typedProps": [
@@ -9342,6 +9393,10 @@
    "exports": [
     "RAIL_WIDTH",
     "ASIDE_WIDTH",
+    "ASIDE_WIDTH_MIN",
+    "ASIDE_WIDTH_MAX",
+    "ASIDE_WIDTH_DEFAULT",
+    "ASIDE_WIDTH_SNAP_POINTS",
     "ScreenShell"
    ]
   },

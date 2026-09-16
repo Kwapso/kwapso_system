@@ -38,6 +38,8 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
+import { AppStageGlyph } from "@/lib/app-stage-icon"
+import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
@@ -225,7 +227,13 @@ export function AppFormDialog({
           name: "",
           accountId: "",
           url: "",
-          stage: "",
+          // A STAGE IS NEVER EMPTY — the client's "kill the Nobody option"
+          // instinct (16 Sep 2026), read for a stage rather than a person: a
+          // new app starts at the FIRST word in the team's own ruled order,
+          // never blank. `APP_STAGES[0]` rather than the literal "Not
+          // started" — position 1 is the definition, the word is only today's
+          // spelling of it (shared/app-stages.ts).
+          stage: APP_STAGES[0].name,
           logoUrl: "",
           cost: "",
           about: "",
@@ -377,21 +385,42 @@ export function AppFormDialog({
       )}
       {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
           which is how one inventory came to carry "live", "Live" and "in dev" for
-          the same three systems. The mark rides the LABEL only. */}
-      <Field config={stageField} htmlFor="app-stage" className={fieldSpacing}>
-        <RecordPicker
-          id="app-stage"
+          the same three systems.
+          A HORIZONTAL PILL ROW WITH ICONS, not the dropdown — the client's
+          ruling, 16 Sep 2026, over this exact vocabulary: "they will not have
+          colors, but icons." `AppearancePillGroup` (shared/web/
+          appearance-pill-group.tsx) is the row the Appearance settings pills
+          already draw, its `swatch` slot standing in for a stage's icon here
+          exactly as it stands in for a colour swatch there — reused rather
+          than a second bare-button row hand-rolled beside it.
+          NO "NOT SAID" PILL — the coordinator's own follow-up, 16 Sep 2026,
+          the client's "kill the Nobody-style empties" instinct read for a
+          stage: a stage is never blank. A new app defaults to `APP_STAGES[0]`
+          above; an edit shows whatever is already stored, which can never be
+          "" once creation no longer offers it.
+          A RETIRED VALUE STILL SHOWS, INERT — an app already sitting in a
+          stage migration 0097 deactivated (Completed, Documentation,
+          Iteration, Maintenance) or one a team retyped by hand keeps
+          reading that exact word (`shared/app-stages.ts`'s own header), so
+          the picker appends it as one extra pill, disabled: it tells the
+          truth about what is stored without offering it as a live pick —
+          the same "show it, don't let it be chosen again" answer the
+          disabled-pill shape gives everywhere else this form needed it. */}
+      <Field config={stageField} shape="group" htmlFor="app-stage" className={fieldSpacing}>
+        <AppearancePillGroup
+          options={[
+            ...stages.map((s) => ({
+              value: s.value,
+              label: t(s.value),
+              swatch: <AppStageGlyph stage={s.value} />,
+            })),
+            ...(values.stage && !stages.some((s) => s.value === values.stage)
+              ? [{ value: values.stage, label: t(values.stage), disabled: true }]
+              : []),
+          ]}
           value={values.stage}
-          onChange={(v) => setValues((s) => ({ ...s, stage: v }))}
-          // THE GLYPH IN THE SLOT, not in the sentence (R35). It used to be
-          // concatenated into the label — `${mark} ${word}` — which is a
-          // pictograph inside a sentence, the one shape UI-CONVENTIONS §5
-          // refuses, and it also meant the trigger and the search index both
-          // carried an emoji nobody typed.
-          options={stages.map((s) => ({ value: s.value, label: t(s.value), mark: s.mark }))}
-          placeholder={t("Not said")}
-          searchPlaceholder={t("Search stages…")}
-          emptyText={t("Nothing matched.")}
+          onValueChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          ariaLabel={t(stageField.label)}
           disabled={busy}
         />
       </Field>

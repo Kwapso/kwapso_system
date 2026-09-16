@@ -288,8 +288,8 @@ describe("which filters a ticket tab offers", () => {
     // this drives the function the toolbar actually calls, so a rule computed
     // correctly and then ignored at the call site cannot pass.
     const apps = [
-      { id: "app-1", name: "Ledger", logoUrl: null, stage: "Development", staff: [] },
-      { id: "app-2", name: "Atlas", logoUrl: null, stage: "Development", staff: [] },
+      { id: "app-1", name: "Ledger", logoUrl: null, stage: "Build", staff: [] },
+      { id: "app-2", name: "Atlas", logoUrl: null, stage: "Build", staff: [] },
     ] as unknown as Parameters<typeof ticketFacets>[0]["apps"]
     const built = (facet: string) =>
       ticketFacets({

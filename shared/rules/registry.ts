@@ -4727,7 +4727,11 @@ export const ORDERED_OPTIONS_OK: Record<string, string> = {
   "web/components/apps/app-form-dialog.tsx#stages":
     "useAppStages() reads the team's own `selectable_data` rows for the `appStage` group — a client lifecycle PIPELINE " +
     "(the same drag-ordered vocabulary R70/Choices already treats as protected order, not a plain word list) — and " +
-    "falls back to the code's own APP_STAGES only when a team has set none. Either way the order is the stage sequence.",
+    "falls back to the code's own APP_STAGES only when a team has set none. Either way the order is the stage " +
+    "sequence: the client's ruling, 16 Sep 2026 (\"not started, audit, plan, build, validation, refinements and " +
+    "enhancement, in that order\"), stored as `selectable_data.position` (team migration 0097) and mirrored in " +
+    "`APP_STAGES`' own array order (shared/app-stages.ts). Feeds this file's own AppearancePillGroup stage row now, " +
+    "not the RecordPicker it replaced (16 Sep 2026, the same ruling: icons, no colours) — same array, same reason.",
   "web/components/work/sprint-form-dialog.tsx#sprintTypes":
     "useSprintTypes() reads the team's own `selectable_data` rows for \"Sprint type\" — the same team-ordered " +
     "vocabulary class as app stages above, not a naming list a reader searches by word.",
@@ -4737,6 +4741,33 @@ export const ORDERED_OPTIONS_OK: Record<string, string> = {
   "web/components/process/steps-panel.tsx#versions":
     "a process map's own REVISION HISTORY (\"Version 1\", \"Version 2\", …) — an ordered SEQUENCE by `versionNo`, " +
     "not a name a reader searches by word. Alphabetical would also break numerically (\"Version 10\" before \"Version 2\").",
+}
+
+/** R75'S OTHER ESCAPE HATCH — the `FilterFacet` sibling of `ORDERED_OPTIONS_OK`
+ * above. `useFilterBar` (shared/web/screen-engine/filter-bar.tsx) alphabetizes
+ * every facet's options by default (R75's "first half" seam); a facet may opt
+ * out by setting `FilterFacet.ordered = true` (config.ts), and that flag is
+ * read only alongside a reasoned line here, keyed `path#field` the same way
+ * `ORDERED_OPTIONS_OK` keys `path#subject` — a boolean nobody has to justify in
+ * writing is a silent exception, the exact shape R75 exists to close.
+ *
+ * A SEPARATE TABLE FROM `ORDERED_OPTIONS_OK`, not a shared one, because the
+ * two escape hatches are found two different ways: a picker's is DERIVED off
+ * disk (the `.map()` → `<SelectItem>`/`options=` census, `alphabetical-
+ * options.test.ts`), so an entry with no matching site goes stale and fails
+ * the build both ways; a facet's `ordered` flag is a RUNTIME read inside one
+ * function, with no static census reaching it, so this table is reviewed by
+ * eye rather than rot-checked — read the list, not this sentence, before
+ * trusting an entry is still live. */
+export const FACET_ORDER_OK: Record<string, string> = {
+  "web/components/apps/apps-screen.tsx#stage":
+    "the Stage facet reads `stageOptions`, built from `APP_STAGES` (shared/app-stages.ts) — the same client " +
+    "lifecycle PIPELINE `app-form-dialog.tsx#stages` above is registered for, the client's ruling 16 Sep 2026 " +
+    "(\"not started, audit, plan, build, validation, refinements and enhancement, in that order\"), stored as " +
+    "`selectable_data.position` (team migration 0097). The Board's own columns (`boardColumns`) already draw this " +
+    "vocabulary in order without touching `useFilterBar` at all (this file's own header explains why); the Stage " +
+    "FILTER facet reaches the same array through the one seam every facet in the app shares, so it needs the flag " +
+    "the Board never did.",
 }
 
 // ── R77 (tab-strips-pin) ────────────────────────────────────────────────────

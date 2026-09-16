@@ -155,6 +155,13 @@ export type SelectableValue = {
   nameDe: string | null
   description: string | null
   standardDays: number | null
+  /** WHERE IT SITS IN AN ORDER SOMEBODY DESIGNED, not the alphabet —
+   * `selectable_data.position` (team migration 0097), null on every group
+   * that has never needed one (the list door falls back to A→Z for those).
+   * The App stage vocabulary is the first to set it, 1..8, the canonical
+   * order the client ruled 16 Sep 2026 (`shared/app-stages.ts`'s own header;
+   * R75's `ORDERED_OPTIONS_OK` entry for `app-form-dialog.tsx#stages`). */
+  position: number | null
   /** WHO WROTE THE WORD, AND WHEN — read by the SINGLE-ROW door only.
    *
    * Optional because the LIST door does not select them, and that is the

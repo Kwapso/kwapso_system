@@ -119,6 +119,7 @@ import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot, AgentDockTabsSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
+import { useAsideWidth, setAsideWidth, setAsideWidthScope } from "@/lib/aside-width"
 
 /** A list with at least one thing in it, said in the type.
  *
@@ -524,6 +525,17 @@ export function AppShell({
   // or shared with the panel's other presentation. One flag, two readers, never
   // two answers.
   const assistantOpen = useAgentOpen()
+  // THE ASSISTANT COLUMN'S WIDTH — variation A "drag the seam", client
+  // ruling 16 Sep 2026. `asideWidth` is CONTROLLED the same way `asideOpen`
+  // is above, and for the identical reason: something outside the kit has
+  // to persist it, and per PERSON rather than per device (`web/lib/aside-
+  // width.ts`'s own header says why the scoping differs from the open
+  // flag's). The scope effect keys off `userId`, computed above, the same
+  // fact `deep-link-screen.tsx` already reads to scope the open-tabs store.
+  React.useEffect(() => {
+    setAsideWidthScope(userId)
+  }, [userId])
+  const asideWidth = useAsideWidth()
   // THE TRAIL, AS ONE ARRAY, BECAUSE TWO THINGS READ IT. The strip itself and
   // the DEPTH the shell derives the title's step from have to be the same
   // fact; `breadcrumbs` is optional at the prop, so it is normalised once here
@@ -1511,6 +1523,24 @@ export function AppShell({
            it is still this app's only way back into a column that renders
            nothing while closed (see "SHUT MEANS ABSENT" above). */
         asideHandleOnOpen={false}
+        /* THE DRAG — variation A, client ruling 16 Sep 2026, with variation
+           B's three sizes as its snap points (320/400/520, the kit's own
+           defaults — this app narrows neither `asideMinWidth` nor
+           `asideMaxWidth`). CONTROLLED, the same shape `asideOpen` two props
+           up already takes, and persisted the same way through a sibling
+           module store: `web/lib/aside-width.ts` (per PERSON, not per
+           device — see that file's own header for why the scoping departs
+           from `agent-open.ts`'s). BECAUSE `asideHandleOnOpen` IS `false`
+           ABOVE, the round handle's own drag never mounts here — the kit's
+           bare resize seam (`RESIZE_SEAM`, no glyph, no mango fill) is what
+           this app actually draws for the drag, exactly the element the
+           2026-09-15 ruling above left in its place; `asideResizeLabel` is
+           its one accessible name (the round handle's `asideOpenLabel`/
+           `asideCloseLabel` do not apply to a control with no open/close
+           meaning of its own). */
+        asideWidth={asideWidth}
+        onAsideWidthChange={setAsideWidth}
+        asideResizeLabel={t("Resize the assistant")}
         breadcrumb={
           /* THE TRAIL, ON THE GROUND. NAVIGATION TEXT ONLY — client rule,
              stated at the kit's own `breadcrumb` prop: no buttons, no pills,

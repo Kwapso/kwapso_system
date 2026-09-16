@@ -298,6 +298,20 @@ const MEETING_TYPE_OLD_NAMES: Record<string, string[]> = {
  * matches. */
 const meetingTypeCandidates = (name: string): string[] => [name, ...(MEETING_TYPE_OLD_NAMES[name] ?? [])]
 
+/** THE APP STAGE WORDS THAT MOVE, 16 Sep 2026 (migration 0097). The client's
+ * own parentheticals name the rename directly — "plan (the old blueprint)",
+ * "build (the old development)" — the same shape `MEETING_TYPE_OLD_NAMES`
+ * above carries for a spelling, read here as a RENAME onto a new canonical
+ * word rather than a second spelling of the same one. */
+const APP_STAGE_OLD_NAMES: Record<string, string[]> = {
+  Plan: ["Blueprint"],
+  Build: ["Development"],
+}
+/** Every spelling that resolves to one canonical App stage — its own
+ * canonical name always included, so a re-run (already renamed) still
+ * matches, the same contract `meetingTypeCandidates` keeps above. */
+const appStageCandidates = (name: string): string[] => [name, ...(APP_STAGE_OLD_NAMES[name] ?? [])]
+
 /** THE WORD "REQUEST" FOLDS INTO, 15 Sep 2026 (migration 0093). Not spelled out
  * again here: `TICKET_TYPES` (shared/ticket-types.ts) is where the four words
  * live and Extra is the third of them, so the day one of the four is renamed in
@@ -6878,6 +6892,109 @@ SELECT lower(hex(randomblob(16))), r.id, 'all_inputs', r.is_default, r.is_defaul
  WHERE NOT EXISTS (
    SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'all_inputs'
  );
+`,
+  },
+  {
+    // APP STAGE, RULED — the client's ruling, 16 Sep 2026, verbatim: "the
+    // sprint types are: not started, audit (this is new), plan (the old
+    // blueprint), build (the old development), validation, refinements and
+    // enhancement (in this order). They will not have colors, but icons.
+    // Let's keep colors for status."
+    //
+    // SHE SAID "SPRINT TYPES." THE WORDS SHE NAMED ARE APP STAGE. Confirmed
+    // read-only against staging before this was written: "Blueprint" and
+    // "Development" exist nowhere in the `Sprint type` vocabulary, seeded or
+    // live (it holds Planning, Iteration and the ten-row
+    // `SPRINT_TYPE_CATALOGUE` — Assessment, Diagnostic, Process Optimization,
+    // Data Migration, Foundation, Implementation, Validation, Refinement,
+    // Training, Enhancement — none of them either word), and both are two of
+    // the eight `App stage` values, on staging, today. The coordinator's
+    // ruling, same day: apply her list here, on `shared/app-stages.ts`'s own
+    // vocabulary, and say so for the next reader — `shared/app-stages.ts`'s
+    // own header carries the same account.
+    //
+    // SEVEN NAMED, AN EIGHTH KEPT. `Archived` is not in her list and nothing
+    // in the ruling touches it: `apps` carries no separate archive flag — the
+    // generic `deactivated_at` every table gets, not an "archived" STATUS of
+    // its own — so putting a system away has only ever been this one stage.
+    // The coordinator's own instruction: "the client wants archive to remain
+    // the one manual state." It keeps its stage, active, LAST — position 8.
+    //
+    // RENAME IN PLACE, RECORDS INCLUDED. `App stage` is a REAL vocabulary
+    // (`shared/selectable-homes.ts`'s own entry): the word is stored on
+    // `apps.stage` itself, not a foreign key, so renaming only the dropdown
+    // row would leave every app that says "Blueprint" or "Development" behind
+    // — the exact fault that file's own header describes, one column along
+    // from the ticket-type fault it was written to close. `storedWordColumns`
+    // derives the column (never hand-typed here), the same seam 0093/0094
+    // already read for ticket and story types.
+    //
+    // DEACTIVATED, NEVER DELETED: Completed, Documentation, Iteration,
+    // Maintenance, and any stage a team invented on its own Dropdown values
+    // screen — every value that is not one of the eight above. Their apps are
+    // UNTOUCHED: only Blueprint and Development are rename targets, so an app
+    // sitting in Completed/Documentation/Iteration/Maintenance keeps that
+    // exact word after this migration, on a vocabulary row that no longer
+    // offers it to a new pick. `shared/app-stages.ts`'s own header says what
+    // that app reads afterwards, out loud rather than silently decided.
+    //
+    // ORDER, STORED. `selectable_data` carried no sort column before this
+    // migration; `position INTEGER` is added here, set 1..8 for the App
+    // stage rows in the canonical order above, and left NULL on every other
+    // group (`workers/tenancy/src/lib/selectable.ts`'s list door now sorts
+    // `COALESCE(position, 999999) ASC, value ASC`, so a group nobody has
+    // ordered still reads A→Z, unchanged).
+    //
+    // ICONS REPLACE THE DOT — code-side only (`shared/app-stages.ts`'s own
+    // `icon` field, resolved in `web/lib/app-stage-icon.tsx`), never a column
+    // here: the six-tone dot this vocabulary used to carry (`AppStage.
+    // dotTone`, `appStageDotTone`) is retired with this migration. "Colors
+    // stay for status" is her own boundary — a ticket's and a story's status
+    // pill (`shared/status-tones.ts`) reads nothing from this file and never
+    // did, and nothing here touches them.
+    //
+    // IDEMPOTENT. Every rewrite UPDATE's WHERE matches nothing once the word
+    // has already moved; each vocabulary UPDATE's predicate is false once the
+    // row is already active, protected, correctly marked, ordered and spelled;
+    // the INSERT is guarded `WHERE NOT EXISTS`; the closing DEACTIVATE matches
+    // nothing once every non-canonical row is already deactivated. ONE
+    // STATEMENT PER ROW, no nested CTEs — comfortably under D1's own
+    // expression-depth ceiling (100, 0088's own header) with room to spare.
+    version: "0097_app_stage_not_started_audit_plan_build_validation_refinements_enhancement",
+    sql: `
+${storedWordColumns(SELECTABLE_GROUPS.appStage)
+  .map((h) =>
+    Object.entries(APP_STAGE_OLD_NAMES)
+      .map(
+        ([canonical, olds]) =>
+          `\nUPDATE ${h.table} SET ${h.column} = ${sqlString(canonical)} WHERE ${h.column} IN (${olds.map((o) => sqlString(o)).join(", ")});`
+      )
+      .join("")
+  )
+  .join("")}
+
+ALTER TABLE selectable_data ADD COLUMN position INTEGER;
+${APP_STAGES.map((s, i) => {
+  const position = i + 1
+  const candidates = appStageCandidates(s.name).map((n) => sqlString(n)).join(", ")
+  return `
+UPDATE selectable_data
+   SET value = ${sqlString(s.name)}, mark = ${sqlString(s.mark)}, position = ${position},
+       is_default = 1, deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL,
+       updated_at = datetime('now')
+ WHERE type = ${sqlString(SELECTABLE_GROUPS.appStage)}
+   AND value IN (${candidates});
+
+INSERT INTO selectable_data (id, type, value, is_default, mark, position, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.appStage)}, ${sqlString(s.name)}, 1, ${sqlString(s.mark)}, ${position}, datetime('now'), 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data WHERE type = ${sqlString(SELECTABLE_GROUPS.appStage)} AND value = ${sqlString(s.name)});`
+}).join("\n")}
+
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'), deactivator_name = 'System', updated_at = datetime('now')
+ WHERE type = ${sqlString(SELECTABLE_GROUPS.appStage)}
+   AND deactivated_at IS NULL
+   AND value NOT IN (${APP_STAGES.map((s) => sqlString(s.name)).join(", ")});
 `,
   },
 ]
