@@ -471,6 +471,30 @@ function doorFilters(worker, path) {
   return null
 }
 
+/** `TOOL_GATES[name]`, read the same way `sharedGetTools` reads SHARED_TOOLS —
+ * off the source, never re-typed here. Most reads carry no line at all (the
+ * map is mostly write gates); a handful of reads DO (`list_story_attachments:
+ * "work:read"` among them), for the same "Needs X." developer hint every
+ * write gets. Since 15 Sep 2026 `tools/list` trims by the caller's role
+ * (keptForRights, the same seam toolSpecs already used for the agent), so a
+ * tool gated this way is genuinely ABSENT from the manifest for a caller
+ * who doesn't hold it — that is the feature working, not a missing door. */
+function sharedToolGate(name) {
+  const src = readFileSync(`${REPO}shared/workers/tool-gates.ts`, "utf8")
+  const start = src.indexOf("export const TOOL_GATES")
+  const end = src.indexOf("\nexport const", start + 1)
+  const block = src.slice(start, end === -1 ? undefined : end)
+  return new RegExp(`\\b${name}:\\s*"([a-z_]+:[a-z]+)"`).exec(block)?.[1] ?? null
+}
+
+/** What the probe role held at the moment `TOOLS` was fetched (section 5,
+ * right after `setProbeRights(BASELINE)` and before `GRANTED` lands in
+ * section 7) — flattened the same way the door's own rights sheet is, so a
+ * tool's absence can be told apart from a missing door. */
+const heldAtCatalogueFetch = new Set(
+  Object.entries(BASELINE).flatMap(([module, rights]) => rights.map((r) => `${module}:${r}`))
+)
+
 const listDoors = sharedGetTools()
 ok("found the shared list doors to check (the scan must not go blind)", listDoors.length >= 5, `${listDoors.length} found`)
 
@@ -478,6 +502,11 @@ for (const door of listDoors) {
   const filters = doorFilters(door.worker, door.path)
   const tool = TOOLS.find((t) => t.name === door.name)
   if (!tool) {
+    const gate = sharedToolGate(door.name)
+    if (gate && !heldAtCatalogueFetch.has(gate)) {
+      skip(`${door.name} is in the deployed catalogue`, `role-trimmed: the probe role doesn't hold ${gate} — tools/list correctly left it off`)
+      continue
+    }
     ok(`${door.name} is in the DEPLOYED catalogue`, false, `the door ${door.path} has no live tool`)
     continue
   }
