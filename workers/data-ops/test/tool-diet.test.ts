@@ -573,7 +573,12 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     //
     // `get_app_impact` keeps its detail and had it rewritten in the first of the
     // two commits, so it is still counted here.
-    const DETAILED_TOOLS = 119
+    //
+    // 119 → 120 on 15 Sep 2026 (mcp-quality audit): `set_account_parent` gained
+    // a `detail` — it is one of only two account-fence writes on this surface
+    // (the write changes who a client can SEE, not only where the row sits)
+    // and had no detail at all to say so.
+    const DETAILED_TOOLS = 120
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),
