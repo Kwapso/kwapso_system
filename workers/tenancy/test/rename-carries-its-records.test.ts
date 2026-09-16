@@ -64,7 +64,15 @@ describe("renaming a value carries the records that stored it", () => {
   }
 
   it("a ticket type: the vocabulary and all 3 tickets move together", () => {
+    // Migration 0093 already PLANTS an active "Ticket type"/"Extra" row on any
+    // fresh replay (its own step 4, "WHERE NOT EXISTS") — this `beforeEach`
+    // runs every migration with no team seed on top, so that row is already
+    // here before this test adds anything. Team migration 0100's partial
+    // UNIQUE index on active (type, value) means a second one can no longer be
+    // planted beside it, so the fixture removes 0093's row first rather than
+    // fight it for the same word.
     db().exec(`
+      DELETE FROM selectable_data WHERE type = 'Ticket type' AND value = 'Extra';
       INSERT INTO selectable_data (id, type, value, mark, created_at) VALUES ('V1','Ticket type','Extra','EX','2026-01-01');
       INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H1','T-1','a','Extra','new','2026-01-01');
       INSERT INTO help (id, ref, description, help_type, status, created_at) VALUES ('H2','T-2','b','Extra','new','2026-01-01');

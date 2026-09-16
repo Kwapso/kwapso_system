@@ -187,8 +187,19 @@ describe("the dropdown-value export refuses rather than truncating", () => {
 // group named with spaces around it, and a list longer than the door accepts.
 describe("the dropdown-value export narrows to the groups a caller names", () => {
   function seedThreeGroups() {
+    // ALL THREE WORDS ARE ALREADY SEEDED. `buildTeamSeed`'s own `DEFAULT_SELECTABLE`
+    // (team-schema/seed.ts) — the fixture `buildSpineDb` builds every team database
+    // from, above — plants an active "Ticket type"/"Question" row (the locked
+    // catalogue), an active "Country"/"Spain" row and an active "Industry"/"Retail"
+    // row on every fresh team. Team migration 0100 added a partial UNIQUE index on
+    // active (type, value), so planting a SECOND active row under any of these three
+    // exact pairs — harmless before that index existed — now collides with the
+    // seed's own row. The DELETE first is what keeps this fixture's OWN ids and
+    // `is_default` free to set exactly as the assertions below expect, rather than
+    // depending on whichever shape the seed happens to plant them in.
     db().exec(
       [
+        `DELETE FROM selectable_data WHERE (type, value) IN (('Ticket type', 'Question'), ('Country', 'Spain'), ('Industry', 'Retail'));`,
         `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G1', 'Ticket type', 'Question', 0, '2026-01-01');`,
         `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G2', 'Country', 'Spain', 0, '2026-01-01');`,
         `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G3', 'Industry', 'Retail', 0, '2026-01-01');`,

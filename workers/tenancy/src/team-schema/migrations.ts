@@ -7210,6 +7210,123 @@ UPDATE waves
    ) = 1;
 `,
   },
+  {
+    // TWO ACTIVE ROWS UNDER ONE (type, value), AND WHY. Found on staging
+    // (Kwapso, team-01kzwxfd86n0k3rzrbhkmkrwys) the same day 0098 shipped:
+    // two live "Plan" rows and two live "Build" rows under "Sprint type",
+    // both pairs position 3 / position 4, both members of each pair `is_default
+    // = 1`. The team had always carried a SECOND, dormant "Planning" row and a
+    // second, dormant "Implementation" row (the ordinary shape of an old
+    // duplicate this app has retired-not-deleted before, 0026's own ruling) —
+    // and 0098's rename statement is, on its own terms, exactly the "one rule,
+    // written once" `refBackfillSql`'s header argues for:
+    //   UPDATE selectable_data SET value = 'Plan', …, deactivated_at = NULL, …
+    //    WHERE type = 'Sprint type' AND value IN ('Plan', 'Planning');
+    // It matches by (type, value) ALONE, with no `deactivated_at IS NULL`
+    // guard and no check that a canonical "Plan" row might already be live —
+    // it wrote both the one live "Planning" row AND the one dormant "Planning"
+    // row, renaming and REACTIVATING both in the same statement. Two rows
+    // entered the rename; two rows left it, both spelled "Plan", both live.
+    // The same shape hit "Implementation" → "Build". "Iteration" duplicated
+    // too (0098 deactivates it, never renames it), but both its rows landed
+    // deactivated, so no active pair resulted — the bug is invisible until a
+    // rename REACTIVATES a dormant duplicate, which is exactly what 0098 did.
+    //
+    // THAT STATEMENT ALREADY RAN AND IS NOT REWRITTEN — this ledger is
+    // append-only (this file's own header) — and making it defensive against
+    // a duplicate it might reactivate is not needed going forward EITHER: this
+    // migration closes the invariant with a UNIQUE index (below), so nothing
+    // written after this migration can ever reintroduce the shape 0098's
+    // statement happened to hit. This entry is the repair and the record.
+    //
+    // THE REPAIR IS FOR EVERY TYPE, not only "Sprint type" — the invariant
+    // ("at most one active row per type+value") is general, and a future
+    // rename anywhere in this file can make the identical mistake 0098 made.
+    // The survivor is the OLDEST row (`created_at` ASC, `id` ASC the
+    // tie-break) — the same "seat 1 keeps it, everyone else is a duplicate"
+    // idiom `refBackfillSql`'s `seated`/`kept` CTEs use above — and every
+    // other active row sharing that (type, value) is DEACTIVATED, never
+    // deleted, `deactivator_name = 'System'` the same signature 0093/0097/0098
+    // all write for a migration's own act.
+    //
+    // A RECORD STORING THE VALUE BY WORD NEEDS NO REWRITE HERE: two rows
+    // sharing (type, value) already carry the IDENTICAL word — that is the
+    // whole definition of the duplicate — so nothing a `sprints.sprint_type`
+    // or any other `storedWordColumns` entry holds changes meaning when one of
+    // the two rows is switched off. This differs from `updateSelectable`'s own
+    // rename (selectable.ts), which changes the WORD ITSELF and so must carry
+    // referencing records with it; this migration changes which ROW answers
+    // for a word both rows already spell the same way.
+    //
+    // IDEMPOTENT: a second run finds at most one active row per (type, value)
+    // — this statement's own effect, and from here on the app's own duplicate
+    // guards (`createSelectable`'s 409, `updateSelectable`'s merge refusal) —
+    // so `seat > 1` matches nothing and the UPDATE below touches no row.
+    //
+    // THE UNIQUE INDEX, ADDED IN THE SAME MIGRATION THAT MAKES IT BUILDABLE.
+    // `idx_selectable_type_value` (migration 0061) stayed a plain index on
+    // purpose — its own header: "this table has carried duplicate (type,
+    // value) rows before and a unique index would REFUSE TO BUILD on any team
+    // that still holds one." The dedupe above is what changes that answer: it
+    // runs FIRST, in this same migration, so no team can reach the CREATE
+    // UNIQUE INDEX statement still holding a live duplicate — a second, wholly
+    // new index, so 0061's own (still useful, still non-unique) index is left
+    // exactly as it was. PARTIAL, `WHERE deactivated_at IS NULL`, for the two
+    // reasons a partial index always applies here: a retired duplicate must
+    // stay retired forever (deactivate-only, ARCHITECTURE §4) rather than
+    // fight the live row for the slot, and a rename that walks a word back
+    // through history must never be blocked by an INACTIVE row that happens to
+    // wear the same spelling — only two ACTIVE rows may never share one.
+    version: "0100_selectable_dedupe_and_wider_wave_app_backfill",
+    sql: `
+WITH ranked AS (
+  SELECT id, ROW_NUMBER() OVER (
+           PARTITION BY type, value ORDER BY created_at ASC, id ASC
+         ) AS seat
+    FROM selectable_data
+   WHERE deactivated_at IS NULL
+)
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'), deactivator_name = 'System', updated_at = datetime('now')
+ WHERE id IN (SELECT id FROM ranked WHERE seat > 1);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_selectable_type_value_active
+  ON selectable_data (type, value) WHERE deactivated_at IS NULL;
+
+-- A WIDER WAVE APP BACKFILL. 0099's own backfill (above) only ever read LIVE
+-- sprints (\`s.deactivated_at IS NULL\`) that all agreed on one app. Investigated
+-- on staging (Kwapso): every wave's app_id is still NULL, and the reason is not
+-- that the backfill is too narrow on THAT team — it is that none of Kwapso's
+-- three wave-wrapped sprints (out of 112 sprints total, 107 of which DO carry
+-- an app_id) names an app at all, live or dead, so no reading of "agree on
+-- one" can fill anything for this team. Reported plainly rather than invented:
+-- this statement cannot and does not manufacture a mapping Kwapso's own data
+-- does not contain.
+--
+-- WIDENED ANYWAY, because the general rule 0099 wrote was narrower than it
+-- needed to be: a wave's app is a fact about what was SOLD, and a sprint that
+-- named an app and was later deactivated (finished, or corrected) still
+-- witnessed that fact — the same "history survives deactivation" reading
+-- \`waves.active\` itself already gets (ARCHITECTURE §4). So this reads every
+-- sprint that HAS an app_id, live or not, and fills a wave's app only where
+-- every one of them agrees on exactly one — \`COUNT(DISTINCT …) = 1\` asked
+-- before the value is read, 0099's own discipline, unchanged. Still
+-- conservative: only ever fills a NULL app_id (a value set through the door,
+-- \`createWave\`/\`updateWave\`, is never overwritten), and a wave whose
+-- app-bearing sprints disagree is left NULL rather than guessed at.
+UPDATE waves
+   SET app_id = (
+     SELECT s.app_id FROM sprints s
+      WHERE s.wave_id = waves.id AND s.app_id IS NOT NULL
+      LIMIT 1
+   )
+ WHERE app_id IS NULL
+   AND (
+     SELECT COUNT(DISTINCT s.app_id) FROM sprints s
+      WHERE s.wave_id = waves.id AND s.app_id IS NOT NULL
+   ) = 1;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for
