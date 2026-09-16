@@ -57,7 +57,7 @@ import { readShortlist } from "../lib/knowledge-reader"
 import { extractFile, unreadableNote } from "../lib/knowledge-files"
 import { presignedKey, UPLOAD_TARGETS } from "../lib/upload-targets"
 import { confirmStored } from "./uploads"
-import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
+import { catchUpWithBudget, KNOWLEDGE_SYNC_PRESS_BUDGET_MS, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
 import { INGEST_SOURCES_PER_PRESS } from "@shared/workers/limits"
@@ -341,7 +341,14 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // ruling was explicit: nothing to press, nothing to wait for. Bounded and
   // best-effort — see catchUp(); a question is still answerable when it cannot
   // run, just as current as the last sweep.
-  await catchUp(env, cfg, guard)
+  //
+  // BUILD-5 §G1 (16 Sep 2026): AND NOW BOUNDED IN TIME, NOT JUST IN ROWS.
+  // catchUp() sweeps every kind, and against a base deep in a backlog that
+  // took 95 SECONDS before this — see catchUpWithBudget's own header for the
+  // measurement and the reasoning. A person asking a question must never wait
+  // for the sweep; the catch-up work itself is never dropped, only handed to
+  // run in the background once the budget is spent.
+  await catchUpWithBudget(request, env, cfg, guard)
   const limit = Number(queryText(url.searchParams.get("limit"), "Limit"))
   // Checked where it sits (R20): the door reads exactly one spelling of yes
   // and one of no. ABSENT means the default above; PRESENT-AND-"1" means on;
@@ -981,7 +988,14 @@ export async function postSetKnowledgeActive(request: Request, env: Env): Promis
 export async function postKnowledgeSync(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
-  const results = await sweepAll(env, cfg, guard)
+  // BUILD-5 §G2 (16 Sep 2026): ONE BOUNDED SLICE, NEVER A HANG. Against a
+  // base deep in a backlog this press used to sweep every kind with no time
+  // limit at all and never answer — see KNOWLEDGE_SYNC_PRESS_BUDGET_MS's own
+  // header. `caughtUp` below is already honest about a kind the budget never
+  // reached, so "press again" is a correct instruction the response itself
+  // supports, exactly like the Google sync door's own "a press is a nudge,
+  // not a backfill".
+  const results = await sweepAll(env, cfg, guard, undefined, { budgetMs: KNOWLEDGE_SYNC_PRESS_BUDGET_MS })
   // THE REVISIT PASS — what the ordinary sweep's forward-only cursor cannot
   // do on its own (`revisitUnhealthySources`'s own header). Rides this same
   // press rather than only the fifteen-minute cron, so a person who presses
