@@ -51,6 +51,7 @@
 // them to agree. See check-cloudflare-account.mjs — its header argued against a
 // third literal copy while five of them existed; this is one of the five.
 import { expectedAccount } from "./check-cloudflare-account.mjs"
+import { vectorIdsToDelete } from "./lib/wipe-vector-ids.mjs"
 
 const KWAPSO_ACCOUNT_ID = expectedAccount()
 if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
@@ -167,8 +168,13 @@ for (const { team, db } of plan) {
      the whole point is that it runs before the step that can fail, not
      after it. (scripts/test/wipe-order.test.mjs pins the order.) */
   await d1(db, "UPDATE knowledge_sources SET content_hash = NULL, indexed_chunks = 0, indexed_at = NULL")
-  /* The vector ids, READ BEFORE THE ROWS GO. A chunk's id is its vector's id. */
-  const ids = (await d1(db, "SELECT id FROM knowledge_chunks")).map((r) => r.id)
+  /* The vector ids, READ BEFORE THE ROWS GO — both levels: a chunk's id is
+     its vector's id, and a SOURCE's summary is a second vector this loop
+     used to leave behind entirely (see vectorIdsToDelete's own header). */
+  const ids = vectorIdsToDelete(
+    await d1(db, "SELECT id FROM knowledge_chunks"),
+    await d1(db, "SELECT id FROM knowledge_sources")
+  )
   if (ids.length) {
     /* Vectorize refuses more than 100 ids per call — measured, not assumed:
        it answered 40007 "max id count is 100" to a batch of a thousand. */
