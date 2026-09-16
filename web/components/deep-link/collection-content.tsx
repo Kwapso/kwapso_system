@@ -236,18 +236,19 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       <MeetingsScreen
         teamId={teamId as string}
         total={totals.meetings}
-        purposeCount={totals.purposes}
         canCreate={can("meetings", "create")}
-        canReadPurposes={can("delivery", "read")}
-        // REDIRECTED, 15 SEP 2026 — Task C: the standalone Purposes screen's
-        // nav entry moved to Settings › Meetings › Choices
-        // (module-settings-screen.tsx's `meetings` page, `MeetingTypesPanel`
-        // — see that file's own header). This button is meetings-screen.tsx's
-        // own ("Meeting types", its own lane already renamed the label); only
-        // the destination changes here, a one-line targeted edit in a shared
-        // deep-link file (see the Task C lane report for the full account —
-        // this is one of the two files named there, beside `web/lib/pages.ts`).
-        onPurposes={() => go(`/settings/meetings`)}
+        // NO `purposeCount`/`canReadPurposes`/`onPurposes` ANY MORE — the
+        // client's ruling, 16 Sep 2026: "On the main meetings screen at the
+        // bottom, there are meeting types, but this should not be there
+        // because this is already on the meeting settings, so remove it from
+        // there." Until this ruling this call site redirected the screen's
+        // own "Meeting types" button to Settings › Meetings › Choices
+        // (`module-settings-screen.tsx`'s `meetings` page, `MeetingTypesPanel`
+        // — Task C, 15 Sep 2026); that destination is unchanged and remains
+        // the section's one door (`SECTION_HOSTED_ELSEWHERE.purposes`,
+        // shared/rules/registry.ts) — only the shortcut from this screen, and
+        // the three props that carried it, are gone.
+        //
         // NO `onImport` ANY MORE — the client's ruling, 2026-09-15 evening:
         // "On meetings, kill the import." MeetingsScreen dropped the prop
         // outright (its own header carries her words); the import DOOR

@@ -29,7 +29,7 @@ import { Check, CheckSquare, PencilSimple } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-dialog"
-import { useStoryFormOptions } from "@/components/work/stories-screen"
+import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
@@ -59,6 +59,7 @@ import type { Story } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
+import { useSessionUserId } from "@/lib/use-active-team"
 
 export function StoryDetailScreen({
   teamId,
@@ -71,6 +72,7 @@ export function StoryDetailScreen({
   basePath: string
 }) {
   const { t, lang } = useLanguage()
+  const myUserId = useSessionUserId()
   // The backlog is PAGED, so a story reached by a deep link may sit past page
   // one — it is fetched by id and kept in its own cache key, exactly as the
   // knowledge base does for a source past its first page.
@@ -213,7 +215,11 @@ export function StoryDetailScreen({
 
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
-    { label: t("Type"), value: story.storyType || "—" },
+    // THE ICON JOINS THE WORD HERE TOO (client ruling, 16 Sep 2026) — the
+    // identical chip the List row and the Board card now draw
+    // (`storyTypeChip`, stories-screen.tsx), so the record's own detail
+    // screen cannot show a third idea of what a story's type looks like.
+    { label: t("Type"), value: storyTypeChip(story.storyType) },
     // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — beside Type,
     // the same overview list, so both halves of the ruling read together.
     { label: t("Category"), value: story.category },
@@ -484,6 +490,11 @@ export function StoryDetailScreen({
         storyTypes={options.storyTypes}
         categories={options.categories}
         storyId={story.id}
+        // THE SIGNED-IN USER — only matters when `initial.assigneeId` below is
+        // empty (an old story with no assignee on file): the form dialog falls
+        // back to this rather than opening on the one state its picker can no
+        // longer draw (16 Sep 2026 ruling killed the "Nobody" pill).
+        defaultAssigneeId={myUserId ?? ""}
         initial={{
           title: story.title,
           detail: story.detail ?? "",

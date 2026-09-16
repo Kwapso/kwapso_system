@@ -115,6 +115,29 @@ const DECLARED = /([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{\s*sortType\s*:/g
  * entry that is no longer an offending key at all is stale and turns the build
  * red, so this list can only shrink or stay true. */
 const DOOR_ORDERED: Record<string, string> = {
+  when: (
+    "the Meetings List (every tab draws the same `RecordTable` since 16 Sep " +
+    "2026 — meetings-screen.tsx's own header carries the client's ruling: " +
+    "'I want it exactly like the one in tickets'). The meetings list PAGES, " +
+    "so `meetings-screen.tsx` hands `order={found.order}` straight to " +
+    "`RecordTable` and `record-table.tsx`'s own `ordered()` is never " +
+    "reached. UNLIKE the AM-rebuild table this column briefly belonged to " +
+    "(2026-09-15, since retired), no column on this table carries a `sort` " +
+    "at all — the client's own words, one ruling later, put the order back " +
+    "in the toolbar's `<SortControl>` alone, matching Tickets' own " +
+    "`TicketRowsTable`, whose headers 'deliberately do not sort'. Declaring " +
+    "a browser comparison here would still be the wrong fix even if a " +
+    "header did click it: the rows arrive already ordered by the door, and " +
+    "comparing the fifty in hand would arrange them under a badge counting " +
+    "the whole meetings list."
+  ),
+  time: (
+    "the same Meetings List `when` is declared for, and the same reason: " +
+    "`order={found.order}` means `ordered()` is never reached for ANY " +
+    "column in this table, and this one carries no `sort` at all either — " +
+    "formatted for display only, `shapeMeetingsList`'s own `time` field " +
+    "(web/components/deep-link/shape.tsx)."
+  ),
   deadline: (
     "Tasks (web/components/work/tasks-screen.tsx). NOT door-ordered — the " +
     "misnomer this list already carries for `time` above, same shape here: " +
@@ -258,10 +281,16 @@ describe("a sortable column showing a formatted value declares what it is", () =
       // it, through `order={found.order}` — no column carries a `sort` key,
       // so `record-table.tsx`'s own `ordered()` returns the rows untouched.
       "web/components/accounts/inputs-screen.tsx",
-      // Meetings drew a `RecordTable` here too, 2026-09-15 (AM) — gone the
-      // same evening (client ruling: "replace the view table for list"), so
-      // this file is out of the net again and `when`/`time` came out of
-      // `DOOR_ORDERED` with it.
+      // Meetings' List body, 16 Sep 2026 — the client's own words:
+      // "the list view on meetings is completely wrong. I want it exactly
+      // like the one in tickets." `RecordTable` in the tickets shape (R80),
+      // back in the net for the second time (it drew one briefly on
+      // 2026-09-15 AM too, then lost it to `shared/web/list-compat.tsx`'s
+      // `List` the same evening). Two formatted cells, Date (`when`) and
+      // Time (`time`), both `DOOR_ORDERED` above: no column on this table
+      // carries a `sort` at all — the order lives in the toolbar's own
+      // `<SortControl>` alone, matching Tickets' own `TicketRowsTable`.
+      "web/components/meetings/meetings-screen.tsx",
       // The Automations table (both Settings › Automations and each module's
       // own settings page), 2026-09-14 — the client's ruling replaced the
       // hand-rolled card list with "the list component exactly the same as
@@ -296,12 +325,11 @@ describe("a sortable column showing a formatted value declares what it is", () =
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)
     expect(cells.size, "no formatted cells were found in any shaper").toBeGreaterThan(3)
-    // …and the one that this whole pass was about is actually in the net,
-    // declared. If it drops out, the census stopped looking at the thing it
-    // was built for. (Meetings' own `when`/`time` pair, door-ordered, left
-    // the net the same evening `RecordTable` left meetings-screen.tsx — see
-    // the file list above.)
+    // …and the two that this whole pass was about are actually in the net —
+    // one declared, one door-ordered. If either drops out, the census stopped
+    // looking at the thing it was built for.
     expect(formattedColumns, "the Tasks Deadline column is not being censused").toContain("deadline")
+    expect(formattedColumns, "the Meetings Date column is not being censused").toContain("when")
   })
 
   it("a declared column reads a RAW value, never the cell it is drawn from", () => {

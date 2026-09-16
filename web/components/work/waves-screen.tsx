@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@shared/ui/components/alert-dialog/alert-dialog"
-import { Badge } from "@shared/ui/components/badge/badge"
+import { Badge, type BadgeDot } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -63,12 +63,14 @@ import { AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { WaveFormDialog } from "@/components/work/wave-form-dialog"
+import { useSprintTypes } from "@/components/work/sprint-form-dialog"
+import { AppMark } from "@/components/apps/app-tiles"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { waves as wavesApi, wavesKey } from "@/lib/api/waves"
-import { companiesKey, totalKey, sprintsKey, listFetch } from "@/lib/live-resources"
+import { companiesKey, totalKey, sprintsKey, appsKey, listFetch } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
-import type { Account, Sprint } from "@shared/types"
+import type { Account, AppRow, Sprint } from "@shared/types"
 import type { Wave } from "@shared/waves"
 import { sprintState } from "@shared/sprint-state"
 import { formatDate, formatDayMonth } from "@shared/web/format"
@@ -183,13 +185,40 @@ export function waveWeekWindow(offset: number, t: (s: string) => string, lang: L
  * but for which this window's own sprint read turned up none is drawn as one
  * plain, unclickable `gap`-toned bar across its own range — the client's own
  * words for the case, "a wave with no sprints is a plain bar".
+ *
+ * THE LEFT COLUMN IS THE WAVE'S APP, NOT THE WAVE — client ruling, 16 Sep
+ * 2026: "what I want in the left column is the name of the app and the
+ * icon." A `Wave` carries no `appId` of its own (`shared/waves.ts`'s own
+ * type has none — a wave is sold to an ACCOUNT, and the systems it touches
+ * are a fact about the SPRINTS inside it, each of which can name a different
+ * app; `sprint-form-dialog.tsx`'s own planner offers every one of the
+ * client's apps, unconstrained). So the face this row wears is DERIVED: the
+ * app every live sprint in the wave agrees on, when there is exactly one —
+ * `waveApp` below. Where the wave has no sprints yet, its sprints name no
+ * app, or its sprints disagree, there is no single app to draw, and the row
+ * falls back to exactly what it drew before this ruling: its own name, on
+ * the initials tile ("A wave without an app shows the wave name with the
+ * initials tile" — this brief's own words for the fallback).
+ *
+ * THE WAVE'S OWN NAME MOVES TO A SECOND LINE, always, rather than onto the
+ * bar itself: see `TimelineRow.sublabel`'s own header
+ * (record-timeline.tsx) for why a fixed second line was chosen over a
+ * squeeze-dependent label on the bar.
  */
+function waveApp(waveId: string, appIdsByWave: Map<string, Set<string>>, appsById: Map<string, AppRow>): AppRow | null {
+  const ids = appIdsByWave.get(waveId)
+  if (!ids || ids.size !== 1) return null
+  const [only] = ids
+  return appsById.get(only) ?? null
+}
+
 export function buildWaveTimelineRows(
   rows: Wave[],
   sprints: Sprint[],
   window_: WaveWeekWindow,
   basePath: string,
-  lang: Language
+  lang: Language,
+  apps: AppRow[] = []
 ): TimelineRow[] {
   const windowStart = new Date(window_.weekStarts[0] ?? isoDay(new Date()))
   const count = window_.weeks.length
@@ -201,6 +230,17 @@ export function buildWaveTimelineRows(
     if (list) list.push(s)
     else byWave.set(s.waveId, [s])
   }
+  // THE APP LOOKUP — off EVERY live sprint in the wave, dated or not (a wave's
+  // app is a fact about what it covers, not about when its work runs), so this
+  // is a second map rather than a re-read of `byWave` above.
+  const appIdsByWave = new Map<string, Set<string>>()
+  for (const s of sprints) {
+    if (!s.waveId || !s.appId || !s.active) continue
+    const set = appIdsByWave.get(s.waveId)
+    if (set) set.add(s.appId)
+    else appIdsByWave.set(s.waveId, new Set([s.appId]))
+  }
+  const appsById = new Map(apps.map((a) => [a.id, a]))
 
   const timelineRows: TimelineRow[] = []
   for (const w of rows) {
@@ -255,9 +295,24 @@ export function buildWaveTimelineRows(
       }
     }
     if (segments.length === 0) continue
+    const app = waveApp(w.id, appIdsByWave, appsById)
     timelineRows.push({
       id: w.id,
-      label: w.name,
+      label: app ? (
+        <span className="flex min-w-0 items-center gap-1.5">
+          <AppMark app={app} size="choice" />
+          <span className="min-w-0 truncate">{app.name}</span>
+        </span>
+      ) : (
+        <span className="flex min-w-0 items-center gap-1.5">
+          <RecordMark picture={null} name={w.name} size="choice" />
+          <span className="min-w-0 truncate">{w.name}</span>
+        </span>
+      ),
+      // The wave's own name, only where the top line stopped being it (an app
+      // was found) — the fallback already IS the wave's name, and a second
+      // copy of it right below would be the row talking to itself.
+      sublabel: app ? w.name : undefined,
       segments,
       onSelectLabel: () => softNavigate(`${basePath}/${w.id}`),
     })
@@ -332,6 +387,53 @@ const SPRINT_DOT_TONE: Record<ReturnType<typeof sprintState>, string> = {
   wrapped: "bg-chart-2",
 }
 
+/** THE WAVE'S OWN TEMPORAL STATE — client ruling, 16 Sep 2026: "on waves, all
+ * list: make status a colored pill." A wave has no status WORD of its own
+ * (`shared/waves.ts` — "a wave is a wave", no kind and, by the same
+ * reasoning, no separate status column): what List used to show was only the
+ * `active`/`deactivated` fact. This reads the SAME three-part axis the T3
+ * timeline already draws the wave's own bar against — planned (has not
+ * started), running (started, not yet over) or done (its own end date has
+ * passed) — off the wave's OWN `startsOn`/`endsOn`, the earliest/latest of
+ * its live sprints (`recalcWaveDates`, workers/tenancy/src/lib/waves.ts).
+ *
+ * NOT `sprintState` ITSELF: that function has no "done" at all by design —
+ * an overrunning sprint stays "running" until somebody closes it, because a
+ * SPRINT is closed by a hand on its own record. A wave is never closed by
+ * hand (there is no such act); the honest reading of "is this package still
+ * running" is whether its own end date, the latest date any sprint in it
+ * carries, has passed — so this is its own function, over the same three
+ * words, rather than a call into one built to answer a different question. */
+export type WaveDisplayState = "planned" | "running" | "done"
+
+export function waveState(w: { startsOn: string | null; endsOn: string | null }, today: string): WaveDisplayState {
+  if (!w.startsOn || w.startsOn > today) return "planned"
+  if (w.endsOn && w.endsOn < today) return "done"
+  return "running"
+}
+
+/** THE SAME NEUTRAL PILL FOR EVERY STATE — `variant="status"`'s own law
+ * ("neutral fill, charcoal label, the state lives in the dot"), so only the
+ * DOT differs; `planned`/`running`/`done` reuse the identical three tones
+ * `sprint-detail.tsx` already draws for a sprint's own status pill
+ * (`{sprint.completedAt ? "shipped" : sprint.active ? "building" : "archived"}`),
+ * word for word: not-yet-started reads as the kit's "review" tone (the
+ * portal's own "awaiting" pill wears it too), live reads `building`, and
+ * done reads `shipped` — the same tone an app's own "Completed" stage wears.
+ * A switched-off wave never reaches this map at all: it draws `archived`
+ * directly, the tone every other deactivated record in the app wears. */
+const WAVE_STATE_DOT: Record<WaveDisplayState, BadgeDot> = {
+  planned: "review",
+  running: "building",
+  done: "shipped",
+}
+
+function waveStateLabel(state: WaveDisplayState, t: (s: string) => string): string {
+  if (state === "done") return t("Done")
+  if (state === "running") return t("Running")
+  return t("Planned")
+}
+
 export function waveListRows(
   rows: Wave[],
   sprints: Sprint[],
@@ -382,10 +484,19 @@ export function waveListRows(
       ),
       start: formatDate(w.startsOn, lang) || "—",
       end: formatDate(w.endsOn, lang) || "—",
+      // A COLOURED PILL, ALWAYS — client, 16 Sep 2026: "make status a
+      // colored pill." Deactivated wins over the temporal read (a wave that
+      // ran to its own end date and was then switched off is switched off,
+      // not "done" — the same order every other record's status/active pair
+      // resolves in this app).
       state: w.active ? (
-        <span className="text-sm">{t("Active")}</span>
+        <Badge variant="status" dot={WAVE_STATE_DOT[waveState(w, today)]}>
+          {waveStateLabel(waveState(w, today), t)}
+        </Badge>
       ) : (
-        <Badge variant="secondary">{t("Switched off")}</Badge>
+        <Badge variant="status" dot="archived">
+          {t("Switched off")}
+        </Badge>
       ),
     }
   })
@@ -461,6 +572,14 @@ export function WaveCollection({
   // own sprint-state dots all read the wave's OWN sprints out of this one
   // round trip rather than three narrower fetches.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
+  // EVERY APP ON THE TEAM — the same cache key `wave-detail.tsx` already
+  // reads (and keeps live, R15), read here only for its LOGO: the timeline's
+  // left column draws the wave's own app, and a `Sprint` row only ever
+  // carries the app's id and name (`shared/types.ts`), never its picture.
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  // THE TEAM'S OWN "Sprint type" VOCABULARY — the new filter facet's options
+  // (client, 16 Sep 2026: "I want, in Waves, the filter by sprint type").
+  const sprintTypes = useSprintTypes(teamId)
 
   // WHAT SHE WAS ASKING THIS COLLECTION, remembered with the screen (see
   // web/lib/nav-memory.ts). The search, the client, the on/off filter and the
@@ -487,6 +606,15 @@ export function WaveCollection({
       q: typeof was.q === "string" ? was.q : "",
       accountId,
       status: was.status === "on" || was.status === "off" ? was.status : "",
+      // Not revalidated against the team's own vocabulary the way `accountId`
+      // is above: `useSprintTypes` always answers something (a real list or
+      // three fallback words, never "not yet loaded"), so there is no moment
+      // to tell "not loaded yet" from "no longer exists" apart the way the
+      // client list's genuine loading state lets `accountId` do it. A type
+      // that was since renamed or removed degrades the same honest way a
+      // switched-off client does above: the filter survives and matches
+      // nothing, with "Clear all" beside it.
+      sprintType: typeof was.sprintType === "string" ? was.sprintType : "",
       sortBy: (["name", "runs", "sprints", "client", "newest"] as const).includes(
         was.sortBy as WaveOrder
       )
@@ -575,10 +703,13 @@ export function WaveCollection({
   // Active IS the "still switched on" collection, not a filter a reader can
   // clear back out of it.
   const all = tab === "active" ? scopedWaves.filter((w) => w.active) : scopedWaves
-  const rows = selectWaves(all, query)
+  // Read BEFORE `rows`: the Sprint type facet is answered off this array
+  // (`selectWaves`'s own EXISTS-over-sprints, mirroring the door's).
+  const sprints = sprintsQ.data ?? []
+  const rows = selectWaves(all, query, sprints)
   const clients = (clientsQ.data ?? []).filter((a) => a.active)
   const asking = waveQueryIsActive(query)
-  const sprints = sprintsQ.data ?? []
+  const apps = appsQ.data ?? []
 
   // R16 — THE TAB STRIP'S OWN BADGES, an exact count each. Waves is a
   // BOUNDED, fully-loaded collection (no pager — the file header says why),
@@ -595,7 +726,7 @@ export function WaveCollection({
   // it is actually on screen.
   const weekWindow = view === "timeline" ? waveWeekWindow(weekOffset, t, lang) : null
   const timelineRows =
-    weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang) : []
+    weekWindow ? buildWaveTimelineRows(rows, sprints, weekWindow, basePath, lang, apps) : []
 
   const calendarEntries = view === "calendar" ? buildWaveCalendarEntries(rows, sprints) : []
   const listRows = view === "list" ? waveListRows(rows, sprints, t, lang) : []
@@ -676,6 +807,7 @@ export function WaveCollection({
             onChange={setQuery}
             clients={clients}
             showClientFilter={!accountId}
+            sprintTypes={sprintTypes}
             resultCount={rows.length}
             views={tabViews}
             view={view}

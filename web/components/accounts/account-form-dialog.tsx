@@ -110,10 +110,13 @@ const cityField = { ...defaultFieldConfig, label: "City", required: false }
 const countryField = { ...defaultFieldConfig, label: "Country", required: false }
 const industryField = { ...defaultFieldConfig, label: "Industry", required: false }
 // 0091, client ruling 14 Sep 2026: "who the account responsible or account
-// manager is, like someone from staff." Not required — most existing
-// accounts have nobody assigned yet, and a required dropdown would make
-// somebody guess (the same reasoning the four `picker(...)` fields below
-// already carry for the team's own vocabulary).
+// manager is, like someone from staff." Not required AT THE DOOR — an API/MCP
+// caller, and a pre-16-Sep-2026 row, may still carry no manager at all — but
+// the UI never leaves it looking that way: since the 16 Sep 2026 ruling ("kill
+// the 'nobody' option for staff … everywhere") the picker itself preselects
+// the signed-in user on a create and falls back to them on an edit whose
+// stored value is empty (see `defaultAccountManagerId` below), so a person
+// never sees this field drawn with nobody chosen.
 const accountManagerField = { ...defaultFieldConfig, label: "Account manager", required: false }
 const aboutField = { ...defaultFieldConfig, label: "About", required: false }
 const languageField = { ...defaultFieldConfig, label: "Language", required: false }
@@ -250,16 +253,25 @@ export function AccountFormDialog({
   members?: PickablePerson[]
   /** THE SIGNED-IN USER, preselected as account manager on a NEW account —
    * client ruling, 15 Sep 2026: "always put the user preselected by default."
-   * Ignored on an edit (`initial` wins), and "" is a legitimate answer (no
-   * session yet, or the caller has no opinion — most of this suite's own
-   * render calls). */
+   * `initial` wins on an EDIT — except where `initial.accountManagerId` is
+   * itself empty (an account with no manager on file, from before this field
+   * existed or before the 16 Sep 2026 ruling), where this is the fallback
+   * too: that ruling killed the picker's own "Nobody" pill, so there is no
+   * state left for an edit to open on if the stored value is blank. "" is a
+   * legitimate answer (no session yet, or the caller has no opinion — most of
+   * this suite's own render calls). */
   defaultAccountManagerId?: string
 }) {
   const { t, lang } = useLanguage()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    initial ?? { ...EMPTY, accountManagerId: defaultAccountManagerId ?? "" },
+    // EDIT: the stored manager wins — except where there is none, an old
+    // account predating this field or the 16 Sep 2026 ruling, which falls
+    // back to the signed-in user the same as a create does.
+    initial
+      ? { ...initial, accountManagerId: initial.accountManagerId || (defaultAccountManagerId ?? "") }
+      : { ...EMPTY, accountManagerId: defaultAccountManagerId ?? "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -489,7 +501,9 @@ export function AccountFormDialog({
         <Field config={accountManagerField} htmlFor="account-manager" className={fieldSpacing}>
           {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN — client ruling, 15 Sep
               2026, preselected to the signed-in user on a new account
-              (`defaultAccountManagerId`, above). */}
+              (`defaultAccountManagerId`, above), and the same fallback on an
+              edit whose stored manager is empty. NO "Nobody" pill — 16 Sep
+              2026 ruling. */}
           <StaffPillPicker
             id="account-manager"
             ariaLabel={t(accountManagerField.label)}
@@ -497,8 +511,6 @@ export function AccountFormDialog({
             lang={lang}
             value={values.accountManagerId}
             onValueChange={(v) => set({ accountManagerId: v })}
-            allowNobody
-            nobodyLabel={t("Nobody yet")}
             disabled={busy}
           />
         </Field>

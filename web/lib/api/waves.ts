@@ -35,12 +35,19 @@ export function waveOneKey(id: string): string {
 }
 
 export const waves = {
-  /** Every wave the caller may see, or one client's. Bounded (R14), with the
-   * door's exact COUNT(*) beside the rows (R16). */
-  list: (accountId?: string) =>
-    api<{ waves: Wave[]; total: number }>(
-      `/api/tenancy/waves${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`
-    ),
+  /** Every wave the caller may see, or one client's, or one carrying a live
+   * sprint of one type (`EXISTS`, the door's own — a wave has no such column).
+   * Bounded (R14), with the door's exact COUNT(*) beside the rows (R16).
+   * Neither filter is sent by the sidebar collection today — it reads the
+   * whole bounded list once and narrows in the browser (wave-finder.tsx's own
+   * header says why) — but the door answers both for any other caller. */
+  list: (params?: { accountId?: string; sprintType?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.accountId) q.set("accountId", params.accountId)
+    if (params?.sprintType) q.set("sprintType", params.sprintType)
+    const qs = q.toString()
+    return api<{ waves: Wave[]; total: number }>(`/api/tenancy/waves${qs ? `?${qs}` : ""}`)
+  },
 
   /** One wave, the sprints in it, and any clash between their dates — three
    * answers in one round trip because they are one screen. */

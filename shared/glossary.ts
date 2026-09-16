@@ -113,7 +113,14 @@ export const GLOSSARY = {
   storyTypeFeature: { term: "Feature", def: "A story type: a brand-new capability that did not exist before." },
   storyTypeChange: { term: "Change", def: "A story type, and the default: modifying something that already works — copy and email wording included." },
   storyCategoryClientRequested: { term: "Client-requested", def: "A story's category, and the default: it traces back to a client ticket or ask." },
-  storyCategoryInternal: { term: "Internal", def: "A story's category: work Kwapso started on its own, not asked for by a client." },
+  // TIGHTENED 2026-09-16 to the client's own two words for it (documents/
+  // UI-RULEBOOK.md K26, migration `0094_story_type_and_category`'s own
+  // header: "Internal (Kwapso-initiated upkeep)"), R34's own discipline read
+  // for a definition rather than a synonym: the paraphrase this def used to
+  // carry ("work Kwapso started on its own, not asked for by a client") said
+  // the same thing in different words than every other file that quotes her
+  // ruling verbatim.
+  storyCategoryInternal: { term: "Internal", def: "A story's category: Kwapso-initiated upkeep, not asked for by a client." },
   todo: { term: "Input", def: "Something we need from a client. It sits in their portal with a due date." },
   task: { term: "Task", def: "Our own internal admin, something for us, not for an account's delivery." },
   sprint: { term: "Sprint", def: "A block of delivery work sold to one account, with a start, an end and a price." },

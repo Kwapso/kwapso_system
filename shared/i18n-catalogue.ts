@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 803 strings · 3 languages · 1463 of the entries below are hand-written seed.
+// 802 strings · 3 languages · 1469 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -374,7 +374,6 @@ export const CATALOGUE: Catalogue = {
   "No meetings about this app yet.": { de: "Noch keine Treffen zu dieser App.", es: "Sin reuniones sobre esta aplicación aún.", ca: "Cap reunió sobre aquesta aplicació encara." },
   "No meetings with them yet.": { de: "Noch keine Treffen mit ihnen.", es: "Sin reuniones con ellos aún.", ca: "Cap reunió amb ells encara." },
   "No processes drawn inside this app yet.": { de: "In dieser App wurden noch keine Prozesse erfasst.", es: "Ningún proceso dibujado dentro de esta aplicación todavía.", ca: "Cap procés dibuixat dins aquesta app encara." },
-  "No processes on this app yet. Tick the box above if it changes none.": { de: "Auf dieser App gibt es noch keine Prozesse. Aktivieren Sie das Kästchen oben, wenn es nichts ändert.", es: "Ningún proceso en esta aplicación todavía. Marca la casilla anterior si no cambia nada.", ca: "Cap procés en aquesta app encara. Marca la casella de dalt si no canvia res." },
   "No sprints yet.": { de: "Noch keine Sprints.", es: "Ningún sprint todavía.", ca: "Cap sprint encara." },
   "No text yet.": { de: "Noch kein Text.", es: "Ningún texto todavía.", ca: "Cap text encara." },
   "No tickets raised for them yet.": { de: "Es wurden noch keine Tickets dafür erstellt.", es: "Ningún ticket levantado para ellos todavía.", ca: "Cap tiquet obert per a ells encara." },
@@ -455,7 +454,6 @@ export const CATALOGUE: Catalogue = {
   "Photo": { de: "Foto", es: "Foto", ca: "Foto" },
   "Pick a story or a ticket": { de: "Geschichte oder Ticket auswählen", es: "Elige un relato o un ticket", ca: "Tria una història o una incidència" },
   "Pick a version": { de: "Version auswählen", es: "Elige una versión", ca: "Tria una versió" },
-  "Pick one": { de: "Einen auswählen", es: "Elige uno", ca: "Tria'n una" },
   "Pick someone to keep in the loop": { de: "Wählen Sie jemanden, der informiert bleiben soll", es: "Elige a alguien para mantenerlo informado", ca: "Tria algú per mantenir al corrent" },
   "Pick the app": { de: "App auswählen", es: "Elige la aplicación", ca: "Tria l'aplicació" },
   "Pick the person who's a contact of": { de: "Wählen Sie die Person, die ein Kontakt von", es: "Elige a la persona que es contacto de", ca: "Tria la persona que és un contacte de" },
@@ -556,6 +554,7 @@ export const CATALOGUE: Catalogue = {
   "Sprint name": { de: "Sprint-Name", es: "Nombre del sprint", ca: "Nom del sprint" },
   "Sprint review": { de: "Sprint-Überprüfung", es: "Revisión del sprint", ca: "Revisió del sprint" },
   "Sprint started.": { de: "Sprint gestartet.", es: "Sprint iniciado.", ca: "Sprint iniciat." },
+  "Sprint type": { de: "Sprintart", es: "Tipo de sprint", ca: "Tipus de sprint" },
   "Sprint updated.": { de: "Sprint aktualisiert.", es: "Sprint actualizado.", ca: "Sprint actualitzat." },
   "Sprints": { de: "Sprints", es: "Sprints", ca: "Sprints" },
   "Stage": { de: "Phase", es: "Etapa", ca: "Etapa" },

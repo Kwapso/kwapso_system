@@ -12,23 +12,44 @@
 // no tab strip to badge; the arbitration context makes sure only one of the two
 // ever renders it.
 //
-// AND IT IS WHERE MEETING PURPOSES ARE REACHED FROM. The taxonomy of why we meet
-// used to sit under the Delivery method page; that page went on 17 Aug 2026 with
-// its programmes folded onto the sprint type, and a purpose belongs beside the
-// meetings list rather than on a rail of its own — it is the vocabulary behind this
-// screen, not a second destination.
+// MEETING TYPES ARE NO LONGER REACHED FROM HERE — the client's ruling, 16 Sep
+// 2026, verbatim: *"On the main meetings screen at the bottom, there are
+// meeting types, but this should not be there because this is already on the
+// meeting settings, so remove it from there."* The link this screen used to
+// draw at its own foot (labelled "Meeting types", redirecting to Settings ›
+// Meetings › Choices since Task C, 15 Sep 2026) is deleted along with the
+// `onPurposes`/`canReadPurposes`/`purposeCount` props that fed it — the
+// destination is unchanged and still the ONLY door
+// (`SECTION_HOSTED_ELSEWHERE.purposes`, shared/rules/registry.ts): Settings ›
+// Meetings › Choices, `MeetingTypesPanel`. This screen no longer links to it,
+// on purpose — a capability living in exactly one place, not zero.
+//
+// THE 16 SEP 2026 RULINGS, verbatim, on top of everything below: *"Also, the
+// list view on meetings is completely wrong. I want it exactly like the one
+// in tickets. What you did is something different. Once again, kill the
+// emojis. Also, when they're in the name, just remove them, please."* Three
+// changes: (1) the List body is `RecordTable` in the tickets shape now, never
+// `shared/web/list-compat.tsx`'s `List` — see the row-shape comment further
+// down; (2) a meeting title arriving from Google Calendar has every
+// emoji/pictograph stripped at ingest (`workers/content/src/lib/meetings.ts`,
+// `google-read.ts`) and again at display for rows already stored, so a title
+// synced before this ruling is clean the next time it renders, not only the
+// next time it syncs; (3) the Meeting types block above is gone, per the
+// paragraph just above this one.
 //
 // THE EVENING RULINGS, 15 SEP 2026 — the SAME day the AM rebuild below swapped
-// this screen's two-line List for a seven-column Table on every tab. Three
-// changes, read verbatim at "THE STRIP AND THE VIEWS" further down:
+// this screen's two-line List for a seven-column Table on every tab, itself
+// superseded the next day by the 16 Sep ruling above. Three changes, read
+// verbatim at "THE STRIP AND THE VIEWS" further down:
 //
-//   1 · TABLE IS GONE AGAIN, AND LIST IS WHAT IT BECAME — her own words,
-//       tested a few hours after the AM rebuild shipped: "On meetings this
-//       week, replace the view table for list." / "On meetings, mine: replace
+//   1 · TABLE IS GONE, AND LIST IS WHAT IT BECAME — her own words, tested a
+//       few hours after the AM rebuild shipped: "On meetings this week,
+//       replace the view table for list." / "On meetings, mine: replace
 //       table for list. Same in everyone's." Every tab now offers List instead
 //       of Table: This week is Agenda · Calendar · List, Mine is Calendar ·
 //       List, Everyone's is List · Calendar — the same three-tabs-three-lists
-//       shape the AM rebuild set up, one word swapped in each.
+//       shape the AM rebuild set up, one word swapped in each. STILL the
+//       shape a day later — only what "List" DRAWS changed, 16 Sep 2026.
 //
 //   2 · THE IMPORT BUTTON IS GONE FROM THIS SCREEN — "On meetings, kill the
 //       import." The toolbar's "Import CSV" button, the empty state's
@@ -68,7 +89,9 @@ import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings
 import { RecordCalendar, RecordAgenda, type CalendarEntry, type AgendaEntry } from "@/components/records/record-calendar"
 import { RecordWeek } from "@/components/records/record-week"
 import { RecordMark } from "@shared/web/record-mark"
-import { List, type ListItem } from "@shared/web/list-compat"
+import { RecordTable, type TableColumn } from "@/components/records/record-table"
+import { defaultCollectionConfig, type CollectionConfig } from "@shared/web/screen-engine/config"
+import { stripPictographs } from "@shared/text-clean"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
@@ -95,29 +118,28 @@ import type { Language } from "@shared/i18n"
  */
 
 
-/** WHAT "TABLE" USED TO SHOW HERE, ON EVERY TAB — gone the same evening it
- * shipped (ruling, 2026-09-15: "replace the view table for list", both on
- * This week and on Mine, "same in everyone's"). It was seven columns
- * (Name/Title, Date, Time, Meeting type, Department, Attendees, Account),
- * `RecordTable`, a `TABLE_COLUMNS`/`COLUMN_SORT`/`TABLE_COLUMN_HEADERS` trio
- * pairing each column to the door's own sort menu, all of it removed rather
- * than kept dark: a table with nowhere left to mount is dead code, and dead
- * code that still compiles is the shape this base's own "lean" directive
- * refuses. `web/test/sorted-columns-declare-their-type.test.ts`'s own
- * `DOOR_ORDERED` entries for `when`/`time` went with it, and so did this
- * file's row in that census's own file list — there is no `<RecordTable`
- * left here for it to find.
+/** WHAT "LIST" SHOWED HERE, 15 SEP (evening) → 16 SEP 2026 — one two-line row
+ * per meeting, built off `shown` and drawn through `shared/web/list-compat.tsx`'s
+ * `List`. GONE, and not kept dark: the client's own words on it, 16 Sep 2026,
+ * verbatim — *"the list view on meetings is completely wrong. I want it
+ * exactly like the one in tickets. What you did is something different."*
  *
- * WHAT "LIST" SHOWS INSTEAD, on every tab that offers it — one row shape,
- * built straight off `shown` (the tab's own `Meeting[]`, not a second
- * shaper): `RecordMark` (the account's own face, R35), the title (a
- * cancelled meeting still says so, the same word `MeetingsAgenda` appends
- * below), and one detail line — date · time · meeting type · account, the
- * four facts her ruling named for this row, in that order. Drawn through
- * `shared/web/list-compat.tsx`'s `List`, the same component every other
- * collection's list body draws through (`sprints-screen.tsx`'s own grouped
- * rows, the library engine's own default body before Table existed here) —
- * never a second hand-rolled row shape. */
+ * WHAT "LIST" SHOWS NOW, on every tab that offers it: `RecordTable`
+ * (`web/components/records/record-table.tsx`) in the tickets shape — the
+ * flush, hairline table every screen but Tickets' own bespoke
+ * `TicketRowsTable` draws through since R80/K22 (`documents/UI-RULEBOOK.md`).
+ * Six columns, her own list: Name, Date, Time, Type (the meeting's own
+ * Phosphor icon + word, `shapeMeetingsList`'s `purposeCell`), Attendees
+ * (faces, then a `+N` count past three), Account (`accountCell` — a mark and
+ * a name, the same split `shapeAccountsList` draws for its own table). No
+ * column carries a `sort` — SORT STAYS IN THE TOOLBAR, the one
+ * `<SortControl>` this screen has ever had, R78 already withdrawing it on
+ * Calendar/Week/Agenda — matching Tickets' own `TicketRowsTable`, whose
+ * headers "deliberately do not sort" (that file's own comment). `when`/`time`
+ * are both formatted cells with no comparator anywhere, so both carry a
+ * reasoned `DOOR_ORDERED` line in
+ * `web/test/sorted-columns-declare-their-type.test.ts` rather than a
+ * `sortType` that would claim a comparison nobody runs. */
 
 /* ── THE STRIP AND THE VIEWS, 2026-09-09 → 2026-09-15 (evening) ──────────────
  *
@@ -169,16 +191,17 @@ import type { Language } from "@shared/i18n"
  * THE THIRD RULING, 2026-09-15 (evening), tested a few hours after the AM
  * rebuild shipped, verbatim: *"On meetings this week, replace the view table
  * for list."* / *"On meetings, mine: replace table for list. Same in
- * everyone's."* TABLE IS GONE AGAIN, and List is what it became a second
- * time — every tab that offered Table now offers List instead, in the exact
- * same slot her AM ruling gave it (first-named is still that tab's own
- * default): This week is Agenda / Calendar / List; Mine is Calendar / List;
- * Everyone's is List / Calendar. The row is one shape on every tab —
- * `RecordMark`, the title, and a date · time · meeting type · account detail
- * line — drawn through `shared/web/list-compat.tsx`'s `List` (the same
- * component every other collection's list body draws through), never the
- * retired `ScreenRenderer` path and never a second hand-rolled row.
+ * everyone's."* TABLE IS GONE, and List is what it became a second time —
+ * every tab that offered Table now offers List instead, in the exact same
+ * slot her AM ruling gave it (first-named is still that tab's own default):
+ * This week is Agenda / Calendar / List; Mine is Calendar / List; Everyone's
+ * is List / Calendar. THE SLOT NAME STOOD, ONLY WHAT IT DRAWS MOVED AGAIN THE
+ * NEXT DAY — 16 Sep 2026, the header block above carries her words in full:
+ * `List` is `RecordTable` in the tickets shape now (R80/K22), never
+ * `shared/web/list-compat.tsx`'s `List`, which drew a two-line row for
+ * exactly one day.
  *
+
  * ALONGSIDE IT, THE SAME EVENING: *"On meetings, kill the import."* The
  * toolbar's "Import CSV" button, the empty state's "Import a list" act and
  * the `onImport` prop that fed both are gone from this screen — the import
@@ -315,13 +338,17 @@ function MeetingsAgenda({
     time: formatTime(m.startsAt, lang),
     dateTime: m.startsAt,
     // A CANCELLED meeting still says so here — the same word `shape.tsx`'s
-    // own `shapeMeetingsList` appends to the calendar's own title (and this
-    // screen's own List rows below build the identical suffix straight off
-    // `m.active`), unwrapped there too (a template literal, not a sentence of
-    // its own for `t` to translate).
+    // own `shapeMeetingsList` appends to the calendar's title and to the
+    // List body's `name`/`nameText`, unwrapped there too (a template
+    // literal, not a sentence of its own for `t` to translate). AND THE SAME
+    // STRIP — a synced title's pictograph is removed at display here too
+    // (16 Sep 2026 ruling, `stripPictographs`'s own header), the same one
+    // `shapeMeetingsList` runs before building its own `name`.
     title: (
       <span className="flex min-w-0 flex-col">
-        <span className="min-w-0 truncate">{m.active ? m.title : `${m.title} (cancelled)`}</span>
+        <span className="min-w-0 truncate">
+          {m.active ? stripPictographs(m.title) : `${stripPictographs(m.title)} (cancelled)`}
+        </span>
         {m.purposeName ? (
           <span className="text-muted-foreground min-w-0 truncate text-xs">{m.purposeName}</span>
         ) : null}
@@ -361,40 +388,99 @@ function MeetingsWeek({
   lang: Language
   onOpen: (id: string) => void
 }) {
-  const entries: CalendarEntry[] = rows.map((m) => ({
-    id: m.id,
-    day: m.startsAt.slice(0, 10),
-    // A CANCELLED meeting still says so — the same suffix `MeetingsAgenda`
-    // and this screen's own List rows both append.
-    title: m.active ? m.title : `${m.title} (cancelled)`,
-    time: formatTime(m.startsAt, lang),
-  }))
+  const entries: CalendarEntry[] = rows.map((m) => {
+    const title = stripPictographs(m.title)
+    return {
+      id: m.id,
+      day: m.startsAt.slice(0, 10),
+      // A CANCELLED meeting still says so — the same suffix `MeetingsAgenda`
+      // and this screen's own List/Table rows both append, over the same
+      // stripped title (16 Sep 2026 ruling, `stripPictographs`'s own header).
+      title: m.active ? title : `${title} (cancelled)`,
+      time: formatTime(m.startsAt, lang),
+    }
+  })
   return <RecordWeek entries={entries} onSelect={(entry) => onOpen(entry.id)} />
+}
+
+/** ONE SHAPED MEETING ROW, read by the List body's own `RecordTable`
+ * (`shapeMeetingsList`'s own contract, `web/components/deep-link/shape.tsx`).
+ * The `Record<string, unknown>` intersection is what lets `RecordTable`'s own
+ * `T extends TableRowData` accept it without a second, looser cast at the
+ * call site — the same shape `ShapedAccountRow` gives `accounts-screen.tsx`
+ * one file over. */
+type ShapedMeetingRow = Record<string, unknown> & {
+  id: string
+  name: string
+  nameText: string
+  when: string
+  time: string
+  purposeCell: React.ReactNode
+  attendeesCell: React.ReactNode
+  accountCell: React.ReactNode
+  ref: string | null | undefined
+}
+
+/** THE TABLE'S SIX COLUMNS, in her own order (16 Sep 2026 ruling, the header
+ * block above carries her words in full): "I want it exactly like the one in
+ * tickets" — Name, Date, Time, Type, Attendees, Account.
+ *
+ * NO COLUMN CARRIES A `sort`. SORT STAYS IN THE TOOLBAR — the one
+ * `<SortControl>` this screen has ever had (`translatedSorts("meetings", t)`
+ * above), matching Tickets' own `TicketRowsTable`, whose headers
+ * "deliberately do not sort" (that file's own comment) — a plain header here
+ * is the honest one, not a second, disagreeing order control bolted onto a
+ * table whose rows the door already arranged.
+ *
+ * `when`/`time` are still both formatted cells with nothing comparing them —
+ * `web/test/sorted-columns-declare-their-type.test.ts`'s own `DOOR_ORDERED`
+ * carries the reasoned line for each, because that census reads every column
+ * key in a `<RecordTable` file against every formatted shaper cell of the
+ * same name, whether or not the column is clickable. */
+function meetingsTableColumns(t: (english: string) => string): TableColumn[] {
+  return [
+    { key: "name", label: t("Name"), searchKey: "nameText" },
+    { key: "when", label: t("Date") },
+    { key: "time", label: t("Time") },
+    {
+      key: "purposeCell",
+      label: t("Type"),
+      searchKey: "purpose",
+      render: (v) => (v == null ? "—" : undefined),
+    },
+    {
+      key: "attendeesCell",
+      label: t("Attendees"),
+      searchKey: "attendeesText",
+      render: (v) => (v == null ? "—" : undefined),
+    },
+    { key: "accountCell", label: t("Account"), searchKey: "client" },
+  ]
 }
 
 export function MeetingsScreen({
   teamId,
   total,
-  purposeCount,
   canCreate,
-  canReadPurposes,
-  onPurposes,
   onIntent,
 }: {
   teamId: string
   /** the exact server total (R16) — never the loaded page's length */
   total: number | undefined
-  /** the exact server total of the MEETING PURPOSES, for the link below */
-  purposeCount: number | undefined
   canCreate: boolean
-  /** `delivery:read` — the right the purposes screen itself gates on. */
-  canReadPurposes: boolean
-  onPurposes: () => void
   // NO `onImport` ANY MORE — the client's ruling, 2026-09-15 evening: "On
   // meetings, kill the import." This screen's own toolbar button, the empty
   // state's "Import a list" act and the prop that fed both are gone; the
   // import DOOR itself is untouched (`/t/<teamId>/import/meetings`, reachable
   // from Home's own generic "Import" tile) — see the header block above.
+  //
+  // NO `purposeCount`/`canReadPurposes`/`onPurposes` ANY MORE EITHER — the
+  // client's ruling, 16 Sep 2026: "On the main meetings screen at the bottom,
+  // there are meeting types, but this should not be there because this is
+  // already on the meeting settings, so remove it from there." This screen's
+  // own "Meeting types" link is gone with the three props that fed it; the
+  // destination (Settings › Meetings › Choices, `MeetingTypesPanel`) is
+  // unchanged and is now the ONLY door — see the header block above.
   onIntent: (intent: ScreenIntent) => void
 }) {
   const { t, lang } = useLanguage()
@@ -408,9 +494,10 @@ export function MeetingsScreen({
   // out of the SAME bounded cache the apps page holds — an agency has tens of
   // apps, so the picker costs nothing anybody has not already paid.
   const appsQ = useCached<AppRow[]>(canCreate ? appsKey(teamId) : null, () => listFetch.apps(teamId))
-  // The purposes are read whenever this screen can offer them at all — the form
-  // picker needs them, and so does the count on the link below.
-  const purposesQ = useCached<MeetingPurpose[]>(canCreate || canReadPurposes ? `purposes:${teamId}` : null, () =>
+  // THE PURPOSES ARE READ ONLY FOR THE CREATE FORM'S OWN PICKER NOW — the
+  // "Meeting types" link's own count read (`canReadPurposes`) is gone with
+  // the link itself (16 Sep 2026 ruling, the header block above).
+  const purposesQ = useCached<MeetingPurpose[]>(canCreate ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
   const [open, setOpen] = React.useState(false)
@@ -606,6 +693,24 @@ export function MeetingsScreen({
       : tab === "mine"
         ? t("Nothing in Meetings you were in.")
         : t("Nothing in Meetings yet.")
+  // THE SAME THREE SENTENCES, UNTRANSLATED — the List body's own `RecordTable`
+  // wraps its rows in `CollectionFrame` (record-table.tsx), whose zero-row
+  // register calls `t(config.emptyText)` ITSELF (`collection-frame.tsx`), the
+  // same seam `withDataDrivenCollection` feeds an untranslated recipe sentence
+  // through on every other paged table (accounts-screen.tsx, inputs-screen.tsx).
+  // Handing it the already-translated `tabEmpty` above would ask `t()` to
+  // resolve a catalogue entry keyed on its own output — a lookup nothing wrote
+  // a translation for, so `t()`'s own English fallback would show even to a
+  // German reader. Kept as a second ternary rather than reused, on purpose:
+  // R28's extraction script reads a literal string inside `t("…")`, never a
+  // variable, so the same three sentences have to be spelled twice for the one
+  // call site that must NOT translate them itself.
+  const tabEmptyRaw =
+    tab === "week"
+      ? "Nothing in Meetings this week."
+      : tab === "mine"
+        ? "Nothing in Meetings you were in."
+        : "Nothing in Meetings yet."
 
   /** THE BODY SWITCH — WHICH BODIES DEPENDS ON THE TAB (ruling, 2026-09-15 —
    * the header block above carries her words). A CONFIG and never a node,
@@ -886,44 +991,28 @@ export function MeetingsScreen({
           // than read off a shared const, for `weekView`'s own reason — a
           // resolved-key const satisfies a reader and not a census.
           monthNarrowing.view = tab === "week" ? "mine-week" : tab
-          // THE LIST'S OWN ROWS, ON EVERY TAB THAT OFFERS ONE (ruling,
-          // 2026-09-15 evening — the header block above carries her words).
-          // Built straight off `shown` (this tab's own `Meeting[]`) rather
-          // than `shapeMeetingsList`: that shaper's own `detail` line is two
-          // facts (date · account) for the calendar's narrower square, and
-          // the ruling asked for four here, so this reads the same raw row a
-          // second time rather than widening a shaper the calendar has no use
-          // for the extra two.
-          const listItems: ListItem[] = shown.map((m) => {
-            const accountLabel = m.accountName ?? t("Ours")
-            return {
-              id: m.id,
-              // THE ACCOUNT'S OWN FACE (R35, client ruling 2026-09-15: "add
-              // the logos to account and app … identify everywhere else
-              // where it makes sense") — the same picture-or-initial the
-              // toolbar's own Account facet draws.
-              leading: <RecordMark picture={m.accountLogoUrl} name={accountLabel} />,
-              // A CANCELLED meeting still says so — the same word
-              // `MeetingsAgenda` appends to its own title above.
-              title: m.active ? m.title : `${m.title} (cancelled)`,
-              // DATE · TIME · MEETING TYPE · ACCOUNT, in that order — the
-              // four facts the ruling named for this row.
-              subtitle: [
-                formatDate(m.startsAt, lang),
-                formatTime(m.startsAt, lang),
-                m.purposeName ?? t("Not said"),
-                accountLabel,
-              ].join(" · "),
-            }
-          })
-          // …AND THE EMPTY SENTENCE IS THE TAB'S, not a generic fallback —
-          // `found.emptyText` ("Nothing matched.") still wins mid-search;
-          // otherwise every tab's own List gets that tab's own honest word
-          // (`tabEmpty`), the same one the Agenda and Calendar bodies below
-          // get, so the three bodies of one tab can never disagree about what
-          // an empty answer means (2026-09-03 audit made exactly this
-          // correction for the week, and it now applies to all three tabs'
-          // Lists alike).
+          // THE TABLE'S OWN ROWS, ON EVERY TAB THAT OFFERS ONE (16 Sep 2026
+          // ruling, the header block above carries her words in full). Built
+          // through `shapeMeetingsList` now, not a second shaper reading
+          // `shown` by hand — its `when`/`purposeCell`/`accountCell` fields
+          // exist for exactly this table (that function's own header: "TABLE
+          // COLUMNS, not facets… read by the table and by nothing else").
+          const tableRows = shapeMeetingsList(shown, lang).rows as unknown as ShapedMeetingRow[]
+          // THE TABLE'S OWN CHROME — R14: the door above (`<PagedFind>`) owns
+          // the search and the sort, so `searchable`/`sortable` stay off and
+          // `RecordTable`'s own in-memory match never runs (the same
+          // "inert on a paged collection" shape `accounts-screen.tsx`'s
+          // gallery states in full one file over). `showCount: false` is R16:
+          // `CollectionHeading` above already carries the one exact count.
+          // `emptyText` is the tab's own RAW sentence — see `tabEmptyRaw`'s
+          // own header for why it is not `tabEmpty`.
+          const tableConfig: CollectionConfig = {
+            ...defaultCollectionConfig,
+            searchable: false,
+            sortable: false,
+            showCount: false,
+            emptyText: tabEmptyRaw,
+          }
           return (
             // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
             // `SectionWithCreate` does this identically) — the create button now
@@ -1014,23 +1103,45 @@ export function MeetingsScreen({
                   onOpen={(id) => onIntent({ kind: "open", module: "meetings", id })}
                 />
               ) : (
-                // LIST — ON EVERY TAB THAT OFFERS ONE (ruling, 2026-09-15
-                // evening). ONE ROW SHAPE drawn by all three tabs now —
-                // `listItems` above says what it shows.
+                // LIST — ON EVERY TAB THAT OFFERS ONE (16 Sep 2026 ruling, the
+                // header block above carries her words in full). `RecordTable`
+                // in the tickets shape (R80/K22) now, ONE ROW SHAPE drawn by
+                // all three tabs — `tableRows`/`tableConfig`/
+                // `meetingsTableColumns` above say what it shows.
                 //
-                // `surface="none"`: `CollectionCard` above (drawn by `wrap`)
-                // is the ONE box already — Accounts and Tickets dropped their
-                // own the same day for the same reason ("the broken
+                // No `useKitPanel`: `CollectionCard` above (drawn by `wrap`)
+                // is the ONE box already — Accounts and Tickets both draw
+                // their own table the identical way, one file over
+                // (`accounts-screen.tsx`, `tickets-collection.tsx`'s own
+                // `TicketRowsTable`), for the same reason ("the broken
                 // combination", screen-bits.tsx's own doc on
-                // `CollectionCard`), and the Table this view replaced made the
-                // identical choice for the identical reason (`No useKitPanel`,
-                // this branch's own history).
-                <List
-                  surface="none"
-                  items={listItems}
-                  empty={found.emptyText ?? tabEmpty}
-                  onItemClick={(item) =>
-                    onIntent({ kind: "open", module: "meetings", id: item.id })
+                // `CollectionCard`).
+                //
+                // `order={found.order}` is inert today — no column below
+                // carries a `sort`, so `record-table.tsx`'s own `ordered()` is
+                // never reached — and is passed anyway, the same way every
+                // other paged `<RecordTable>` in the app is wired, so the door
+                // stays the one thing that can ever own this table's order.
+                //
+                // `narrowedOutside={found.active}`: the door above owns this
+                // search (R14), so the table cannot see the narrowing from
+                // inside and its own query is always empty — without this a
+                // search that matched nothing would read as "this collection
+                // is empty" and offer "Add the first" over rows the term was
+                // only hiding.
+                <RecordTable
+                  columns={meetingsTableColumns(t)}
+                  rows={tableRows}
+                  // THE NUMBER IN FRONT OF THE NAME, the same black chip
+                  // every other collection leads with (Tickets'
+                  // `TicketRowsTable`, Accounts' table one file over) — never
+                  // a seventh column of its own.
+                  refColumn="ref"
+                  config={tableConfig}
+                  order={found.order}
+                  narrowedOutside={found.active}
+                  onRowClick={(row) =>
+                    onIntent({ kind: "open", module: "meetings", id: String(row.id) })
                   }
                 />
               )}
@@ -1127,36 +1238,17 @@ export function MeetingsScreen({
         </div>
       )}
 
-      {/* WHY WE MEET, one level down. A link rather than a nav line: the types
-          are the vocabulary this screen picks from, and a rail that lists both a
-          page and the words behind it reads as two ideas. R16: the number is the
-          door's exact total through the ONE seam, and an unloaded total renders
-          nothing rather than a "0" that reads as "there are none".
-          "MEETING TYPES", NOT "MEETING PURPOSES" — the glossary rename this
-          lane hands over (`shared/glossary.ts`, "Meeting purpose" → "Meeting
-          type"); the label is the only thing that moved, every prop and
-          identifier below it (`purposeId`, `purposeCount`, `canReadPurposes`,
-          `onPurposes`, `purposesQ`, `MeetingPurpose`) stays exactly as named. */}
-      {canReadPurposes ? (
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onPurposes}
-          /* `ghost` IS this quiet tertiary action: `--ink-tertiary` is
-             `--muted-foreground` and its hover is the ink going to full, which
-             is what was hand-written here. The overrides are the box only (a
-             quiet text action occupies none) plus the hover underline `ghost`
-             does not carry and this line always has. NOT the weight: a
-             `font-normal` here measured 300, not the 400 it was replacing,
-             because `--font-weight-normal` is 300 in this palette — so the
-             neutralising class made it lighter than either side. The kit's own
-             control weight (500) stands instead. */
-          className="h-auto w-fit p-0 underline-offset-4 hover:underline"
-        >
-          {t("Meeting types")}
-          {formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
-        </Button>
-      ) : null}
+      {/* "WHY WE MEET" USED TO BE ONE LEVEL DOWN, HERE — a "Meeting types" link
+          to Settings › Meetings › Choices, since Task C moved the editor there
+          on 15 Sep 2026. GONE, 16 Sep 2026, the client's own ruling verbatim:
+          "On the main meetings screen at the bottom, there are meeting types,
+          but this should not be there because this is already on the meeting
+          settings, so remove it from there." The destination did not move —
+          `SECTION_HOSTED_ELSEWHERE.purposes` (shared/rules/registry.ts) still
+          names Settings › Meetings › Choices as meeting types' one door — only
+          this screen's own shortcut to it is gone, along with the
+          `purposeCount`/`canReadPurposes`/`onPurposes` props that fed it (see
+          this file's own header block and `MeetingsScreen`'s prop list). */}
 
       <MeetingFormDialog
         open={open}

@@ -23,6 +23,7 @@ import { describeChanges, logActivity, type Actor } from "@shared/workers/activi
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { mendMojibake } from "@shared/workers/mojibake"
+import { stripPictographs } from "@shared/text-clean"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor } from "./google"
 import { type CalendarEvent } from "./google-api"
@@ -1378,9 +1379,22 @@ const SERIES_HORIZON_DAYS = 28
  * repairing the row is a treadmill for the same reason the sweep lanes were:
  * this is the third door Google's text comes through, and a census of every
  * TEXT column in the team database is what found it, after two rounds of
- * fixing the doors I happened to remember. */
+ * fixing the doors I happened to remember.
+ *
+ * AND THE PICTOGRAPH STRIP BELONGS HERE FOR THE IDENTICAL REASON, ONE RULING
+ * LATER — the client, 16 Sep 2026, verbatim: "Once again, kill the emojis.
+ * Also, when they're in the name, just remove them, please." A meeting whose
+ * invitation carries an emoji is re-read from Google on every sweep exactly
+ * like the mojibake above, so stripping it once at display would lose the
+ * fight again the next time the sweep re-writes `title` from Google's own
+ * text. `stripPictographs` runs AFTER the mend (a mangled byte is never a
+ * pictograph, so the order cannot matter for correctness, but the mend
+ * existed first and this reads as "clean the text, then remove the glyphs"
+ * rather than the reverse) and BEFORE the empty-title fallback: a title that
+ * was only an emoji becomes "A meeting with no title", the same honest
+ * sentence a title that was only whitespace already gets. */
 function titleOf(event: CalendarEvent): string {
-  return mendMojibake(event.summary) || "A meeting with no title"
+  return stripPictographs(mendMojibake(event.summary)) || "A meeting with no title"
 }
 
 /** HOW FAR BACK THE LIVE WINDOW RE-READS, ON EVERY CALL.

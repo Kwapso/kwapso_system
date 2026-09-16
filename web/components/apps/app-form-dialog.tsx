@@ -190,8 +190,13 @@ export function AppFormDialog({
   teamId: string
   /** THE SIGNED-IN USER, preselected on a NEW app as both staff and lead —
    * client ruling, 15 Sep 2026: "always put the user preselected by default."
-   * Ignored on an edit (`initial` wins). "" (the default) offers nobody
-   * preselected, same as before this ruling. */
+   * On an EDIT, `initial` wins for the staff list; the LEAD is different (see
+   * `lead`, below the draft) because it must also be one of the staff — the
+   * 16 Sep 2026 ruling that killed the picker's own "Nobody" pill means an
+   * old app with no lead on file, or one whose lead was since unstaffed,
+   * cannot be allowed to open the field with no pill pressed, so this is one
+   * of the fallbacks `lead` tries. "" (the default) is a legitimate answer
+   * (no session yet, or the caller has no opinion). */
   defaultStaffUserId?: string
 }) {
   const { t, lang } = useLanguage()
@@ -264,9 +269,24 @@ export function AppFormDialog({
   // boundary like every other stored URL this app renders.
   const logoPreview = values.logoUrl.startsWith("data:") ? values.logoUrl : safeSrc(values.logoUrl)
 
+  // WHO IS STAFFED, IN THE ORDER THE PICKER DRAWS THEM — shared by the fallback
+  // below and the `people` list the Lead picker renders, so the two can never
+  // disagree about who is even offered.
+  const staffedInOrder = sortedOptions(members, lang, (m) => m.name).filter((m) =>
+    values.staffUserIds.includes(m.id)
+  )
   // A lead who has been unticked is no longer a lead — worked out on the fly so
-  // the form can never send the pair the door would refuse.
-  const lead = values.staffUserIds.includes(values.leadUserId) ? values.leadUserId : ""
+  // the form can never send the pair the door would refuse. And since the 16
+  // Sep 2026 ruling killed this picker's own "Nobody" pill, once ANYBODY is
+  // staffed this can never come out empty: the ticked value first, then the
+  // signed-in user if they are staffed, then whoever is first on the row —
+  // so unstaffing a lead, or opening an old app with no lead on file, never
+  // leaves the field with no pill pressed.
+  const lead =
+    (values.leadUserId && values.staffUserIds.includes(values.leadUserId) && values.leadUserId) ||
+    (defaultStaffUserId && values.staffUserIds.includes(defaultStaffUserId) ? defaultStaffUserId : "") ||
+    staffedInOrder[0]?.id ||
+    ""
   const mainHolder = values.stakeholderContactIds.includes(values.mainStakeholderContactId)
     ? values.mainStakeholderContactId
     : ""
@@ -500,20 +520,18 @@ export function AppFormDialog({
       </Field>
       {/* THE LEAD IS CHOSEN FROM THE PEOPLE ALREADY TICKED, and the field is not
           there until somebody is: a lead is one of the staff by definition, and
-          a picker with nothing in it is a question with no possible answer. */}
+          a picker with nothing in it is a question with no possible answer.
+          Once it IS there, `lead` (above) guarantees a pill is always pressed —
+          NO "Nobody" pill (16 Sep 2026 ruling). */}
       {values.staffUserIds.length > 0 && (
         <Field config={leadField} htmlFor="app-lead" className={fieldSpacing}>
           <StaffPillPicker
             id="app-lead"
             ariaLabel={t(leadField.label)}
-            people={sortedOptions(members, lang, (m) => m.name)
-              .filter((m) => values.staffUserIds.includes(m.id))
-              .map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            people={staffedInOrder.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
             lang={lang}
             value={lead}
             onValueChange={(v) => setValues((s) => ({ ...s, leadUserId: v }))}
-            allowNobody
-            nobodyLabel={t("Nobody yet")}
             disabled={busy}
           />
         </Field>

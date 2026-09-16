@@ -760,6 +760,12 @@ export function AppDetailScreen({
         accounts={(accountsQ.data ?? [])
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
+        // THE SIGNED-IN USER — one of the fallbacks the Lead field tries when
+        // `initial.leadUserId` below is empty (an old app with no lead on
+        // file): see `AppFormDialog`'s own `lead` computation. Its "Nobody"
+        // pill is gone (16 Sep 2026 ruling), so the field can no longer open
+        // with no pill pressed once anybody is staffed.
+        defaultStaffUserId={myUserId ?? ""}
         initial={{
           name: app.name,
           accountId: app.accountId ?? "",

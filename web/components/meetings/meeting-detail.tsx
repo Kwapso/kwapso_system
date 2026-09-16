@@ -69,6 +69,7 @@ import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { RecordMark } from "@shared/web/record-mark"
+import { stripPictographs } from "@shared/text-clean"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
@@ -356,6 +357,20 @@ export function MeetingDetailScreen({
       />
     )
 
+  // THE DISPLAY-TIME STRIP — the client's ruling, 16 Sep 2026: "kill the
+  // emojis. Also, when they're in the name, just remove them, please." A row
+  // synced from Google before this ruling shipped is still stored with
+  // whatever pictograph its invitation carried
+  // (`workers/content/src/lib/meetings.ts`'s `titleOf` only strips at INGEST,
+  // for every sync from now on) — this is the other half, so it reads clean
+  // here the next time anybody opens it rather than only the next time it
+  // re-syncs. EVERY READ-ONLY display of the title below uses this, never
+  // `item.title` directly; the edit form's own `initial.title` and the
+  // notes-save/cancel doors' own `title: item.title` (this file's write
+  // paths, which simply echo the record back to the update door unchanged)
+  // are deliberately untouched — this is the display half only.
+  const cleanTitle = stripPictographs(item.title)
+
   const overviewItems = [
     { label: t("Who it is with"), value: item.accountName ?? "Nobody, it is ours" },
     { label: t("Which app"), value: item.appName ?? "—" },
@@ -464,7 +479,7 @@ export function MeetingDetailScreen({
                 // Honest, specific copy: it comes out of Meetings, nothing is lost.
                 onSelect: () =>
                   ask({
-                    title: t("Cancel {title}?", { title: item.title }),
+                    title: t("Cancel {title}?", { title: cleanTitle }),
                     body: t(
                       "It comes out of Meetings. The record and its notes stay exactly where they are, and you can put it back any time."
                     ),
@@ -503,7 +518,7 @@ export function MeetingDetailScreen({
       // (shared/web/record-mark.tsx). Before this, four of the eleven record
       // screens opened with a bare title while the other seven led with a mark,
       // which is the drift a reader feels and never reports.
-      leading={<RecordMark name={item.title} size="band" />}
+      leading={<RecordMark name={cleanTitle} size="band" />}
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself
@@ -556,7 +571,7 @@ export function MeetingDetailScreen({
           )}
         </>
       }
-      title={item.title}
+      title={cleanTitle}
       // THE SUBTITLE — client ruling, 2026-08-31, verbatim: "some titles may
       // have 'subtitles'. place it directly under the title and on top of
       // the pills. f.e. in a meeting, the time." An earlier header-cleanup
@@ -627,7 +642,7 @@ export function MeetingDetailScreen({
               <WorkLogsPanel
                 targetTable="meetings"
                 targetId={meetingId}
-                recordLabel={item.title}
+                recordLabel={cleanTitle}
                 canEdit={canEditTime}
                 // Read-only on a meeting — the comment beside `canSeeTime` above
                 // says why the hours here are written by the transcript rather

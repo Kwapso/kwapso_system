@@ -6,10 +6,30 @@
 // horizontal choices, not the dropdown. By default, in all of these where I'm
 // selecting staff, always put the user preselected by default."
 //
+// NO "NOBODY" OPTION, ANYWHERE — a second, later ruling, same client, 16 Sep
+// 2026, verbatim: "Kill the 'nobody' option for staff. If we leave it empty,
+// it's not an option. Remove it from tasks and everywhere else. This
+// 'nobody', just kill it." `mode="single"` used to be able to render an extra
+// "Nobody" pill that cleared the row (`allowNobody`/`nobodyLabel`); that prop
+// pair is GONE, not merely unused — there is no way to reach an empty
+// `value` from this component any more, in either mode's UI. THE CALL SITE
+// carries the other half of her ruling: a create form's draft is seeded with
+// the signed-in user's id (`defaultAssigneeId`/`defaultAccountManagerId`/
+// `defaultStaffUserId`, each form dialog's own prop) and an edit form's draft
+// is seeded from the stored value — and where that stored value is itself
+// empty (a row written before this field existed, or before this ruling), the
+// same signed-in-user id is the fallback there too, so the row a person
+// reopens to edit is never the one case this component itself cannot draw. A
+// person cannot type their way back to empty from here: every pill's own
+// `onClick` only ever SELECTS (`selected ? undefined : () => onValueChange(...)`),
+// never clears.
+//
 // ONE COMPONENT, TWO MODES. `mode="single"` (the default) is a `role="radiogroup"`
-// of `role="radio"` pills — an assignee, an account manager, a lead: exactly one
-// or nobody. `mode="multi"` is `role="group"` with `aria-pressed` on each pill —
-// a ticket's stakeholders, an app's staff: any number, toggled independently.
+// of `role="radio"` pills — an assignee, an account manager, a lead: exactly
+// one, always. `mode="multi"` is `role="group"` with `aria-pressed` on each pill —
+// a ticket's stakeholders, an app's staff: any number, and EMPTY IS FINE (no
+// pill pressed is not a "Nobody" option, it is nobody having been pressed yet —
+// her ruling was about a pill that says the word, not about the state).
 // Same visual idiom either way, the same one `AppearancePillGroup`
 // (`shared/web/appearance-pill-group.tsx`) already established for Settings ›
 // Appearance's Size/Appearance/Background rows: a bare `<button role="…">` row
@@ -29,6 +49,9 @@
 // `record-picker.tsx` is also the one file `web/test/rules.test.ts`'s
 // `one-record-picker` law lets compose the kit's `Command`; this file composes
 // nothing from it; it is closer to `AppearancePillGroup` than to `RecordPicker`.
+// (It once had "no radio/optional-Nobody shape" as a third difference; the
+// optional Nobody pill is gone from here too now, per the 16 Sep 2026 ruling
+// above — the remaining difference is the radio semantics and the preselect.)
 //
 // THE FACE IS `RecordMark` (R35), round — a person in their own right, never a
 // client/app square. THE WORD IS THE FIRST NAME ALONE: a disambiguated name
@@ -73,8 +96,8 @@ function firstName(name: string): string {
 }
 
 /** ROVING FOCUS ALONG ONE ROW. `data-pill` marks every button this component
- * draws (the "Nobody" pill included), so Left/Right walks the whole group
- * regardless of mode. Wraps at both ends, the same as a native radio group. */
+ * draws, so Left/Right walks the whole group regardless of mode. Wraps at
+ * both ends, the same as a native radio group. */
 function movePillFocus(current: HTMLElement, dir: 1 | -1) {
   const row = current.closest<HTMLElement>("[data-pill-row]")
   if (!row) return
@@ -132,16 +155,18 @@ type BaseProps = {
 export type StaffPillPickerProps =
   | (BaseProps & {
       mode?: "single"
-      /** The chosen id, or "" for nobody. */
+      /** The chosen id. NEVER "" IN PRACTICE — the 16 Sep 2026 ruling killed
+       * the "Nobody" pill that used to be the only way to reach that value
+       * from inside this component, and the caller is what keeps it that way
+       * (see the file header): a create form's draft starts on the signed-in
+       * user, an edit form's draft starts on the stored person, and a stored
+       * person who is themselves missing (an old, pre-ruling row) falls back
+       * to the signed-in user too. The type stays `string` rather than a
+       * branded non-empty one because this component cannot enforce a
+       * caller's draft state — it can only refuse to ever CLEAR it, which the
+       * removed prop pair was the one door for. */
       value: string
       onValueChange: (value: string) => void
-      /** Render a "Nobody" pill and let the row clear itself — only where the
-       * field genuinely may hold no one. Omit on a required field. */
-      allowNobody?: boolean
-      /** Required alongside `allowNobody` — the screen's own words ("Nobody
-       * yet", "Not said"), already translated, the same sentence the dropdown
-       * this replaces used as its `emptyOption`/`placeholder`. */
-      nobodyLabel?: string
     })
   | (BaseProps & {
       mode: "multi"
@@ -196,8 +221,7 @@ export function StaffPillPicker(props: StaffPillPickerProps) {
     )
   }
 
-  const { value, onValueChange, allowNobody = false, nobodyLabel } = props
-  const nobodyChosen = value === ""
+  const { value, onValueChange } = props
   return (
     <div
       id={id}
@@ -206,20 +230,6 @@ export function StaffPillPicker(props: StaffPillPickerProps) {
       data-pill-row
       className={cn("flex flex-wrap gap-1.5", className)}
     >
-      {allowNobody && (
-        <button
-          type="button"
-          role="radio"
-          data-pill
-          aria-checked={nobodyChosen}
-          disabled={disabled}
-          onKeyDown={onPillKeyDown}
-          onClick={nobodyChosen ? undefined : () => onValueChange("")}
-          className={pillClass(nobodyChosen, disabled)}
-        >
-          {nobodyLabel}
-        </button>
-      )}
       {ordered.map((p) => {
         const selected = p.id === value
         return (

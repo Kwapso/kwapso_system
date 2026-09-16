@@ -75,6 +75,18 @@ export type TimelineSegment = {
 export type TimelineRow = {
   id: string
   label: React.ReactNode
+  /** A SECOND, MUTED LINE under `label` — added for the client's 16 Sep 2026
+   * ruling ("what I want in the left column is the name of the app and the
+   * icon"): the left column now carries the row's FACE (an app's mark and
+   * name, or the row's own name where it has no face), and whatever used to
+   * be the whole of `label` moves down here rather than onto the bar itself.
+   * A T3 segment is `h-6` (24px) and already carries its own sprint's name —
+   * there is no room in there for a second tier of text, so the caller's own
+   * choice (see `waves-screen.tsx#buildWaveTimelineRows`) is this line,
+   * always, rather than a conditional squeeze that depends on how short the
+   * bar happens to be this week. Omitted where there is nothing more to say
+   * (the row's face already IS its only name). */
+  sublabel?: React.ReactNode
   segments: TimelineSegment[]
   /** clicking the row's own name opens the wave; absent draws plain text. */
   onSelectLabel?: () => void
@@ -92,7 +104,12 @@ const TONE_FILL: Record<TimelineSegment["tone"], string> = {
   gap: "bg-surface-panel text-muted-foreground",
 }
 
-const ROW_MIN_HEIGHT = "min-h-[2.25rem]"
+// Bumped from 2.25rem (one line) so a row carrying a `sublabel` — the ordinary
+// case now, see `TimelineRow` above — has room for both lines without the bar
+// looking cramped against the label column beside it. A row with no sublabel
+// simply sits a little taller than it strictly needs to, which reads as more
+// consistent than two different row heights on one grid.
+const ROW_MIN_HEIGHT = "min-h-[2.75rem]"
 
 export function RecordTimeline({
   weeks,
@@ -217,17 +234,32 @@ export function RecordTimeline({
                 )}
                 style={{ gridTemplateColumns: `10rem repeat(${count}, minmax(3.25rem, 1fr))` }}
               >
-                {row.onSelectLabel ? (
-                  <button
-                    type="button"
-                    onClick={row.onSelectLabel}
-                    className="min-w-0 truncate pe-2 text-start text-sm font-medium underline-offset-2 hover:underline"
-                  >
-                    {row.label}
-                  </button>
-                ) : (
-                  <span className="min-w-0 truncate pe-2 text-sm font-medium">{row.label}</span>
-                )}
+                {/* TWO LINES, ONE GRID CELL — the row's face (an icon +
+                    name, or plain text) on top, `sublabel` muted underneath.
+                    Neither line forces `truncate` on `row.label`/`sublabel`
+                    directly any more: the content can be a flex row (a mark
+                    beside a name), and truncating an ARBITRARY node clips it
+                    without the ellipsis text-overflow was meant to draw — the
+                    caller truncates its own name text where it actually is
+                    one (waves-screen.tsx's own icon+name spans do exactly
+                    that, the same pattern waveListRows already uses for the
+                    account cell). */}
+                <div className="flex min-w-0 flex-col gap-0.5 pe-2">
+                  {row.onSelectLabel ? (
+                    <button
+                      type="button"
+                      onClick={row.onSelectLabel}
+                      className="min-w-0 text-start text-sm font-medium underline-offset-2 hover:underline"
+                    >
+                      {row.label}
+                    </button>
+                  ) : (
+                    <span className="min-w-0 text-sm font-medium">{row.label}</span>
+                  )}
+                  {row.sublabel ? (
+                    <span className="text-muted-foreground min-w-0 truncate text-xs">{row.sublabel}</span>
+                  ) : null}
+                </div>
 
                 <div
                   className="relative grid h-6"

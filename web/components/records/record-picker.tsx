@@ -217,6 +217,28 @@ export type PickerOption = {
    * — the one map that supplies these today — is where that discipline is kept
    * and reasoned. Never drawn as a `RecordMark`: see this type's own header. */
   swatch?: string | null
+  /** A NODE MARK — a Phosphor glyph, drawn directly rather than routed through
+   * `RecordMark`'s TEXT-only `mark` prop. Added 2026-09-16 for the story TYPE
+   * row (`story-form-dialog.tsx`, client ruling: "assign an icon to each
+   * type … make it a horizontal pick"): a type's icon is a real component
+   * (`shared/story-types.ts`), not a short word, and `RecordMark`/
+   * `RecordMarkGlyph` (shared/web/record-mark.tsx) is typed `mark?: string |
+   * null` on purpose — it is not this lane's file to widen, and a bag of
+   * fallback logic built for TEXT ("mark || name's first letter") has no
+   * honest way to fall back from a missing node either.
+   *
+   * A FOURTH KIND OF MARK, drawn in the same slot `swatch` already proves is
+   * safe to add beside `picture`/`mark`: never together, precedence fixed in
+   * ONE place (below and in `RowChip`), so two callers cannot disagree about
+   * which one wins. `picture` still beats it — a record's own photo outranks
+   * a generic glyph wherever both are somehow present — and it outranks
+   * `mark`/`face`, because a caller that bothered to hand over a real icon
+   * component said more than a two-letter code can.
+   *
+   * KEEPS EVERY EXISTING CALLER WORKING: this is a new, independent optional
+   * field, so the thirty-plus call sites that only ever set `mark` (a string)
+   * are untouched — nothing here changes what `mark` means or how it is read. */
+  icon?: React.ReactNode
   /** THIS OPTION IS A RECORD AND ALWAYS WEARS ITS FACE — even when it has
    * neither a picture nor a glyph, in which case `RecordMark` draws the name's
    * own initial, which is its whole last-resort branch.
@@ -541,7 +563,7 @@ export function RecordPicker({
           prop for the same box, exactly the drift `RecordMark`'s own header
           warns a caller-supplied size class causes; that bug is fixed, this is
           a size decision on top of it. */}
-      {(o.picture || o.mark || o.face) && (
+      {o.picture || o.mark || o.face ? (
         <RecordMark
           picture={o.picture}
           mark={o.mark}
@@ -550,13 +572,25 @@ export function RecordPicker({
           size="choice"
           className="mt-0.5"
         />
-      )}
+      ) : o.icon ? (
+        // THE FOURTH KIND OF MARK — a node, not text, so it cannot go through
+        // `RecordMark`'s `mark` prop (see `PickerOption.icon`'s own header).
+        // Same box a `RecordMark` at `size="choice"` draws (`--avatar-sm`,
+        // `bg-muted`, the same radius), so a row of icon options sits at the
+        // identical size and offset as a row of face options one field over.
+        <span
+          aria-hidden
+          className="bg-muted text-muted-foreground mt-0.5 grid size-[var(--avatar-sm)] shrink-0 place-items-center overflow-hidden rounded-[var(--radius)]"
+        >
+          {o.icon}
+        </span>
+      ) : null}
       {/* THE THIRD KIND OF MARK, in the same slot and never beside a face: an
           option carries a picture, a glyph or a colour, and a record that
           somehow had two would be saying the same thing twice in one row. The
           `mt-1.5` is the dot's own optical centring against the first line of a
           two-line option, the same job `mt-0.5` does for the 24px box above. */}
-      {!o.picture && !o.mark && o.swatch && (
+      {!o.picture && !o.mark && !o.icon && o.swatch && (
         <span className="mt-1.5 flex">
           <Swatch colour={o.swatch} />
         </span>
@@ -973,7 +1007,7 @@ function RowChip({
           UI-CONVENTIONS §5's reason: it is a pictograph, and the row's own
           ordering already says what it says. */}
       {offering && <Sparkle aria-hidden className="size-3.5 shrink-0" />}
-      {(option.picture || option.mark || option.face) && (
+      {option.picture || option.mark || option.face ? (
         <RecordMark
           picture={option.picture}
           mark={option.mark}
@@ -981,8 +1015,18 @@ function RowChip({
           shape={option.shape}
           size="choice"
         />
+      ) : option.icon ? (
+        // THE FOURTH KIND OF MARK — see `PickerOption.icon`'s own header and
+        // the open list's identical branch above. `aria-hidden`: the chip's
+        // own label already says the word, the same reason `RecordMark`
+        // itself is `aria-hidden`.
+        <span aria-hidden className="shrink-0 [&>svg]:size-3.5">
+          {option.icon}
+        </span>
+      ) : null}
+      {!option.picture && !option.mark && !option.face && !option.icon && option.swatch && (
+        <Swatch colour={option.swatch} />
       )}
-      {!option.picture && !option.mark && !option.face && option.swatch && <Swatch colour={option.swatch} />}
       <span className="truncate">{option.label}</span>
     </Button>
   )

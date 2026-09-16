@@ -168,9 +168,17 @@ export const MAX_TAB_LABEL_CHARS = 80
  * a sign-out was killed rather than clicked. */
 let scope: string | null = null
 
-/** The set, in the ORDER EACH TAB WAS FIRST OPENED — FIXED, and it does not
- * move when a tab is merely activated. See `activePath` and `recency` below
- * for the two facts that used to be smuggled into this one array's order.
+/** The set, in the order each tab landed at when it was OPENED — FIXED, and it
+ * does not move when a tab is merely activated. See `activePath` and
+ * `recency` below for the two facts that used to be smuggled into this one
+ * array's order.
+ *
+ * WHERE A NEW TAB LANDS CHANGED 16 SEP 2026, THE POSITION RULE DID NOT. Until
+ * that date "opened" meant "appended at the far end" — see `visitTrail`'s own
+ * `put` for the client's ruling and why it is now "immediately after the tab
+ * that was active a moment before" instead. What this array still guarantees
+ * is unchanged either side of that date: once a tab has a position, nothing
+ * but closing it moves it again.
  *
  * THIS WAS A COMPROMISE WITH THE KIT UNTIL KIT v1.2.59, AND IT NO LONGER IS.
  * Chrome's tabs never move: the active one is highlighted wherever it happens
@@ -181,8 +189,9 @@ let scope: string | null = null
  * the reader's own cursor on every switch, which is the opposite of the thing
  * being copied. `BreadcrumbFoldersProps.activeIndex` is the kit's fix — WHICH
  * tab is live, decoupled from WHERE it sits — and this array is what taking it
- * looks like: growth only. A tab's position is a fact about when it was
- * OPENED, never about when it was last looked at. */
+ * looks like: growth only, an entry already open never moves. A tab's
+ * position is a fact about when — and, since 16 Sep 2026, WHERE — it was
+ * opened, never about when it was last looked at. */
 let tabs: OpenTab[] = []
 
 /** WHICH TAB IS BEING LOOKED AT — the fact `activeIndex` asks for, sent to the
@@ -328,6 +337,10 @@ function trim(label: string): string {
  * at rather than moved anywhere. That is what stops a strip from reshuffling
  * itself twice on one click, and — now — from reshuffling at all.
  *
+ * A level that is GENUINELY NEW lands beside the tab she was just standing
+ * on, not at the far right of the strip — the client's ruling, see `put`'s
+ * own comment below for the sentence and the reasoning.
+ *
  * A level with no path (the current page's own crumb carries no `href`) is
  * given the current address by the caller, so every entry here has one. */
 export function visitTrail(trail: OpenTab[]): void {
@@ -355,13 +368,38 @@ export function visitTrail(trail: OpenTab[]): void {
       if (activate) touch(entry.path)
       return
     }
-    // New — appended at the END of the fixed-position array, which is the
-    // only thing position ever does now: grow. `recency` is touched
-    // regardless of `activate`, because cold-opening a whole trail means
-    // every level just opened is fresh, not just the deepest one — an
-    // ancestor seeded this way is exactly as protected from the next
-    // eviction as the tab it leads to.
-    next.push({ path: entry.path, label })
+    // New — inserted immediately AFTER the tab she was standing on a moment
+    // ago, never appended to the far right. THE CLIENT'S RULING, 16 SEP 2026,
+    // verbatim: "when opening a new tab, do not open it on the very right,
+    // but immediately to the right of the tab where I was before. if I'm in
+    // the tab 'Tickets' and I click a ticket, open it next to the tab
+    // 'Tickets', not to the very right." `activePath` is read LIVE here
+    // rather than captured once at the top of `visitTrail`, which is what
+    // keeps a cold multi-level trail internally ordered: the first new
+    // ancestor lands after whatever was active before this call, `touch()`
+    // then makes IT the active one, and the next new level lands after THAT
+    // — so a whole trail opened at once still reads outermost-to-innermost,
+    // left to right, instead of the deepest level jumping ahead of its own
+    // parent. When nothing is active yet (the very first tab, or a scope
+    // with none open) there is no "before" to sit next to, so this is
+    // exactly a plain append — the same is true whenever the active tab
+    // already happens to be the rightmost one, which is the ordinary case of
+    // opening things one after another and is why most of this store's own
+    // tests never had to change for this ruling.
+    //
+    // A pinned/home tab, if this app ever grows one, needs nothing extra
+    // here: it would sit before every ordinary tab and this only ever
+    // inserts AFTER the active tab's own position, so a pin ahead of the
+    // active tab is never disturbed, and a pin that IS the active tab
+    // correctly receives the new tab right beside it, same as any other.
+    //
+    // `recency` is touched regardless of `activate`, because cold-opening a
+    // whole trail means every level just opened is fresh, not just the
+    // deepest one — an ancestor seeded this way is exactly as protected from
+    // the next eviction as the tab it leads to.
+    const afterIndex = activePath ? next.findIndex((tab) => tab.path === activePath) : -1
+    const insertAt = afterIndex >= 0 ? afterIndex + 1 : next.length
+    next.splice(insertAt, 0, { path: entry.path, label })
     touch(entry.path)
   }
 

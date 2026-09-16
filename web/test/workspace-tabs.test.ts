@@ -200,6 +200,55 @@ describe("it is bounded — this is not Chrome's ninety tabs", () => {
   })
 })
 
+// THE CLIENT'S RULING, 16 SEP 2026, verbatim: "When opening a new tab, do not
+// open it on the very right, but immediately to the right of the tab where I
+// was before. If I'm in the tab 'Tickets' and I click a ticket, open it next
+// to the tab 'Tickets', not to the very right." Every test below is one
+// sentence of that ruling.
+describe("a new tab opens beside where she was, not at the far right — 16 Sep 2026 ruling", () => {
+  it("opening from the middle lands the new tab right after the active one", () => {
+    visitTrail(at(["/tickets", "Tickets"]))
+    visitTrail(at(["/tickets/T1", "T1"]))
+    visitTrail(at(["/tickets/T2", "T2"]))
+    // She steps back to "Tickets" — the tab she was in — and opens a third
+    // ticket from there. It must land beside Tickets, not after T2.
+    visitTrail(at(["/tickets", "Tickets"]))
+    visitTrail(at(["/tickets/T3", "T3"]))
+    expect(paths()).toEqual(["/tickets", "/tickets/T3", "/tickets/T1", "/tickets/T2"])
+    expect(activeTabPathSnapshot()).toBe("/tickets/T3")
+  })
+
+  it("opening while the active tab is already the rightmost one still appends", () => {
+    visitTrail(at(["/tickets", "Tickets"]))
+    visitTrail(at(["/tickets/T1", "T1"]))
+    visitTrail(at(["/tickets/T2", "T2"]))
+    expect(paths()).toEqual(["/tickets", "/tickets/T1", "/tickets/T2"])
+  })
+
+  it("reopening an already-open tab activates it in place — no move, regardless of where she opened it from", () => {
+    visitTrail(at(["/tickets", "Tickets"]))
+    visitTrail(at(["/tickets/T1", "T1"]))
+    visitTrail(at(["/tickets/T2", "T2"]))
+    visitTrail(at(["/tickets", "Tickets"])) // back to Tickets — the active tab
+    visitTrail(at(["/tickets/T2", "T2"])) // T2 is already open, at the far end
+    expect(paths()).toEqual(["/tickets", "/tickets/T1", "/tickets/T2"])
+    expect(activeTabPathSnapshot()).toBe("/tickets/T2")
+  })
+
+  it("cap eviction still takes the oldest non-active tab, even when the new one lands mid-strip", () => {
+    for (let i = 0; i < MAX_OPEN_TABS; i++) visitTrail(at([`/apps/A${String(i)}`, `APP-${String(i)}`]))
+    // She goes back to the middle of the strip and opens one more from there.
+    visitTrail(at(["/apps/A3", "APP-3"]))
+    visitTrail(at(["/apps/NEW", "NEW"]))
+    expect(openTabsSnapshot()).toHaveLength(MAX_OPEN_TABS)
+    expect(paths()).not.toContain("/apps/A0") // oldest ACTIVATED, evicted — never the one just opened
+    expect(paths()).toContain("/apps/A3")
+    // NEW landed immediately after A3, not at the end.
+    expect(paths().indexOf("/apps/NEW")).toBe(paths().indexOf("/apps/A3") + 1)
+    expect(activeTabPathSnapshot()).toBe("/apps/NEW")
+  })
+})
+
 describe("a tab holds the position it was opened in — Chrome parity, kit v1.2.59", () => {
   it("activating an already-open tab marks it active and moves nothing", () => {
     visitTrail(at(["/apps/A0", "APP-0"]))

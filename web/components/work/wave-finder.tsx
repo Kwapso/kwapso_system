@@ -33,8 +33,9 @@ import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { RecordMark } from "@shared/web/record-mark"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { NO_SORT_VIEW_VALUES, TOOLBAR_SEARCH_SLOT } from "@/components/deep-link/screen-bits"
-import { useT } from "@shared/web/language"
-import type { Account } from "@shared/types"
+import { sprintTypeLabel, type SprintTypeOption } from "@/components/work/sprint-form-dialog"
+import { useLanguage } from "@shared/web/language"
+import type { Account, Sprint } from "@shared/types"
 import type { Wave } from "@shared/waves"
 
 /** THE THREE BODIES the client's 2026-09-15 ruling ("i choose t3") named:
@@ -54,6 +55,14 @@ export type WaveQuery = {
   accountId: string
   /** "" = both · "on" · "off" */
   status: string
+  /** "" = every kind. THE FACET WITH NO FIELD OF ITS OWN — a wave carries no
+   * `sprintType` column (`shared/waves.ts`'s own Wave type has none; "a wave
+   * is a wave", no kind), so this asks a different question than the other
+   * two: whether ANY live sprint inside the wave carries this type, the
+   * `EXISTS` the door computes (`workers/tenancy/src/lib/waves.ts#listWaves`)
+   * and `selectWaves` below mirrors off the sprints already in hand — client
+   * ruling, 16 Sep 2026: "I want, in Waves, the filter by sprint type." */
+  sprintType: string
   sortBy: WaveOrder
   dir: "asc" | "desc"
 }
@@ -62,6 +71,7 @@ export const EMPTY_WAVE_QUERY: WaveQuery = {
   q: "",
   accountId: "",
   status: "",
+  sprintType: "",
   sortBy: "newest",
   dir: "desc",
 }
@@ -71,7 +81,9 @@ export const EMPTY_WAVE_QUERY: WaveQuery = {
  * different sentences and a screen that says the wrong one sends somebody
  * looking for a wave that was never sold. */
 export function waveQueryIsActive(query: WaveQuery): boolean {
-  return query.q.trim() !== "" || query.accountId !== "" || query.status !== ""
+  return (
+    query.q.trim() !== "" || query.accountId !== "" || query.status !== "" || query.sprintType !== ""
+  )
 }
 
 /** A number that sorts null-last in both directions: a wave with no sprints yet
@@ -94,13 +106,34 @@ function compare(a: Wave, b: Wave, by: WaveOrder): number {
   return Date.parse(a.createdAt) - Date.parse(b.createdAt)
 }
 
-/** SEARCH, FILTER, SORT — in that order, over the whole bounded collection. */
-export function selectWaves(rows: Wave[], query: WaveQuery): Wave[] {
+/** SEARCH, FILTER, SORT — in that order, over the whole bounded collection.
+ *
+ * `sprints` IS THE DOOR'S `EXISTS`, READ CLIENT-SIDE. The Sprint type facet
+ * asks about a table this collection does not carry a column for (see
+ * `WaveQuery.sprintType` above), so it cannot be answered off `rows` alone —
+ * but the team's whole sprint list is already resident (`WaveCollection`'s
+ * own `sprintsQ`, read for the T3 timeline), so this stays the same
+ * "everything that can match is already in front of us" shape the file's own
+ * header argues for the other two facets, rather than a second round trip
+ * for a bounded collection that does not need one. Defaults to `[]` so a
+ * caller that has not touched the sprint-type facet (every existing one)
+ * needs no change. */
+export function selectWaves(rows: Wave[], query: WaveQuery, sprints: Sprint[] = []): Wave[] {
   const needle = query.q.trim().toLowerCase()
+  // Only a LIVE sprint counts — the same `deactivated_at IS NULL` the door's
+  // own EXISTS carries (workers/tenancy/src/lib/waves.ts#listWaves).
+  const wavesWithType = query.sprintType
+    ? new Set(
+        sprints
+          .filter((s) => s.waveId && s.active && s.sprintType === query.sprintType)
+          .map((s) => s.waveId as string)
+      )
+    : null
   const matched = rows.filter((w) => {
     if (query.accountId && w.accountId !== query.accountId) return false
     if (query.status === "on" && !w.active) return false
     if (query.status === "off" && w.active) return false
+    if (wavesWithType && !wavesWithType.has(w.id)) return false
     if (!needle) return true
     // The client's name is searched too: "Hogo" is how somebody looks for the
     // package they sold Hogo, and it is on the row already.
@@ -132,6 +165,11 @@ export function WaveFinder({
   clients,
   /** Omit the client filter where the list is already one client's. */
   showClientFilter = true,
+  /** THE TEAM'S OWN "Sprint type" VOCABULARY — the facet's options, A→Z
+   * through the one chokepoint every `FilterFacet` on both front doors
+   * renders through (R75's `filter-bar.tsx#optionsFor`), so this file
+   * declares them in whatever order and never sorts them itself. */
+  sprintTypes = [],
   resultCount,
   views,
   view,
@@ -143,6 +181,7 @@ export function WaveFinder({
   onChange: (next: WaveQuery) => void
   clients: Account[]
   showClientFilter?: boolean
+  sprintTypes?: SprintTypeOption[]
   resultCount?: number
   /** THE BODIES THIS TAB OFFERS — CH19's third toolbar zone ("search, then
    * filters, then view switcher, then actions pinned right", CH27.13), the
@@ -173,7 +212,7 @@ export function WaveFinder({
    * from the toolbar it belongs to). */
   actions?: React.ReactNode
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
 
   const facets: FilterFacet[] = [
     ...(showClientFilter
@@ -217,12 +256,27 @@ export function WaveFinder({
         { value: "off", label: t("Switched off") },
       ],
     },
+    // SPRINT TYPE — client ruling, 16 Sep 2026: "I want, in Waves, the filter
+    // by sprint type." A wave carries no `sprintType` of its own (see
+    // `WaveQuery.sprintType`'s own header above), so this facet's match is
+    // resolved in `selectWaves`, off the sprints already in hand, the same
+    // `EXISTS` shape the door computes for a caller that is not this screen.
+    // Offered only where the team actually has a vocabulary to filter by —
+    // `useSprintTypes` never returns empty (it falls back to three generic
+    // words), so this is never blank, but a team with no real vocabulary at
+    // all still gets a working facet rather than one hidden and one shown.
+    {
+      field: "sprintType",
+      label: t("Sprint type"),
+      control: "select" as const,
+      options: sprintTypes.map((o) => ({ value: o.value, label: sprintTypeLabel(o, lang) })),
+    },
   ]
 
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
     facets,
-    values: { accountId: query.accountId, status: query.status },
-    // Empty on purpose: both facets carry their own options, so there is
+    values: { accountId: query.accountId, status: query.status, sprintType: query.sprintType },
+    // Empty on purpose: every facet carries its own options, so there is
     // nothing for the bar to derive from the rows on screen — and a client
     // whose only wave is filtered out must not vanish from the filter.
     data: [],
@@ -303,77 +357,113 @@ export function WaveFinder({
       >
         <div
           data-slot="toolbar-row-track"
-          className="flex w-full flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+          // ONE ROW, ALWAYS — FOR REAL THIS TIME (client, 16 Sep 2026, over a
+          // screenshot: "the container looks broken", the "+" and the view
+          // switch spilling out past the pill's own right edge). The comment
+          // above already claimed "one row, always"; the class here did not
+          // keep the promise — `flex-wrap` let the trailing controls drop to
+          // a second line the moment the lane ran out of room, and this
+          // column's radius is `rounded-pill` when collapsed (below), a
+          // capsule computed off the box's own HEIGHT. A one-line box reads
+          // as a normal pill; a two-line one reads as a much MORE rounded
+          // pill wrapped around a taller box, and the wrapped second line
+          // sat close enough to that exaggerated curve to look clipped by
+          // it — exactly the "broken rounded box" in her screenshot.
+          //
+          // THE FIX IS THE KIT'S OWN SHAPE (`ToolbarRow`,
+          // shared/ui/components/toolbar-row/toolbar-row.tsx): `flex-nowrap`
+          // on the track, a SCROLLING LANE around search/filters/sort/period
+          // (`min-w-0 flex-1 overflow-x-auto` — `min-w-0` is load-bearing,
+          // without it the lane cannot shrink below its content and the
+          // PAGE scrolls sideways instead), and the action group pinned
+          // OUTSIDE the lane with `ms-auto shrink-0` so the "+" is never the
+          // thing that gives. Nothing wraps, so the pill's radius is always
+          // computed against a single-line height, at every width — the kit
+          // draws the exact same lane for the identical reason
+          // (toolbar-row.tsx's own "ONE ROW AT EVERY WIDTH").
+          className="flex w-full flex-nowrap items-center gap-2 py-1.5 pe-1.5 ps-4"
         >
-          {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-              like in your atifact": the reference artifact's search element is
-              `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
-              pill/sort/period after it to the track's far edge instead of sitting
-              immediately after a narrow box.
+          <div
+            data-slot="toolbar-row-lane"
+            className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto"
+          >
+            {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+                like in your atifact": the reference artifact's search element is
+                `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
+                pill/sort/period after it to the track's far edge instead of sitting
+                immediately after a narrow box.
 
-              THE FLOOR IS THE ROW'S, AND IT IS ON THE FIELD — `TOOLBAR_SEARCH_SLOT`
-              (screen-bits.tsx), the one string `<ToolbarRow>` and `<PagedFind>` also
-              wear. This file is a hand-written second copy of the row
-              (`TOOLBAR_CONTROL_OWNERS` pins the divergence, R53), so a guarantee the
-              row makes and this copy does not is exactly the drift that registry
-              exists to keep readable. */}
-          <div className={TOOLBAR_SEARCH_SLOT}>
-            <SearchInput
-              value={query.q}
-              onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
-              // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
-              // "Clear all", which was one control quietly owning two questions; the
-              // kit's bar says "Clear filters" and now means only that.
-              onClear={() => onChange({ ...query, q: "" })}
-              placeholder={t("Search waves…")}
-              className="w-full"
-            />
+                THE FLOOR IS THE ROW'S, AND IT IS ON THE FIELD — `TOOLBAR_SEARCH_SLOT`
+                (screen-bits.tsx), the one string `<ToolbarRow>` and `<PagedFind>` also
+                wear. This file is a hand-written second copy of the row
+                (`TOOLBAR_CONTROL_OWNERS` pins the divergence, R53), so a guarantee the
+                row makes and this copy does not is exactly the drift that registry
+                exists to keep readable. */}
+            <div className={TOOLBAR_SEARCH_SLOT}>
+              <SearchInput
+                value={query.q}
+                onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}
+                // THE SEARCH CLEARS ITSELF. It used to be cleared by the filter row's
+                // "Clear all", which was one control quietly owning two questions; the
+                // kit's bar says "Clear filters" and now means only that.
+                onClear={() => onChange({ ...query, q: "" })}
+                placeholder={t("Search waves…")}
+                className="w-full"
+              />
+            </div>
+            {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
+                normal flex child (wrapping itself in a non-growing box internally),
+                and its open PANEL is the separate `filterPanel` value, rendered
+                into the column below rather than into this row — the split
+                `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
+                never the filters themselves — client, 2026-09-02: "when activce
+                filters, do not display them in the toolbar. only a count niside
+                the filter pill". See `filter-bar.tsx`'s own header for the full
+                account. */}
+            {filterPill}
+            {/* R78 — CALENDAR VIEWS CARRY NO SORT, extended to Timeline
+                (2026-09-15: "the timeline is time-ordered too"). `<ToolbarRow>`
+                suppresses its own `<SortControl>` centrally off
+                `NO_SORT_VIEW_VALUES` (screen-bits.tsx); this file is a
+                registered hand-copy of that row (`TOOLBAR_CONTROL_OWNERS`,
+                R53) and makes the identical promise itself, off the same set,
+                rather than a second copy of the three-value list. Sort stays
+                on List — a flat, orderable body, unlike a time-axis grid. */}
+            {view && NO_SORT_VIEW_VALUES.has(view) ? null : (
+              <SortControl
+                options={[
+                  { value: "newest", label: t("Newest first") },
+                  { value: "name", label: t("Name") },
+                  { value: "client", label: t("Account") },
+                  { value: "runs", label: t("When it runs") },
+                  { value: "sprints", label: t("Sprints inside it") },
+                ]}
+                value={query.sortBy}
+                onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
+                direction={query.dir}
+                onDirectionChange={(dir) => onChange({ ...query, dir })}
+                label={t("Sort by")}
+                hideLabel
+              />
+            )}
+            {period}
+            {views && views.length > 1 && view && onViewChange ? (
+              <ViewSwitch
+                views={views}
+                value={view}
+                onValueChange={(v) => onViewChange(v as WaveView)}
+                label={t("View")}
+              />
+            ) : null}
           </div>
-          {/* NO WRAPPING BOX AROUND THE PILL — `filterPill` renders inline as a
-              normal flex child (wrapping itself in a non-growing box internally),
-              and its open PANEL is the separate `filterPanel` value, rendered
-              into the column below rather than into this row — the split
-              `useFilterBar` itself returns (v1.2.27). The pill says a COUNT and
-              never the filters themselves — client, 2026-09-02: "when activce
-              filters, do not display them in the toolbar. only a count niside
-              the filter pill". See `filter-bar.tsx`'s own header for the full
-              account. */}
-          {filterPill}
-          {/* R78 — CALENDAR VIEWS CARRY NO SORT, extended to Timeline
-              (2026-09-15: "the timeline is time-ordered too"). `<ToolbarRow>`
-              suppresses its own `<SortControl>` centrally off
-              `NO_SORT_VIEW_VALUES` (screen-bits.tsx); this file is a
-              registered hand-copy of that row (`TOOLBAR_CONTROL_OWNERS`,
-              R53) and makes the identical promise itself, off the same set,
-              rather than a second copy of the three-value list. Sort stays
-              on List — a flat, orderable body, unlike a time-axis grid. */}
-          {view && NO_SORT_VIEW_VALUES.has(view) ? null : (
-            <SortControl
-              options={[
-                { value: "newest", label: t("Newest first") },
-                { value: "name", label: t("Name") },
-                { value: "client", label: t("Account") },
-                { value: "runs", label: t("When it runs") },
-                { value: "sprints", label: t("Sprints inside it") },
-              ]}
-              value={query.sortBy}
-              onValueChange={(by) => onChange({ ...query, sortBy: by as WaveOrder })}
-              direction={query.dir}
-              onDirectionChange={(dir) => onChange({ ...query, dir })}
-              label={t("Sort by")}
-              hideLabel
-            />
-          )}
-          {period}
-          {views && views.length > 1 && view && onViewChange ? (
-            <ViewSwitch
-              views={views}
-              value={view}
-              onValueChange={(v) => onViewChange(v as WaveView)}
-              label={t("View")}
-            />
+          {/* OUTSIDE THE LANE, ON PURPOSE — the same placement the kit's own
+              `ToolbarRow` gives its `actions` slot, so the "+" is never the
+              control that scrolls out of sight or wraps to a second line. */}
+          {actions ? (
+            <div data-slot="toolbar-row-actions" className="ms-auto flex shrink-0 flex-nowrap items-center gap-2">
+              {actions}
+            </div>
           ) : null}
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
         {filterPanel}
       </div>

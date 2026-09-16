@@ -53,6 +53,7 @@ import { safeHref } from "@shared/web/rich-text"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
+import { useSessionUserId } from "@/lib/use-active-team"
 
 export function TaskDetailScreen({
   teamId,
@@ -75,6 +76,7 @@ export function TaskDetailScreen({
   onToggleDone: () => void
 }) {
   const { t, lang } = useLanguage()
+  const myUserId = useSessionUserId()
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "update")
   // The clock asks for the right its own door asks for (`work:create`).
@@ -309,7 +311,11 @@ export function TaskDetailScreen({
         apps={options.apps}
         accounts={options.accounts}
         departments={options.departments}
-        defaultAssigneeId={task.assigneeId ?? ""}
+        // THE SIGNED-IN USER — not the stored assignee. Only matters when
+        // `initial.assigneeId` below is empty (an old task with no assignee
+        // on file): the form dialog falls back to this rather than opening
+        // on the one state its picker can no longer draw (16 Sep 2026 ruling).
+        defaultAssigneeId={myUserId ?? ""}
         // THE TASK AS IT STANDS. The door replaces every field with what arrives,
         // so the form has to open holding the whole task — a blank form would
         // clear the four fields nobody touched.

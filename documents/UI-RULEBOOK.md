@@ -37,7 +37,7 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L11)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L12)
 - [3. Detail screens](#3-detail-screens) (D1 to D13)
 - [4. Collections](#4-collections) (K1 to K27)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
@@ -646,6 +646,39 @@ tab-strip behaviour [K4](#k4-a-tab-that-reveals-a-collection-carries-the-count-a
 own model already gives every other tab, extended to this one door.
 
 **Law.** [R74](../RULES.md) (`import-opens-a-tab`).
+
+### L12: a new content tab opens beside the tab you were on, never at the far right
+
+**The rule.** *"When opening a new tab, do not open it on the very right, but immediately
+to the right of the tab where I was before. If I'm in the tab 'Tickets' and I click a
+ticket, open it next to the tab 'Tickets', not to the very right."* — client, 2026-09-16.
+Chrome does this too: a link opened from a tab lands beside it, not after every tab
+already open elsewhere in the window.
+
+**The mechanism.** `visitTrail`'s own `put` (`web/lib/workspace-tabs.ts`) is the one place
+a tab is ever inserted. A record that is already open is untouched — it is only
+activated where it already sits, same as before this ruling. A record that is genuinely
+new is spliced in immediately after whichever tab is active at that moment — read live off
+`activePath`, not captured once at the top of the function, which is what keeps a whole
+cold-opened trail (an ancestor plus the record under it) landing as an internally ordered
+block rather than the deepest level jumping ahead of its own parent. When nothing is
+active yet — the very first tab opened in a scope — there is nowhere to sit "beside," so
+this is a plain append, and the same is true whenever the active tab already happens to be
+the rightmost one, which is the ordinary case of opening things one after another. Eviction
+at the cap ([MAX_OPEN_TABS](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in),
+`web/lib/workspace-tabs.ts`) is unchanged by this: it still takes the least-recently-ACTIVATED
+tab, by `recency` and never by position, so the tab just opened — always freshly touched — is
+never its own victim.
+
+**What it does not touch.** A pinned or home tab, should one ever exist first on the strip,
+needs nothing extra here: insertion only ever happens AFTER the active tab's own position,
+so a pin sitting ahead of the active tab is never disturbed by this rule.
+
+**Law.** None registered — `web/test/workspace-tabs.test.ts` pins the behaviour (opening
+from the middle, opening from the rightmost tab, reopening an already-open tab, and cap
+eviction under the new insertion point) but nothing in `shared/rules/registry.ts` censuses
+it; a hand-rolled tab strip elsewhere in the app would not be caught the way `no-handrolled-toggles`
+catches a bespoke collection tab.
 
 ---
 
@@ -1578,11 +1611,11 @@ applied in `web/components/work/tasks-screen.tsx`.
   only department, department — in a chip on top of the title, like we have it already
   somewhere else."* That "somewhere else" is [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title)/R65:
   `KanbanCard.badges` is the exact slot, the same one the tickets board already draws its
-  own chip through. `boardChip` (tasks-screen.tsx) picks APP > ACCOUNT > DEPARTMENT — the
-  narrowest fact wins outright rather than combining — and draws `<RecordMark>` beside the
-  app/account branches (the identical node the table's own App/Account cells already draw)
-  or the department's own glyph (`departmentGlyph`) for the department branch, which carries
-  no picture.
+  own chip through. **AMENDED 2026-09-16 by client ruling, verbatim: "Replace the chip for
+  always the department."** The board chip ALWAYS shows the task's department (plain text,
+  no mark); a task with no department shows no chip. App and account no longer appear in the
+  board chip — they remain in the list's Account/App columns and the week view's detail
+  line, which was simplified to department-only for consistency.
 - *"On Everyone's, add the column 'Closed On' or 'Finished On'."* `EVERYONE_COLUMNS` gains
   an eighth column, `closed`, reading the identical row key Completed's own eighth column
   does (`t.completedAt`, blank "—" for a task still open) — labelled "Closed on" rather than
@@ -1728,6 +1761,12 @@ into six more `frame="bare"` call sites.
 `record-table.tsx` off disk for the banded fill and walks every `<RecordTable` mount across
 `web/` for a `frame` prop carrying anything other than the literal `"bare"`.
 
+**SETTLED, 16 SEP 2026** — the word for the whole app, not only the screens above: "List"
+names this shape, the flush `RecordTable`/`TicketRowsTable` column list, and never
+`shared/web/list-compat.tsx`'s two-line row, which Meetings briefly drew under that same
+name and the client corrected by name ([B7](#b7-a-view-switch-is-a-labelled-pill-not-a-plus),
+this document, carries the ruling verbatim).
+
 ---
 
 ### K23: Apps — gallery and board by stage, never tiles or a table
@@ -1789,6 +1828,65 @@ derive a Gallery-default rule from, but `appsListRecipe` (`web/lib/screens.ts`) 
 so a census built against `recipe.display` would fail on the very screen this entry is
 about. Recorded here for the next reader rather than checked, until a real registry of
 host-composed screens exists to check against instead.
+
+**Amendment, 16 Sep 2026 — one flat pill ground, the dot is the only thing that
+changes.** The client's ruling, verbatim: *"show me the different colors for
+the pills for the status, and make sure that there is a space between the
+color dot and the name. Make sure that all the pills have a background,
+because currently development does not. All of them should have the same
+color background. What changes is the color of their dot."* Two defects, one
+app-side and one kit-side, both traced rather than guessed.
+
+*The gap.* Both call sites left `size` unset on `<Badge variant="status">`,
+which defaults to `size="counter"` — the 20-tall COUNT chip, with no `gap-*`
+of its own — never CH11's 26-tall status-pill geometry (`size="pill"`,
+`--control-height-pill`, `gap-2` between the dot and the word). Fixed by
+naming the size, not by a space character (R28/R66 both forbid a literal
+glyph standing in for a token). `record-chrome.tsx`'s own `IDENTITY_ROW`
+already forced this geometry for the record head's own chips by a different
+route (`[&_[data-slot=badge]]:gap-2` etc.), which is why the detail screen's
+three pills were never part of this complaint.
+
+*The background.* `variant="status"`'s own fill, `--pill-fill`
+(`shared/ui/foundations/tokens/tokens.css`), is `var(--card)` — CH11 draws
+the status pill sitting on `--sheet`, "the OTHER paper tone from the panel it
+sits on" (`badge.tsx`'s own header). Both places this chip renders — the
+Gallery's `<Card variant="raised">` and the Kanban board's own card — are
+THEMSELVES `bg-card`, so the pill's fill paints the exact colour of the card
+underneath it, in both palettes: a background that equals its own container,
+`card.tsx`'s own documented failure ("a `--card` box on the page draws
+nothing at all") one layer further in. It was invisible on every stage, not
+only "Development" — a coloured dot beside it still read as "a chip is here"
+for the other five; `building`'s dot is close to the label's own ink, so
+Development was the one stage with nothing left to read. Fixed the way
+`record-chrome.tsx`'s `IDENTITY_ROW` already fixes the identical collision for
+the record head — a local `bg-surface-panel`/`text-foreground` rebind at the
+two call sites this screen owns (`STAGE_PILL_PROPS`, `apps-screen.tsx`) —
+rather than inside `Card`/`Kanban`, which neither this entry nor this lane
+touches.
+
+*The kit bug underneath it — PROPOSED, NOT YET SHIPPED.* Ruling 26's dark
+clause puts exactly one tone — `building`, the one this app's own vocabulary
+uses for three of its eight stages (Development, Documentation, Iteration) —
+on a mango fill with a charcoal label and dot in dark mode, the one stage
+whose PILL changes colour at all. That directly contradicts this ruling's
+second sentence ("all of them should have the same color background"), so
+`badge.tsx`'s `status`+`building` compound variant needs to be retired: every
+stage's pill would then share one fill and one label ink in both palettes,
+and only `DOT_FILL[dot]` — the plain per-tone dot colour every other stage
+already uses unmodified — decides what changes. **Not made this session**: a
+second kit lane was tagging v1.2.90 (the assistant strip) at the same time,
+and this lane's brief was to wait for that tag, pull, then tag v1.2.91 on top
+of it. 25 minutes of polling `git ls-remote --tags origin` never saw v1.2.90
+land, so the Badge/tokens edit was not made and the app is still on the kit
+pin it started the session on. The app-side fix above (`STAGE_PILL_PROPS`)
+already gives every stage pill the same visible background regardless of this
+— it forces `bg-surface-panel`, which wins over whatever `badge.tsx` computes
+internally — so the client's complaint is fixed on screen either way; what is
+still open is retiring the dead-in-practice dark-mode special case at its
+source so a future caller of `variant="status"` outside this screen does not
+inherit it. Next session: check whether v1.2.90 has landed, pull, make this
+edit, tag v1.2.91, sync, and update this paragraph.
 
 ---
 
@@ -1891,6 +1989,63 @@ reader rather than independently checked — the same "not a law" footing
 [K18](#k18-a-record-with-a-face-defaults-to-the-gallery-the-list-is-the-alternate-view)/[K23](#k23-apps-gallery-and-board-by-stage-never-tiles-or-a-table)
 stand on, until a registry of host-composed screens exists to hold a bespoke
 component's own shape to something checked rather than read.
+
+**Amendment, 16 Sep 2026 — the app's face, a broken toolbar, a new facet, and
+a status pill.** The client, over a screenshot of the shipped screen,
+verbatim: *"Great work there. However, what I want in the left column is the
+name of the app and the icon. Look at the third screenshot. The container
+looks broken. Fix it. I want, in Waves, the filter by sprint type. On waves,
+all list: make status a colored pill."* Four changes, each recorded where its
+reasoning lives:
+
+1. **The T3 timeline's left column is now the wave's APP**, not the wave —
+   an app mark (`AppMark`, or `RecordMark` on the initials tile where no
+   single app resolves) beside the app's name, `waves-screen.tsx#waveApp`.
+   A `Wave` carries no `appId` of its own (only its sprints do, and they are
+   not constrained to agree), so this is DERIVED: the one app every live
+   sprint in the wave names, when there is exactly one. The wave's OWN name
+   moved to a second, muted line under the app's — always, never onto the bar
+   itself, which this brief chose over the letter's other option (a label on
+   the bar before the segments) because a T3 segment is 24px tall and already
+   carries its own sprint's name; see `TimelineRow.sublabel`'s own header
+   (`record-timeline.tsx`) for the fuller account. A wave with no single
+   resolvable app draws exactly what it drew before this amendment: its own
+   name, on the initials tile.
+2. **The broken container was `wave-finder.tsx`'s own track wrapping to a
+   second line.** The row's comments already claimed "one row, always" (the
+   2026-09-01 ruling); the CSS did not keep the promise — `flex-wrap`, no
+   scrolling lane, no pinned action group — so the trailing controls (the
+   view switch, the "+") dropped to a second line the moment the lane ran
+   out of room, and the outer column's `rounded-pill` (a capsule computed off
+   the box's own HEIGHT) stretched around the now-two-line box, reading as a
+   corner clipping the wrapped controls. Fixed to the kit `ToolbarRow`'s own
+   shape (`shared/ui/components/toolbar-row/toolbar-row.tsx`): `flex-nowrap`
+   on the track, a `min-w-0 flex-1 overflow-x-auto` lane around
+   search/filters/sort/period, and the actions group pinned outside it with
+   `ms-auto shrink-0` — nothing wraps, at any width, so the pill's radius is
+   always computed against one line. `web/test/wave-finder-toolbar-is-one-container.test.tsx`
+   pins the shape.
+3. **A Sprint type facet**, `wave-finder.tsx`'s `WaveQuery.sprintType`. A wave
+   carries no `sprintType` column (a wave has no kind; only its sprints do),
+   so this is answered as an `EXISTS` over the wave's own LIVE sprints —
+   computed at the door (`workers/tenancy/src/lib/waves.ts#listWaves`/
+   `countWaves`, both now taking an optional `sprintType`) and mirrored,
+   for the sidebar collection, off the sprints already resident in the
+   browser (`selectWaves`'s own third argument) rather than a second round
+   trip for a bounded collection that does not need one — the same
+   "everything that can match is already in front of us" reasoning this
+   file's header already gives the other two facets. Options are the team's
+   own "Sprint type" vocabulary (`useSprintTypes`), A→Z through the one
+   render chokepoint every facet passes (R75).
+4. **List's Status column is now a coloured pill**, `Badge variant="status"`
+   — the kit's own law, one neutral fill for every state, the state living
+   only in the dot. A live wave reads `waveState` (`waves-screen.tsx`), the
+   same three-part axis the T3 timeline already draws its bar against —
+   planned / running / done, off the wave's own `startsOn`/`endsOn` — dotted
+   `review` / `building` / `shipped`, the identical three tones
+   `sprint-detail.tsx` already draws a sprint's own status pill with. A
+   switched-off wave draws `archived` directly, the tone every other
+   deactivated record in the app wears, winning over the temporal read.
 
 ### K25: Inputs — the third Accounts tab, three server views, no Mine tab
 
@@ -2031,6 +2186,59 @@ screen shows both Type and Category on its overview, side by side, the same
 list the client's ruling put them in. No priority anywhere on a story, in either
 place — the ruling's own last sentence, held to by absence rather than a field
 nobody draws.
+
+**Amended 2026-09-16.** The client's ruling, verbatim: *"Assign an icon to each
+type, and when I'm editing or creating, make it a horizontal pick. Also, the
+client requested or internal should be at the very bottom and prefilled. If it
+comes from a ticket, it's client requested. If it's created from scratch, it's
+prefilled with internal. … Everywhere I'm selecting an app or an account, in
+this case, when I'm creating a story, I want to see the icons of the app or the
+image of the account on the choice component."*
+
+- **An icon per type, in code, not a column.** The five words are still the
+  live `Story type` vocabulary (`selectable_data`, unchanged); only the GLYPH
+  moved to code, `shared/story-types.ts` — Data → `Database`, Tech →
+  `Wrench`, Bug → `Bug`, Feature → `Sparkle`, Change → `ArrowsClockwise`
+  (not `PencilSimple`: CLAUDE.md's own action-icon table already fixes that
+  glyph as "edit," and `story-detail.tsx`'s own overflow menu draws it a few
+  pixels from where a Change chip would sit). A column was considered and
+  rejected the same way the task brief itself flagged: the five types are
+  PROTECTED (K26 above, `is_default = 1`), so a closed code map costs nothing
+  a migration would have bought, and `shared/ticket-types.ts`/`shared/meeting-
+  icons.ts` already carry the identical pattern for their own closed sets.
+  The row/card/detail chip is now **icon + word on the same neutral pill**
+  `categoryChip` already draws — REPLACING the two-letter text tile, not a
+  dot: a colour dot for a type has only ever been a TICKET pattern
+  (`web/lib/type-colours.ts`), never a story one.
+- **Type is a horizontal pick.** `story-form-dialog.tsx`'s Type field is now
+  `RecordPicker layout="row"` — the same idiom the staff row on this form and
+  the ticket form's own Type row already draw — carrying the new
+  `PickerOption.icon` (`record-picker.tsx`, a React node, additive: every
+  caller that only ever set the text `mark` keeps working unchanged).
+- **Category, last and prefilled.** Moved from right after Type to the very
+  last field on the form. The default now reads the dialog's own `fixedTicket`
+  prop — set at exactly the one call site that opens this dialog off a
+  ticket's own Related stories tab (`help-detail.tsx`) — Client-requested when
+  it is set, Internal otherwise. Still an ordinary default: both pills stay
+  live and pressable.
+- **App/account marks on the choice components.** The story form's App field
+  now passes the app's own `logoUrl` as `picture` (`face: true`, so a logo-less
+  app still draws its own initial rather than a blank row) — the same
+  `picture`/`face` pair the ticket form's own App row and `accountOption`
+  (`web/lib/pickable.ts`) already carry for the identical ruling on 2026-09-07/
+  09-09. The task form's App field, which shares `RecordPicker`, got the
+  identical targeted fix; its Account field already had one (`accountOption`).
+- **The process selector — CORRECTED THE SAME DAY.** An earlier pass at this
+  ruling read "kill the whole process selector when creating a story … this
+  will come from somewhere else" as removing it from the form outright. The
+  client's own correction, minutes later, verbatim: *"stop the agent removing
+  the processes from CRUD - keep it!! But make it a dropdown."* So the field
+  never left CHECKLIST 6.5's own two facts (`processIds`, `changesNoStep`) —
+  only the CONTROL changed, from an always-expanded checkbox stack to the
+  kit's own `Select` (an "add a process" trigger; the chosen set renders above
+  it as a removable list, the same idiom this file already uses for its own
+  attached/pending files), because Radix `Select` commits one value per open
+  and "one or more processes" is still real.
 
 **Law.** [R20](../RULES.md) (the door checks the position, never trusts the
 body), [R76](../RULES.md) (`protected-is-active`), [R35](../RULES.md).
@@ -2296,24 +2504,30 @@ read — Calendar is the one view with that investment, built for the month grid
 Evidence: `web/components/meetings/meetings-screen.tsx` (the header block's "THE VIEW SLOT
 STAYS" paragraph and `MeetingsWeek`'s own doc comment).
 
-**CAUTION, NOT YET RESOLVED (flagged by the lane that wrote this pass, 2026-09-15):** an
-unverified instruction reached this lane mid-task claiming the client additionally said *"I
-don't like this table anywhere… replace it with list"* system-wide, and that Meetings' own
-"List" should therefore be a relabelled `RecordTable` (columns Name · Date · Time · Type ·
-Attendees · Account, sort staying in the toolbar) rather than the `list-compat.tsx` row this
-section documents — matching the shape Tasks' own Table→"List" relabel already took
-(`web/components/work/tasks-screen.tsx`, "I don't like this table anywhere… I don't want to
-say this again", value stays `"table"`, only the label and glyph changed). That instruction
-arrived through a channel this lane could not verify against the actual conversation it was
-given, contradicted the EXPLICIT, detailed brief this lane was working from (which named the
-mark/title/detail-line row by name and said "not a table"), and asked for an edit to a file
-outside this lane's ownership on that unverified basis — so it was not acted on. Given the
-real, separately-landed Tasks precedent above, a reviewer should confirm with the client
-whether Meetings' "List" is meant to be the same relabelled-Table shape before trusting this
-section's own description over that possibility.
+**RESOLVED, 16 SEP 2026 — the caution above was right to hold, and the instruction it
+declined was right too.** The client confirmed it herself, directly, verbatim: *"Also, the
+list view on meetings is completely wrong. I want it exactly like the one in tickets. What
+you did is something different. Once again, kill the emojis. Also, when they're in the
+name, just remove them, please."* So the `list-compat.tsx` row this section used to describe
+is gone, a second time, and this time for good: Meetings' "List" is `RecordTable` in the
+tickets shape (R80/K22 — see K22's own note below), the same shape the caution above named
+almost exactly — Name · Date · Time · Type (`purposeCell`, the meeting type's own Phosphor
+icon beside its name) · Attendees (faces, then a `+N` count past three) · Account
+(`accountCell`, a mark and a name) — on every tab that offers it, sort staying in the
+toolbar's one `<SortControl>`, no column head clickable, matching Tickets' own
+`TicketRowsTable` ("deliberately do not sort"). This settles the word for the whole app:
+**"List" names the flush, hairline COLUMN list (R80/K22's shape), never the two-line
+`list-compat.tsx` row** — the same settlement K22 itself records, one file below. Titles
+arriving from Google Calendar are stripped of every emoji/pictograph at ingest
+(`workers/content/src/lib/meetings.ts`'s `titleOf`) and again at display for a row synced
+before this ruling shipped (`stripPictographs`, `shared/text-clean.ts`), and the "Meeting
+types" link at the foot of the main screen is gone outright — the same day's ruling, "this
+should not be there because this is already on the meeting settings" — leaving Settings ›
+Meetings › Choices as its one door.
 
-Evidence: `web/components/meetings/meetings-screen.tsx` (the header block's "THE THIRD
-RULING" paragraph carries both sentences verbatim).
+Evidence: `web/components/meetings/meetings-screen.tsx` (the file's own header block carries
+the 16 Sep 2026 ruling verbatim), `web/test/sorted-columns-declare-their-type.test.ts`
+(`DOOR_ORDERED.when`/`.time`), `shared/text-clean.ts`.
 
 **"Calendar" IS THE MONTH VIEW, ONLY — 2026-09-15, the same AM ruling, read further:**
 *"Agenda is a different component than month. Inside the calendar, the whole month
@@ -2795,8 +3009,12 @@ already names, but unconditional: unlike a glyph choice, a staff list is never
 pills whatever the team's size.
 
 - **One person** (an assignee, a lead, an account manager): `role="radiogroup"` of
-  `role="radio"` pills. A "Nobody" pill only where the field is genuinely optional, in the
-  screen's own words — never invented by the component.
+  `role="radio"` pills. **A staff picker never offers Nobody** — the client's second
+  ruling, 16 Sep 2026, verbatim: *"Kill the 'nobody' option for staff. If we leave it
+  empty, it's not an option. Remove it from tasks and everywhere else. This 'nobody',
+  just kill it."* The component's own `allowNobody`/`nobodyLabel` props are gone, not
+  merely unused — there is no click left inside `StaffPillPicker` that can clear a
+  single-mode selection.
 - **Several people** (an app's staff, a ticket's stakeholders): `role="group"` with
   `aria-pressed` on each pill. Already-set, un-removable people (R54's ADD-ONLY sets) show
   pressed and disabled rather than being left off the row.
@@ -2812,7 +3030,12 @@ pills whatever the team's size.
 already selected — `TaskFormDialog`'s pre-existing `defaultAssigneeId`, and the same shape
 added to `StoryFormDialog`, `AccountFormDialog` (account manager) and `AppFormDialog`
 (staff and lead both). An **edit** form keeps the stored value; the signed-in user is never
-substituted for one that is already there. An **action row that commits on the click** —
+substituted for one that is already there — **except** where the stored value is itself
+empty (an old row from before this field existed, or from before the 16 Sep 2026 "kill
+Nobody" ruling), where the signed-in user is the fallback there too: the killed "Nobody"
+pill left no other state for an edit to open on, so `AppFormDialog`'s Lead field falls back
+further still, to the first staffed person, when the signed-in user is not themselves
+staffed on that app. An **action row that commits on the click** —
 `TriageStrip`'s on-duty pick, the triage queue's own "who is picking this up?" rows (already
 `RecordPicker`'s `layout="row"`, unaffected by this law) — has no submit step to preselect
 into, so nothing there is preselected: a pill that looked already-chosen would be a click
@@ -4278,16 +4501,54 @@ solving a nesting problem that no longer exists — and the closing/reopening be
 `web/test/agent-tab-strip.test.tsx` proves the aside draws exactly one tab strip and that no
 tab renders named "Assistant."
 
+**Corrected 16 Sep 2026, three ways, over a screenshot of the built strip beside the main
+content strip.** *"The concept is great, but the design is still broken. Make sure that they
+look exactly like the tabs in the main content. Also, I want the history tab to be on the left
+of the plus, not the very far left. Put it to the left of the plus. Also, now when I click on
+the tab, it doesn't close, so restore that behavior."* Three claims, three findings:
+
+1. **Order — a real bug, fixed.** `AgentTabStrip` pinned History at `items[0]`, ahead of every
+   conversation tab, reading "put it before the plus tab" as "ahead of everything." It now
+   builds `items` as `[...conversations, history, new]` — History sits immediately left of "+"
+   and never at the front. `web/lib/agent-conversation-tabs.ts`'s own header comment on the
+   pinned clock tab is corrected to match. Tested: `agent-tab-strip.test.tsx`'s "pinned History
+   tab" describe block now asserts History's index is `newIndex - 1` and `> 0`, not merely
+   first.
+2. **Look — not reproducible from source, and not a kit skin.** `ScreenShell`'s `asideTabs`
+   slot (kit v1.2.88) draws the caller's node completely unconditionally — same
+   `screen-shell-aside-tab` wrapper, same `ASIDE_TAB` geometry, same `--folder-tab-overlap`
+   attachment, no kit-added skin around it (`compositions/templates/screen-shell.tsx`, the
+   `asideTabs ?? (...)` line). `AgentTabStrip` calls the identical `BreadcrumbFolders` the
+   content trail calls, with the same `items`/`activeIndex`/`onClose` shape. Rendering the real
+   app component through the real `AgentDockTabsSlot` portal (not a direct `asideTabs` hand-off)
+   and reading the DOM back confirms every tab carries `data-slot="breadcrumb-folder-fill"` and
+   the kit's `TAB`/`TAB_REST`/`TAB_LIVE` classes, byte-identical to the content strip's own
+   markup — and the kit's own demo (`demo/shapes/templates-0.tsx`'s `asideTabs` panel,
+   `BreadcrumbFolders` with `onClose`) renders the real folder silhouette in a live browser
+   (`<svg data-slot="folder-shape">` with a real, non-empty `viewBox`). No variant, prop, or
+   wrapper skin difference was found anywhere in the reachable source. The chip screenshot most
+   likely reflects a staging build that predates this round shipping (`ready-means-deployed`) —
+   redeploy and re-screenshot before assuming another code path draws it.
+3. **Close — not reproducible from source; coverage gap closed.** `web/test/agent-tab-strip.test.tsx`
+   previously only ever handed `<AgentTabStrip>` straight to `asideTabs`, which proves the kit
+   slot but skips the actual production wiring — `agent-panel.tsx` builds the strip at the root
+   and reaches the aside through `createPortal` into `AgentDockTabsSlot`'s published node
+   (`web/lib/agent-dock.tsx`). A new describe block, "AgentTabStrip through the real
+   AgentDockTabsSlot portal," reproduces that exact shape (a sibling component reading
+   `useAgentDockTabs()` and portalling into it) and presses a real conversation tab's × through
+   it: `onClose` still fires with that tab's own id. The portal boundary is not where a close
+   regression would hide.
+
 ---
 
 ## Rule index
 
-**145 rules.**
+**146 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L11 (11) |
+| 2. Page layout and width | L1 to L12 (12) |
 | 3. Detail screens | D1 to D14 (14) |
 | 4. Collections | K1 to K27 (27) |
 | 5. Buttons and actions | B1 to B14 (14) |

@@ -62,6 +62,21 @@ function Harness() {
   return <WaveFinder query={query} onChange={setQuery} clients={CLIENTS} />
 }
 
+/** WITH ACTIONS — the "+" button, the control her screenshot found spilling
+ * out of the pill's own right edge. `HarnessWithActions` renders it so the
+ * regression has something concrete to sit outside the lane. */
+function HarnessWithActions() {
+  const [query, setQuery] = React.useState(EMPTY_WAVE_QUERY)
+  return (
+    <WaveFinder
+      query={query}
+      onChange={setQuery}
+      clients={CLIENTS}
+      actions={<button type="button">Sell a wave</button>}
+    />
+  )
+}
+
 const openPanel = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }))
 
 describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () => {
@@ -133,5 +148,54 @@ describe("WaveFinder's toolbar is one container, exactly like ToolbarRow's", () 
     expect(trackShape(track)).toBe(closedTrack)
     expect(column!.className).toContain("rounded-pill")
     expect(column!.className).not.toContain("rounded-[var(--radius)]")
+  })
+})
+
+// THE BROKEN CONTAINER — client, 16 Sep 2026, over a screenshot: "The
+// container looks broken." The track's own comment already claimed "one row,
+// always" (the 2026-09-01 ruling); `flex-wrap`, no scrolling lane and no
+// pinned action group meant it did not keep that promise — the trailing
+// controls dropped to a second line the moment the lane ran out of room, and
+// the collapsed `rounded-pill` (a capsule computed off the box's own HEIGHT)
+// stretched around the now-taller box, reading as a corner clipping the
+// wrapped "+"/view switch. Pinned here the way the kit's own `ToolbarRow`
+// (shared/ui/components/toolbar-row/toolbar-row.tsx) is built: the track
+// never wraps, a scrolling lane holds search/filters/sort/period, and the
+// action group is pinned outside it.
+describe("WaveFinder's track never wraps to a second line (16 Sep 2026 fix)", () => {
+  it("the track is flex-nowrap, never flex-wrap", () => {
+    render(<Harness />)
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    expect(track).toBeTruthy()
+    expect(track.className).toMatch(/(?:^|\s)flex-nowrap(?:\s|$)/)
+    expect(track.className).not.toMatch(/(?:^|\s)flex-wrap(?:\s|$)/)
+  })
+
+  it("search/filters/sort/period sit in their own scrolling lane, not loose in the track", () => {
+    render(<Harness />)
+    const track = document.querySelector('[data-slot="toolbar-row-track"]') as HTMLElement
+    const lane = document.querySelector('[data-slot="toolbar-row-lane"]') as HTMLElement
+    expect(lane, "the track needs a lane to scroll instead of wrapping").toBeTruthy()
+    expect(track.contains(lane)).toBe(true)
+    // `min-w-0` is load-bearing (toolbar-row.tsx's own note): without it the
+    // lane cannot shrink below its content and the PAGE scrolls sideways
+    // instead of the lane scrolling internally.
+    expect(lane.className).toMatch(/(?:^|\s)min-w-0(?:\s|$)/)
+    expect(lane.className).toMatch(/(?:^|\s)overflow-x-auto(?:\s|$)/)
+    expect(lane.className).not.toMatch(/(?:^|\s)flex-wrap(?:\s|$)/)
+  })
+
+  it("the action group is pinned outside the lane with ms-auto, never inside it", () => {
+    render(<HarnessWithActions />)
+    const lane = document.querySelector('[data-slot="toolbar-row-lane"]') as HTMLElement
+    const actionsGroup = document.querySelector('[data-slot="toolbar-row-actions"]') as HTMLElement
+    expect(actionsGroup, "actions render in their own pinned group").toBeTruthy()
+    expect(lane.contains(actionsGroup), "the action group is a sibling of the lane, not nested in it").toBe(
+      false
+    )
+    expect(actionsGroup.className).toMatch(/(?:^|\s)ms-auto(?:\s|$)/)
+    expect(actionsGroup.className).toMatch(/(?:^|\s)shrink-0(?:\s|$)/)
+    expect(actionsGroup.className).toMatch(/(?:^|\s)flex-nowrap(?:\s|$)/)
+    expect(screen.getByRole("button", { name: "Sell a wave" })).toBeTruthy()
   })
 })

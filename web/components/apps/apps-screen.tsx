@@ -191,6 +191,62 @@ function compareApps(
  * kind of line on the other. */
 const GALLERY_MIN_CARD = "12rem"
 
+/** THE STAGE PILL'S OWN GEOMETRY AND GROUND — client feedback, 16 Sep 2026,
+ * verbatim: "show me the different colors for the pills for the status, and
+ * make sure that there is a space between the color dot and the name. Make
+ * sure that all the pills have a background, because currently development
+ * does not. All of them should have the same color background. What changes
+ * is the color of their dot."
+ *
+ * `size="pill"` — the default `<Badge>` geometry is `size="counter"` (the
+ * 20-tall COUNT chip, no `gap-*` of its own at all), never CH11's 26-tall
+ * STATUS PILL (`--control-height-pill`, `gap-2` between the dot and the
+ * label). Both call sites below left `size` unset, so the dot sat flush
+ * against the word — a missing kit token, not a missing space character.
+ *
+ * `bg-surface-panel` — why a call-site override is needed at all, and why it
+ * is not a `Badge`/token bug alone: `variant="status"`'s own fill,
+ * `--pill-fill`, is `var(--card)` (`shared/ui/foundations/tokens/tokens.css`),
+ * because the kit's CH11 draws the status pill on `--sheet`, "the OTHER paper
+ * tone from the panel it sits on" (badge.tsx's own header). Both cards this
+ * chip renders inside — the Gallery's `<Card variant="raised">` and the
+ * Board's Kanban card — are THEMSELVES `bg-card` (`card.tsx`'s own comment:
+ * "off-beige over soft paper"), so `--pill-fill` paints the exact colour of
+ * the card underneath it, in both palettes (`--pill-fill` tracks `--card`
+ * byte-for-byte, tokens.css §7). A background that equals its own container
+ * is `card.tsx`'s own documented failure mode ("`--card` box on the page
+ * draws nothing at all") one layer further in, and it was invisible on every
+ * stage, not only "Development" — a coloured dot beside it read as "a chip is
+ * there" for the other five; `building`'s dot is `--foreground` (near the
+ * label's own ink), so it was the one stage with nothing left to read.
+ * `record-chrome.tsx`'s `IDENTITY_ROW` already rebinds the identical pill to
+ * `--surface-panel` for the record head, for the identical reason (that row
+ * sits on the page, not a card); this is the same fix for the two surfaces
+ * this file owns, done at the call site rather than inside `Card`/`Kanban`
+ * (kit components neither this lane nor this change touches).
+ *
+ * ONE FLAT GROUND FOR EVERY STAGE — the client's own second sentence. A KIT
+ * bug, still OPEN as of 16 Sep 2026: ruling 26's dark clause puts the ONE
+ * tone this app actually uses most, `building` ("Development"/
+ * "Documentation"/"Iteration"), on a mango fill with a charcoal label and dot
+ * in dark mode — the one stage whose pill changes colour at all, which is
+ * exactly why `text-foreground` is named here rather than left to the
+ * badge's own `--pill-label`: this className wins over whatever `badge.tsx`
+ * computes internally (a caller's `className` is merged last, `cn()`'s own
+ * contract), so it gives every stage the identical ground and ink regardless
+ * of what the kit does with `building` underneath. The right fix is still to
+ * retire `shared/ui/components/badge/badge.tsx`'s `status`+`building`
+ * compound variant at the source — this call-site override is the visible
+ * fix, not a substitute for that one — but it is a kit change, gated on a
+ * second kit lane's own tag (v1.2.90) landing first; UI-RULEBOOK.md K23's
+ * amendment, 16 Sep 2026, has the open item.
+ */
+const STAGE_PILL_PROPS = {
+  variant: "status" as const,
+  size: "pill" as const,
+  className: "bg-surface-panel text-foreground",
+}
+
 /** THE GALLERY CARD — client ruling, 15 Sep 2026: "In the gallery, make this
  * a chip, then the title and the subtitle: the name of the account." A kit
  * `Card`/`CardTitle` (R65/K16 needs the real thing, not a hand-rolled `<span>`
@@ -242,11 +298,7 @@ function appGalleryCard(
               `app.stage` for the same reason. Absent when an app carries no
               stage at all — a chip is a fact about the record, not a blank
               placeholder. */}
-          {app.stage && (
-            <Badge variant="status" dot={appStageDotTone(app.stage)}>
-              {t(app.stage)}
-            </Badge>
-          )}
+          {app.stage && <Badge {...STAGE_PILL_PROPS} dot={appStageDotTone(app.stage)}>{t(app.stage)}</Badge>}
           <CardTitle className="text-sm">{app.name}</CardTitle>
           {/* THE SUBTITLE — the account name (this function's own header,
               above, on why R72 does not forbid it here). */}
@@ -493,8 +545,12 @@ export function AppsScreen({
     const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
     return {
       id: app.id,
+      // Same pill, same reason: `STAGE_PILL_PROPS` (see this file's header,
+      // above `appGalleryCard`) — the Kanban card is `bg-card` too, so the
+      // fill needs the identical `--surface-panel` rebind and `size="pill"`
+      // gap.
       badges: app.stage ? (
-        <Badge variant="status" dot={appStageDotTone(app.stage)}>
+        <Badge {...STAGE_PILL_PROPS} dot={appStageDotTone(app.stage)}>
           {t(app.stage)}
         </Badge>
       ) : undefined,

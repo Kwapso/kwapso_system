@@ -1,12 +1,20 @@
 "use client"
 
-// THE ASSISTANT'S OWN TAB STRIP — a pinned clock tab that opens History,
-// FIRST; one folder tab per open conversation; the "+" that is always LAST
-// and never closes. Client ruling, 15 Sep 2026, said in two parts the same
-// day (see web/lib/agent-conversation-tabs.ts for both quotes in full and for
-// why a conversation tab is a different shape from `workspace-tabs.ts`'s
-// record ones): the "+" first, then "I like the history rail tab. Put it
-// before the plus tab."
+// THE ASSISTANT'S OWN TAB STRIP — one folder tab per open conversation,
+// FIRST; then the pinned clock tab that opens History; the "+" that is
+// always LAST and never closes. History sits immediately to the LEFT of
+// "+" — not at the very front of the strip. Client ruling, 15 Sep 2026, said
+// in two parts the same day (see web/lib/agent-conversation-tabs.ts for both
+// quotes in full and for why a conversation tab is a different shape from
+// `workspace-tabs.ts`'s record ones): the "+" first, then "I like the
+// history rail tab. Put it before the plus tab." The first build read that
+// second sentence as "ahead of everything, including every open
+// conversation" and pinned History at index 0 — the client's follow-up
+// correction, 16 Sep 2026, over a screenshot of exactly that: "I want the
+// history tab to be on the left of the plus, not the very far left. Put it
+// to the left of the plus." So "before the plus tab" meant only that: History
+// sits directly to the plus tab's left, after every conversation tab, never
+// ahead of the strip.
 //
 // DRAWN WITH THE KIT'S OWN `BreadcrumbFolders` — the identical component the
 // main content trail uses (`web/components/shell/app-shell.tsx`), called
@@ -112,21 +120,6 @@ export function AgentTabStrip({
   const t = useT()
 
   const items: BreadcrumbFoldersItem[] = [
-    {
-      key: "history",
-      label: (
-        <>
-          <ClockCounterClockwise aria-hidden className="size-[var(--icon-button)]" />
-          <span className="sr-only">{t("History")}</span>
-        </>
-      ),
-      href: HISTORY_TAB_HREF,
-      // PINNED, LIKE "+" — the client's own ruling, 15 Sep 2026: "I like the
-      // history rail tab. Put it before the plus tab." First in the row,
-      // never closable, for the identical reason "+" is neither: it is not a
-      // conversation, so there is nothing here for a × to close.
-      closable: false,
-    },
     ...tabs.map(
       (tab): BreadcrumbFoldersItem => ({
         key: tab.id,
@@ -137,6 +130,26 @@ export function AgentTabStrip({
         href: tabHref(tab.id),
       })
     ),
+    {
+      key: "history",
+      label: (
+        <>
+          <ClockCounterClockwise aria-hidden className="size-[var(--icon-button)]" />
+          <span className="sr-only">{t("History")}</span>
+        </>
+      ),
+      href: HISTORY_TAB_HREF,
+      // PINNED, LIKE "+" — the client's own ruling, 15 Sep 2026: "I like the
+      // history rail tab. Put it before the plus tab", CORRECTED 16 Sep 2026
+      // over a screenshot of History pinned ahead of every conversation
+      // tab: "I want the history tab to be on the left of the plus, not the
+      // very far left. Put it to the left of the plus." So History sits
+      // AFTER every conversation tab and directly before "+" — never at the
+      // front of the strip. Never closable, for the identical reason "+" is
+      // neither: it is not a conversation, so there is nothing here for a ×
+      // to close.
+      closable: false,
+    },
     {
       key: "new",
       label: (
@@ -155,13 +168,14 @@ export function AgentTabStrip({
     },
   ]
 
-  // OFFSET BY ONE FOR THE PINNED HISTORY ITEM AT `items[0]`. `tabs` and
-  // `items` agree on every OTHER position (a conversation tab's index in
-  // `tabs` is its index in `items` minus one, the "+" always last), which is
-  // why `agent-panel.tsx` can keep handing this component the same `tabs`/
-  // `activeId` pair it always has.
+  // NO OFFSET ANY MORE. `tabs` now shares its indices with the LEADING run
+  // of `items` byte for byte (a conversation tab's index in `tabs` is its
+  // index in `items`, full stop) — History and "+" both trail the real
+  // tabs now, so nothing here has to shift a `tabs` index to land on the
+  // matching `items` one. `historyActive` points at History's own slot,
+  // `tabs.length`, the position right after the last conversation tab.
   const tabIndex = activeId ? tabs.findIndex((tab) => tab.id === activeId) : -1
-  const activeIndex = historyActive ? 0 : tabIndex >= 0 ? tabIndex + 1 : -1
+  const activeIndex = historyActive ? tabs.length : tabIndex >= 0 ? tabIndex : -1
 
   return (
     <BreadcrumbFolders

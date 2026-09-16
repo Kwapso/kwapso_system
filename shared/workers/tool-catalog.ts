@@ -2493,12 +2493,17 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_waves",
     summary:
-      "The packages clients have bought — several sprints sold together. `accountId` narrows. Dates are derived from the sprints inside.",
+      "The packages clients have bought — several sprints sold together. `accountId` and `sprintType` narrow. Dates are derived from sprints inside.",
     detail:
-      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
+      "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's, and `sprintType` narrows to waves holding a live sprint of one type, as the team spells it. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves",
-    schema: obj({ accountId: S }),
-    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    schema: obj({ accountId: S, sprintType: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["accountId", "sprintType"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
     agent: { write: false, summarize: () => "List the packages clients bought" },
   },
   {

@@ -5,7 +5,8 @@
 
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
-import { formatDate, formatDateTime, formatRelative } from "@shared/web/format"
+import { formatDate, formatDateTime, formatRelative, formatTime } from "@shared/web/format"
+import { stripPictographs } from "@shared/text-clean"
 // The ROW SHAPE, named rather than restated. `use-record-activity.ts` declares
 // what a dressed activity row is for the bespoke record path; this function has
 // always produced exactly that object (the header above is the record of two
@@ -356,15 +357,31 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // accessible name and the visible text beside it, so the two can never
       // say two different words about the same row.
       const accountLabel = m.accountName ?? t("Ours")
+      // THE DISPLAY-TIME STRIP — the client's ruling, 16 Sep 2026: "kill the
+      // emojis. Also, when they're in the name, just remove them, please." A
+      // title synced from Google before this ruling shipped is still stored
+      // with whatever pictograph its invitation carried
+      // (`workers/content/src/lib/meetings.ts`'s `titleOf` strips at INGEST,
+      // for every sync from now on) — this is the other half, read once here
+      // so every field below that carries the title agrees.
+      const title = stripPictographs(m.title)
       return {
       id: m.id,
       // WHO IT WAS WITH, as a picture. A calendar scanned by date still wants to
       // say at a glance whose call it was (R35).
-      mark: <RecordMark name={m.accountName ?? m.title} />,
+      mark: <RecordMark name={m.accountName ?? title} />,
       // A CANCELLED meeting stays in the list (deactivate-not-delete) and says
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
-      name: m.active ? m.title : `${m.title} (cancelled)`,
+      name: m.active ? title : `${title} (cancelled)`,
+      // THE PLAIN-TEXT SIBLING (R80/K22, 16 Sep 2026's table) — `name` above
+      // is already plain text today, but this is declared anyway, the same
+      // convention `shapeAccountsList`'s own `nameText` follows one file
+      // over: a table's `searchKey` names a PROPERTY the frame reads
+      // (record-table.tsx's own doc), and a name that later grows a node
+      // (a mark, a badge) must not silently break the column that searches
+      // and sorts it.
+      nameText: m.active ? title : `${title} (cancelled)`,
       // K1: when, and who with. The purpose is a column on the "all" view, which
       // is where a person compares meetings on it (K2).
       detail: [formatDate(m.startsAt, lang), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
@@ -421,12 +438,49 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // record-table.tsx's `sortKey`/`sortType` seam has now removed. Warm and
       // in the reader's own language, the same as the subtitle above it.
       when: formatDate(m.startsAt, lang),
+      // THE TIME, SPLIT FROM THE DATE — the table's own Time column (16 Sep
+      // 2026 table ruling: "I want it exactly like the one in tickets"),
+      // read down a page the same way `when` is. DOOR-ORDERED for the
+      // identical reason `when` is one comment up — see
+      // `sorted-columns-declare-their-type.test.ts`'s own `DOOR_ORDERED.time`.
+      time: formatTime(m.startsAt, lang),
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),
       app: m.appName ?? "—",
       where: m.location ?? "—",
       written: m.notes ? "Yes" : "—",
+      // WHO IS COMING, AS FACES — the table's own Attendees column. Rooms are
+      // not stakeholders (`meeting-detail.tsx`'s own split, "a room shown as
+      // a stakeholder is a stakeholder nobody can ring"), so they are
+      // filtered out before anybody is counted. `null` for a typed meeting
+      // with no guest list — the honest absence a `render` fallback below
+      // draws as an em dash, never an invented name.
+      attendeesCell: (() => {
+        const people = (m.googleGuests ?? []).filter((g) => !g.resource)
+        if (people.length === 0) return null
+        const shown = people.slice(0, 3)
+        return (
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1">
+              {shown.map((g) => (
+                <RecordMark key={g.email} name={g.name || g.email} shape="round" size="choice" />
+              ))}
+            </span>
+            {people.length > shown.length ? (
+              <span className="text-muted-foreground text-xs">+{people.length - shown.length}</span>
+            ) : null}
+          </span>
+        )
+      })(),
+      // THE PLAIN-TEXT SIBLING, declared for the same reason `nameText` is
+      // above — never read today (R14: the door owns this table's search),
+      // visibly correct the day it stops being paged rather than silently
+      // unsearchable.
+      attendeesText: (m.googleGuests ?? [])
+        .filter((g) => !g.resource)
+        .map((g) => g.name || g.email)
+        .join(", "),
       // THE NUMBER, FOR THE CHIP IN FRONT OF THE NAME (the recipe's own
       // `reference` column, screens.ts). It was `reference: m.ref ?? "—"` and
       // had no reader at all after the All table's Reference COLUMN was cut —

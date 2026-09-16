@@ -435,6 +435,44 @@ describe("switching a wave off is idempotent (R17)", () => {
   })
 })
 
+describe("filtering by the Sprint type facet — an EXISTS over live sprints (16 Sep 2026)", () => {
+  it("keeps only waves holding a live sprint of that type", async () => {
+    const withType = await aWave("Has the type")
+    const withoutType = await aWave("Does not")
+    await setSprintWave(cfg, guard, staff, actor, { sprintId: "SP_MARCH", waveId: withType })
+    await setSprintWave(cfg, guard, staff, actor, { sprintId: "SP_APRIL", waveId: withoutType })
+    db().exec(`UPDATE sprints SET sprint_type = 'Implementation' WHERE id = 'SP_MARCH'`)
+    db().exec(`UPDATE sprints SET sprint_type = 'Planning' WHERE id = 'SP_APRIL'`)
+
+    expect(
+      (await listWaves(cfg, guard, staff, IDS.victimAccount, "Implementation")).map((w) => w.id)
+    ).toEqual([withType])
+    expect(await countWaves(cfg, guard, staff, IDS.victimAccount, "Implementation")).toBe(1)
+    // A type nothing carries: neither wave, never everything.
+    expect(await countWaves(cfg, guard, staff, IDS.victimAccount, "Nothing like it")).toBe(0)
+  })
+
+  it("ignores a switched-off sprint's type — the same LIVE reading every other count on this row takes", async () => {
+    const id = await aWave()
+    await setSprintWave(cfg, guard, staff, actor, { sprintId: "SP_MARCH", waveId: id })
+    db().exec(
+      `UPDATE sprints SET sprint_type = 'Implementation', deactivated_at = '2026-03-02' WHERE id = 'SP_MARCH'`
+    )
+    expect(await countWaves(cfg, guard, staff, IDS.victimAccount, "Implementation")).toBe(0)
+  })
+
+  it("composes with the account fence — the facet never widens what a caller may see", async () => {
+    // Bergman's wave carries the type; a client login of Delaval's may not
+    // see it even when asking for the exact same type.
+    const id = await aWave()
+    await setSprintWave(cfg, guard, staff, actor, { sprintId: "SP_MARCH", waveId: id })
+    db().exec(`UPDATE sprints SET sprint_type = 'Implementation' WHERE id = 'SP_MARCH'`)
+    const burglar = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
+    expect(await listWaves(cfg, guard, burglar, undefined, "Implementation")).toEqual([])
+    expect(await countWaves(cfg, guard, burglar, undefined, "Implementation")).toBe(0)
+  })
+})
+
 describe("two identical packages are two waves", () => {
   it("refuses a second LIVE wave of the same name for one client, and allows it once the first is off", async () => {
     // The owner's own example: "Three weeks later he sells a second, identical

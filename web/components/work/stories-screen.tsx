@@ -73,8 +73,8 @@ import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
 import { assignableMembers } from "@/lib/members"
-import { MARK_GROUP, markMap } from "@/lib/type-marks"
-import { RecordMark } from "@shared/web/record-mark"
+import { storyTypeIconName, type StoryTypeIconName } from "@shared/story-types"
+import { iconComponent } from "@shared/web/screen-engine/icon"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** WHAT A STORY NEEDS TO BE WRITTEN AT ALL — the sprints it could sit in, the
@@ -130,7 +130,12 @@ export function useStoryFormOptions(teamId: string) {
         // already carries it.
         waveName: s.waveName,
       })),
-    apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
+    // `logoUrl` RIDES ALONG NOW (client ruling, 16 Sep 2026: "I want to see
+    // the icons of the app … on the choice component"), off the same
+    // `PickableRecord` shape every other app/account picker in the app reads
+    // (web/lib/pickable.ts) — an extra optional field, so every existing
+    // reader of `apps` (this hook has five callers) keeps working unchanged.
+    apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name, logoUrl: a.logoUrl })),
     appNames: new Map((appsQ.data ?? []).map((a) => [a.id, a.name])),
     // CHECKLIST 6.4: OPEN tickets only, each tagged with the app it is about so
     // the form can narrow to the one being chosen.
@@ -248,14 +253,66 @@ export async function createStoryFrom(
  * sprint", never a blank cell.
  */
 
+/** THE TYPE CHIP — icon + word, on the same neutral pill `categoryChip` beside
+ * it already draws (client ruling, 16 Sep 2026: "assign an icon to each
+ * type"). REPLACES the two-letter `RecordMark` tile (DA/TC/BG…) this row used
+ * to lead with — there is no DOT to remove here: a colour dot for a type is a
+ * TICKET-ONLY pattern (`web/lib/type-colours.ts`'s own header says so, and
+ * `web/lib/type-marks.ts`'s `MARK_GROUP` deliberately carries no `ticket` key
+ * any more for that exact reason); a story's type has always drawn a TEXT
+ * glyph in a square, never a dot, and the icon replaces THAT.
+ *
+ * `storyTypeIconName` (shared/story-types.ts) is a closed, five-entry code
+ * map — the vocabulary itself is still read live off `selectable_data`
+ * (`Story type`), only the glyph is code. The map holds the kit's kebab-case
+ * NAME, not a component (shared/story-types.ts's own header says why — a
+ * worker reads that file too, and no worker tsconfig allows JSX), so the
+ * name is resolved to a component here through the same seam `Icon`/
+ * `RecordPicker` already use, `iconComponent()`. A team that has renamed a
+ * type past recognition (or a story with none at all) draws the word alone,
+ * same as `type-marks.ts`'s own text mark always has.
+ *
+ * EXPORTED so `story-detail.tsx`'s Overview "Type" row draws the identical
+ * chip rather than a second idea of what a story's type looks like. */
+export function storyTypeChip(value: string | null | undefined): React.ReactNode {
+  if (!value) return <span className="text-muted-foreground text-sm">—</span>
+  const iconName = storyTypeIconName(value)
+  const Icon = iconName ? iconComponent(iconName) : null
+  return (
+    <Badge variant="secondary" className="gap-1">
+      {Icon && <Icon className="size-3.5" />}
+      {value}
+    </Badge>
+  )
+}
+
+// THE GENERATOR'S CENSUS BAIT, the same shape `MEETING_TYPE_ICON_CENSUS`
+// (web/components/deep-link/shape.tsx) plants for the meeting-type vocabulary
+// — `scripts/icon-map.mjs`'s census can only see a literal `icon: "…"` in
+// SOURCE, and the two call above never write one: they resolve a NAME through
+// `iconComponent()` and hand the result to `<Icon .../>`, so the string never
+// appears as an `icon:` field anywhere a source scan can read it. Without
+// this, `icon-map.ts` would never import `ArrowsClockwise`/`Bug`/`Database`/
+// `Sparkle`/`Wrench` for THIS reason (some of the five may still be pulled in
+// by an unrelated call elsewhere), and a story type's chip would draw a HOLE
+// the day it stopped being. Kept beside `STORY_TYPE_ICONS`
+// (@shared/story-types) so the two can never drift the way the meeting
+// census and its vocabulary cannot.
+const STORY_TYPE_ICON_CENSUS: { icon: StoryTypeIconName }[] = [
+  { icon: "database" },
+  { icon: "wrench" },
+  { icon: "bug" },
+  { icon: "sparkle" },
+  { icon: "arrows-clockwise" },
+]
+void STORY_TYPE_ICON_CENSUS
+
 /** ONE STORY'S OWN TWO-COLOUR SHAPE — mark, ref chip, title — shared by every
  * view that shows a story as a single node (the List's Story column, and the
- * Board's card title row). `marks` is the Story type's glyph (R35, the same
- * lookup `web/lib/type-marks.ts` gives the tickets collection). */
-function storyLead(s: Story, marks?: Map<string, string>): React.ReactNode {
+ * Board's card title row). */
+function storyLead(s: Story): React.ReactNode {
   return (
     <span className="flex items-center gap-2 min-w-0">
-      <RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? "?"} />
       {s.ref && (
         <Badge variant="secondary" className="font-mono shrink-0">
           {s.ref}
@@ -267,7 +324,7 @@ function storyLead(s: Story, marks?: Map<string, string>): React.ReactNode {
 }
 
 /** THE CATEGORY CHIP (client ruling, 15 Sep 2026) — a small, quiet badge
- * beside the type mark, on every row and every card. Client-requested /
+ * beside the type chip, on every row and every card. Client-requested /
  * Internal, whatever the team has renamed either to. */
 function categoryChip(s: Story): React.ReactNode {
   return (
@@ -298,15 +355,15 @@ function sprintCell(s: Story, waveNames: Map<string, string | null>): React.Reac
  * (status, sprint dates, assignee) because neither of those needs the
  * formatted, translated cell. TAKES ROWS ALREADY IN ORDER — this shapes, it
  * does not sort (R53: one order, decided at the toolbar). */
-function shapeStories(
-  stories: Story[],
-  waveNames: Map<string, string | null>,
-  marks?: Map<string, string>
-) {
+function shapeStories(stories: Story[], waveNames: Map<string, string | null>) {
   return {
     rows: stories.map((s) => ({
       id: s.id,
-      name: storyLead(s, marks),
+      name: storyLead(s),
+      // ITS OWN COLUMN NOW, NOT SQUEEZED INTO THE STORY CELL — an icon+word
+      // chip is wider than the two-letter tile it replaces, and Category
+      // (beside it) already gets its own column for the identical reason.
+      type: storyTypeChip(s.storyType),
       category: categoryChip(s),
       status: STORY_STATUS_LABEL[s.status],
       sprint: sprintCell(s, waveNames),
@@ -323,13 +380,20 @@ function shapeStories(
  * on Everyone's, the one tab that is not already narrowed to the caller. */
 const MINE_COLUMNS = [
   field("name", "Story"),
+  field("type", "Type"),
   field("category", "Category"),
   field("status", "Status"),
   field("sprint", "Sprint"),
 ]
-const COMPLETED_COLUMNS = [field("name", "Story"), field("category", "Category"), field("sprint", "Sprint")]
+const COMPLETED_COLUMNS = [
+  field("name", "Story"),
+  field("type", "Type"),
+  field("category", "Category"),
+  field("sprint", "Sprint"),
+]
 const EVERYONE_COLUMNS = [
   field("name", "Story"),
+  field("type", "Type"),
   field("assignee", "Who has it"),
   field("category", "Category"),
   field("status", "Status"),
@@ -442,11 +506,10 @@ export function StoriesScreen({
 
   const storiesQ = useCached<Story[]>(storiesKey(teamId, view), () => listFetch.stories(teamId, view))
   const options = useStoryFormOptions(teamId)
-  // THE STORY TYPE'S GLYPH, keyed by the word the row stores. The vocabulary is
-  // already in hand — `useStoryFormOptions` reads the same `selectable:` cache
-  // the Dropdown values screen writes — so this costs no extra request, and an
-  // emoji changed on that screen reaches these rows the moment it lands.
-  const storyMarks = markMap(options.selectableValues, MARK_GROUP.story)
+  // THE STORY TYPE'S GLYPH used to be read here (`markMap`, the team's own
+  // two-letter code) — RETIRED 2026-09-16 with the row's own text mark: the
+  // type chip now draws a Phosphor icon (`storyTypeChip`, `shared/story-
+  // types.ts`), keyed off the word itself rather than a per-team glyph.
   // THE SPRINT COLUMN'S SECOND LINE — the wave each sprint was sold inside,
   // read off the sprints this screen already loads for the create dialog
   // (`useStoryFormOptions`'s own `sprintsQ`, which carries `waveName`). No new
@@ -586,7 +649,7 @@ export function StoriesScreen({
   }
 
   const sortedRows = [...filteredRows].sort((a, b) => compareStories(a, b, sortField, sortDir))
-  const data = shapeStories(sortedRows, waveNames, storyMarks)
+  const data = shapeStories(sortedRows, waveNames)
   const columns = view === "completed" ? COMPLETED_COLUMNS : view === "all" ? EVERYONE_COLUMNS : MINE_COLUMNS
   const tableRecipeBase = withDataDrivenCollection(
     { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
@@ -608,11 +671,17 @@ export function StoriesScreen({
     title: s.title,
     // THE SPRINT, ABOVE THE TITLE (R65/K16) — the artifact's own words for
     // the Now board: "the sprint as a chip above the title instead of owning
-    // the grouping".
+    // the grouping". THE TYPE CHIP JOINS IT 2026-09-16 (same ruling as the
+    // List's own new Type column) — `badges` is a flex-wrap row
+    // (kanban.tsx), so the two sit side by side and wrap on a narrow card
+    // rather than fighting for one slot.
     badges: (
-      <Badge variant="secondary" size="pill" className={s.sprintName ? undefined : "opacity-55 italic"}>
-        {s.sprintName ?? t("No sprint")}
-      </Badge>
+      <>
+        {storyTypeChip(s.storyType)}
+        <Badge variant="secondary" size="pill" className={s.sprintName ? undefined : "opacity-55 italic"}>
+          {s.sprintName ?? t("No sprint")}
+        </Badge>
+      </>
     ),
     // NO REFERENCE HERE — a reference belongs in the one black chip in FRONT
     // of a name (`storyLead`, the List view's own Story cell), never glued

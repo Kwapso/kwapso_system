@@ -204,9 +204,13 @@ export function setAgentTabThread(id: string, threadId: string): void {
 /** ── THE PINNED CLOCK TAB ─────────────────────────────────────────────────
  * Client ruling, 15 Sep 2026, the same day as the header's own quote: "I
  * like the history rail tab. Put it before the plus tab... when I click on
- * one, it would open in a tab." `agent-tab-strip.tsx` draws it first, ahead
- * of every conversation and "+"; `agent-history-tab.tsx` is its body — V2
- * from the artifact, grouped by last used. */
+ * one, it would open in a tab." CORRECTED 16 Sep 2026, over a screenshot of
+ * History pinned ahead of every conversation tab: "I want the history tab
+ * to be on the left of the plus, not the very far left. Put it to the left
+ * of the plus." `agent-tab-strip.tsx` draws it AFTER every conversation
+ * tab and immediately before "+", never at the front of the strip;
+ * `agent-history-tab.tsx` is its body — V2 from the artifact, grouped by
+ * last used. */
 
 export function openHistoryTab(): void {
   if (historyOpen) return

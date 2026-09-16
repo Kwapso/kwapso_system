@@ -167,11 +167,10 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // "temporarily failing" and it is not quietly deleted — it is inverted, and
     // the inversion is the coverage.
     //
-    // NOTHING WAS DROPPED. The seam is unchanged and still has real subjects:
-    // stories and sprints draw their marks through the same `markMap`, on four
-    // screens. So this check now proves the same sentence about the kinds that
-    // still have marks, plus the negative the ruling asked for. The stored
-    // glyphs on `Ticket type` rows were NOT touched — see web/lib/type-marks.ts,
+    // NOTHING WAS DROPPED. The seam is unchanged and still has real subjects.
+    // So this check now proves the same sentence about the kinds that still
+    // have marks, plus the negative the ruling asked for. The stored glyphs
+    // on `Ticket type` rows were NOT touched — see web/lib/type-marks.ts,
     // which carries the ruling and what it left alone.
     const marksSeam = readFileSync(join(ROOT, "web", "lib", "type-marks.ts"), "utf8")
 
@@ -181,7 +180,21 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
       /story:\s*"Story type"/.test(marksSeam),
       "MARK_GROUP no longer names the story vocabulary — this check has no subject left"
     ).toBe(true)
-    const stories = readFileSync(join(ROOT, "web", "components", "work", "stories-screen.tsx"), "utf8")
+    // ── ITS SUBJECT MOVED A FOURTH TIME, 2026-09-16, AND FOR THE SAME REASON
+    // THE TICKET CLAUSE INVERTED BELOW — a ruling, not a regression. The
+    // client: "assign an icon to each type." `stories-screen.tsx`'s OWN List/
+    // Board rows no longer read a TEAM-set text glyph through `markMap` —
+    // they draw a fixed Phosphor icon (`storyTypeIconName`, `shared/story-
+    // types.ts`, `storyTypeChip`) for the CLOSED, protected five-word
+    // vocabulary (K26, RULES.md), which is a different seam answering a
+    // different question ("which glyph does the CODE draw for this kind"
+    // rather than "which glyph did the TEAM set for it"). The team-set glyph
+    // seam this check exists to prove is not gone, though: `sprint-
+    // detail.tsx`'s own Related stories panel still reads a story's mark
+    // through `markMap`/`MARK_GROUP.story` exactly as before — it is a
+    // NESTED list inside another record's screen, never rewritten — so that
+    // pair of files is the surviving positive example.
+    const sprintDetail = readFileSync(join(ROOT, "web", "components", "work", "sprint-detail.tsx"), "utf8")
     // `.` DOES NOT MATCH A NEWLINE. `markMap\(.*MARK_GROUP\.story\)` needed the
     // whole call typed on one physical line, so the ordinary wrap Prettier
     // applies the moment that argument list grows would have reddened a law
@@ -189,16 +202,18 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // at the call's own closing paren, so it cannot drift into a later call
     // either.
     expect(
-      /markMap\(\s*[^)]*MARK_GROUP\.story\s*\)/.test(stories),
-      "the stories screen no longer reads the team's own glyphs through the type-mark seam"
+      /markMap\(\s*[^)]*MARK_GROUP\.story\s*\)/.test(sprintDetail),
+      "sprint-detail.tsx no longer reads the team's own glyphs through the type-mark seam"
     ).toBe(true)
     // The row parameter's NAME is the screen's business, not this law's: `s`
     // here is a `.map((s) => …)` callback and renaming it to `story` changes
     // nothing. What must hold is that the mark drawn is looked up from `marks`
-    // by that row's own storyType.
+    // by that row's own storyType — read off `work-panels.tsx`'s `Row`, the
+    // component sprint-detail.tsx hands its `markMap(...)` result to.
+    const workPanels = readFileSync(join(ROOT, "web", "components", "work", "work-panels.tsx"), "utf8")
     expect(
-      /marks\?\.get\(\s*\w+\.storyType/.test(stories),
-      "the stories screen no longer draws the team's own glyph for a row's kind"
+      /marks\?\.get\(\s*\w+\.storyType/.test(workPanels),
+      "work-panels.tsx no longer draws the team's own glyph for a story row's kind"
     ).toBe(true)
 
     // THE NEGATIVE HALF — the ruling, held as a ratchet. `MARK_GROUP` is a

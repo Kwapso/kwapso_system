@@ -45,8 +45,12 @@ const TICKET: HelpTicket = {
   editorName: null,
 } as unknown as HelpTicket
 
+// "Fix" IS RETIRED (team migration 0094 deactivated it, K26/RULES.md) — the
+// five live words since 15 Sep 2026 are Data/Tech/Bug/Feature/Change, and the
+// door refuses a `storyType` that does not name an ACTIVE row. "Feature" is
+// as good as any of the five for this file's purposes.
 const STORY_TYPES: SelectableValue[] = [
-  { type: "Story type", value: "Fix", active: true } as unknown as SelectableValue,
+  { type: "Story type", value: "Feature", active: true } as unknown as SelectableValue,
 ]
 
 const api = vi.hoisted(() => ({ createStory: vi.fn(), stories: vi.fn() }))
@@ -124,14 +128,20 @@ const openTicket = () =>
     <HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />
   )
 
-/** Choose the story's TYPE through the REAL control. It is the searchable
- * RecordPicker now, not a Radix Select — a button that opens a popover holding
- * a cmdk list — so it opens on a click rather than on Enter. The option is
- * still chosen exactly as a person would, rather than a value being written
- * past the control. */
+/** Choose the story's TYPE through the REAL control. HORIZONTAL PILLS since
+ * 2026-09-16 (client: "make it a horizontal pick") — `RecordPicker
+ * layout="row"`, a `role="group"` of real `<Button>` chips, already open and
+ * committing on the click. There is no combobox to open first any more. */
 async function pickStoryType() {
-  fireEvent.click(screen.getByLabelText(/^type\s*\*?$/i))
-  fireEvent.click(await screen.findByRole("option", { name: "Fix" }))
+  fireEvent.click(await screen.findByRole("button", { name: "Feature" }))
+}
+
+/** Open the process dropdown and choose the explicit "no process" answer —
+ * the kit's own `Select` since 2026-09-16 (client correction: "keep it!! But
+ * make it a dropdown"), in place of the checkbox this used to be. */
+async function markChangesNoProcess() {
+  fireEvent.click(screen.getByRole("combobox", { name: /processes/i }))
+  fireEvent.click(await screen.findByRole("option", { name: "This changes no process" }))
 }
 
 /** Open Related stories and press the create action the tab promises. */
@@ -169,7 +179,7 @@ describe("writing a story on the ticket that asked for it", () => {
     // The type is required by the door, so the form collects it.
     await pickStoryType()
     // …and the explicit "it changes no process", which the door refuses to infer.
-    fireEvent.click(screen.getByLabelText(/changes no process/i))
+    await markChangesNoProcess()
     fireEvent.submit(document.querySelector("form") as HTMLFormElement)
 
     await waitFor(() => expect(api.createStory).toHaveBeenCalled())
@@ -198,7 +208,7 @@ describe("writing a story on the ticket that asked for it", () => {
       target: { value: "Make the board responsive" },
     })
     await pickStoryType()
-    fireEvent.click(screen.getByLabelText(/changes no process/i))
+    await markChangesNoProcess()
     fireEvent.submit(document.querySelector("form") as HTMLFormElement)
     await waitFor(() => expect(api.createStory).toHaveBeenCalled())
 
@@ -231,11 +241,15 @@ describe("the story form never shows a person its own placeholder value", () => 
     fireEvent.click(await screen.findByRole("button", { name: "New story" }))
     const dialog = await screen.findByRole("dialog")
     expect(dialog.textContent).not.toContain("__none__")
-    // /type/i, not /^type$/i: the label carries a required marker, so an
-    // anchored match finds nothing. No other label in this form contains the
-    // word — App, What needs doing, Detail, Sprint, Tickets, Processes, Who's
-    // doing it — so this is unambiguous. It read "Kind of work" until the
-    // glossary folded Kind, Category and Type into one word (R6).
-    expect(screen.getByLabelText(/type/i).textContent).toBe("Pick one")
+    // THE TYPE FIELD IS A ROW NOW (client, 2026-09-16: "make it a horizontal
+    // pick") — `RecordPicker layout="row"`, a `role="group"` of real chip
+    // buttons, already open. There is no closed control fed a sentinel and
+    // no fallback label chain to get wrong here any more; what a row CAN
+    // still get wrong is drawing the team's own vocabulary word on the
+    // chip, which is what this asserts instead.
+    expect(within(dialog).getByRole("group", { name: /type/i })).toBeTruthy()
+    // ASYNC — the row's own words are the team's live vocabulary
+    // (`tenancy.selectable()`), so the chip is not there on the first paint.
+    expect(await within(dialog).findByRole("button", { name: "Feature" })).toBeTruthy()
   })
 })

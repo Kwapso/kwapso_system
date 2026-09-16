@@ -1315,6 +1315,17 @@ export const SEED: Catalogue = {
    * German the same way "Personality type" → "Persönlichkeitstyp" already is. */
   "Meeting type": { de: "Termintyp", es: "Tipo de reunión", ca: "Tipus de reunió" },
   "Meeting types": { de: "Termintypen", es: "Tipos de reunión", ca: "Tipus de reunió" },
+  /* THE MEETINGS TABLE'S OWN TWO COLUMNS (16 Sep 2026: "I want it exactly
+   * like the one in tickets"). Both words carried this same seed once, for
+   * the AM-rebuild's seven-column table 2026-09-15 — pruned the same
+   * evening when that table was retired in favour of `shared/web/
+   * list-compat.tsx`'s `List` (`node scripts/i18n-prune.mjs`, run against a
+   * tree with no reader left for either). Back a second time, hand
+   * translated rather than left to the generator, the same as their first
+   * seeding. "Time" is the column, not a duration — Zeit/Hora/Hora, not
+   * Dauer/Duración/Durada. */
+  "Time": { de: "Zeit", es: "Hora", ca: "Hora" },
+  "Attendees": { de: "Teilnehmer", es: "Asistentes", ca: "Assistents" },
   "Transcript read.": { de: "Mitschrift gelesen.", es: "Transcripción leída.", ca: "Transcripció llegida."},
   "Try fewer words, or clear the filters.": { de: "Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Prueba con menos palabras o borra los filtros.", ca: "Prova amb menys paraules o esborra els filtres."},
   "Update the details you hold for them.": { de: "Aktualisieren Sie die Angaben, die Sie zu dieser Person haben.", es: "Actualiza los datos que tienes de esta persona.", ca: "Actualitza les dades que en tens."},
@@ -1494,7 +1505,6 @@ export const SEED: Catalogue = {
   "What it gives them": { de: "Was es ihnen bringt", es: "Qué les aporta", ca: "Què els aporta"},
   "Where the team manages their own preferences.": { de: "Wo das Team seine eigenen Einstellungen verwaltet.", es: "Donde el equipo gestiona sus propias preferencias.", ca: "On l'equip gestiona les seves preferències."},
   "Your invite has been accepted, so nothing is waiting on you. Open the portal at the address your invite came from, and sign in with this same email address.": { de: "Ihre Einladung wurde angenommen, es wartet also nichts auf Sie. Öffnen Sie das Portal unter der Adresse, von der Ihre Einladung kam, und melden Sie sich mit derselben E-Mail-Adresse an.", es: "Tu invitación ya está aceptada, así que no hay nada pendiente. Abre el portal en la dirección desde la que llegó tu invitación e inicia sesión con este mismo correo.", ca: "La teva invitació ja està acceptada, així que no hi ha res pendent. Obre el portal a l'adreça des d'on va arribar la invitació i inicia sessió amb aquest mateix correu."},
-  "Yours unless you say otherwise, an unassigned task is a task nobody picks up.": { de: "Ihre, sofern Sie nichts anderes sagen – eine nicht zugewiesene Aufgabe nimmt niemand auf.", es: "Tuya salvo que digas lo contrario: una tarea sin asignar es una tarea que nadie recoge.", ca: "Teva llevat que diguis el contrari: una tasca sense assignar és una tasca que ningú no agafa."},
   "an account": { de: "ein Kunde", es: "una cuenta", ca: "un compte"},
   "a ticket type": { de: "ein Tickettyp", es: "un tipo de ticket", ca: "un tipus de tiquet"},
   "an app": { de: "eine App", es: "una aplicación", ca: "una aplicació"},
@@ -3437,6 +3447,13 @@ export const SEED: Catalogue = {
   "At least one. A screenshot, a recording, a link to the page it changed.": { de: "Mindestens eines. Ein Screenshot, eine Aufnahme, ein Link zur geänderten Seite.", es: "Al menos uno. Una captura de pantalla, una grabación, un enlace a la página que cambió.", ca: "Almenys un. Una captura de pantalla, un enregistrament, un enllaç a la pàgina que ha canviat."},
   "Blocks on this app that are still running or still to come.": { de: "Blöcke auf dieser App, die noch laufen oder noch bevorstehen.", es: "Bloques de esta app que siguen en marcha o que aún están por venir.", ca: "Blocs d'aquesta app que encara estan en marxa o encara han d'arribar."},
   "Company number, VAT number, whatever your country asks for.": { de: "Handelsregisternummer, USt-IdNr., was auch immer Ihr Land verlangt.", es: "Número de empresa, NIF/CIF, lo que pida tu país.", ca: "Número d'empresa, NIF, el que demani el teu país."},
+  // FOUR NEW STRINGS, 16 Sep 2026, for the story form's process dropdown
+  // (story-form-dialog.tsx) and its Type row — R44's ceiling stays where it
+  // was, none of these are debt.
+  "Add a process": { de: "Einen Prozess hinzufügen", es: "Añadir un proceso", ca: "Afegir un procés"},
+  "This changes no process": { de: "Das ändert keinen Prozess", es: "Esto no cambia ningún proceso", ca: "Això no canvia cap procés"},
+  "This app has no processes yet.": { de: "Diese App hat noch keine Prozesse.", es: "Esta aplicación aún no tiene procesos.", ca: "Aquesta aplicació encara no té processos."},
+  "Your team has no story types set up yet.": { de: "Ihr Team hat noch keine Story-Typen eingerichtet.", es: "Tu equipo aún no tiene tipos de historia configurados.", ca: "El teu equip encara no té tipus d'història configurats."},
   "Editable on the Choices screen.": { de: "Bearbeitbar auf der Seite „Optionen“.", es: "Editable en la pantalla de Opciones.", ca: "Editable a la pantalla d'Opcions."},
   "Every way of working this changes, or tick that it changes none.": { de: "Jede Arbeitsweise, die sich dadurch ändert, oder anhaken, dass sich keine ändert.", es: "Cada forma de trabajar que esto cambia, o marca que no cambia ninguna.", ca: "Cada manera de treballar que això canvia, o marca que no en canvia cap."},
   "On unless you say otherwise.": { de: "Aktiv, sofern Sie nichts anderes sagen.", es: "Activado, a menos que digas lo contrario.", ca: "Activat, llevat que diguis el contrari."},
@@ -3965,6 +3982,7 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "Story types": { de: "Aufgaben-Typen", es: "Tipos de historia", ca: "Tipus d'història" },
+  "Sprint type": { de: "Sprintart", es: "Tipo de sprint", ca: "Tipus de sprint" },
   "Sprint types": { de: "Sprint-Typen", es: "Tipos de sprint", ca: "Tipus de sprint" },
   "Stages and deliverable kinds": { de: "Phasen und Ergebnisarten", es: "Etapas y tipos de entregable", ca: "Etapes i tipus de lliurable" },
   "Industries and countries": { de: "Branchen und Länder", es: "Sectores y países", ca: "Sectors i països" },
@@ -4265,4 +4283,20 @@ export const SEED: Catalogue = {
   "Next week": { de: "Nächste Woche", es: "Semana siguiente", ca: "Setmana següent" },
   "Previous day": { de: "Vorheriger Tag", es: "Día anterior", ca: "Dia anterior" },
   "Previous week": { de: "Vorherige Woche", es: "Semana anterior", ca: "Setmana anterior" },
+
+  /* ── 16 Sep 2026, the "kill Nobody" staff-picker lane. The task assignee
+     field's own `helpText` lost its second clause when it stopped being true
+     ("Yours unless you say otherwise, an unassigned task is a task nobody
+     picks up." -> "Yours unless you say otherwise." — an assignee can no
+     longer be left unset, so the sentence explaining that state was no
+     longer a fact). "Yours" is predicate, agreeing with "To-do" (neuter,
+     "Ein neues To-do" elsewhere in this file) — de: "Ihres". Same vocabulary
+     as "On unless you say otherwise." above ("sofern Sie nichts anderes
+     sagen" / "a menos que digas lo contrario" / "llevat que diguis el
+     contrari"), so the phrase reads the same wherever it recurs. */
+  "Yours unless you say otherwise.": {
+    de: "Ihres, sofern Sie nichts anderes sagen.",
+    es: "Tuya, a menos que digas lo contrario.",
+    ca: "Teva, llevat que diguis el contrari.",
+  },
 }

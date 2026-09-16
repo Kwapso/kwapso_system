@@ -234,6 +234,10 @@
 //     department, whatever is the most detailed… in a chip on top of the
 //     title, like we have it already somewhere else." Covered at
 //     `boardChip`'s own comment, below (R65/K16 is the "somewhere else").
+//     AMENDED 2026-09-16 by client ruling: the chip ALWAYS shows the
+//     department (plain text, no mark); a task with no department shows no
+//     chip. App/account no longer appear in the board chip (they remain in
+//     list columns and week view detail line).
 // 5 · "On Everyone's, add the column 'Closed On' or 'Finished On'." Everyone's
 //     gains an eighth column, `closed` — the same `completedAt`-sourced cell
 //     Completed's own eighth column already draws (`shapeTasks`'s `closed`
@@ -367,67 +371,31 @@ function PriorityChip({ level, t }: { level: 1 | 2 | 3 | 4; t: (s: string) => st
  * is the exact slot, the same one the tickets board already draws its own
  * card chip through (`badges: <TriageChips … />`, tickets-collection.tsx).
  *
- * APP > ACCOUNT > DEPARTMENT — the client's own order ("whatever is the most
- * detailed"): an app belongs to an account, and a department names neither,
- * so the narrowest fact wins outright rather than the three combining into
- * one crowded chip. THE RECORD MARK rides the app/account branches only —
- * `<RecordMark>`, the identical node this file's own table cells already
- * draw for App/Account (`shapeTasks`, below) — because a department is a
- * team vocabulary word, not a record with a logo; it carries its own glyph
- * (`departmentGlyph`) instead, the same mark the table's Department column
- * already leads with, never a picture.
+ * AMENDED 2026-09-16 by client ruling: the chip ALWAYS shows the task's
+ * department (plain text, no mark). A task with no department shows no chip.
+ * App and account no longer appear in the board chip (they remain in list
+ * columns and the week view's detail line — see `weekDetail`, below).
  *
  * `size="choice"`/`size="pill"`: the kit's own smallest mark (24, `--avatar-
  * sm`) inside its own pill-height badge (26, `--control-height-pill`) — the
  * one standard pairing in the kit's own vocabulary sized to hold a mark at
  * all (`shared/ui/docs/TOKENS.md`). */
-/** APP > ACCOUNT > DEPARTMENT, decided once — the one thing `boardChip` (the
- * board's own Badge) and `weekDetail` (below, the week view's plain-text
- * line, item 7) must never answer differently. `undefined` when a task names
- * none of the three, matching `boardChip`'s own "no chip" and `weekDetail`'s
- * own "no detail line". */
-function mostDetailed(r: Task): "app" | "account" | "department" | undefined {
-  if (r.appName) return "app"
-  if (r.accountName) return "account"
-  if (r.department) return "department"
-  return undefined
-}
-
 function boardChip(r: Task): React.ReactNode {
-  const kind = mostDetailed(r)
-  if (kind === "app")
-    return (
-      <Badge variant="secondary" size="pill" className="gap-1.5">
-        <RecordMark picture={r.appLogoUrl} name={r.appName} size="choice" />
-        {r.appName}
-      </Badge>
-    )
-  if (kind === "account")
-    return (
-      <Badge variant="secondary" size="pill" className="gap-1.5">
-        <RecordMark picture={r.accountLogoUrl} name={r.accountName} size="choice" />
-        {r.accountName}
-      </Badge>
-    )
-  if (kind === "department") {
-    const mark = departmentGlyph(r.department)
-    return <Badge variant="secondary" size="pill">{[mark, r.department].filter(Boolean).join(" ")}</Badge>
-  }
-  return undefined
+  if (!r.department) return undefined
+  const mark = departmentGlyph(r.department)
+  return <Badge variant="secondary" size="pill">{[mark, r.department].filter(Boolean).join(" ")}</Badge>
 }
 
 /** THE WEEK VIEW'S OWN DETAIL LINE (item 7 of the third pass: "entries with
  * `dotTone` and the chip rule from item 4") — `CalendarEntry.detail` is a
  * plain string, not a node (`record-calendar.tsx`'s own type; `RecordWeek`
- * draws it as the card's quiet second line, no chip/logo slot on that type),
- * so the SAME `mostDetailed` precedence `boardChip` reads is read again here,
- * in words only — no `<RecordMark>`, which stays a board-only affordance. */
+ * draws it as the card's quiet second line, no chip/logo slot on that type).
+ * AMENDED 2026-09-16 with the board chip ruling: the week detail line now
+ * reads department only, matching the board chip simplification — a task with
+ * no department shows no detail line. */
 function weekDetail(r: Task): string | undefined {
-  const kind = mostDetailed(r)
-  if (kind === "app") return r.appName ?? undefined
-  if (kind === "account") return r.accountName ?? undefined
-  if (kind === "department") return [departmentGlyph(r.department), r.department].filter(Boolean).join(" ")
-  return undefined
+  if (!r.department) return undefined
+  return [departmentGlyph(r.department), r.department].filter(Boolean).join(" ")
 }
 
 /** One task, as a row. Every column any view needs is on it, so the shaping is
@@ -640,11 +608,11 @@ type OverdueView = "table" | "board"
  * Planned's fourth view, reading the identical `CalendarEntry[]`
  * `RecordCalendar`'s own Calendar view already builds (`calendarEntries`,
  * below), plus `dotTone` (already set there) and a `detail` line built off
- * the same app/account/department precedence `boardChip` uses (`mostDetailed`,
- * above `shapeTasks`) — the client's own "like we have it already somewhere
- * else" idiom, reused a second time rather than invented again. Overdue does
- * NOT gain it: the client's own list of tabs for Week named Planned and
- * Everyone's only. */
+ * the same department-only logic `boardChip` uses (`weekDetail`, below) — the
+ * client's own "like we have it already somewhere else" idiom, reused a second
+ * time rather than invented again. AMENDED 2026-09-16: both `boardChip` and
+ * `weekDetail` now show department only. Overdue does NOT gain Week: the
+ * client's own list of tabs for Week named Planned and Everyone's only. */
 type PlannedView = "table" | "board" | "calendar" | "week"
 /** Everyone's own sub-view — Table + Board, the pair Overdue offers, PLUS
  * Week (same arrival as Planned's, above; Everyone's has no Calendar view to

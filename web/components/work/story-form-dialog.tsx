@@ -17,15 +17,24 @@
 // four option lists. A field added below appears on both, or on neither.
 //
 // WHAT IS ON IT NOW AND WHAT IS NOT:
-//   • a TYPE, required (6.2) — Fix, Feature, Change, editable on the Dropdown
-//     values screen. The old note here said a story deliberately had none; the
-//     owner reversed that on 17 Aug 2026;
+//   • a TYPE, required (6.2) — Data · Tech · Bug · Feature · Change, editable
+//     on the Choices screen. AS A HORIZONTAL PILL ROW WITH AN ICON since
+//     16 Sep 2026 (client: "assign an icon to each type … when I'm editing
+//     or creating, make it a horizontal pick") — same idiom as the staff row
+//     below, `RecordPicker layout="row"`, icons from `shared/story-types.ts`;
 //   • the SPRINT list, narrowed to that app and to blocks still worth putting
 //     work into, each carrying its mark (6.3);
 //   • "Request behind it" is now TICKETS (6.4), narrowed to that app and to the
 //     ones still open — a resolved request is not something to hang new work on;
 //   • the PROCESSES this work touches, one or more, with an explicit "it changes
-//     none" that has to be TICKED rather than left blank (6.5, Aurora's ts4);
+//     none" that has to be CHOSEN rather than left blank (6.5, Aurora's ts4) — a
+//     `Select` dropdown since 16 Sep 2026 (see the field's own note below for
+//     the correction that kept it on this form at all);
+//   • CATEGORY IS LAST, AND PREFILLED (16 Sep 2026 ruling): Client-requested
+//     when this dialog was opened FROM a ticket (`fixedTicket` set), Internal
+//     otherwise — "if it comes from a ticket, it's client requested. If it's
+//     created from scratch, it's prefilled with internal." Still editable, and
+//     still the two-pill row it already was;
 //   • NO DUE DATE. A story is due when the block it was sold inside is due (3.15).
 
 import * as React from "react"
@@ -33,13 +42,12 @@ import * as React from "react"
 import { LinkSimple, Paperclip, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
-import { Checkbox } from "@shared/ui/components/checkbox/checkbox"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
-import { Label } from "@shared/ui/components/label/label"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
@@ -48,6 +56,8 @@ import { ApiFailure, content as contentApi } from "@/lib/api"
 import { storyAttachmentsKey } from "@/lib/live-resources"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
+import { storyTypeIconName } from "@shared/story-types"
+import { iconComponent } from "@shared/web/screen-engine/icon"
 import type { PickableRecord } from "@/lib/pickable"
 import { staffedOn, type PickablePerson } from "@/lib/members"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
@@ -87,6 +97,16 @@ export type StoryFormValues = {
  * the library's Select, so the absence of a sprint has to be a value of its own
  * rather than a blank the control silently rejects. */
 const NONE = "__none__"
+
+/** THE PROCESS DROPDOWN'S OWN "picked none of them" ANSWER — kept apart from
+ * `NONE` above, which means "nothing chosen yet" on every other field on this
+ * form. Here the two are different facts: `NONE` still means the Select has
+ * nothing to show (the fresh, unanswered state — CHOOSING it is a no-op), and
+ * this sentinel is the CHOICE Aurora's ruling asks for, ticked rather than
+ * left blank. Conflating them would make "I haven't answered yet" and "I have
+ * answered: none" the same value, which is exactly the ambiguity the door's
+ * own `resolveProcesses` refuses (workers/content/src/lib/stories.ts). */
+const PROCESS_NONE = "__changes_no_process__"
 
 /** A sprint, with the mark CHECKLIST 6.3 asks for. Derived from the two facts the
  * row already carries rather than stored: a mark computed on the fly can never
@@ -167,7 +187,6 @@ export function StoryFormDialog({
   processes,
   storyTypes,
   categories,
-  typeMarks,
   storyId,
   initial,
   draftKey,
@@ -226,11 +245,20 @@ export function StoryFormDialog({
    * control (`ToggleGroup`/`ToggleGroupItem`) is built for exactly "two to
    * four options that change how the same data is drawn." */
   categories: string[]
-  /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
-   * because the words come from the door and the marks come from the team's
-   * own vocabulary cache — two reads the screen already holds, and joining
-   * them here would make the dialog fetch. */
-  typeMarks?: Map<string, string>
+  /* `typeMarks` USED TO SIT HERE — the two-letter glyph beside each word, as
+     a `Map<string, string>` a caller could pass instead of richer options.
+     REMOVED 2026-09-16 for `help-form-dialog.tsx`'s own exact reason
+     (see that file's identical note, dated 2026-09-07, for the ticket
+     form's own version of this move): not one of this dialog's five call
+     sites ever passed it (a census of all of them, not an absent grep — none
+     of stories-screen.tsx, story-detail.tsx, sprint-detail.tsx,
+     app-detail.tsx or help-detail.tsx did), and the Type field is now a
+     `RecordPicker layout="row"` whose glyph is a real Phosphor icon
+     (`shared/story-types.ts`, `PickerOption.icon`) rather than a two-letter
+     text mark a caller could hand in. The glyph is not lost from the rest of
+     the app: `web/lib/type-marks.ts` still supplies the team's OWN mark to
+     any screen keyed on a story's word, this dialog just no longer accepts
+     one nobody was sending. */
   /** THE STORY BEING EDITED, when this is an edit. Present here for one
    * reason: the file field below has to know where to hang what somebody
    * picked, and on an edit that is known before the submit rather than after
@@ -244,8 +272,12 @@ export function StoryFormDialog({
    * is picked. Read into the draft's own initial value (below), the same shape
    * `TaskFormDialog`'s own `defaultAssigneeId` already uses, so a reopened
    * draft keeps whatever was actually chosen rather than reverting to it.
-   * Ignored on an edit (`initial` wins). "" when the signed-in user is not
-   * assignable here (staffedOn's own fail-open still offers everyone else). */
+   * `initial` wins on an EDIT — except where `initial.assigneeId` is itself
+   * empty (an old story with no assignee on file), where this is the
+   * fallback too: the 16 Sep 2026 ruling killed the picker's own "Nobody"
+   * pill, so there is no state left for an edit to open on if the stored
+   * value is blank. "" when the signed-in user is not assignable here
+   * (staffedOn's own fail-open still offers everyone else). */
   defaultAssigneeId?: string
   /** RETURNS THE NEW STORY'S ID on a create, when the caller has one.
    *
@@ -260,18 +292,32 @@ export function StoryFormDialog({
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    initial ?? {
-      title: "",
-      detail: "",
-      sprintId: "",
-      appId: "",
-      ticketId: "",
-      assigneeId: defaultAssigneeId ?? "",
-      storyType: "",
-      category: "Client-requested",
-      processIds: [],
-      changesNoStep: false,
-    },
+    initial
+      ? // EDIT. The stored assignee wins — except where there is none, an old
+        // row predating "an assignee is always somebody", which falls back to
+        // the signed-in user the same as a create does (16 Sep 2026 ruling:
+        // the picker itself can no longer draw an empty state at all).
+        { ...initial, assigneeId: initial.assigneeId || (defaultAssigneeId ?? "") }
+      : {
+          title: "",
+          detail: "",
+          sprintId: "",
+          appId: "",
+          ticketId: "",
+          assigneeId: defaultAssigneeId ?? "",
+          storyType: "",
+          // PREFILLED BY ORIGIN (client ruling, 16 Sep 2026): a ticket raised
+          // it, so a story answering it traces back the same way; nothing did,
+          // so it defaults to our own upkeep. `fixedTicket` IS "opened from a
+          // ticket" — it is set at exactly the one call site that opens this
+          // dialog off a ticket's own Related stories tab (help-detail.tsx)
+          // — so it is the fact to read rather than a second flag saying the
+          // same thing. Still an ordinary default: the field below stays
+          // editable, same as `typeField`'s own "always answered" one field up.
+          category: fixedTicket ? "Client-requested" : "Internal",
+          processIds: [],
+          changesNoStep: false,
+        },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -450,18 +496,21 @@ export function StoryFormDialog({
     value: string,
     placeholder: string,
     searchPlaceholder: string,
-    // `picture`/`shape` optional: the app and sprint calls below pass neither,
-    // and the PERSON one passes both — a staff member's own face, on the
-    // closed control and in the list, the way any Owner/Assignee field does
-    // (record-picker.tsx's `shape: "round"` discriminator).
-    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round" }[],
+    // `picture`/`shape`/`face` optional: the sprint call below passes none of
+    // them, the APP call passes `picture`+`face` (its own logo, always a
+    // mark — client ruling, 16 Sep 2026: "I want to see the icons of the
+    // app … on the choice component"), and the PERSON one passes `picture`+
+    // `shape` — a staff member's own face, on the closed control and in the
+    // list, the way any Owner/Assignee field does (record-picker.tsx's
+    // `shape: "round"` discriminator).
+    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round"; face?: boolean }[],
     set: (v: string) => void
   ) => (
     <RecordPicker
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
+      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape, face: o.face }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -513,7 +562,11 @@ export function StoryFormDialog({
             values.appId,
             "No app yet",
             t("Search apps…"),
-            apps.map((a) => ({ id: a.id, label: a.name })),
+            // THE APP'S OWN LOGO (client, 16 Sep 2026). `face: true` so an app
+            // with no logo on file still draws its own initial rather than a
+            // blank row — the same flag `accountOption`/the ticket form's own
+            // App row use for the identical reason (web/lib/pickable.ts).
+            apps.map((a) => ({ id: a.id, label: a.name, picture: a.logoUrl, face: true })),
             (v) => setValues((s) => ({ ...s, appId: v }))
           )
         )}
@@ -528,47 +581,30 @@ export function StoryFormDialog({
           autoFocus
         />
       </Field>
+      {/* A HORIZONTAL PICK, NOT A DROPDOWN (client ruling, 16 Sep 2026: "when
+          I'm editing or creating, make it a horizontal pick") — the same
+          `RecordPicker layout="row"` idiom the staff row below and the
+          ticket form's own Type row already draw. Still required and still
+          the team's own live words (`storyTypes`, never hardcoded); only the
+          GLYPH beside each is code now (`storyTypeIconName` + `iconComponent()`,
+          `PickerOption.icon` — a real node, not `typeMarks`' two-letter text,
+          which is why this field no longer reads that prop). */}
       <Field config={typeField} htmlFor="story-type" className={fieldSpacing}>
         <RecordPicker
           id="story-type"
-          value={values.storyType || NONE}
-          onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
-          options={storyTypes.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
-          // THE PICKER HAS TO BE TOLD WHAT "NOTHING" IS. It decides whether
-          // something is chosen by comparing the value against `emptyOption`,
-          // so a sentinel passed without one is a value it has never heard of:
-          // it looks for a row with that id, finds none, and falls all the way
-          // through to painting the id. This field shipped reading `__none__`
-          // to a person opening the story form — the helper at the top of this
-          // file has always passed it, and this one field was written by hand.
-          emptyOption={{ value: NONE, label: t("Pick one") }}
-          placeholder={t("Pick one")}
+          layout="row"
+          ariaLabel={t(typeField.label)}
+          value={values.storyType}
+          onChange={(v) => setValues((s) => ({ ...s, storyType: v }))}
+          options={storyTypes.map((v) => {
+            const iconName = storyTypeIconName(v)
+            const Icon = iconName ? iconComponent(iconName) : null
+            return { value: v, label: v, icon: Icon ? <Icon className="size-3.5" /> : undefined }
+          })}
           searchPlaceholder={t("Search types…")}
-          emptyText={t("Nothing matched.")}
+          emptyText={t("Your team has no story types set up yet.")}
           disabled={busy}
         />
-      </Field>
-      <Field config={categoryField} shape="group" htmlFor="story-category" className={fieldSpacing}>
-        <ToggleGroup
-          id="story-category"
-          type="single"
-          value={values.category}
-          onValueChange={(v) => {
-            // Radix's own contract: re-pressing the active segment reports an
-            // empty string rather than leaving it selected. A required field
-            // with a default is never genuinely empty, so that press is a
-            // no-op instead of a value the door would refuse.
-            if (v) setValues((s) => ({ ...s, category: v }))
-          }}
-          disabled={busy}
-          aria-label={t("Category")}
-        >
-          {categories.map((c) => (
-            <ToggleGroupItem key={c} value={c} disabled={busy}>
-              {c}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
       </Field>
       <Field config={detailField} htmlFor="story-detail" className={fieldSpacing}>
         <Notes
@@ -683,51 +719,112 @@ export function StoryFormDialog({
           />
         )}
       </Field>
-      {/* CHECKLIST 6.5. The tick is the explicit "no process" Aurora asked for:
-          an empty list on its own is refused by the door, so a person cannot skip
-          the question by not answering it. Ticking it hides the list, because a
-          list you have just said you are not using is noise. */}
-      <Field config={processField} shape="group" htmlFor="story-processes" className={fieldSpacing}>
-        <div className="flex flex-col gap-2" id="story-processes">
-          <Label className="flex">
-            <Checkbox
-              checked={values.changesNoStep}
-              onCheckedChange={(c) => setValues((s) => ({ ...s, changesNoStep: c === true }))}
-              disabled={busy}
-            />
-            {t("This changes no process")}
-          </Label>
-          {!values.changesNoStep &&
-            (processOptions.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {t("No processes on this app yet. Tick the box above if it changes none.")}
-              </p>
-            ) : (
-              processOptions.map((p) => (
-                <Label key={p.id} className="flex">
-                  <Checkbox
-                    checked={values.processIds.includes(p.id)}
-                    onCheckedChange={(c) =>
-                      setValues((s) => ({
-                        ...s,
-                        processIds:
-                          c === true
-                            ? [...s.processIds, p.id]
-                            : s.processIds.filter((x) => x !== p.id),
-                      }))
-                    }
+      {/* CHECKLIST 6.5. The tick is the explicit "no process" Aurora asked
+          for: an empty list on its own is refused by the door
+          (`resolveProcesses`, workers/content/src/lib/stories.ts), so a
+          person cannot skip the question by not answering it.
+
+          A DROPDOWN NOW, NOT A CHECKBOX LIST — CLIENT CORRECTION, 16 Sep
+          2026, over an earlier draft of this exact change that had dropped
+          the field from this form entirely ("this will come from somewhere
+          else … definitely do not need to see it on the add or edit
+          screen"): "stop the agent removing the processes from CRUD - keep
+          it!! But make it a dropdown." So the field stays, both fields it
+          always had stay (`processIds`, `changesNoStep`), and only the
+          CONTROL changes — the kit's own `Select` (`shared/ui/components/
+          select/select.tsx`), the same closed-list idiom every other
+          single-pick dropdown in this app draws, in place of an
+          always-expanded stack of checkboxes.
+
+          RADIX SELECT COMMITS ONE VALUE PER OPEN, and "one or more
+          processes" is still real (CHECKLIST 6.5's own words), so this
+          Select is an ADD control rather than a value holder: picking a
+          process appends it to `processIds` (skipping a duplicate) and
+          picking "This changes no process" clears the list and ticks
+          `changesNoStep`. The chosen set renders above as a removable list —
+          the identical idiom this file already uses for `attached`/`pending`
+          files a few fields up, not a new one. The Select's own displayed
+          value stays on the sentinel that means "add a process": showing the
+          last-picked item as if it were a single answer would say "one
+          process" about a field that can hold several. */}
+      <Field config={processField} htmlFor="story-processes" className={fieldSpacing}>
+        <div className="flex flex-col gap-2">
+          {!values.changesNoStep && values.processIds.length > 0 && (
+            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+              {values.processIds.map((id) => (
+                <li key={id} className="flex items-center gap-2 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {processOptions.find((p) => p.id === id)?.name ?? id}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    aria-label={t("Take it off")}
                     disabled={busy}
-                  />
+                    onClick={() =>
+                      setValues((s) => ({ ...s, processIds: s.processIds.filter((x) => x !== id) }))
+                    }
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Select
+            value={NONE}
+            onValueChange={(v) => {
+              if (v === NONE) return
+              if (v === PROCESS_NONE) {
+                setValues((s) => ({ ...s, changesNoStep: true, processIds: [] }))
+                return
+              }
+              setValues((s) => ({
+                ...s,
+                changesNoStep: false,
+                processIds: s.processIds.includes(v) ? s.processIds : [...s.processIds, v],
+              }))
+            }}
+            disabled={busy}
+          >
+            {/* `aria-label` RATHER THAN LEANING ON THE FIELD'S OWN `htmlFor`
+                — the same wall `detailField`'s Notes hits a few fields up,
+                one layer further out: the kit Field clones its `id` onto
+                its DIRECT child, which here is the wrapping `div` (the
+                removable chip list needs somewhere to live beside the
+                control), not this trigger — so the visible `<label for>`
+                would bind to a plain `<div>` and this button would carry no
+                accessible name at all. Named explicitly instead, off the
+                same config the visible label reads. */}
+            <SelectTrigger id="story-processes" aria-label={t(processField.label)}>
+              <SelectValue placeholder={t("Add a process")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>{t("Add a process")}</SelectItem>
+              <SelectItem value={PROCESS_NONE}>{t("This changes no process")}</SelectItem>
+              {/* A→Z (R75) — the same `sortedOptions` seam every other picker on
+                  this form reads its options through. */}
+              {sortedOptions(processOptions, lang, (p) => p.name).map((p) => (
+                <SelectItem key={p.id} value={p.id}>
                   {p.name}
-                </Label>
-              ))
-            ))}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {processOptions.length === 0 && (
+            <p className="text-muted-foreground text-sm">{t("This app has no processes yet.")}</p>
+          )}
         </div>
       </Field>
       <Field config={assigneeField} htmlFor="story-assignee" className={fieldSpacing}>
         {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN, preselected to the
             signed-in user on a new story — the client's ruling, 15 Sep 2026.
-            `assignable` is `staffedOn`'s own fail-open list (see above). */}
+            `assignable` is `staffedOn`'s own fail-open list (see above). NO
+            "Nobody" pill (16 Sep 2026 ruling) — an edit whose stored
+            assignee is empty falls back to the signed-in user too, in the
+            draft's own initial value above. */}
         <StaffPillPicker
           id="story-assignee"
           ariaLabel={t(assigneeField.label)}
@@ -735,17 +832,38 @@ export function StoryFormDialog({
           lang={lang}
           value={values.assigneeId}
           onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
-          allowNobody
-          nobodyLabel={t("Nobody yet")}
           disabled={busy}
         />
       </Field>
-      {/* A hidden anchor so the label above always has a control to point at even
-          when the process list is empty. Keeps the field accessible without
-          inventing a second layout for the empty case. */}
-      <Label htmlFor="story-processes" className="sr-only">
-        {t("Processes")}
-      </Label>
+      {/* CATEGORY, LAST AND PREFILLED — client ruling, 16 Sep 2026: "the
+          client requested or internal should be at the very bottom and
+          prefilled." Moved here from right after Type; the default (Client-
+          requested opened from a ticket, Internal from scratch) is set once,
+          in the draft's own initial value above, and this row only ever
+          shows what that answered — still editable, still the two-pill row
+          it always was. */}
+      <Field config={categoryField} shape="group" htmlFor="story-category" className={fieldSpacing}>
+        <ToggleGroup
+          id="story-category"
+          type="single"
+          value={values.category}
+          onValueChange={(v) => {
+            // Radix's own contract: re-pressing the active segment reports an
+            // empty string rather than leaving it selected. A required field
+            // with a default is never genuinely empty, so that press is a
+            // no-op instead of a value the door would refuse.
+            if (v) setValues((s) => ({ ...s, category: v }))
+          }}
+          disabled={busy}
+          aria-label={t("Category")}
+        >
+          {categories.map((c) => (
+            <ToggleGroupItem key={c} value={c} disabled={busy}>
+              {c}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Field>
     </FormShellDialog>
   )
 }

@@ -78,7 +78,7 @@ const assigneeField = {
   ...defaultFieldConfig,
   label: "Who's doing it",
   required: false,
-  helpText: "Yours unless you say otherwise, an unassigned task is a task nobody picks up.",
+  helpText: "Yours unless you say otherwise.",
 }
 const departmentField = { ...defaultFieldConfig, label: "Department", required: false }
 const fileField = { ...defaultFieldConfig, label: "A photo or a file", required: false }
@@ -106,7 +106,13 @@ export function TaskFormDialog({
   apps: PickableRecord[]
   accounts: PickableRecord[]
   departments: string[]
-  /** whoever is opening the form — a new task is theirs until they say otherwise */
+  /** THE SIGNED-IN USER — a new task is theirs until they say otherwise, and
+   * the 16 Sep 2026 ruling that killed the picker's own "Nobody" pill also
+   * means this is the fallback on an EDIT whose stored `assigneeId` is empty
+   * (an old row written before an assignee was required to be someone): see
+   * the draft's own initial value below. The caller passes the signed-in
+   * user either way — there is no longer a call site where this can be
+   * omitted, because there is no longer a form state it would leave empty. */
   defaultAssigneeId: string
   /** THE TASK AS IT STANDS, when this form is CORRECTING one rather than writing
    * one. Absent = a new task. It arrived with the update door on 19 Aug 2026:
@@ -119,20 +125,27 @@ export function TaskFormDialog({
   const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    initial ?? {
-      title: "",
-      detail: "",
-      dueOn: "",
-      // THE DEFAULT THE TESTER ASKED FOR, in the draft's own initial value so it
-      // survives a reopen: "if we don't assign a responsible when we create it
-      // they're just gonna die in the unassigned folder."
-      assigneeId: defaultAssigneeId,
-      department: "",
-      appId: "",
-      accountId: "",
-      important: false,
-      urgent: false,
-    },
+    initial
+      ? // EDIT. The stored value wins — except where there is none, an old row
+        // predating "an assignee is always somebody" (or this ruling's own
+        // rollout), which falls back to the signed-in user the same as a
+        // create does, so this form can never open on the one state its own
+        // picker can no longer draw.
+        { ...initial, assigneeId: initial.assigneeId || defaultAssigneeId }
+      : {
+          title: "",
+          detail: "",
+          dueOn: "",
+          // THE DEFAULT THE TESTER ASKED FOR, in the draft's own initial value so it
+          // survives a reopen: "if we don't assign a responsible when we create it
+          // they're just gonna die in the unassigned folder."
+          assigneeId: defaultAssigneeId,
+          department: "",
+          appId: "",
+          accountId: "",
+          important: false,
+          urgent: false,
+        },
     open
   )
   const [file, setFile] = React.useState<{ dataUrl: string; name: string } | null>(null)
@@ -185,18 +198,21 @@ export function TaskFormDialog({
     value: string,
     placeholder: string,
     searchPlaceholder: string,
-    // `picture`/`shape` optional: department and app below pass neither, and
-    // the PERSON one passes both — a staff member's own face, the way any
-    // Owner/Assignee field does (record-picker.tsx's `shape: "round"`
-    // discriminator).
-    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round" }[],
+    // `picture`/`shape`/`face` optional: department below passes none of
+    // them, the APP call passes `picture`+`face` (its own logo, always a
+    // mark — client ruling, 16 Sep 2026: "I want to see the icons of the
+    // app … on the choice component", the same fix story-form-dialog.tsx's
+    // identical App field got), and the PERSON one passes `picture`+`shape`
+    // — a staff member's own face, the way any Owner/Assignee field does
+    // (record-picker.tsx's `shape: "round"` discriminator).
+    options: { id: string; label: string; picture?: string | null; shape?: "square" | "round"; face?: boolean }[],
     set: (v: string) => void
   ) => (
     <RecordPicker
       id={id}
       value={value || NONE}
       onChange={(v) => set(v === NONE ? "" : v)}
-      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape }))}
+      options={sortedOptions(options, lang, (o) => o.label).map((o) => ({ value: o.id, label: o.label, picture: o.picture, shape: o.shape, face: o.face }))}
       emptyOption={{ value: NONE, label: placeholder }}
       placeholder={placeholder}
       searchPlaceholder={searchPlaceholder}
@@ -251,7 +267,9 @@ export function TaskFormDialog({
             generally absolutely everywhere..."). Preselected already: the
             draft's own initial value is `defaultAssigneeId` (above), so this
             row opens with the signed-in user's own pill selected on a new
-            task, and an edit keeps the stored value. */}
+            task, and an edit keeps the stored value (or, for an old row with
+            none, the same signed-in-user fallback — see the draft's own
+            initial value above). NO "Nobody" pill — 16 Sep 2026 ruling. */}
         <StaffPillPicker
           id="task-assignee"
           ariaLabel={t(assigneeField.label)}
@@ -259,8 +277,6 @@ export function TaskFormDialog({
           lang={lang}
           value={values.assigneeId}
           onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
-          allowNobody
-          nobodyLabel={t("Nobody yet")}
           disabled={busy}
         />
       </Field>
@@ -287,7 +303,11 @@ export function TaskFormDialog({
             values.appId,
             "Which app is it on?",
             t("Search apps…"),
-            apps.map((a) => ({ id: a.id, label: a.name })),
+            // THE APP'S OWN LOGO (client, 16 Sep 2026), `face: true` so an
+            // app with no logo on file still draws its own initial rather
+            // than a blank row — `accountOption` below already does this
+            // for the account half of the same ruling.
+            apps.map((a) => ({ id: a.id, label: a.name, picture: a.logoUrl, face: true })),
             (v) => setValues((s) => ({ ...s, appId: v }))
           )}
         </Field>

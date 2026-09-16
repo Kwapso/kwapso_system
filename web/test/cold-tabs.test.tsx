@@ -354,10 +354,7 @@ function renderMeetingsCalendar(meetings: Meeting[], view: "list" | "calendar" |
       <MeetingsScreen
         teamId={teamId}
         total={meetings.length}
-        purposeCount={0}
         canCreate
-        canReadPurposes={false}
-        onPurposes={() => {}}
         onIntent={() => {}}
       />
     </RememberedScreen>

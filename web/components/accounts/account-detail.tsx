@@ -883,6 +883,11 @@ export function AccountDetailScreen({
         onOpenChange={setEditOpen}
         draftKey={`account:edit:${accountId}`}
         members={members}
+        // THE SIGNED-IN USER — only matters when `initial.accountManagerId`
+        // below is empty (an old account with no manager on file): the form
+        // dialog falls back to this rather than opening on the one state its
+        // picker can no longer draw (16 Sep 2026 ruling killed the "Nobody" pill).
+        defaultAccountManagerId={myUserId ?? ""}
         initial={{
           accountType: account.accountType,
           name: account.name,

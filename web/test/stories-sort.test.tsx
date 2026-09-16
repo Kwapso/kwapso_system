@@ -160,11 +160,14 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     expect(headerButtons.length).toBe(0)
   })
 
-  it("draws a Story, Category, Status and Sprint column, in that order — never a priority column", async () => {
+  it("draws a Story, Type, Category, Status and Sprint column, in that order — never a priority column", async () => {
     const rows = [story({ id: "s1", title: "Columns", rank: "a0" })]
     renderBacklog(rows)
     await screen.findByText(/Columns/)
     const headers = Array.from(document.querySelectorAll("thead th")).map((th) => th.textContent)
-    expect(headers).toEqual(["Story", "Category", "Status", "Sprint"])
+    // TYPE JOINED THE ROW 2026-09-16 (client: "assign an icon to each type"),
+    // its own column now rather than squeezed into the Story cell — see
+    // `MINE_COLUMNS`, stories-screen.tsx.
+    expect(headers).toEqual(["Story", "Type", "Category", "Status", "Sprint"])
   })
 })

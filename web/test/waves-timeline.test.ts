@@ -19,10 +19,11 @@ import {
   buildWaveTimelineRows,
   waveListColumns,
   waveListRows,
+  waveState,
   waveWeekWindow,
 } from "@/components/work/waves-screen"
 import type { Wave } from "@shared/waves"
-import type { Sprint } from "@shared/types"
+import type { Sprint, AppRow } from "@shared/types"
 
 const t = (s: string) => s
 
@@ -40,6 +41,26 @@ function wave(over: Partial<Wave> & { id: string; accountId: string }): Wave {
     createdByName: null,
     updatedAt: null,
     editedByName: null,
+    ...over,
+  }
+}
+
+function app(over: Partial<AppRow> & { id: string; name: string }): AppRow {
+  return {
+    ref: null,
+    accountId: "a1",
+    url: null,
+    stage: null,
+    logoUrl: null,
+    toolCostCentsPerMonth: null,
+    about: null,
+    clientContext: null,
+    solution: null,
+    keyActors: null,
+    canOpen: true,
+    staff: [],
+    stakeholders: [],
+    active: true,
     ...over,
   }
 }
@@ -155,6 +176,76 @@ describe("buildWaveTimelineRows — one bar per wave, cut into its own sprints",
     // The window opens two weeks behind today (waveWeekWindow's own header),
     // so its first week has already started — "running", never "upcoming".
     expect(seg.tone).toBe("running")
+  })
+
+  // THE LEFT COLUMN IS THE WAVE'S APP — client, 16 Sep 2026: "what I want in
+  // the left column is the name of the app and the icon." These pin the
+  // DERIVATION (which app, if any, resolves for a wave) off `sublabel`,
+  // which is a plain string here (the wave's own name, moved off the top
+  // line) rather than a rendered node — cheap to assert without mounting
+  // anything. `row.label` itself (the mark + name JSX `AppMark`/`RecordMark`
+  // draws) is not separately rendered here: both branches call the same two
+  // kit-backed components every other row/list cell in this file already
+  // does, with no new logic of their own to protect.
+  it("every live sprint names the same app: that app's row resolves, and the wave's name moves to `sublabel`", () => {
+    const w = wave({ id: "w5", accountId: "a1", name: "Onboarding package", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
+    const sprints: Sprint[] = [
+      sprint({ id: "s5", name: "Build", waveId: "w5", appId: "app1", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+    ]
+    const apps = [app({ id: "app1", name: "Padelbase" })]
+    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", apps)
+    expect(rows[0]!.sublabel).toBe("Onboarding package")
+  })
+
+  it("no sprint names an app at all: no sublabel — the fallback IS the wave's own name, on top", () => {
+    const w = wave({ id: "w6", accountId: "a1", name: "No app yet", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
+    const sprints: Sprint[] = [
+      sprint({ id: "s6", name: "Discovery", waveId: "w6", appId: null, startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+    ]
+    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
+    expect(rows[0]!.sublabel).toBeUndefined()
+  })
+
+  it("two sprints name two DIFFERENT apps: no single face resolves, no sublabel", () => {
+    const w = wave({ id: "w7", accountId: "a1", name: "Multi-system package", startsOn: windowStart, endsOn: addDays(windowStart, 20) })
+    const sprints: Sprint[] = [
+      sprint({ id: "s7a", name: "Build A", waveId: "w7", appId: "app1", startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+      sprint({ id: "s7b", name: "Build B", waveId: "w7", appId: "app2", startsOn: addDays(windowStart, 10), endsOn: addDays(windowStart, 20) }),
+    ]
+    const apps = [app({ id: "app1", name: "Padelbase" }), app({ id: "app2", name: "Hogo CRM" })]
+    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", apps)
+    expect(rows[0]!.sublabel).toBeUndefined()
+  })
+
+  it("a switched-off sprint's app does not count — a wave that lost its only sprint has no app either", () => {
+    const w = wave({ id: "w8", accountId: "a1", name: "Wrapped", startsOn: windowStart, endsOn: addDays(windowStart, 5) })
+    const sprints: Sprint[] = [
+      sprint({ id: "s8", name: "Old build", waveId: "w8", appId: "app1", active: false, startsOn: windowStart, endsOn: addDays(windowStart, 5) }),
+    ]
+    const rows = buildWaveTimelineRows([w], sprints, win, "/waves", "en", [app({ id: "app1", name: "Padelbase" })])
+    expect(rows[0]!.sublabel).toBeUndefined()
+  })
+})
+
+describe("waveState — planned/running/done, off the wave's own dates", () => {
+  it("has not started yet: planned", () => {
+    expect(waveState({ startsOn: "2026-09-20", endsOn: "2026-09-30" }, "2026-09-16")).toBe("planned")
+  })
+
+  it("no dates at all — nobody has planned a sprint into it yet: planned", () => {
+    expect(waveState({ startsOn: null, endsOn: null }, "2026-09-16")).toBe("planned")
+  })
+
+  it("started, not yet over: running", () => {
+    expect(waveState({ startsOn: "2026-09-01", endsOn: "2026-09-30" }, "2026-09-16")).toBe("running")
+  })
+
+  it("started, no end date yet: running rather than a guess", () => {
+    expect(waveState({ startsOn: "2026-09-01", endsOn: null }, "2026-09-16")).toBe("running")
+  })
+
+  it("its own end date has passed: done", () => {
+    expect(waveState({ startsOn: "2026-08-01", endsOn: "2026-09-01" }, "2026-09-16")).toBe("done")
   })
 })
 

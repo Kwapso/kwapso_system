@@ -63,18 +63,28 @@ function accountFilter(request: Request): string | null {
   return queryText(new URL(request.url).searchParams.get("accountId"), "Client") || null
 }
 
+/** WHICH SPRINT TYPE, off the query string — the Sprint type facet (client,
+ * 16 Sep 2026), answered by `listWaves`/`countWaves` as an `EXISTS` over the
+ * wave's own live sprints (a wave carries no such column itself). */
+function sprintTypeFilter(request: Request): string | null {
+  return queryText(new URL(request.url).searchParams.get("sprintType"), "Sprint type") || null
+}
+
 /* ------------------------------- reading them ------------------------------ */
 
-/** GET /api/tenancy/waves?accountId= — every wave this caller may see. */
+/** GET /api/tenancy/waves?accountId=&sprintType= — every wave this caller may
+ * see, optionally narrowed to one client and/or to waves holding a live
+ * sprint of one type. */
 export async function getWaves(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   const scope = await agencyScope(cfg, guard)
   const accountId = accountFilter(request)
+  const sprintType = sprintTypeFilter(request)
   // These are independent reads — one wait, not 2.
   const [waves, total] = await Promise.all([
-    listWaves(cfg, guard, scope, accountId),
+    listWaves(cfg, guard, scope, accountId, sprintType),
     // R16: the badge shows the door's exact COUNT(*), never the list's length.
-    countWaves(cfg, guard, scope, accountId),
+    countWaves(cfg, guard, scope, accountId, sprintType),
   ])
   return json({ waves, total })
 }

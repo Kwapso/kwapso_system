@@ -159,6 +159,23 @@ function toWave(r: WaveRow): Wave {
   }
 }
 
+/** ONE WAVE'S OWN `EXISTS`, over its LIVE sprints — shared by `listWaves` and
+ * `countWaves` so the two can never disagree about what "has a sprint of
+ * this type" means. A wave carries no `sprintType` column of its own (a wave
+ * has no kind; only its sprints do), so the facet the client asked for ("I
+ * want, in Waves, the filter by sprint type", 16 Sep 2026) can only ever be
+ * answered by reaching into `sprints` — and `deactivated_at IS NULL` is the
+ * same "live" reading every other count on this row already takes
+ * (`sprint_count` on `WAVE_COLUMNS`, `recalcWaveDates`). */
+function sprintTypeExistsClause(waveIdColumn: string, sprintType: string | null | undefined): string {
+  return sprintType
+    ? `EXISTS (SELECT 1 FROM sprints wst
+                WHERE wst.wave_id = ${waveIdColumn}
+                  AND wst.deactivated_at IS NULL
+                  AND wst.sprint_type = ${sqlString(sprintType)})`
+    : ""
+}
+
 /** Every wave of the clients this caller may see, live ones first, newest
  * package first inside that.
  *
@@ -169,10 +186,15 @@ export async function listWaves(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  accountId?: string | null
+  accountId?: string | null,
+  sprintType?: string | null
 ): Promise<Wave[]> {
   const fence = accountScopeClause(scope, "w.account_id")
-  const where = [fence.sql, accountId ? `w.account_id = ${sqlString(accountId)}` : ""]
+  const where = [
+    fence.sql,
+    accountId ? `w.account_id = ${sqlString(accountId)}` : "",
+    sprintTypeExistsClause("w.id", sprintType),
+  ]
     .filter(Boolean)
     .join(" AND ")
   const rows = await d1Query<WaveRow>(
@@ -197,10 +219,17 @@ export async function countWaves(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  accountId?: string | null
+  accountId?: string | null,
+  sprintType?: string | null
 ): Promise<number> {
   const fence = accountScopeClause(scope, "account_id")
-  const where = [fence.sql, accountId ? `account_id = ${sqlString(accountId)}` : ""]
+  const where = [
+    fence.sql,
+    accountId ? `account_id = ${sqlString(accountId)}` : "",
+    // No `w.` alias on this query (bare `waves`), so the EXISTS reaches back
+    // to it by the table's own name — the one identifier this statement has.
+    sprintTypeExistsClause("waves.id", sprintType),
+  ]
     .filter(Boolean)
     .join(" AND ")
   const rows = await d1Query<{ n: number }>(
