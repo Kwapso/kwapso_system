@@ -70,17 +70,45 @@ for (const ground of ["bare", "page", "panel"]) {
 }
 
 /* ── 2 · THE ORANGE/WARNING TOKEN, NEVER A LITERAL COLOUR ────────────────
-   Every quoted string in the file's CODE (class lists, cva entries) must be
-   free of a hex/rgb/hsl literal — RULES.md §2.2's law, checked locally. The
-   wash and the dot must both still reach the kit's own `--warning` token
-   rather than some other accent.
+   Scoped to quoted strings within the CVA definition block itself, never
+   stripping comments. The wash (`bg-warning/10`) and the dot (`bg-warning`)
+   must both still reach the kit's own `--warning` token rather than a
+   literal hex/rgb/hsl. No comment-stripper regex (the consuming app forbids
+   re-typed regexes); comments are outside the CVA call, so they don't interfere. */
 
-   Block comments are stripped first — this file's own header and inline
-   docs quote real hexes on purpose (the "MEASURED" section's contrast
-   math), and a quote character inside three hundred lines of prose is not
-   a code string; scanning it would make this check permanently red. */
-const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, "");
-const quotedStrings = codeOnly.match(/(["'`])(?:(?!\1)[^\\]|\\.)*\1/g) ?? [];
+// Find the CVA definition: "const unsavedChangesBarVariants = cva("
+const cvaStart = src.indexOf("const unsavedChangesBarVariants = cva(");
+if (cvaStart === -1) {
+  console.error(`FAIL unsaved-changes-bar check: could not find the CVA definition in ${FILE}.`);
+  process.exit(1);
+}
+
+// Find the matching closing paren of the cva() call
+let parenDepth = 0;
+let cvaEnd = -1;
+let foundOpenParen = false;
+for (let i = cvaStart + "const unsavedChangesBarVariants = cva(".length - 1; i < src.length; i++) {
+  if (src[i] === "(") {
+    parenDepth++;
+    foundOpenParen = true;
+  } else if (src[i] === ")") {
+    parenDepth--;
+    if (foundOpenParen && parenDepth === 0) {
+      cvaEnd = i + 1;
+      break;
+    }
+  }
+}
+
+if (cvaEnd === -1) {
+  console.error(`FAIL unsaved-changes-bar check: could not find the closing paren of the CVA call.`);
+  process.exit(1);
+}
+
+const cvaBlock = src.slice(cvaStart, cvaEnd);
+
+// Extract quoted strings from the CVA block only
+const quotedStrings = cvaBlock.match(/(["'`])(?:(?!\1)[^\\]|\\.)*\1/g) ?? [];
 const hexLiteral = /#[0-9a-fA-F]{3,8}\b/;
 const rgbOrHsl = /\b(?:rgb|rgba|hsl|hsla)\s*\(/i;
 
@@ -90,10 +118,12 @@ for (const q of quotedStrings) {
   }
 }
 
-if (!/\bbg-warning\/10\b/.test(src)) {
+// Check for the wash (bg-warning/10) within the CVA block
+if (!/\bbg-warning\/10\b/.test(cvaBlock)) {
   findings.push("the wash no longer reads `bg-warning/10` — the kit's own `--warning` token at 10% alpha.");
 }
 
+// Check for the dot (bg-warning, but not bg-warning/) in the entire source
 if (!/\bbg-warning\b(?!\/)/.test(src)) {
   findings.push("the dot no longer reads a bare `bg-warning` — the kit's own `--warning` token.");
 }

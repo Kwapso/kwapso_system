@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+### Fixed — check-unsaved-changes-bar reads class literals directly; no comment stripping (the consuming app forbids re-typed stripper regexes)
+
 ### Changed — `BreadcrumbFolders` drag-to-reorder now follows the pointer, Chrome's own model
 
 Client ruling, 16 Sep 2026, second of the day on this file, over the native
