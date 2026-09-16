@@ -18,6 +18,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { METADATA_INDEXES } from "../src/lib/knowledge-vectors"
+import { labelsFor } from "../src/lib/knowledge"
 
 const BOOTSTRAP = readFileSync(join(__dirname, "..", "..", "..", "documents", "BOOTSTRAP.md"), "utf8")
 
@@ -55,5 +56,31 @@ describe("the runbook's Vectorize indexes mirror the code's", () => {
     // pin is what makes that a fact rather than a hope.
     expect(METADATA_INDEXES.length).toBe(10)
     expect(METADATA_INDEXES.map((i) => i.property)).toContain("shared")
+  })
+
+  // BUILD-5 §G2's dead-vector follow-up (17 Sep 2026) — the two checks above
+  // never asked whether METADATA_INDEXES agrees with the RUNTIME shape
+  // `labelsFor()` actually produces; they only ever compared it against
+  // BOOTSTRAP.md's prose, which is hand-kept in step with the same constant
+  // and could drift from `labelsFor` itself in the same way BOOTSTRAP.md
+  // could drift from METADATA_INDEXES before the check above existed.
+  // scripts/rebuild-vector-index.mjs derives its metadata-index list from
+  // METADATA_INDEXES specifically so it can never fall behind `labelsFor`'s
+  // real keys the way BOOTSTRAP.md's hand-copied block once did — this is
+  // the proof that substitution is sound.
+  it("METADATA_INDEXES names exactly the keys labelsFor() actually returns", () => {
+    const sample = labelsFor({
+      kind: "ticket",
+      compartment: "agency",
+      account_id: null,
+      app_id: null,
+      ticket_id: null,
+      sprint_id: null,
+      record_date: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      owner_user_id: null,
+      shared_with: "agency",
+    })
+    expect(Object.keys(sample).sort()).toEqual(METADATA_INDEXES.map((i) => i.property).sort())
   })
 })

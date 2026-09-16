@@ -417,13 +417,38 @@ One bucket PER MODULE, per-team key prefix inside (the R2 golden rule). Create b
 
 Not a bucket and not a database, so it is easy to miss on a fresh environment: the
 content worker binds `KNOWLEDGE_INDEX` to `kwapso-knowledge` / `kwapso-knowledge-staging`.
-**Create the index and all nine metadata indexes BEFORE anything is ingested**.
-Vectorize does not index metadata retrospectively, and getting the order wrong is not
-an error, it is a knowledge base whose compartments silently do not narrow. The
-commands, the dimension count and the recovery path are BOOTSTRAP.md §3b. The binding
-is OPTIONAL: without it the knowledge base answers from its word index alone rather
-than refusing every question, a real degradation, and a visible one (`reason` on
-every answer says what it searched).
+**Create the index and all TEN metadata indexes BEFORE anything is ingested** (this
+paragraph said "nine" until 17 Sep 2026 — a stale copy of the count `METADATA_INDEXES`
+grew past on 10 Sep 2026 when `shared` became the tenth; `workers/content/
+test/vector-indexes-mirror.test.ts` pins the true count against BOOTSTRAP.md's own
+setup block, read that over this sentence). Vectorize does not index metadata
+retrospectively, and getting the order wrong is not an error, it is a knowledge base
+whose compartments silently do not narrow. The commands, the dimension count and the
+recovery path are BOOTSTRAP.md §3b. The binding is OPTIONAL: without it the knowledge
+base answers from its word index alone rather than refusing every question, a real
+degradation, and a visible one (`reason` on every answer says what it searched).
+
+**`scripts/rebuild-vector-index.mjs`** is the FAST path through that same recovery —
+BOOTSTRAP.md §3b's own procedure re-ingests through the ordinary app doors (a press,
+or the 15-minute sweep, one bounded slice at a time), which is correct but slow
+against a large base. This script instead reads every LIVE chunk and source straight
+out of D1 and re-embeds/upserts them directly: `knowledge_chunks.text` and
+`knowledge_sources.summary`/`.title` still hold the real words (a fresh bge-m3 embed,
+`EMBED_BATCH=100`, matching production's own constant), so nothing is lost even
+though the index itself was emptied — falling back to the STORED quantised embedding
+(`.embedding`/`.summary_embedding`) only for the rare row that has lost its text,
+counted explicitly rather than silently. It creates or verifies all ten metadata
+indexes itself before touching a single vector, deriving the list from
+`METADATA_INDEXES` (`workers/content/src/lib/knowledge-vectors.ts`) — imported via
+the run-shipped-worker-code-in-node pattern (`scripts/kb-bench.mjs`), never
+hand-copied, because a hand copy is exactly how the live index went nine-of-ten the
+first time this script ran, `shared` missing, caught only by reading this very
+section afterward. `--dry-run` (default) counts what would move and compares it
+against `SUM(indexed_chunks)` + `summary_embedding IS NOT NULL` — they must match
+exactly before `--go` touches anything. Enumerates every team with knowledge tables
+by schema conjunction off THIS account's own core DB, never `wrangler d1 list` (see
+the `prove-a-team-db-by-schema-conjunction` pattern). The index's own delete/recreate
+is a separate, explicit step this script never takes.
 
 ### Owner-only endpoints (data-ops, x-admin-key, same key as the tenancy maintenance actions)
 
