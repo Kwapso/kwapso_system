@@ -37,7 +37,7 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L14)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L15)
 - [3. Detail screens](#3-detail-screens) (D1 to D13)
 - [4. Collections](#4-collections) (K1 to K27)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
@@ -746,6 +746,39 @@ tabs — wired in `app-shell.tsx`.
 
 **Law.** None registered — `shared/ui/compositions/templates/screen-shell.tsx` carries the
 drag/snap/keyboard mechanism; `web/test/aside-width.test.ts` pins the app-side persistence.
+
+### L15: "Close all tabs" keeps the tab you are on and shuts every other one
+
+**The rule.** Chrome's "close other tabs", asked for under the app's own name for it:
+a trailing control on the workspace tab strip that closes every open tab except the one
+she is standing on, which stays open and stays active — nothing about it moves.
+
+**The mechanism.** `closeAllTabs(keepPath)` (`web/lib/workspace-tabs.ts`) is the one
+mutator: it keeps only the tab whose path is `keepPath` — always the tab
+`deep-link-screen.tsx` is currently rendering, read live off `currentPath` the same way
+`closeWorkspaceTab` already does — and drops every other entry from `tabs` and from
+`recency` in one step. `BreadcrumbFolders`' own `onCloseAll` (kit v1.2.92) draws the
+control as the strip's last flex child, styled like the per-tab × rather than like a tab
+(`CLOSE_ALL_WRAP`/`CLOSE_ALL` in the kit, the `XSquare` glyph in place of the per-tab `X`),
+and it is the KIT that decides when there is nothing to close: with one tab open it draws
+no control at all, rather than one that would do nothing — `onClose` and `onCloseAll` are
+both required for it to appear, and `items.length > 1` besides.
+
+**Why it never has to ask about an unsaved draft.** A tab set is a set of PATHS, not
+mounted screens (see `OpenTab`'s own doc, `workspace-tabs.ts`) — this whole app is one
+never-unmounting shell (R37), so at any moment exactly one screen is actually on the page:
+the one behind the ACTIVE tab. `web/lib/unsaved-changes.ts`'s dirty registry can therefore
+only ever hold a draft for that one mounted screen, and this action never closes it — every
+OTHER tab it removes was already unmounted, holding nothing but its own remembered path and
+label. So `closeAllTabs` calls no guard, asks no confirm, and moves nobody: the same
+"background tab, nothing mounted is at risk" fact `closeTab`'s own doc already establishes,
+just true of every tab this closes instead of one.
+
+**Law.** None registered — `web/test/workspace-tabs.test.ts` pins the store (keeps the tab
+she is on regardless of its position, closes every other one, is a no-op at one tab, and
+survives a reload) and `web/test/workspace-tabs-are-wired.test.tsx` pins the wiring (the
+control renders when given and hides at one tab, and never touches an unsaved draft on the
+kept tab).
 
 ---
 
@@ -4678,12 +4711,12 @@ strip's z-index the way it censuses e.g. R63's pinned toolbar.
 
 ## Rule index
 
-**152 rules.**
+**153 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C12 (12) |
-| 2. Page layout and width | L1 to L14 (14) |
+| 2. Page layout and width | L1 to L15 (15) |
 | 3. Detail screens | D1 to D15 (15) |
 | 4. Collections | K1 to K30 (30) |
 | 5. Buttons and actions | B1 to B14 (14) |

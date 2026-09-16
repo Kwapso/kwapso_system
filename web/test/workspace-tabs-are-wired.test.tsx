@@ -73,6 +73,7 @@ describe("the workspace tab strip", () => {
           { label: "Gamma", href: "/t/t1/gamma", closeKey: "/t/t1/gamma" },
         ]}
         onCloseCrumb={() => {}}
+        onCloseAllTabs={() => {}}
         activeCrumbIndex={1}
       >
         <div>body</div>
@@ -83,12 +84,14 @@ describe("the workspace tab strip", () => {
       expect(screen.queryByText(label), `${label} must be drawn`).not.toBeNull()
     }
 
-    // THE COUNT, said as a count: one close button per tab. A strip that drew
-    // one tab, or none, passes the queries above and fails here.
+    // THE COUNT, said as a count: one close button per tab, PLUS the trailing
+    // close-all control — four "close"-named buttons for three tabs. A strip
+    // that drew one tab, or none, or dropped the trailing control, fails here.
     const closers = [...document.querySelectorAll("button[aria-label]")].filter((b) =>
       /close/i.test(b.getAttribute("aria-label") ?? "")
     )
-    expect(closers.length, "one close button per open tab").toBe(3)
+    expect(closers.length, "one close button per open tab, plus close-all").toBe(4)
+    expect(screen.queryByLabelText("Close all tabs"), "the trailing close-all control").not.toBeNull()
 
     // AND THE LINK RULE, which is what discriminates. The live tab is the page
     // in front of you and has nowhere to go; BOTH the others are real links,
@@ -119,7 +122,7 @@ describe("the workspace tab strip", () => {
     // forgets is caught rather than averaged away.
     const shells = src.split("<AppShell").length - 1
     expect(shells, "expected the spine to render at least one AppShell").toBeGreaterThan(0)
-    for (const prop of ["breadcrumbs={", "onCloseCrumb={", "activeCrumbIndex={"]) {
+    for (const prop of ["breadcrumbs={", "onCloseCrumb={", "onCloseAllTabs={", "activeCrumbIndex={"]) {
       expect(
         src.split(prop).length - 1,
         `every <AppShell> in the spine must pass ${prop} — ${shells} shells, ` +
@@ -142,6 +145,45 @@ describe("the workspace tab strip", () => {
         "and the owner cannot click it."
     ).not.toContain("openTabs.length - 1")
     expect(src, "the href must be gated on the active index").toContain("index === activeTabIndex")
+  })
+
+  // ── CLOSE ALL, AND WHAT IT DOES NOT NEED TO ASK ───────────────────────────
+  it("draws no close-all control with a single tab open — nothing else to close", () => {
+    render(
+      <AppShell
+        active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
+        breadcrumbs={[{ label: "Beta", closeKey: "/t/t1/beta" }]}
+        onCloseCrumb={() => {}}
+        onCloseAllTabs={() => {}}
+        activeCrumbIndex={0}
+      >
+        <div>body</div>
+      </AppShell>
+    )
+    // The kit's own gate (`onCloseAll` + `items.length > 1`) hides the
+    // control rather than drawing one that would do nothing — see kit
+    // v1.2.92's `breadcrumb-folders.tsx`.
+    expect(screen.queryByLabelText("Close all tabs")).toBeNull()
+  })
+
+  it("never asks about an unsaved draft — the kept tab is the only one that could hold one, and it is never closed", async () => {
+    const { markDirty, anyDirty } = await import("@/lib/unsaved-changes")
+    const { closeAllTabs, setWorkspaceScope, forgetOpenTabs, visitTrail } = await import("@/lib/workspace-tabs")
+    forgetOpenTabs()
+    setWorkspaceScope("wired-test-user:team1")
+    visitTrail([
+      { path: "/apps", label: "Apps" },
+      { path: "/apps/A1", label: "APP-1" },
+    ])
+    // The screen she is standing on ("APP-1", kept) stages a draft — the ONE
+    // key this app's dirty registry can ever hold, since only the mounted
+    // screen can call `markDirty` (R37: one shell, one route). Closing every
+    // other tab must not touch it, and nothing here calls the discard confirm
+    // to ask about it.
+    markDirty("apps:A1-draft", true)
+    closeAllTabs("/apps/A1")
+    expect(anyDirty()).toEqual(["apps:A1-draft"])
+    markDirty("apps:A1-draft", false) // leave the registry clean for the next test
   })
 
   // ── AND THE STORE'S OWN ANSWER, so the two halves cannot drift apart ──────
