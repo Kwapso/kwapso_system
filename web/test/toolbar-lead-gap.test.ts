@@ -37,6 +37,24 @@
 // `space-y-*` utility in its `className` is a caller paying the strip's own
 // number a second time, unless the file is named in
 // `TOOLBAR_LEAD_GAP_EXEMPT` (shared/rules/registry.ts) with the real reason.
+//
+// AMENDED THE SAME DAY, 16 Sep 2026, MEASURED ON STAGING: "every screen but
+// one spent each exactly once" (line 14 above) was true of THIS census and
+// false of the SCREEN — this file only ever asks about a wrapping `gap-*`/
+// `space-y-*` column, and never asks what `<CollectionCard>`'s own
+// `CardContent` spends AFTER the strip's `pb-[var(--tab-content-gap)]`. A
+// card whose first child is the toolbar (every current call site above) ALSO
+// pays `CardContent`'s own leading `p-4`/`lg:p-[var(--space-7)]` inset, a
+// second, unrelated 16-to-32px on top of the strip's correct 20 — Tasks
+// (1600px) measured 52px above its toolbar against 20 below; Settings ›
+// Team › Members and Contacts (1280px) measured 44 against 20. The census
+// below is still correct and stays as written — it catches a DIFFERENT
+// double-payment (a wrapping column) that is a real, distinct fault. The
+// card-padding fault is fixed once, in `web/app/globals.css`
+// (`.pinned-strip + [data-slot="card"]`, zeroing both `[data-slot=
+// "card-content"]`'s real `padding-top` and the R63 `--pinned-lead` property
+// that reproduces it while a toolbar is pinned), and proved in
+// `web/test/toolbar-lead-gap-card.test.tsx`, this file's own sibling.
 
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"

@@ -149,6 +149,7 @@ import type { TriageGap } from "@shared/triage-readiness"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { appsKey, helpAttachmentsKey, helpKey, listFetch, triageKey } from "@/lib/live-resources"
+import { useSessionUserId } from "@/lib/use-active-team"
 import { primeCache, invalidate, mergePage, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { AppRow, HelpAttachment, HelpTicket, TeamMember } from "@shared/types"
@@ -259,6 +260,13 @@ export function TriageQueue({
   // rule underneath all three moves is the same one: whoever DRAWS the date asks
   // for the locale, and nobody else holds it just in case.
   const t = useT()
+  /** THE SIGNED-IN MEMBER — handed to `staffedOn` below so an app's own
+   * staffing can never make her disappear from "who could pick this up?"
+   * (16 Sep 2026 correction, `lib/members.ts`'s own account). This row never
+   * preselects a value (see `peopleFor`'s own comment for why it is exempt
+   * from R79's preselect clause), so there is no default here to seed — only
+   * the OFFERED half of the fix applies to an action row. */
+  const myUserId = useSessionUserId()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState(false)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
@@ -519,7 +527,19 @@ export function TriageQueue({
    * work — `staffedOn`'s own fail-open, shared with the story form (see
    * `lib/members.ts`). The fallback is not a nicety here: Accept on an Issue
    * cannot proceed without somebody to pick, so an empty list would be a dead
-   * end on exactly the apps whose staffing has not been filled in yet. */
+   * end on exactly the apps whose staffing has not been filled in yet.
+   *
+   * AND THE SIGNED-IN MEMBER IS NEVER *NARROWED* OUT OF IT EITHER (16 Sep
+   * 2026 correction) — `myUserId` rides as `staffedOn`'s fourth argument
+   * below, the same fix the story form carries, because this row asks the
+   * identical question of the identical seam. THIS ROW STAYS EXEMPT FROM
+   * R79'S PRESELECT CLAUSE, though: it is `RecordPicker layout="row"`, an
+   * ACTION row that commits Assign on the click rather than a form with a
+   * submit step to preselect a value INTO (R79's own text, and
+   * `staff-preselect-call-sites.test.ts`'s derivation reads this file's
+   * `<StaffPillPicker>`-only population and finds none here for the same
+   * reason) — so the fix here is "she is always an option", never "she is
+   * the option already clicked". */
   const appStaff = new Map((appsQ.data ?? []).map((a) => [a.id, a.staff.map((p) => p.userId)]))
   /* WHO MAY TAKE A TICKET ON ONE APP — a function now, not a value, because the
      LIST asks it once per row. The card only ever asks about the ticket in hand,
@@ -536,7 +556,7 @@ export function TriageQueue({
      keep honest. The work is a filter and a map over a team's members, done a
      handful of times per render. */
   const peopleFor = (appId: string | null | undefined): PickerOption[] =>
-    staffedOn(assignableMembers(membersQ.data), appStaff, appId).map((m) => ({
+    staffedOn(assignableMembers(membersQ.data), appStaff, appId, myUserId).map((m) => ({
       value: m.id,
       label: m.name,
       picture: m.photo,

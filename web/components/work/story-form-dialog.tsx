@@ -269,8 +269,19 @@ export function StoryFormDialog({
    * empty (an old story with no assignee on file), where this is the
    * fallback too: the 16 Sep 2026 ruling killed the picker's own "Nobody"
    * pill, so there is no state left for an edit to open on if the stored
-   * value is blank. "" when the signed-in user is not assignable here
-   * (staffedOn's own fail-open still offers everyone else). */
+   * value is blank.
+   *
+   * ALSO HANDED TO `staffedOn` BELOW (16 Sep 2026 correction, over this very
+   * form: "on Add Story, I don't see myself preselected. Make sure you fix it
+   * everywhere, not only here"). A picked-but-unstaffed app used to drop the
+   * signed-in user from `assignable` along with everyone else not on that
+   * app's rota — a stricter fate than "not assignable", since she was never
+   * offered a pill to become unselected from. `staffedOn`'s own fourth
+   * argument keeps her in the list regardless, so this id is always both the
+   * preselected VALUE (below) and a real OFFERED pill. "" only when the
+   * caller itself has no signed-in id yet (`myUserId ?? ""` at every call
+   * site, session not loaded) — `staffedOn` treats that the same as
+   * omitted. */
   defaultAssigneeId?: string
   /** RETURNS THE NEW STORY'S ID on a create, when the caller has one.
    *
@@ -349,7 +360,18 @@ export function StoryFormDialog({
   // `assignableMembers`, which is the seam that already decides WHICH people are
   // ours at all, for the reason that file's own header gives: a rule copied
   // twice is a rule that holds once.
-  const assignable = staffedOn(members, appStaff, appId)
+  //
+  // THE SIGNED-IN USER RIDES ALONG AS `staffedOn`'s FOURTH ARGUMENT (16 Sep
+  // 2026 correction) — the same fail-open reasoning one level up: an app THAT
+  // HAS staff, and simply does not name her, is not a reason to make her
+  // un-offered either. `defaultAssigneeId` is read here rather than a second
+  // prop, because it already names exactly the person this form treats as
+  // "me": the preselected VALUE below and the guaranteed OFFERED pill are the
+  // same fact, asked once. Recomputed on every render off the live `appId`
+  // (derived above from `values.appId`), so picking a different app inside
+  // this same open dialog can never drop her either — there is no snapshot of
+  // "the staff list when the dialog opened" for her to fall out of.
+  const assignable = staffedOn(members, appStaff, appId, defaultAssigneeId)
   // A story is describable once it has a name, a kind, and an answer about which
   // maps it changes — the same three the door insists on, so the button is never
   // enabled into a refusal.
@@ -825,10 +847,13 @@ export function StoryFormDialog({
       <Field config={assigneeField} htmlFor="story-assignee" className={fieldSpacing}>
         {/* THE HORIZONTAL CHOICES, NOT THE DROPDOWN, preselected to the
             signed-in user on a new story — the client's ruling, 15 Sep 2026.
-            `assignable` is `staffedOn`'s own fail-open list (see above). NO
-            "Nobody" pill (16 Sep 2026 ruling) — an edit whose stored
-            assignee is empty falls back to the signed-in user too, in the
-            draft's own initial value above. */}
+            `assignable` is `staffedOn`'s own fail-open list (see above),
+            with the signed-in user kept in it even on an app whose own
+            staffing does not name her (16 Sep 2026 correction — see the
+            call above and `defaultAssigneeId`'s own comment). NO "Nobody"
+            pill (16 Sep 2026 ruling) — an edit whose stored assignee is
+            empty falls back to the signed-in user too, in the draft's own
+            initial value above. */}
         <StaffPillPicker
           id="story-assignee"
           ariaLabel={t(assigneeField.label)}

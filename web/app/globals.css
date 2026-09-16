@@ -205,6 +205,61 @@
   --pinned-chrome-h: calc(var(--tab-strip-h) + var(--tab-content-gap));
 }
 
+/* ============================================================================
+   THE CARD OWES NO SECOND LEADING GAP WHEN THE STRIP ALREADY PAID ONE
+   (R83, amended 16 Sep 2026).
+   ============================================================================
+   The client's ruling, verbatim: "reduce the spacing above ALL TOOLBARS. i
+   want it exactly as its currently below, make it like that above." R83's
+   first pass concluded `--tab-content-gap` and `--toolbar-content-gap` "were
+   already equal … and every screen but one spent each exactly once" — true of
+   the TOKEN and incomplete about the SCREEN. That pass only ever measured the
+   wrapping `gap-*`/`space-y-*` census (waves-screen.tsx's stray outer `gap-6`);
+   it never measured the space PAST the strip's own padding, where a
+   `<CollectionCard>` sits.
+
+   MEASURED ON STAGING, 16 Sep 2026, on the common shape — a tab strip
+   (`renderFolderTabs`) directly above a `<CollectionCard>` whose first child
+   is a pinned toolbar (`data-slot="toolbar-row-pin"`): Tasks (1600px) read
+   52px above the toolbar against 20px below it; Settings › Team › Members and
+   Contacts (1280px) read 44px above against 20px below. The strip pays its
+   own `pb-[var(--tab-content-gap)]` (20px, correct) and then `CardContent`'s
+   own leading inset (`p-4`/`lg:p-[var(--space-7)]`, 16 or 32px more) pays a
+   SECOND, unrelated number before the toolbar's own content starts — the
+   identical shape R49 already forbids for the row's own TRAILING margin, one
+   edge over.
+
+   THE STRIP ALREADY PAYS THE WHOLE VISIBLE GAP, so a card that follows one
+   owes its leading toolbar nothing beyond it. `CollectionCard`
+   (`web/components/deep-link/screen-bits.tsx`) is the one component that
+   boxes a toolbar-led collection, and every call site reaches it only through
+   a `renderFolderTabs(...)` call in the same gapless column
+   (`toolbar-lead-gap.test.ts`'s own census enforces exactly that shape) — so
+   the strip named here (`.pinned-strip`, `PINNED_STRIP_MARK`) is always the
+   card's own preceding sibling. Derived off that adjacency, never off a prop
+   a call site has to remember to pass.
+
+   TWO THINGS TO ZERO, NOT ONE. `CardContent`'s own real, rendered
+   `padding-top` is what pushes the toolbar's static position down; a
+   negative top margin on the toolbar cannot out-run it. R63's own
+   `--pinned-lead` `mt`/`pt` pair (`PINNED_TOOLBAR`, shared/web/pinned-chrome.ts)
+   only CANCELS a lead at rest, it does not remove one — so leaving
+   `--pinned-lead` at the card's old 16/32 ladder while this rule zeroed the
+   real padding would pull the toolbar UP PAST the card's own top edge and
+   into the strip above it. So both halves of the same number move together.
+   This costs R63's "peek" nothing: with nothing left for the card to
+   contribute above the toolbar at rest, there is nothing to reveal once it
+   pins either — the toolbar's own `::before` still draws the container's
+   rounded top corner at `--pinned-chrome-h`, flush under the strip, exactly
+   as it sits at rest. */
+.pinned-strip + [data-slot="card"] {
+  --pinned-lead: 0px;
+}
+
+.pinned-strip + [data-slot="card"] > [data-slot="card-content"] {
+  padding-top: 0px;
+}
+
 /* WHAT IS BEHIND A CONTAINER THAT INSETS A PINNED TOOLBAR (R63, part 4).
    The other half of the corner, and the reason it needs a rule at all.
 

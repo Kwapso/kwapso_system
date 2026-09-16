@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { NOT_A_WORK_PICKER } from "@shared/rules/registry"
 import type { TeamMember } from "@shared/types"
-import { assignableMembers } from "@/lib/members"
+import { assignableMembers, staffedOn } from "@/lib/members"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
@@ -126,6 +126,52 @@ describe("assignableMembers — our people, and only ours", () => {
 })
 
 /* ------------------------------------------------------------------------- */
+
+// STAFFEDON NEVER NARROWS THE SIGNED-IN MEMBER AWAY — the client's ruling,
+// 16 Sep 2026, over Add Story: "That's still not correct. For example, on
+// Add Story, I don't see myself preselected. Make sure you fix it
+// everywhere, not only here." The bug: an app WITH staff on file, that
+// simply does not name her, dropped her from the offered list along with
+// everyone genuinely off the rota — stricter than "not preselected", she
+// was not even an option any more. Fixed at this one seam so the story form
+// AND the triage card (both callers) inherit it without a second copy.
+describe("staffedOn — the signed-in member is never narrowed away", () => {
+  const ME = { id: "u-me", name: "Signed In", photo: null }
+  const OTHER = { id: "u-other", name: "Other Staff", photo: null }
+  const appStaffExcludingMe = new Map([["app-1", ["u-other"]]])
+
+  it("keeps the signed-in member offered on an app staffed WITHOUT her", () => {
+    const out = staffedOn([ME, OTHER], appStaffExcludingMe, "app-1", ME.id)
+    expect(out.map((p) => p.id).sort()).toEqual(["u-me", "u-other"])
+  })
+
+  it("still narrows everyone else to the app's own staff", () => {
+    const THIRD = { id: "u-third", name: "Third Staff", photo: null }
+    const out = staffedOn([ME, OTHER, THIRD], appStaffExcludingMe, "app-1", ME.id)
+    expect(out.map((p) => p.id).sort()).toEqual(["u-me", "u-other"])
+  })
+
+  it("narrows exactly as before when no signed-in id is given", () => {
+    const out = staffedOn([ME, OTHER], appStaffExcludingMe, "app-1")
+    expect(out.map((p) => p.id)).toEqual(["u-other"])
+  })
+
+  it("does not duplicate her when the app's own staff already includes her", () => {
+    const appStaffIncludingMe = new Map([["app-1", ["u-me", "u-other"]]])
+    const out = staffedOn([ME, OTHER], appStaffIncludingMe, "app-1", ME.id)
+    expect(out.map((p) => p.id)).toEqual(["u-me", "u-other"])
+  })
+
+  it("keeps the fail-open: an app with NO staff still offers everybody", () => {
+    const out = staffedOn([ME, OTHER], new Map(), "app-1", ME.id)
+    expect(out.map((p) => p.id).sort()).toEqual(["u-me", "u-other"])
+  })
+
+  it("is a no-op when the signed-in id names nobody in the list", () => {
+    const out = staffedOn([ME, OTHER], appStaffExcludingMe, "app-1", "u-ghost")
+    expect(out.map((p) => p.id)).toEqual(["u-other"])
+  })
+})
 
 // NOT_A_WORK_PICKER moved to shared/rules/registry.ts, 14 Sep 2026 (RULES.md
 // line 13's promise made true). Imported above.

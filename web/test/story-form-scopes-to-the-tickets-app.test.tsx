@@ -76,3 +76,61 @@ describe("the story form scopes to the ticket's own app, not just the app screen
     expect(within(listbox).queryByText("The other app's process")).toBeNull()
   })
 })
+
+// F13/R79 — the client's ruling, 16 Sep 2026, verbatim: "That's still not
+// correct. For example, on Add Story, I don't see myself preselected. Make
+// sure you fix it everywhere, not only here." Reproduced here exactly as
+// found on staging: an app WITH staff on file, none of whom is the signed-in
+// member, used to drop her from the "Who's doing it" pill row entirely
+// (`staffedOn`'s narrowing, `lib/members.ts`) rather than merely leave her
+// pill unselected — the prop's own old comment said as much ("" when the
+// signed-in user is not assignable here"). She must always be offered AND
+// preselected on a create, regardless of the chosen app's own staffing.
+describe("the signed-in member is always offered and preselected, even on an app that does not staff her", () => {
+  const APP_C = "APP_C"
+  const ME = "u-me"
+  const OTHER_STAFF = "u-other"
+
+  function renderOnAppWithoutMe() {
+    return render(
+      <StoryFormDialog
+        open
+        onOpenChange={() => {}}
+        teamId="team-1"
+        sprints={[]}
+        apps={[{ id: APP_C, name: "Console app" }]}
+        fixedApp={{ id: APP_C, name: "Console app" }}
+        tickets={[]}
+        members={[
+          { id: ME, name: "Alaap", photo: null },
+          { id: OTHER_STAFF, name: "Priya", photo: null },
+        ]}
+        // THE APP HAS STAFF — this is not the fail-open case (an app with NO
+        // staff, which already offered everybody before this fix). It has a
+        // staff list, and the signed-in member is deliberately not on it.
+        appStaff={new Map([[APP_C, [OTHER_STAFF]]])}
+        processes={[]}
+        storyTypes={["Feature"]}
+        categories={["Client-requested", "Internal"]}
+        draftKey="story:add:app-without-me"
+        defaultAssigneeId={ME}
+        onSubmit={vi.fn(async () => {})}
+      />
+    )
+  }
+
+  it("still shows her pill in the row (offered)", async () => {
+    renderOnAppWithoutMe()
+    expect(await screen.findByRole("radio", { name: /Alaap/i })).toBeTruthy()
+    // The app's own staff stays offered too — this is a widening, not a
+    // replacement of the narrowing.
+    expect(screen.getByRole("radio", { name: /Priya/i })).toBeTruthy()
+  })
+
+  it("starts her pill selected (preselected)", async () => {
+    renderOnAppWithoutMe()
+    const mine = await screen.findByRole("radio", { name: /Alaap/i })
+    expect(mine.getAttribute("aria-checked")).toBe("true")
+    expect(screen.getByRole("radio", { name: /Priya/i }).getAttribute("aria-checked")).toBe("false")
+  })
+})

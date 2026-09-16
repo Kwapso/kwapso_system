@@ -107,16 +107,43 @@ export function assignableMembers(members: TeamMember[] | undefined): PickablePe
  * the whole team, which is also what the DOOR does: `refuseOffAppAssignee`
  * (`workers/content/src/lib/stories.ts`) refuses an assignee who is not on the
  * app's staff ONLY when the app has staff. The picker is the courtesy half of a
- * rule the server keeps; this makes the two say the same sentence. */
+ * rule the server keeps; this makes the two say the same sentence.
+ *
+ * THE SIGNED-IN MEMBER IS NEVER NARROWED AWAY — the client's ruling, 16 Sep
+ * 2026, over Add Story: "That's still not correct. For example, on Add Story,
+ * I don't see myself preselected. Make sure you fix it everywhere, not only
+ * here." The fail-open above only saves an app with NO staff; an app that
+ * DOES have staff, and simply does not happen to include the person sitting
+ * at the keyboard, narrowed her out along with everyone else not on the rota
+ * — which is precisely backwards, because she is not "everyone else", she is
+ * the one person a create form always needs to be able to offer (R79's own
+ * second clause: "always put the user preselected by default"). So a fourth,
+ * optional argument names her, and she is kept in the returned list even when
+ * the app's own staffing would otherwise have dropped her — appended after
+ * the narrowed set rather than reordered into it, because every caller of
+ * this list re-sorts A→Z before drawing it (`StaffPillPicker` itself, R75),
+ * so a position chosen here would just be undone one layer up. Fixed HERE,
+ * at the one seam, rather than in `story-form-dialog.tsx` alone: the triage
+ * card's `peopleFor` (`triage-queue.tsx`) asks this same function the same
+ * question and inherits the fix for free, which is the whole reason this
+ * narrowing lives beside `assignableMembers` and not inline in either
+ * caller. */
 export function staffedOn(
   members: PickablePerson[],
   /** app id → the user ids on it, straight off the apps list's own `staff` */
   appStaff: Map<string, string[]>,
   /** the app in question — `null`/`undefined` on a record that names none */
-  appId: string | null | undefined
+  appId: string | null | undefined,
+  /** THE SIGNED-IN MEMBER'S id, when the caller has one — never dropped by
+   * the narrowing below, whether or not she is on this app's own staff.
+   * Omitted (or not found in `members`) narrows exactly as before. */
+  signedInMemberId?: string | null
 ): PickablePerson[] {
   const here = appId ? (appStaff.get(appId) ?? []) : []
-  return here.length ? members.filter((m) => here.includes(m.id)) : members
+  const narrowed = here.length ? members.filter((m) => here.includes(m.id)) : members
+  if (!signedInMemberId || narrowed.some((m) => m.id === signedInMemberId)) return narrowed
+  const signedIn = members.find((m) => m.id === signedInMemberId)
+  return signedIn ? [...narrowed, signedIn] : narrowed
 }
 
 /** The same answer, fetched. Every screen that offers people reads the ONE

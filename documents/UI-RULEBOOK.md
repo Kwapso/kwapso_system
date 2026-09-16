@@ -2665,6 +2665,7 @@ parent (fragments walked through) carries a `gap-*`/`space-y-*` utility, unless 
 named in `TOOLBAR_LEAD_GAP_EXEMPT` with the real reason.
 
 **Law.** [R83](../RULES.md) (`toolbar-lead-gap`), `web/test/toolbar-lead-gap.test.ts`.
+**AMENDED 16 Sep 2026, same day, measured on staging:** the wrapper census above was not the whole gap — a `<CollectionCard>` hosting a toolbar as its first child ALSO spent `CardContent`'s own leading inset on top of the strip's `pb-[var(--tab-content-gap)]`. Tasks measured 52px above the toolbar against 20px below; Settings › Team › Members and Contacts measured 44px above against 20px below. Fixed once in `web/app/globals.css`: `.pinned-strip + [data-slot="card"]` zeroes both the card's real `padding-top` and the R63 `--pinned-lead` property together, so above = below = 20px on every screen. Proved by `web/test/toolbar-lead-gap-card.test.tsx`.
 
 ---
 
@@ -3504,13 +3505,18 @@ example, on Add Story, I don't see myself preselected. Make sure you fix it ever
 only here."* [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected)
 already states the rule; this ruling is the correction that the POPULATION it applies to
 must be derived, never a hand-list somebody forgot a form on. Every create form with a
-single-pick staff picker seeds the signed-in member as its default.
+single-pick staff picker seeds the signed-in member as its default. The signed-in member is
+ALWAYS OFFERED in the pill row even when the chosen app's staffing narrows everyone else out —
+that was the actual Add Story gap on the Kwapso team: `staffedOn` (web/lib/members.ts) now
+keeps the signed-in member; the story form and the ticket triage row use it.
 
 **The check.** The population is DERIVED, not typed: `web/test/staff-preselect-call-sites.test.ts`
 censuses every `*FormDialog` mount carrying a `default*Id` prop and requires it be passed at
 every call site, over the call sites rather than the dialogs' own bodies — the shape that
 caught `contact-detail.tsx`'s own `<AccountFormDialog>` opening with no
-`defaultAccountManagerId`, the one call site among four that had never been wired.
+`defaultAccountManagerId`, the one call site among four that had never been wired. The
+signed-in member's presence is verified by `web/test/assignable-members.test.ts` and
+`web/test/story-form-scopes-to-the-tickets-app.test.tsx`.
 
 **Law.** [R79](../RULES.md) (`staff-pill-row`) — see F11's own account of the census.
 

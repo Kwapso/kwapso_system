@@ -502,7 +502,13 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
 - **A tab strip and what it labels share one gapless column (R83).** The strip pays its own
   trailing gap once; a caller never pays it twice above the toolbar. The client's ruling,
   16 Sep 2026: "reduce the spacing above ALL TOOLBARS ... make it like that above." Exemptions
-  in `TOOLBAR_LEAD_GAP_EXEMPT`. (`toolbar-lead-gap`)
+  in `TOOLBAR_LEAD_GAP_EXEMPT`. (`toolbar-lead-gap`) **AMENDED the same day, measured on
+  staging:** the wrapper census above was not the whole gap — a `<CollectionCard>` hosting a
+  toolbar as its first child ALSO spent `CardContent`'s own leading inset on top of the strip's
+  `pb-[var(--tab-content-gap)]` (Tasks measured 52px above / 20 below; Settings › Team › Members
+  and Contacts measured 44 / 20). Fixed once in `web/app/globals.css`: `.pinned-strip +
+  [data-slot="card"]` zeroes both the card's real `padding-top` and the R63 `--pinned-lead`
+  property together. Proved by `web/test/toolbar-lead-gap-card.test.tsx`.
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 
