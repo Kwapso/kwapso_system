@@ -55,7 +55,21 @@ function stop(why, detail = "") {
   process.exit(1)
 }
 
-async function signIn(email) {
+// `rename: true` overwrites the SIGNED-IN PERSON's own display name — never
+// pass it for an admin login. An admin is somebody real (often the owner's
+// own staging account); the "Blackbox Tester" name belongs on the dedicated
+// sandbox member alone, whose name nobody else relies on. Bug, 2026-09-16:
+// this used to rename unconditionally, so the very first run against a real
+// admin (alaap@kwapso.com) renamed the owner's own staging identity to
+// "Blackbox Tester" and stayed that way for ~8.5 hours until the planner's
+// scorer caught it. Restored by hand from the pre-rename value (confirmed
+// by this script's own earlier tool-call output AND the auth activity
+// trail, which had no name_changed row before the bad one). The guard below
+// is not decorative — it is what makes that specific mistake impossible to
+// repeat by construction, not just by remembering not to pass `true` here.
+async function signIn(email, { rename = false } = {}) {
+  if (rename && email === ADMIN_EMAIL)
+    stop(`refusing to rename ${email} — that is the admin login, never the sandbox account`)
   const start = await api("/api/auth/admin/test-login", {
     method: "POST",
     headers: { "x-admin-key": TEST_LOGIN_KEY },
@@ -70,12 +84,12 @@ async function signIn(email) {
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
   if (!/^(__Host-)?kwapso_session=/.test(cookie)) stop(`sign-in failed for ${email}`, `status ${verify.status}`)
-  await api("/api/auth/profile", { method: "POST", body: JSON.stringify({ firstName: "Blackbox", lastName: "Tester" }) }, cookie)
+  if (rename) await api("/api/auth/profile", { method: "POST", body: JSON.stringify({ firstName: "Blackbox", lastName: "Tester" }) }, cookie)
   return cookie
 }
 
 console.log(`— signing in (${BASE})`)
-const adminCookie = await signIn(ADMIN_EMAIL)
+const adminCookie = await signIn(ADMIN_EMAIL) // never renamed — see the guard above
 await api("/api/tenancy/bootstrap", { method: "POST" }, adminCookie)
 const adminActive = await api("/api/tenancy/active", {}, adminCookie)
 const TEAM = adminActive.body?.team
@@ -85,7 +99,7 @@ if (TEAM.id !== EXPECTED_TEAM_ID)
 if (adminActive.body?.role?.title !== "Admin") stop(`${ADMIN_EMAIL} is not Admin on ${TEAM.name}`, adminActive.body?.role)
 console.log(`  team: ${TEAM.name} (${TEAM.id})`)
 
-const ownerCookie = await signIn(OWNER_EMAIL)
+const ownerCookie = await signIn(OWNER_EMAIL, { rename: true }) // the dedicated sandbox account — safe to rename
 await api("/api/tenancy/bootstrap", { method: "POST" }, ownerCookie)
 
 /* ------------------------------------------------------------------------ *
