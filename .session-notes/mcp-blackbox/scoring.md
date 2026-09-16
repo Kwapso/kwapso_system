@@ -66,6 +66,15 @@ this isn't as clear-cut as it reads — there's no false statement, just
 an answer that never reached the material the question was actually
 about), so FAIL over MISS (found was true, not false).
 
+**Caveat (added after a planner check, 2026-09-17): this FAIL was
+measured at the run's one real call, 20:24:13 UTC 16 Sep, against a
+knowledge base that was still mid-rebuild at that moment (ticket ingest
+~35% done; ~35% of returned vector ids since found dead) — not against
+the caught-up base the amended answer-key's grading basis assumes. A
+later "rerun" made zero calls (see findings.md) and cannot stand in as a
+same-day measurement against the caught-up base. Full detail in
+findings.md.
+
 ## Scorer gap (read before trusting `score.mjs` output on any future run)
 
 The transcript's own `tool_result.content` is NOT the tool's real reply
