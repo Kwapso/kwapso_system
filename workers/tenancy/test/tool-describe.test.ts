@@ -27,6 +27,8 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { MCP_ONLY_TOOLS, RECORD_ACTIVE_GENERIC_DESC } from "@shared/workers/mcp-catalog"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "./spine-harness"
 
@@ -98,6 +100,52 @@ describe("describe_tool hands back the prose the manifest stopped carrying", () 
     // is an ordinary team member at the other hostname, so the refusal is the
     // door's, not the gateway's.
     const { status, body } = await describeTool(IDS.contactUser, `?tool=${TRIMMED.name}`)
+    expect(status).toBe(403)
+    expect(body.error).toBe("client_login")
+  })
+})
+
+// THE OTHER 42 — the 18 `set_<record>_active` toggles, the generic
+// `set_record_active`, and the 23 MCP-only tools (whoami, the CSV exports, the
+// agentic-import batch flow, the AI allowance, the assistant bridge). Until
+// 15 Sep 2026 `getToolDescribe` looked in `SHARED_TOOLS` only, so every one of
+// these answered "unknown tool" — a caller reaching for the very tools this
+// door was widened to explain (`set_account_active`, `run_import`) got refused
+// by the door meant to explain them.
+describe("describe_tool reaches all 179 tools, not just the ~two dozen SHARED_TOOLS ones", () => {
+  it("whoami, run_import, set_account_active and agent_chat each answer with a real detail", async () => {
+    for (const name of ["whoami", "run_import", "set_account_active", "agent_chat"]) {
+      const { status, body } = await describeTool(IDS.staffUser, `?tool=${name}`)
+      expect(status, name).toBe(200)
+      expect(body.tool, name).toBe(name)
+      expect(body.trimmed, name).toBe(true)
+      expect(typeof body.detail, name).toBe("string")
+      expect(String(body.detail).length, name).toBeGreaterThan(String(body.summary).length)
+    }
+  })
+
+  it("every MCP-only tool and every set_<record>_active toggle resolves (no unknown_tool)", async () => {
+    const names = [
+      ...MCP_ONLY_TOOLS.map((t) => t.name),
+      "set_record_active",
+      ...Object.keys(RECORD_TOGGLES).map((r) => `set_${r}_active`),
+    ]
+    expect(names.length).toBe(42)
+    for (const name of names) {
+      const { status, body } = await describeTool(IDS.staffUser, `?tool=${name}`)
+      expect(status, name).toBe(200)
+      expect(body.tool, name).toBe(name)
+    }
+  })
+
+  it("set_record_active answers its OWN generic detail, not a toggle's", async () => {
+    const { body } = await describeTool(IDS.staffUser, "?tool=set_record_active")
+    expect(body.summary).toBe(RECORD_ACTIVE_GENERIC_DESC.summary)
+    expect(body.detail).toBe(RECORD_ACTIVE_GENERIC_DESC.detail)
+  })
+
+  it("a client login is refused here too, on the same door (R21)", async () => {
+    const { status, body } = await describeTool(IDS.contactUser, "?tool=whoami")
     expect(status).toBe(403)
     expect(body.error).toBe("client_login")
   })

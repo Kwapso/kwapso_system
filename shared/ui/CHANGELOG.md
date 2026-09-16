@@ -147,6 +147,31 @@ Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; no app
 wiring required beyond the existing `asideHandleOnOpen={false}` call site,
 which inherits the new resting/hover behaviour for free.
 
+### Added — `BreadcrumbFolders` gets a trailing close-all control (`onCloseAll`)
+
+Requested by the consuming app for a "Close all tabs" control on its
+workspace tab strip — Chrome's "close other tabs", drawn as the strip's own
+trailing flex child rather than exported tab classes (this file's own
+closing note: "ship the THING, not the string"). `onCloseAll` + a
+translatable `closeAllLabel` (default "Close all tabs"), opt-in alongside
+`onClose`, rendered only when there is more than one tab open — a control
+that would close nothing is worse than one that is absent. It is not a tab:
+no `FolderShape`, no paper, no label, drawn like `TAB_CLOSE` (the kit's
+other strip-level control) rather than `TAB`/`TAB_REST`, sized to
+`--folder-lip` and pulled up by `--folder-tab-overlap` as the strip's last
+flex child since it has no ancestor tab box to sit over. It never touches
+the live tab — the set that survives is exactly the one item this call
+already marks live (`activeIndex`, or the last item by the same default).
+
+Rebranched from v1.2.91 onto this line at v1.2.97 — cut originally against
+the stale v1.2.89, replayed unchanged since `breadcrumb-folders.tsx` did not
+move between v1.2.89 and v1.2.91 — and reconciled here with `onReorder` and
+`iconOnly` (v1.2.95), which touch disjoint regions of the same file.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; the app's
+`workspace-tabs.ts`/`app-shell.tsx` wire `onCloseAll` on the content strip
+alongside the existing `onClose`/`onReorder`.
+
 ### Added — `ScreenShell`'s aside column is resizable: drag the seam, snapping to 320 / 400 / 520
 
 The client's ruling, 16 Sep 2026: *"Is it possible that we can, while using

@@ -182,7 +182,7 @@ import {
   DropdownMenuTrigger,
 } from "../dropdown-menu/dropdown-menu";
 import { FolderShape } from "../folder/folder";
-import { X } from "../../foundations/icons";
+import { X, XSquare } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
 
@@ -618,6 +618,41 @@ const TAB_CLOSE = cn(
 );
 
 /* ----------------------------------------------------------------------------
+   THE CLOSE-ALL CONTROL — one per STRIP, not per tab, added 2026-09-16 for
+   the app's "close all tabs" ask. This is the concrete call site the file's
+   own closing note asked for: "nothing is logged as owed until a call site
+   names the control it wants" — a trailing "+" was the example that note
+   gave; this is the same shape of ask, a control that WEARS the strip
+   without being a crumb, and it is shipped as a real element rather than as
+   exported tab classes for exactly the reason that note argues.
+
+   IT IS NOT A TAB. It carries no `FolderShape`, no paper, no label — a
+   member of the SET is a place you can visit; this acts on the set itself,
+   the same distinction `onClose`'s own doc draws between a trail and a set
+   of peers. So it is drawn like `TAB_CLOSE` — the kit's other "acts on the
+   strip" control — rather than like `TAB`/`TAB_REST`.
+
+   IN FLOW, NOT ABSOLUTE, AND THAT IS THE ONE GEOMETRY DIFFERENCE FROM
+   `TAB_CLOSE`. A per-tab × is laid OVER its own tab because the tab's label
+   already owns that box; this control owns no box of its own to sit over, so
+   it is the strip's last flex child instead — sized to `--folder-lip` (the
+   same band a close button centres inside) and pulled up by
+   `--folder-tab-overlap`, the identical two numbers `TAB_CLOSE`'s own
+   comment measures, read as a margin instead of a `top`/`absolute` pair
+   because there is no ancestor tab to be absolute WITHIN. */
+const CLOSE_ALL_WRAP = cn(
+  "flex h-[var(--folder-lip)] shrink-0 items-center justify-center",
+  "mb-[var(--folder-tab-overlap)]",
+);
+
+const CLOSE_ALL = cn(
+  "inline-grid size-[var(--control-height-pill)] place-content-center",
+  "cursor-pointer appearance-none rounded-pill border-0 bg-transparent",
+  "text-ink-tertiary hover:bg-accent hover:text-foreground",
+  "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+);
+
+/* ----------------------------------------------------------------------------
    The silhouette behind one tab.
 
    NO LONGER TAKES A `lead` FLAG. Until 2026-09-02 the leading tab drew an
@@ -820,6 +855,25 @@ export interface BreadcrumbFoldersProps
    */
   onClose?: (item: BreadcrumbFoldersItem, index: number) => void;
   /**
+   * Close every tab EXCEPT the live one — Chrome's "Close other tabs",
+   * under whatever verb the caller's own label gives it. A trailing control
+   * at the strip's own end, after the last crumb, drawn only when `onClose`
+   * is also given (this is a tab-SET action, meaningless on a plain trail)
+   * AND there are at least two items — with one tab open the action is a
+   * no-op, and a control that does nothing is worse than an absent one.
+   *
+   * IT NEVER TOUCHES THE LIVE TAB. The set that survives is exactly the one
+   * item this call already marks live (`activeIndex`, or the last item by
+   * the same default) — the control does not ask which crumbs to spare, it
+   * is asked once, structurally, by never being handed the live one.
+   */
+  onCloseAll?: () => void;
+  /**
+   * The close-all control's own accessible name. A prop with a default
+   * because it is announced, and anything announced must be translatable.
+   */
+  closeAllLabel?: string;
+  /**
    * The verb in every close control's accessible name. A prop with a default
    * because it is announced, and anything announced must be translatable.
    *
@@ -1013,6 +1067,8 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       listClassName,
       activeIndex,
       onClose,
+      onCloseAll,
+      closeAllLabel = "Close all tabs",
       closeLabel = "Close",
       formatCloseLabel,
       onCurrentActivate,
@@ -1687,6 +1743,25 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                 </BreadcrumbItem>
               );
             })}
+            {/* ── CLOSE ALL TABS — see `CLOSE_ALL_WRAP`'s own comment for the
+                geometry and `onCloseAll`'s doc for the gate. `items.length >
+                1` rather than `> 0`: with one tab open, every OTHER tab is
+                the empty set, and a control that closes nothing is a control
+                that does nothing — the same "no-op is worse than absent"
+                call `onClose`'s own per-item `closable` makes. */}
+            {onClose && onCloseAll && items.length > 1 ? (
+              <li className={cn(CLOSE_ALL_WRAP, "shrink-0")}>
+                <button
+                  type="button"
+                  data-slot="breadcrumb-folders-close-all"
+                  aria-label={closeAllLabel}
+                  onClick={onCloseAll}
+                  className={CLOSE_ALL}
+                >
+                  <XSquare size={16} aria-hidden="true" />
+                </button>
+              </li>
+            ) : null}
           </BreadcrumbList>
         </Breadcrumb>
       </>

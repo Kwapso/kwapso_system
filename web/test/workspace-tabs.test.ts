@@ -26,6 +26,7 @@ import {
   MAX_OPEN_TABS,
   MAX_TAB_LABEL_CHARS,
   activeTabPathSnapshot,
+  closeAllTabs,
   closeTab,
   forgetOpenTabs,
   openTabsSnapshot,
@@ -321,6 +322,58 @@ describe("closing lands somewhere real", () => {
     setWorkspaceScope(null)
     setWorkspaceScope(ME)
     expect(strip()).toEqual(["Apps"])
+  })
+})
+
+// "CLOSE ALL TABS" — Chrome's "close other tabs" under the client's own name
+// for it. It never moves or navigates: the kept tab is the one she is on, and
+// it stays exactly where it is and exactly what it is.
+describe("close all tabs — every tab but the one she is on", () => {
+  it("keeps the tab she is on and closes every other one", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    visitTrail(at(["/apps", "Apps"], ["/apps/A2", "APP-2"]))
+    visitTrail(at(["/apps", "Apps"])) // she steps back to "Apps"
+    closeAllTabs("/apps")
+    expect(strip()).toEqual(["Apps"])
+    expect(activeTabPathSnapshot()).toBe("/apps")
+  })
+
+  it("keeps the MIDDLE tab when that is the one she is on — position is not the question", () => {
+    visitTrail(at(["/apps/A0", "APP-0"]))
+    visitTrail(at(["/apps/A1", "APP-1"]))
+    visitTrail(at(["/apps/A2", "APP-2"]))
+    visitTrail(at(["/apps/A1", "APP-1"])) // she steps back to the middle tab
+    closeAllTabs("/apps/A1")
+    expect(strip()).toEqual(["APP-1"])
+    expect(activeTabPathSnapshot()).toBe("/apps/A1")
+  })
+
+  it("is a no-op with one tab open — nothing else exists to close", () => {
+    visitTrail(at(["/apps/A1", "APP-1"]))
+    closeAllTabs("/apps/A1")
+    expect(strip()).toEqual(["APP-1"])
+  })
+
+  it("does nothing when the kept path is not actually open", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    closeAllTabs("/apps/GONE")
+    expect(strip()).toEqual(["Apps", "APP-1"])
+  })
+
+  it("survives a reload — the closed tabs stay closed", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    closeAllTabs("/apps/A1")
+    setWorkspaceScope(null)
+    setWorkspaceScope(ME)
+    expect(strip()).toEqual(["APP-1"])
+  })
+
+  it("a closed tab's canonical key is free again — reopening it is a genuinely NEW tab, not a silent reactivation of the gone one", () => {
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    closeAllTabs("/apps") // A1 is gone; "Apps" is kept
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1 reopened"]))
+    expect(strip()).toEqual(["Apps", "APP-1 reopened"])
+    expect(paths()).toEqual(["/apps", "/apps/A1"])
   })
 })
 

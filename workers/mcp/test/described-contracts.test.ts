@@ -130,8 +130,14 @@ const JUDGED: Judged[] = [
     text: t.detail ? `${t.summary}\n${t.detail}` : t.summary,
     schema: t.schema, method: t.method, path: t.path,
   })),
+  // MCP-only tools got the same `detail` split on 15 Sep 2026 (describe_tool
+  // widened to reach all 179 tools, not just SHARED_TOOLS) — joined here for
+  // the identical reason a SharedTool's two halves are joined above.
   ...MCP_TOOLS.filter((t) => !sharedNames.has(t.name)).map((t): Judged => ({
-    name: t.name, surface: "mcp", text: t.description, schema: t.inputSchema, method: t.method, path: t.path,
+    name: t.name,
+    surface: "mcp",
+    text: t.detail ? `${t.description}\n${t.detail}` : t.description,
+    schema: t.inputSchema, method: t.method, path: t.path,
   })),
   ...TOOL_CATALOG.filter((t) => !sharedNames.has(t.name)).map((t): Judged => ({
     name: t.name, surface: "agent", text: t.description, schema: t.schema, method: t.method, path: t.path,

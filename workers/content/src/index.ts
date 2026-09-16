@@ -251,7 +251,7 @@ import {
   postGoogleSourceActive,
 } from "./routes/google"
 import { googleAutopilot } from "./lib/google-autopilot"
-import { rebuildNameIndex, revisitUnhealthySources } from "./lib/knowledge"
+import { rebuildNameIndex, revisitUnhealthySources, unhealthySourceCount, unhealthySourceSample } from "./lib/knowledge"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { clientUserIds } from "@shared/workers/record-link"
@@ -980,10 +980,14 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
         roleId: "system",
         databaseId: team.database_id,
       }
-      const [onDuty, waiting, members] = await Promise.all([
+      const [onDuty, waiting, members, knowledgeUnhealthyCount] = await Promise.all([
         dutyFor(cfg, guard, now),
         needsTriage(cfg, guard, now),
         teamMemberNames(env, team.id),
+        // BUILD-5 §D (16 Sep 2026): read alongside the rest of the digest's own
+        // bounded reads (R14) — a count, never the raw `index_error` tally
+        // (`unhealthySourceCount`'s own header says why).
+        unhealthySourceCount(cfg, guard),
       ])
       // THE TEAM'S OWN TWO SWITCHES (R70, `shared/automations.ts`), read on a
       // cron, where there is no response for them to be on the path of. They
@@ -1014,11 +1018,19 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
       const to = onDuty
         ? staff.filter((m) => m.userId === onDuty.userId)
         : staff
+      // THE NAMES, ONLY WHEN THERE IS SOMETHING TO NAME — the count above is
+      // read every morning regardless (it decides whether the mail says
+      // anything), the sample is one more bounded read (R14) and only worth
+      // it once the count says there is a name to fetch.
+      const knowledgeUnhealthy = knowledgeUnhealthyCount > 0
+        ? { count: knowledgeUnhealthyCount, sample: await unhealthySourceSample(cfg, guard) }
+        : undefined
       await sendTriageDigest(env, team.id, to, {
         waiting: waiting.total,
         oldestDays: waiting.waiting[0]?.days ?? 0,
         onDutyName: onDuty?.userName ?? null,
         missingTime,
+        knowledgeUnhealthy,
       })
     } catch (e) {
       failed = true

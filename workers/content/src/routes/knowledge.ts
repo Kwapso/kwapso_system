@@ -301,6 +301,25 @@ export async function getKnowledgeShape(request: Request, env: Env): Promise<Res
  * hands it to the SECOND pass only. */
 type RetrieveRead = (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
 
+/** BUILD-5 §E (16 Sep 2026) — READER BY DEFAULT. This door has exactly THREE
+ * callers: the Knowledge tab (`askKnowledge`, web/lib/api/content.ts), the
+ * assistant's own tool call, and the external MCP surface — the last two are
+ * literally ONE call site, the `ask_knowledge` entry in
+ * `shared/workers/tool-catalog.ts`, which is what makes capability parity
+ * (R9) hold here without a second constant. Every one of the three reaches
+ * this same door, so ONE constant here is every caller's default at once,
+ * and a caller who wants less still can: send the query literal "0" (or
+ * anything that is not "1") for `read` or `compose` and this door honours
+ * it — see the two lines below that read it.
+ *
+ * WHY THE DEFAULT FLIPPED. The measured cost of the honest shape (COSTS.md
+ * "One knowledge question") is ≈$0.0053, a fraction of an agent turn, and
+ * the alternative — a caller that forgets to ask for the reader — silently
+ * gets the WEAKER answer (the floor alone deciding, no prose) with nothing
+ * on the wire to say so. Opt-out is the safe direction for a decision this
+ * cheap to make automatically. */
+const KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT = true
+
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
@@ -316,15 +335,19 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // run, just as current as the last sweep.
   await catchUp(env, cfg, guard)
   const limit = Number(queryText(url.searchParams.get("limit"), "Limit"))
-  // Checked where it sits (R20): the door reads exactly one spelling of yes, so
-  // there is no truthiness anywhere on this path.
-  const write = queryText(url.searchParams.get("compose"), "Compose") === "1"
+  // Checked where it sits (R20): the door reads exactly one spelling of yes
+  // and one of no. ABSENT means the default above; PRESENT-AND-"1" means on;
+  // present and anything else (the literal "0", say) means the caller is
+  // asking for less than the default, and is honoured.
+  const composeParam = queryText(url.searchParams.get("compose"), "Compose")
+  const write = composeParam === null ? KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT : composeParam === "1"
   // RE-READ THE SHORTLIST (BUILD-5 §5-6) — SEPARATE from `compose` above, on
   // purpose: a caller may want the honest, reader-widened decision without
   // paying for prose too (the Knowledge tab's evidence view, say), or the
   // reverse. `payToRead` gates and meters itself exactly as `payToWrite` does,
   // so a question the base cannot even build a shortlist for costs nothing.
-  const reread = queryText(url.searchParams.get("read"), "Read") === "1"
+  const readParam = queryText(url.searchParams.get("read"), "Read")
+  const reread = readParam === null ? KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT : readParam === "1"
   // WHICH DOORS THIS CONVERSATION IS USING — the source chips, as a comma list of
   // chip keys. Every value is checked against the declared set at the boundary
   // (R20): an allow-list `.includes` is the checking position, so an invented key
@@ -372,16 +395,20 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
     }
   }
 
-  // A SECOND LOOK BEFORE SAYING "I DON'T KNOW". Search the cheap way first;
-  // only if THAT comes back with nothing, spend a unit re-reading what it
-  // found. A question that already answers costs exactly what it cost before.
+  // A SECOND LOOK BEFORE SAYING "I DON'T KNOW" — reached now only by a caller
+  // who explicitly asked for LESS than the default (`read=0`, still wanting
+  // an honest floor-widened answer rather than none at all). Search the
+  // cheap way first; only if THAT comes back with nothing, spend a unit
+  // re-reading what it found. A question that already answers costs exactly
+  // what it cost before.
   //
-  // Until tonight the reader was offered only to a caller passing `read=1`,
-  // which `askKnowledge` — the knowledge screen's own call — never did. So the
-  // screen's refusals were the reader's entire best case and it was never
-  // invoked on them. Measured: the three paraphrases the owner named are
-  // refused by the floor alone and answered with receipts once something
-  // re-reads the shortlist.
+  // Before BUILD-5 §E (16 Sep 2026) the reader was offered only to a caller
+  // passing `read=1`, which `askKnowledge` — the knowledge screen's own call —
+  // never did. So the screen's refusals were the reader's entire best case and
+  // it was never invoked on them. Measured: the three paraphrases the owner
+  // named are refused by the floor alone and answered with receipts once
+  // something re-reads the shortlist — which is why the reader is the default
+  // now rather than an opt-in nobody opted into.
   //
   // THE FIRST PASS IS QUIET because a provisional refusal is a reason to look
   // again rather than an answer. The deciding pass logs normally.

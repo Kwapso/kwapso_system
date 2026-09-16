@@ -363,6 +363,7 @@ export function AppShell({
   onNavigate,
   onCloseCrumb,
   onReorderCrumb,
+  onCloseAllTabs,
   activeCrumbIndex,
   activePath,
 }: {
@@ -386,6 +387,15 @@ export function AppShell({
    * has no opinion about what moving a tab means, only about drawing a
    * strip that can be dragged. */
   onReorderCrumb?: (fromIndex: number, toIndex: number) => void
+  /** CLOSE EVERY TAB EXCEPT THE ONE SHE IS ON — Chrome's "close other tabs",
+   * under the client's own name for it ("Close all tabs"). Given only
+   * alongside `onCloseCrumb`, for the same reason: it is a tab-SET action,
+   * meaningless on a plain trail, so an ordinary breadcrumb screen never
+   * grows it. Wired straight to the kit's own `onCloseAll` (`BreadcrumbFolders`,
+   * kit v1.2.92) — the kit itself decides when there is nothing to close (one
+   * tab open) and draws no control at all rather than one that would do
+   * nothing. */
+  onCloseAllTabs?: () => void
   /** WHICH CRUMB IN `breadcrumbs` IS THE TAB BEING LOOKED AT — the kit's own
    * `activeIndex` (`BreadcrumbFoldersProps`, v1.2.59), forwarded untouched.
    * Given only alongside `onCloseCrumb`, for the same reason and never
@@ -1601,6 +1611,14 @@ export function AppShell({
                  own `onReorderCrumb` prop (see its doc). `undefined` on every
                  ordinary trail, same guard as `onClose`. */
               onReorder={onReorderCrumb}
+              /* THE TRAILING CLOSE-ALL CONTROL — kit v1.2.92's own
+                 `onCloseAll`, given only when `onCloseCrumb` is (a tab set,
+                 never a plain trail). The kit draws it after the last tab
+                 and decides on its own when there is nothing to close (one
+                 tab open); this file's only job is to hand it the callback
+                 and the translated label, same as `closeLabel` above. */
+              onCloseAll={onCloseAllTabs}
+              closeAllLabel={t("Close all tabs")}
               /* NO `foldAfter` ANY MORE. It used to be the only lever this
                  file had for "do not fold a set of open tabs into a `···`
                  menu" — passing the set's own ceiling so nothing could ever

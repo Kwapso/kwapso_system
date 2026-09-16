@@ -31,7 +31,7 @@ import { B, checkArgTypes, enumOf, obj, S, str } from "@shared/workers/tool-args
 import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { googleServiceOfPath } from "@shared/knowledge-chips"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
-import { alwaysConfirms, isMoneyWrite, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
+import { alwaysConfirms, isMoneyWrite, isPrivilegeWrite, keptForRights, TOOL_GATES } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"
@@ -942,10 +942,7 @@ export function getTool(name: string): AgentTool | undefined {
  * a right is asked for and never offered. */
 export function toolSpecs(held?: ReadonlySet<string>, loaded?: ReadonlySet<string>): ToolSpec[] {
   return TOOL_CATALOG.filter((t) => {
-    if (held) {
-      const gate = TOOL_GATES[t.name]
-      if (gate && !held.has(gate)) return false
-    }
+    if (!keptForRights(TOOL_GATES[t.name], held)) return false
     // `loaded` absent = the whole catalogue, exactly as before this existed. Every
     // caller that only wants "what may this person reach" — the census tests, the
     // failure wrap-up, the measurement script — passes nothing and is unaffected.
