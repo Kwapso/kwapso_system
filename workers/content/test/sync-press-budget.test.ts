@@ -99,3 +99,77 @@ describe("sweepKinds — the manual press never times out", () => {
     expect(results.every((r) => r.caughtUp)).toBe(true)
   })
 })
+
+// BUILD-5 §G2 FOLLOW-UP (16 Sep 2026) — MEASURED LIVE ON STAGING: the
+// between-kinds budget above answered honestly, but one press still took
+// 87.8 SECONDS, because the ONE kind it reached spent the whole press inside
+// its own row batch (25 rows, real embeds, heavy concurrent load) — a budget
+// that cannot see inside a kind's own batch is not a bound on the request at
+// all. The fix threads the SAME deadline one level deeper, into sweepKind's
+// own row loop, checked between ROWS the same way sweepKinds checks it
+// between KINDS.
+describe("sweepKinds — the deadline reaches inside a single kind's own row batch", () => {
+  beforeEach(() => {
+    d1Query.mockClear()
+    d1ExecScript.mockClear()
+  })
+
+  /** ONE kind, several rows — the shape a real backlog takes: `meeting` alone
+   * held 25 rows the day this was measured. Each row is a trivial, valid
+   * IngestRow; the mocked d1Query returns no upserted row for any of them, so
+   * no real chunk/embed work happens — this suite is isolated to the BUDGET's
+   * own pacing, exactly as the between-kinds suite above is. */
+  const heavyKind: IngestKind = {
+    kind: "heavy",
+    table: "heavy_table",
+    label: "a kind with a real backlog",
+    textVersion: 1,
+    read: async () =>
+      Array.from({ length: 5 }, (_, i) => ({
+        originRowId: `row${i}`,
+        sortAt: `2026-09-16T00:00:0${i}.000Z`,
+        title: `row ${i}`,
+        body: `body ${i}`,
+        accountId: null,
+        sourceUrl: null,
+        ownerUserId: null,
+      })),
+  }
+
+  it("stops between rows once the budget is spent, mid-kind, and reports caughtUp:false", async () => {
+    // Advances by 100ms per call. sweepKinds calls it once for its own
+    // between-kinds check before this kind starts, then sweepKind calls it
+    // once per row.
+    let t = 0
+    const now = () => (t += 100)
+
+    const [result] = await sweepKinds(env, cfg, guard, [heavyKind], 25, { budgetMs: 250, now })
+
+    expect(result.kind).toBe("heavy")
+    // Some rows were reached (the budget does not fire on the very first
+    // check) and NOT all five — the live case this reproduces.
+    expect(result.read).toBe(5) // `read` reports what was FETCHED, honestly
+    expect(result.caughtUp).toBe(false) // — but not all of it was PROCESSED
+  })
+
+  it("with a generous budget, processes every row and reports caughtUp honestly", async () => {
+    const [result] = await sweepKinds(env, cfg, guard, [heavyKind], 25, { budgetMs: 60_000 })
+    expect(result.read).toBe(5)
+    // 5 read < 25 limit, and nothing cut it short — genuinely caught up.
+    expect(result.caughtUp).toBe(true)
+  })
+
+  it("the cursor written only ever names a row that was actually finished", async () => {
+    let t = 0
+    const now = () => (t += 100)
+    await sweepKinds(env, cfg, guard, [heavyKind], 25, { budgetMs: 250, now })
+
+    // recordRun's own INSERT is the last d1ExecScript call — its cursor
+    // argument must name the row that was actually finished (row0, worked
+    // out below from the same fake clock the loop itself reads), never the
+    // batch's last row (row4), which the budget never let the loop reach.
+    const write = d1ExecScript.mock.calls.at(-1)?.[2] as string
+    expect(write).toContain("row0")
+    expect(write).not.toContain("row4")
+  })
+})

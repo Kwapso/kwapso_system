@@ -990,11 +990,14 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
   await refusePortalCaller(cfg, guard)
   // BUILD-5 §G2 (16 Sep 2026): ONE BOUNDED SLICE, NEVER A HANG. Against a
   // base deep in a backlog this press used to sweep every kind with no time
-  // limit at all and never answer — see KNOWLEDGE_SYNC_PRESS_BUDGET_MS's own
-  // header. `caughtUp` below is already honest about a kind the budget never
-  // reached, so "press again" is a correct instruction the response itself
-  // supports, exactly like the Google sync door's own "a press is a nudge,
-  // not a backfill".
+  // limit at all and never answer. The budget reaches BETWEEN kinds and INTO
+  // each kind's own row loop (see KNOWLEDGE_SYNC_PRESS_BUDGET_MS's header for
+  // the live measurement that found the gap), so the row cap stays the
+  // cron's own size — a fast, steady-state press still finishes in one go.
+  // `caughtUp` below is already honest about whatever the budget cut short,
+  // so "press again" is a correct instruction the response itself supports,
+  // exactly like the Google sync door's own "a press is a nudge, not a
+  // backfill".
   const results = await sweepAll(env, cfg, guard, undefined, { budgetMs: KNOWLEDGE_SYNC_PRESS_BUDGET_MS })
   // THE REVISIT PASS — what the ordinary sweep's forward-only cursor cannot
   // do on its own (`revisitUnhealthySources`'s own header). Rides this same

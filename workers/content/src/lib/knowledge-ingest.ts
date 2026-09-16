@@ -2041,7 +2041,18 @@ async function sweepKind(
   cfg: D1Rest,
   guard: MemberGuard,
   kind: IngestKind,
-  limit = INGEST_SOURCES_PER_TICK
+  limit = INGEST_SOURCES_PER_TICK,
+  // BUILD-5 §G2 follow-up (16 Sep 2026) — the SAME deadline sweepKinds checks
+  // between kinds, threaded one level deeper. Measured live: the between-kinds
+  // check alone answered honestly but still took 87.8s, because the ONE kind
+  // it reached spent the whole press inside its own row loop (real embeds,
+  // heavy concurrent Vectorize/D1 load) — a budget that cannot see inside a
+  // kind's own batch is not a bound on the request at all, only on how many
+  // kinds can be dominated by one slow batch. `deadline`/`now` are optional so
+  // every existing caller (the cron, catchUp, every mocked test) keeps the
+  // exact shape it had — this is a bound a caller opts into, not a new
+  // ceiling on the engine itself. */
+  opts: { deadline?: number; now?: () => number } = {}
 ): Promise<SweepResult> {
   const stateKey = kind.stateKey ?? kind.kind
   const state = await d1Query<{ cursor: string | null }>(
@@ -2057,6 +2068,15 @@ async function sweepKind(
   /** Sources this tick stopped retrying (EMBED_ATTEMPT_CAP), reported once below. */
   const givenUp: string[] = []
   let last: Cursor | null = cursor
+  // Named `clock`, not `now` — a row's own `now` (a fresh ISO timestamp,
+  // below) shadows the obvious name inside this same loop.
+  const clock = opts.now ?? Date.now
+  // Whether the deadline cut this kind's batch short — the missing half
+  // `rows.length < limit` cannot answer on its own: a batch smaller than the
+  // cap genuinely means "nothing more past the cursor" UNLESS the deadline is
+  // also why the loop below stopped reading it, in which case some already-
+  // FETCHED rows were never reached and reporting caughtUp would be wrong.
+  let stoppedEarly = false
 
   // A WINDOWED KIND THAT HAS CAUGHT UP REWINDS, AND RE-WALKS IN THE SAME TICK.
   //
@@ -2079,6 +2099,14 @@ async function sweepKind(
   }
 
   for (const row of rows) {
+    // BETWEEN ROWS, NEVER MID-ROW — the same rule sweepKinds keeps between
+    // kinds, one level deeper. `last` (and so the cursor this tick writes)
+    // only ever advances past a row that was FULLY processed, so a row this
+    // check skips is simply read again on the next press, never lost.
+    if (opts.deadline !== undefined && clock() >= opts.deadline) {
+      stoppedEarly = true
+      break
+    }
     const compartment = row.accountId ? accountCompartment(row.accountId) : AGENCY_COMPARTMENT
     const hash = contentHash(indexableText({ title: row.title, body: row.body }))
     const now = new Date().toISOString()
@@ -2348,7 +2376,9 @@ async function sweepKind(
       )
     )
 
-  const caughtUp = rows.length < limit
+  // A SHORT BATCH IS ONLY THE END OF THE TABLE WHEN NOTHING CUT IT SHORT
+  // FIRST — see `stoppedEarly`'s own header.
+  const caughtUp = rows.length < limit && !stoppedEarly
   // A ROLLUP KIND THAT HAS REACHED THE END STARTS AGAIN NEXT TICK. Its text is
   // built from rows its own cursor cannot see (an account's apps, sprints,
   // tickets, people), so "nothing past the cursor" does not mean "nothing has
@@ -2469,7 +2499,11 @@ export async function sweepKinds(
       continue
     }
     try {
-      results.push(await sweepKind(env, cfg, guard, kind, limit))
+      // The SAME deadline, one level deeper — see sweepKind's own header for
+      // why the between-kinds check above is not enough on its own.
+      results.push(
+        await sweepKind(env, cfg, guard, kind, limit, opts.budgetMs !== undefined ? { deadline, now } : {})
+      )
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e)
       await recordRun(cfg, guard, stateKey, { cursor: null, indexed: 0, error })
@@ -2504,10 +2538,22 @@ const CATCH_UP_PER_KIND = 5
  * (`POST /api/content/knowledge/sync`) may spend inside `sweepAll` before it
  * has to stop between kinds and answer with whatever it got — see
  * `sweepKinds`'s own header for the measurement (three real presses, 180s
- * each, no answer at all) and why a row-count cap alone was not the fix.
- * Generous next to `CATCHUP_BUDGET_MS` on purpose: this door's whole point is
- * to make real progress a person can see, not just avoid a hang — but still
- * comfortably under any HTTP client's own timeout. */
+ * each, no answer at all) and why a row-count cap alone was not the fix on
+ * its own. Generous next to `CATCHUP_BUDGET_MS` on purpose: this door's whole
+ * point is to make real progress a person can see, not just avoid a hang —
+ * but still comfortably under any HTTP client's own timeout.
+ *
+ * MEASURED LIVE ON STAGING, 16 Sep 2026, during BUILD-5 §C's rebuild, and the
+ * reason this budget reaches all the way into `sweepKind`'s own row loop, not
+ * just the gap between kinds: a first version that checked only BETWEEN
+ * kinds answered honestly but still took 87.8 SECONDS, because the one kind
+ * it reached (`meeting`, real transcripts, several chunks each) spent the
+ * whole press inside its own INGEST_SOURCES_PER_TICK-sized batch (25 rows),
+ * each a real embed call under the rebuild's own heavy Vectorize/D1 load. A
+ * budget that cannot see inside a kind's own batch is not a bound on the
+ * request at all — see sweepKind's own header for the row-level fix, which
+ * is what let the row CAP stay at the cron's own size rather than being
+ * shrunk for every caller, fast steady-state presses included. */
 export const KNOWLEDGE_SYNC_PRESS_BUDGET_MS = 10_000
 
 /** BRING THE INDEX UP TO DATE BEFORE ANSWERING — the mechanism behind "no manual

@@ -1183,11 +1183,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // so this fired correctly; no word any kind SAYS changed (that repair is
 // `person`'s own textVersion bump, in READER_DIGESTS above), so no other
 // textVersion moved.
-// Moved 16 Sep 2026 (BUILD-5 §G1/§G2): catchUpWithBudget and the sweepKinds
-// budget check are new code OUTSIDE every per-kind reader, so the digest
-// moved — no kind's TEXT changed (neither the readers nor the shared text
-// helpers were touched), only the orchestration around when a sweep runs.
-const SHARED_DIGEST = "3348b12e5f9461cd"
+// Moved 16 Sep 2026 (BUILD-5 §G1/§G2), across three commits — catchUpWithBudget
+// and the sweepKinds between-kinds budget check, a live-measured follow-up
+// that (briefly) shrank the press door's row cap, then the real fix: the
+// SAME deadline threaded one level deeper into sweepKind's own row loop,
+// which is what let the row cap go back to the cron's own size. All of it is
+// new code OUTSIDE every per-kind reader, so the digest moved — no kind's
+// TEXT changed (neither the readers nor the shared text helpers were
+// touched), only the orchestration around when and how much a sweep runs.
+const SHARED_DIGEST = "bf60722eddc8137b"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
