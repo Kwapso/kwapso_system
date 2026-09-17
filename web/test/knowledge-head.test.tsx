@@ -7,7 +7,7 @@
 // own container background."
 //
 // FOUR PROOFS, off the real call site in collection-content.tsx — the same
-// "read source off disk" technique web/test/knowledge-search-removed.test.tsx
+// "read source off disk" technique web/test/knowledge-search-restored.test.tsx
 // already uses for this exact screen, because the knowledge branch needs the
 // whole `ModuleContentCtx` (a dozen queries, permissions, callbacks) to
 // render at all, and a render-level proof would spend most of its weight on
@@ -21,9 +21,11 @@
 //      `openNewAgentTab()` (the tab-store "+"), `pickAgentTabScope(id,
 //      "knowledge", …)` (skips the picker straight to her scope) and
 //      `setAgentOpen(true)` (opens/focuses the panel).
-//   3. THE TOOLBAR IS STILL THERE, MINUS SEARCH — <PagedFind> still carries
-//      `search={false}` (K36) alongside `facets={` and `view={` — never
-//      suppressed wholesale.
+//   3. THE TOOLBAR IS STILL THERE, SEARCH INCLUDED AGAIN — <PagedFind> carries
+//      a real `placeholder=` alongside `facets={` and `view={`; client ruling,
+//      17 Sep 2026: "Also add the search to the toolbar. It's missing." —
+//      reversing K36's own `search={false}`, never suppressed wholesale
+//      either way.
 //   4. THE CONTAINER — <PagedFind> now carries a `wrap` that boxes the
 //      toolbar and whichever body it draws (List or Shape) in one
 //      `CollectionCard`, the identical call every other collection screen
@@ -47,9 +49,13 @@ function knowledgeHeadBlock(src: string): string {
   expect(moduleAt, "the knowledge module's own branch").toBeGreaterThan(-1)
   const headingAt = src.indexOf("<CollectionHeading", moduleAt)
   expect(headingAt, "the knowledge screen's own <CollectionHeading>").toBeGreaterThan(-1)
-  const askAt = src.indexOf("<AskTheAssistant", headingAt)
-  expect(askAt, "the head ends where the inline ask box begins").toBeGreaterThan(headingAt)
-  return src.slice(headingAt, askAt)
+  // THE HEAD ENDS WHERE THE LIST'S OWN <PagedFind> BEGINS — the inline
+  // AskTheAssistant box that used to mark this boundary is gone outright
+  // (client, 17 Sep 2026: "remove the whole modal 'Ask a question'"), so the
+  // next real element after the heading is the toolbar/list itself.
+  const listAt = src.indexOf("<PagedFind<KnowledgeSource>", headingAt)
+  expect(listAt, "the head ends where the list's own <PagedFind> begins").toBeGreaterThan(headingAt)
+  return src.slice(headingAt, listAt)
 }
 
 describe("the knowledge head (collection-content.tsx) — order", () => {
@@ -120,16 +126,25 @@ describe('the mango "Ask" button — calls the new-conversation door', () => {
   })
 })
 
-describe("the knowledge toolbar — present, search alone is off (K36)", () => {
-  it("<PagedFind> still carries facets, sort, view and search={false} together", () => {
+describe("the knowledge toolbar — present, search included again (17 Sep 2026, reverses K36)", () => {
+  it("<PagedFind> carries facets, sort, view and a real placeholder together — never search={false}", () => {
     const src = readCollectionContent()
     const at = src.indexOf("<PagedFind<KnowledgeSource>")
     expect(at).toBeGreaterThan(-1)
     const tag = src.slice(at, at + 1800)
-    expect(tag).toContain("search={false}")
+    expect(tag, "her ruling: \"Also add the search to the toolbar. It's missing.\"").not.toContain("search={false}")
+    expect(tag).toMatch(/placeholder=\{t\(/)
     expect(tag).toMatch(/\bfacets=\{/)
     expect(tag).toMatch(/\bview=\{/)
     expect(tag).toMatch(/\bsorts=\{/)
+  })
+})
+
+describe("the modal 'Ask a question' box is gone (client, 17 Sep 2026)", () => {
+  it("does not mount AskTheAssistant on the knowledge screen any more", () => {
+    const src = readCollectionContent()
+    expect(src, "\"remove the whole modal 'Ask a question'\"").not.toMatch(/<AskTheAssistant\s*\/>/)
+    expect(src).not.toMatch(/from "@\/components\/assistant\/ask-the-assistant"/)
   })
 })
 

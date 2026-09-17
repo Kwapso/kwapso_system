@@ -57,7 +57,7 @@
 // The client, 2026-09-15, over the automations table: *"make sure that each
 // status has a different color because right now active and protected look
 // the same."* Two rulings later, both 16 Sep 2026, landed as FILLS —
-// `AUTOMATION_STATUS_VARIANT` below (still live, see next section) went
+// `AUTOMATION_STATUS_VARIANT` (deleted 17 Sep 2026, see next section) went
 // `inverse`/`success`/`outline`, then Inactive's own follow-up swapped
 // `outline` for `secondary` ("make sure that the status 'inactive' for the
 // automations also has a background… the pill"). THE THIRD RULING, SAME
@@ -89,21 +89,19 @@
 //                      invented hue (R32, the closed palette). Flag this for
 //                      her the next time status colours come up.
 //
-// `AUTOMATION_STATUS_VARIANT` IS NOT DELETED — it still has two readers
-// outside this change's own scope: the Choices table's own status cell
+// `AUTOMATION_STATUS_VARIANT` IS DELETED, 17 SEP 2026 — it used to keep two
+// readers outside this change's own 16 Sep scope ("worth its own pass, not
+// this one"): the Choices table's own status cell
 // (`deep-link/shape.tsx#shapeChoicesTable`) and the internal automations
-// panel (`team/internal-screens.tsx`), neither of which this ruling named.
-// Both keep the filled-pill look unchanged; the divergence from Automations'
-// own new dot is the SAME kind of gap this file already carried on purpose
-// (see the next paragraph, unchanged) — "worth its own pass, not this one."
-//
-// NOT THE SAME COLOUR THE CHOICES TABLE DRAWS FOR ITS OWN "Protected" (
-// deep-link/shape.tsx, `variant="secondary"`) — read as a separate, narrower
-// finding rather than folded in here: this ruling was given over the
-// Automations screen alone, Choices' table is out of this lane's scope
-// (settings-screen.tsx/shape.tsx are read-only reference for this change),
-// and the Choices table has the identical undifferentiated-badge shape this
-// ruling is about. Worth its own pass; not this one.
+// panel (`team/internal-screens.tsx`). That later pass is this one — the
+// client's ruling on the Choices tables' status column: *"Dots like
+// everywhere else."* Both readers now draw `AUTOMATION_STATUS_DOT` instead,
+// the identical map this file's own list/detail dot already reads, so all
+// three surfaces (the Automations list, this sheet's detail head, and the
+// Choices table) share one tone derivation with nothing left importing the
+// old filled-pill map. It is gone rather than kept unread — an exported
+// derivation nothing calls is exactly the kind of drift `named-paths` and
+// this codebase's own `GONE_ON_PURPOSE` discipline exist to catch.
 //
 // ── R70, STILL HERE, UNCHANGED IN SHAPE ─────────────────────────────────────
 //
@@ -161,27 +159,21 @@ import {
   type AutomationStatus,
 } from "@shared/automations"
 
-/** THE FILLED-PILL DERIVATION — SUPERSEDED FOR THIS SCREEN, STILL LIVE FOR
- * TWO OTHERS. See this file's own header ("THE STATUS CHIP'S COLOUR") for
- * the 16 Sep 2026 ruling that moved Automations' own status chip to a dot
- * (`AUTOMATION_STATUS_DOT`, below). This map is UNCHANGED and still exported
- * because `deep-link/shape.tsx#shapeChoicesTable` and
- * `team/internal-screens.tsx` both still read it — neither was named in the
- * dot ruling, and removing their import would be an unrelated redesign no
- * one asked for in this pass. */
-export const AUTOMATION_STATUS_VARIANT: Record<AutomationStatus, "inverse" | "success" | "secondary"> = {
-  protected: "inverse",
-  on: "success",
-  off: "secondary",
-}
-
 /** THE DOT DERIVATION — the client's ruling, 16 Sep 2026: "let's change the
  * full color pill to also be a dot. Inactive gets gray, and active gets
  * green." See this file's own header for the full account, including that
  * she did not name Protected's tone (`building` is this change's own
  * suggestion). `ModuleAutomations`' own table column imports this rather
  * than keeping a second copy, so the list row and this panel's own detail
- * head can never disagree about which dot a status wears. */
+ * head can never disagree about which dot a status wears.
+ *
+ * THE ONLY DERIVATION NOW, 17 SEP 2026 — the client's ruling on the Choices
+ * tables' status column, *"Dots like everywhere else,"* moved
+ * `deep-link/shape.tsx#shapeChoicesTable` and `team/internal-screens.tsx`
+ * onto this same map too, so the older `AUTOMATION_STATUS_VARIANT`
+ * filled-pill export (this file's own header has its history) is deleted —
+ * every reader of an automation/choice/meeting-type status now reads this
+ * one `Record`, never a second copy or a second palette. */
 export const AUTOMATION_STATUS_DOT: Record<AutomationStatus, DotTone> = {
   protected: "building",
   on: "shipped",

@@ -25,11 +25,16 @@ import { Swatch } from "@/components/records/record-picker"
 import type { PickablePerson } from "@/lib/members"
 import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
 import { CONCEPT_ICON } from "@/lib/pages"
-// THE ONE STATUS→FILL DERIVATION, IMPORTED RATHER THAN COPIED — see
+// THE ONE STATUS→DOT DERIVATION, IMPORTED RATHER THAN COPIED — see
 // `shapeChoicesTable`'s own status-cell comment below. `automation-edit-sheet.tsx`
-// is the module that defines it (`ModuleAutomations` already imports it the
-// same way); this is the second, not a third.
-import { AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"
+// is the module that defines it (`ModuleAutomations` and its own detail head
+// already import it the same way); this is a third reader, not a second copy.
+// AMENDED, 17 Sep 2026 — the client's ruling on the Choices tables' status
+// column: *"Dots like everywhere else."* This file used to import the older
+// `AUTOMATION_STATUS_VARIANT` (a filled-pill map) instead; that map is now
+// deleted (see automation-edit-sheet.tsx's own header) and every reader,
+// this one included, reads `AUTOMATION_STATUS_DOT` alone.
+import { AUTOMATION_STATUS_DOT } from "@/components/screens/automation-edit-sheet"
 // THE CLASS, NOT THE CHIP. `REF_LEADS_NAME` is the one spelling of "a shrink-0
 // thing in front of a name that truncates", written for the reference lozenge
 // and exactly as true of the contacts table's mark — the alternative was a
@@ -1112,19 +1117,24 @@ export function shapeChoicesTable(
         // COLUMN". `null` for every type with nothing beyond its word, which
         // `record-table.tsx` renders as a genuinely empty cell, not a dash.
         details: choiceDetailsCell(v, t),
-        // ── SAME WORD, SAME COLOUR AS AUTOMATIONS — 15 Sep 2026 ─────────────
-        // The coordinator's own ruling: Choices' three-way status
+        // ── SAME WORD, SAME DOT AS AUTOMATIONS — 15 Sep 2026, AMENDED 17 Sep 2026 ──
+        // The coordinator's own ruling, 15 Sep 2026: Choices' three-way status
         // (Protected/Active/Inactive) and Automations' own three-way
-        // (Protected/On/Off, `AUTOMATION_STATUS_VARIANT`,
-        // automation-edit-sheet.tsx) are the SAME concept read from two
-        // modules, and a reader who learns "grey outline = off" on one
-        // settings tab should not have to learn a second palette for the
-        // other. ONE derivation, imported rather than copied — this file
-        // maps its own `isDefault`/`active` pair onto the automations
-        // module's own key domain (`"protected" | "on" | "off"`) rather than
-        // carrying a second copy of the map itself.
+        // (Protected/On/Off, automation-edit-sheet.tsx) are the SAME concept
+        // read from two modules, and a reader who learns one palette on one
+        // settings tab should not have to learn a second for the other. That
+        // used to mean a shared FILL (`AUTOMATION_STATUS_VARIANT`); the
+        // client's ruling on this table specifically, 17 Sep 2026, verbatim —
+        // *"Dots like everywhere else."* — replaces the filled pill with
+        // `<Badge variant="status" dot={…}>`, the same D17 tone table
+        // Automations' own list and detail head already draw: Active →
+        // `shipped` (green), Protected → `building` (charcoal), Retired/
+        // Inactive → `archived` (grey). ONE derivation, imported rather than
+        // copied — this file maps its own `isDefault`/`active` pair onto the
+        // automations module's own key domain (`"protected" | "on" | "off"`)
+        // rather than carrying a second copy of the map itself.
         status: (
-          <Badge variant={AUTOMATION_STATUS_VARIANT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
+          <Badge variant="status" dot={AUTOMATION_STATUS_DOT[v.isDefault ? "protected" : v.active ? "on" : "off"]}>
             {statusWord}
           </Badge>
         ),

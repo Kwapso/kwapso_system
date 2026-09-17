@@ -26,6 +26,7 @@ import * as React from "react"
 import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -310,9 +311,10 @@ export function SprintFormDialog({
       </Field>
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
         {initial || fixedAccount ? (
-          <p className="text-muted-foreground text-sm" id="sprint-account">
-            {fixedAccount ? fixedAccount.name : initial?.accountName || t("Ours, no account")}
-          </p>
+          <FactRow
+            id="sprint-account"
+            name={fixedAccount ? fixedAccount.name : initial?.accountName || t("Ours, no account")}
+          />
         ) : (
         <RecordPicker
           id="sprint-account"
@@ -330,13 +332,9 @@ export function SprintFormDialog({
       </Field>
       <Field config={appField} htmlFor="sprint-app" className={fieldSpacing}>
         {initial ? (
-          <p className="text-muted-foreground text-sm" id="sprint-app">
-            {initial.appName || t("No app")}
-          </p>
+          <FactRow id="sprint-app" name={initial.appName || t("No app")} />
         ) : fixedApp ? (
-          <p className="text-muted-foreground text-sm" id="sprint-app">
-            {fixedApp.name}
-          </p>
+          <FactRow id="sprint-app" name={fixedApp.name} />
         ) : (
           // THE HORIZONTAL CHOICE COMPONENT, once the account above is
           // answered — client ruling, 16 Sep 2026: "when selecting app in

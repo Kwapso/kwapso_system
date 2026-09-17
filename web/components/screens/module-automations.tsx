@@ -216,9 +216,9 @@ export function ModuleAutomations({ teamId, scope }: { teamId: string; scope: Au
       // 2026, verbatim: "let's change the full color pill to also be a dot.
       // Inactive gets gray, and active gets green." (Same evening: "All dots
       // are always solid, not rings.") Two rulings earlier this cell drew a
-      // filled pill (`AUTOMATION_STATUS_VARIANT`); this one replaces it with
-      // the SAME shape the ticket detail head's own stage chip draws,
-      // `<Badge variant="status" dot={…}>`. `AUTOMATION_STATUS_DOT`
+      // filled pill; this one replaces it with a dot, styled by
+      // `AUTOMATION_STATUS_DOT` (automation-edit-sheet.tsx, which this sheet's
+      // own detail head imports the same constant from). `AUTOMATION_STATUS_DOT`
       // (automation-edit-sheet.tsx, which this sheet's own detail head
       // imports the same constant from) is the one derivation: `shipped`
       // (green) for Active, `archived` (grey) for Inactive — both her exact

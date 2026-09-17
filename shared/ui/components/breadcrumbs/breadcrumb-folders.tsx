@@ -229,10 +229,24 @@ import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
    correct." A tab is sized to its content again, full stop; the "reach the
    container" idea is dropped rather than solved a different way.
    -------------------------------------------------------------------------- */
+/* THE STRIP NEVER DRAWS ITS OWN SCROLLBAR — client, 17 Sep 2026, verbatim:
+   "there is a certain horizontal scroll. Kill that." `[scrollbar-width:none]`
+   is Firefox's own property and the ONLY one some engines honour; a WebKit-
+   family renderer that ignores it (Safari, and an older Chromium — the exact
+   two this file's own scrollbar note already named) falls back to drawing
+   the ordinary bar the moment the strip overflows, which is the bar the
+   client saw. `[&::-webkit-scrollbar]:hidden` (`display: none` on the
+   pseudo-element) plus `:h-0` (belt-and-suspenders — a renderer that still
+   reserves the scrollbar's own gutter height even once it is display:none
+   would otherwise leave the four-pixel band under the tabs the strip's own
+   `pt-1`/negative-margin pair above is not accounting for) close the two
+   remaining engines. Wheel and drag scrolling are untouched — hiding the bar
+   is a paint change, not an `overflow` one, and `overflow-x-auto` still
+   reads its own value below. */
 const STRIP = cn(
   "flex flex-nowrap items-end gap-1",
   "max-w-full overflow-x-auto scroll-p-2 [scrollbar-width:none]",
-  "[&::-webkit-scrollbar]:hidden",
+  "[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0",
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",
 );
@@ -421,19 +435,49 @@ const TAB = cn(
 );
 
 /**
- * ICON-ONLY TABS — 16 Sep 2026 fifth ruling. Applied alongside `TAB` (never
+ * ICON-ONLY TABS — 16 Sep 2026 fifth ruling, CORRECTED 17 Sep 2026 (the
+ * client's THIRD report on this exact shape: "the inactives on the assistant
+ * are overlapping, so they're on top of the active tab" — a static
+ * screenshot of exactly `History`/`+`, drawn with a flat, square top-left
+ * edge where every other tab in the app, content strip included, draws a
+ * rounded corner and a sloping shoulder). Applied alongside `TAB` (never
  * instead of it) on any crumb whose item sets `iconOnly: true`; see that
- * field's own doc. `min-w-0` drops `TAB`'s 128px text floor, and the two
- * insets tighten to icon-plus-padding: `ps-3` leading (was `ps-5`) and a
- * trailing inset that keeps the shoulder curve's own width
- * (`--folder-shoulder`, unchanged) but drops the extra `--space-3h` `TAB`
- * reserves for a label's own trailing padding, down to `--space-2`. The
- * folder shoulder is a fixed-length curve in brand units (`folder.tsx`'s own
- * law: "Only FLAT runs take the width and the height"), so narrowing the box
- * around it does not slant or stretch it.
+ * field's own doc. `TAB`'s 128px text floor still drops — that ruling did
+ * not change — and the two insets still tighten to icon-plus-padding: `ps-3`
+ * leading (was `ps-5`) and a trailing inset that keeps the shoulder curve's
+ * own width (`--folder-shoulder`, unchanged) but drops the extra
+ * `--space-3h` `TAB` reserves for a label's own trailing padding, down to
+ * `--space-2`.
+ *
+ * `min-w-0` DROPPED A FLOOR THE SHAPE ITSELF NEEDS, NOT JUST THE TEXT ONE.
+ * `folder.tsx`'s `crop="lip"` path is "Only FLAT runs take the width and the
+ * height" (its own law) ONLY down to `radiusLip + shoulder` — its measured
+ * minimum, below which `Math.max(w, radiusLip + shoulder)` widens the
+ * VIEWBOX past the box `FolderShape` actually measured, and
+ * `preserveAspectRatio="none"` (`folder.tsx`'s own "WHY IT MEASURES") then
+ * stretches — here, squashes — the curve non-uniformly to force the two
+ * back into agreement. A box narrower than that floor does not draw a
+ * smaller version of the same corner; it draws a flattened one, which reads
+ * exactly like the corner is simply gone. `min-w-0` removed EVERY floor,
+ * text and geometric alike, so nothing in this file stopped an icon-only tab
+ * from being asked to render under the shape's own minimum — today's
+ * `--icon-button` and padding tokens happen to add up to comfortably more
+ * than that minimum, which is why this sat quiet until a narrower
+ * combination (or a future token change) crossed it.
+ *
+ * `min-w-[calc(var(--folder-radius-lip)_+_var(--folder-shoulder))]` is that
+ * floor, read off the SAME two tokens `folder.tsx`'s `SHAPE.radiusLip` and
+ * `SHAPE.shoulder` are the brand-unit twins of (that file's own header:
+ * "tokens.css states the relation and carries the CSS side of the same
+ * numbers") — not a second, hand-copied number that could drift from them.
+ * It sits far below the icon-plus-padding content width this tab actually
+ * renders at (roughly 4.1-4.6rem against a 2.505rem floor), so it changes
+ * nothing about how any tab looks today; it exists so nothing can ever again
+ * hand `FolderShape` a box smaller than the one curve it draws.
  */
 const TAB_ICON_ONLY = cn(
-  "min-w-0 ps-[var(--space-3)] pe-[calc(var(--folder-shoulder)_+_var(--space-2))]",
+  "min-w-[calc(var(--folder-radius-lip)_+_var(--folder-shoulder))]",
+  "ps-[var(--space-3)] pe-[calc(var(--folder-shoulder)_+_var(--space-2))]",
 );
 
 /* An ancestor: the rest fill, 13/300 in secondary ink, hovering to the active

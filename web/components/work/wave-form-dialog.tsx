@@ -25,6 +25,7 @@ import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -162,27 +163,28 @@ export function WaveFormDialog({
       }
       submit={{ busy: busy, disabled: !ready }}
     >
-      {!editing && fixedClient && (
-        <p className="text-muted-foreground text-sm">
-          {t("For")} <span className="text-foreground font-medium">{fixedClient.name}</span>
-        </p>
-      )}
-      {!editing && !fixedClient && (
+      {!editing && (
         <Field config={clientField} htmlFor="wave-client" className={fieldSpacing}>
-          <RecordPicker
-            id="wave-client"
-            value={values.accountId}
-            onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
-            // `accountOption`, not the bare `asOption` this used to call: an
-            // account always wears a mark (client, 2026-09-09), and on staging
-            // 48 of 134 hold a picture — so without `face` two rows in three
-            // drew nothing beside the ones that do.
-            options={sortedOptions(clients, lang, (c) => c.name).map(accountOption)}
-            placeholder={t("Pick the account")}
-            searchPlaceholder={t("Search accounts…")}
-            emptyText={t("No account matched.")}
-            disabled={busy}
-          />
+          {fixedClient ? (
+            // A FACT, NOT A CONTROL — opened FROM the account's own record, so
+            // which one this wave is for is settled rather than asked.
+            <FactRow id="wave-client" name={fixedClient.name} />
+          ) : (
+            <RecordPicker
+              id="wave-client"
+              value={values.accountId}
+              onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+              // `accountOption`, not the bare `asOption` this used to call: an
+              // account always wears a mark (client, 2026-09-09), and on staging
+              // 48 of 134 hold a picture — so without `face` two rows in three
+              // drew nothing beside the ones that do.
+              options={sortedOptions(clients, lang, (c) => c.name).map(accountOption)}
+              placeholder={t("Pick the account")}
+              searchPlaceholder={t("Search accounts…")}
+              emptyText={t("No account matched.")}
+              disabled={busy}
+            />
+          )}
         </Field>
       )}
       <Field config={nameField} htmlFor="wave-name" className={fieldSpacing}>

@@ -255,6 +255,20 @@ export interface FolderShapeProps
    * `lip` — chapter 14's own crop, for a folder TAB: the lip and the shoulder
    * over a straight cut, with the box's bottom left open because the panel
    * covers it.
+   *
+   * `lip`'s BOX HAS A FLOOR THE CALLER MUST HONOUR: `radiusLip + shoulder`
+   * (`--folder-radius-lip` + `--folder-shoulder`, 2.505rem at the artwork's
+   * own numbers), below which this component's own `Math.max(w, radiusLip +
+   * shoulder)` widens the drawn viewBox past the box it actually measured —
+   * `preserveAspectRatio="none"` then stretches the curve to force the two
+   * back into agreement, which SQUASHES the top-left corner and the shoulder
+   * rather than shrinking them. This file cannot enforce that floor itself:
+   * the svg is `size-full` of whatever box its caller gives it (see "WHY IT
+   * MEASURES", above), so a caller narrower than the floor is asking for the
+   * squash, silently, with no error anywhere in this file. Confirmed 17 Sep
+   * 2026 against `breadcrumb-folders.tsx`'s icon-only tabs, this shape's one
+   * `lip` consumer — see `TAB_ICON_ONLY`'s own comment there for the fix
+   * (a `min-width` on the tab itself, read off the same two tokens).
    */
   crop?: "full" | "lip";
   /**

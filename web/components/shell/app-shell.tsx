@@ -49,7 +49,7 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree, ClipboardText } from "@shared/ui/foundations/icons"
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, Brain, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree, ClipboardText } from "@shared/ui/foundations/icons"
 // `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
 import { Waves } from "@shared/ui/foundations/icons"
@@ -166,7 +166,10 @@ const SECTION_ICONS: Record<string, typeof House> = {
   // one distinct icon per concept.
   inputs: ClipboardText,
   tickets: Tray,
-  knowledge: HardDrives,
+  // WAS HardDrives — client ruling, 17 Sep 2026, verbatim: "can we change the
+  // icon of the knowledge base? I was thinking a brain." Same glyph
+  // CONCEPT_ICON.knowledge now resolves to ("brain", web/lib/pages.ts).
+  knowledge: Brain,
   processes: GitFork,
   stories: PuzzlePiece,
   sprints: CalendarDots,

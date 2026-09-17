@@ -18,6 +18,7 @@ import * as React from "react"
 import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -238,24 +239,30 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
-        {/* THE HORIZONTAL CHOICE COMPONENT, once an account is named — client
-            ruling, 16 Sep 2026: "when selecting app in cases account has been
-            selected first, show horizontal choice component." No account
-            named yet keeps the search-and-pick control this field always had. */}
-        <AccountAppPicker
-          id="meeting-app"
-          ariaLabel={t(appField.label)}
-          accountId={values.accountId === NONE ? null : values.accountId}
-          apps={appOptions}
-          value={values.appId === NONE ? "" : values.appId}
-          onChange={(v) => setValues((s) => ({ ...s, appId: v || NONE }))}
-          lang={lang}
-          disabled={busy}
-          placeholder={t("Not about one app")}
-          searchPlaceholder={t("Search apps…")}
-          emptyOption={{ value: NONE, label: t("Not about one app") }}
-          emptyText={t("No app matched.")}
-        />
+        {fixedApp ? (
+          // A FACT, NOT A CONTROL — opened FROM the app's own record, so
+          // which system this meeting is about is settled rather than asked.
+          <FactRow id="meeting-app" name={fixedApp.name} />
+        ) : (
+          /* THE HORIZONTAL CHOICE COMPONENT, once an account is named — client
+             ruling, 16 Sep 2026: "when selecting app in cases account has been
+             selected first, show horizontal choice component." No account
+             named yet keeps the search-and-pick control this field always had. */
+          <AccountAppPicker
+            id="meeting-app"
+            ariaLabel={t(appField.label)}
+            accountId={values.accountId === NONE ? null : values.accountId}
+            apps={appOptions}
+            value={values.appId === NONE ? "" : values.appId}
+            onChange={(v) => setValues((s) => ({ ...s, appId: v || NONE }))}
+            lang={lang}
+            disabled={busy}
+            placeholder={t("Not about one app")}
+            searchPlaceholder={t("Search apps…")}
+            emptyOption={{ value: NONE, label: t("Not about one app") }}
+            emptyText={t("No app matched.")}
+          />
+        )}
       </Field>
       <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>
         <RecordPicker

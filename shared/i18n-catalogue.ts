@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 792 strings · 3 languages · 1421 of the entries below are hand-written seed.
+// 791 strings · 3 languages · 1423 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -220,7 +220,6 @@ export const CATALOGUE: Catalogue = {
   "Finds hard": { de: "Schwer zu finden", es: "Difícil de encontrar", ca: "Difícil de trobar" },
   "Finished": { de: "Abgeschlossen", es: "Terminado", ca: "Finalitzat" },
   "First name": { de: "Vorname", es: "Nombre", ca: "Nom" },
-  "For": { de: "Für", es: "Para", ca: "Per a" },
   "For example: the booking page that's wrong": { de: "Beispiel: die fehlerhafte Buchungsseite", es: "Por ejemplo: la página de reservas que está mal", ca: "Per exemple: la pàgina de reserva que va malament" },
   "For example: the new booking page is showing last month's prices.": { de: "Beispiel: die neue Buchungsseite zeigt die Preise des letzten Monats.", es: "Por ejemplo: la nueva página de reservas muestra los precios del mes pasado.", ca: "Per exemple: la nova pàgina de reserva mostra els preus del mes passat." },
   "Found in Google": { de: "in Google gefunden", es: "Encontrado en Google", ca: "Trobat a Google" },
@@ -261,7 +260,6 @@ export const CATALOGUE: Catalogue = {
   "In your calendar": { de: "In Ihrem Kalender", es: "En tu calendario", ca: "Al vostre calendari" },
   "Inactive": { de: "Inaktiv", es: "Inactivo", ca: "Inactiu" },
   "Industry": { de: "Branche", es: "Sector", ca: "Sector" },
-  "Inside": { de: "Intern", es: "Dentro", ca: "Dins" },
   "Install": { de: "Installieren", es: "Instalar", ca: "Instal·lar" },
   "Instructions": { de: "Anleitung", es: "Instrucciones", ca: "Instruccions" },
   "Invite revoked.": { de: "Einladung widerrufen.", es: "Invitación revocada.", ca: "Invitació revocada." },
@@ -507,6 +505,7 @@ export const CATALOGUE: Catalogue = {
   "Search accounts…": { de: "Konten durchsuchen…", es: "Buscar cuentas…", ca: "Cercar comptes…" },
   "Search meetings…": { de: "Meetings durchsuchen…", es: "Buscar reuniones…", ca: "Cercar reunions…" },
   "Search processes…": { de: "Prozesse durchsuchen…", es: "Buscar procesos…", ca: "Cercar processos…" },
+  "Search sources…": { de: "Quellen durchsuchen…", es: "Buscar fuentes…", ca: "Cercar fonts…" },
   "Search tickets…": { de: "Tickets durchsuchen…", es: "Buscar tickets…", ca: "Cercar entrades…" },
   "Search values…": { de: "Werte durchsuchen…", es: "Buscar valores…", ca: "Cercar valors…" },
   "Search work…": { de: "Arbeit durchsuchen…", es: "Buscar trabajo…", ca: "Cercar treball…" },

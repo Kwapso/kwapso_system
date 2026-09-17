@@ -895,6 +895,8 @@ The client reported the same issue on 17 Sep 2026. The fix is in the kit's verif
 (`verify/tabstrip-parity`, kit v1.2.102) and is not reproduced there. The issue is open
 until measured against the live app on staging.
 
+**MEASURED 17 Sep 2026 — the icon-only tabs lost their top-left arc.** On the live page, the assistant strip's icon-only tabs are squashed below the silhouette's minimum width, losing the rounded top-left corner that marks the folder shape as a folder and not just a label strip. Kit v1.2.103 gives icon-only tabs the silhouette's minimum width (`--folder-radius-lip` + `--folder-shoulder`). The fix is verified on the page `verify/tabstrip-parity` in kwapso-design.
+
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Recreate the drag behavior on
@@ -930,8 +932,19 @@ in its own `overflow-x: auto` container. `web/test/rules.test.ts` asserts `scrol
 —  the count of `min-w-max` inside an exempt path — stays equal to the known count; any new
 `min-w-max` outside the exemption turns the build red.
 
-**Mark:** Root cause on staging is still unmeasured (17 Sep 2026); the check guards the
-known shape and will surface the culprit when it is run against the live app.
+**AMENDED 17 Sep 2026 — The tab strip's own scrollbar, not the body.** Measured on staging at 1280 and 1440px viewport widths: the page body carries no overflow. The horizontal scroll the client saw is the tab strip's own internal scrollbar (`overflow-x: auto` on the strip itself, never on the body). Kit v1.2.103 hides the scrollbar on WebKit (Safari) too, where it was still visible; Chromium already hides it. The page body measured no overflow at any tested width and remains correct.
+
+**Mark:** Root cause on staging is now measured (17 Sep 2026); no further action needed.
+
+### L22: activating "+" selects the newest unused conversation
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"On the assistant, when I have a new chat open and I create another new one, if this new one is still unused, just open the already existing one. What I want to avoid is having 10 new unused sessions."* The "+" button that mints a new conversation in the assistant strip does not open it; instead, if a conversation with no thread exists (unused, never replied to), that one is brought to front. The newest such conversation is the one selected, and a second "+" press still names only one conversation so `switchThreadless()` keeps only one per session. Her follow-up report (same session): *"now when I have a new open, I cannot go back to my conversation. Is that a bug? Please fix it. Also, I cannot close the new tab in the assistant."* Two findings: the newly created tab's back-button opened the wrong history panel, and no close button appeared on it. Both are fixed.
+
+**Tests:** `web/test/agent-conversation-tabs.test.ts` and `web/test/agent-panel-tab-wiring.test.tsx` (the latter also guards: switching tabs while the assistant is busy is retried when it frees, and a tab's own thread is never overwritten).
+
+**Law.** None registered.
+
+---
 
 ### D1: a detail screen has exactly four regions, in this order
 
@@ -1305,14 +1318,14 @@ outline standing in for a status.
 no colour; every dot Badge renders (`variant="status"`) is a filled circle by construction —
 there is no ring variant to reach for by mistake.
 
-**Not yet ruled.** `shared/app-stages.ts`'s own eight-rung app-status ladder is mid-redesign
-(see CLAUDE.md's "Vocabulary settled 16 Sep 2026" note — App status is pending the client's
-final pick and is derived from waves/sprints except Archived, which is still set by hand).
-Of the rung colours discussed with her, **Not started (red), Validation (purple),
-Refinements (blue), Live (green) and Archived (grey) are RULED**; **Planned (orange) and In
-audit / In plan / In build (all charcoal) are PROPOSED, not yet built** — named here so the
-next reader does not re-litigate the ruled half or silently ship the proposed half as if she
-had signed off on it.
+**App-status ladder rungs, 17 Sep 2026.** The client's ruling on the rung wording, verbatim,
+over screenshot "6A": **In audit · In plan · In build · In validation · In refinements · Live · Archived**.
+Archived is still the one rung set by hand; every other rung is DERIVED from an app's waves
+and sprints. An app reaches Live only after its first Refinements sprint has wrapped — In
+validation and In refinements are two distinct rungs, not one, and an app sits in the
+earlier of the two until a refinement sprint has actually run. **Colouring of the dots is
+still pending her pick** — app stage pills stay coloured the old way meanwhile. **Status:
+ruled, not yet built.**
 
 **Law.** None registered — `shared/status-tones.ts` and `shared/departments.ts` are the
 mechanism; R32 (`closed-palette`) already forbids a hex/Tailwind-ramp literal standing in
@@ -2904,12 +2917,13 @@ KB view to archive/source-manager, centralize search through assistant. The gear
 on the very far right. this 'Bring it in' should be changed to 'Sync'. Add a Mango button
 that says something like 'Ask' or 'Assistant', and this should open a new chat on the
 assistant. it's missing the toolbar. Make it like the dashboard, so that it has its own
-container background."* The knowledge collection draws NO search box; searching happens
-through the assistant thread instead. Facets and the List/Shape view controls sit in a
-toolbar inside a `CollectionCard` with its own background, the same layout and container as
-the dashboard. Head actions above the toolbar: **Ask** (mango, `variant="default"`, opens a
-new assistant conversation scoped to the knowledge base) · **Sync** · **Settings** (gear,
-last). No search on the toolbar (`search={false}`).
+container background."*
+
+**AMENDED 17 Sep 2026.** The client's follow-up ruling, verbatim: *"The ask button and the sync are correct. However, remove the whole modal 'Ask a question'. On the first screenshot also, can we change the icon of the knowledge base? I was thinking a brain. Also add the search to the toolbar. It's missing."* The Ask-a-question modal is gone (the head's mango Ask button is the one way to ask); the toolbar search is restored (PagedFind default, no longer in the exemption); the icon is **Brain** everywhere (app-shell SECTION_ICONS, pages CONCEPT_ICON, tabs-view TAB_ICONS).
+
+**The shape.** The knowledge collection draws NO search box in a separate field; searching happens through the assistant thread instead. Facets and the List/Shape view controls sit in a toolbar inside a `CollectionCard` with its own background, the same layout and container as the dashboard. Head actions above the toolbar: **Ask** (mango, `variant="default"`, opens a new assistant conversation scoped to the knowledge base) · **Sync** · **Settings** (gear, last). The search sits in the toolbar itself, not exempt.
+
+**Tests:** `web/test/knowledge-search-restored.test.tsx`, `web/test/knowledge-head.test.tsx`.
 
 **Where this reaches today.** The knowledge listing is named in `TOOLBAR_EXEMPT` with the
 ruling as its reason, and [R48](../RULES.md) (`toolbar-shows-search`) covers the exemption.
@@ -3298,6 +3312,14 @@ Portal column moves to the identical dot shape the same session; see K31's own a
 its own `gap-1` between the dot and its label, independent of size. Automations and Contacts
 both use the dot badge now; both benefit from the unified gap. `web/test/badge-dot-gap.test.tsx`
 asserts every size variant (`sm` / `md` / `lg`) renders the gap consistently.
+
+**AMENDED 17 Sep 2026 — Dots like everywhere else.** Choices and meeting-type status now
+draw the status dot from `AUTOMATION_STATUS_DOT` — green for active, charcoal for protected
+(meeting type only), grey for retired (Choices) or inactive (meeting type). The Choices
+table's own status cell (`deep-link/shape.tsx`) and the meeting-type settings panel now draw
+`<Badge variant="status" dot={AUTOMATION_STATUS_DOT[status]}>` in place of the filled
+`AUTOMATION_STATUS_VARIANT` pill, matching the Automations list's own shape. `web/test/automations.test.ts`
+and `web/test/shape.test.ts` assert the dot use.
 
 **Re-explained, 16 Sep 2026, pending her validation.** Both the Automations tab and the
 Choices tab above were walked through with her again, over a side-by-side artifact
@@ -3712,6 +3734,15 @@ quiet dismissal, never styled as the destructive action).
 Evidence: `P-4.10.31`, `P-4.10.36`. Every field in the old form carries "Required" as a
 small grey word on the right of its label. This app currently marks required fields with
 a `.required-ring` and no words.
+
+**AMENDED 17 Sep 2026 — Fact rows for every form's fixed properties.** The client's ruling,
+verbatim: *"Keep the fact rows, but make sure they appear everywhere."* One primitive
+component `shared/web/fact-row.tsx` implements the label-left, fact-right layout for every
+form's fixed, read-only properties (a record's own story, time, sprint, help, meeting, wave,
+process, todo — the parent that opened the edit form). Where a form renders a `fact-row`
+component with a `fixed` parent type, the layout is one line (label and value) with no
+control, and the value sits inline with the label's own line, never below it like an
+editable field. Derived test: `web/test/fixed-props-are-fact-rows.test.ts`.
 
 ### F6: a character-limited text field shows its counter under the input, right-aligned
 
@@ -5505,16 +5536,21 @@ app stage pills stay coloured the old way meanwhile. Status: ruled, not yet buil
 Accounts screen is retired. What replaces it is pending her pick from a follow-up artifact
 ("Accounts Tabs"). Status: ruled, not yet built.
 
+**Decisions awaiting further input (17 Sep 2026):**
+
+- **Meeting-type department inheritance.** The client's exact words: *"I would need more consulting to take a decision."* Pending follow-up conversation.
+- **Close-dialog proof pattern.** The client's exact words: *"We will work on this later when we work on the ticket details page."* Deferred to the ticket details work and a future session.
+
 ---
 
 ## Rule index
 
-**179 rules.**
+**180 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L21 (21) |
+| 2. Page layout and width | L1 to L22 (22) |
 | 3. Detail screens | D1 to D18 (18) |
 | 4. Collections | K1 to K36 (36) |
 | 5. Buttons and actions | B1 to B19 (19) |

@@ -47,6 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@shared/ui/components/toggle-group/toggle-group"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -574,17 +575,9 @@ export function StoryFormDialog({
         className={fieldSpacing}
       >
         {derivedApp ? (
-          // A FACT, NOT A CONTROL — time-form-dialog.tsx's words, and its shape:
-          // the panel and padding are what make this read as a filled answer
-          // rather than a hint under the label. It used to be bare muted text,
-          // so the only real information in the row looked less important than
-          // the word "App" above it.
-          <p
-            id="story-app"
-            className="bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm"
-          >
-            {derivedApp.name}
-          </p>
+          // A FACT, NOT A CONTROL — shared/web/fact-row.tsx, the one shape
+          // every settled parent value renders through on both front doors.
+          <FactRow id="story-app" name={derivedApp.name} />
         ) : (
           picker(
             "story-app",
@@ -725,9 +718,7 @@ export function StoryFormDialog({
       </Field>
       <Field config={ticketField} htmlFor="story-ticket" className={fieldSpacing}>
         {fixedTicket ? (
-          <p className="text-muted-foreground text-sm" id="story-ticket">
-            {fixedTicket.label}
-          </p>
+          <FactRow id="story-ticket" name={fixedTicket.label} />
         ) : (
           /* TICKETS PAGE (R14), so this one asks the DOOR — narrowed to the
              same app the rest of the form is narrowed to, which is what the

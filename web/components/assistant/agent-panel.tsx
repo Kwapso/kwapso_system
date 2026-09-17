@@ -532,10 +532,90 @@ export function AgentPanel({
   // sets `chat.threadId` the moment either happens, and whichever tab is
   // active right now is the one it happened TO, because switching tabs is a
   // synchronous swap (see `switchToAgentTab` below) before either can occur.
+  //
+  // THE GUARD BELOW IS NOT DECORATION. `switchToAgentTab`'s own
+  // `chat.newChat()` / `chat.openThread()` calls are silently DROPPED by
+  // `use-agent-chat.tsx`'s own `if (busy) return` the instant the reader
+  // switches (or opens a fresh "+") WHILE the assistant is still replying in
+  // the tab they are leaving — a perfectly ordinary thing to do, not an edge
+  // case. The STORE's `activeId` still moves (this effect's own
+  // `activeAgentTabId` dep fires), but the live chat never actually loaded
+  // anything for the newly active tab, so `chat.threadId` is still whatever
+  // the tab being LEFT was showing. Without this guard that stale id gets
+  // stamped onto the newly active tab — silently rebinding an already-real
+  // conversation to a different one it was never asked to become, corrupting
+  // exactly the identity `openAgentTabForThread`'s own doc calls permanent
+  // ("a history-resumed tab always arrives used"). A tab that has not yet
+  // minted ANY thread of its own (`activeTab?.threadId` falsy) is never
+  // refused here — that is the legitimate "first message mints a thread" /
+  // "resume lands after the seed" case this effect exists for in the first
+  // place, and it never has an existing value to conflict with.
+  //
+  // A KNOWN, NARROWER RESIDUAL GAP — WRITTEN DOWN RATHER THAN PAPERED OVER. A
+  // tab that has NOT yet minted its own thread (a fresh "+" draft) has no
+  // existing value for this guard to compare against, so switching to (or
+  // opening) one WHILE busy can still absorb whatever stale `chat.threadId`
+  // the tab being left was showing, exactly as an already-threaded tab used
+  // to. Closing that gap needs a request-scoped "which tab is this reply
+  // actually FOR" token threaded through every legitimate path that changes
+  // `activeAgentTabId` (select, close, "+", a history pick, AND a fresh
+  // draft's own first-message mint mid-stream) — a bigger, riskier change
+  // than this fix, and one that deserves its own review rather than riding
+  // in on a same-session patch. The guard here closes the more severe half
+  // (an EXISTING real conversation silently losing its own identity) and the
+  // reconcile effect below recovers the frozen-content symptom for it; a
+  // fresh draft absorbing a stray thread is the narrower, still-open case.
+  //
+  // READ THE LIVE SNAPSHOT, NOT THE RENDER-TIME `agentTabs` — deliberately.
+  // `agentTabsSnapshot()` reads the store's own current array imperatively,
+  // the freshest answer at the moment this effect actually runs, WITHOUT
+  // adding `agentTabs` to the dependency list below: `setAgentTabThread`
+  // announces on every call (even a no-op one, the store's own contract —
+  // see its own header), so `agentTabs` gets a new array identity from this
+  // very effect's own write, and listing it here would re-fire the effect
+  // off its own announce forever.
   React.useEffect(() => {
     if (!chat.threadId || !activeAgentTabId) return
+    const activeTab = agentTabsSnapshot().find((t) => t.id === activeAgentTabId)
+    if (activeTab?.threadId && activeTab.threadId !== chat.threadId) return
     setAgentTabThread(activeAgentTabId, chat.threadId)
   }, [chat.threadId, activeAgentTabId])
+
+  // RECONCILE THE INSTANT THE ASSISTANT GOES FREE AGAIN — the other half of
+  // the guard above. A switch dropped by `chat.busy` (the tab being switched
+  // TO never actually loaded) is not merely a corruption risk the guard
+  // above closes; it also leaves the reader stuck looking at whichever
+  // thread the panel showed before they clicked, even though the strip now
+  // highlights a DIFFERENT tab as active — exactly the client's own words,
+  // "I cannot go back to my conversation." Once `chat.busy` clears, catch
+  // the live chat up to whichever tab is active NOW (never a stashed
+  // target — the reader may have clicked through several tabs while busy,
+  // and only the last one matters).
+  //
+  // GATED ON THE TRUE→FALSE TRANSITION ITSELF (`wasBusyRef`), NOT ON "busy is
+  // false and something looks mismatched" — that second, broader form
+  // re-fires on every render of an ORDINARY, never-busy switch too (the
+  // async gap between calling `chat.openThread` and its own fetch actually
+  // resolving is a real mismatch for a tick or two, not a dropped call), and
+  // reissues the very fetch already in flight, over and over, until it
+  // happens to resolve. Reacting only to busy's own falling edge fires
+  // exactly once, exactly when a drop could have happened.
+  const wasBusyRef = React.useRef(chat.busy)
+  React.useEffect(() => {
+    const wasBusy = wasBusyRef.current
+    wasBusyRef.current = chat.busy
+    if (!wasBusy || chat.busy || !activeAgentTabId) return
+    const tab = agentTabsSnapshot().find((t) => t.id === activeAgentTabId)
+    if (!tab) return
+    if ((tab.threadId ?? null) === (chat.threadId ?? null)) return
+    switchToAgentTab(tab)
+    // `switchToAgentTab` is remade every render (it closes over `chat`,
+    // itself a fresh object each render) — the same reason the Escape effect
+    // below excludes `handleCloseAgentTab`. Listing it would fire this
+    // effect on every unrelated render rather than only on busy's own
+    // falling edge.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.busy, activeAgentTabId])
 
   // Load whichever tab is now active into the one live chat — the swap model
   // `agent-conversation-tabs.ts`'s own header argues for. A tab with a real

@@ -43,7 +43,6 @@ import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-car
 import { AccountsScreen } from "@/components/accounts/accounts-screen"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
 import { InputsScreen } from "@/components/accounts/inputs-screen"
-import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -472,36 +471,35 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             </div>
           }
         />
-        {/* ASK IT, HERE — AND STILL THE ONLY QUESTION BOX ON THIS SCREEN.
-            B0296/T3659 (client review, 16 Sep 2026, verbatim): "Remove KB
-            search bar, convert KB view to archive/source-manager, centralize
-            search through assistant." The list below used to draw its own
-            search box beside this one — two search-shaped controls asking the
-            same door two different ways — so this is where "what does it know
-            about X?" is asked now; the list under it browses what is filed,
-            it does not search. The answer arrives in the assistant, with its
-            sources marked at the claims and room to ask the follow-up — see
-            ask-the-assistant.tsx. Distinct from the mango "Ask" button above:
-            that one opens a blank conversation, this one asks a specific
-            question in place. */}
-        <AskTheAssistant />
-        {/* THE LIST IS AN ARCHIVE, NOT A SECOND SEARCH BOX (B0296/T3659). It
-            still pages (R14) and still carries its facets and the List·Shape
-            switch — compartment/kind/active narrow what is FILED here, which
-            is a different act from asking a question of it — but the field
-            itself is off: TOOLBAR_EXEMPT["knowledge.list"] carries the reason,
-            and `search={false}` is the mechanism (paged-find.tsx).
+        {/* THE MODAL "ASK A QUESTION" BOX IS GONE — client ruling, 17 Sep 2026,
+            verbatim: "remove the whole modal 'Ask a question'." It used to sit
+            here, above the list: an inline AskTheAssistant panel (the
+            assistant module's own component, mounted directly by this branch
+            until today) with its own input, its "Ask" pill, and the
+            explanatory sentence under it (an R81 hint on a form the client
+            never asked to keep). The mango "Ask" button in the head above is
+            the one way in now — it opens a fresh assistant conversation
+            scoped to the knowledge base, exactly as the client asked. The
+            component itself is untouched: the account and app records' own
+            Knowledge tabs still mount it there, in context, which is a
+            different screen with a different ruling. */}
+        {/* THE LIST IS AN ARCHIVE — it pages (R14) and carries its facets and
+            the List·Shape switch, compartment/kind/active narrowing what is
+            FILED here. The toolbar's search field is back too — client
+            ruling, 17 Sep 2026: "Also add the search to the toolbar. It's
+            missing." — so this collection searches like every other paged
+            one in the app again, through the row's own default rather than a
+            `search={false}` override.
 
-            THE TOOLBAR ITSELF WAS NEVER SUPPRESSED — facets/sort/view already
-            draw here regardless of search. What WAS missing is the container
-            R67 asks for ("nothing on top of white background, its a rule!")
-            and her 17 Sep ruling repeats by name ("make it like the
-            dashboard, so that it has its own container background"): `wrap`
-            below is the identical call accounts-screen.tsx,
-            contacts-screen.tsx, inputs-screen.tsx, meetings-screen.tsx and
-            tickets-collection.tsx already make, and it boxes the toolbar AND
-            whichever body `children` returns — the List cards or the Shape
-            picture — in the one `CollectionCard` surface, never two. */}
+            THE CONTAINER — R67 asks for it ("nothing on top of white
+            background, its a rule!") and her 17 Sep ruling repeats it by name
+            ("make it like the dashboard, so that it has its own container
+            background"): `wrap` below is the identical call
+            accounts-screen.tsx, contacts-screen.tsx, inputs-screen.tsx,
+            meetings-screen.tsx and tickets-collection.tsx already make, and
+            it boxes the toolbar AND whichever body `children` returns — the
+            List cards or the Shape picture — in the one `CollectionCard`
+            surface, never two. */}
         <PagedFind<KnowledgeSource>
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
@@ -521,7 +519,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             value: ctx.knowledgeView,
             onValueChange: (v: string) => ctx.setKnowledgeView(v === "shape" ? "shape" : "list"),
           }}
-          search={false}
+          placeholder={t("Search sources…")}
           matches={{
             none: t("No sources match"),
             one: t("1 source matches"),

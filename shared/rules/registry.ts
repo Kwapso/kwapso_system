@@ -2218,25 +2218,7 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   "accounts.list":
     "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx, which always renders a SearchInput. Same reason as tickets.list: the recipe's own search sees only the loaded page.",
   "knowledge.list":
-    "NO SEARCH BOX ANYWHERE ON THIS SCREEN ANY MORE — B0296/T3659, the client's " +
-    "review ruling, 16 Sep 2026, verbatim: \"Remove KB search bar, convert KB view " +
-    "to archive/source-manager, centralize search through assistant.\" The ticket's " +
-    "own words: \"KB has two overlapping search entry points (its own search bar + " +
-    "the assistant chat). Decision: kill the KB's own search bar, turn that view " +
-    "into a pure archive/source-management screen, redirect all searching through " +
-    "the assistant.\" Until this ruling this key covered a DIFFERENT reason — the " +
-    "recipe's own in-memory search (R14, `searchable: !paged`) standing down " +
-    "because the host's <PagedFind> asked the door instead, which was still one " +
-    "search box on the screen. Now there are zero: <PagedFind> in " +
-    "web/components/deep-link/collection-content.tsx (the same file as " +
-    "accounts.list, a second call site) passes `search={false}` — the one prop " +
-    "this file's redesign added for exactly this screen, still required for " +
-    "every other <PagedFind> caller (paged-find.tsx) — so the field itself never " +
-    "renders. The facets (compartment/kind/active) and the List·Shape view switch " +
-    "stay: they narrow what is FILED here, which is browsing, not searching, and " +
-    "asking a question of the archive is what web/components/assistant/" +
-    "ask-the-assistant.tsx is for, mounted directly above this row on the same " +
-    "screen.",
+    "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx (the same file as accounts.list, a second call site), which renders a real SearchInput again — client ruling, 17 Sep 2026: \"Also add the search to the toolbar. It's missing.\" REVERSES B0296/T3659 (16 Sep 2026), which had this call site pass `search={false}` and this entry stand for zero search boxes on the screen; that shape is gone, and this entry now names the SAME structural reason every other paged recipe carries — the recipe's own in-memory search (`searchable: !paged`, screens.ts) sees only the loaded page, so the real box lives in the host's <PagedFind> instead, same reason as tickets.list.",
   "contacts.list":
     "paged (R14) — its search box is the host's own <PagedFind> in contacts-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
   "inputs.list":

@@ -2,6 +2,95 @@
 
 ## Unreleased
 
+### Fixed — `BreadcrumbFolders` icon-only tabs draw a rounded top-left corner again, tucked under the tab before them
+
+Client review, 17 Sep 2026, her THIRD report on this exact silhouette: *"the
+inactives on the assistant are overlapping, so they're on top of the active
+tab."* A screenshot of the assistant strip (the two pinned tabs, History and
+"+") next to the content strip: every content tab draws a rounded top-left
+corner and a sloping shoulder that tucks under the tab before it; the
+assistant's two icon-only tabs drew a flat, square top-left edge instead — a
+vertical wall starting exactly where the previous tab's shoulder ends, which
+reads as one tab sitting on top of another even though neither the tab's nor
+the `<li>`'s z-index had moved since the last two fixes on this shape
+(16 Sep, twice).
+
+IT WAS NEVER Z-INDEX. `verify/tabstrip-parity`'s own `forcedOverlapStacking`
+probe manufactures the one geometry a resting strip cannot produce on its
+own — a genuine pixel overlap between the active tab and its pinned
+neighbour — and reads `topElementIsActiveTab: true` against the current
+source: the active tab already wins any real overlap. The corner itself was
+the defect, not the paint order.
+
+THE ROOT CAUSE: `folder.tsx`'s `crop="lip"` path is a fixed formula ("Only
+FLAT runs take the width and the height") only down to its own measured
+floor, `radiusLip + shoulder` (`--folder-radius-lip` + `--folder-shoulder`,
+2.505rem). Below that floor, `FolderShape`'s own `Math.max(w, radiusLip +
+shoulder)` widens the drawn viewBox past the box it actually measured, and
+`preserveAspectRatio="none"` (that file's own "WHY IT MEASURES") stretches
+the curve non-uniformly to force the two back into agreement — squashing the
+top-left arc and the shoulder rather than merely narrowing them. In
+`breadcrumb-folders.tsx`, `TAB_ICON_ONLY` (added 16 Sep, for the "the
+assistant's two pinned tabs … read as big empty grey blocks" ruling) dropped
+`min-w-0` — EVERY floor a tab carried, not just `TAB`'s 128px text one — so
+nothing in the component stopped an icon-only tab's box from being asked to
+render under the shape's own geometric minimum. Today's `--icon-button` and
+padding tokens happen to sum to comfortably more than that floor, which is
+why this sat quiet under the exact props the app passes; the contract had no
+guarantee of it, and the client's staging screenshot is the proof the gap is
+real regardless.
+
+FIXED AT THE FLOOR ITSELF, not by hand-tuning today's numbers: `TAB_ICON_ONLY`
+now carries `min-w-[calc(var(--folder-radius-lip)_+_var(--folder-shoulder))]`
+— the same two tokens `folder.tsx`'s own `SHAPE` constants are the
+brand-unit twins of, not a second, hand-copied number that could drift from
+them. An icon-only tab can no longer be handed a box narrower than the one
+curve `FolderShape` draws, so the corner and the shoulder are guaranteed
+undistorted regardless of icon size, padding tokens, density scale or
+locale — a structural guarantee, not a fix for today's specific widths.
+`folder.tsx`'s own `crop` doc now states the floor `lip` callers must honour,
+since this file cannot enforce it on itself (the svg is `size-full` of
+whatever box its caller gives it).
+
+Verified in `verify/tabstrip-parity` (new — the content strip's and the
+assistant strip's real call sites, `app-shell.tsx`'s breadcrumb and
+`agent-tab-strip.tsx`'s `items` builder, copied verbatim including the real
+embedding chain) and `verify/breadcrumb-folder`: `silhouetteParity` and the
+new `iconOnlyFloor_assistant` both read `passes: true`. Screenshot:
+`tabs-fixed.png` — both pinned tabs draw the rounded corner and tuck under
+their neighbour's shoulder, the same silhouette the content strip draws.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`,
+`components/folder/folder.tsx`, `verify/tabstrip-parity/page.tsx`,
+`verify/breadcrumb-folder/page.tsx`.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
+### Fixed — `BreadcrumbFolders`' strip never draws its own horizontal scrollbar
+
+Client, 17 Sep 2026, verbatim: *"there is a certain horizontal scroll. Kill
+that."* `STRIP` already hid the bar on Firefox (`[scrollbar-width:none]`)
+and on WebKit/Chromium (`[&::-webkit-scrollbar]:hidden`, `display: none` on
+the pseudo-element) — a renderer that honours neither (an older Chromium, or
+one running with "always show scrollbars") still draws the strip's own bar
+the moment the tabs overflow, which is the bar in the client's screenshot.
+`[&::-webkit-scrollbar]:h-0` is added alongside `:hidden` as a second,
+height-based guard, for a renderer that still reserves the scrollbar's own
+gutter once the pseudo-element is `display:none`. Wheel and drag scrolling
+are untouched — this is a paint change, not an `overflow` one.
+
+Both properties are now asserted as COMPUTED STYLES in
+`verify/tabstrip-parity` (`scrollbarHidden_content` /
+`scrollbarHidden_assistant`, reading `scrollbar-width` and
+`getComputedStyle(strip, "::-webkit-scrollbar")` directly off the live
+`<ol>`), so a future edit that drops either utility fails there instead of
+waiting for a Safari/old-Chromium screenshot to catch it again.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`,
+`verify/tabstrip-parity/page.tsx`.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
 ### Fixed — `Badge`'s dot-to-label gap no longer depends on `size="pill"`
 
 Client review, 17 Sep 2026, over the automations status chip: *"Validated the

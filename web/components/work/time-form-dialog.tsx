@@ -23,6 +23,7 @@ import * as React from "react"
 import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Switch } from "@shared/ui/components/switch/switch"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
@@ -177,10 +178,9 @@ export function TimeFormDialog({
           // A FACT, NOT A CONTROL. On a correction because the door never moves a
           // row from a story to a ticket, so a picker here would offer a change
           // the server would quietly drop; on a new entry opened from a record
-          // because the record IS the answer.
-          <p id="time-target" className="bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm">
-            {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
-          </p>
+          // because the record IS the answer. shared/web/fact-row.tsx, the one
+          // shape every settled parent value renders through.
+          <FactRow id="time-target" name={fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")} />
         ) : (
           // BOTH HALVES PAGE (R14), so both are asked of their own door. This
           // used to read the two list caches, which hold page one each — so an

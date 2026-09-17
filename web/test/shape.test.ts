@@ -664,5 +664,37 @@ describe("shapeChoicesTable", () => {
     ).rows
     expect(React.isValidElement(rows?.[0].details)).toBe(true)
   })
+
+  // THE STATUS COLUMN — client ruling, 17 Sep 2026, verbatim: "Dots like
+  // everywhere else." Read alongside D17's tone table (`shared/status-tones.ts`'s
+  // own palette, applied here through `AUTOMATION_STATUS_DOT`): Active → shipped
+  // (green), Protected → building (charcoal), Retired/Inactive → archived (grey).
+  // Protected OUTRANKS active/inactive (this function's own header, "PROTECTED
+  // OUTRANKS ACTIVE/INACTIVE"), so a row with both `isDefault: true` and
+  // `active: true` still reads Protected/building, never Active/shipped — the
+  // second case below is exactly that row. Each case also asserts the cell is
+  // `variant="status"` rather than the retired filled pill (`inverse` /
+  // `success` / `secondary`), so a regression back to `AUTOMATION_STATUS_VARIANT`
+  // fails here even if shape.tsx's own import census (automations.test.ts) is
+  // ever weakened.
+  it("draws a status dot with the D17 tone per state, never a filled pill", () => {
+    const cases: Array<{
+      over: Partial<SelectableValue> & { id: string; type: string; value: string }
+      tone: "shipped" | "building" | "archived"
+      word: string
+    }> = [
+      { over: { id: "s1", type: "Industry", value: "Active row", active: true, isDefault: false }, tone: "shipped", word: "Active" },
+      { over: { id: "s2", type: "Industry", value: "Protected row", active: true, isDefault: true }, tone: "building", word: "Protected" },
+      { over: { id: "s3", type: "Industry", value: "Inactive row", active: false, isDefault: false }, tone: "archived", word: "Inactive" },
+    ]
+    for (const { over, tone, word } of cases) {
+      const rows = shapeChoicesTable([selectableValue(over)], choicesGroupHome, "en").rows
+      const status = rows?.[0].status as React.ReactElement<{ variant?: string; dot?: string }> | undefined
+      expect(React.isValidElement(status), `${word} row's status cell must be a node`).toBe(true)
+      expect(status!.props.variant, `${word} row must draw variant="status" (a dot badge), never the old filled pill`).toBe("status")
+      expect(status!.props.dot, `${word} row's dot must read D17's "${tone}" tone`).toBe(tone)
+      expect(rows?.[0].statusText, `${word} row's plain-text status word`).toBe(word)
+    }
+  })
 })
 

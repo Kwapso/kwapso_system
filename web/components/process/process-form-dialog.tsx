@@ -14,6 +14,7 @@ import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -132,23 +133,24 @@ export function ProcessFormDialog({
         disabled: !ready,
       }}
     >
-      {!editing && fixedApp && (
-        <p className="text-muted-foreground text-sm">
-          {t("Inside")} <span className="text-foreground font-medium">{fixedApp.name}</span>
-        </p>
-      )}
-      {!editing && !fixedApp && (
+      {!editing && (
         <Field config={appField} htmlFor="process-app" className={fieldSpacing}>
-          <RecordPicker
-            id="process-app"
-            value={values.appId}
-            onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
-            options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
-            placeholder={t("Pick the app")}
-            searchPlaceholder={t("Search apps…")}
-            emptyText={t("No app matched.")}
-            disabled={busy}
-          />
+          {fixedApp ? (
+            // A FACT, NOT A CONTROL — opened FROM the app's own record, so
+            // which one this process lives inside is settled rather than asked.
+            <FactRow id="process-app" name={fixedApp.name} />
+          ) : (
+            <RecordPicker
+              id="process-app"
+              value={values.appId}
+              onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+              options={sortedOptions(apps, lang, (a) => a.name).map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+              placeholder={t("Pick the app")}
+              searchPlaceholder={t("Search apps…")}
+              emptyText={t("No app matched.")}
+              disabled={busy}
+            />
+          )}
         </Field>
       )}
       <Field config={nameField} htmlFor="process-name" className={fieldSpacing}>

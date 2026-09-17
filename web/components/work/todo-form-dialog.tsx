@@ -14,6 +14,7 @@ import * as React from "react"
 import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -108,20 +109,28 @@ export function TodoFormDialog({
       }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>
-        {/* THE DOOR ANSWERS THIS, because accounts PAGE (R14): the list cache
-            this used to read holds page one, so an agency past fifty companies
-            could not ask the fifty-first for anything. */}
-        <RecordPicker
-          id="todo-account"
-          value={values.accountId}
-          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
-          search={(term) => searchAccounts(term)}
-          searchKey={pickerKey("accounts", teamId)}
-          placeholder={t("Pick the account")}
-          searchPlaceholder={t("Search accounts…")}
-          emptyText={t("No account matched.")}
-          disabled={busy}
-        />
+        {fixedAccount ? (
+          // A FACT, NOT A CONTROL — opened FROM the client's own record, so
+          // who this is for is settled rather than asked (this field's own
+          // doc comment always claimed this; the control stayed live under
+          // it until now).
+          <FactRow id="todo-account" name={fixedAccount.name} />
+        ) : (
+          /* THE DOOR ANSWERS THIS, because accounts PAGE (R14): the list cache
+             this used to read holds page one, so an agency past fifty companies
+             could not ask the fifty-first for anything. */
+          <RecordPicker
+            id="todo-account"
+            value={values.accountId}
+            onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+            search={(term) => searchAccounts(term)}
+            searchKey={pickerKey("accounts", teamId)}
+            placeholder={t("Pick the account")}
+            searchPlaceholder={t("Search accounts…")}
+            emptyText={t("No account matched.")}
+            disabled={busy}
+          />
+        )}
       </Field>
       <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
         <Input

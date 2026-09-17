@@ -65,10 +65,12 @@ import { primeCache, useCached } from "@shared/web/store"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
-// THE SAME STATUS→FILL DERIVATION CHOICES NOW USES (coordinator's own
-// ruling, 15 Sep 2026) — imported rather than copied a third time, the same
-// reasoning `deep-link/shape.tsx`'s own `shapeChoicesTable` carries.
-import { AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"
+// THE SAME STATUS→DOT DERIVATION CHOICES NOW USES (coordinator's own
+// ruling, 15 Sep 2026, moved from a filled pill to a dot by the client's own
+// ruling, 17 Sep 2026: "Dots like everywhere else.") — imported rather than
+// copied a third time, the same reasoning `deep-link/shape.tsx`'s own
+// `shapeChoicesTable` carries.
+import { AUTOMATION_STATUS_DOT } from "@/components/screens/automation-edit-sheet"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { shapeBrandList, shapePurposesList } from "@/components/deep-link/shape"
 import { RecordTable, type TableColumn } from "@/components/records/record-table"
@@ -383,8 +385,10 @@ export function MeetingTypesPanel({
   // THE STATUS CHIP IS THE TOGGLE, the same idiom `ValueChip` used on the old
   // Choices screen: a two-way status (no "protected" concept on a meeting
   // type — `MeetingPurpose` carries no `isDefault`), coloured through the
-  // SAME `AUTOMATION_STATUS_VARIANT` map Choices now uses (coordinator
-  // ruling, 15 Sep 2026: "same word → same colour, both palettes").
+  // SAME `AUTOMATION_STATUS_DOT` map Choices now uses (coordinator ruling,
+  // 15 Sep 2026: "same word → same colour, both palettes"; moved from a
+  // fill to a dot by the client's 17 Sep 2026 ruling, "Dots like everywhere
+  // else").
   const rows = purposesQ.data.map((p) => {
     const statusWord = p.active ? t("Active") : t("Inactive")
     return {
@@ -410,7 +414,9 @@ export function MeetingTypesPanel({
           onClick={() => setActive(p, !p.active)}
           aria-label={`${p.name} — ${statusWord}`}
         >
-          <Badge variant={AUTOMATION_STATUS_VARIANT[p.active ? "on" : "off"]}>{statusWord}</Badge>
+          <Badge variant="status" dot={AUTOMATION_STATUS_DOT[p.active ? "on" : "off"]}>
+            {statusWord}
+          </Badge>
         </button>
       ),
       statusText: statusWord,

@@ -204,34 +204,42 @@ describe("R70 — every automation is visible, and one that cannot be switched s
       "R70 — shape.tsx no longer wraps its computed status word in one element the way this check expects; re-read `shapeChoicesTable`'s status cell before changing the pattern"
     ).not.toBeNull()
     const part = drawn![1]
-    // THE COLOUR IS NO LONGER A LITERAL, 15 SEP 2026 — the coordinator's own
-    // ruling: Choices' three-way status and Automations' own three-way status
-    // (`AUTOMATION_STATUS_VARIANT`, `automation-edit-sheet.tsx`) share ONE
-    // fill derivation now, so the proof that the two can never drift is the
-    // IMPORT, not a literal `variant="…"` string match — a stronger
-    // guarantee than the one this check used to make.
+    // THE COLOUR IS NO LONGER A LITERAL, 15 SEP 2026, AND NO LONGER A FILL AT
+    // ALL, 17 SEP 2026 — the client's ruling on the Choices tables' status
+    // column, verbatim: *"Dots like everywhere else."* Choices' three-way
+    // status and Automations' own three-way status (`AUTOMATION_STATUS_DOT`,
+    // `automation-edit-sheet.tsx`) share ONE dot derivation now, so the proof
+    // that the two can never drift is the IMPORT, not a literal `variant="…"`
+    // or `dot="…"` string match — a stronger guarantee than either check this
+    // test used to make.
     expect(
-      choices.includes('AUTOMATION_STATUS_VARIANT } from "@/components/screens/automation-edit-sheet"'),
-      "R70 — the Choices half no longer imports the shared status→colour map (AUTOMATION_STATUS_VARIANT), so its badge can silently drift from Automations' own colour again"
+      choices.includes('AUTOMATION_STATUS_DOT } from "@/components/screens/automation-edit-sheet"'),
+      "R70 — the Choices half no longer imports the shared status→dot map (AUTOMATION_STATUS_DOT), so its badge can silently drift from Automations' own colour again"
     ).toBe(true)
     expect(
-      drawn![2].includes("AUTOMATION_STATUS_VARIANT["),
-      `R70 — the Choices ${part} no longer resolves its fill through AUTOMATION_STATUS_VARIANT`
+      drawn![2].includes('variant="status"') && drawn![2].includes("dot={AUTOMATION_STATUS_DOT["),
+      `R70 — the Choices ${part} no longer draws variant="status" or no longer resolves its dot through AUTOMATION_STATUS_DOT`
     ).toBe(true)
+    // THE OLD FILL IS GONE FROM THIS FILE TOO — a stray `AUTOMATION_STATUS_VARIANT`
+    // import here would mean a second, competing colour source for the one status
+    // cell, and the map itself no longer exists to import (automation-edit-sheet.tsx
+    // deleted the export the same session).
+    expect(
+      choices.includes("AUTOMATION_STATUS_VARIANT"),
+      "R70 — shape.tsx must not import the old filled-pill map (AUTOMATION_STATUS_VARIANT) any more; it reads AUTOMATION_STATUS_DOT only, and no filled status pill remains on the Choices table"
+    ).toBe(false)
 
     // 2 · THE AUTOMATIONS TABLE'S OWN STATUS BADGE DREW FROM THE SAME MAP,
     //     UNTIL THE CLIENT'S 16 Sep 2026 EVENING RULING MOVED IT TO A DOT —
     // verbatim: "let's change the full color pill to also be a dot. Inactive
     // gets gray, and active gets green." `module-automations.tsx`'s
-    // `RecordTable` column now reads `status: <Badge variant="status"
-    // dot={AUTOMATION_STATUS_DOT[status]}>` — a SEPARATE map
-    // (`automation-edit-sheet.tsx`, beside the untouched
-    // `AUTOMATION_STATUS_VARIANT` the Choices half below still reads) — so
-    // Automations and Choices no longer share one fill; they share nothing
-    // any more except the WORD, which part 1 above still proves. This is the
-    // deliberate divergence this file's own comment already named ("worth
-    // its own pass, not this one") landing for real, not a parity this
-    // check can still make.
+    // `RecordTable` column reads `status: <Badge variant="status"
+    // dot={AUTOMATION_STATUS_DOT[status]}>` off the SAME map the Choices half
+    // above now reads too (17 Sep 2026: "Dots like everywhere else" folded the
+    // one deliberate divergence this file's own comment used to name — "worth
+    // its own pass, not this one" — landing for real). Automations and
+    // Choices share one dot derivation again, the same way they once shared
+    // one fill.
     const table = stripComments(read(join(WEB, "components/screens/module-automations.tsx")))
     expect(
       /<Badge[^>]*variant="status"[^>]*dot=\{AUTOMATION_STATUS_DOT\[/.test(table),
@@ -258,6 +266,24 @@ describe("R70 — every automation is visible, and one that cannot be switched s
       /<Badge[^>]*variant="status"[^>]*dot=\{AUTOMATION_STATUS_DOT\[/.test(screen),
       "R70 — the automation edit sheet's own detail head no longer draws its status chip as a dot through AUTOMATION_STATUS_DOT"
     ).toBe(true)
+
+    // 4 · THE MEETING TYPES PANEL DRAWS THE SAME PILL-TURNED-DOT — B11's own
+    // adapter for a choice that is not `selectable_data` (`MeetingTypesPanel`,
+    // `team/internal-screens.tsx`), coloured through the same map the Choices
+    // table above reads. It has no "Protected" state (a meeting type carries
+    // no `isDefault`), only Active/Inactive, but the badge itself must be the
+    // same dot shape everywhere else on this ruling — "Dots like everywhere
+    // else" — not a lone holdout still drawing a fill.
+    const meetingTypes = stripComments(read(join(WEB, "components/team/internal-screens.tsx")))
+    expect(
+      /<Badge[^>]*variant="status"[^>]*dot=\{AUTOMATION_STATUS_DOT\[/.test(meetingTypes),
+      "R70 — the meeting types panel no longer draws its status pill as a dot through AUTOMATION_STATUS_DOT; re-read B11's meeting-types adapter and the 17 Sep 2026 ruling (\"Dots like everywhere else\") before changing this pattern"
+    ).toBe(true)
+    expect(
+      meetingTypes.includes("AUTOMATION_STATUS_VARIANT"),
+      "R70 — the meeting types panel must not import the old filled-pill map any more; it reads AUTOMATION_STATUS_DOT only"
+    ).toBe(false)
+
     const said = screen.split(says).length - 1
     expect(
       said,

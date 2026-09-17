@@ -594,7 +594,11 @@ export const CONCEPT_ICON = {
   accounts: "buildings",
   contacts: "address-book",
   portal: "key",
-  knowledge: "hard-drives",
+  // WAS "hard-drives" — client ruling, 17 Sep 2026, verbatim: "can we change
+  // the icon of the knowledge base? I was thinking a brain." Phosphor draws
+  // `brain` (fill weight, shared/ui/foundations/icons), the literal ask
+  // rather than a closest-match substitute.
+  knowledge: "brain",
   tickets: "tray",
   // The map and the numbers drilled through it: a process is a route someone
   // follows, a step is one stop on it, a version is a point in its history, and

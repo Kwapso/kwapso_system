@@ -59,6 +59,7 @@ import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
 import { Paperclip, X } from "@shared/ui/foundations/icons"
 import { Field } from "@shared/web/field"
+import { FactRow } from "@shared/web/fact-row"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
@@ -1294,9 +1295,7 @@ export function HelpFormDialog({
           be refusing to state a fact it already has. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
         {fixedApp ? (
-          <p className="text-muted-foreground text-sm" id="help-app">
-            {fixedApp.name}
-          </p>
+          <FactRow id="help-app" name={fixedApp.name} />
         ) : (
           <RecordPicker
             id="help-app"

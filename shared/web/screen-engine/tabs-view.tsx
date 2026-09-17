@@ -147,7 +147,7 @@ export const TAB_ICONS: Record<string, IconName> = {
   grouped: "buildings",
   deliverables: "package",
   impact: "piggy-bank",
-  knowledge: "hard-drives",
+  knowledge: "brain",
   meetings: "chat",
   sprints: "calendar-dots",
   stories: "puzzle-piece",
