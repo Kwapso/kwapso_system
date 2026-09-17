@@ -101,17 +101,6 @@ async function storyPage(
   filter: StoryFilter,
   cursor: string | null,
   ordering?: Parameters<typeof listStories>[4],
-  /** THE ROW THIS REQUEST JUST MADE, when it made one.
-   *
-   * The create door answers with the refreshed PAGE — the shape every list
-   * screen wants — and used to throw the new id away with it. A screen that
-   * needs to do one more thing to the story it just created (attach the
-   * screenshot somebody picked before pressing Submit) then had to guess which
-   * row was new, and rank ordering means the newest is not reliably first.
-   *
-   * So the id rides beside the page. Additive: every existing caller reads
-   * `stories` exactly as before. */
-  createdId?: string,
   viewCounts?: Awaited<ReturnType<typeof countStoryViews>>
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
@@ -123,7 +112,6 @@ async function storyPage(
     { ...page, total: counts.total },
     {
       mineTotal: counts.mineTotal,
-      ...(createdId ? { createdId } : {}),
       ...(viewCounts
         ? {
             openTotal: viewCounts.open,
@@ -135,6 +123,30 @@ async function storyPage(
           }
         : {}),
     }
+  )
+}
+
+/** WHAT A MUTATION ANSWERS WITH: the row it just touched, never the backlog's
+ * whole newest-fifty page — the same fix as `help.ts`'s `ticketMutationReply`,
+ * for the same reason (a mystery-shopper run measured this door's sibling
+ * costing 65KB to learn one id). The SHAPE stays a page (`stories`, `mineTotal`)
+ * because `createStoryFrom` (web/components/work/stories-screen.tsx) still
+ * reads `createdId` off it to hang a picked screenshot on the new row; the
+ * ROWS shrink to the one this call changed. */
+async function storyMutationReply(
+  cfg: Parameters<typeof listStories>[0],
+  guard: Parameters<typeof listStories>[1],
+  filter: StoryFilter,
+  id: string
+): Promise<Response> {
+  const [story, counts] = await Promise.all([
+    getStory(cfg, guard, id),
+    countStories(cfg, guard, filter),
+  ])
+  return pagedJson(
+    "stories",
+    { rows: story ? [story] : [], total: counts.total, hasMore: false, nextCursor: null },
+    { mineTotal: counts.mineTotal, createdId: id }
   )
 }
 
@@ -192,7 +204,6 @@ export async function getStories(request: Request, env: Env): Promise<Response> 
       queryText(url.searchParams.get("sort"), "Sort"),
       queryText(url.searchParams.get("dir"), "Direction")
     ),
-    undefined,
     viewCounts
   )
 }
@@ -214,7 +225,7 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   // it. R17 rides the flip, so a second story on an already-scheduled ticket
   // moves zero rows and publishes nothing.
   await announceScheduled(env, cfg, guard, actor, ticketId ?? null)
-  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null, undefined, id)
+  return storyMutationReply(cfg, guard, storyFilterFrom(new URL(request.url)), id)
 }
 
 /** POST /api/content/stories/update — edit a story (work:update). */
@@ -236,7 +247,7 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   // The edit form is where a sprint gets attached, so this is the ordinary way a
   // ticket becomes `scheduled`.
   await announceScheduled(env, cfg, guard, actor, ticketId ?? null)
-  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
+  return storyMutationReply(cfg, guard, storyFilterFrom(new URL(request.url)), id)
 }
 
 /** THE SCHEDULED FLIP AND ITS PING, in one place because three doors do it and

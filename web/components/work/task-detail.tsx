@@ -51,7 +51,7 @@ import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RichText } from "@shared/web/rich-text-view"
 import { safeHref } from "@shared/web/rich-text"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
+import { invalidate, mergePage, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { useSessionUserId } from "@/lib/use-active-team"
 
@@ -345,7 +345,7 @@ export function TaskDetailScreen({
             important: values.important,
             urgent: values.urgent,
           })
-          primeCache(tasksKey(teamId), tasks)
+          mergePage(tasksKey(teamId), "id", tasks as unknown as Record<string, unknown>[])
           invalidate(`activity:record:tasks:${taskId}`)
           toast.success(t("Task updated."))
         }}
