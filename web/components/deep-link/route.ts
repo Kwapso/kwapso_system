@@ -83,7 +83,13 @@ export const TOP_LEVEL_MODULES = [
   "brand", "purposes",
   // The agency itself (CHECKLIST 10.1) — an account-level screen like Settings,
   // because it is about the team rather than a collection inside one.
-  "home", "kwapso", "settings", "invitations", "profile",
+  //
+  // "profile" LEFT THIS LIST 17 Sep 2026 — the client's ruling retired the
+  // standalone `/profile` route (UI-RULEBOOK.md L26): the nav bar's own name
+  // now opens the signed-in person's own team-scoped member record instead
+  // (`/t/<teamId>/members/<userId>`), which was already reachable through
+  // this list's ordinary `/t/*` grammar and needed no entry of its own here.
+  "home", "kwapso", "settings", "invitations",
   // THE NEW-TAB SCREEN (17 Sep 2026) — Chrome's own blank tab, this app's
   // shape of it. Reached only through the deliberate doors that open a tab
   // beside the one she is on (the content strip's pinned "+", cmd/ctrl-T —
@@ -94,8 +100,10 @@ export const TOP_LEVEL_MODULES = [
   "new",
 ]
 
-/** The account-level screens the shell renders directly (not team-scoped module content). */
-export const ACCOUNT_MODULES = ["home", "kwapso", "settings", "invitations", "profile", "new"]
+/** The account-level screens the shell renders directly (not team-scoped module content).
+ * "profile" left this list 17 Sep 2026 with the retired `/profile` route — see the
+ * matching note on TOP_LEVEL_MODULES above. */
+export const ACCOUNT_MODULES = ["home", "kwapso", "settings", "invitations", "new"]
 
 export function parseRoute(pathname: string, search: string): Route {
   const segs = pathname.split("/").filter(Boolean) // ["t", teamId, module?, id?] OR [module, id?]

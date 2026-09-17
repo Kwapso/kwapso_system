@@ -48,7 +48,6 @@ import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
 import { NewTabScreen } from "@/components/shell/new-tab-screen"
-import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { ModuleSettingsScreen, moduleSettingsPage } from "@/components/screens/module-settings-screen"
@@ -81,7 +80,7 @@ import { useAfterPaint } from "@shared/web/after-paint"
 /** THE ACCOUNT SCREENS' OWN NAMES, so they can be tabs like everything else.
  *
  * `buildCrumbs` (deep-link/crumbs.ts) reads `TEAM_SECTIONS` and knows nothing
- * about /settings or /profile — those five screens render straight in the shell
+ * about /settings or /invitations — these account screens render straight in the shell
  * and have always built their one crumb by hand, in the branch below. The words
  * are lifted from that branch unchanged, so nothing new is said to anybody:
  * every one of them is already in the catalogue, and `t(…)` is applied at the
@@ -95,7 +94,11 @@ const ACCOUNT_TAB_TITLE: Record<string, string> = {
   settings: "Settings",
   kwapso: "Kwapso",
   invitations: "Invites",
-  profile: "Your profile",
+  // "profile" LEFT THIS TABLE 17 Sep 2026 with the retired `/profile` route —
+  // the nav bar's own name now opens a team-scoped member record
+  // (`/t/<teamId>/members/<userId>`), an ordinary module detail that already
+  // gets its tab title from `buildCrumbs`/`TEAM_SECTIONS` like any other, not
+  // from this account-screen table.
   // THE NEW-TAB SCREEN'S OWN LABEL — "New tab", the exact string
   // `workspace-tabs.ts`'s `openNewTab` already seeds the tab with, so the
   // crumb built here (from this table) and the label the tab opened with
@@ -761,7 +764,7 @@ export function DeepLinkScreen() {
   // and only the original shape tells TypeScript so.
   if (active.loading || !active.ctx || !route) return <ShellLoading />
 
-  // Account screens (/home, /settings, /invitations, /profile) render DIRECTLY in the shell — they
+  // Account screens (/home, /settings, /invitations) render DIRECTLY in the shell — they
   // aren't team-scoped module content, so they skip the team tabs / queries / membership
   // gate below. Because they live inside this one never-unmounting shell, moving in and
   // out of them (and into /t) is soft History-API nav — no reload anywhere.
@@ -809,7 +812,6 @@ export function DeepLinkScreen() {
           ) : (
             <SettingsScreen active={active} initialTab={query.tab} />
           ))}
-        {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
         {module === "new" && <NewTabScreen />}
         </RememberedScreen>
@@ -922,8 +924,8 @@ export function DeepLinkScreen() {
        * rings the content region — a just-opened dialog draws the eye on its own. */}
       {/* THE WIDTH CAP MOVED TO THE SHELL (R29, app-shell.tsx). This line used to
        * carry `mx-auto` + `max-w-[1600px]` itself, which capped every MODULE
-       * screen but not the five account screens (home, kwapso, settings,
-       * profile, invitations) that return earlier in this component and never
+       * screen but not the account screens (home, kwapso, settings,
+       * invitations) that return earlier in this component and never
        * reach this div at all — they ran uncapped, invisibly, until a wide
        * monitor showed Kwapso wider than Meetings. The cap now lives once on
        * `AppShell`'s own content div, which every screen this component renders

@@ -26,6 +26,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { letterMark } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { useT } from "@shared/web/language"
 
 const nameField = { ...defaultFieldConfig, label: "Team name", required: true }
@@ -108,7 +109,26 @@ export function TeamEditDialog({
             {letterMark(name)}
           </AvatarFallback>
         </Avatar>
-        <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
+        {/* THE TILE GRID SHOWS WHAT IS ALREADY THERE — client ruling, 17 Sep
+            2026: "I can really see the images that I have already uploaded."
+            The freshly-picked data URL wins over the stored one (the same
+            precedence the `Avatar` above already reads), through the one
+            shared seam every FileUpload call site now builds its items with
+            (shared/web/upload-items.ts). No `onRemove`: this form never had a
+            "clear the logo" action, only "pick a different one", so the Add
+            tile stays the only way in. */}
+        <FileUpload
+          accept="image/*"
+          multiple={false}
+          files={
+            logo
+              ? [storedFileToUploadItem({ id: "team-logo", name: t("Team logo"), href: logo })]
+              : team?.logoUrl
+                ? [storedFileToUploadItem({ id: "team-logo", name: t("Team logo"), href: team.logoUrl })]
+                : []
+          }
+          onFilesSelected={handlePhoto}
+        />
       </div>
       <Field config={nameField} htmlFor="team-name" className={fieldSpacing}>
         <Input

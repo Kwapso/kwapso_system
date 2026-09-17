@@ -660,6 +660,31 @@ export type HelpTicket = {
   raiserId: string | null
   raiserName: string | null
   editorName: string | null
+  /** WHO MOVED IT TO `resolved` — read back off `help.resolver_id` /
+   * `help.resolver_name`, the same actor snapshot `setStatus`
+   * (workers/content/src/lib/help.ts) stamps on every resolve and clears on
+   * every reopen (R17: a status move is idempotent, and a reopen NULLs the
+   * whole triple — `resolver_id`, `resolver_email`, `resolver_name` — the
+   * identical clearing `resolved_at` already gets, so the two can never
+   * disagree about whether this ticket is currently resolved). NOT a nested
+   * `{id, name, avatar}` object: this row already carries every other person
+   * reference as a flat `xId`/`xName` pair (`raiserId`/`raiserName` above,
+   * `editorName` beside it), and a resolver is one more actor on the same
+   * shape, not a different kind of fact. There is no avatar on the wire —
+   * the team's own DB, which is what this worker reads, holds no face for a
+   * person (R47's own finding: names and pictures live in the GLOBAL core
+   * DB) — so the FACE is resolved the way every other person-picker in this
+   * app resolves one, client-side, against the team's already-cached
+   * members list (`useCached('members:'+teamId, …)`, exactly `TriageQueue`'s
+   * own `peopleFor`), through `RecordMark` (R35).
+   *
+   * REDACTED THE SAME WAY `editorName` IS (`hideEditor` in `toTicket`), not
+   * a redaction of its own: a resolver is a staff actor doing an edit-shaped
+   * thing to the ticket, so SCOPE ch.06's "the portal shows work status but
+   * never which staff member is doing it" covers it exactly as it covers
+   * the editor beside it. */
+  resolverId: string | null
+  resolverName: string | null
   /** WHOSE SIDE OF THE FENCE EACH OF THOSE TWO IS ON (R54). Already computed on
    * the row for the redaction above (`raiser_is_client` / `editor_is_client`,
    * an EXISTS over `portal_users`) and, until 7 Sep 2026, thrown away on the way
@@ -1806,6 +1831,11 @@ export type AppModule = {
   name: string
   /** the emoji shown beside the name, as on a dropdown value */
   mark: string | null
+  /** the kit's Phosphor name for this module's gallery card (client's ruling,
+   * 17 Sep 2026: "when I add a module, I should be able to select an icon for
+   * it"), one of `MODULE_ICON_NAMES` (shared/module-icons.ts) or null when
+   * nobody has chosen one — `DEFAULT_MODULE_ICON` draws then. */
+  icon: string | null
   /** the German name, for a client whose account reads in German */
   nameDe: string | null
   description: string | null
@@ -2226,6 +2256,24 @@ export type Todo = {
    * along). `null` draws the account's own initial, same as everywhere
    * else `RecordMark` renders one. */
   accountLogoUrl: string | null
+  /** WHICH SYSTEM THIS ASK IS ABOUT — optional (client ruling, 17 Sep 2026:
+   * "it is optional to select an app"), the same shape `Help.appId`/`appName`
+   * already carry, joined off `apps` the identical way. `null` for an input
+   * with no app named. */
+  appId: string | null
+  appName: string | null
+  /** THE APP'S OWN FACE (R35), joined off `apps.logo_url` the same way
+   * `accountLogoUrl` above is — see `Task.appLogoUrl`'s own note for the
+   * ruling this generalises. */
+  appLogoUrl: string | null
+  /** WHO AT THE CLIENT THIS IS AIMED AT — the CONTACT the client's ruling
+   * names ("I want to be able to select who this gets assigned to"), never a
+   * staff member: the same population `Help.raisedByContactId`/
+   * `raisedByContactName` already carry, and the same reason it is a person's
+   * own `accounts` row rather than a second table (15.1). `null` until
+   * somebody picks one. */
+  assignedContactId: string | null
+  assignedContactName: string | null
   ticketId: string | null
   createdAt: string
 }

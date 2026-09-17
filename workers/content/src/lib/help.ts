@@ -115,6 +115,14 @@ type TicketRow = {
   creator_id: string
   creator_name: string | null
   editor_name: string | null
+  /** WHO MOVED IT TO `resolved` — `help.resolver_id`/`help.resolver_name`,
+   * stamped by `setStatus`'s own resolve/reopen SQL (below) and read back
+   * here for the first time: the columns have existed since the resolve
+   * write was built, and nothing selected them until this ruling asked for
+   * a "Resolved by" column. See `shared/types.ts`'s `resolverId`/
+   * `resolverName` for the redaction and the shape. */
+  resolver_id: string | null
+  resolver_name: string | null
   created_at: string
   updated_at: string | null
   /** Computed in TICKET_COLS: does the person who raised / last edited this row
@@ -184,6 +192,11 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     raiserId: hideRaiser ? null : r.creator_id,
     raiserName: hideRaiser ? null : r.creator_name,
     editorName: hideEditor ? null : r.editor_name,
+    // R35/SCOPE ch.06 — one more staff actor on this row, redacted by the
+    // SAME predicate as the editor beside it: resolving a ticket is an
+    // edit-shaped staff action, not a third population.
+    resolverId: hideEditor ? null : r.resolver_id,
+    resolverName: hideEditor ? null : r.resolver_name,
     // R54, AND IT IS THE SAME FACT THE TWO LINES ABOVE ARE ALREADY STANDING ON.
     // The row has always known whether each of these two people is one of the
     // client's or one of ours; the portal used it and then it was dropped. The
@@ -271,7 +284,7 @@ function toMessage(r: ReplyRow, fromClient: boolean): HelpMessage {
 const TICKET_COLS = `id, help_type, raised_as_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
   account_id, app_id, module_id, raised_by_contact_id, validated_at,
   ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
-  creator_id, creator_name, editor_name, created_at, updated_at,
+  creator_id, creator_name, editor_name, resolver_id, resolver_name, created_at, updated_at,
   (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
   -- R35: the App column's own face (client ruling 2026-09-15), off the same
   -- row app_name already reads — one correlated subselect, not a second one.

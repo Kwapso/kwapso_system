@@ -228,6 +228,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     onIntent,
     sectionPath,
     myUserId,
+    // THE SIGNED-IN SESSION — read here only for `MemberScreen`'s
+    // `member.isYou` branch (name/photo edit, email change, the retired
+    // `/profile` page's own account-activity trail). Nothing else in this
+    // switch needs it; `myUserId` above already carries the one fact every
+    // OTHER branch wants (whose id is this).
+    active,
   } = ctx
 
     if (noAccess) return <NoAccess />
@@ -413,6 +419,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           recipe={recipe}
           rights={rights}
           onRemoved={() => onIntent({ kind: "close" })}
+          // THE RETIRED `/profile` PAGE'S OWN SESSION — handed down for
+          // `MemberScreen`'s `member.isYou` branch only (name/photo edit,
+          // email change, the global account-activity trail). The host
+          // already holds both from `useActiveTeam`; this is the same object
+          // `ProfileDialog`/`EmailChangeDialog` always read, never a second
+          // door opened here.
+          sessionUser={active.user}
+          onProfileSaved={active.refresh}
         />
       )
     }

@@ -718,10 +718,22 @@ export function AgentPanel({
   // The record-scope prefix rides only the FIRST message of a record-scoped
   // tab — `!tab.threadId` is "nothing sent yet in this tab", the same signal
   // `setAgentTabThread` clears the moment the server mints one.
+  //
+  // "app" SCOPE'S OWN PREFIX carries the id too, not only the name — the one
+  // difference from "record" (which has no id to carry): the model can then
+  // pass `appId` straight to `ask_knowledge` instead of matching the app by
+  // name alone, exactly the way naming a client's own words lets it resolve
+  // `accountId` from an ordinary "record"-scoped question today.
   function handleSend(text: string) {
     const tab = activeAgentTab
-    const prefixed =
-      tab?.scope === "record" && !tab.threadId && tab.recordLabel ? `About ${tab.recordLabel}: ${text}` : text
+    const firstMessage = tab && !tab.threadId && tab.recordLabel
+    const prefixed = !firstMessage
+      ? text
+      : tab.scope === "app"
+        ? `About the app "${tab.recordLabel}"${tab.scopeId ? ` (app id ${tab.scopeId})` : ""}: ${text}`
+        : tab.scope === "record"
+          ? `About ${tab.recordLabel}: ${text}`
+          : text
     return chat.send(prefixed)
   }
 

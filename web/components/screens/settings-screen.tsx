@@ -8,12 +8,16 @@
 // of them reads as three destinations.
 //
 // TWO THINGS LEFT IT ON 17 AUG 2026, and the reason is the same for both.
-//   • YOUR PROFILE AND YOUR EMAIL moved to a page of their own
-//     (screens/profile-screen.tsx, reached from the profile menu). Everything
+//   • YOUR PROFILE AND YOUR EMAIL moved to a page of their own. Everything
 //     here is about the APP; those are about a PERSON, and a tester looking for
 //     "change my name" should not have to guess which of three tabs holds it.
-//     That still holds for your name, your email address and your history, and
-//     that page is still where they live.
+//     That still holds for your name, your email address and your history —
+//     THE PAGE ITSELF WAS RETIRED ON 17 SEP 2026 (the client: "this page
+//     should not exist… it should lead me to the same page I arrive at when I
+//     click on one member"), so where they live now is the signed-in person's
+//     own member record (web/components/team/member-screen.tsx), reached the
+//     same way from the profile menu — never back here, which is still about
+//     the app and nothing about a person.
 //   • THE TEAMS LIST is hidden rather than removed — shared/product.ts explains
 //     at length why nothing underneath it was touched.
 //
@@ -276,15 +280,14 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { Card, CardContent } from "@shared/ui/components/card/card"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Headline } from "@shared/ui/components/typography/typography"
-import { Icon } from "@shared/web/screen-engine/icon"
-import { InAppLink } from "@/components/shell/in-app-link"
 import { List } from "@shared/web/list-compat"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
 import { AccessTokensSection } from "@/components/team/access-tokens"
+import { GalleryCard } from "@/components/records/gallery-card"
 import { GoogleConnectionsSection } from "@/components/knowledge/google-connections"
 import { InvitationsPanel, useReceivedInvites } from "@/components/team/invitations"
 import { letterMark } from "@/lib/identity"
@@ -1250,74 +1253,24 @@ export function SettingsScreen({
                       empty={shownModules.length === 0}
                       emptyLabel={t("No modules match what you're looking for.")}
                     >
+                      {/* THE SAME CARD THE APP'S OWN MODULES TAB NOW RENDERS
+                          (`GalleryCard`, web/components/records/gallery-card.tsx)
+                          — client's ruling, 17 Sep 2026: "I want it to look
+                          exactly like the settings modules, this kind of
+                          gallery with the icons." One component, not two hand
+                          copies of the same JSX: this wall passes `href` and no
+                          `actions` (a pure destination card, unchanged); the
+                          app's Modules tab passes `actions` and no `href`. NAME
+                          ONLY — R72 (`no-default-subtitles`), see that law's
+                          own history over this exact wall in the component's
+                          header. */}
                       {shownModules.map(({ page }) => (
-                        <Card
+                        <GalleryCard
                           key={page.segment}
-                          variant="raised"
-                          // A CARD THAT IS A LINK ACKNOWLEDGES THE POINTER —
-                          // client, 2026-09-14, over this exact wall: "we are
-                          // missing a hover state for the cards. For example,
-                          // in settings modules, I would need to see a hover
-                          // when I hover over a card."
-                          //
-                          // NOT `interactive` — see `members-gallery.tsx`'s
-                          // identical note beside its own wall: that prop also
-                          // grants `motion-hover-lift` (motion.css §13), and
-                          // this is a WALL, the shape `app-tiles.tsx` already
-                          // argued down to a fill-only wash for the same
-                          // reason ("a grid of them lifting is the page of
-                          // reacting boxes UI-RULEBOOK C2 exists to prevent").
-                          // `--accent` is the same token `interactive` would
-                          // have reached for; `motion-hover` is the kit's own
-                          // transition class for it. Nothing here is invented.
-                          className="hover:bg-accent motion-hover"
-                        >
-                          <InAppLink href={`/settings/${page.segment}`} className="block">
-                            <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
-                              <Icon
-                                name={
-                                  CONCEPT_ICON[page.segment as keyof typeof CONCEPT_ICON] ??
-                                  CONCEPT_ICON.settings
-                                }
-                                className="text-muted-foreground size-6"
-                              />
-                              {/* THE PAGE'S OWN NAME, so all three doors say the
-                                  same words: this card, the gear's tooltip and
-                                  accessible name, and the `<h1>` you land on. A
-                                  card whose label is the module and whose
-                                  destination is titled something else is the
-                                  smallest possible way to make one page feel like
-                                  two.
-
-                                  THE KIT'S OWN TITLE PART, not a `<span>` — R65
-                                  (`chip-above-title`). The law is about where a
-                                  chip sits relative to the title, and a title
-                                  hand-rolled into a span has no position a census
-                                  can read, so every card that stands for a record
-                                  names itself through `CardTitle`. `text-sm`
-                                  because the kit's step is chapter 13's 18/500 for
-                                  a full card and this is a cell on a wall — the
-                                  class carries the wall's own step, exactly as it
-                                  did when this was a span, and nothing about the
-                                  drawing changes. */}
-                              <CardTitle className="text-sm">{t(page.title)}</CardTitle>
-                              {/* NAME ONLY — R72 (`no-default-subtitles`). This used to
-                                  carry a second line, the page's own section titles
-                                  joined by " · " ("Ticket types · Automations"), read
-                                  off the FILTERED `sections` this row already carries
-                                  (so it never advertised a block this reader would not
-                                  be shown). The client killed it outright, 2026-09-14,
-                                  over this exact wall: "In settings, modules: delete
-                                  this. Generally, I don't like subtitles, so stop
-                                  putting them unless I ask." `sections` stays on the
-                                  row's own type ABOVE — `moduleSettingsIndex` still
-                                  filters a module out when it has none (R61 clause ii,
-                                  "the index is derived") — it is simply no longer
-                                  destructured here, because nothing in this JSX reads
-                                  it any more. */}
-                            </CardContent>
-                          </InAppLink>
-                        </Card>
+                          href={`/settings/${page.segment}`}
+                          icon={CONCEPT_ICON[page.segment as keyof typeof CONCEPT_ICON] ?? CONCEPT_ICON.settings}
+                          title={t(page.title)}
+                        />
                       ))}
                     </CardGrid>
                   </div>

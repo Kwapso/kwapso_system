@@ -54,10 +54,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@shared/ui/components/dialog/dialog"
-import { Button } from "@shared/ui/components/button/button"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
-import { Paperclip, X } from "@shared/ui/foundations/icons"
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -71,7 +69,6 @@ import { appModulesKey, appsKey, listFetch, sprintsKey } from "@/lib/live-resour
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
-import { ManageDropdownsLink } from "@/components/choices/manage-dropdowns-link"
 import { RecordPicker } from "@/components/records/record-picker"
 // `NEUTRAL_TYPE_COLOUR`/`ticketTypeColour` USED TO BE IMPORTED HERE, for the
 // dot on the "No type" chip and then for the type row's own swatch. Both
@@ -85,6 +82,7 @@ import { isFeedbackTicketType, isValidationSprintType, ticketTypeIconName } from
 import { sprintIsRunning } from "@shared/sprint-state"
 import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
+import { pickedFileId, usePickedFileItems } from "@shared/web/upload-items"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
 
@@ -388,6 +386,13 @@ export function HelpFormDialog({
   React.useEffect(() => {
     if (!open) setPending([])
   }, [open])
+  // THE TILES THE FIELD BELOW DRAWS — client ruling, 17 Sep 2026: "I can
+  // really see the images that I have already uploaded." Every picked file
+  // becomes a tile through the one shared seam (shared/web/upload-items.ts)
+  // every FileUpload call site now builds its items with; an image gets an
+  // object URL preview, everything else falls back to the kit's own
+  // icon-and-tag.
+  const pendingItems = usePickedFileItems(pending)
   // T3655 — "when raising tickets or stories on any record from inside its
   // parent record… it does not make sense to select the app or the account."
   // The APP already answers this: every app has exactly one owning account
@@ -1171,42 +1176,21 @@ export function HelpFormDialog({
             }
             // THE NAME AND NOTHING ELSE — client, 2026-09-09: *"in add/edit for
             // tickets for accounts, i only need the nme (no email no others)."*
+            // Narrow when it was written: `searchAccounts` still added a
+            // `[code, email]` hint for every OTHER dialog, so this call site
+            // carried its own `.map` to strip it, reasoned at length about why
+            // it applied here and nowhere else yet.
             //
-            // WHAT THE OPTION CARRIED. `searchAccounts` (web/lib/picker-sources.ts)
-            // builds every account option through the one `accountOption` seam
-            // — value, label, picture, `shape: "square"`, `face: true` — and
-            // then adds a `hint` of its own: `[a.code, a.email].join(" · ")`.
-            // `PickerOption.hint` is drawn by `RecordPicker` as a SECOND LINE
-            // under the name, in `text-xs text-muted-foreground`. So a row read
-            // "Bergström Handels AB" over "KW-0031 · info@bergstrom.se" — the
-            // email and the "others" she named, and the only two things on the
-            // row that are not the name.
-            //
-            // WHAT IT CARRIES NOW: the name, and the ROUND MARK BESIDE IT,
-            // which is deliberately kept. A face is not "email and others" —
-            // it is the same icon the accounts list, the app facet and every
-            // other select in the app now draw, put there by her OWN ruling of
-            // the same day ("for accounts include icon in select components and
-            // filters", `accountOption`'s header). Two rulings from one person
-            // on one day: one adds the picture, one removes the text. Taking the
-            // icon out here would be answering the second by undoing the first.
-            //
-            // AND ONLY ON THIS FORM, because that is the scope of her sentence
-            // — "in add/edit for tickets". Nine other dialogs ask the same door
-            // for the same accounts and still show the hint, which is where the
-            // code and the email earn their place: they are two of the three
-            // fields the door SEARCHES, so a row that matched on an email
-            // nobody could see looks like a wrong answer. That argument is
-            // weakest exactly here, on a form where the person raising a ticket
-            // already knows which client they mean. So the subtraction is a
-            // `.map` at this call site rather than a flag on the shared
-            // function: one screen changed, nine untouched, and no second way
-            // to ask the accounts door.
-            search={(term) =>
-              searchAccounts(term, { type: "entity" }).then((rows) =>
-                rows.map(({ hint: _hint, ...option }) => option)
-              )
-            }
+            // THAT SCOPE IS GONE. Her 17 Sep 2026 ruling generalises the same
+            // sentence to every add screen ("do only show me the icon and the
+            // name, no email or anything else"), so `searchAccounts` itself
+            // (web/lib/picker-sources.ts) no longer adds a hint for any
+            // caller — see that function's own header. The `.map` this call
+            // site carried is redundant now, not wrong; removed so the source
+            // stays the one place this is decided, and the face beside the
+            // name (`accountOption`'s `face: true`, R35, her OTHER ruling the
+            // same day) is exactly what `searchAccounts` still hands back.
+            search={(term) => searchAccounts(term, { type: "entity" })}
             searchKey={pickerKey("companies", teamId)}
             // WITHOUT THIS, THE CLOSED CONTROL SHOWS THE ID (RecordPicker's own
             // documented gap): a draft restored on a cold cache — or simply this
@@ -1396,11 +1380,6 @@ export function HelpFormDialog({
           emptyText={t("Your team has no ticket types set up yet.")}
           disabled={busy}
         />
-        {/* THE SIGNPOST POINTS AT THE MODULE, not at a wall of every group the
-            team has — `tickets`, because the row above it is the `Ticket type`
-            vocabulary and `MODULE_SETTINGS` puts that group on Settings ›
-            Tickets (client, 2026-09-11, retiring the general Choices tab). */}
-        <ManageDropdownsLink teamId={teamId ?? null} segment="tickets" />
       </Field>
       {/* WHAT TO CALL IT, above the paragraph rather than below it: this is the
           line the triage card, the list's title column and the ticket's own
@@ -1492,34 +1471,21 @@ export function HelpFormDialog({
           and a control that always refused would be worse than none. */}
       {canAttach && (
         <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
-          <div className="flex flex-col gap-2">
-            {pending.length > 0 && (
-              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-                {pending.map((file, i) => (
-                  <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
-                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-6"
-                      aria-label={t("Take it off")}
-                      disabled={busy}
-                      onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <FileUpload
-              multiple
-              onFilesSelected={(files) => setPending((f) => [...f, ...files])}
-              className={busy ? "pointer-events-none opacity-60" : undefined}
-            />
-          </div>
+          {/* THE HAND-ROLLED LIST IS GONE — SUPERSEDED BY THE KIT'S OWN TILE
+              GRID (file-upload.tsx's "OPTION B"): the moment a file lands,
+              the zone itself becomes the row of tiles this field used to
+              draw beside it by hand. `pendingItems` is `pending` run through
+              the one shared seam every FileUpload call site now builds its
+              items with (shared/web/upload-items.ts) — an object URL preview
+              for an image, the kit's icon-and-tag for anything else. */}
+          <FileUpload
+            multiple
+            files={pendingItems}
+            onFilesSelected={(files) => setPending((f) => [...f, ...files])}
+            onRemove={(id) => setPending((f) => f.filter((file) => pickedFileId(file) !== id))}
+            removeLabel={t("Take it off")}
+            className={busy ? "pointer-events-none opacity-60" : undefined}
+          />
         </Field>
       )}
       {/* TYPE USED TO BE HERE, last and outside the sequence, with a note

@@ -638,7 +638,7 @@ Start with **[README.md](README.md)** (the doc map), then:
   proof-of-red, and never run `git checkout --` on a tracked file.
 - **Measure on staging, not in the harness.** Screenshots from the desktop harness lie about
   the app — no tab shoulders, no boot. Proof of a UI claim is a headless Playwright run
-  (installed in this repo's `node_modules`) against https://staging.system.kwapso.com, logged
+  (installed in this repo's `node_modules`) against https://agency-staging.kwapso.app, logged
   in through POST `/api/auth/admin/test-login` with the key in the macOS Keychain item
   `test-login-key-kwapso` (never print the key). Three defects were only found this way: a
   flat icon-only tab corner, a 4px gap with no nesting, pointer capture killing tab clicks.

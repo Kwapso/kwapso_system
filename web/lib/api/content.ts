@@ -835,8 +835,18 @@ export const content = {
    * exists" for every row past the cursor the moment either changed. */
   todoOne: (id: string) =>
     api<{ todos: Todo[] }>(`/api/content/todos?id=${enc(id)}`).then((r) => r.todos[0] ?? null),
-  raiseTodo: (input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }) =>
-    api<PagedResponse<TodoPageSidecar>>("/api/content/todos", post(input)),
+  raiseTodo: (input: {
+    accountId: string
+    title: string
+    detail?: string
+    dueOn?: string
+    ticketId?: string
+    /** which of the client's own systems this is about — client ruling, 17
+     * Sep 2026, optional. */
+    appId?: string
+    /** which of the account's own CONTACTS this is aimed at — same ruling. */
+    assignedContactId?: string
+  }) => api<PagedResponse<TodoPageSidecar>>("/api/content/todos", post(input)),
   /** The client's own act — mark it done, and attach the one file they were asked
    * for. `fileDataUrl` is a base64 data URL; the door caps and parses it. */
   completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
@@ -975,6 +985,10 @@ export const content = {
       q?: string
       kind?: string
       compartment?: string
+      /** EVERYTHING ABOUT ONE APP (17 Sep 2026) — the app record's own
+       * Knowledge tab (`knowledge-screen.tsx`'s `KnowledgeScreen`, scope
+       * "app"). */
+      appId?: string
       /** "yes" = the sources the assistant may read, "no" = the ones taken away */
       active?: string
       sort?: string

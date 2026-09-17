@@ -102,18 +102,27 @@ describe("the knowledge head (knowledge-screen.tsx) — order", () => {
 
 describe('the mango "Ask" button — calls the new-conversation door', () => {
   it("calls openNewAgentTab, preselects the knowledge scope, then opens the panel", () => {
-    const head = knowledgeHeadBlock(readKnowledgeScreen())
-    const onClickAt = head.indexOf("onClick={() => {")
-    expect(onClickAt, "the Ask button's own onClick").toBeGreaterThan(-1)
-    const onClickEnd = head.indexOf("}}", onClickAt)
-    const body = head.slice(onClickAt, onClickEnd)
+    const src = readKnowledgeScreen()
+    // SHARED WITH THE APP SCOPE'S OWN ASK BUTTON (17 Sep 2026) — both press
+    // the identical door, so the call lives ONCE, in `openAskConversation`,
+    // rather than being copied into two `onClick`s that could drift. The head
+    // block's own button reads `onClick={openAskConversation}`.
+    const head = knowledgeHeadBlock(src)
+    expect(head, "the head's own Ask button calls the shared opener").toMatch(
+      /onClick=\{openAskConversation\}/
+    )
+
+    const fnAt = src.indexOf("function openAskConversation()")
+    expect(fnAt, "the shared opener is a real function in this file").toBeGreaterThan(-1)
+    const fnEnd = src.indexOf("\n  }", fnAt)
+    const body = src.slice(fnAt, fnEnd)
 
     // THE DOOR — web/lib/agent-conversation-tabs.ts's own "+": reuses the
     // newest unused draft or mints a fresh one, then activates it.
     expect(body, "opens (or reuses) a fresh conversation tab").toMatch(/openNewAgentTab\(\)/)
     // SCOPE, SKIPPING THE PICKER — her ask was answered directly rather than
     // leaving the reader to press "Knowledge" in the picker themselves.
-    expect(body, "preselects the knowledge scope").toMatch(/pickAgentTabScope\(\s*id\s*,\s*"knowledge"/)
+    expect(body, "preselects the knowledge scope").toMatch(/pickAgentTabScope\(id,\s*"knowledge"/)
     // OPENS AND FOCUSES — agent-panel.tsx's own open effect hands focus to
     // the composer the moment `open` flips true.
     expect(body, "opens the assistant panel").toMatch(/setAgentOpen\(true\)/)

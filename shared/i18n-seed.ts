@@ -4336,4 +4336,47 @@ export const SEED: Catalogue = {
      seven above. */
   "Search calls": { de: "Aufrufe durchsuchen", es: "Buscar llamadas", ca: "Cerca trucades" },
   "Search calls…": { de: "Aufrufe durchsuchen…", es: "Buscar llamadas…", ca: "Cerca trucades…" },
+
+  /* ── 17 Sep 2026, cross-lane hygiene pass — the eleven strings the ceiling
+     check found with no seed entry for de/es/ca, landed by the eight lanes
+     that shipped uncommitted the same day: the tickets board/queue/ID/
+     resolved columns (web/components/tickets/tickets-collection.tsx,
+     web/components/work/work-panels.tsx), the inputs app+assignee field
+     (web/components/work/todo-form-dialog.tsx), the app Knowledge tab's
+     empty state (web/components/knowledge/knowledge-screen.tsx) and the
+     Modules gallery's icon picker (web/components/records/icon-picker.tsx).
+     "Resolved by"/"Resolved date" reuse the existing "Resolved" word
+     (Erledigt/Resuelto/Resolt) rather than a second, competing translation
+     of the same status. */
+  "Assigned to": { de: "Zugewiesen an", es: "Asignado a", ca: "Assignat a" },
+  "ID": { de: "ID", es: "ID", ca: "ID" },
+  "Icon": { de: "Symbol", es: "Icono", ca: "Icona" },
+  "Resolved by": { de: "Erledigt von", es: "Resuelto por", ca: "Resolt per" },
+  "Resolved date": { de: "Erledigungsdatum", es: "Fecha de resolución", ca: "Data de resolució" },
+  "Nothing to triage.": { de: "Nichts zu sichten.", es: "Nada que priorizar.", ca: "Res a triar." },
+  "Nothing filed under this app yet.": {
+    de: "Noch nichts unter dieser App abgelegt.",
+    es: "Aún no hay nada archivado bajo esta app.",
+    ca: "Encara no hi ha res arxivat sota aquesta app.",
+  },
+  "Everything the assistant knows about this app will show up here — its tickets, process maps and meetings, and anything filed against it by hand.": {
+    de: "Alles, was der Assistent über diese App weiß, erscheint hier — ihre Tickets, Prozesskarten und Termine sowie alles, was von Hand dafür abgelegt wurde.",
+    es: "Todo lo que el asistente sabe sobre esta app aparecerá aquí — sus tickets, mapas de proceso y reuniones, y todo lo archivado bajo ella a mano.",
+    ca: "Tot el que l'assistent sap sobre aquesta app apareixerà aquí — els seus tiquets, mapes de procés i reunions, i tot el que s'hi ha arxivat a mà.",
+  },
+  "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.": {
+    de: "Die Karten sind die passenden Tickets, soweit sie geladen wurden. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Las tarjetas son los tickets que coincidieron, hasta donde se han cargado. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Les targetes són els tiquets que han coincidit, fins on s'han carregat. Fes clic en una targeta per obrir el tiquet.",
+  },
+  "Cards are this app's own tickets, as far as they have loaded. Click a card to open the ticket.": {
+    de: "Die Karten sind die eigenen Tickets dieser App, soweit sie geladen wurden. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Las tarjetas son los tickets propios de esta app, hasta donde se han cargado. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Les targetes són els tiquets propis d'aquesta app, fins on s'han carregat. Fes clic en una targeta per obrir el tiquet.",
+  },
+  "Each column counts every ticket at that stage — every ticket is in exactly one. Click a card to open the ticket.": {
+    de: "Jede Spalte zählt jedes Ticket in dieser Phase — jedes Ticket steht in genau einer. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada columna cuenta todos los tickets en esa etapa — cada ticket está en exactamente una. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cada columna compta tots els tiquets en aquesta etapa — cada tiquet és exactament en una. Fes clic en una targeta per obrir el tiquet.",
+  },
 }

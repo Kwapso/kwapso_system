@@ -102,6 +102,8 @@ const ticket: HelpTicket = {
   raiserId: "u1",
   raiserName: "Alaap",
   editorName: null,
+  resolverId: null,
+  resolverName: null,
   // Which system it is about and who asked (CHECKLIST 5.8 + 5.9). The agency's
   // own question is about no app and was asked by nobody outside the building,
   // so both are null here — which is the case the row shape has to survive.

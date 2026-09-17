@@ -116,18 +116,29 @@ export function ProfileMenu({
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* YOUR OWN PAGE, not Gear. Your name, your email address and what you
-            have done are who you ARE; Gear is how the app is set up. They were
-            one screen until 17 Aug 2026, and a tester looking for "change my
-            name" had to guess. The language you read kwapso in was on this page
-            too until 2026-09-10 — *"language shoudl be in settings somewhere,
-            not in my porfile"* (client) — and is now the fourth card in Gear's
-            Appearance tab, beside size, light or dark, and the sidebar's
-            colour. */}
-        <DropdownMenuItem onSelect={() => softNavigate("/profile")} className="gap-2">
-          <User className="size-4" />
-          {t("Your profile")}
-        </DropdownMenuItem>
+        {/* NOT A PAGE OF ITS OWN ANY MORE — the client's ruling, 17 Sep 2026,
+            verbatim: "I go to the nav bar, on my name, and to my profile. This
+            page should not exist. It should lead me to the same page that I
+            arrive at when I go to Settings, Members, and I click on one
+            member." The standalone `/profile` route and `ProfileScreen` are
+            retired (see UI-RULEBOOK.md L26); this item now opens the
+            signed-in person's OWN member record — the exact screen a card on
+            Settings › Members opens for anybody else
+            (web/components/team/member-screen.tsx), by their id (R38), never
+            a second bespoke "my profile" body kept alive beside it. Avatar
+            upload, name edit and email change moved onto that screen's own
+            ⋯ menu, self-only (member-screen.tsx's `member.isYou` branch);
+            appearance and sign-out were never on this page's material — they
+            stay right here, below. */}
+        {active.ctx?.team?.id && user?.id && (
+          <DropdownMenuItem
+            onSelect={() => softNavigate(`/t/${active.ctx?.team?.id}/members/${user.id}`)}
+            className="gap-2"
+          >
+            <User className="size-4" />
+            {t("Your profile")}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={() => softNavigate("/settings")} className="gap-2">
           <Gear className="size-4" />
           {t("Settings")}

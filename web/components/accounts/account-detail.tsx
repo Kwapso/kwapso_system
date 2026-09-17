@@ -986,6 +986,9 @@ export function AccountDetailScreen({
       <TodoFormDialog
         open={todoOpen}
         onOpenChange={setTodoOpen}
+        // THE WHOLE ROW, same reasoning as the sprint form's own `apps` above:
+        // `AccountAppPicker` narrows by `accountId` itself.
+        apps={(appsQ.data ?? []).filter((a) => a.active && a.accountId === accountId)}
         fixedAccount={{ id: accountId, name: account.name }}
         draftKey={`todo:add:account:${accountId}`}
         onSubmit={async (v: TodoFormValues) => {
@@ -994,6 +997,8 @@ export function AccountDetailScreen({
             title: v.title,
             detail: v.detail || undefined,
             dueOn: v.dueOn ? new Date(v.dueOn).toISOString() : undefined,
+            appId: v.appId || undefined,
+            assignedContactId: v.assignedContactId || undefined,
           })
           invalidate(sliceKey("todos-account", accountId))
           invalidate(todosKey(teamId))

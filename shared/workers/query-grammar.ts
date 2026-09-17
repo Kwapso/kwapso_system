@@ -43,6 +43,7 @@
 // red — which is the only kind of check worth having.
 
 import { APP_STAGES } from "../app-stages"
+import { MODULE_ICON_NAMES } from "../module-icons"
 import { DELIVERABLE_KINDS } from "../selectable-groups"
 import { HELP_STATUSES, RETIRED_HELP_STATUSES, STORY_STATUSES } from "../types"
 
@@ -854,6 +855,12 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "name", column: "name", type: "text" },
       { name: "description", column: "description", type: "text", bulky: true },
       { name: "benefit", column: "benefit", type: "text", bulky: true },
+      // THE GALLERY CARD'S OWN ICON (client's ruling, 17 Sep 2026) — an enum
+      // over `MODULE_ICON_NAMES` (shared/module-icons.ts), the SAME allow-list
+      // the door's own R20 check and the form's picker both hold, so an agent
+      // reading this field can never see a value none of the other two would
+      // ever have written.
+      { name: "icon", column: "icon", type: "enum", values: MODULE_ICON_NAMES as unknown as string[] },
       APP,
       ACCOUNT,
       CREATED,

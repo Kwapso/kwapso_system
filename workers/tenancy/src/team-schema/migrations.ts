@@ -7391,6 +7391,76 @@ UPDATE waves
 ALTER TABLE staff_profiles ADD COLUMN cover_url TEXT;
 `,
   },
+  {
+    // INPUTS GAIN AN APP AND AN ASSIGNEE — the client's ruling, 17 Sep 2026,
+    // verbatim: "When I'm asking a client for something under which account,
+    // it is optional to select an app. Remember, when we already selected an
+    // account, this app choice must be in a horizontal component. Also, I
+    // want to be able to select who this gets assigned to. Of course, it
+    // needs to filter the contacts of this account, including the avatar
+    // and full name, in a horizontal choice component with pills."
+    //
+    // `app_id` is the same optional, unfenced pointer `help.app_id` (0028)
+    // and `tasks.app_id` (2026-08-31) already carry: nullable, checked only
+    // for "exists and is active" at the door (`appForTodo`,
+    // workers/content/src/lib/todos.ts) — the account narrowing is the
+    // picker's own UX (`AccountAppPicker`), not a hard fence, the same split
+    // `appForTicket` already draws.
+    //
+    // `assigned_contact_id` is WHO AT THE CLIENT this input is aimed at —
+    // never a staff member, which is the whole point of her second
+    // sentence: "filter the CONTACTS of this account". Same shape as
+    // `help.raised_by_contact_id` (0028): it points at an `accounts` row of
+    // type `individual`, because a contact IS a person's own account row —
+    // there is no separate contacts table (15.1). Checked the identical way
+    // `contactForTicket` checks a ticket's raised-by contact
+    // (`contactForTodo`, lib/todos.ts): the account itself, or a live
+    // `account_links` row to it.
+    //
+    // NO INDEX ON `assigned_contact_id`, matching `help.raised_by_contact_id`
+    // (0028) — neither is filtered by in a list door today, only read back on
+    // the row. `app_id` gets one, matching every other table this shape
+    // landed on (`idx_help_app`, `idx_meetings_app`).
+    //
+    // NUMBERED 0103 — read live off the tail of this file right before
+    // appending (CLAUDE.md, "team migration numbers are read, never
+    // recalled"): 0102 is the highest version in this tree, so 0103 is the
+    // next free number.
+    version: "0103_inputs_get_an_app_and_an_assignee",
+    sql: `
+ALTER TABLE todos ADD COLUMN app_id TEXT REFERENCES apps (id);
+ALTER TABLE todos ADD COLUMN assigned_contact_id TEXT REFERENCES accounts (id);
+CREATE INDEX idx_todos_app ON todos (app_id);
+`,
+  },
+  {
+    // A MODULE GETS AN ICON — the client's ruling, 17 Sep 2026, verbatim:
+    // "Inside an app, the tabs module: I want it to look exactly like the
+    // settings modules, this kind of gallery with the icons. When I add a
+    // module, I should be able to select an icon for it." `app_modules`
+    // already carries `mark` (a short word or initial, 0048) for a dense
+    // list row; this is a SECOND, separate field for the gallery card's own
+    // icon well — the kit's Phosphor name, checked at the door against the
+    // reasoned allow-list `MODULE_ICON_NAMES` (shared/module-icons.ts), same
+    // shape as `mark`'s own `optionalMark` refusal (R20), a different
+    // vocabulary. Nullable: an unset module draws `DEFAULT_MODULE_ICON`
+    // rather than a blank well, decided on the browser side rather than
+    // backfilled here, so every existing module (the legacy import carried
+    // none) reads the same default without a write touching 246 rows.
+    //
+    // NUMBERED 0104 — read live off the tail of this file right before
+    // appending (CLAUDE.md, "team migration numbers are read, never
+    // recalled"): 0103 is the highest version in this tree, so 0104 is the
+    // next free number. This lane ran with no git access (its own brief:
+    // "No git"), so this is read off the LOCAL tree only — the number this
+    // lane chose is 0104; a collision against `origin/main` is caught and
+    // renumbered the way 0102's own header describes, by whichever lane
+    // appends next and actually runs `git fetch origin`.
+    version: "0104_app_modules_get_an_icon",
+    sql: `
+ALTER TABLE app_modules ADD COLUMN icon TEXT;
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

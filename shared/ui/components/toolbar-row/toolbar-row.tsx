@@ -128,6 +128,77 @@
    No `"use client"`. This module holds no state, calls no hook and creates no
    handler during its own render — it forwards nodes and props. `DropdownMenu`
    is itself a client component and carries its own directive.
+
+   ── THE FOLD, CLIENT RULING 17 SEP 2026 ("option B", "popover menu") ───────
+   Verbatim: "We need to look at the toolbar on smaller screens. I want
+   everything in one row." … "toolbar option B" … "popover menu". Validated
+   against the reference mock at 768 and 390; "at 1024 and above nothing
+   folds". Search never shrinks or hides and the action group never folds —
+   both already true above, untouched here. `filters` and `viewSwitch`
+   (which already carries `SortControl` beside `ViewSwitch` by this file's own
+   "one slot, not two" ruling above) fold into ONE `···` trigger beside the
+   action group, opening a `DropdownMenu` that holds the same two nodes, a
+   `DropdownMenuSeparator` between them.
+
+   THE FOLD OPENS A `Popover`, NOT A `DropdownMenu` — see `foldTrigger`'s own
+   note where it is built. Short version: a `DropdownMenu` is Radix `Menu`
+   (`role="menu"`, commands, arrow-key/typeahead item navigation) and
+   `filters`/`viewSwitch` are not commands — a `FilterBar` and a hand-rolled
+   `ViewSwitch` each carry their own keyboard model, which a menu role
+   conflicts with. `Popover` is a plain anchored panel with neither.
+
+   A CONTAINER QUERY, NOT A VIEWPORT ONE. `@container` (→ `container-type:
+   inline-size`) on THIS root is new to the kit — no other file queries a
+   container yet, so this is the convention's first use, recorded here for the
+   next file that needs one rather than reinvented differently. The existing
+   group separators above fold on `sm:`, a VIEWPORT breakpoint, because until
+   now this row's width and the viewport's were assumed to track together.
+   They no longer can: the same row folds the same way at 48rem whether it is
+   the full-bleed row `CollectionFrame` draws or a copy standing inside a
+   narrower sheet or card, which a viewport query cannot see. `@min-[48rem]`
+   is written out in full rather than reached for a named container step
+   (Tailwind v4's `@3xl` also resolves to 48rem) because 48rem is the number
+   the ruling was measured against, not a rung on an unrelated scale that
+   happens to land on it today.
+
+   TWO RENDERS OF THE SAME PROP, NOT ONE NODE PHYSICALLY RELOCATED. `filters`
+   and `viewSwitch` are opaque `ReactNode`s — this file has never read into
+   them and does not start now — so "moved into the popover" is built as the
+   SAME node reference placed in two positions, each gated by the complementary
+   side of the same `@min-[48rem]` query (`hidden @min-[48rem]:flex` inline,
+   `flex @min-[48rem]:hidden` inside the menu). A single physical DOM move
+   between the inline lane and a Radix `Portal` is not a CSS operation at
+   all — Radix mounts `DropdownMenuContent` into `document.body` only while
+   open, so there is no element to hand across without JavaScript deciding
+   where it lives, which is the one thing this file was asked to keep doing
+   without (see above: "holds no state, calls no hook"). The practical result:
+   the inline copy stays mounted (`display: none` under 48rem, so it holds no
+   tab stop and is not read by a screen reader) and Radix mounts a second,
+   live instance of the same props only while the menu is actually open. A
+   caller whose `filters`/`viewSwitch` node is fully controlled (value +
+   `onChange` from outside, which is what every real call site already does —
+   see `verify/toolbar-one-row/page.tsx`'s `switcher`) renders both instances
+   identically and either one's interaction updates the one source of truth;
+   a node holding its own uncontrolled UI state (which facet row is expanded,
+   say) would NOT share that state between the two instances. No call site in
+   this repository does that today, and this is exactly the trade a true
+   single-instance move would have avoided at the cost of adding the state and
+   the hook this file has never carried. Recorded rather than hidden.
+
+   THE MENU'S TWO ROWS ARE THE CALLER'S NODES, NOT A REBUILT SUMMARY. The
+   reference mock draws "Filter" and "Sort" as their own labelled rows — an
+   icon, a word, a muted current value or a count chip. This file cannot draw
+   that: `filters` and `viewSwitch` are opaque nodes and `ToolbarRow` is never
+   told how many filters are active or what a `SortControl` inside
+   `viewSwitch` currently reads, so a literal count chip or "Owner ↓" value
+   would be invented here rather than reported. What IS drawn is the
+   structure the ruling actually asks the KIT for: one `···` trigger, one
+   menu, the filters group, a divider, the view-switch group — captioned by
+   `DropdownMenuLabel`s ("Filters" / "Sort & view") so an unlabelled node
+   reads as something inside a menu rather than as a random box. The
+   per-control summary (a live count on "Filter", a live value on "Sort") is
+   a property of `FilterBar`/`SortControl` themselves, which is where it
+   belongs and where it stays out of this file's reach.
    ========================================================================= */
 
 import * as React from "react";
@@ -140,6 +211,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "../dropdown-menu/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "../popover/popover";
 import { Separator } from "../separator/separator";
 import { DotsThree } from "../../foundations/icons";
 
@@ -162,6 +234,23 @@ import { DotsThree } from "../../foundations/icons";
  */
 export const TOOLBAR_ROW_GAP = "mb-[var(--space-5)]";
 
+/**
+ * THE FOLD MENU'S TWO GROUP CAPTIONS AND DIVIDER — visual copies of
+ * `dropdown-menu.tsx`'s `DropdownMenuLabel` / `DropdownMenuSeparator`
+ * classes, not imports of them. `PopoverContent`, not `DropdownMenuContent`,
+ * is what hosts the fold (see `foldTrigger`'s own note on why), and
+ * `DropdownMenuLabel`/`DropdownMenuSeparator` wrap Radix's
+ * `DropdownMenuPrimitive.Label`/`.Separator`, which read `DropdownMenuPrimitive
+ * .Root`'s own context — mounting them under a `Popover` instead throws
+ * ("must be used within DropdownMenu"), not degrades quietly. Copying the
+ * two class strings keeps the look identical (same ink, same rule, same
+ * insets, `--radius` and the kit's own tokens throughout — no new colour) with
+ * no dependency on a menu that is not there.
+ */
+const FOLD_LABEL_CLASS =
+  "text-micro uppercase font-[var(--font-weight-medium)] text-ink-tertiary px-3 pt-2 pb-[var(--space-1h)]";
+const FOLD_DIVIDER_CLASS = "mx-3 my-[var(--space-2h)] h-px bg-border";
+
 const toolbarRowVariants = cva(
   [
     /* A COLUMN, not a row: the row itself is the track below, and what a
@@ -169,6 +258,11 @@ const toolbarRowVariants = cva(
        an open facet panel read as this row EXPANDING rather than as a second
        piece of furniture appearing under it. */
     "flex min-w-0 flex-col",
+    /* THE FOLD'S QUERY CONTAINER — the kit's first, see the file header's
+       "A CONTAINER QUERY, NOT A VIEWPORT ONE". `container-type: inline-size`
+       only; no `container-name`, so the descendants below query the nearest
+       ancestor rather than a name that would have to be kept in sync with it. */
+    "@container",
   ],
   {
     variants: {
@@ -261,6 +355,24 @@ export interface ToolbarRowProps
    */
   moreActionsLabel?: string;
   /**
+   * THE FOLD, CLIENT RULING 17 SEP 2026 ("toolbar option B", "popover menu").
+   * Below the row's own 48rem — a container width, not a viewport one; see
+   * the file header — `filters` and `viewSwitch` leave the lane and gather
+   * behind this trigger instead, beside the action group. The accessible name
+   * of that `···`. A prop with a default for the same reason `moreActionsLabel`
+   * is: the applications run in more than one language.
+   */
+  moreFiltersLabel?: string;
+  /**
+   * THE FOLDED MENU'S TWO GROUP CAPTIONS, in order: the `filters` group, then
+   * the `viewSwitch` group (which already carries `SortControl` beside
+   * `ViewSwitch` — see slot 4 below). Props with defaults for the same
+   * i18n reason as `moreFiltersLabel`; pass `null` for either to drop that
+   * caption and let the node speak for itself.
+   */
+  filtersMenuLabel?: string | null;
+  viewSwitchMenuLabel?: string | null;
+  /**
    * WHAT A TOOLBAR CONTROL OPENED — under the track, in flow, inside the same
    * painted box.
    *
@@ -338,6 +450,18 @@ export interface ToolbarRowProps
  *  it. Nothing is hidden behind a control, nothing changes its accessible name
  *  and nothing leaves the tab order.
  *
+ *  BELOW 48rem OF THE ROW'S OWN WIDTH (not the viewport's — see the file
+ *  header), `filters` and `viewSwitch` are the one exception to "nothing is
+ *  hidden": client ruling 17 Sep 2026, "toolbar option B" / "popover menu".
+ *  They leave the lane and gather behind a `···` trigger beside the action
+ *  group instead, opening a `DropdownMenu` that holds the same two nodes.
+ *  `search`, `period` and `actions` are unaffected at every width — the
+ *  ruling only ever named filter, sort and the view switch. This DOES take
+ *  two controls out of the tab order between the lane and the trigger while
+ *  folded, which is the one deliberate exception to "nothing … leaves the tab
+ *  order" above: they are still reachable, now from inside the menu the `···`
+ *  opens, the same trade every disclosure control makes.
+ *
  * RTL — safe. Every inset and every push is logical (`ms-auto`, `pe`/`ps`),
  * the lane scrolls the INLINE axis so it mirrors on its own, and no rule here
  * names a physical side. The `···` glyph is a horizontal ellipsis and is
@@ -355,6 +479,9 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
       actions,
       maxActions = 3,
       moreActionsLabel = "More actions",
+      moreFiltersLabel = "More filters and view options",
+      filtersMenuLabel = "Filters",
+      viewSwitchMenuLabel = "Sort & view",
       panel,
       ...props
     },
@@ -390,7 +517,11 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
     const actionGroup = actionList.length ? (
       <div
         data-slot="toolbar-row-actions"
-        className="ms-auto flex shrink-0 flex-nowrap items-center gap-2"
+        /* `ms-auto` MOVED to the shared `toolbar-row-trailing` wrapper below,
+           which also carries `foldTrigger` — see its own note. This div keeps
+           its `data-slot` (nothing external stops querying it) and its
+           internal layout; only the outer pin moved. */
+        className="flex shrink-0 flex-nowrap items-center gap-2"
       >
         {visibleActions}
         {overflowActions.length ? (
@@ -405,6 +536,75 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
         ) : null}
       </div>
     ) : null;
+
+    /* THE FOLD TRIGGER — client ruling 17 Sep 2026, "toolbar option B" /
+       "popover menu". Present whenever there is anything TO fold; its own
+       visibility below/above 48rem is CSS, not this condition, so the trigger
+       and the inline `filters`/`viewSwitch` blocks above are always both in
+       the tree and never both visible — see the file header's "TWO RENDERS OF
+       THE SAME PROP, NOT ONE NODE PHYSICALLY RELOCATED".
+
+       `Popover`, NOT `DropdownMenu`, HOSTS IT — the one deliberate difference
+       from the actions overflow beside it. A `DropdownMenu` is Radix `Menu`
+       under `role="menu"`: a list of COMMANDS, arrow-key and typeahead
+       navigated over registered items. `filters` and `viewSwitch` are not
+       commands — a `FilterBar` carries checkboxes and text inputs, and
+       `viewSwitch` already carries `SortControl` beside a `ViewSwitch` built
+       on no Radix primitive of its own (hand-rolled roving focus, per its own
+       file). Nesting either inside `role="menu"` is the ARIA failure mode the
+       task brief itself named ("or Popover if … DropdownMenu cannot host a
+       segmented switch"): a menu's own roving-tabindex model and a nested
+       control's own keyboard model both want the arrow keys. `Popover` is a
+       plain anchored panel with no item role and no keyboard model of its
+       own, which is what the kit's OWN actions overflow gets away without —
+       raw `Button`s, not `DropdownMenuItem`s — because a `Button` at least
+       LOOKS like a command; a checkbox row does not. */
+    const foldTrigger =
+      filters || viewSwitch ? (
+        <div
+          data-slot="toolbar-row-fold"
+          className="flex shrink-0 items-center @min-[48rem]:hidden"
+        >
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="secondary" size="icon" aria-label={moreFiltersLabel}>
+                <DotsThree aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            {/* `p-0`: `PopoverContent`'s own `--space-5` pad is right for its
+               one shipped shape (a title, a sentence, a button pair) and wrong
+               for two full-width groups, which want to run edge to edge and
+               pad themselves — the same reason the actions overflow's menu
+               above pads 10 instead. `w-auto` lets the panel size to `filters`'/
+               `viewSwitch`'s own content instead of the confirm-panel's fixed
+               300; `--space-11` (8rem) floors it so a single short row does
+               not collapse to a sliver. */}
+            <PopoverContent align="end" className="w-auto min-w-[var(--space-11)] p-0">
+              {filters ? (
+                <div data-slot="toolbar-row-fold-filters">
+                  {filtersMenuLabel ? <div className={FOLD_LABEL_CLASS}>{filtersMenuLabel}</div> : null}
+                  {/* 36 tall / 8 padded, the ruling's own figure for a folded
+                     row — `min-h-9` (36) and `p-2` (8), Tailwind's own numeric
+                     scale, matching this file's existing `py-1.5`/`gap-3`
+                     rather than reaching for a `--space-*` step that lands
+                     elsewhere (nearest are `--space-2` (8, right) and no scale
+                     step is 36). A FLOOR, not a fixed height: `filters` is
+                     `FilterBar`'s own chip row and may be taller than one line
+                     at this width, and 36 must not clip it. */}
+                  <div className="min-h-9 p-2">{filters}</div>
+                </div>
+              ) : null}
+              {filters && viewSwitch ? <div className={FOLD_DIVIDER_CLASS} /> : null}
+              {viewSwitch ? (
+                <div data-slot="toolbar-row-fold-view-switch">
+                  {viewSwitchMenuLabel ? <div className={FOLD_LABEL_CLASS}>{viewSwitchMenuLabel}</div> : null}
+                  <div className="min-h-9 p-2">{viewSwitch}</div>
+                </div>
+              ) : null}
+            </PopoverContent>
+          </Popover>
+        </div>
+      ) : null;
 
     /* Prefer nothing (PATTERN §4). An empty row is a painted pill standing in
        for a toolbar, which reads as one that failed to load. A panel with no
@@ -439,12 +639,27 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
           /* ONE ROW. AT EVERY WIDTH. Client, 2026-09-04, verbatim: "i want
              that toolbar is a single row like in the pdf i gave you long ago
              wiuth designs". Two children — a scrolling lane and a pinned
-             action group — and the lane absorbs every width problem by
+             trailing group — and the lane absorbs every width problem by
              scrolling its own inline axis, so this element's height is its
              tallest control's height and nothing else. The measurements that
              rejected a `···` fold, an in-flow disclosure and a double render
-             are in `collection-frame.tsx`'s own note; they are not repeated
-             here because they were made once and they did not move.
+             AS AN ANSWER TO "EVERYTHING WRAPS/DISAPPEARS AT 380" are in
+             `collection-frame.tsx`'s own note; they are not repeated here
+             because they were made once and they did not move, and they were
+             never touched by the fold below.
+
+             THAT REJECTION AND THE FOLD BELOW ARE NOT THE SAME QUESTION,
+             which is worth stating so nobody reads the fold as reopening it.
+             The 2026-09-04 shapes were rejected as ways to keep EVERY control
+             visible without a second line; the lane-scroll answer they lost
+             to still does that job for `search`, `period` and `actions` at
+             every width today, untouched. The 17 Sep 2026 ruling is a later,
+             narrower, explicitly client-approved trade for exactly two
+             controls — `filters` and `viewSwitch` — giving up VISIBILITY
+             below 48rem in exchange for staying in ONE row and fully
+             reachable from a `···`, which a scrolling lane could already do
+             (nothing was unreachable before either) but at the cost of a
+             swipe the client, this time, ruled she would rather not take.
 
              The inline-start inset is deeper than the others so a search
              glyph does not sit flush on the seam of a painted row, and the
@@ -502,15 +717,35 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
                 decorative
                 /* A rule earns its keep by separating two groups the eye reads
                    as one run — and on a phone it does not: see THREE
-                   BREAKPOINTS. Drawn as a fill, never a border. */
-                className="hidden h-[1.375rem] sm:block"
+                   BREAKPOINTS. Drawn as a fill, never a border.
+
+                   TWO DIFFERENT GATES, PICKED IN JS BECAUSE THEY ARE STATIC
+                   PER RENDER. `period` never folds, so a rule guarding it
+                   keeps the original VIEWPORT gate (`sm:`) exactly as before.
+                   Without `period`, everything this rule could be separating
+                   search from (`filters`, `viewSwitch`) folds away below
+                   48rem, and a rule with nothing after it is a mark standing
+                   for nothing — so it takes the FOLD's own CONTAINER gate
+                   instead, the same one `filters`/`viewSwitch` answer to. */
+                className={cn(
+                  "hidden h-[1.375rem]",
+                  period ? "sm:block" : "@min-[48rem]:block",
+                )}
               />
             ) : null}
 
             {filters ? (
               <div
+                data-slot="toolbar-row-filters"
                 className={cn(
                   "flex min-w-[var(--space-11)] items-center gap-2",
+                  /* THE FOLD, CLIENT RULING 17 SEP 2026. Below the row's own
+                     48rem this group leaves the lane for the `···` menu
+                     beside the action group instead — see the file header
+                     and `foldTrigger` below. The class pair is the mirror of
+                     `foldTrigger`'s own: hidden here is exactly where it is
+                     visible there, and never both, never neither. */
+                  "hidden @min-[48rem]:flex",
                   /* THE ROW'S OWN GUARANTEE, NOT A REQUEST OF THE CALL SITE.
                      Left to itself a `FilterBar` releases its chip row to
                      `flex-wrap` from `sm` up, and a wrapping row inside this
@@ -548,7 +783,11 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
               <Separator
                 orientation="vertical"
                 decorative
-                className="hidden h-[1.375rem] sm:block"
+                /* Tied to `filters`' own fold gate, not `sm:` — this rule
+                   trails `filters`, and `filters` is invisible below 48rem,
+                   so a rule that stayed on `sm:` would float with nothing
+                   before it. */
+                className="hidden h-[1.375rem] @min-[48rem]:block"
               />
             ) : null}
 
@@ -562,12 +801,28 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
               <Separator
                 orientation="vertical"
                 decorative
-                className="hidden h-[1.375rem] sm:block"
+                /* Tied to `viewSwitch`'s own fold gate, not `sm:` — `period`
+                   alone (unaffected by the fold) is not enough to keep this
+                   rule meaningful once `viewSwitch`, the thing it leads into,
+                   is the one that folded away. */
+                className="hidden h-[1.375rem] @min-[48rem]:block"
               />
             ) : null}
 
             {viewSwitch ? (
-              <div className="flex shrink-0 items-center">{viewSwitch}</div>
+              <div
+                data-slot="toolbar-row-view-switch"
+                className={cn(
+                  "flex shrink-0 items-center",
+                  /* THE FOLD — the mirror of `filters`' own gate above, and
+                     `foldTrigger`'s below. `viewSwitch` already carries
+                     `SortControl` beside `ViewSwitch` (slot 4's own note),
+                     so folding this one node is folding both. */
+                  "hidden @min-[48rem]:flex",
+                )}
+              >
+                {viewSwitch}
+              </div>
             ) : null}
           </div>
 
@@ -578,8 +833,24 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
               a phone is a control the reader has to go looking for. Pinning it
               here is also what makes the lane's scroll safe to reason about:
               one scrolling child and one fixed child, in that order, at every
-              width. */}
-          {actionGroup}
+              width.
+
+              `foldTrigger` PINS BESIDE IT, same reasoning: the client's 17 Sep
+              2026 ruling puts the `···` "beside the create/actions button",
+              never inside the lane it rescues `filters`/`viewSwitch` from. One
+              wrapper carries both so exactly one `ms-auto` ever fires — two
+              siblings each with their own `ms-auto` split the free space
+              between them instead of collapsing it, opening a gap between the
+              trigger and the actions it is meant to sit flush beside. */}
+          {(foldTrigger || actionGroup) ? (
+            <div
+              data-slot="toolbar-row-trailing"
+              className="ms-auto flex shrink-0 flex-nowrap items-center gap-2"
+            >
+              {foldTrigger}
+              {actionGroup}
+            </div>
+          ) : null}
         </div>
 
         {/* NO GAP ABOVE IT, WHICH IS THE POINT. Two boxes of the identical

@@ -2745,7 +2745,32 @@ export const UNCONTAINED_SECTION_OK: Record<string, string> = {
 // census reaches) is left for the lane that owns that screen to fix or
 // reason about; this lane's brief is the record-detail PANEL wrappers listed
 // in its own brief, not those five files' bodies.
-export const RECORD_DETAIL_COLLECTION_OK: Record<string, string> = {}
+export const RECORD_DETAIL_COLLECTION_OK: Record<string, string> = {
+  // `web/components/apps/app-detail.tsx#knowledge` — the app record's
+  // Knowledge tab, `<KnowledgeScreen scope={{ kind: "app", … }} />`
+  // (web/components/knowledge/knowledge-screen.tsx). A FALSE POSITIVE, not an
+  // uncontained collection: both the "app" and "team" scope branches call the
+  // SAME hoisted `renderGallery()` (the file's own header explains why it is
+  // one function, not two copies of the JSX — `web/test/knowledge-head.test.tsx`
+  // reads the source and requires `<CollectionHeading>` to precede
+  // `<PagedFind>` TEXTUALLY, which only holds if it is written once), and
+  // `renderGallery()`'s one `<PagedFind>` tree already carries
+  // `wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}` — the exact
+  // seam this census asks for, on the app scope exactly as on the team scope.
+  // The census cannot see it: `if (scope.kind === "app") return (…)` is
+  // structurally indistinguishable from a loading/error guard (an `if` with
+  // no `else`, whose `then` is a bare `return`), so `realRoots` strips it and
+  // asks only the trailing `team`-branch return whether it paints — and that
+  // return's own body calls `renderGallery()`, a plain `CallExpression` whose
+  // callee body the AST walk never inlines. Two structural blind spots
+  // (guard-return stripping + a call site standing in for its callee) meeting
+  // on one component, neither a real gap in the screen: staging shows the
+  // same nested card on the app's Knowledge tab as on the team-wide Knowledge
+  // page. Delete this line if `renderGallery()` is ever inlined into both
+  // branches (it should not be — see the file's own header for why).
+  "web/components/apps/app-detail.tsx#knowledge":
+    "<KnowledgeScreen scope={{ kind: \"app\" }}> already stands on the shared renderGallery()'s <PagedFind wrap={…}> → CollectionCard, identically to the team-scope Knowledge page; the census's guard-return heuristic strips the app branch and never sees the wrap because it sits behind a hoisted function call, not inline JSX.",
+}
 
 // ── A HAND-ROLLED STATUS DOT NEVER SHIPS ────────────────────────────────────
 //
@@ -3731,7 +3756,11 @@ export const GROWING_COLLECTIONS: Record<
  * the build red, so the list can only shrink. */
 export const FIND_NARROWING_OK: Record<string, string> = {
   "web/components/tickets/tickets-collection.tsx::rows.filter((r) => r.status === stage)":
-    "the Open tab's BOARD, and a partition rather than a narrowing: the columns are mapped off OPEN_TAB_STATUSES (`web/test/tab-facets.test.tsx` holds that), a loaded ticket has exactly one status, and every one of those statuses is drawn — so no card the page loaded is dropped from the board. The number beside each column stands down the moment anything is being asked (`count: narrowed ? undefined : counts?.[stage]`, with `narrowed={found.active}`), so the exact server count never sits over a bucketed page. The fifth column (Waiting) is a SECOND door read, not a slice of these rows, for the same reason.",
+    "the Open tab's BOARD, and a partition rather than a narrowing: the columns are mapped off OPEN_TAB_STATUSES (`web/test/tab-facets.test.tsx` holds that), a loaded ticket has exactly one status, and every one of those statuses is drawn — so no card the page loaded is dropped from the board. The number beside each column stands down the moment anything is being asked (`count: narrowed ? undefined : counts?.[stage]`, with `narrowed={found.active}`), so the exact server count never sits over a bucketed page. The fifth column (Waiting) is a SECOND door read, not a slice of these rows, for the same reason. Also covers the identical call in `AllBoard`, the same file, added 17 Sep 2026 for the All tab's own board — same partition, over HELP_STATUSES instead of the narrower four.",
+  "web/components/work/work-panels.tsx::rows.filter((r) => r.status === stage)":
+    "the app record's own ticket BOARD (`AppTicketsBoard`, 17 Sep 2026: \"In Tickets inside the app, I want a board view by status\") — a partition of the same bounded per-app page the List body already reads (`content.help({ appId })`, R14's ordinary hard cap), one column per HELP_STATUSES entry, every loaded ticket landing in exactly one. No column is handed a `count` at all (there is no per-app equivalent of the top-level screen's team-wide `byStatus` read to hand it), so there is no exact server number for a bucketed page to sit under and contradict — the cards ARE the board's whole claim, the same fallback OpenBoard/AllBoard themselves take the moment their own toolbar is narrowed.",
+  "web/components/work/work-panels.tsx::rows.filter((r) => r.status === \"new\")":
+    "the app record's own ticket QUEUE (`AppTicketsPanel`'s `renderBody`, 17 Sep 2026: \"I also want the queue view for triaging\") — a genuine narrowing, not a partition, over the SAME bounded per-app page the List body already reads. Safe because nothing on this screen shows an exact count that this view could then contradict: the app's `ticketsTotal` badge (read one level up, on the record's own tab strip) counts the WHOLE ticket collection and is never claimed to be \"how many are new\", and the queue itself shows no count of its own, only the filtered rows. The client's own words license the bounded read: \"if the door already returns a page, group client-side for the board with the same bounded read the list uses\" carries over to the queue, the list's other alternate body.",
 }
 
 export const DEAF_EXEMPT: Record<string, string> = {
@@ -4004,8 +4033,15 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "one system's own fields — whose it is, its stage, the four paragraphs of context, the four prose fields and the address, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
   "app-detail.impact":
     "the hours this app gives back every month and what they are worth at the rate of the role that used to spend them (8.13). An arithmetic over the app's process maps, drilled process by process — the lines are the sum's own working, not a collection of records, and a badge over them would be counting the number of terms in an addition.",
-  "app-detail.knowledge":
-    "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
+  // `app-detail.knowledge` STOOD HERE and left this map on 17 Sep 2026, the day
+  // the client ruled the Knowledge tab should "replicate what we have in the
+  // general knowledge [...] a gallery with all the knowledge we have about
+  // this". It is a real, app-filtered collection now (`SourceFilters.appId`,
+  // workers/content/src/lib/knowledge.ts), so it carries an exact server total
+  // the same way its five collection siblings on this record already do
+  // (`shared/record-counts.ts`'s new `knowledge-app` entry) — the old
+  // reasoning ("retrieval, not a collection") describes the ask box this tab
+  // no longer is.
   "process-detail.overview":
     "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
   // THE WORK ENGINE'S TWO RECORDS, pinned on 18 Aug 2026 — the day the census
@@ -4360,7 +4396,7 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "screens/portal-impact.tsx":
     "MISMATCH. The kit's `/impact` is a flat progress-bars-plus-savings-figure report; this app's real `/impact` (`web-portal/components/impact-screen.tsx`) is an interactive App → Process → Step drill-down accordion with per-step regression flags, comments and conditional pricing — structure the composition has no slot for.",
   "screens/profile.tsx":
-    "MISMATCH. This app's real profile screen (`web/components/screens/profile-screen.tsx`) shows a summary plus an `ActivityFeed` and edits through a separate popup dialog; the composition is an inline full-page required/optional form with its own commit bar — a different editing model, not a missing prop.",
+    "REALIZED DIFFERENTLY, revised 17 Sep 2026. This app no longer has a profile screen of its own to compare against the composition — the client's own ruling retired it outright ('this page should not exist… it should lead me to the same page that I arrive at when I go to Settings, Members, and I click on one member'). The signed-in person's identity now renders through `web/components/team/member-screen.tsx`, the SAME generic member-record detail every other teammate's row opens, by their id (R38), never a page whose whole subject is always 'me'. The composition's premise — a screen that is always about the current user — has no slot left to fill; adopting it would mean building back the second, bespoke identity screen the ruling removed.",
   "screens/session-expired.tsx":
     "GAP, a real unscoped finding — not a permanent exemption. Nothing today persists a signed-out user's identity or a return destination: a 401 clears the session cache and redirects to a bare `/login` with no context (`web/lib/use-active-team.ts`), and there is no redirect-back mechanism anywhere in the login flow to restore to. Worth a scoped brief (identity storage + a redirect-back contract the whole login flow honours) when auth UX gets dedicated attention — real, unstarted plumbing on the one path where a half-built screen locks somebody out of their own account.",
   "screens/sign-in-portal.tsx":
@@ -4423,6 +4459,8 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
  * Rot-checked twice: a path that comes back, or one nothing names any more,
  * turns the build red, so the list can only shrink. */
 export const GONE_ON_PURPOSE: Record<string, string> = {
+  "web/components/screens/profile-screen.tsx":
+    "the standalone /profile screen, retired 17 Sep 2026 at the client's own ruling ('I go to the nav bar, on my name, and to my profile. This page should not exist. It should lead me to the same page that I arrive at when I go to Settings, Members, and I click on one member.'). The nav bar's own name (profile-menu.tsx) now opens the signed-in person's own team-scoped member record (member-screen.tsx) by id, the same screen a card on Settings › Members opens for anybody else. UI-RULEBOOK.md's L26 entry and its N8 width census both name this path precisely BECAUSE it is gone — L26 is the retirement record itself, and N8's table is measured history of a cap that no longer exists anywhere, this file included.",
   "web/lib/app-stage-icon.tsx":
     "the small resolver that turned `AppStage.icon` into a real Phosphor glyph, deleted 16 Sep 2026 the same day it shipped — the client's correction of migration 0097's misread moved the icon vocabulary to Sprint type (`web/lib/sprint-type-icon.tsx`) and put App stage's own pill back on a coloured dot, so nothing resolves an `AppStage` icon any more. Team migration 0097's own header (workers/tenancy/src/team-schema/migrations.ts, both the original paragraph and the correction appended beside it) and UI-RULEBOOK.md K28 both name this path precisely BECAUSE it is gone — the correction cannot be told without naming the file it retired.",
   "web/components/choices/selectable-screen.tsx":
@@ -4887,6 +4925,8 @@ export const NO_RECORD_BEHIND_IT: Record<string, string> = {
 export const NOT_A_WORK_PICKER: Record<string, string> = {
   "screens/kwapso-screen.tsx":
     "the team roster on the agency's own record — a list of who is here, not a list of who can be given something",
+  "work/work-panels.tsx":
+    "reads the members list once, in AppTicketsPanel, only to resolve a ticket's editor/resolver AVATAR (`memberAvatar`, a `.find()` by userId) — a lookup by id, never turned into an option list. This file offers nobody a member to PICK. (The to-do form's own new 'Assigned to' field, migration 0103, is a different picker entirely — the account's own CONTACT, off `contactOptions`, never the team members list this census watches.)",
 }
 
 // ── orphan-components ───────────────────────────────────────────────────────
@@ -4900,6 +4940,18 @@ export const PARKED: Record<string, string> = {
     "the reachable-screens exemption for POST /google/gmail/trash names this file as " +
     "where a person's own 'bin it' belongs the day a screen opens it — delete this " +
     "line and the dialog together with that one.",
+  "choices/manage-dropdowns-link":
+    "the gated 'Manage choices' signpost under a dropdown field. Its one remaining " +
+    "call site — the ticket form's Type row — was retired 17 Sep 2026 at the " +
+    "client's own ruling ('remove the manage choices under type and replace these " +
+    "colors with the icons for each type', see help-form-dialog.tsx and " +
+    "web/test/help-form-dialog-type-icons.test.tsx), which leaves it unmounted " +
+    "everywhere. Parked, not dead: the mechanism (a permission-gated jump from a " +
+    "vocabulary field to that field's own module settings page, via " +
+    "`moduleSettingsPage()`) is still the right shape for the next dropdown field " +
+    "that wants one — delete this line and the file together the day nothing ever " +
+    "mounts it again, or a caller reappears and this line comes out on its own " +
+    "(the rot check below catches that).",
 }
 
 // ── R41 (picked-files-are-sent) ─────────────────────────────────────────────

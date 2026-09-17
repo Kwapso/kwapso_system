@@ -100,10 +100,14 @@ describe("the Closed tab shows less, and only the Closed tab does", () => {
 
   // ── THE COLUMNS ───────────────────────────────────────────────────────────
 
-  it("Closed draws title, type, app, raised and closed — and nothing else", () => {
-    // Her five, in her order. Read as an exact SEQUENCE because the order is
-    // half the ruling: she said them in the order she wants to read them.
-    expect(helpTabColumns(CLOSED)).toEqual(["title", "type", "app", "created", "closed"])
+  it("Closed draws id, title, type, app, raised and closed — and nothing else", () => {
+    // Her five, in her order, PLUS the ID column restored 17 Sep 2026 ("add
+    // the header ID for the ID") — see TICKET_COLUMN_ORDER's own header
+    // (web/lib/live-resources.ts) for the full account of why it left and
+    // came back. Read as an exact SEQUENCE because the order is half the
+    // ruling: she said them in the order she wants to read them, and this
+    // now lands exactly on R82's six-column ceiling.
+    expect(helpTabColumns(CLOSED)).toEqual(["id", "title", "type", "app", "created", "closed"])
   })
 
   it("Closed is every other tab's row plus the closing date", () => {

@@ -912,6 +912,7 @@ export async function listAppModules(
     account_id: string | null
     name: string
     mark: string | null
+    icon: string | null
     name_de: string | null
     description: string | null
     benefit: string | null
@@ -929,7 +930,7 @@ export async function listAppModules(
     // cannot show is R16's failure in its quietest form. The owner deleted that
     // kind outright on 15 Sep 2026 (`shared/ticket-types.ts` carries the
     // ruling), so a plain `COUNT(*)` says what the clause used to have to say.
-    `SELECT m.id, m.app_id, a.name AS app_name, m.account_id, m.name, m.mark, m.name_de,
+    `SELECT m.id, m.app_id, a.name AS app_name, m.account_id, m.name, m.mark, m.icon, m.name_de,
             m.description, m.benefit, m.deactivated_at, m.created_at,
             (SELECT COUNT(*) FROM help h
               WHERE h.module_id = m.id AND h.resolved = 0) AS ticket_count
@@ -944,6 +945,7 @@ export async function listAppModules(
     accountId: r.account_id,
     name: r.name,
     mark: r.mark,
+    icon: r.icon,
     nameDe: r.name_de,
     description: r.description,
     benefit: r.benefit,
@@ -959,7 +961,7 @@ async function moduleOrThrow(
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ id: string; appId: string; name: string; mark: string | null; nameDe: string | null; description: string | null; benefit: string | null }> {
+): Promise<{ id: string; appId: string; name: string; mark: string | null; icon: string | null; nameDe: string | null; description: string | null; benefit: string | null }> {
   const fence = accountScopeClause(scope, "account_id")
   // AND THE APP FENCE — the by-id sibling of `appModulesWhere`, held to the same
   // clause as the list it came from. FOUND BY THE CENSUS
@@ -978,13 +980,14 @@ async function moduleOrThrow(
     app_id: string
     name: string
     mark: string | null
+    icon: string | null
     name_de: string | null
     description: string | null
     benefit: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, apps.sql || undefined, "id = ?"])}`,
+    `SELECT id, app_id, name, mark, icon, name_de, description, benefit FROM app_modules${where([fence.sql, apps.sql || undefined, "id = ?"])}`,
     [...fence.params, ...apps.params, id]
   )
   const row = rows[0]
@@ -994,6 +997,7 @@ async function moduleOrThrow(
     appId: row.app_id,
     name: row.name,
     mark: row.mark,
+    icon: row.icon,
     nameDe: row.name_de,
     description: row.description,
     benefit: row.benefit,
@@ -1011,7 +1015,7 @@ export async function createAppModule(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { appId: string; name: string; mark?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
+  input: { appId: string; name: string; mark?: string | null; icon?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
 ): Promise<string> {
   const app = await appOrThrow(cfg, guard, scope, input.appId)
   const id = ulid()
@@ -1023,6 +1027,7 @@ export async function createAppModule(
       account_id: app.accountId,
       name: input.name,
       mark: input.mark ?? null,
+      icon: input.icon ?? null,
       name_de: input.nameDe ?? null,
       description: input.description ?? null,
       benefit: input.benefit ?? null,
@@ -1059,7 +1064,7 @@ export async function updateAppModule(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; mark?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
+  input: { name: string; mark?: string | null; icon?: string | null; nameDe?: string | null; description?: string | null; benefit?: string | null }
 ): Promise<void> {
   const before = await moduleOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
@@ -1067,6 +1072,7 @@ export async function updateAppModule(
   // ABSENT MEANS "SAY NOTHING", the patch rule every other door in this file
   // keeps — so a picker that sends only a name cannot silently erase an emoji.
   const mark = input.mark === undefined ? before.mark : input.mark
+  const icon = input.icon === undefined ? before.icon : input.icon
   const nameDe = input.nameDe === undefined ? before.nameDe : input.nameDe
   const description = input.description === undefined ? before.description : input.description
   const benefit = input.benefit === undefined ? before.benefit : input.benefit
@@ -1075,9 +1081,9 @@ export async function updateAppModule(
     changed = await d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
-      `UPDATE app_modules SET name = ?, mark = ?, name_de = ?, description = ?, benefit = ?, ${audit.sql}
+      `UPDATE app_modules SET name = ?, mark = ?, icon = ?, name_de = ?, description = ?, benefit = ?, ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
-      [input.name, mark, nameDe, description, benefit, ...audit.params, ...fence.params, id]
+      [input.name, mark, icon, nameDe, description, benefit, ...audit.params, ...fence.params, id]
     )
   } catch (err) {
     if (String(err).includes("UNIQUE"))
@@ -1088,6 +1094,7 @@ export async function updateAppModule(
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
     { label: "Mark", from: before.mark, to: mark },
+    { label: "Icon", from: before.icon, to: icon },
     { label: "German name", from: before.nameDe, to: nameDe },
     { label: "Description", from: before.description, to: description, hideValues: true },
     { label: "Benefit", from: before.benefit, to: benefit, hideValues: true },

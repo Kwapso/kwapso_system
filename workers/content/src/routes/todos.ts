@@ -286,7 +286,16 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
     detail?: unknown
     dueOn?: unknown
     ticketId?: unknown
+    appId?: unknown
+    assignedContactId?: unknown
   }>(request, env, "inputs", "create")
+  // R20 positional: every field this door reads sits inside a checker, here at
+  // the boundary, before lib/todos proves the two ids point at live rows the
+  // same shape help.ts's own `postCreateHelp` already checks appId/
+  // raisedByContactId twice for (once here, once again inside the lib
+  // functions that resolve them against `apps`/`account_links`).
+  optionalText(body.appId, "App", TEXT_LIMITS.short)
+  optionalText(body.assignedContactId, "Assigned to", TEXT_LIMITS.short)
   const scope = await refusePortalCaller(cfg, guard)
   const created = await createTodo(cfg, guard, actor, {
     accountId: requireText(body.accountId, "Client", TEXT_LIMITS.short),
@@ -294,6 +303,8 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
     detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
     dueOn: optionalMoment(body.dueOn, "Due"),
     ticketId: optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short),
+    appId: body.appId,
+    assignedContactId: body.assignedContactId,
   })
   await publishChange(env, guard.teamId, "todos", created.id, "add", created.accountId)
   // Best-effort, and after the write: a failed email must never fail the to-do

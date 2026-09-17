@@ -34,31 +34,30 @@ export function pickerKey(kind: string, teamId: string | null | undefined): stri
  * `archived: "no"` is the door's own way of saying what every picker used to say
  * in the browser with `.filter(a => a.active)`: a put-away company is still a
  * row, and still readable on its own record, but it is not something new work
- * should be filed against. */
+ * should be filed against.
+ *
+ * NO HINT. Client ruling, 17 Sep 2026, verbatim: *"On all add screens, when
+ * I'm picking an account, do only show me the icon and the name, no email or
+ * anything else."* Until this ruling the option below carried a second line
+ * of its own — `[a.code, a.email].filter(Boolean).join(" · ")` — reasoned as
+ * "two of the three fields the door itself searched, so a match on an email
+ * nobody could see looked like a wrong answer." A narrower ruling on
+ * 2026-09-09 had already stripped it from ONE call site (the ticket dialog's
+ * own account field, `help-form-dialog.tsx`), with a `.map` there and a note
+ * that nine other dialogs "still show the hint" on purpose. Her 17 Sep
+ * sentence removes that purpose: EVERY add screen now gets the name alone, so
+ * the fix belongs here, at the one function every one of those forms calls,
+ * not at nine more call sites. `accountOption` (web/lib/pickable.ts) still
+ * carries the face (R35) — the icon her sentence keeps — untouched. */
 export async function searchAccounts(
   term: string,
   opts: { type?: "entity" | "individual" } = {}
 ): Promise<PickerOption[]> {
   const r = await tenancy.accounts({ q: term || undefined, type: opts.type, archived: "no" })
-  return r.accounts.map((a) => ({
-    // THE FACE (R35), through the ONE seam that says what an account looks
-    // like as an option (`accountOption`, web/lib/pickable.ts). It carries the
-    // logo — which arrived on every one of these rows and was dropped here, one
-    // line before the picker, so the accounts LIST drew a company's mark and the
-    // picker that chooses the same company drew a word — the square box, and
-    // `face`, which is the half added on 2026-09-09 for the client's ruling
-    // ("for accounts include icon in select components and filters"): two
-    // accounts in three have no picture, and without the flag those rows drew
-    // nothing at all beside the seventeen that do.
-    //
-    // The HINT is this door's own and nothing in the shared seam has an opinion
-    // about it: the code and the email are what tell two people called Marta
-    // apart, and they are two of the three fields the door itself searched — so
-    // a row that matched on an email nobody could see used to look like a wrong
-    // answer.
-    ...accountOption(a),
-    hint: [a.code, a.email].filter(Boolean).join(" · ") || undefined,
-  }))
+  // THE FACE (R35) AND NOTHING ELSE, through the one seam that says what an
+  // account looks like as an option (`accountOption`). No `hint` — see the
+  // ruling above.
+  return r.accounts.map((a) => accountOption(a))
 }
 
 /** TICKETS — the help door (`q` searches the description and the reference).

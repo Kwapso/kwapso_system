@@ -244,9 +244,9 @@ export const tenancy = {
       body: JSON.stringify({ id, active }),
     }),
 
-  createAppModule: (input: { appId: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
+  createAppModule: (input: { appId: string; name: string; mark?: string; icon?: string; nameDe?: string; description?: string; benefit?: string }) =>
     api<{ id: string }>("/api/tenancy/app-modules", { method: "POST", body: JSON.stringify(input) }),
-  updateAppModule: (input: { id: string; name: string; mark?: string; nameDe?: string; description?: string; benefit?: string }) =>
+  updateAppModule: (input: { id: string; name: string; mark?: string; icon?: string; nameDe?: string; description?: string; benefit?: string }) =>
     api<{ ok: true }>("/api/tenancy/app-modules/update", { method: "POST", body: JSON.stringify(input) }),
   setAppModuleActive: (id: string, active: boolean) =>
     api<{ ok: true; changed: boolean }>("/api/tenancy/app-modules/active", {

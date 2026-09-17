@@ -31,6 +31,7 @@ import type { SessionUser } from "@shared/types"
 import { ApiFailure, auth } from "@/lib/api"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { useT } from "@shared/web/language"
 
 const firstField = { ...defaultFieldConfig, label: "First name", required: true }
@@ -129,7 +130,30 @@ export function ProfileDialog({
               )}
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>
-            <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
+            {/* THE TILE GRID SHOWS WHAT IS ALREADY THERE — client ruling, 17
+                Sep 2026. The freshly-picked data URL wins over the stored
+                photo, through the one shared seam every FileUpload call site
+                now builds its items with (shared/web/upload-items.ts). No
+                `onRemove`: this form never offered "clear your photo", only
+                "pick a different one". */}
+            <FileUpload
+              accept="image/*"
+              multiple={false}
+              files={
+                photo
+                  ? [storedFileToUploadItem({ id: "profile-photo", name: t("Your photo"), href: photo })]
+                  : user?.imageUrl
+                    ? [
+                        storedFileToUploadItem({
+                          id: "profile-photo",
+                          name: t("Your photo"),
+                          href: user.imageUrl,
+                        }),
+                      ]
+                    : []
+              }
+              onFilesSelected={handlePhoto}
+            />
           </div>
           <Field config={firstField} htmlFor="pf-first">
             <Input

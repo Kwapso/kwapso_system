@@ -2,6 +2,200 @@
 
 ## Unreleased
 
+### Added — `FileUpload`'s zone becomes a tile grid the moment a file lands — v1.2.110
+
+Client ruling, 17 Sep 2026, verbatim: *"I like the status when it's empty,
+like 'Drop files here' or 'Choose.' That really works, but when I already
+drop something, I don't like that what I dropped is so small and the other
+remains the same big. … My goal would be that the 'Drop files' becomes
+smaller and that I can really see the images that I have already uploaded.
+They don't show only as the name, but I also see the image itself, or, if
+it's a document, a preview."* Then, choosing among the drawings this put in
+front of her: *"upload zone option B."*
+
+Option B, "the zone becomes a tile": the empty zone — the dashed box, "Drop
+files here," "Choose" — is UNCHANGED, pixel for pixel. The moment the first
+file lands, the SAME `data-slot="file-upload-zone"` element stops being the
+32×24 padded box CH16 draws and becomes a CSS grid instead:
+`grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr))`, `gap-3`
+(`--space-3`, the token table's own "card grid gap" figure). `auto-fill`,
+never `auto-fit`, is the one CSS decision the whole redesign turns on:
+`auto-fit` collapses empty tracks and hands their space to whatever tiles
+exist, so two files in a wide zone would each balloon to fill half the row —
+trading the client's exact complaint for a new version of the same bug.
+`auto-fill` reserves 5.5rem (88px) tiles regardless of how many siblings a
+tile has, which is what "I can really see the images" is asking for.
+
+An Add tile — the dashed box's own next form, sharing its edge classes
+(`ZONE_EDGE_CLASSES`) rather than a copy that could drift — sits first, top
+left. Every file after it is a tile: `preview`, a new optional field on
+`FileUploadItem`, draws the actual picture through the kit's own `Image`
+primitive at its default `fit="cover"`; with no `preview`, the tile falls
+back to a `KIND_ICON`/`KIND_TAG` pair — a Phosphor glyph already in the kit
+and a short type tag ("PDF", "XLS", …) — keyed by a new `kind` field
+(`FileUploadFileKind`: `image` / `pdf` / `doc` / `sheet` / `archive` / `audio`
+/ `video` / `other`). `kind`, undefined, derives from a third new field,
+`type` (a MIME string, e.g. a picked `File`'s own `.type`), through
+`deriveKind`; with neither given, a row honestly resolves to `"other"` rather
+than guessing from the file name. All three fields are additive — every
+existing `FileUploadItem` and every existing call site (`import-wizard.tsx`,
+`compositions/templates/import-flow.tsx`) keeps compiling and keeps working,
+just without pictures until it starts passing them.
+
+The caption is the file's `name`, one line, ellipsised, under the square —
+not beside it. There is no room left for `size` on that one line, so
+`formatSize`/`sizeUnits` (both kept, both still spent) move to the tile's
+`title` instead of going dead, alongside a string `file.error`, so neither is
+silently dropped, just relocated to where a hover or a focus still reaches
+it. Remove is an "×" on hover/focus (`X`, top-right corner) — a DELIBERATE,
+scoped departure from CH16's "one word, no button" convention, which still
+governs the empty zone's browse control and stays the rule everywhere else in
+this kit; an 88px square has no room to print "Remove," and the ruling's own
+drawing for Option B asks for the icon. A failed tile draws
+`shadow-[var(--hairline-error)]` — `input.tsx`'s own expression, an inset
+shadow rather than a second dashed edge, because a tile is not a drop target
+— and a visible (never hover-gated) `Retry`, with the row list's existing
+fallback to `removeLabel` when no `onRetry` is given. An uploading tile lays
+the kit's one `Progress` bar across its own bottom edge; the kit has no
+separate progress ring, so a bar over the tile is the closest built-in
+primitive to the ruling's "ring/bar" phrasing, and `formatProgress` still
+reaches assistive technology through `Progress`'s own `formatValue`.
+
+Read-only keeps its own law unchanged ("a system-set value loses its box")
+except the box withdrawn is now the Add tile and the drag handlers, not a
+whole zone: a read-only `FileUpload` with files still renders the same tile
+grid, so a client who cannot add or remove files can still be shown, at
+last, the pictures they already sent.
+
+NO NEW COLOUR AND NO NEW RADIUS. Every fill is a token already spent in this
+file (`--card`, `--surface-quiet`, `--destructive`) and every rounded corner
+is `--radius`, the one this file has always taken — there is no "R60" or any
+other second radius anywhere in tokens.css, so the tile takes the same one
+the zone already did. ICONS ARE ALL ALREADY IN THE KIT — `FileImage`,
+`FilePdf`, `FileDoc`, `FileXls`, `FileZip`, `FileAudio`, `FileVideo`, `File`,
+`Plus`, `X`, verified against `foundations/icons/` before use; nothing new
+was drawn. NO NEW BORDER EXEMPTION — `foundations/rules/exemptions.json`'s
+existing `"what": "*"` entry for this file already blesses every `border`
+utility it commits, the Add tile's dashed edge included; the borders law's
+own run now shows ×10 uses against that one entry (up from ×3), still
+`OK`.
+
+`components/file-upload/check-file-upload.mjs`, new, and wired into
+`npm run check`, pins both halves of the ruling as code: the empty zone must
+still render `zoneVariants`'s full box, the tiled branch must render only
+`TILE_GRID_CLASS` (`auto-fill`, `5.5rem`, `gap-3`) and never `zoneVariants`,
+and every `FileUploadTile` must draw a square media box — a picture or an
+icon and its tag — with the name as a caption underneath, never the name
+alone. Broken deliberately, twice, to prove it catches what it says it
+catches before being wired in: reintroducing `zoneVariants(...)` into the
+tiled branch fails with "KEEPS THE FULL-SIZE ZONE AFTER A FILE LANDS," and
+deleting a tile's media box fails with "draws names without tiles" — the
+two regressions named in the brief this pass was built against.
+
+`demo/sections/f-m.tsx`'s `FileUpload` specimen page is extended with five
+new panels — empty, three files (a picture, a PDF, a doc), seven files (the
+grid wrapping across every `kind`), uploading and failed — alongside the
+existing live/translated-strings/loading-disabled-readOnly panels. Every
+picture tile in the demo is the demo's own offline placeholder
+(`useSlotSrc`, already `Image`/`Video`/`Map`'s convention) — this page makes
+no network calls.
+
+### Added — `ToolbarRow` folds `filters`/`viewSwitch` into a `···` popover below its own 48rem — v1.2.109
+
+Client ruling, 17 Sep 2026, verbatim: *"We need to look at the toolbar on
+smaller screens. I want everything in one row."* Then, choosing among the
+drawings this put in front of her: *"toolbar option B."* Then: *"popover
+menu."* Option B: the search field never shrinks or hides; on tablet and
+phone widths `filters` and `viewSwitch` (which already carries `SortControl`
+beside `ViewSwitch` — this file's own "one slot, not two" ruling) fold into
+ONE `···` (More) button beside the action group, opening a popover that holds
+the SAME two nodes the caller already passed, a divider between them. `search`,
+`period` and `actions` are unaffected at every width — the ruling only ever
+named filter, sort and the view switch, and the row's own long-standing
+promise ("ONE ROW. AT EVERY WIDTH.") is unchanged: nothing wraps, the fold is
+the one exception to "nothing folds," not an exception to "nothing wraps."
+
+THE FOLD IS A CONTAINER QUERY, NOT A VIEWPORT ONE — `@container`
+(`container-type: inline-size`) on the row's own root, the kit's first use of
+the convention, and the fold pair answers `@min-[48rem]`, never `sm:`/`md:`/
+`lg:`. `verify/toolbar-one-row`'s new `narrow-container` specimen proves it:
+`typical`'s own props, in a fixed 26rem box, fold at a 1440 viewport while the
+plain `typical` specimen two rows up stays fully unfolded at the same
+viewport — the two could not both be true if this had been written as a media
+query.
+
+THE POPOVER IS THE KIT'S `Popover`, NOT `DropdownMenu` — the one deliberate
+difference from the actions overflow beside it, which does use `DropdownMenu`
+(and always has). A `DropdownMenu` is Radix `Menu`, `role="menu"`: a list of
+commands under arrow-key/typeahead item navigation. `filters` is a `FilterBar`
+carrying checkboxes and a text input; `viewSwitch` carries a hand-rolled
+`ViewSwitch` with its own roving-focus model. Neither is a command, and
+nesting either inside `role="menu"` is an ARIA conflict, not a style choice —
+two keyboard models over the same arrow keys. `Popover` is a plain anchored
+panel with no item role and no keyboard model of its own. The two caption rows
+("Filters" / "Sort & view") and the divider between them are NOT
+`DropdownMenuLabel`/`DropdownMenuSeparator` reused under the new host —
+those wrap Radix's `DropdownMenuPrimitive.Label`/`.Separator`, which read
+`DropdownMenuPrimitive.Root`'s own context and throw when mounted under a
+`Popover` instead. They are local copies of the identical class strings
+(`FOLD_LABEL_CLASS` / `FOLD_DIVIDER_CLASS`) — same ink, same rule, same
+`--radius`, no new colour, no new radius, just no dependency on a menu that
+is not there.
+
+TWO RENDERS OF THE SAME PROP, NOT ONE NODE PHYSICALLY RELOCATED. `filters`
+and `viewSwitch` are opaque `ReactNode`s; "moved into the popover" is built as
+the same node reference placed in two positions (the inline lane block and
+the popover panel), gated by the complementary side of one `@min-[48rem]`
+query, rather than a single DOM node handed across a `Portal` boundary — the
+latter is not a CSS operation (Radix mounts `PopoverContent` into
+`document.body` only while open) and would need JavaScript deciding where the
+node lives, which this file has never carried and does not start now. The
+practical cost, stated rather than hidden: the inline copy stays mounted
+(`display: none` under 48rem, so it holds no tab stop and is not read by a
+screen reader) and a second, live instance of the same props mounts only
+while the popover is open. Every real call site in this repository passes a
+FULLY CONTROLLED node (value + `onChange` from outside — see
+`verify/toolbar-one-row/page.tsx`'s `switcher`), so both instances render
+identically and either one's interaction updates the one source of truth; a
+node holding its own uncontrolled UI state would not share it between the two
+instances. No call site does that today.
+
+NOT DONE, AND WHY — the reference mock draws "Filter" and "Sort" as their own
+labelled rows: an icon, a word, a muted current sort value on one, a count
+chip on the other. This file cannot draw that. `filters` and `viewSwitch` are
+opaque nodes; `ToolbarRow` is never told how many filters are active or what
+a `SortControl` inside `viewSwitch` currently reads, and inventing a count or
+a value here would be reporting something this component does not know. What
+IS built is the structure the ruling asks the KIT for — one trigger, one
+panel, the filters group, a divider, the view-switch group, captioned — with
+the live summary left where the data already lives: on `FilterBar` and
+`SortControl` themselves, a follow-up those two files would carry, not this
+one. Similarly, the kit deliberately carries no dedicated `sort` slot (see
+this file's own "WHAT THIS FILE DELIBERATELY DID NOT TAKE FROM THAT
+APPLICATION"), so the mock's four-way "Filter, Sort, divider, view switch"
+menu is drawn here as the two groups the row's existing props actually
+distinguish — `filters`, then `viewSwitch` (which already reads as "Sort,
+then the view switch" wherever a caller builds it that way, as every call
+site in this repository does).
+
+CHECK — `components/toolbar-row/check-toolbar-row.mjs`, new, wired into
+`npm run check`. Pins: the root carries `@container`; the search wrapper
+carries no fold gate at all; the inline `filters`/`viewSwitch` blocks and
+`foldTrigger` answer `@min-[48rem]` as exact mirrors of each other; exactly
+one `ms-auto` (on the shared `toolbar-row-trailing` wrapper, never on
+`toolbar-row-actions` or `toolbar-row-fold` individually); the track stays
+`flex-nowrap`; and the fold opens through `Popover`, never `DropdownMenu`.
+Verified against injected breaks in all seven, each producing the expected
+failure, before being left green.
+
+FILES — `components/toolbar-row/toolbar-row.tsx` (the fold itself);
+`components/toolbar-row/check-toolbar-row.mjs` (new); `package.json` (wires
+the new check into `npm run check`); `verify/toolbar-one-row/page.tsx` (a new
+`narrow-container` specimen, fold-state columns in the readout, and the
+`REACHABILITY` note updated to state the one width-dependent exception this
+ruling introduces rather than the flat "identical at 380 and 1440" claim that
+predates it).
+
 ### Changed — `PermissionMatrix`: a locked capability takes a solid quiet-grey fill of its own; the row-level "Locked by policy" mark is retired in favour of a per-segment tooltip / `title`
 
 Client ruling, 17 Sep 2026, verbatim: *"In Permissions, the ones that are

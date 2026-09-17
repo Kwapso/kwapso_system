@@ -48,8 +48,9 @@ import {
   sliceKey,
 } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
+import { softNavigate } from "@/lib/nav"
 import { DeliverablesPanel } from "@/components/apps/deliverables-panel"
-import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
+import { KnowledgeScreen } from "@/components/knowledge/knowledge-screen"
 import { AppMoneyPanel } from "@/components/apps/app-money-panel"
 import { OverviewList } from "@/components/records/overview-list"
 import { content as contentApi, tenancy } from "@/lib/api"
@@ -133,6 +134,12 @@ export function AppDetailScreen({
   const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
   const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
   const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
+  // EVERYTHING WE KNOW ABOUT IT (17 Sep 2026) — the Knowledge tab stopped
+  // being a bare ask box and became a real, app-filtered gallery, so it earns
+  // an exact count the same way its five siblings above do (R16); the same
+  // total the tab's own toolbar badges, from `shared/record-counts.ts`'s new
+  // `knowledge-app` entry.
+  const knowledgeTotal = useCachedValue<number | null>(totalKey("knowledge-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "update")
@@ -244,6 +251,13 @@ export function AppDetailScreen({
   // record's own address, so a related record lands INSIDE it and the trail is
   // in the URL for the crumbs, the Back button and anybody you send it to.
   const host = { base: `${basePath}/${appId}` }
+  // THE SAME PREFIX, WITHOUT THIS RECORD'S OWN SEGMENT — for the one panel
+  // whose records do NOT nest under an app's own address (a knowledge source
+  // is a top-level module, `deep-link-screen.tsx`'s own `onIntent` opens it at
+  // `/knowledge/<id>` or `/t/<teamId>/knowledge/<id>`, never inside another
+  // record's URL). `basePath` is this list's own address (".../apps"); the
+  // segment before it is the prefix every OTHER module already opens at.
+  const urlPrefix = basePath.replace(/\/apps$/, "")
 
   const refresh = React.useCallback(() => {
     invalidate(appsKey(teamId))
@@ -514,18 +528,21 @@ export function AppDetailScreen({
             },
           ]
         : []),
-      // THE KNOWLEDGE BASE, IN CONTEXT (8.9 + 12.1). Not a collection and so not
-      // counted — see RECORD_TAB_COUNT_EXCEPTIONS. What it is instead is the
-      // ordinary ask box with THIS record's own details already in the question,
-      // which is what Aurora meant by "in context": nobody should have to retype
-      // which system they are asking about while standing on its page.
+      // THE KNOWLEDGE BASE, IN CONTEXT (8.9 + 12.1). Client ruling, 17 Sep
+      // 2026: "replicate what we have in the general knowledge [...] a gallery
+      // with all the knowledge we have about this". A real, app-filtered
+      // collection now, not an ask box — so it carries the exact server total
+      // (R16) its five siblings above already do, rather than the "not a
+      // collection" exemption this tab used to sit in
+      // (RECORD_TAB_COUNT_EXCEPTIONS' `app-detail.knowledge` line left the
+      // registry the same day this landed).
       ...(canReadKnowledge
         ? [
             {
               value: "knowledge",
               label: t("Knowledge"),
               icon: CONCEPT_ICON.knowledge,
-              badge: "",
+              badge: formatCount(knowledgeTotal),
               badgeVariant: "" as const,
             },
           ]
@@ -742,14 +759,23 @@ export function AppDetailScreen({
           if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
           if (panel.value === "knowledge")
             return (
-              <AskTheAssistant
-                context={[
-                  `the app "${app.name}"`,
-                  accountName ? `built for ${accountName}` : "one of our own systems",
-                  app.stage ? `at stage ${app.stage}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
+              <KnowledgeScreen
+                scope={{
+                  kind: "app",
+                  teamId,
+                  appId,
+                  appName: app.name,
+                  // A KNOWLEDGE SOURCE OPENS AT ITS OWN ADDRESS, not nested
+                  // under this app's — the identical destination
+                  // `deep-link-screen.tsx`'s own `onIntent` sends a "knowledge"
+                  // open intent to everywhere else in the app (R37: through
+                  // the soft-navigation bus, never a bare `<a href>`).
+                  onIntent: (intent) => {
+                    if (intent.kind === "open") softNavigate(`${urlPrefix}/${intent.module}/${intent.id}`)
+                  },
+                }}
+                t={t}
+                can={can}
               />
             )
           return <OverviewList items={overviewItems} />

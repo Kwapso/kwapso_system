@@ -77,6 +77,12 @@ vi.mock("@/lib/api", () => ({
     raiseTodo: async () => ({ todos: [], openTotal: 0, doneTotal: 0, allTotal: 0 }),
     completeTodo: async () => ({ todo: door[0] }),
   },
+  // The App field's own bounded read (F15, `AccountAppPicker`) — the create
+  // dialog this screen opens asks for the team's apps the moment it mounts,
+  // same as every other screen `listFetch.apps` backs.
+  tenancy: {
+    apps: async () => ({ apps: [], total: 0 }),
+  },
 }))
 
 import { InputsScreen } from "@/components/accounts/inputs-screen"
@@ -98,6 +104,11 @@ const ONE_WAITING: Todo = {
   accountId: "a1",
   accountName: "Bergman S.A.",
   accountLogoUrl: null,
+  appId: null,
+  appName: null,
+  appLogoUrl: null,
+  assignedContactId: null,
+  assignedContactName: null,
   ticketId: null,
   createdAt: "2026-09-14T00:00:00.000Z",
 }

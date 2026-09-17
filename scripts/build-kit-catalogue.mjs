@@ -202,8 +202,18 @@ function readCvaSite(call, sf) {
   for (const g of objectProps(findProp(config, "variants"))) {
     const gname = propName(g)
     if (!gname) continue
+    // A GROUP'S OWN OPTIONS TABLE CAN BE AN IDENTIFIER, not only an inline
+    // object literal — `variants: { state: ZONE_EDGE_CLASSES }`
+    // (shared/ui/components/file-upload/file-upload.tsx), a named constant
+    // shared between two `cva()` blocks so their dashed edge cannot drift
+    // apart. `objectProps` alone returns nothing for an Identifier, which
+    // used to read as "zero options" rather than "not inline" — the same
+    // resolution `evalClasses` already does for a single option's VALUE
+    // (line ~107), done here for the group's whole TABLE before iterating it.
+    let groupInit = g.initializer
+    if (groupInit && ts.isIdentifier(groupInit)) groupInit = topLevelConst(sf, groupInit.text) ?? groupInit
     const options = []
-    for (const o of objectProps(g.initializer)) {
+    for (const o of objectProps(groupInit)) {
       const oname = propName(o)
       if (oname === null) continue
       const valueNode = ts.isShorthandPropertyAssignment(o) ? o.name : o.initializer
@@ -211,6 +221,10 @@ function readCvaSite(call, sf) {
       if (classes === null) note(`${gname}.${oname}`, valueNode)
       options.push({ name: oname, classes, note: leadingNote(o, sf) })
     }
+    // STILL NOT AN OBJECT LITERAL — an identifier this file never declares, a
+    // spread, a computed table. Reported like any other unresolved shape
+    // rather than catalogued as a group with no options at all.
+    if (options.length === 0) note(gname, g.initializer)
     groups.push({ name: gname, options })
   }
 

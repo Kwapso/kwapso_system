@@ -247,6 +247,16 @@ describe("the record-counts door (content)", () => {
          VALUES ('R_MEET', ?, 'meetings', 1, 1, 1, 1)`
       )
       .run(IDS.adminRole)
+    // …AND KNOWLEDGE (17 Sep 2026) — the app record's own Knowledge tab became
+    // a real, app-filtered collection (`knowledge-app`, shared/record-counts.ts),
+    // and the shared fixture's role does not hold it either, the identical gap
+    // `meetings` closes above.
+    db()
+      .prepare(
+        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_update, can_delete)
+         VALUES ('R_KNOW', ?, 'knowledge', 1, 1, 1, 1)`
+      )
+      .run(IDS.adminRole)
     const ids: Record<string, string> = {
       accounts: IDS.victimAccount,
       apps: IDS.victimApp,

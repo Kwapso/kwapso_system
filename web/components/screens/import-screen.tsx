@@ -332,7 +332,16 @@ export function ImportScreen({
         </>
       }
       /* ---- 1 · upload ---- */
-      files={files.map((f) => ({ id: f.fileId, name: f.name }))}
+      /* THE ONE HONEST TAG THIS SITE CAN OFFER: every file this wizard ever
+         holds is a spreadsheet (`accept=".csv,.tsv,.xlsx,.xls,text/csv"`
+         below) and nothing about a batch keeps its MIME (`ImportBatchView`'s
+         own `files` are `{ fileId, name, headers, rowCount }` — no bytes,
+         no type), so there is no picked `File` or served `href` left to run
+         through shared/web/upload-items.ts once a file has become a batch
+         row. `kind: "sheet"` is still real information the kit's tile grid
+         (v1.2.110) can draw — its own XLS icon and tag — rather than the
+         generic fallback an unset `kind` would show. */
+      files={files.map((f) => ({ id: f.fileId, name: f.name, kind: "sheet" as const }))}
       onFilesSelected={(picked) => void addFiles(picked)}
       accept=".csv,.tsv,.xlsx,.xls,text/csv"
       multiple

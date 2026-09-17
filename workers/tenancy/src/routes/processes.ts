@@ -23,6 +23,7 @@
 
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { imageFieldLimit, optionalMark, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { MODULE_ICON_NAMES } from "@shared/module-icons"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -347,6 +348,21 @@ export async function getAppModules(request: Request, env: Env): Promise<Respons
 export async function postCreateAppModule(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
+  // R20, THE GALLERY CARD'S OWN ICON (client's ruling, 17 Sep 2026: "when I add
+  // a module, I should be able to select an icon for it") — POSITIONAL: `typeof`
+  // and the allow-list `.includes` both sit directly on `body.icon`. Absent,
+  // null OR an empty string (the MCP tool's own "clear this field" convention
+  // — create_app_module's description) all mean "no icon chosen", and the
+  // card falls back to `DEFAULT_MODULE_ICON` on the browser side; anything
+  // else must be one of `MODULE_ICON_NAMES` (shared/module-icons.ts), the
+  // same allow-list the picker itself offers.
+  if (
+    body.icon !== undefined &&
+    body.icon !== null &&
+    body.icon !== "" &&
+    (typeof body.icon !== "string" || !(MODULE_ICON_NAMES as readonly string[]).includes(body.icon))
+  )
+    return fail(400, "invalid_input", "Icon isn't one of the ones on offer.")
   const id = await createAppModule(cfg, guard, scope, actor, {
     appId: requireText(body.appId, "App", TEXT_LIMITS.short),
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
@@ -355,6 +371,7 @@ export async function postCreateAppModule(request: Request, env: Env): Promise<R
     // is what actually enforces "no emoji" now, the same guard selectable.ts
     // and client-org.ts's tool "Icon" carry.
     mark: optionalMark(body.mark, "Mark", TEXT_LIMITS.short),
+    icon: body.icon === undefined || body.icon === null || body.icon === "" ? undefined : (body.icon as string),
     nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),
@@ -369,6 +386,17 @@ export async function postUpdateAppModule(request: Request, env: Env): Promise<R
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "update")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Module", TEXT_LIMITS.short)
+  // R20 — same positional icon check as postCreateAppModule, above, and the
+  // same three-way "" ALSO CLEARS reading: absent leaves the icon alone
+  // (checked below, at the lib layer's own "absent means say nothing" rule),
+  // null or "" clear it back to `DEFAULT_MODULE_ICON`.
+  if (
+    body.icon !== undefined &&
+    body.icon !== null &&
+    body.icon !== "" &&
+    (typeof body.icon !== "string" || !(MODULE_ICON_NAMES as readonly string[]).includes(body.icon))
+  )
+    return fail(400, "invalid_input", "Icon isn't one of the ones on offer.")
   await updateAppModule(cfg, guard, scope, actor, id, {
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     // R20: "Mark", not "Emoji" — the field's own UI label dropped the word on
@@ -376,6 +404,12 @@ export async function postUpdateAppModule(request: Request, env: Env): Promise<R
     // is what actually enforces "no emoji" now, the same guard selectable.ts
     // and client-org.ts's tool "Icon" carry.
     mark: optionalMark(body.mark, "Mark", TEXT_LIMITS.short),
+    icon:
+      body.icon === undefined
+        ? undefined
+        : body.icon === null || body.icon === ""
+          ? null
+          : (body.icon as string),
     nameDe: optionalText(body.nameDe, "German name", TEXT_LIMITS.short),
     description: optionalText(body.description, "Description", TEXT_LIMITS.long),
     benefit: optionalText(body.benefit, "Benefit", TEXT_LIMITS.long),

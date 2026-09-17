@@ -98,7 +98,7 @@ describe("a notes editor says what it is", () => {
   it("the To-do form's detail box is a multi-line textbox called by its own label", () => {
     render(
       <LanguageProvider value="en">
-        <TodoFormDialog open onOpenChange={() => {}} onSubmit={async () => {}} />
+        <TodoFormDialog open onOpenChange={() => {}} apps={[]} onSubmit={async () => {}} />
       </LanguageProvider>
     )
 
@@ -118,7 +118,7 @@ describe("a notes editor says what it is", () => {
   it("…and says it in the reader's language", () => {
     render(
       <LanguageProvider value="de">
-        <TodoFormDialog open onOpenChange={() => {}} onSubmit={async () => {}} />
+        <TodoFormDialog open onOpenChange={() => {}} apps={[]} onSubmit={async () => {}} />
       </LanguageProvider>
     )
     const german = translate("Anything else they should know", "de")

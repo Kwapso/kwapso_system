@@ -37,11 +37,11 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L25)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L26)
 - [3. Detail screens](#3-detail-screens) (D1 to D20)
-- [4. Collections](#4-collections) (K1 to K40)
+- [4. Collections](#4-collections) (K1 to K46)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B19)
-- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F15)
+- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F17)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S6)
 - [9. Mobile](#9-mobile) (M1 to M6)
@@ -1114,6 +1114,29 @@ two.
 
 **Law.** None registered — kit v1.2.106's own header verifies the hover shape's computed
 opacity with a real `page.hover()`, never a synthetic event.
+
+### L26: the nav bar's own name opens no page of its own — it opens the signed-in member's own record
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"I go to the nav bar, on my
+name, and to my profile. This page should not exist. It should lead me to the same page
+that I arrive at when I go to Settings, Members, and I click on one member."* The
+standalone profile screen is retired. Clicking the signed-in person's own name in the nav
+bar opens the same member-detail screen that Settings › Members opens for any other
+member, addressed by the signed-in person's own id — never a second, bespoke "my profile"
+body kept alive beside it.
+
+**Why it is a redirect, not a deletion.** [L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place)'s
+own rule for a retired screen applies here too: a page taken away has to say which door
+now carries its material. This is that door — the nav bar's name link
+(`web/components/shell/profile-menu.tsx`) routes to the member-detail screen
+(`web/components/team/member-screen.tsx`) by id, the same
+[D12](#d12-a-screen-showing-one-record-asks-the-door-for-that-record-never-the-loaded-page)
+rule every other detail screen already follows, rather than the separate
+`web/components/screens/profile-screen.tsx` body.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
 
 ---
 
@@ -3327,8 +3350,21 @@ Issue → `Bug`, Question → `Question`, Extra → `PlusCircle`, Feedback → `
 dashboard's own chart series is the one reader left, an aggregate view's series colour
 being a different domain from a record's own chip.
 
+**AMENDED 17 Sep 2026 — the add-ticket screen's own Type field.** The client's
+follow-up ruling, verbatim, over the create dialog: *"On the add ticket screen, remove the
+manage choices under type and replace these colors with the icons for each type."* The
+colour-to-icon half is this rule, already built and already reaching the create dialog's
+own type row (`typeOptions`, `web/components/tickets/help-form-dialog.tsx`) through the
+same `ticketTypeIconName` map — nothing further to do there. The new half: the "Manage
+dropdowns" signpost (`ManageDropdownsLink`) that sits under the Type field on that one
+screen is removed outright, not moved — the vocabulary is still reached from Settings ›
+Tickets, the door [B10](#b10-a-modules-settings-have-two-entrances-and-one-page-behind-them)
+already names, and a create dialog carries no second entrance to it.
+
 **Tests:** `web/test/status-owns-the-chip.test.ts`, `web/test/ticket-type-icons.test.ts`,
 `web-portal/test/ticket-row-type-icon.test.tsx`.
+
+**Status of the 17 Sep amendment: ruled, in build, 17 Sep 2026.**
 
 **Law.** [R86](../RULES.md) (`status-owns-the-chip`).
 
@@ -3369,6 +3405,108 @@ segment they explain as a `title`/`Tooltip` rather than a row-level caption.
 **Law.** None registered — `shared/rules/registry.ts`'s `TOOLBAR_SORT_EXEMPT` no longer
 names this file; the kit's own `verify/permission-locked/` page (kwapso-design) is the
 proof for the locked fill.
+
+---
+
+### K41: Tickets carries a Board view grouped by status, both inside an app and on the general collection
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"In Tickets inside the app, I
+want a board view by status. Also add this board view by status in general tickets,
+all."* A Board view joins the Tickets view switch in both places tickets are collected —
+an app's own Tickets tab, and the team-wide Tickets screen ("all") — one column per ticket
+STATUS, the kit `Kanban` [K23](#k23-apps-gallery-and-board-by-stage-never-tiles-or-a-table)
+already draws for Apps. This is a second, status-keyed board alongside
+`tickets-collection.tsx`'s existing `OpenBoard` (`web/components/tickets/
+tickets-collection.tsx`), which groups only the Open facet's own tickets by stage — the
+new board is the collection's outer STATUS, not a facet's inner one, and it is offered
+wherever the List view already is.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
+
+### K42: a tickets list view carries a leading "ID" column, the reference ahead of the title
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"In all tickets list view add
+the header ID for the ID and move the ticket on top of the ticket."* The ticket's own
+reference gets a column of its own, headed literally **ID**, drawn ahead of the Title
+column. Today the reference draws only as a leading `RecordRef` chip inside the `title`
+cell (`TICKET_COLUMN_ORDER`, `web/lib/live-resources.ts`; `TicketRowsTable`, `web/
+components/tickets/tickets-collection.tsx`), under no header of its own — this rule pulls
+it out into its own leading column, with Title following it, on every tab of every
+tickets list, general and in-app alike.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
+
+### K43: an app's own Tickets tab carries a Queue view for triage, and it draws the standing empty state when there is nothing to triage
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Inside app tickets, I also
+want the queue view for triaging. Empty. Show there's nothing to triage."* An app's own
+Tickets tab gains a Queue view, scoped to that app's own tickets, mirroring the general
+Tickets triage queue (`TriageQueue`, `TriageStrip`, `web/components/tickets/
+triage-queue.tsx`, `triage-strip.tsx`). Where an app has nothing waiting to triage, the
+queue draws the collection's own empty register — no toolbar, no boxed "nothing here"
+panel floating above one — the same refusal [R50](../RULES.md) already makes for every
+other empty collection in the app, read onto this new view rather than given a bespoke
+empty state of its own.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered — held to R50 (`empty-toolbar`) like any other collection view.
+
+### K44: a tickets list inside an app carries Resolved Date and Resolved By
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"On tickets list inside an app,
+add columns: Resolved Date, Resolved By."* An app's own Tickets list draws two more facts
+than the columns `TICKET_COLUMN_ORDER` already gives a resolved-pinned tab (Title, Type,
+App, Raised, Closed) — **Resolved Date** (the existing closing-date fact, named for what a
+reader on this screen actually wants to know) and **Resolved By**, who closed it. K32's own
+ceiling still applies: at six columns already spoken for on a resolved tab, a seventh goes
+on a second line rather than squeezed onto the row's end
+([K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end),
+[R82](../RULES.md)).
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered — the new columns are held to R82 (`table-column-budget`) like
+every other tickets column.
+
+### K45: an app's own Knowledge tab is the general Knowledge collection, scoped to that app
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"In the Knowledge tab,
+replicate what we have in the general knowledge. This should just be a gallery with all
+the knowledge we have about this, with a toolbar that I can search and filter, blah, blah,
+blah, and a button to ask about this. This should open a conversation with the assistant
+only about this app."* An app's own Knowledge tab draws the identical shape
+[K36](#k36-the-knowledge-collection-centralizes-search-through-the-assistant-a-head-bar-carries-ask-sync-and-gear)
+already gives the general Knowledge collection — the same Gallery of source cards, the
+same toolbar (search restored, Kind tabs, sort, Gallery/Shape switch), the same head
+actions in the same order, Ask · Sync · Settings — narrowed to that one app's own sources.
+The Ask button opens a new assistant conversation scoped to this app alone, never the
+team-wide knowledge base the general Ask button opens.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered — held to [R48](../RULES.md) (`toolbar-shows-search`) and
+[R84](../RULES.md) (`mango-in-title-only`) the same way K36 is.
+
+### K46: an app's own Tabs screen is a gallery with icons, matching Settings' Modules panel; adding a module asks for its icon
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Inside an app, the tabs
+module: I want it to look exactly like the settings modules, this kind of gallery with the
+icons. When I add a module, I should be able to select an icon for it."* An app's own Tabs
+screen (`web/components/apps/modules-panel.tsx`) draws the identical gallery
+[B10](#b10-a-modules-settings-have-two-entrances-and-one-page-behind-them) already gives
+Settings' own Modules panel — one card per module, its icon leading, never a plain list.
+Adding a module to an app is a form that asks for that module's own icon, picked from the
+kit's own icon set ([R39](../RULES.md), `kit-supplies-the-ui`), rather than one assigned
+silently or left to a fallback glyph.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
 
 ---
 
@@ -4432,7 +4570,46 @@ that account's own apps, each carrying its mark — instead of the plain picker
 stays the existing picker; with an account chosen that has no apps of its own, the field
 shows nothing and no hint explaining why (R81 — a form carries no hints).
 
+**AMENDED 17 Sep 2026 — the app choice stays optional.** The client's ruling, verbatim:
+*"When I'm asking a client for something under which account, it is optional to select an
+app. Remember, when we already selected an account, this app choice must be in a
+horizontal component."* Confirms the shape above and settles what it left open: the app
+field is never required — a form may submit with an account chosen and no app picked —
+the horizontal pill row it becomes once an account is chosen is still that same optional
+field, never a forced choice.
+
 **Law.** None registered — `AccountAppPicker` is a form field, held to R81 like any other.
+
+### F16: an account picker on any add screen shows the account's icon and name, and nothing else
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"On all add screens, when I'm
+picking an account, do only show me the icon and the name, no email or anything else."*
+Every create form's account field draws the account's mark and its name, and drops every
+other fact a picker option might otherwise carry — an email, a code, a status — the same
+face-only reading [R35](../RULES.md) already asks of any record shown anywhere.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered — held to [R35](../RULES.md) (`records-carry-their-face`) like any
+other record picker.
+
+### F17: once an account is chosen, who a ticket gets assigned to is a horizontal pill row of that account's own contacts
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Also, I want to be able to
+select who this gets assigned to. Of course, it needs to filter the contacts of this
+account, including the avatar and full name, in a horizontal choice component with
+pills."* Once an account is chosen on a form that asks a client for something, the
+assignee field is a horizontal pill row —
+[F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected)'s
+own pattern, read onto a different roster — narrowed to that account's own contacts, each
+pill carrying the contact's avatar and full name. With no account chosen yet the field has
+no roster to filter and stays the existing picker, the same fallback
+[F15](#f15-once-an-account-is-chosen-the-app-field-becomes-a-horizontal-pill-row-of-that-accounts-own-apps)
+takes for the app field beside it.
+
+**Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
 
 ---
 
@@ -6090,35 +6267,88 @@ ruled, not yet built —
 [D17](#d17-a-status-colour-means-one-thing-everywhere-dots-are-always-solid-and-a-department-is-told-apart-by-an-icon-never-a-hue)
 is where the built palette lives once it lands.
 
-**Toolbar on small screens, decision pending.** Shown an artifact of the collection
-toolbar folding for a phone/tablet width, the client's ruling, verbatim: *"toolbar option
-B, expand the artifact to show me how it looks when I click the three-dot button and how
-it looks expanded, with everything: the sort, the filter, the views, everything. Possible
-to have the search bar, but also all the buttons there? Just asking."* Option B itself is
-chosen — search stays on the row, Filter/Sort/View fold into a ⋯ button on tablet and
-phone — but the expanded state's own drawing, and her closing question (search bar plus
-every button together, in the same row, on a small screen), are both still open. Status:
-**DECISION PENDING.**
+**Toolbar on small screens, RULED 17 Sep 2026.** Shown an artifact of the collection
+toolbar folding for a phone/tablet width, the client's first ruling, verbatim: *"toolbar
+option B, expand the artifact to show me how it looks when I click the three-dot button
+and how it looks expanded, with everything: the sort, the filter, the views, everything.
+Possible to have the search bar, but also all the buttons there? Just asking."* Option B
+itself was chosen from that round — search stays on the row and never shrinks; Filter,
+Sort and the view switch fold into one ⋯ button below 48rem container width, on tablet
+and phone. Her closing question is now answered: the client's follow-up ruling the same
+evening, verbatim, its whole text: *"popover menu."* The three-dot button's open state is
+a popover — Filter, Sort and the view switch sit together inside it, opened from the one
+⋯ button — never a sheet and never every button spread back out along the search row.
+
+**Status: ruled, in build (kit v1.2.109, in progress), 17 Sep 2026.**
+
+**Law.** None registered.
+
+**Kit upload zone, ruled, artifact
+[E19jyAKzRs6hoYdrWtQgTR](https://claude.ai/artifact/E19jyAKzRs6hoYdrWtQgTR).** Shown an
+artifact of three upload-zone layouts (A strip+grid, B add tile, C filmstrip), the
+client's first ruling, 17 Sep 2026, verbatim: *"I like the status when it's empty, like 'Drop
+files here' or 'Choose.' That really works, but when I already drop something, I don't
+like that what I dropped is so small and the other remains the same big. Can you create an
+artifact with alternatives? My goal would be that the 'Drop files' becomes smaller and
+that I can really see the images that I have already uploaded. They don't show only as the
+name, but I also see the image itself, or, if it's a document, a preview."* None of the
+three shown options was chosen from that first round. The empty-state copy and affordance
+("Drop files here" / "Choose") stay as drawn — that half already worked from the start.
+What was still open was the FILLED state: the original zone kept the drop target at its
+full, empty-state size once a file landed beside it, and a dropped file showed as a
+filename rather than an image thumbnail or a document preview. A follow-up artifact of
+filled-state alternatives was built and shown the same day, and the client's second
+ruling, 17 Sep 2026, verbatim: *"upload zone option B."* Option B is the shrinking
+behaviour: once the first file lands, the dashed drop zone stops holding the full,
+empty-state footprint and becomes one tile alongside the rest, in a wrapping grid of
+thumbnails — an image renders as the image, a document as a preview, never a bare
+filename standing in for either.
+
+**Status: ruled, in build (kit v1.2.110, in progress), 17 Sep 2026.**
+
+**Law.** None registered.
 
 **Decisions awaiting further input (17 Sep 2026):**
 
 - **Meeting-type department inheritance.** The client's exact words: *"I would need more consulting to take a decision."* Pending follow-up conversation.
 - **Close-dialog proof pattern.** The client's exact words: *"We will work on this later when we work on the ticket details page."* Deferred to the ticket details work and a future session.
 
+**The app record's Knowledge tab becomes a gallery (17 Sep 2026, not yet numbered/indexed).**
+The client's ruling, verbatim, from a consultation: *"In the Knowledge tab, replicate what
+we have in the general knowledge. This should just be a gallery with all the knowledge we
+have about this, with a toolbar that I can search and filter, blah, blah, blah, and a
+button to ask about this. This should open a conversation with the assistant only about
+this app."* The tab's own inline "ask a question" box (`AskTheAssistant`) is gone; it now
+mounts the SAME shared gallery component the general Knowledge screen does
+(`web/components/knowledge/knowledge-screen.tsx`'s `KnowledgeScreen`, parameterised by a
+`scope` prop), filtered to this app's own material — a mirror of its own rows plus
+anything filed under it by hand (`SourceFilters.appId`,
+`workers/content/src/lib/knowledge.ts`). The Ask button opens a NEW assistant conversation
+scoped to this app (`AgentTabScope` gained `"app"`, `web/lib/agent-conversation-tabs.ts`),
+carrying the app's own id into the retrieval door (`retrieve()`'s new `appId` parameter,
+narrowing the READ-BACK only, per R26). Applies R14 (bounded/paged read), R16 (the tab's
+badge is now a real server count, not the old "not a collection" exemption — see
+`shared/rules/registry.ts`'s `RECORD_TAB_COUNT_EXCEPTIONS`), R48/R50 (the toolbar, search
+included, stands down only when the collection is genuinely empty), and R84 (the Ask
+button is mango in the general screen's own `CollectionHeading`, and `variant="inverse"`
+on the app tab, which has no title component of its own). **Status: shipped, this
+session** — not yet folded into the numbered K-series above; a future documentation pass
+should give it its own line and cross-reference.
+
 ---
 
 ## Rule index
 
-**190 rules.**
+**199 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L25 (25) |
+| 2. Page layout and width | L1 to L26 (26) |
 | 3. Detail screens | D1 to D20 (20) |
-| 4. Collections | K1 to K40 (40) |
+| 4. Collections | K1 to K46 (46) |
 | 5. Buttons and actions | B1 to B19 (19) |
-| 6. Forms and dialogs | F1 to F15 (15) |
+| 6. Forms and dialogs | F1 to F17 (17) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |

@@ -84,6 +84,7 @@ import { forgetEverything } from "@/lib/nav-memory"
 import { BrandMark } from "@/components/shell/brand-mark"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { useT } from "@shared/web/language"
 import { MarkLoader, useMarkHold } from "@shared/web/mark-loader"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
@@ -425,7 +426,17 @@ export default function OnboardingPage() {
                 {photo && <AvatarImage src={photo} alt={t("Your photo")} />}
                 <AvatarFallback className="text-lg">{initials}</AvatarFallback>
               </Avatar>
-              <FileUpload accept="image/*" multiple={false} onFilesSelected={handlePhoto} />
+              {/* THE TILE GRID SHOWS THE SAME PHOTO THE AVATAR ABOVE DOES —
+                  client ruling, 17 Sep 2026 — through the one shared seam
+                  (shared/web/upload-items.ts) every FileUpload call site now
+                  feeds its items with. No `onRemove`: this screen never
+                  offered "clear your photo", only "pick a different one". */}
+              <FileUpload
+                accept="image/*"
+                multiple={false}
+                files={photo ? [storedFileToUploadItem({ id: "onboarding-photo", name: t("Your photo"), href: photo })] : []}
+                onFilesSelected={handlePhoto}
+              />
             </div>
 
             <Field config={firstNameField} htmlFor="first-name">

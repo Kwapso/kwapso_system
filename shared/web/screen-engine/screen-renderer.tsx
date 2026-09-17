@@ -51,8 +51,13 @@ import { DatePicker } from "@shared/ui/components/date-picker/date-picker"
 // translates a config's words on the way to the screen (R33), and its import
 // ban is what keeps every renderer honest, this one included.
 import { Field } from "@shared/web/field"
-import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { FileUpload, type FileUploadItem } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
+import {
+  pickedFileId,
+  storedFileToUploadItem,
+  usePickedFileItems,
+} from "@shared/web/upload-items"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { Switch } from "@shared/ui/components/switch/switch"
@@ -459,6 +464,20 @@ function ScreenForm({
   const set = (col: string, v: unknown) =>
     setValues((s) => ({ ...s, [col]: v }))
 
+  // THE TILES AN "image" FIELD DRAWS — client ruling, 17 Sep 2026. ONE hook
+  // call, unconditionally, for every `File` sitting in ANY field's value
+  // (rules-of-hooks: this function's own `case "image"` below is called
+  // per-field inside a loop, where a conditional hook call would be a real
+  // bug the moment gating hides or shows a field between renders — this
+  // stays a single call whatever the recipe's own field list does).
+  // `usePickedFileItems` doesn't care which field a file belongs to, only
+  // that it is still present; `renderInput` looks its items back up by file
+  // identity through `pickedFileId`.
+  const allPickedFiles = Object.values(values).flatMap((v) =>
+    Array.isArray(v) && v.every((x) => x instanceof File) ? (v as File[]) : []
+  )
+  const pickedFileItems = usePickedFileItems(allPickedFiles)
+
   function fire(action: RecipeAction) {
     const next: Record<string, string> = {}
     for (const f of fields) {
@@ -512,8 +531,28 @@ function ScreenForm({
             onChange={(html) => set(f.column, html)}
           />
         )
-      case "image":
-        return <FileUpload onFilesSelected={(files) => set(f.column, files)} />
+      case "image": {
+        // `v` is either a stored URL off the record (a plain string, R40's
+        // own shape), or a freshly-picked `File[]` nobody has saved yet —
+        // never both, which is this field's whole value model. The tiles
+        // (client ruling, 17 Sep 2026) come from the one shared seam every
+        // FileUpload call site now builds its items with
+        // (shared/web/upload-items.ts).
+        const storedUrl = typeof v === "string" && v ? v : undefined
+        const picked = Array.isArray(v) ? (v as File[]) : []
+        const items: FileUploadItem[] = storedUrl
+          ? [storedFileToUploadItem({ id: f.column, name: f.field.label ?? f.column, href: storedUrl })]
+          : picked
+              .map((file) => pickedFileItems.find((it) => it.id === pickedFileId(file)))
+              .filter((it): it is FileUploadItem => !!it)
+        return (
+          <FileUpload
+            files={items}
+            onFilesSelected={(files) => set(f.column, files)}
+            onRemove={() => set(f.column, storedUrl ? "" : [])}
+          />
+        )
+      }
       case "choice":
         // The OLD library's Choice in "dropdown" mode was an option list; the
         // kit's Choice is a selectable card and its option dropdown is Select.

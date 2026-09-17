@@ -67,9 +67,15 @@ describe("the knowledge tab strip is built from the kind vocabulary, with counts
 describe("the Kind facet leaves the toolbar — the strip replaces it", () => {
   it("filters `kind` out of the facet row the door still returns", () => {
     const src = readKnowledgeScreen()
-    const at = src.indexOf("facets={translatedFacets(")
+    // TEAM SCOPE ONLY (17 Sep 2026) — `facets` is now a ternary on
+    // `scope.kind` (the app scope keeps `kind` as an ordinary facet instead,
+    // this file's own header says why), so the team branch's own
+    // `translatedFacets(` call sits a few lines after the `facets={` tag
+    // rather than immediately inside it.
+    const at = src.indexOf("facets={")
     expect(at, "the knowledge screen's own facets prop").toBeGreaterThan(-1)
-    const tag = src.slice(at, at + 500)
+    const tag = src.slice(at, at + 700)
+    expect(tag, "the team branch calls translatedFacets").toMatch(/translatedFacets\(/)
     expect(tag, 'the tabs replace it — her own words').toMatch(/\.filter\(\(f\)\s*=>\s*f\.field\s*!==\s*"kind"\)/)
     // Compartment and active stay — nothing else about the toolbar's other
     // facets was asked to change.
@@ -88,12 +94,18 @@ describe('"All" is the default tab', () => {
     expect(kindTabsSpreadAt, "the kind tabs are spread in").toBeGreaterThan(tabsAt)
     expect(allAt, "All leads the array, before the kind tabs").toBeLessThan(kindTabsSpreadAt)
 
+    // TEAM SCOPE ONLY (17 Sep 2026) — this screen now also draws the app
+    // record's own gallery (`KnowledgeGalleryScope`'s "app" branch), which has
+    // no kind-tab strip at all (its own file header says why), so the "all"
+    // fallback is gated on `scope.kind === "team"` rather than unconditional.
     expect(src, "an unbadged/absent tab value falls through to \"all\"").toMatch(
-      /const activeTab = tab && byKind\[tab\] \? tab : "all"/
+      /const activeTab = scope\.kind === "team" && scope\.tab && byKind\[scope\.tab\] \? scope\.tab : "all"/
     )
     // THE URL AGREES — pressing back onto the default omits `?tab=` entirely,
     // the same shape accounts-screen.tsx's own Active/Inactive/All strip uses.
-    expect(src).toMatch(/onValueChange:\s*\(v\)\s*=>\s*go\(sectionPath,\s*v === "all" \? \{\} : \{ tab: v \}\)/)
+    expect(src).toMatch(
+      /onValueChange:\s*\(v\)\s*=>\s*scope\.go\(scope\.sectionPath,\s*v === "all" \? \{\} : \{ tab: v \}\)/
+    )
   })
 })
 
@@ -107,7 +119,10 @@ describe("the strip pins on scroll for free (R77)", () => {
     // ever spelled, so every host of it — this one included — pins without
     // being told.
     expect(src).not.toMatch(/<TabsView\b/)
-    const at = src.indexOf("tabs={{")
+    // TEAM SCOPE ONLY (17 Sep 2026) — `tabs` is now a ternary on `scope.kind`
+    // (the app scope passes `undefined`, this file's own header says why), so
+    // the tag opens `tabs={` rather than `tabs={{` directly.
+    const at = src.indexOf("tabs={")
     expect(at, "the tabs prop is really wired on <PagedFind>").toBeGreaterThan(-1)
     const tag = src.slice(at, at + 300)
     expect(tag, "built from the shared TabsConfig default, like every other tab strip in the app").toMatch(

@@ -31,6 +31,7 @@ import { countTodos } from "../lib/todos"
 import { countMeetings } from "../lib/meetings"
 import { countWorkLogs, WORK_LOG_TARGETS } from "../lib/work-logs"
 import { countDeliverables } from "../lib/deliverables"
+import { countSources } from "../lib/knowledge"
 import type { Env } from "../env"
 
 /** One figure, by the sidecar name the badge reads.
@@ -61,6 +62,9 @@ const COUNTERS: Record<string, RecordCounter> = {
   // WHAT WE HANDED OVER on it — the whole shelf, archived rows included, because
   // the tab shows those too: a superseded handover doc is still something we sent.
   "deliverables-app": (cfg, guard, _s, id) => countDeliverables(cfg, guard, { appId: id }),
+  // EVERYTHING WE KNOW ABOUT IT — the same exact count the tab's own gallery
+  // badges through `<PagedFind>` (R16), over the same filter (`appId`).
+  "knowledge-app": (cfg, guard, _s, id) => countSources(cfg, guard, { appId: id }),
   // A request's record.
   "stories-ticket": (cfg, guard, _s, id) =>
     countStories(cfg, guard, { ticketId: id, view: "all" }).then((r) => r.total),

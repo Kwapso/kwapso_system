@@ -29,8 +29,10 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, content } from "@/lib/api"
 import { FilePicker } from "@/components/records/file-picker"
+import { IconPicker } from "@/components/records/icon-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
+import { DEFAULT_MODULE_ICON, MODULE_ICON_NAMES } from "@shared/module-icons"
 
 /** One field on the form. `kind` decides the control; `options` turns a text
  * input into a pick-or-create one (a datalist, so typing past the list is
@@ -45,7 +47,7 @@ export type InternalField = {
    * has no bytes to upload; a handover PDF has no address until we make one).
    * Two fields would be two columns, two lists and two ways to be wrong about
    * which one is set. */
-  kind: "text" | "prose" | "date" | "number" | "file" | "link"
+  kind: "text" | "prose" | "date" | "number" | "file" | "link" | "icon"
   placeholder?: string
   options?: string[]
   required?: boolean
@@ -162,6 +164,14 @@ export function InternalRecordDialog({
                   disabled={busy}
                 />
               </div>
+            ) : f.kind === "icon" ? (
+              <IconPicker
+                names={MODULE_ICON_NAMES}
+                value={values[f.key] ?? ""}
+                defaultName={DEFAULT_MODULE_ICON}
+                onChange={(name) => setValues((v) => ({ ...v, [f.key]: name }))}
+                disabled={busy}
+              />
             ) : f.kind === "prose" ? (
               <Textarea
                 id={id}
@@ -281,6 +291,12 @@ export const deliverableFields = (kinds: string[]): InternalField[] => [
  * is why they are bare here. */
 export const moduleFields = (): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Settings" },
+  // THE GALLERY CARD'S OWN ICON — client's ruling, 17 Sep 2026: "when I add a
+  // module, I should be able to select an icon for it." A grid, not a text
+  // field: `IconPicker` (web/components/records/icon-picker.tsx) offers the
+  // reasoned, rot-checked set `MODULE_ICON_NAMES` (shared/module-icons.ts),
+  // and an empty value draws (and counts as) `DEFAULT_MODULE_ICON`.
+  { key: "icon", label: "Icon", kind: "icon" },
   { key: "mark", label: "Mark", kind: "text", placeholder: "A short word or initial" },
   { key: "nameDe", label: "German name", kind: "text", placeholder: "Einstellungen" },
   { key: "description", label: "What it does", kind: "prose", placeholder: "Where the team manages their own preferences." },

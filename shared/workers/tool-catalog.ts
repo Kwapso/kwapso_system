@@ -28,6 +28,7 @@
 
 import { B, enumOf, N, obj, S, str } from "./tool-args"
 import { brand } from "../brand"
+import { MODULE_ICON_NAMES } from "../module-icons"
 import { canonicalModule } from "./query-grammar"
 
 /** THE WORD A PERSON READS, never the alias the model was told it could type.
@@ -1560,15 +1561,20 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Ask a client for something: `accountId` and `title`. It sits in their portal and they complete it. Our own admin is create_task; delivery work is create_story.",
     detail:
-      "Ask a client for something, `accountId` says which client and `title` says what we need. A to-do sits in THEIR portal with a due date, and they complete it and attach a file themselves. Use it only for something we genuinely cannot proceed without; our own admin is create_task and a piece of delivery work is create_story.",
+      "Ask a client for something, `accountId` says which client and `title` says what we need. A to-do sits in THEIR portal with a due date, and they complete it and attach a file themselves. Use it only for something we genuinely cannot proceed without; our own admin is create_task and a piece of delivery work is create_story. `appId` optionally names which of the client's own systems this is about — any active app, not narrowed to that account, exactly as the UI picker draws it once an account is chosen. `assignedContactId` optionally names which of the account's own CONTACTS this is aimed at — that account itself, or one of its own linked people; a contact of a different company is refused.",
     binding: "CONTENT", method: "POST", path: "/api/content/todos",
-    schema: obj({ accountId: S, title: S, detail: S, dueOn: S, ticketId: S }, ["accountId", "title"]),
+    schema: obj({ accountId: S, title: S, detail: S, dueOn: S, ticketId: S, appId: S, assignedContactId: S }, [
+      "accountId",
+      "title",
+    ]),
     buildBody: (i) => ({
       accountId: str(i, "accountId"),
       title: str(i, "title"),
       detail: opt(i, "detail"),
       dueOn: opt(i, "dueOn"),
       ticketId: opt(i, "ticketId"),
+      appId: opt(i, "appId"),
+      assignedContactId: opt(i, "assignedContactId"),
     }),
     agent: {
       write: true,
@@ -1863,12 +1869,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Search tickets, meetings, mail, chat, articles; `q` stands alone. Mark claims [[src:…]]; never write a list of sources. `found` false: say so, not from memory.",
     detail:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. WRITE `q` SO IT STANDS ALONE: retrieval sees only that string, never the conversation around it, so resolve any pronoun, \"it\"/\"that\", or follow-up shorthand yourself before calling — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), never the two words as typed. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. BY DEFAULT (BUILD-5 §E, 16 Sep 2026) IT BOTH RE-READS AND COMPOSES for you, spending two of the team's assistant credits: `read` re-reads the shortlist before deciding what counts as evidence, which recovers a real answer a plain similarity score would have refused (a paraphrase, thin material), and `compose` writes the answer out of exactly what was found and returns it as `answer`. Set `compose: false` when you are going to write the reply yourself instead — mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports, the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own, and never pay for the same answer twice. Set `read: false` too when the plain similarity floor is good enough and the extra credit is not worth spending. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` rides `records`, `citations` and `passages` alike — where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sourceId` NAMES THE KNOWLEDGE SOURCE, never the record it mirrors, and the two are different ids in different id spaces: never hand a `sourceId` to a tool that reads the record itself (`get_meeting_transcript` and its like) — take the segment after the last slash in `recordPath` for that, `sourceId` is not it. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. WRITE `q` SO IT STANDS ALONE: retrieval sees only that string, never the conversation around it, so resolve any pronoun, \"it\"/\"that\", or follow-up shorthand yourself before calling — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), never the two words as typed. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. Pass `appId` the same way when the question is about one system and a conversation opened already naming it (an app record's own Ask button hands you the app's id in its first message) — it narrows what the passages are ABOUT, never which client's material is searched, so the two may be sent together. BY DEFAULT (BUILD-5 §E, 16 Sep 2026) IT BOTH RE-READS AND COMPOSES for you, spending two of the team's assistant credits: `read` re-reads the shortlist before deciding what counts as evidence, which recovers a real answer a plain similarity score would have refused (a paraphrase, thin material), and `compose` writes the answer out of exactly what was found and returns it as `answer`. Set `compose: false` when you are going to write the reply yourself instead — mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports, the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own, and never pay for the same answer twice. Set `read: false` too when the plain similarity floor is good enough and the extra credit is not worth spending. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` rides `records`, `citations` and `passages` alike — where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sourceId` NAMES THE KNOWLEDGE SOURCE, never the record it mirrors, and the two are different ids in different id spaces: never hand a `sourceId` to a tool that reads the record itself (`get_meeting_transcript` and its like) — take the segment after the last slash in `recordPath` for that, `sourceId` is not it. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
-    schema: obj({ q: S, accountId: S, sources: { type: "array" }, limit: N, compose: B, read: B }, ["q"]),
+    schema: obj({ q: S, accountId: S, appId: S, sources: { type: "array" }, limit: N, compose: B, read: B }, ["q"]),
     buildQuery: (i) => {
       const q = [`q=${encodeURIComponent(str(i, "q"))}`]
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
+      if (str(i, "appId")) q.push(`appId=${encodeURIComponent(str(i, "appId"))}`)
       // WHICH DOORS TO USE. A list here, a comma string on the wire, because the
       // door reads one query parameter and checks each value against the declared
       // set where it sits (R20). Omitted means all of them — never none.
@@ -1892,14 +1899,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
-      "What the assistant may read. `kind`, `compartment`, `q`, `active` narrow it. A row carries the summary, not the material. For prose, ask_knowledge.",
+      "What the assistant may read. `kind`, `compartment`, `appId`, `q`, `active` narrow it. A row carries the summary, not the material. For prose, ask_knowledge.",
     detail:
-      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, 'file' for one somebody uploaded, or 'ticket' / 'account' / 'contact' / 'app' / 'process' / 'sprint' / 'story' / 'meeting' / 'todo' / 'task' for material mirrored from the app's own rows, and 'document' / 'email' / 'event' / 'message' for material out of your own Google connection), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary), `active` ('yes' for the sources the assistant may read, 'no' for the ones somebody took away — they are kept, not deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'touched' (the default, most recently changed), 'added', 'title', 'kind' or 'dated' (the date the MATERIAL is from, which is not the date it was filed). Pass `id` for one source, a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, 'file' for one somebody uploaded, or 'ticket' / 'account' / 'contact' / 'app' / 'process' / 'sprint' / 'story' / 'meeting' / 'todo' / 'task' for material mirrored from the app's own rows, and 'document' / 'email' / 'event' / 'message' for material out of your own Google connection), `compartment` ('agency' or 'account:<id>'), `appId` (everything about one system — a mirror of its own rows, or a note/file somebody filed under it by hand), `q` (searches the title and the summary), `active` ('yes' for the sources the assistant may read, 'no' for the ones somebody took away — they are kept, not deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'touched' (the default, most recently changed), 'added', 'title', 'kind' or 'dated' (the date the MATERIAL is from, which is not the date it was filed). Pass `id` for one source, a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
-    schema: obj({ id: S, kind: S, compartment: S, q: S, active: S, sort: S, dir: S, cursor: S }),
+    schema: obj({ id: S, kind: S, compartment: S, appId: S, q: S, active: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["id", "kind", "compartment", "q", "active", "sort", "dir", "cursor"])
+      for (const key of ["id", "kind", "compartment", "appId", "q", "active", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -2141,7 +2148,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "The sections an app is divided into — what a ticket says it is about, not a process. `appId` narrows; `archived` 'all' includes switched-off ones.",
     detail:
-      "List the MODULES of an app — the sections the software is divided into, like Settings, Documents or Tasks. A module is what a ticket says it is about, so this is how tickets are grouped; it is NOT a process (a process is a way of working, and belongs to the account's world, not the app's structure). `appId` narrows to one system and is what you almost always want; `id` fetches just one module; `archived` accepts 'all' to include the sections that have been switched off. Each row carries `name`, `mark` (the emoji beside it), `nameDe` (the German name), `description`, `benefit` and `ticketCount`, the open tickets filed against it. Bounded, not paged: an app has a handful of sections, never a stream of them.",
+      "List the MODULES of an app — the sections the software is divided into, like Settings, Documents or Tasks. A module is what a ticket says it is about, so this is how tickets are grouped; it is NOT a process (a process is a way of working, and belongs to the account's world, not the app's structure). `appId` narrows to one system and is what you almost always want; `id` fetches just one module; `archived` accepts 'all' to include the sections that have been switched off. Each row carries `name`, `mark` (a short word or initial beside it), `icon` (the kit's Phosphor name for its gallery card, or null when nobody has chosen one), `nameDe` (the German name), `description`, `benefit` and `ticketCount`, the open tickets filed against it. Bounded, not paged: an app has a handful of sections, never a stream of them.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/app-modules",
     schema: obj({ id: S, appId: S, archived: S }),
     buildQuery: (i) => {
@@ -2157,15 +2164,23 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app_module",
     summary:
-      "Add a section to an app: `name`, plus `mark`, `nameDe`, `description`, `benefit`. Two live modules of one app cannot share a name.",
+      "Add a section to an app: `name`, plus `mark`, `icon`, `nameDe`, `description`, `benefit`. Two live modules of one app cannot share a name.",
     detail:
-      "Add a section to an app. `name` is what it is called on screen; `mark` is an emoji shown beside it, `nameDe` the German name for a client who reads in German, `description` what the section does and `benefit` what it gives them. Two live modules of one app cannot share a name.",
+      "Add a section to an app. `name` is what it is called on screen; `mark` is a short word or initial shown beside it in a list, `icon` is the kit's Phosphor name for its gallery card (one of a fixed set — a bad name is refused, not ignored), `nameDe` the German name for a client who reads in German, `description` what the section does and `benefit` what it gives them. Two live modules of one app cannot share a name.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules",
-    schema: obj({ appId: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["appId", "name"]),
+    // "" ALONGSIDE THE REAL NAMES — checkArgTypes (shared/workers/tool-args.ts)
+    // validates an enum field against its own members before buildBody ever
+    // runs, so a bare `enumOf(MODULE_ICON_NAMES)` would refuse the empty
+    // string this tool's own description promises clears the field.
+    schema: obj(
+      { appId: S, name: S, mark: S, icon: enumOf([...MODULE_ICON_NAMES, ""]), nameDe: S, description: S, benefit: S },
+      ["appId", "name"]
+    ),
     buildBody: (i) => ({
       appId: str(i, "appId"),
       name: str(i, "name"),
       mark: opt(i, "mark"),
+      icon: opt(i, "icon"),
       nameDe: opt(i, "nameDe"),
       description: opt(i, "description"),
       benefit: opt(i, "benefit"),
@@ -2177,13 +2192,20 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Rename or re-describe a module by `id`. Send only what you change; an empty string clears a field.",
     detail:
-      "Rename or re-describe a module (by id). Send ONLY what you are changing; to empty a field, send it as an empty string. A rename reaches every ticket filed against it straight away, because a ticket stores the module rather than its spelling.",
+      "Rename or re-describe a module (by id). Send ONLY what you are changing; to empty a field, send it as an empty string — `icon` (the kit's Phosphor name for its gallery card) included, which then falls back to the default glyph. A rename reaches every ticket filed against it straight away, because a ticket stores the module rather than its spelling.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules/update",
-    schema: obj({ id: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["id", "name"]),
+    // "" ALONGSIDE THE REAL NAMES — see create_app_module's identical note,
+    // above: this tool's own description says an empty string clears a
+    // field, and `icon` is the one field here that is otherwise a closed set.
+    schema: obj(
+      { id: S, name: S, mark: S, icon: enumOf([...MODULE_ICON_NAMES, ""]), nameDe: S, description: S, benefit: S },
+      ["id", "name"]
+    ),
     buildBody: (i) => ({
       id: str(i, "id"),
       name: str(i, "name"),
       mark: sent(i, "mark"),
+      icon: sent(i, "icon"),
       nameDe: sent(i, "nameDe"),
       description: sent(i, "description"),
       benefit: sent(i, "benefit"),

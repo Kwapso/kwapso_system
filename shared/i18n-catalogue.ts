@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 791 strings · 3 languages · 1423 of the entries below are hand-written seed.
+// 790 strings · 3 languages · 1435 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -106,7 +106,6 @@ export const CATALOGUE: Catalogue = {
   "Cancel it": { de: "Abbrechen", es: "Cancelarlo", ca: "Cancel·la-ho" },
   "Cancelled": { de: "Storniert", es: "Cancelado", ca: "Cancel·lat" },
   "Change": { de: "Änderung", es: "Cambio", ca: "Canvi" },
-  "Change email": { de: "E-Mail ändern", es: "Cambiar correo electrónico", ca: "Canviar correu electrònic" },
   "Change role": { de: "Rolle ändern", es: "Cambiar rol", ca: "Canviar rol" },
   "Change your email": { de: "Ihre E-Mail ändern", es: "Cambiar tu correo electrónico", ca: "Canvia el teu correu electrònic" },
   "Change your team's name or add a logo. This is what everyone sees.": { de: "Ändern Sie den Namen Ihres Teams oder fügen Sie ein Logo hinzu. Das sehen alle.", es: "Cambiar el nombre de tu equipo o agregar un logo. Esto es lo que todos ven.", ca: "Canvia el nom del teu equip o afegeix un logotip. Això és el que veu tothom." },

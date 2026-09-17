@@ -148,6 +148,14 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // open an app but not publish against it sees no number rather than a
     // number they may not have (R18).
     { key: "deliverables-app", module: "deliverables", resource: "deliverables", door: "content" },
+    // EVERYTHING WE KNOW ABOUT IT (client ruling, 17 Sep 2026: "a gallery with
+    // all the knowledge we have about this"). Now a real collection — the
+    // Knowledge tab's own gallery, filtered to this app (`SourceFilters.appId`,
+    // workers/content/src/lib/knowledge.ts) — so it earns a badge the same way
+    // its five siblings do, and `app-detail.knowledge`'s old
+    // RECORD_TAB_COUNT_EXCEPTIONS line ("retrieval, not a collection") left the
+    // registry the same day this landed.
+    { key: "knowledge-app", module: "knowledge", resource: "knowledge", door: "content" },
   ],
   help: [
     // The work answering this request. One story may answer many tickets and one

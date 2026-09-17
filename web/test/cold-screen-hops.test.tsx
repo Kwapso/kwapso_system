@@ -182,6 +182,8 @@ const ticket: HelpTicket = {
   // What it arrived as, before triage said what it is.
   raisedAsType: "Question",
   editorName: null,
+  resolverId: null,
+  resolverName: null,
   moduleId: null,
   moduleName: null,
   moduleMark: null,

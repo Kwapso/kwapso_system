@@ -74,6 +74,7 @@ export function AccountAppPicker({
   searchPlaceholder,
   emptyOption,
   emptyText,
+  noneLabel,
 }: {
   id?: string
   /** Named on the ROW, where a `<label for>` cannot bind to a `role="group"`
@@ -96,6 +97,16 @@ export function AccountAppPicker({
   searchPlaceholder: string
   emptyOption: { value: string; label: string }
   emptyText: string
+  /** ROW MODE ONLY — an explicit "leave it off" pill, drawn AFTER the
+   * account's own apps and committing `""` on the click. Undefined (every
+   * caller before the Inputs form) keeps the row exactly as it always drew:
+   * `layout="row"` carries no clear-X and no `emptyOption` by design
+   * (record-picker.tsx's own header), which is right for a field that opens
+   * on a blank draft and is never revisited mid-form — but the client's 17
+   * Sep 2026 ruling on the Inputs form asks for a visible "None" state on a
+   * row that also has real chips to choose from, so this is the opt-in
+   * rather than a change to every existing row. */
+  noneLabel?: string
 }) {
   if (!accountId) {
     // NO ACCOUNT YET — her ruling's own words: "with no account chosen the
@@ -124,8 +135,20 @@ export function AccountAppPicker({
   // NOTHING TO PICK, NOTHING SAID (R81) — see this file's header. A row handed
   // an empty `options` array draws a locked "No apps yet." shell; her ruling
   // today asks for silence instead, so this returns before `RecordPicker` ever
-  // gets the chance to say anything.
-  if (narrowed.length === 0) return null
+  // gets the chance to say anything. A caller that opted into `noneLabel` still
+  // has ONE thing to pick even when the account has no apps of its own — "None"
+  // — so the silent-return only fires for a caller that did not ask for it.
+  if (narrowed.length === 0 && !noneLabel) return null
+
+  const rowOptions = [
+    ...sortedOptions(narrowed, lang, (a) => a.name).map(appOption),
+    // ALWAYS LAST, AND ALWAYS "" — the row calls `onChange` with the raw pill
+    // value it was clicked with (no NONE-sentinel translation, unlike the
+    // control branch above), so "" here is also exactly the blank a form's
+    // optional draft field already starts on. Never sorted in among the real
+    // apps: it is a way OUT of the list, not a member of it.
+    ...(noneLabel ? [{ value: "", label: noneLabel }] : []),
+  ]
 
   return (
     <RecordPicker
@@ -134,7 +157,7 @@ export function AccountAppPicker({
       ariaLabel={ariaLabel}
       value={value}
       onChange={onChange}
-      options={sortedOptions(narrowed, lang, (a) => a.name).map(appOption)}
+      options={rowOptions}
       searchPlaceholder={searchPlaceholder}
       emptyText={emptyText}
       disabled={disabled}

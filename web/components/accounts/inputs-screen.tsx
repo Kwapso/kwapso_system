@@ -92,13 +92,13 @@ import { RecordTable, type TableAction, type TableColumn } from "@/components/re
 import { CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
 import { TodoFormDialog, type TodoFormValues } from "@/components/work/todo-form-dialog"
 import { content as contentApi, ApiFailure } from "@/lib/api"
-import { inputsKey, todosKey, type InputView } from "@/lib/live-resources"
+import { appsKey, inputsKey, listFetch, todosKey, type InputView } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
-import { invalidate } from "@shared/web/store"
+import { invalidate, useCached } from "@shared/web/store"
 import type { Todo } from "@shared/types"
 import type { Language } from "@shared/i18n"
 
@@ -233,12 +233,21 @@ export function InputsScreen({
   const loading = inputsQ.data === undefined
   const resting = inputsQ.data ?? []
 
+  // THE TEAM'S OWN APPS, bounded (R14) and cached under the one key every
+  // other App field in the app already shares (R15/R56) — the same read
+  // `sprints-screen.tsx` makes for its own `AccountAppPicker` (F15). Fed to
+  // the form dialog rather than fetched inside it, the same shape
+  // `SprintFormDialog`/`WaveFormDialog`/`MeetingFormDialog` all take.
+  const appsQ = useCached(appsKey(teamId), () => listFetch.apps(teamId))
+
   async function addInput(values: TodoFormValues) {
     await contentApi.raiseTodo({
       accountId: values.accountId,
       title: values.title,
       detail: values.detail || undefined,
       dueOn: values.dueOn ? new Date(values.dueOn).toISOString() : undefined,
+      appId: values.appId || undefined,
+      assignedContactId: values.assignedContactId || undefined,
     })
     // A NEW INPUT LANDS ON WAITING (or, rarely, already Overdue if raised with
     // a past due date) — never Received. All three keys drop rather than one
@@ -389,6 +398,7 @@ export function InputsScreen({
         open={addOpen}
         onOpenChange={setAddOpen}
         draftKey={`todo:add:inputs:${teamId}`}
+        apps={(appsQ.data ?? []).filter((a) => a.active)}
         onSubmit={addInput}
       />
     </div>

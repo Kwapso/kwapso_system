@@ -95,6 +95,10 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     compartment: queryText(url.searchParams.get("compartment"), "Compartment"),
     q: queryText(url.searchParams.get("q"), "Search"),
     active: active === "yes" || active === "no" ? active : undefined,
+    // THE APP RECORD'S OWN KNOWLEDGE TAB (client ruling, 17 Sep 2026): "everything
+    // we have about this [app]". An id, not a name, so it narrows exactly rather
+    // than by a LIKE over a title (`sourcesWhere` says how it matches).
+    appId: queryText(url.searchParams.get("appId"), "App") ?? undefined,
   }
   const [page, total, byKind] = await Promise.all([
     listSources(
@@ -391,6 +395,11 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
     await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
+      // THE APP SCOPE (17 Sep 2026) — the app record's own Ask button hands the
+      // assistant this app's id in the conversation's first message (the "record"
+      // scope's own convention, one record kind along); the model reads it back
+      // off the sentence and passes it here when a question is about one system.
+      appId: queryText(url.searchParams.get("appId"), "App") ?? null,
       kinds: kindsForChips(chips),
       limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
       // The writer is only ever REACHED once there is something to write about —

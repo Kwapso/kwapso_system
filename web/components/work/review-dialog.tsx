@@ -35,13 +35,14 @@ import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { CheckSquare, Link as LinkIcon, Paperclip, Plus, X } from "@shared/ui/foundations/icons"
+import { CheckSquare, Link as LinkIcon, Plus, X } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { Button } from "@shared/ui/components/button/button"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import type { StoryAttachment } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -219,38 +220,51 @@ export function ReviewDialog({
       </Field>
       <Field config={fileField} htmlFor="review-file" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
-          {/* WHAT IS ALREADY ON THE STORY, including anything attached days ago.
-              Listed first because it is what the door will count. */}
+          {/* A LINK STAYS A PLAIN LIST — the tile grid below is FILES only:
+              `AttachmentPreview` never previews a link either ("the kind
+              decides, not the content type"), and this one is added through
+              the separate URL field down the form, not through FileUpload. */}
           {shown === null ? (
             <p className="text-muted-foreground text-sm">{t("Reading what's attached…")}</p>
-          ) : shown.length === 0 ? null : (
-            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-              {shown.map((a) => (
-                <li key={a.id} className="flex items-center gap-2 px-3 py-2">
-                  {a.kind === "file" ? (
-                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-                  ) : (
-                    <LinkIcon className="text-muted-foreground size-3.5 shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    aria-label={t("Take it off")}
-                    disabled={busy || uploading}
-                    onClick={() => void detach(a.id)}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+          ) : (
+            (() => {
+              const links = shown.filter((a) => a.kind === "link")
+              return links.length === 0 ? null : (
+                <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+                  {links.map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 px-3 py-2">
+                      <LinkIcon className="text-muted-foreground size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        aria-label={t("Take it off")}
+                        disabled={busy || uploading}
+                        onClick={() => void detach(a.id)}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            })()
           )}
+          {/* THE FILES THEMSELVES, AS TILES — client ruling, 17 Sep 2026,
+              through the one shared seam every FileUpload call site now
+              builds its items with (shared/web/upload-items.ts). */}
           <FileUpload
             multiple
+            files={(shown ?? [])
+              .filter((a) => a.kind === "file")
+              .map((a) =>
+                storedFileToUploadItem({ id: a.id, name: a.label, href: a.url, mime: a.contentType, size: a.sizeBytes })
+              )}
             onFilesSelected={(files) => void attachFiles(files)}
+            onRemove={(id) => void detach(id)}
+            removeLabel={t("Take it off")}
             className={busy || uploading ? "pointer-events-none opacity-60" : undefined}
           />
         </div>

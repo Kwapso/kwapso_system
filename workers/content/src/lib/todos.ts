@@ -27,6 +27,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
+import { optionalText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Todo, TodoViewName } from "@shared/types"
 
 import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
@@ -50,6 +51,16 @@ type TodoRow = {
    * shared/types.ts. Arrived 15 Sep 2026 with the Inputs screen; the same
    * join `tasks.ts`'s own `TASK_COLS` already reads. */
   account_logo_url: string | null
+  /** WHICH SYSTEM (client ruling, 17 Sep 2026) — optional, unfenced to the
+   * account (see `appForTodo`'s own doc for why), the same shape
+   * `help.app_id`/`tasks.app_id` already carry. */
+  app_id: string | null
+  app_name: string | null
+  app_logo_url: string | null
+  /** WHO AT THE CLIENT (client ruling, 17 Sep 2026) — an `accounts` row of
+   * type `individual`, the same shape `help.raised_by_contact_id` carries. */
+  assigned_contact_id: string | null
+  assigned_contact_name: string | null
   ticket_id: string | null
   created_at: string
 }
@@ -60,9 +71,12 @@ const TODO_COLS = `t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.c
   -- Both keep their name; only ours is shortened to a first name on screen,
   -- and this is the only thing that can tell the screen which it is holding.
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = t.completer_id) AS completer_is_client,
-  t.file_url, t.file_name, t.cancelled_at, t.account_id, t.ticket_id, t.created_at,
+  t.file_url, t.file_name, t.cancelled_at, t.account_id, t.app_id, t.assigned_contact_id, t.ticket_id, t.created_at,
   (SELECT a.name FROM accounts a WHERE a.id = t.account_id) AS account_name,
-  (SELECT a.logo_url FROM accounts a WHERE a.id = t.account_id) AS account_logo_url`
+  (SELECT a.logo_url FROM accounts a WHERE a.id = t.account_id) AS account_logo_url,
+  (SELECT p.name FROM apps p WHERE p.id = t.app_id) AS app_name,
+  (SELECT p.logo_url FROM apps p WHERE p.id = t.app_id) AS app_logo_url,
+  (SELECT c.name FROM accounts c WHERE c.id = t.assigned_contact_id) AS assigned_contact_name`
 
 function toTodo(r: TodoRow): Todo {
   return {
@@ -84,6 +98,11 @@ function toTodo(r: TodoRow): Todo {
     accountId: r.account_id,
     accountName: r.account_name,
     accountLogoUrl: r.account_logo_url,
+    appId: r.app_id,
+    appName: r.app_name,
+    appLogoUrl: r.app_logo_url,
+    assignedContactId: r.assigned_contact_id,
+    assignedContactName: r.assigned_contact_name,
     ticketId: r.ticket_id,
     createdAt: r.created_at,
   }
@@ -398,6 +417,54 @@ export async function todoOrThrow(
   return row
 }
 
+/** WHICH SYSTEM THIS ASK IS ABOUT — optional (client ruling, 17 Sep 2026: "it
+ * is optional to select an app"). Checked only for "exists and is active",
+ * the same unfenced shape `appForTicket` (workers/content/src/lib/help.ts)
+ * already draws: the account narrowing (`AccountAppPicker`, only offering an
+ * app that belongs to the chosen account) is the PICKER's own UX, never a
+ * hard fence at this door — an agency-wide app genuinely has no account, and
+ * a stricter check here would refuse exactly the row that field is for. */
+async function appForTodo(cfg: D1Rest, guard: MemberGuard, raw: unknown): Promise<string | null> {
+  const id = optionalText(raw, "App", TEXT_LIMITS.short)
+  if (!id) return null
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM apps WHERE id = ${sqlString(id)} AND deactivated_at IS NULL LIMIT 1`
+  )
+  if (!rows[0]) throw new GuardError(400, "invalid_input", "That app isn't one of ours any more.")
+  return rows[0].id
+}
+
+/** WHO AT THE CLIENT (client ruling, 17 Sep 2026: "select who this gets
+ * assigned to … filter the contacts of this account"). The identical check
+ * `contactForTicket` runs for a ticket's raised-by contact: the account
+ * itself, or a live `account_links` row to it — never a contact of a
+ * DIFFERENT company, and never a staff member (this table has no such
+ * population to check against). */
+async function contactForTodo(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  raw: unknown,
+  accountId: string
+): Promise<string | null> {
+  const id = optionalText(raw, "Assigned to", TEXT_LIMITS.short)
+  if (!id) return null
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT p.id FROM accounts p
+      WHERE p.id = ? AND p.deactivated_at IS NULL
+        AND (p.id = ? OR EXISTS (
+              SELECT 1 FROM account_links l
+               WHERE l.person_account_id = p.id AND l.account_id = ? AND l.deactivated_at IS NULL))
+      LIMIT 1`,
+    [id, accountId, accountId]
+  )
+  if (!rows[0]) throw new GuardError(400, "invalid_input", "That person isn't a contact at this client.")
+  return rows[0].id
+}
+
 /** Ask a client for something. STAFF ONLY — the door refuses a portal caller, so
  * a client cannot write themselves a to-do (which would be a note, and notes go
  * on the ticket). */
@@ -405,7 +472,18 @@ export async function createTodo(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }
+  input: {
+    accountId: string
+    title: string
+    detail?: string
+    dueOn?: string
+    ticketId?: string
+    /** raw, unvalidated — checked inside against `apps` (`appForTodo`). */
+    appId?: unknown
+    /** raw, unvalidated — checked inside against this same `accountId`'s own
+     * contacts (`contactForTodo`). */
+    assignedContactId?: unknown
+  }
 ): Promise<{ id: string; ref: string | null; accountId: string }> {
   const accounts = await d1Query<{ id: string }>(
     cfg,
@@ -414,6 +492,11 @@ export async function createTodo(
     [input.accountId]
   )
   if (!accounts[0]) throw new GuardError(400, "invalid_input", "That client isn't on your books any more.")
+
+  const [appId, assignedContactId] = await Promise.all([
+    appForTodo(cfg, guard, input.appId),
+    contactForTodo(cfg, guard, input.assignedContactId, input.accountId),
+  ])
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -424,8 +507,8 @@ export async function createTodo(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO todos (id, ref, account_id, ticket_id, title, detail, due_on, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sqlString(input.ticketId ?? null)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.dueOn ?? null)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO todos (id, ref, account_id, app_id, assigned_contact_id, ticket_id, title, detail, due_on, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sqlString(appId)}, ${sqlString(assignedContactId)}, ${sqlString(input.ticketId ?? null)}, ${sqlString(input.title)}, ${sqlString(input.detail ?? null)}, ${sqlString(input.dueOn ?? null)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "To-do raised",

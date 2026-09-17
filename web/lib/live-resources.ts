@@ -1308,32 +1308,41 @@ function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
    inventing a ruling out of the shape of another one. Two subtractions were
    never the same subtraction, and only one of them has been revised.
 
-   ── WHERE THE NUMBER GOES NOW ────────────────────────────────────────────
+   ── WHERE THE NUMBER WENT, AND WHERE IT WENT NEXT (AMENDED 17 SEP 2026) ────
 
-   "title (with id)" is a pairing this app already has ONE drawing of:
+   "title (with id)" was a pairing this app drew with ONE component:
    `RecordRef` inside `REF_LEADS_NAME` (shared/web/record-ref.tsx), the black
    chip in front of the name — her own earlier instruction, "put the ID before
-   the title to the left, with the usual black chip design", and a law rather
-   than a habit (`web/test/one-black-chip.test.ts` is the census that holds it:
-   a reference belongs in that chip and never glued into a title as text). The
-   `title` column has drawn it that way on every other tab all along, so the
-   Closed tab does not get a new cell — it gets the same one.
+   the title to the left, with the usual black chip design". That held from
+   6 Sep 2026 to 17 Sep 2026, when she ruled on this exact table again: "add
+   the header ID for the ID." Read together with 6 Sep's "the usual black chip
+   design", that is not a reopening of "should the number get its own column" —
+   it settles it the other way. So `"id"` is back in `TICKET_COLUMN_ORDER`
+   (above), carrying the identical `RecordRef` chip, now under a header that
+   says what it is rather than sharing the Title header's name. `one-black-
+   chip.test.ts` is untouched by this: its whole census is WHICH COMPONENT may
+   draw the chip and WHETHER a reference is ever glued into a string instead —
+   neither question is about which TableHead the chip sits under, so a `<td>`
+   moving the identical `<RecordRef>` element into a column of its own trips
+   neither clause.
 
-   AND SO `ref` IS NO LONGER A COLUMN OF ITS OWN. It existed for about a day,
-   for the one tab that had no title for the number to lead. Nothing names it
-   now, and a column no tab may ask for is not optionality — it is a second way
-   to draw a reference sitting one edit away from being used, which is exactly
-   what `one-black-chip.test.ts` exists to prevent. It is gone from the
-   vocabulary, from `TICKET_COLUMN_ORDER` and from the table.
+   THE PARAGRAPH THAT USED TO STAND HERE argued the opposite — that a `ref`
+   column "existed for about a day" and was deliberately retired, "a second way
+   to draw a reference sitting one edit away from being used". That argument
+   was correct for the ruling it was answering and is superseded by a later,
+   more specific one over the same table: read it as history, not as the
+   current rule. There is still exactly one component that may draw the black
+   chip, which is the property that argument was actually protecting.
 
    ── THE RESULT, AND WHY IT IS SPELLED AS THE DEFAULT PLUS ONE ─────────────
 
-   Title · Type · App · Raised · Closed is her four-column ruling of 2026-09-06
-   with the closing date added to the end. Written that way below rather than
-   as five literals, because that is what it IS: the Closed tab is now every
-   other tab plus the one fact only it can tell the truth about. A fifth column
-   added to `TICKET_COLUMNS_DEFAULT` tomorrow reaches this tab without anybody
-   remembering this paragraph.
+   ID · Title · Type · App · Raised · Closed is her four-column ruling of
+   2026-09-06 (Title · Type · App · Raised) with the ID column restored ahead
+   of it and the closing date added to the end. Written that way below rather
+   than as six literals, because that is what it IS: the Closed tab is every
+   other tab plus the one fact only it can tell the truth about — and it lands
+   on R82's six-column ceiling exactly, which is the reason nothing more may
+   join `TICKET_COLUMNS_DEFAULT` without dropping one first.
 
    ── WHY IT IS A RULE OVER TOKENS AND NOT AN `if (facet === CLOSED)` ───────
 
@@ -1362,8 +1371,18 @@ function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
 
 /** One column of the shared ticket table (`TicketRowsTable`,
  * web/components/tickets/tickets-collection.tsx). The names are the FACTS a row
- * shows, not the cells that draw them. */
-export type TicketColumn = "title" | "type" | "app" | "created" | "closed"
+ * shows, not the cells that draw them.
+ *
+ * `"id"` JOINED THE VOCABULARY 17 SEP 2026, and it is a genuine reversal of the
+ * paragraph two below that used to end this comment ("the reference is not a
+ * column and is not missing"). The client's own words, over this exact table:
+ * "add the header ID for the ID." What changed is not which fact the row
+ * carries — the black `RecordRef` chip has led the title since 6 Sep 2026 and
+ * still does — it is that the chip now sits in a header OF ITS OWN rather than
+ * sharing the "Title" header with the name beside it, so a reader scanning the
+ * header row sees "ID" over the column that answers "which ticket", the same
+ * way every other fact here has its own label. */
+export type TicketColumn = "id" | "title" | "type" | "app" | "created" | "closed"
 
 /** LEFT TO RIGHT, ONCE, FOR EVERY TAB. A tab chooses WHICH facts it shows and
  * never in what order they sit — the header row and the body row are both laid
@@ -1372,6 +1391,7 @@ export type TicketColumn = "title" | "type" | "app" | "created" | "closed"
  * rulings that survive: the name of the thing (carrying its number), then its
  * facts, then the dates, oldest question first. */
 export const TICKET_COLUMN_ORDER: readonly TicketColumn[] = [
+  "id",
   "title",
   "type",
   "app",
@@ -1379,12 +1399,15 @@ export const TICKET_COLUMN_ORDER: readonly TicketColumn[] = [
   "closed",
 ]
 
-/** THE FOUR EVERY TAB DRAWS, in the client's own order of 2026-09-06
- * (Title · Type · App · Raised). The reference is not a column and is not
- * missing: the number leads the TITLE inside that cell, which is where she put
- * it ("put the ID before the title to the left"), drawn by the one component
- * that draws a reference anywhere in either front door. */
-export const TICKET_COLUMNS_DEFAULT: readonly TicketColumn[] = ["title", "type", "app", "created"]
+/** THE FIVE EVERY TAB DRAWS: ID, then the client's own four-column order of
+ * 2026-09-06 (Title · Type · App · Raised). Until 17 Sep 2026 the reference
+ * was not a column at all — it led the TITLE cell instead ("put the ID before
+ * the title to the left") — but her later ruling asked for the header itself,
+ * so the same black `RecordRef` chip (`shared/web/record-ref.tsx`, the one
+ * component that draws one anywhere in either front door — `web/test/
+ * one-black-chip.test.ts` still holds that) now sits under a header of its
+ * own, first, and the Title cell carries the name alone. */
+export const TICKET_COLUMNS_DEFAULT: readonly TicketColumn[] = ["id", "title", "type", "app", "created"]
 
 /** WHICH COLUMNS ONE TAB'S TABLE DRAWS. */
 export function helpTabColumns(facet: HelpFacet): readonly TicketColumn[] {
@@ -1392,9 +1415,12 @@ export function helpTabColumns(facet: HelpFacet): readonly TicketColumn[] {
     ? // HER REVISED SET, 2026-09-09 (second reading): "columns for close: title
       // (with id), type, app, raised closed". Spelled as the default plus the
       // closing date because that is what it is — every other tab's row, plus
-      // the one fact only a resolved-pinned tab can state without lying. "(with
-      // id)" needs nothing here: the `title` cell has led with the black
-      // `RecordRef` chip since her 2026-09-06 ruling and does so on every tab.
+      // the one fact only a resolved-pinned tab can state without lying.
+      // "(with id)" now reads literally: `TICKET_COLUMNS_DEFAULT` carries its
+      // own `id` column (17 Sep 2026 ruling, see the block above this
+      // function), so the Closed tab gets it for free rather than needing a
+      // seventh literal — which is as well, since a seventh would break
+      // R82's six-column ceiling.
       [...TICKET_COLUMNS_DEFAULT, "closed"]
     : TICKET_COLUMNS_DEFAULT
 }
@@ -1616,7 +1642,15 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.knowledge(t),
     // The source's own history — the Activity tab on its screen — and the
     // by-id read the detail falls back to when the row is past page one.
-    deps: (_t, id) => [`activity:record:knowledge_sources:${id}`, `knowledge:one:${id}`],
+    deps: (_t, id) => [
+      `activity:record:knowledge_sources:${id}`,
+      `knowledge:one:${id}`,
+      // THE APP RECORD'S OWN BADGE (17 Sep 2026) — `knowledge-app` is now a
+      // real RECORD_CHILDREN entry (shared/record-counts.ts), so a change to
+      // any source can move an open app screen's Knowledge tab count exactly
+      // the way it already moves its own Sprints/Stories/Tickets ones.
+      ...recordCountDeps("knowledge"),
+    ],
     // …AND BOTH PICTURES THIS ROW APPEARS IN (R15). A ping names one row and
     // neither of these keys can be derived from it, so each family is dropped
     // whole — the same seam, twice, for two different drawings.
@@ -1634,7 +1668,12 @@ export const TEAM_RESOURCES: Record<
     //   rows appear on a map already drops this family; knowledge did not,
     //   because until the map learned to draw a knowledge source there was
     //   nothing of its to be stale.
-    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX],
+    //
+    //   THE APP'S OWN GALLERY (17 Sep 2026) — `knowledge-app-of:<appId>`
+    //   (`sliceKey`, work-panels.tsx), the Knowledge tab's own `<PagedFind>`
+    //   list cache. A ping cannot name which app a row concerns either, so it
+    //   drops by prefix exactly as the shape and the map already do.
+    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX, "knowledge-app-of:"],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

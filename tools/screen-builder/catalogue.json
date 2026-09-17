@@ -1,19 +1,19 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.108",
-  "sha": "5e05893efacfd5ed647de3656e2fadda88189f24",
+  "tag": "v1.2.110",
+  "sha": "9ef5ff8b4cebc3e002481e66c28b2426c14fd306",
   "syncedAt": "2026-09-17"
  },
- "generatedAt": "2026-09-17T16:35:08.410Z",
+ "generatedAt": "2026-09-17T17:59:26.525Z",
  "counts": {
   "components": 120,
   "hooks": 2,
   "withVariants": 43,
   "withoutVariants": 77,
-  "cvaSites": 53,
-  "variantGroups": 80,
-  "variantOptions": 266,
+  "cvaSites": 54,
+  "variantGroups": 81,
+  "variantOptions": 269,
   "typedEnumProps": 43,
   "typedBooleanProps": 317,
   "compositions": 47,
@@ -3808,8 +3808,44 @@
     {
      "file": "components/file-upload/file-upload.tsx",
      "name": "zoneVariants",
-     "line": 98,
+     "line": 321,
      "base": "flex w-full flex-col items-start gap-2 rounded-[var(--radius)] px-6 py-8 bg-card transition-[box-shadow,background-color,color] duration-[var(--duration-colour)] ease-kwapso motion-drop-target",
+     "groups": [
+      {
+       "name": "state",
+       "options": [
+        {
+         "name": "default",
+         "classes": "border border-dashed border-[var(--hair-strong)] text-foreground data-[over=true]:border-[var(--foreground)]",
+         "note": null
+        },
+        {
+         "name": "error",
+         "classes": "border border-dashed border-[color-mix(in_srgb,var(--destructive)_65%,transparent)] text-foreground",
+         "note": "Chapter 9's 65%, token-driven so dark re-resolves to poppy-lift. Spelled as the mix rather than as `--hairline-error`, because that token is an inset SHADOW and this edge has to be dashed; the expression is the token's own, so no second value exists."
+        },
+        {
+         "name": "disabled",
+         "classes": "cursor-not-allowed border border-dashed border-[var(--hair)] bg-hair-faint text-ink-disabled",
+         "note": "A fill and an ink. Never looks droppable, so hover does not move."
+        }
+       ]
+      }
+     ],
+     "defaults": {
+      "state": "default"
+     },
+     "compound": [],
+     "unresolved": [],
+     "usedBy": [
+      "FileUpload"
+     ]
+    },
+    {
+     "file": "components/file-upload/file-upload.tsx",
+     "name": "addTileVariants",
+     "line": 355,
+     "base": "relative flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-[var(--radius)] bg-card p-1 text-center transition-[box-shadow,background-color,color] duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
        "name": "state",
@@ -3870,7 +3906,7 @@
        "name": "readOnly",
        "optional": true,
        "kind": "boolean",
-       "note": "The list may be read but not changed. The zone is withdrawn entirely and the remove controls go with it — chapter 9's rule that a system-set value loses its box, applied to a whole control."
+       "note": "The list may be read but not changed. The Add tile and the drag handlers are withdrawn — chapter 9's rule that a system-set value loses its box — but a picked file still renders as a tile (OPTION B): a client who cannot add or remove files can still be shown the pictures they sent."
       }
      ]
     }
@@ -8237,8 +8273,8 @@
     {
      "file": "components/toolbar-row/toolbar-row.tsx",
      "name": "toolbarRowVariants",
-     "line": 165,
-     "base": "flex min-w-0 flex-col",
+     "line": 254,
+     "base": "flex min-w-0 flex-col @container",
      "groups": [
       {
        "name": "ground",

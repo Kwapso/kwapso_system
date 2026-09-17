@@ -45,7 +45,18 @@
 
 import * as React from "react"
 
-export type AgentTabScope = "record" | "knowledge" | "everything"
+// "app" (17 Sep 2026) IS ITS OWN SCOPE, NOT A RENAME OF "record" — the client's
+// ruling on the app record's Knowledge tab: "a button to ask about this [...]
+// should open a conversation with the assistant only about this app." "record"
+// already means "about whatever record you're standing on, whichever kind it
+// is" and carries no structured id at all, only a label (`recordLabel`, below)
+// folded into the first message's prose. An app is the one record kind the
+// retrieval door can actually narrow BY (`retrieve()`'s new `appId` parameter,
+// workers/content/src/lib/knowledge.ts — R26's read-back half, never the
+// vector call), so its scope carries the id too (`scopeId`), and the seam that
+// opens it (an app record's own Ask button) always knows exactly which app —
+// unlike "record", never picked through the generic in-panel picker.
+export type AgentTabScope = "record" | "knowledge" | "everything" | "app"
 
 export type AgentTab = {
   /** A client-side id, stable for the tab's whole lifetime — never the thread
@@ -64,8 +75,17 @@ export type AgentTab = {
   /** Captured the instant "This record" is chosen, because the reader may
    * navigate elsewhere before they finish typing — a snapshot, the same
    * reasoning `workspace-tabs.ts`'s own `OpenTab.label` gives for writing a
-   * background tab's name down rather than resolving it live. */
+   * background tab's name down rather than resolving it live. Also carries
+   * "app" scope's own name (the app's), for the identical reason. */
   recordLabel?: string
+  /** THE STRUCTURED ID BEHIND A SCOPE THAT HAS ONE — today only "app"
+   * (the app's id). `recordLabel` alone is a NAME, which is all "record"
+   * scope has ever needed (its retrieval narrows by prose, never a
+   * parameter); "app" scope's whole point is that the retrieval door CAN
+   * take an exact id (`ask_knowledge`'s `appId`), so the tab carries it
+   * through to the first message rather than making the model guess an app
+   * from its name alone. */
+  scopeId?: string
 }
 
 /** How many conversation tabs may sit open at once, the "+" not counted — the
@@ -280,8 +300,14 @@ export function activateAgentTab(id: string): void {
  * pick itself — the design artifact's own reading: "the tab's own label is the
  * pick, not a fourth control... a record's name if she'd picked 'This
  * record'." */
-export function pickAgentTabScope(id: string, scope: AgentTabScope, label: string, recordLabel?: string): void {
-  tabs = tabs.map((t) => (t.id === id ? { ...t, scope, label, recordLabel } : t))
+export function pickAgentTabScope(
+  id: string,
+  scope: AgentTabScope,
+  label: string,
+  recordLabel?: string,
+  scopeId?: string
+): void {
+  tabs = tabs.map((t) => (t.id === id ? { ...t, scope, label, recordLabel, scopeId } : t))
   announce()
 }
 

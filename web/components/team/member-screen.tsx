@@ -104,18 +104,21 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, UserMinus, UserSwitch } from "@shared/ui/foundations/icons"
+import { Envelope, PencilSimple, UserMinus, UserSwitch } from "@shared/ui/foundations/icons"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { invalidate, primeCache } from "@shared/web/store"
 import { RecordMark } from "@shared/web/record-mark"
 import { staffFullName } from "@shared/staff-name"
 import { useT } from "@shared/web/language"
-import type { TeamMember, TeamRole } from "@shared/types"
+import type { SessionUser, TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import { RecordActionsMenu, RecordScreen, type RecordAction } from "@/components/records/record-chrome"
+import { AccountActivityPanel } from "@/components/team/account-activity-panel"
 import { MemberHead } from "@/components/team/member-head"
+import { ProfileDialog } from "@/components/team/profile-dialog"
+import { EmailChangeDialog } from "@/components/team/email-change-dialog"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { StaffPanel } from "@/components/team/staff-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -129,6 +132,8 @@ export function MemberScreen({
   recipe,
   rights,
   onRemoved,
+  sessionUser,
+  onProfileSaved,
 }: {
   teamId: string
   /** The row the host already has in hand from the members read (R56 — this
@@ -147,10 +152,32 @@ export function MemberScreen({
   /** The person is gone — the host takes the reader off a record that no longer
    * exists, exactly as the deep-link confirm has always done. */
   onRemoved: () => void
+  /** THE RETIRED PROFILE PAGE'S OWN SESSION, handed down for the `member.isYou`
+   * branch only (below) — `active.user` from the host's `useActiveTeam`, the
+   * SAME object `ProfileDialog` always read. Nothing here opens a second
+   * session door: this screen already has the signed-in person's row (it IS
+   * `member` when `isYou`), but `ProfileDialog`/`EmailChangeDialog` are typed
+   * against `SessionUser`/a plain email string and are reused UNCHANGED rather
+   * than forked, so they take the host's own copy instead of a reshaped one. */
+  sessionUser: SessionUser | null
+  /** `active.refresh` — reruns after a saved name/photo or a verified email
+   * change, the exact callback `ProfileDialog`/`EmailChangeDialog` have always
+   * taken, so the rail's own avatar and name update with the record below it. */
+  onProfileSaved: () => Promise<void>
 }) {
   const t = useT()
   const [pickRole, setPickRole] = React.useState(false)
   const [confirmRemove, setConfirmRemove] = React.useState(false)
+  // THE RETIRED PROFILE PAGE'S TWO EDIT DOORS, SELF-ONLY (17 Sep 2026 — see
+  // this file's header for the client's ruling that retired `/profile`
+  // outright). `ProfileDialog` (name + photo) and `EmailChangeDialog` are the
+  // exact components that page used; only WHERE they open from moved, onto
+  // this screen's own ⋯ menu (`accountMenuActions`, below), self-only —
+  // nobody edits another member's name or signs in as them to change their
+  // email, so these two dialogs, unlike `StaffProfileDialog`, are never wired
+  // for anybody but `member.isYou`.
+  const [editAccount, setEditAccount] = React.useState(false)
+  const [changingEmail, setChangingEmail] = React.useState(false)
   // THE HEAD'S OWN EDIT PENCIL — client ruling, 2026-09-15: "make the pencil
   // button visible." Lifted here rather than left as `StaffPanel`'s own local
   // state so the SAME `StaffProfileDialog` opens whether a reader presses the
@@ -191,6 +218,17 @@ export function MemberScreen({
   // record-detail.tsx) draws NOTHING for.
   const activity = useRecordActivity("users", member.userId)
 
+  // THE OTHER TRAIL — THE PROFILE PAGE'S "ACCOUNT ACTIVITY", SELF-ONLY. This is
+  // NOT `activity` above wearing a second name: `activity` is the TEAM'S own
+  // generic (table, id) read (R5); `account_activity` is a different table in
+  // a different (GLOBAL) database, recording the person's own identity
+  // history rather than what happened to their membership row. Read (and the
+  // whole reasoning) lives in `AccountActivityPanel`, mounted below for
+  // `member.isYou` only, kept out of THIS file on purpose — R2's own census
+  // (`record-detail-tabs`) flags a record detail that hand-rolls its own
+  // `<ActivityFeed>` as a second, competing copy of the pairing above, and
+  // that component's own header says why this one genuinely is not that.
+  //
   // ── THE TWO DOORS ───────────────────────────────────────────────────────
   // Cache-first (CACHING.md): each door answers with the WHOLE list, so the
   // members cache is primed with what the write returned rather than dropped
@@ -294,6 +332,34 @@ export function MemberScreen({
   // promise a door that isn't there.
   const canEditProfile = Boolean(rights.staff_profiles?.read && rights.staff_profiles?.update)
 
+  // THE RETIRED PROFILE PAGE'S TWO OTHER ACTS, SELF-ONLY, IN THE SAME ⋯ MENU
+  // "CHANGE ROLE"/"REMOVE" ALREADY USE. No recipe/gate to read here — unlike
+  // those two, editing your own name/photo or your own sign-in email needs no
+  // permission beyond being the person on the page, exactly as it needed none
+  // on the old `/profile` screen. Labelled with the two dialogs' own titles
+  // (`t("Edit your profile")`, `t("Change your email")`) rather than new
+  // copy — both strings were already in the catalogue from those dialogs, and
+  // reusing them keeps this menu item and the sheet it opens saying the same
+  // thing, which also keeps this distinct from the pencil's own "Edit
+  // profile"/"Write a profile" (the bio, `StaffProfileDialog` — a different
+  // record, `staff_profiles`, not this one).
+  const accountMenuActions: RecordAction[] = member.isYou
+    ? [
+        {
+          key: "account.editProfile",
+          label: t("Edit your profile"),
+          icon: <PencilSimple className="size-3.5" />,
+          onSelect: () => setEditAccount(true),
+        },
+        {
+          key: "account.changeEmail",
+          label: t("Change your email"),
+          icon: <Envelope className="size-3.5" />,
+          onSelect: () => setChangingEmail(true),
+        },
+      ]
+    : []
+
   return (
     <>
       <RecordScreen
@@ -352,7 +418,9 @@ export function MemberScreen({
                 <PencilSimple className="size-3.5" />
               </Button>
             )}
-            <RecordActionsMenu actions={[...changeRoleMenuActions, ...removeMenuActions]} />
+            <RecordActionsMenu
+              actions={[...accountMenuActions, ...changeRoleMenuActions, ...removeMenuActions]}
+            />
           </>
         }
         // THE RECORD COLUMN — client ruling, 2026-09-15: "the footer … is
@@ -399,6 +467,16 @@ export function MemberScreen({
             editOpen={editProfile}
             onEditOpenChange={setEditProfile}
           />
+          {/* THE RETIRED PROFILE PAGE'S OWN ACTIVITY SECTION, SELF-ONLY — the
+              GLOBAL identity trail, never the team membership feed the
+              footer already draws (see `AccountActivityPanel`'s own header).
+              NO SECOND CARD INSIDE IT, same reasoning as `StaffPanel`'s own
+              header: this `<div>` is already `children` of the one Card
+              `RecordScreen` draws, so a second `bg-surface-panel` in there —
+              which the old standalone page needed, standing directly on the
+              bare page — would be the container-inside-a-container the
+              client rejected on this exact shape. */}
+          {member.isYou && <AccountActivityPanel />}
         </div>
       </RecordScreen>
 
@@ -439,6 +517,32 @@ export function MemberScreen({
           }
         }}
       />
+
+      {/* EDIT YOUR OWN NAME AND PHOTO — the retired `/profile` page's own
+          `ProfileDialog`, unchanged, opened from this screen's ⋯ menu instead
+          (`accountMenuActions`, above). Self-only, so `sessionUser`/
+          `onProfileSaved` are only ever meant for `member.isYou`; the dialog
+          itself never opens for anybody else because nothing but that menu
+          item sets `editAccount`. */}
+      {member.isYou && (
+        <ProfileDialog
+          open={editAccount}
+          onOpenChange={setEditAccount}
+          user={sessionUser}
+          onSaved={onProfileSaved}
+        />
+      )}
+
+      {/* CHANGE YOUR OWN SIGN-IN EMAIL — the retired page's `EmailChangeDialog`,
+          unchanged, same self-only door. */}
+      {member.isYou && (
+        <EmailChangeDialog
+          open={changingEmail}
+          onOpenChange={setChangingEmail}
+          currentEmail={member.email}
+          onSaved={onProfileSaved}
+        />
+      )}
     </>
   )
 }

@@ -39,7 +39,7 @@
 
 import * as React from "react"
 
-import { LinkSimple, Paperclip, X } from "@shared/ui/foundations/icons"
+import { LinkSimple, X } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
@@ -67,6 +67,7 @@ import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
 import type { StoryAttachment } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
+import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
@@ -412,6 +413,21 @@ export function StoryFormDialog({
     })
   )
   const attached = attachedQ.data ?? []
+  // THE TILES THE FIELD BELOW DRAWS — client ruling, 17 Sep 2026: "I can
+  // really see the images that I have already uploaded." Both halves feed
+  // one grid, through the one shared seam every FileUpload call site now
+  // builds its items with (shared/web/upload-items.ts): what the story
+  // already carries (a served URL, safeSrc-checked) and what is still only
+  // picked in this browser (an object URL, revoked when it is removed or
+  // this dialog unmounts). A "link" attachment is not a file — `AttachmentPreview`
+  // never previews one either — so only `kind === "file"` rows join the grid.
+  const attachedFileItems = attached
+    .filter((a) => a.kind === "file")
+    .map((a) =>
+      storedFileToUploadItem({ id: a.id, name: a.label, href: a.url, mime: a.contentType, size: a.sizeBytes })
+    )
+  const pendingItems = usePickedFileItems(pending)
+  const fileTiles = [...attachedFileItems, ...pendingItems]
 
   /** Keep the one cache both this field and the tab read. */
   function keepAttached(target: string, r: { attachments: StoryAttachment[]; total: number }) {
@@ -650,55 +666,48 @@ export function StoryFormDialog({
           path, and the upload simply knows a different id on an edit. */}
       <Field config={fileField} htmlFor="story-files" className={fieldSpacing}>
         <div className="flex flex-col gap-2">
-          {attached.length > 0 && (
+          {/* A LINK STAYS A PLAIN LIST — the tile grid below is for FILES,
+              and a link has no tile to become: `AttachmentPreview` never
+              previews one either ("the kind decides, not the content
+              type"). This dialog never creates one itself (`pick`/`attach`
+              only ever send `kind: "file"`), but one can arrive on the same
+              cache key from the story's own Files and links tab. */}
+          {attached.some((a) => a.kind === "link") && (
             <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-              {attached.map((a) => (
-                <li key={a.id} className="flex items-center gap-2 px-3 py-2">
-                  {a.kind === "file" ? (
-                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-                  ) : (
+              {attached
+                .filter((a) => a.kind === "link")
+                .map((a) => (
+                  <li key={a.id} className="flex items-center gap-2 px-3 py-2">
                     <LinkSimple className="text-muted-foreground size-3.5 shrink-0" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    aria-label={t("Take it off")}
-                    disabled={busy || uploading}
-                    onClick={() => void detach(a.id)}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
+                    <span className="min-w-0 flex-1 truncate text-sm">{a.label}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      aria-label={t("Take it off")}
+                      disabled={busy || uploading}
+                      onClick={() => void detach(a.id)}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
             </ul>
           )}
-          {pending.length > 0 && (
-            <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-              {pending.map((file, i) => (
-                <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
-                  <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    aria-label={t("Take it off")}
-                    disabled={busy}
-                    onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          {/* THE FILES THEMSELVES, AS TILES — client ruling, 17 Sep 2026.
+              `fileTiles` is what the story already carries plus what is
+              still only picked in this browser, both built through the one
+              shared seam (shared/web/upload-items.ts). */}
           <FileUpload
             multiple
+            files={fileTiles}
             onFilesSelected={(files) => void pick(files)}
+            onRemove={(id) => {
+              if (attached.some((a) => a.id === id)) void detach(id)
+              else setPending((f) => f.filter((file) => pickedFileId(file) !== id))
+            }}
+            removeLabel={t("Take it off")}
             className={busy || uploading ? "pointer-events-none opacity-60" : undefined}
           />
         </div>

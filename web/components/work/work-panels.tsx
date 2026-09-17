@@ -32,8 +32,16 @@ import { Button } from "@shared/ui/components/button/button"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Prohibit, CaretRight, ListBullets } from "@shared/ui/foundations/icons"
+import { Prohibit, CaretRight, ListBullets, Kanban as KanbanGlyph, Cards } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+/* THE APP RECORD'S OWN BOARD AND QUEUE — client, 17 Sep 2026: "In Tickets
+   inside the app, I want a board view by status" and "I also want the queue
+   view for triaging. Empty." Neither is hand-rolled: `Kanban` is the same kit
+   composition the top-level Tickets screen already adopted (`OpenBoard`/
+   `AllBoard`, tickets-collection.tsx), and `ticketStatusColumnTitles`/
+   `ticketBoardCard` are that file's own shared pieces, exported the day this
+   third caller needed them rather than copied. */
+import { Kanban } from "@shared/ui/components/kanban/kanban"
 
 import { AppMark } from "@/components/apps/app-tiles"
 import { LoadMore } from "@/components/records/load-more"
@@ -42,7 +50,18 @@ import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resource
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
-import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
+import { HELP_STATUSES } from "@shared/types"
+import type {
+  AppRow,
+  HelpTicket,
+  Meeting,
+  ProcessSummary,
+  Sprint,
+  Story,
+  TeamMember,
+  Todo,
+  TodoViewName,
+} from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -62,6 +81,7 @@ import { PagedFind, type FindPage, type FindQuery } from "@/components/records/p
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
+import { ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -979,12 +999,21 @@ export function AppMeetingsPanel({
  * would be an answer that looks like an answer. `total` is the door's exact
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
 export function AppTicketsPanel({
+  teamId,
   appId,
   helpTypeOptions,
   host,
   onNew,
   view,
 }: {
+  /** ONLY FOR THE RESOLVED-BY FACE (R35) — the team's own members cache,
+   * `members:<teamId>`, the same key `TriageQueue`'s own `peopleFor` reads.
+   * The door hands back a resolver's id and stamped name (`resolverId`/
+   * `resolverName`, `shared/types.ts`), never a picture: the content worker
+   * reads the TEAM's own database, and a person's face lives in the GLOBAL
+   * one (R47's own finding), so the picture is resolved here, client-side,
+   * against a list this record already caches for its staff pickers. */
+  teamId: string
   appId: string
   /** the team's live `Ticket type` values (the same list `tickets-collection.tsx`
    * builds its own strip from) — what the Kind facet below offers. Absent
@@ -1008,6 +1037,11 @@ export function AppTicketsPanel({
       return r.tickets
     })
   )
+  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+    tenancy.members().then((r) => r.members)
+  )
+  const memberAvatar = (userId: string | null): string | null | undefined =>
+    membersQ.data?.find((m) => m.userId === userId)?.imageUrl
 
   /* ══ THE LIST — A TABLE, THE SAME SHAPE THE TICKET LIST ALREADY DRAWS ═════
      Client, 6 Sep 2026: "create me, in each app, the ticket page. Put me in the
@@ -1060,12 +1094,13 @@ export function AppTicketsPanel({
      do. It is a picture, not a column, so it costs no header. */
   const renderRows = (rows: HelpTicket[]) => (
     <Table
-      // Four columns, so the kit's own specimen width is the right pin — its
-      // doc asks a call site that knows its column count to pass one. Below
-      // that the container scrolls on the inline axis rather than crushing the
-      // title, which is the kit's stated mobile answer: it never restacks a
-      // table into cards.
-      minWidth="42rem"
+      // SIX COLUMNS NOW, NOT FOUR — client, 17 Sep 2026: "On tickets list
+      // inside an app, add columns: Resolved Date, Resolved By." That lands
+      // this row exactly on R82's six-column ceiling (Title · Type · Stage ·
+      // Raised · Resolved date · Resolved by), so nothing here budges for a
+      // seventh without dropping one first — see `TABLE_COLUMN_BUDGET_EXEMPT`
+      // if that day comes. Widened to the kit's six-column specimen with it.
+      minWidth="54rem"
       aria-label={t("Tickets")}
     >
       <TableHeader>
@@ -1079,6 +1114,19 @@ export function AppTicketsPanel({
           <TableHead>{t("Type")}</TableHead>
           <TableHead>{t("Stage")}</TableHead>
           <TableHead>{t("Raised")}</TableHead>
+          {/* RESOLVED DATE — `resolvedAt`, already on the wire (the general
+              Tickets screen's own Closed tab has read it since 2026-09-09;
+              see `TicketRowsTable`'s `closed` column). No door change needed
+              for this one, only a column. */}
+          <TableHead>{t("Resolved date")}</TableHead>
+          {/* RESOLVED BY — genuinely new: `resolverId`/`resolverName`
+              (`shared/types.ts`), read back off `help.resolver_id`/
+              `help.resolver_name` for the first time today
+              (workers/content/src/lib/help.ts's `TICKET_COLS`/`toTicket`).
+              Redacted to a client login exactly as `editorName` beside it is
+              — SCOPE ch.06, "the portal shows work status but never which
+              staff member is doing it". */}
+          <TableHead>{t("Resolved by")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -1178,11 +1226,83 @@ export function AppTicketsPanel({
                   two screens that show it. */}
               {formatDate(ticket.createdAt, lang)}
             </TableCell>
+            {/* RESOLVED DATE — the same em-dash treatment `TicketRowsTable`'s
+                `closed` column gives an unresolved ticket: a blank cell reads
+                as a rendering fault, an em dash reads as "not yet". A reopen
+                NULLs `resolved_at` (the owner's 2026-09-06 ruling — the
+                closure survives in the activity trail instead), so this cell
+                never lies about a ticket that has been closed twice. */}
+            <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+              {ticket.resolvedAt ? formatDate(ticket.resolvedAt, lang) : "—"}
+            </TableCell>
+            {/* RESOLVED BY — R35's face, the same shape every staff picker in
+                this app draws a person with: a picture (or an initial tile)
+                beside their name. Staff are named by FIRST NAME ONLY in the
+                agency app (R54) — `staffNameFromSnapshot` is the one seam
+                that trims a stored "First Last" snapshot, the same one the
+                Raised/Type columns' own history would use if they named a
+                person. `null` (never resolved, or redacted for a portal
+                caller) draws the same em dash every other absent fact here
+                draws. */}
+            <TableCell className="text-muted-foreground">
+              {ticket.resolverName ? (
+                <span className="flex items-center gap-2">
+                  <RecordMark
+                    picture={memberAvatar(ticket.resolverId)}
+                    name={ticket.resolverName}
+                    shape="round"
+                  />
+                  <span className="min-w-0 truncate">{staffNameFromSnapshot(ticket.resolverName)}</span>
+                </span>
+              ) : (
+                "—"
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
   )
+
+  const openTicket = (id: string) => softNavigate(`${host.base}/tickets/${id}`)
+
+  /** WHICH BODY THIS TAB'S LIST TAB SHOWS — the three views `view?.value` can
+   * name, one function so `<PagedPanelBody>` never has to know Board or Queue
+   * exist. List is the fallback for both an absent `view` (every other
+   * `PagedPanelBody` caller in this file) and an unrecognised value, which is
+   * the same defensive default `AppTicketsTab`'s own switch takes below. */
+  const renderBody = (rows: HelpTicket[]) => {
+    if (view?.value === "board") return <AppTicketsBoard teamId={teamId} rows={rows} onOpen={openTicket} />
+    if (view?.value === "queue") {
+      /* THE QUEUE — client, 17 Sep 2026: "I also want the queue view for
+         triaging. Empty. Show there's nothing to triage." A far smaller ask
+         than the top-level Triage sitting (`TriageQueue`, tickets-collection.tsx):
+         no decisions, no skip pile, just the app's own unsorted pile, oldest
+         first, in the SAME table the List body already draws — the leanest
+         shape that answers her sentence, and one this file does not have to
+         invent a second row layout for.
+
+         BOUNDED, NOT PAGED PAST WHAT'S LOADED — the same `rows` the List body
+         receives (`content.help({ appId })`'s own R14 hard cap), narrowed to
+         `status === "new"` and re-sorted client-side. `helpTabOrder`/
+         `helpFacetFilter` (web/lib/live-resources.ts) do the identical job
+         server-side for the top-level screen's own Triage tab; this panel has
+         no per-view door parameter to carry one, and the app's own ticket
+         count is small enough that "the loaded page, filtered" is the whole
+         answer in practice. */
+      const queueRows = rows
+        .filter((r) => r.status === "new")
+        .slice()
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      if (queueRows.length === 0)
+        // R62 — the same register every other zero state on this screen
+        // draws. Not `filtered`: this is not "nothing matched a search", it
+        // is the queue genuinely empty, the sentence she asked for.
+        return <CollectionEmptyState title={t("Nothing to triage.")} />
+      return renderRows(queueRows)
+    }
+    return renderRows(rows)
+  }
 
   return (
     <PagedPanelBody<HelpTicket>
@@ -1245,8 +1365,62 @@ export function AppTicketsPanel({
       // No `help`/tickets import target exists.
       emptyTitle={t("Nothing has been raised about this app yet.")}
       loadMoreLabel={t("Load more tickets")}
-      renderRows={renderRows}
+      renderRows={renderBody}
       view={view}
+    />
+  )
+}
+
+/** THE APP RECORD'S OWN BOARD — client, 17 Sep 2026: "In Tickets inside the
+ * app, I want a board view by status." The general Tickets screen answers the
+ * SAME sentence's second half for the whole team ("also add this board view
+ * by status in general tickets, all" — `AllBoard`, tickets-collection.tsx);
+ * this is the identical idea, the same kit `Kanban` composition, the same
+ * shared column titles and card shape (`ticketStatusColumnTitles`/
+ * `ticketBoardCard`, exported from that file the day this became a third
+ * caller rather than a fourth hand-rolled board), narrowed to one app.
+ *
+ * NO EXACT PER-STAGE COUNT, AND THAT IS A DELIBERATE, NAMED DEPARTURE FROM
+ * `OpenBoard`/`AllBoard`. Both of those read `byStatus`, a team-wide grouped
+ * `COUNT(*)` the top-level Tickets screen's own tab-strip badges already
+ * hold — a sixth caller of an existing read. There is no per-APP equivalent
+ * on this screen, and adding one would be a new round trip to the door for a
+ * number a reader can already count across six short columns of cards. So
+ * this board never passes the kit a `count` prop, which is the kit's own
+ * documented way to say "the cards ARE the whole answer" (the same fallback
+ * `OpenBoard`/`AllBoard` themselves fall into the moment the toolbar is
+ * narrowed) — honest for the bounded page `AppTicketsPanel`'s own List body
+ * already reads (R14's ordinary hard cap) and grouped here client-side, the
+ * SAME rows, just bucketed by status rather than a second read of them. */
+function AppTicketsBoard({
+  teamId,
+  rows,
+  onOpen,
+}: {
+  teamId: string
+  rows: readonly HelpTicket[]
+  onOpen: (id: string) => void
+}) {
+  const { t, lang } = useLanguage()
+  const COLUMN = ticketStatusColumnTitles(t)
+  const boardCard = ticketBoardCard(teamId, t, lang)
+  return (
+    <Kanban
+      // SIX COLUMNS SHARE THE ROW — the identical fluid formula `AllBoard`
+      // uses for its own six (tickets-collection.tsx), so a reader who has
+      // seen one board recognises the other's math instantly.
+      columnWidth="max(18rem, calc((100% - 5 * var(--space-2h)) / 6))"
+      columns={HELP_STATUSES.map((stage) => ({
+        id: stage,
+        title: COLUMN[stage].title,
+        cards: rows.filter((r) => r.status === stage).map(boardCard),
+        emptyLabel: t("Nothing at this stage."),
+      }))}
+      onCardSelect={(card) => onOpen(card.id)}
+      footnote={t(
+        "Cards are this app's own tickets, as far as they have loaded. Click a card to open the ticket."
+      )}
+      emptyColumnLabel={t("Nothing at this stage.")}
     />
   )
 }
@@ -1312,18 +1486,36 @@ export function AppTicketsTab({
   // own stated contract and the same slot shape `triage-view` uses one screen
   // along: the memory is scoped to the address the host published, so choosing
   // the dashboard on one app says nothing about the next one you open.
-  const [view, setView] = useRemembered<"list" | "dashboard">("tickets-view", "list")
+  //
+  // FOUR VIEWS NOW, NOT TWO — client, 17 Sep 2026: "In Tickets inside the
+  // app, I want a board view by status" and "I also want the queue view for
+  // triaging." Board and Queue join List and Dashboard in the SAME
+  // remembered slot and the SAME switch, never a second control: R53's own
+  // rule is that a collection's view choice is one question, not one per
+  // pair of bodies.
+  const VIEW_NAMES = ["list", "dashboard", "board", "queue"] as const
+  type TicketsTabView = (typeof VIEW_NAMES)[number]
+  const [view, setView] = useRemembered<TicketsTabView>("tickets-view", "list")
   const viewSlot: ToolbarViewSlot = {
     views: [
-      // A VIEW SHAPE FOR THE LIST, A CONCEPT GLYPH FOR THE DASHBOARD, and the
-      // difference is deliberate rather than an inconsistency. "List" is a way
-      // of looking at rows and wears the same `ListBullets` the Triage switch
-      // wears for the identical body; "Dashboard" is an IDEA this product
-      // already has one icon for, and UI-CONVENTIONS §4 says a concept gets one
+      // A VIEW SHAPE FOR LIST, BOARD AND QUEUE, A CONCEPT GLYPH FOR THE
+      // DASHBOARD, and the difference is deliberate rather than an
+      // inconsistency. "List" wears the same `ListBullets` the Triage switch
+      // wears for the identical body; "Board" wears the same `Kanban` glyph
+      // the top-level Tickets screen's own Open/All switches do (R53's own
+      // shared vocabulary for a control the kit draws, not a copy of it);
+      // "Queue" wears the same `Cards` glyph the top-level Triage tab's own
+      // Queue/List switch does, because it is the identical idea drawn
+      // smaller — a "figures, then one thing at a time" reading, here
+      // simplified to a plain filtered list (see `AppTicketsPanel`'s own
+      // Queue branch for why). "Dashboard" is an IDEA this product already
+      // has one icon for, and UI-CONVENTIONS §4 says a concept gets one
       // glyph reused at page, tab and button level — so it resolves through
-      // `CONCEPT_ICON` exactly as the Tickets screen's own Dashboard tab does,
-      // and the two cannot drift apart.
+      // `CONCEPT_ICON` exactly as the Tickets screen's own Dashboard tab
+      // does, and the two cannot drift apart.
       { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+      { value: "board", label: t("Board"), icon: <KanbanGlyph className="size-4" /> },
+      { value: "queue", label: t("Queue"), icon: <Cards className="size-4" /> },
       {
         value: "dashboard",
         label: t("Dashboard"),
@@ -1331,16 +1523,19 @@ export function AppTicketsTab({
       },
     ],
     value: view,
-    onValueChange: (v) => setView(v === "dashboard" ? "dashboard" : "list"),
+    onValueChange: (v) => setView(VIEW_NAMES.includes(v as TicketsTabView) ? (v as TicketsTabView) : "list"),
   }
 
   if (view === "dashboard")
     // NO TOOLBAR HERE ANY MORE (client ruling, 17 Sep 2026: "Remove the
     // toolbar from the tickets dashboard") — `<TicketsDashboard>` no longer
     // accepts `viewSlot`/`actions`, nothing left to draw them into. The
-    // List↔Dashboard switch (`viewSlot`) and "Raise a ticket" (`onNew`)
-    // still reach the reader through the LIST view's own toolbar below
-    // (`<AppTicketsPanel view={viewSlot}>`), which is the one this tab keeps.
+    // switch (`viewSlot`, now List/Board/Queue/Dashboard) and "Raise a
+    // ticket" (`onNew`) still reach the reader through the LIST view's own
+    // toolbar below (`<AppTicketsPanel view={viewSlot}>`) — Board and Queue
+    // are alternate BODIES `AppTicketsPanel` draws inside that SAME toolbar
+    // (see its own `renderBody`), so switching to either of them never loses
+    // the one way back to Dashboard the way leaving List for Dashboard does.
     return (
       <TicketsDashboard
         teamId={teamId}
@@ -1357,6 +1552,7 @@ export function AppTicketsTab({
 
   return (
     <AppTicketsPanel
+      teamId={teamId}
       appId={appId}
       helpTypeOptions={helpTypeOptions}
       host={host}

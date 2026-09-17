@@ -1162,8 +1162,16 @@ export const KNOWLEDGE_SORTS: SortMenu<KnowledgeSource> = {
  * `active` is an ALLOW-LIST of two words rather than a boolean, because it
  * arrives off a query string where everything is text and `"false"` is truthy.
  * "yes" is the sources the assistant may read; "no" is the ones somebody took
- * away and can put back (deactivate-never-delete, so they are still rows). */
-export type SourceFilters = { kind?: string; compartment?: string; q?: string; active?: string }
+ * away and can put back (deactivate-never-delete, so they are still rows).
+ *
+ * `appId` (added for the app record's own Knowledge tab, 17 Sep 2026) narrows
+ * to what a system's own read is ABOUT — a mirror whose `app_id` column the
+ * ingest sweep stamped from its origin row (a ticket, a sprint, a meeting…;
+ * `knowledge-ingest.ts` writes it), or a note/file somebody filed under this
+ * app by hand (the `apps` JSON array `createSource`/`createFileSource` write).
+ * Either counts: the client's ruling was "everything we have about this", not
+ * only what mirrors the app row itself. */
+export type SourceFilters = { kind?: string; compartment?: string; q?: string; active?: string; appId?: string }
 
 /** THE FENCE PLUS THE FILTERS, built ONCE — because the list and the COUNT have
  * to be the same question. They were not: the count was the fence alone, so a
@@ -1181,6 +1189,18 @@ function sourcesWhere(guard: MemberGuard, filter: SourceFilters): { sql: string[
   if (filter.compartment) {
     sql.push("compartment = ?")
     params.push(filter.compartment)
+  }
+  if (filter.appId) {
+    // TWO WAYS A SOURCE IS "ABOUT" AN APP: the mirror's own `app_id` column, and
+    // the `apps` JSON array a person's own filing can add on top (0073's array,
+    // additive beside the singular column — DATA-MODEL.md § knowledge_sources).
+    // The array is matched as a LIKE over its own quoted element rather than a
+    // JSON function, the same reasoning `filter.q` above gives for a LIKE
+    // pattern: `likeLiteral` neutralises `%`/`_`, and an app id is a ULID (no
+    // quote, no backslash), so `%"<id>"%` can only ever match that id sitting in
+    // the array as its own element, never a prefix of a longer one.
+    sql.push(`(app_id = ? OR apps LIKE ? ESCAPE '\\')`)
+    params.push(filter.appId, `%"${likeLiteral(filter.appId)}"%`)
   }
   // Not a parameter: the two words are matched against literals ABOVE this line
   // (the door's own allow-list), so what reaches the statement is our SQL and
@@ -4465,6 +4485,15 @@ export async function retrieve(
   input: {
     question: string
     accountId?: string | null
+    /** THE APP SCOPE (17 Sep 2026): "a conversation with the assistant only
+     * about this app". Narrows THE READ-BACK ONLY, never the vector call — R26's
+     * own division applied to a filter the index has no label for (a source's
+     * `app_id`/`apps` are D1 columns, not one of the ten Vectorize metadata
+     * keys). So a passage from another app can still surface as a CANDIDATE and
+     * is dropped the moment the database, not the index, decides what is real —
+     * exactly the shape `chipClause` beside this already has for `kinds`, one
+     * filter along. */
+    appId?: string | null
     /** WHICH DOORS THIS CONVERSATION IS USING — the source chips, already
      * resolved from chip keys to kinds by `kindsForChips`. Null means every
      * kind, which is what a caller who has never touched the chips sends.
@@ -4709,6 +4738,16 @@ export async function retrieve(
   const chipClause = input.kinds?.length
     ? ` AND s.kind IN (${input.kinds.map((k) => sqlString(k)).join(", ")})`
     : ""
+  // THE APP SCOPE, AS SQL — the read-back half of R26 applied to `input.appId`,
+  // built once beside `chipClause` for the same reason: two reads can hand a
+  // passage back (this one and the router's fallback below) and a filter
+  // written at only one of them is a second way in that is wider than the
+  // first. Interpolated, not bound — `input.appId` is our own ULID or absent,
+  // never caller text reaching a WHERE clause unchecked (the door validates it
+  // before it ever reaches here).
+  const appScopeClause = input.appId
+    ? ` AND (s.app_id = ${sqlString(input.appId)} OR s.apps LIKE ${sqlString(`%"${likeLiteral(input.appId)}"%`)} ESCAPE '\\')`
+    : ""
   const rows = await d1Query<ScoredRow>(
     cfg,
     guard.databaseId,
@@ -4720,7 +4759,7 @@ export async function retrieve(
             s.origin_table, s.origin_row_id, s.record_date
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
-        AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
+        AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}${appScopeClause}
       LIMIT ${RANKING_POOL}`,
     reader.params
   )
@@ -4774,7 +4813,7 @@ export async function retrieve(
               s.origin_table, s.origin_row_id, s.record_date
          FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
         WHERE c.source_id IN (${named.map((id) => sqlString(id)).join(", ")})
-          AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}
+          AND s.deactivated_at IS NULL AND ${reader.sql}${chipClause}${appScopeClause}
         ORDER BY c.seq LIMIT ${RANKING_POOL}`,
       reader.params
     )

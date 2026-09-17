@@ -21,17 +21,28 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { PaperPlaneTilt } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { RecordPicker } from "@/components/records/record-picker"
+import { AccountAppPicker, type AccountScopedApp } from "@/components/records/account-app-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 
-export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
+export type TodoFormValues = {
+  accountId: string
+  title: string
+  detail: string
+  dueOn: string
+  /** WHICH SYSTEM — optional, client ruling 17 Sep 2026. "" means none named. */
+  appId: string
+  /** WHO AT THE CLIENT — optional, same ruling. "" means nobody named. */
+  assignedContactId: string
+}
 
 const accountField = { ...defaultFieldConfig, label: "Which account", required: true }
 const titleField = { ...defaultFieldConfig, label: "What we need from them", required: true }
@@ -40,12 +51,19 @@ const detailField = { ...defaultFieldConfig, label: "Anything else they should k
  * every other screen in the app uses for the same fact (CHECKLIST 2.5) — this
  * form said "By when" and was the last place a second word for it survived. */
 const dueField = { ...defaultFieldConfig, label: "Deadline", required: false }
+/** WHICH OF THE CLIENT'S OWN SYSTEMS — client ruling, 17 Sep 2026: "it is
+ * optional to select an app." Never required. */
+const appField = { ...defaultFieldConfig, label: "App", required: false }
+/** WHO AT THE CLIENT — same ruling: "I want to be able to select who this
+ * gets assigned to." Never required — this door has no gate that needs one. */
+const assignedField = { ...defaultFieldConfig, label: "Assigned to", required: false }
 
 export function TodoFormDialog({
   open,
   onOpenChange,
   fixedAccount,
   draftKey,
+  apps,
   onSubmit,
 }: {
   open: boolean
@@ -57,18 +75,43 @@ export function TodoFormDialog({
    * reason: the relation is the whole point of creating it from here. */
   fixedAccount?: { id: string; name: string }
   draftKey?: string
+  /** THE TEAM'S APPS, bounded (R14) and already held by the screen this dialog
+   * opens from — the same prop `SprintFormDialog`/`WaveFormDialog`/
+   * `MeetingFormDialog` take, fed into the identical `AccountAppPicker` (F15).
+   * No filter needed here: the picker narrows to the chosen account itself. */
+  apps: AccountScopedApp[]
   onSubmit: (values: TodoFormValues) => Promise<void>
 }) {
   const { t, lang } = useLanguage()
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { accountId: "", title: "", detail: "", dueOn: "" },
+    { accountId: "", title: "", detail: "", dueOn: "", appId: "", assignedContactId: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
   const accountId = fixedAccount ? fixedAccount.id : values.accountId
   const ready = accountId !== "" && values.title.trim() !== ""
+
+  // THE ACCOUNT'S OWN CONTACTS — the same door and the same cache key
+  // `help-form-dialog.tsx`'s raised-by row already reads (R56: one door,
+  // asked once), so opening this dialog from a screen that has the account's
+  // detail warm in cache costs nothing extra. `AccountDetail.links` is the
+  // account's own address book (R35: each carries its face and its full
+  // name), the client's own words: "it needs to filter the contacts of this
+  // account, including the avatar and full name."
+  const detailQ = useCached(accountId ? `account-detail:${accountId}` : null, () =>
+    tenancy.accountDetail(accountId)
+  )
+  const contactOptions = (detailQ.data?.links ?? [])
+    .filter((l) => l.active)
+    .map((l) => ({
+      value: l.personAccountId,
+      label: l.personName,
+      picture: l.personLogoUrl,
+      shape: "round" as const,
+      face: true,
+    }))
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,6 +123,8 @@ export function TodoFormDialog({
         title: values.title.trim(),
         detail: richTextValue(values.detail),
         dueOn: values.dueOn,
+        appId: values.appId,
+        assignedContactId: values.assignedContactId,
       })
       clearDraft()
       onOpenChange(false)
@@ -122,7 +167,12 @@ export function TodoFormDialog({
           <RecordPicker
             id="todo-account"
             value={values.accountId}
-            onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+            // CHANGING THE ACCOUNT CLEARS THE TWO FIELDS THAT HANG OFF IT — the
+            // same behaviour `help-form-dialog.tsx`'s own account picker takes
+            // over its App/Module/Raised-by trio, and for the identical reason:
+            // an app row and a contact row that are only offered once an
+            // account is named must not keep an answer from before one was.
+            onChange={(v) => setValues((s) => ({ ...s, accountId: v, appId: "", assignedContactId: "" }))}
             search={(term) => searchAccounts(term)}
             searchKey={pickerKey("accounts", teamId)}
             placeholder={t("Pick the account")}
@@ -132,6 +182,64 @@ export function TodoFormDialog({
           />
         )}
       </Field>
+      {/* THE APP, ONCE AN ACCOUNT IS NAMED — client ruling, 17 Sep 2026:
+          "when we already selected an account, this app choice must be in a
+          horizontal component," read together with her earlier one this same
+          field is built from ("show horizontal choice component," F15,
+          `AccountAppPicker`). Optional, and HIDDEN before an account is
+          chosen rather than offered as a search-and-pick of every app in the
+          team — an Input always has an account (`accountField` above is
+          required), so this is only ever the sliver of time before that
+          field is answered. `noneLabel` is this form's own opt-in into an
+          explicit "None" pill (see that component's own note on the prop):
+          `layout="row"` otherwise carries no way back to blank once a chip
+          has been pressed. */}
+      {accountId && (
+        <Field config={appField} htmlFor="todo-app" className={fieldSpacing}>
+          <AccountAppPicker
+            id="todo-app"
+            ariaLabel={t(appField.label)}
+            accountId={accountId}
+            apps={apps}
+            value={values.appId}
+            onChange={(appId) => setValues((s) => ({ ...s, appId }))}
+            lang={lang}
+            disabled={busy}
+            placeholder={t("No app")}
+            searchPlaceholder={t("Search apps…")}
+            emptyOption={{ value: "", label: t("No app") }}
+            emptyText={t("No app matched.")}
+            noneLabel={t("No app")}
+          />
+        </Field>
+      )}
+      {/* WHO AT THE CLIENT — client ruling, 17 Sep 2026: "I want to be able
+          to select who this gets assigned to. Of course, it needs to filter
+          the contacts of this account, including the avatar and full name,
+          in a horizontal choice component with pills." Same row idiom as the
+          App field above and as the ticket form's own Raised-by row
+          (`help-form-dialog.tsx`), narrowed to THIS account's own contacts
+          (`contactOptions`, off `AccountDetail.links`) rather than a shared
+          component — the ticket form draws its own row inline for the
+          identical reason, and a second abstraction over one `RecordPicker`
+          call is not what either form is missing. Hidden until an account is
+          chosen, same reasoning as the App field: there is no roster to
+          filter before then. */}
+      {accountId && (
+        <Field config={assignedField} htmlFor="todo-assigned" className={fieldSpacing}>
+          <RecordPicker
+            id="todo-assigned"
+            layout="row"
+            ariaLabel={t(assignedField.label)}
+            value={values.assignedContactId}
+            onChange={(assignedContactId) => setValues((s) => ({ ...s, assignedContactId }))}
+            options={contactOptions}
+            searchPlaceholder={t("Search contacts…")}
+            emptyText={t("No contacts yet.")}
+            disabled={busy}
+          />
+        </Field>
+      )}
       <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
         <Input
           id="todo-title"

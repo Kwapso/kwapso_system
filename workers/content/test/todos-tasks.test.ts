@@ -191,6 +191,85 @@ describe("a to-do is aimed at the client", () => {
   })
 })
 
+// AN INPUT MAY NAME AN APP AND WHO AT THE CLIENT IT IS FOR — client ruling, 17
+// Sep 2026 ("it is optional to select an app … I want to be able to select
+// who this gets assigned to … it needs to filter the contacts of this
+// account"). Both are optional and both are checked the identical way
+// `createTicket` already checks the same pair (`appForTicket`/
+// `contactForTicket`, workers/content/src/lib/help.ts) — this is the door
+// half of the round trip the form draws.
+describe("an input names an app and who at the client it is for", () => {
+  it("round-trips both onto the row and back out the door, with the contact's own name", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/todos", {
+      accountId: IDS.victimAccount,
+      title: "Send us your brand logo as an SVG",
+      appId: IDS.victimApp,
+      assignedContactId: IDS.victimPerson,
+    })
+    expect(res.status).toBe(200)
+    const row = todoRows()[0]
+    expect(row.app_id).toBe(IDS.victimApp)
+    expect(row.assigned_contact_id).toBe(IDS.victimPerson)
+    // …and the door's own reply carries both straight back (R27 — the response
+    // this asserts on is the same `json({…})`/`pagedJson` literal the tool
+    // description is allowed to promise fields off).
+    const body = (await res.json()) as { todos: Array<Record<string, unknown>> }
+    expect(body.todos[0]).toMatchObject({ appId: IDS.victimApp, assignedContactId: IDS.victimPerson })
+    // R35: the row carries the contact's own name beside the id, the same
+    // shape `accountName` rides beside `accountId`.
+    expect(body.todos[0].assignedContactName).toBeTruthy()
+  })
+
+  it("leaves both unset when nobody names them, same as before this pair existed", async () => {
+    await askFor("Send us your brand logo as an SVG")
+    const row = todoRows()[0]
+    expect(row.app_id).toBe(null)
+    expect(row.assigned_contact_id).toBe(null)
+  })
+
+  it("refuses a contact who belongs to a DIFFERENT company", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/todos", {
+      accountId: IDS.victimAccount,
+      title: "Send us your brand logo as an SVG",
+      // Diego Sanz is Delaval Group's own contact (`account_links` L_BURGLAR),
+      // never Bergman's — the same cross-company refusal `contactForTicket`
+      // already proves for a ticket's raised-by contact.
+      assignedContactId: IDS.burglarPerson,
+    })
+    expect(res.status).toBe(400)
+    expect(todoRows()).toHaveLength(0)
+  })
+
+  it("refuses an app that is not ours, the same way the tasks door does", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/todos", {
+      accountId: IDS.victimAccount,
+      title: "Send us your brand logo as an SVG",
+      appId: "AP_MADE_UP",
+    })
+    expect(res.status).toBe(400)
+    expect(todoRows()).toHaveLength(0)
+  })
+
+  it("accepts an app that belongs to no account at all — the picker's narrowing is not a fence", async () => {
+    // The account narrowing (`AccountAppPicker`, only offering an app that
+    // belongs to the chosen client) is the FORM's own UX — the door checks
+    // only "exists and is active", the identical split `appForTicket` already
+    // draws, so an agency-wide app named on a client's input is a legal row.
+    db()
+      .prepare(
+        `INSERT INTO apps (id, account_id, name, created_at, creator_id) VALUES ('AP_OURS', NULL, 'Internal tools', '2026-02-01', '${IDS.staffUser}')`
+      )
+      .run()
+    const res = await call(IDS.staffUser, "POST /api/content/todos", {
+      accountId: IDS.victimAccount,
+      title: "Send us your brand logo as an SVG",
+      appId: "AP_OURS",
+    })
+    expect(res.status).toBe(200)
+    expect(todoRows()[0].app_id).toBe("AP_OURS")
+  })
+})
+
 // THE ONE CASE IN THIS FILE THAT IS A SOURCE SCAN, and it is here because it was
 // caught being missing. Deliberately breaking the fence on the completing UPDATE
 // left all ten behavioural cases green: `completeTodo` resolves the row through

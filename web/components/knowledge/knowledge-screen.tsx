@@ -16,17 +16,43 @@
 // facet leaves the toolbar — the strip replaces it — compartment/active,
 // search, sort and Gallery · Shape all stay exactly as K36 (amended the same
 // day) left them.
+//
+// A SECOND SCOPE, THE SAME COMPONENT (17 Sep 2026). The client's other ruling
+// the same day, on the app record: "replicate what we have in the general
+// knowledge. This should just be a gallery with all the knowledge we have
+// about this, with a toolbar that I can search and filter, [...] and a button
+// to ask about this." So this file no longer draws ONE screen — it draws ONE
+// GALLERY (the card grid of `KnowledgeSourceCard`, the toolbar's search +
+// filter + sort, the R62 empty register and the Ask button), parameterised by
+// `scope`: the whole team's base (unchanged from K2, below) or one app's own
+// slice of it. One seam, no duplicated JSX — every prop that differs between
+// the two is resolved ONCE, near the top of the function, and the
+// `<PagedFind>` tree itself is written once and read by both.
+//
+// WHAT THE APP SCOPE DROPS, ON PURPOSE, and why each is a real subtraction
+// rather than an oversight: the kind-TAB STRIP (K2's own shape) becomes a
+// plain `kind` facet — a nested record tab has no URL segment of its own to
+// deep-link a tab onto (`go`/`sectionPath` are the team screen's, not a
+// tab's), and a facet asks the identical question of the identical door. The
+// compartment facet is gone too — an app's own material is filed under
+// whichever client owns the app, which is one thing to say, not a list to
+// pick from. The List · Shape view switch, the Google sync button and the
+// settings gear are the team's own furniture (a whole-base picture, a
+// personal sweep, a module's settings) and have no reading scoped to one
+// app. And there is no "Add a source" / "Upload a file" action here: the
+// client's own words named a gallery, a toolbar and an Ask button — not a
+// fourth thing to author from a tab that was never asked to grow one.
 
 import * as React from "react"
 
+import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Button } from "@shared/ui/components/button/button"
 import { Graph, ListBullets, Sparkle, UploadSimple } from "@shared/ui/foundations/icons"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { formatCount } from "@shared/web/format-count"
-import { invalidate, primeCache, useCachedValue } from "@shared/web/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { Account, KnowledgeSource } from "@shared/types"
 
@@ -42,7 +68,8 @@ import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi } from "@/lib/api"
-import { knowledgeByKindKey, knowledgeKey } from "@/lib/live-resources"
+import { knowledgeByKindKey, knowledgeKey, totalKey } from "@/lib/live-resources"
+import { sliceKey } from "@/components/work/work-panels"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
 import { openNewAgentTab, pickAgentTabScope } from "@/lib/agent-conversation-tabs"
 import { setAgentOpen } from "@/lib/agent-open"
@@ -57,42 +84,67 @@ type Translate = (english: string) => string
  * title, one chip, one line. Passed to `CardGrid`'s `fluid` mode below. */
 const KNOWLEDGE_CARD_MIN = "12rem"
 
-export function KnowledgeScreen({
-  teamId,
-  t,
-  go,
-  sectionPath,
-  tab,
-  can,
-  onIntent,
-  knowledgeQ,
-  knowledgeShapeQ,
-  accountsQ,
-  companiesQ,
-  total,
-  knowledgeView,
-  setKnowledgeView,
-}: {
-  teamId: string
-  t: Translate
-  go: (path: string, q?: Record<string, string>) => void
-  sectionPath: string
-  /** `ctx.query.tab` — "all" (the default) or one source kind. Anything the
-   * strip does not currently badge (an unrecognised value, or a kind that has
-   * dropped to zero since the link was made) falls through to "all" below. */
-  tab: string | undefined
-  can: Can
-  onIntent: (intent: ScreenIntent) => void
-  knowledgeQ: { data: KnowledgeSource[] | undefined; error: unknown }
-  knowledgeShapeQ: { data: Omit<React.ComponentProps<typeof KnowledgeShape>, "teamId"> | undefined }
-  accountsQ: { data: Account[] | undefined }
-  companiesQ: { data: { id: string; name: string }[] | undefined }
-  /** the exact server total (R16) — every source, whatever kind, whatever
-   * compartment. What the "All" tab badges. */
-  total: number | undefined
-  knowledgeView: string
-  setKnowledgeView: (v: string) => void
-}) {
+/** WHICH SLICE OF THE BASE THIS INSTANCE DRAWS — the team's whole collection
+ * (K2, the general Knowledge screen, fed by `collection-content.tsx`'s own
+ * `ctx`) or one app's own material (the app record's Knowledge tab, which has
+ * no such orchestrator and reads for itself, the same way every other
+ * app-record collection does — `work-panels.tsx`'s `sliceKey`). */
+export type KnowledgeGalleryScope =
+  | {
+      kind: "team"
+      teamId: string
+      go: (path: string, q?: Record<string, string>) => void
+      sectionPath: string
+      /** `ctx.query.tab` — "all" (the default) or one source kind. Anything
+       * the strip does not currently badge (an unrecognised value, or a kind
+       * that has dropped to zero since the link was made) falls through to
+       * "all" below. */
+      tab: string | undefined
+      onIntent: (intent: ScreenIntent) => void
+      knowledgeQ: { data: KnowledgeSource[] | undefined; error: unknown }
+      knowledgeShapeQ: { data: Omit<React.ComponentProps<typeof KnowledgeShape>, "teamId"> | undefined }
+      accountsQ: { data: Account[] | undefined }
+      companiesQ: { data: { id: string; name: string }[] | undefined }
+      /** the exact server total (R16) — every source, whatever kind, whatever
+       * compartment. What the "All" tab badges. */
+      total: number | undefined
+      knowledgeView: string
+      setKnowledgeView: (v: string) => void
+    }
+  | {
+      kind: "app"
+      teamId: string
+      appId: string
+      /** the app's own name — folded into the empty state and into the Ask
+       * button's conversation label, the identical convention
+       * `ask-the-assistant.tsx` used for "About {context}: …". */
+      appName: string
+      onIntent: (intent: ScreenIntent) => void
+    }
+
+export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScope; t: Translate; can: Can }) {
+  const teamId = scope.teamId
+  const isApp = scope.kind === "app"
+
+  // THE APP TAB'S OWN READ. A nested record tab has no `collection-content.tsx`
+  // orchestrator feeding it a pre-fetched `knowledgeQ` the way the team screen
+  // is fed (below) — so this asks the door itself, filtered to the app
+  // (`SourceFilters.appId`, workers/content/src/lib/knowledge.ts), over the
+  // SAME `sliceKey` seam `work-panels.tsx` gives every other app-record
+  // collection (sprints, stories, tickets…), which is what makes this list
+  // live (R15, `live-resources.ts`'s `knowledge` entry now carries
+  // `"knowledge-app-of:"` in its own `slicePrefix`) and countable (R16) the
+  // same way its five tab siblings already are. `null` on the team branch —
+  // never fetched, never cached under a key nobody reads.
+  const appKey = isApp ? sliceKey("knowledge-app", scope.appId) : null
+  const appKnowledgeQ = useCached<KnowledgeSource[]>(appKey, () =>
+    contentApi.knowledge({ appId: isApp ? scope.appId : "" }).then((r) => {
+      primeCache(totalKey("knowledge-app", isApp ? scope.appId : ""), r.total)
+      return r.sources
+    })
+  )
+  const appTotal = useCachedValue<number | null>(isApp ? totalKey("knowledge-app", scope.appId) : null)
+
   // THE TAB STRIP'S OWN BADGES (R16 — one count per tab from the door, never
   // a client-side count of a page). `countSourceKinds`
   // (workers/content/src/lib/knowledge.ts) rides every knowledge list read as
@@ -101,6 +153,8 @@ export function KnowledgeScreen({
   // (live-resources.ts's `listFetch.knowledge`) and re-primed by this
   // screen's own `<PagedFind>` fetch below on every search/facet/tab change,
   // so a badge always answers the question the toolbar is currently asking.
+  // TEAM ONLY — the app scope draws no kind-tab strip (its own header above
+  // says why), so nothing here ever reads this sidecar for it.
   //
   // HOISTED ABOVE the loading/error early returns below (17 Sep 2026 hygiene
   // pass) — a hook called only once `knowledgeQ` has settled changes this
@@ -108,23 +162,28 @@ export function KnowledgeScreen({
   // web/test/hooks-order.test.ts exists to catch.
   const byKind = useCachedValue<Record<string, number>>(knowledgeByKindKey(teamId)) ?? {}
 
+  const knowledgeQ = isApp ? appKnowledgeQ : scope.knowledgeQ
   if (knowledgeQ.error) return <LoadError what="the knowledge base" />
   if (knowledgeQ.data === undefined) return <Skeleton variant="list" lines={4} />
   // The account NAMES a source is filed under — the list says "Bergman S.A.",
   // never `account:01J…`. `accountsQ` is gated to the accounts/contacts
   // screens, so it is empty on THIS one; `companiesQ` asks the door directly.
-  // Merged with whatever `accountsQ` happens to already hold.
-  const names = new Map([
-    ...(accountsQ.data ?? []).map((a) => [a.id, a.name] as const),
-    ...(companiesQ.data ?? []).map((a) => [a.id, a.name] as const),
-  ])
+  // Merged with whatever `accountsQ` happens to already hold. TEAM ONLY — the
+  // app scope offers no compartment facet, so it never needs these names.
+  const names =
+    scope.kind === "team"
+      ? new Map([
+          ...(scope.accountsQ.data ?? []).map((a) => [a.id, a.name] as const),
+          ...(scope.companiesQ.data ?? []).map((a) => [a.id, a.name] as const),
+        ])
+      : new Map<string, string>()
   const loadedSources = knowledgeQ.data
-  const canCreateKnowledge = can("knowledge", "create")
+  const canCreateKnowledge = scope.kind === "team" && can("knowledge", "create")
 
   // ONE TAB PER SOURCE KIND THE DATA ACTUALLY HAS — her own words. A kind
   // with zero sources today draws no tab; `KNOWLEDGE_KIND`'s own declaration
   // order (shape.tsx) gives a stable order to filter down from, never the
-  // order sources happen to load in.
+  // order sources happen to load in. TEAM ONLY.
   const kindTabs = Object.keys(KNOWLEDGE_KIND)
     .filter((k) => (byKind[k] ?? 0) > 0)
     .map((k) => ({
@@ -134,6 +193,7 @@ export function KnowledgeScreen({
       badge: formatCount(byKind[k]),
       badgeVariant: "" as const,
     }))
+  const total = isApp ? (appTotal ?? undefined) : scope.total
   const allBadge = formatCount(total)
   const knowledgeTabs = [
     { value: "all", label: t("All"), icon: "asterisk", badge: allBadge, badgeVariant: "" as const },
@@ -142,7 +202,40 @@ export function KnowledgeScreen({
   // "ALL" IS DEFAULT — a tab value that no longer badges anything (an
   // unrecognised `?tab=`, or a kind whose last source just left) falls
   // through to it rather than to a tab the strip cannot draw.
-  const activeTab = tab && byKind[tab] ? tab : "all"
+  const activeTab = scope.kind === "team" && scope.tab && byKind[scope.tab] ? scope.tab : "all"
+  // "app" NEVER SHOWS THE SHAPE VIEW — the whole-base picture answers a
+  // different question ("where is the knowledge, and where is there none")
+  // than one app's own tab ever asks (this file's own header says the rest).
+  const knowledgeView = scope.kind === "team" ? scope.knowledgeView : "list"
+
+  const listKey = isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)
+
+  function openAskConversation() {
+    const id = openNewAgentTab()
+    if (isApp) pickAgentTabScope(id, "app", scope.appName, scope.appName, scope.appId)
+    else pickAgentTabScope(id, "knowledge", t("Knowledge"))
+    setAgentOpen(true)
+  }
+
+  if (scope.kind === "app")
+    return (
+      <div className="flex flex-col gap-4">
+        {/* THE ASK BUTTON, ALWAYS OFFERED — outside `<PagedFind>`'s own
+            toolbar on purpose: R50 stands that whole toolbar down on an empty,
+            unsearched collection, and asking is exactly the thing a person
+            reaches for when the gallery has nothing in it yet. Never mango
+            (R84) — this is a tab's own body, not the app record's title
+            component, so the button reads `variant="inverse"`, the same as
+            every other nested panel's own action. */}
+        <div className="flex justify-end">
+          <Button variant="inverse" className="gap-1" onClick={openAskConversation}>
+            <Sparkle className="size-4" aria-hidden />
+            {t("Ask")}
+          </Button>
+        </div>
+        {renderGallery()}
+      </div>
+    )
 
   return (
     // R16's ARBITRATION — the tab strip now carries the exact count "All"
@@ -165,15 +258,7 @@ export function KnowledgeScreen({
                   same tab-store door the assistant's own "+" uses, then
                   opened; the panel's own open effect hands focus to the
                   composer the moment it becomes visible. */}
-              <Button
-                variant="default"
-                className="gap-1"
-                onClick={() => {
-                  const id = openNewAgentTab()
-                  pickAgentTabScope(id, "knowledge", t("Knowledge"))
-                  setAgentOpen(true)
-                }}
-              >
+              <Button variant="default" className="gap-1" onClick={openAskConversation}>
                 <Sparkle className="size-4" aria-hidden />
                 {t("Ask")}
               </Button>
@@ -187,123 +272,160 @@ export function KnowledgeScreen({
             </div>
           }
         />
-        {/* THE LIST IS AN ARCHIVE — it pages (R14) and carries the kind-tab
-            strip (K2 by kind, above), compartment/active facets, search,
-            sort and the List · Shape switch. The strip PINS for free
-            (R77) — `renderFolderTabs` is the one place a `tabs` prop ever
-            draws, and every host of it already wears `STICKY_FOLDER_TABS`. */}
-        <PagedFind<KnowledgeSource>
-          sorts={translatedSorts("knowledge", t)}
-          defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
-          // R50 — the resting read's own row count.
-          restingEmpty={loadedSources.length === 0}
-          listKey={knowledgeKey(teamId)}
-          view={{
-            views: [
-              { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
-              { value: "shape", label: t("Shape"), icon: <Graph className="size-4" /> },
-            ],
-            value: knowledgeView,
-            onValueChange: (v: string) => setKnowledgeView(v === "shape" ? "shape" : "list"),
-          }}
-          placeholder={t("Search sources…")}
-          matches={{
-            none: t("No sources match"),
-            one: t("1 source matches"),
-            many: t("{count} sources match"),
-          }}
-          // THE KIND FACET IS GONE, THE TABS REPLACE IT — her own ruling. Only
-          // `compartment` and `active` stay on the toolbar; both are rows/a
-          // closed vocabulary the door still narrows by underneath whichever
-          // tab is open.
-          facets={translatedFacets("knowledge", t, {
-            compartment: [
-              { value: "agency", label: t("The agency") },
-              ...[...names].map(([id, name]) => ({ value: `account:${id}`, label: name })),
-            ],
-          }).filter((f) => f.field !== "kind")}
-          tabs={{
-            config: { ...defaultTabsConfig, tabs: knowledgeTabs },
-            value: activeTab,
-            // "all" IS DEFAULT, so a press back onto it omits `tab` from the
-            // URL entirely.
-            onValueChange: (v) => go(sectionPath, v === "all" ? {} : { tab: v }),
-          }}
-          fixed={activeTab === "all" ? undefined : { kind: activeTab }}
-          fetchPage={(query, cursor) =>
-            contentApi.knowledge({ ...query, cursor }).then((r) => {
-              // RE-PRIME THE STRIP'S OWN BADGES on every search/facet/tab
-              // fetch, not only the resting one — the identical shape the
-              // ticket sub-tab strip's `helpFacet` fetcher takes for
-              // `help-by-type`/`help-by-status`, so a badge never answers a
-              // question the toolbar has since moved on from.
-              primeCache(knowledgeByKindKey(teamId), r.byKind)
-              return { rows: r.sources, nextCursor: r.nextCursor, total: r.total }
-            })
-          }
-          actions={() =>
-            canCreateKnowledge ? (
-              <>
-                <Button
-                  variant="secondary"
-                  className="gap-1"
-                  onClick={() => go(sectionPath, { panel: "add", module: "knowledge-file" })}
-                >
-                  <UploadSimple className="size-4" />
-                  {t("Upload a file")}
-                </Button>
-                <AddButton
-                  label={t("Add a source")}
-                  onClick={() => go(sectionPath, { panel: "add", module: "knowledge" })}
-                />
-              </>
-            ) : null
-          }
-          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
-        >
-          {(found) => {
-            // THE PICTURE IS THE WHOLE BASE, so it stands outside the paged
-            // rows — the switch that chose it is a slot on this row (R53).
-            if (knowledgeView === "shape") {
-              if (!knowledgeShapeQ.data) return <Skeleton variant="list" lines={4} />
-              return <KnowledgeShape teamId={teamId} {...knowledgeShapeQ.data} />
-            }
-            const rows = found.active ? found.rows : loadedSources
-            if (rows === null) return <Skeleton variant="list" lines={4} />
-            return (
-              <>
-                {rows.length === 0 ? (
-                  <CollectionEmptyState
-                    title={t("Nothing in the knowledge base yet.")}
-                    description={t(
-                      "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
-                    )}
-                    filtered={found.active}
-                    onCreate={canCreateKnowledge ? () => go(sectionPath, { panel: "add", module: "knowledge" }) : undefined}
-                  />
-                ) : (
-                  <CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN} label={t("Sources")}>
-                    {rows.map((source) => (
-                      <KnowledgeSourceCard
-                        key={source.id}
-                        source={source}
-                        onOpen={() => onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
-                      />
-                    ))}
-                  </CardGrid>
-                )}
-                {/* R14: one source per ticket, per article, per account, plus every
-                    note anybody writes — the list pages. */}
-                <LoadMore
-                  listKey={found.listKey ?? knowledgeKey(teamId)}
-                  label={t("Load more sources")}
-                  fetchPage={found.fetchPage}
-                />
-              </>
-            )
-          }}
-        </PagedFind>
+        {renderGallery()}
       </div>
     </CountedAbove>
   )
+
+  // THE GALLERY ITSELF — a nested, HOISTED function declaration (not a `const`)
+  // so both branches above can call it despite it being written below them:
+  // `<CollectionHeading>` (R84's one legal mango home) has to lead the team
+  // branch's own JSX in the SOURCE, not only on screen — web/test/
+  // knowledge-head.test.tsx reads this file off disk and checks the head ends
+  // where `<PagedFind>` begins, which only holds if the tag is textually AFTER
+  // `<CollectionHeading>`. One `<PagedFind>` tree, written once, called twice.
+  function renderGallery() {
+    return (
+    <>
+      {/* THE LIST IS AN ARCHIVE — it pages (R14) and carries the kind-tab
+          strip (K2 by kind, team only), compartment/active facets (team
+          only), search, sort and the List · Shape switch (team only). The
+          strip PINS for free (R77) — `renderFolderTabs` is the one place a
+          `tabs` prop ever draws, and every host of it already wears
+          `STICKY_FOLDER_TABS`. */}
+      <PagedFind<KnowledgeSource>
+        sorts={translatedSorts("knowledge", t)}
+        defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
+        restingEmpty={loadedSources.length === 0}
+        listKey={isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)}
+        fixed={isApp ? { appId: scope.appId } : activeTab === "all" ? undefined : { kind: activeTab }}
+        fetchPage={(query, cursor) =>
+          contentApi.knowledge({ ...query, cursor }).then((r) => {
+            if (scope.kind === "team") primeCache(knowledgeByKindKey(teamId), r.byKind)
+            else primeCache(totalKey("knowledge-app", scope.appId), r.total)
+            return { rows: r.sources, nextCursor: r.nextCursor, total: r.total }
+          })
+        }
+        placeholder={t("Search sources…")}
+        matches={{
+          none: t("No sources match"),
+          one: t("1 source matches"),
+          many: t("{count} sources match"),
+        }}
+        facets={
+          scope.kind === "team"
+            ? translatedFacets("knowledge", t, {
+                compartment: [
+                  { value: "agency", label: t("The agency") },
+                  ...[...names].map(([id, name]) => ({ value: `account:${id}`, label: name })),
+                ],
+              }).filter((f) => f.field !== "kind")
+            : translatedFacets("knowledge", t, {}).filter((f) => f.field !== "compartment")
+        }
+        view={
+          scope.kind === "team"
+            ? {
+                views: [
+                  { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+                  { value: "shape", label: t("Shape"), icon: <Graph className="size-4" /> },
+                ],
+                value: knowledgeView,
+                onValueChange: (v: string) => scope.setKnowledgeView(v === "shape" ? "shape" : "list"),
+              }
+            : undefined
+        }
+        tabs={
+          scope.kind === "team"
+            ? {
+                config: { ...defaultTabsConfig, tabs: knowledgeTabs },
+                value: activeTab,
+                onValueChange: (v) => scope.go(scope.sectionPath, v === "all" ? {} : { tab: v }),
+              }
+            : undefined
+        }
+        actions={() =>
+          canCreateKnowledge ? (
+            <>
+              <Button
+                variant="secondary"
+                className="gap-1"
+                onClick={() => scope.kind === "team" && scope.go(scope.sectionPath, { panel: "add", module: "knowledge-file" })}
+              >
+                <UploadSimple className="size-4" />
+                {t("Upload a file")}
+              </Button>
+              <AddButton
+                label={t("Add a source")}
+                onClick={() => scope.kind === "team" && scope.go(scope.sectionPath, { panel: "add", module: "knowledge" })}
+              />
+            </>
+          ) : null
+        }
+        // THE NESTED CARD — the app scope's own toolbar and rows read as ONE
+        // panel, the identical wrapper every other app-record collection uses
+        // (`work-panels.tsx`'s `PagedPanelBody`). The team screen already
+        // wrapped itself the same way.
+        wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
+      >
+        {(found) => {
+          // THE PICTURE IS THE WHOLE BASE, so it stands outside the paged
+          // rows — the switch that chose it is a slot on this row (R53).
+          // TEAM ONLY: the app scope never sets `knowledgeView` to "shape"
+          // (it draws no switch to set it with).
+          if (scope.kind === "team" && knowledgeView === "shape") {
+            if (!scope.knowledgeShapeQ.data) return <Skeleton variant="list" lines={4} />
+            return <KnowledgeShape teamId={teamId} {...scope.knowledgeShapeQ.data} />
+          }
+          const rows = found.active ? found.rows : loadedSources
+          if (rows === null) return <Skeleton variant="list" lines={4} />
+          return (
+            <>
+              {rows.length === 0 ? (
+                <CollectionEmptyState
+                  title={
+                    isApp
+                      ? t("Nothing filed under this app yet.")
+                      : t("Nothing in the knowledge base yet.")
+                  }
+                  description={
+                    isApp
+                      ? t(
+                          "Everything the assistant knows about this app will show up here — its tickets, process maps and meetings, and anything filed against it by hand."
+                        )
+                      : t(
+                          "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
+                        )
+                  }
+                  filtered={found.active}
+                  onCreate={
+                    canCreateKnowledge && scope.kind === "team"
+                      ? () => scope.go(scope.sectionPath, { panel: "add", module: "knowledge" })
+                      : undefined
+                  }
+                />
+              ) : (
+                <CardGrid fluid minItemWidth={KNOWLEDGE_CARD_MIN} label={t("Sources")}>
+                  {rows.map((source) => (
+                    <KnowledgeSourceCard
+                      key={source.id}
+                      source={source}
+                      onOpen={() => scope.onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
+                    />
+                  ))}
+                </CardGrid>
+              )}
+              {/* R14: one source per ticket, per article, per account, plus every
+                  note anybody writes — the list pages. */}
+              <LoadMore
+                listKey={found.listKey ?? listKey}
+                label={t("Load more sources")}
+                fetchPage={found.fetchPage}
+              />
+            </>
+          )
+        }}
+      </PagedFind>
+    </>
+    )
+  }
 }

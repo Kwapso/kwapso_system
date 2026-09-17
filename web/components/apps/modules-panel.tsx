@@ -11,9 +11,17 @@
 // reason both exist is that "which screen is broken" and "how does this job get
 // done" are different questions.
 //
-// ROWS AND NOT CARDS. A module has no picture (K9 allows a card grid only where
-// a record carries one), and the list is read to FIND a name rather than to
-// browse — a picker's index, printed on the app record.
+// A GALLERY NOW, NOT ROWS — the client's ruling, 17 Sep 2026, verbatim:
+// "Inside an app, the tabs module: I want it to look exactly like the
+// settings modules, this kind of gallery with the icons. When I add a
+// module, I should be able to select an icon for it." This used to read "ROWS
+// AND NOT CARDS" (K9 — a card grid needs a picture, and a module had none):
+// it has one now, the module's own `icon` (an new field, team migration
+// 0104), and the SAME `GalleryCard` (web/components/records/gallery-card.tsx)
+// Settings › Modules renders — one component, not a second hand-copy of that
+// wall's JSX. The icon picker is `IconPicker`
+// (web/components/records/icon-picker.tsx), reused by the add/edit form's own
+// `moduleFields()` (internal-record-dialog.tsx).
 //
 // IT ASKS FOR EVERY MODULE, NOT THIS APP'S. One read, one cache key, filtered
 // here: the ticket form needs whichever app was just chosen and re-fetching on
@@ -41,21 +49,32 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { GalleryCard } from "@/components/records/gallery-card"
 import { InternalRecordDialog, moduleFields, type InternalRecordValues } from "@/components/team/internal-record-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { appModulesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import type { AppModule } from "@shared/types"
+import { DEFAULT_MODULE_ICON } from "@shared/module-icons"
 import { useT } from "@shared/web/language"
 import { primeCache, useCached } from "@shared/web/store"
+
+// SAME FLOOR AS SETTINGS › MODULES (settings-screen.tsx's own `MIN_MODULE_CARD`)
+// — this cell carries the identical content (an icon, a title, an actions
+// row), so it needs the identical room. Each gallery wall in this app keeps
+// its own copy of this constant (members-gallery.tsx's `MIN_CARD` is the same
+// pattern, a different number for a different cell) rather than importing one
+// screen's local constant into another module's component.
+const MIN_MODULE_CARD = "16rem"
 
 export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string }) {
   const t = useT()
@@ -115,6 +134,10 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     const input = {
       name: String(values.name ?? "").trim(),
       mark: String(values.mark ?? "").trim(),
+      // THE GALLERY CARD'S OWN ICON — an empty picker value is "nothing chosen
+      // yet" (draws DEFAULT_MODULE_ICON on the card) rather than a name to send;
+      // the door treats "" identically to omitting the field.
+      icon: String(values.icon ?? "").trim(),
       nameDe: String(values.nameDe ?? "").trim(),
       description: String(values.description ?? "").trim(),
       benefit: String(values.benefit ?? "").trim(),
@@ -151,7 +174,19 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
     )
 
   return (
-    <div className="flex flex-col">
+    <>
+      {/* THE NESTED CARD — client, 17 Sep 2026, over the app's Tickets tab,
+          the same "wall of cards on the page" shape this gallery draws:
+          "there is still the space between the point and the type missing,
+          and also they are missing the background card." The record's own
+          outer chrome already stands on one shared card (see
+          `work-panels.tsx`'s `PagedPanelBody` and `deliverables-panel.tsx`
+          for the full citation); a collection nested in a tab needs its OWN,
+          the way `SprintsPanel`/`AppsPanel` already draw theirs
+          (`CollectionFrame useKitPanel`). The dialogs below stay OUTSIDE
+          this card — an overlay portals off the page ground rather than
+          standing on any card (R67's own ACT/overlay reasoning). */}
+      <CollectionCard>
       <ToolbarRow
         empty={modules.length === 0}
         search={
@@ -200,50 +235,55 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
           onCreate={canCreate ? () => setAddOpen(true) : undefined}
         />
       ) : (
-        <ul className="space-y-2">
+        // THE SAME CARD SETTINGS › MODULES RENDERS (`GalleryCard`,
+        // web/components/records/gallery-card.tsx) — client's ruling, 17 Sep
+        // 2026: "I want it to look exactly like the settings modules, this
+        // kind of gallery with the icons." No `href`: a module has no page of
+        // its own to open, so edit and switch off live in `actions` instead.
+        // The open-ticket count is `topBadge`, in the SAME wrapper `<span>`
+        // as the title (R65/R72 — see the component's own header for why that
+        // structurally can never read as a subtitle).
+        <CardGrid fluid minItemWidth={MIN_MODULE_CARD} label={t("Modules")}>
           {shownModules.map((m) => (
-            <li
+            <GalleryCard
               key={m.id}
-              className="bg-surface-panel flex flex-wrap items-center gap-3 rounded-[var(--radius)] p-3"
-            >
-              {/* THE EMOJI IS THE RECORD'S FACE (R35) — one glyph, and a quiet
-                  dot where nobody has chosen one, so the names still line up. */}
-              <span aria-hidden className="w-6 shrink-0 text-center text-lg">
-                {m.mark || "·"}
-              </span>
-              <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="truncate text-sm font-medium">{m.name}</p>
-                {m.description ? (
-                  <p className="text-muted-foreground truncate text-xs">{m.description}</p>
-                ) : null}
-              </div>
-              {m.ticketCount > 0 ? (
-                <Badge variant="secondary">
-                  {m.ticketCount} {m.ticketCount === 1 ? t("open ticket") : t("open tickets")}
-                </Badge>
-              ) : null}
-              {/* ICON-ONLY, on every width now (client ruling, 2026-08-31: "edit,
-                  only the pencil icon") — no more `sm:not-sr-only` reveal. */}
-              {canEdit ? (
-                <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
-                  <PencilSimple className="size-3.5" />
-                </Button>
-              ) : null}
-              {canSwitchOff ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSwitching(m)}
-                  className="text-destructive gap-1"
-                >
-                  <Power className="size-3.5" aria-hidden />
-                  <span className="sr-only sm:not-sr-only">{t("Switch off")}</span>
-                </Button>
-              ) : null}
-            </li>
+              icon={m.icon ?? DEFAULT_MODULE_ICON}
+              title={m.name}
+              topBadge={
+                m.ticketCount > 0 ? (
+                  <Badge variant="secondary">
+                    {m.ticketCount} {m.ticketCount === 1 ? t("open ticket") : t("open tickets")}
+                  </Badge>
+                ) : undefined
+              }
+              actions={
+                <div className="flex items-center gap-1">
+                  {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
+                      "edit, only the pencil icon") — no more `sm:not-sr-only`
+                      reveal. */}
+                  {canEdit ? (
+                    <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
+                      <PencilSimple className="size-3.5" />
+                    </Button>
+                  ) : null}
+                  {canSwitchOff ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSwitching(m)}
+                      className="text-destructive"
+                      aria-label={t("Switch off")}
+                    >
+                      <Power className="size-3.5" aria-hidden />
+                    </Button>
+                  ) : null}
+                </div>
+              }
+            />
           ))}
-        </ul>
+        </CardGrid>
       )}
+      </CollectionCard>
 
       <InternalRecordDialog
         open={addOpen}
@@ -269,6 +309,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
             ? {
                 name: editing.name,
                 mark: editing.mark ?? "",
+                icon: editing.icon ?? "",
                 nameDe: editing.nameDe ?? "",
                 description: editing.description ?? "",
                 benefit: editing.benefit ?? "",
@@ -314,6 +355,6 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }

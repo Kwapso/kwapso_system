@@ -124,7 +124,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Kanban as KanbanGlyph, ListBullets, SquareSplitHorizontal } from "@shared/ui/foundations/icons"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
-import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
+import { RecordRef } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
@@ -167,8 +167,9 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
-import { OPEN_TAB_STATUSES } from "@shared/types"
-import type { Account, AppRow, HelpTicket } from "@shared/types"
+import type { Language, Vars } from "@shared/i18n"
+import { HELP_STATUSES, OPEN_TAB_STATUSES } from "@shared/types"
+import type { Account, AppRow, HelpStatus, HelpTicket } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 import { TriageChips } from "@/components/tickets/triage-chips"
 import { ReadySplit } from "@/components/tickets/ready-split"
@@ -903,26 +904,37 @@ export function TicketsCollection({
      is worth more than the comment: filed as a follow-up rather than pretended
      to be solved here. */
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", DASHBOARD)
-  /* WHICH BODY EACH OF THE TWO MULTI-VIEW TABS IS SHOWING.
+  /* WHICH BODY EACH OF THE THREE MULTI-VIEW TABS IS SHOWING — Open and Ready
+   * from the start, All since 17 Sep 2026 (see the third hook's own note,
+   * just below).
    *
-   * TWO PIECES OF STATE, NOT ONE KEYED BY TAB, and that is `useRemembered`'s own
-   * contract rather than a style choice: it reads its slot ONCE, at mount ("the
-   * host owns the address; while this screen is up, the screen owns the value"),
-   * so a key built out of `facet` would be read for whichever tab happened to be
-   * open on the first render and never again. Two hooks, both unconditional,
-   * both remembered under their own name.
+   * ONE PIECE OF STATE PER TAB, NOT ONE KEYED BY ALL OF THEM, and that is
+   * `useRemembered`'s own contract rather than a style choice: it reads its
+   * slot ONCE, at mount ("the host owns the address; while this screen is up,
+   * the screen owns the value"), so a key built out of `facet` would be read
+   * for whichever tab happened to be open on the first render and never
+   * again. Three hooks, all unconditional, each remembered under its own
+   * name.
    *
    * REMEMBERED RATHER THAN PLAIN STATE, which is `ViewSwitch`'s own rule: a view
    * is a PERSON'S preference, per person and never in a store a colleague
    * shares. Scoped per tab so choosing the board on Open does not decide
-   * anything on Ready — they are two different questions about two different
-   * piles.
+   * anything on Ready or All — three different questions about three
+   * different piles.
    *
-   * THE FIVE OTHER ROW TABS HOLD NO STATE AT ALL. They have one body, so there
-   * is nothing to remember; `viewSlot` hands the kit a single view and the kit
-   * draws its name. */
+   * THE TWO OTHER ROW TABS (WAITING, CLOSED) HOLD NO STATE AT ALL. They have
+   * one body, so there is nothing to remember; `viewSlot` hands the kit a
+   * single view and the kit draws its name. */
   const [openView, setOpenView] = useRemembered<"list" | "board">("ticket-open-view", "list")
   const [readyView, setReadyView] = useRemembered<"list" | "split">("ticket-ready-view", "list")
+  /** ALL GETS A BOARD TOO — client, 17 Sep 2026: "Also add this board view by
+   * status in general tickets, all." A third piece of remembered state, for
+   * the identical reason the two above are two and not one: `useRemembered`
+   * reads its slot once at mount, so a key built from `facet` would freeze on
+   * whichever tab happened to be open first. See `AllBoard`'s own header for
+   * what the board draws and why it needs none of Open's fifth-column
+   * machinery. */
+  const [allView, setAllView] = useRemembered<"list" | "board">("ticket-all-view", "list")
   // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
   // above it has to answer "is the queue empty" to know whether to draw
   // itself at all, and only `TriageQueue` — which fetches the queue — ever
@@ -1243,6 +1255,16 @@ export function TicketsCollection({
         ],
         value: readyView,
         onValueChange: (v: string) => setReadyView(v === "split" ? "split" : "list"),
+      }
+    // ALL GETS THE BOARD TOO — client, 17 Sep 2026. Same shape as Open's
+    // branch above, a different pair of states, because `useRemembered`'s own
+    // rule (see its declaration) is one hook per tab that has something to
+    // remember.
+    if (facet === ALL)
+      return {
+        views: [list, { value: "board", label: t("Board"), icon: <KanbanGlyph className="size-4" /> }],
+        value: allView,
+        onValueChange: (v: string) => setAllView(v === "board" ? "board" : "list"),
       }
     // ONE VIEW, AND THE KIT SAYS SO RATHER THAN THE ROW LOSING ITS LAST
     // ELEMENT. The handler is written out as a no-op with its reason rather than
@@ -1594,6 +1616,18 @@ export function TicketsCollection({
                       />
                     ) : facet === READY && readyView === "split" ? (
                       <ReadySplit teamId={teamId} rows={rows} onOpen={openTicket} />
+                    ) : facet === ALL && allView === "board" ? (
+                      // "Also add this board view by status in general
+                      // tickets, all" — the SAME `byStatus` read the strip's
+                      // own badges use above, so this board's numbers can
+                      // never disagree with the tab strip they sit under.
+                      <AllBoard
+                        teamId={teamId}
+                        rows={rows}
+                        counts={byStatus}
+                        narrowed={found.active}
+                        onOpen={openTicket}
+                      />
                     ) : (
                       // WHICH COLUMNS THIS TAB SHOWS — `helpTabColumns`, the
                       // rule beside the facets' and the sorts' (client,
@@ -1796,6 +1830,7 @@ export function TicketRowsTable<T extends TicketFace>({
    * for the created column is the client's own pick ("i choose raised"); the ID
    * column's word is the one she used in the ruling that created it. */
   const HEADING: Record<TicketColumn, string> = {
+    id: t("ID"),
     title: t("Title"),
     type: t("Type"),
     app: t("App"),
@@ -1820,7 +1855,15 @@ export function TicketRowsTable<T extends TicketFace>({
       // (It briefly went the other way: her first reading of the same day left
       // this tab with three narrow columns and no title at all, and this line
       // dropped to 28rem for it. That shape is gone.)
-      minWidth={columns.length > 4 ? "48rem" : "42rem"}
+      //
+      // THE THRESHOLD MOVED FROM 4 TO 5 ON 17 SEP 2026, the day `id` joined
+      // `TICKET_COLUMNS_DEFAULT`: every ordinary tab now carries five columns
+      // rather than four, and a chip-wide ID column costs far less room than
+      // the date column the original threshold was measured against. Widening
+      // every tab to 48rem for a column that narrow would be asking for space
+      // the row does not need; the six-column Closed tab is still the one that
+      // earns it.
+      minWidth={columns.length > 5 ? "48rem" : "42rem"}
       aria-label={label}
     >
       <TableHeader>
@@ -1858,59 +1901,64 @@ export function TicketRowsTable<T extends TicketFace>({
         {rows.map((w) => (
           <React.Fragment key={w.id}>
             <TableRow onClick={() => onOpen(w.id)} className="cursor-pointer">
-              {/* THE NUMBER HAD A COLUMN OF ITS OWN HERE FOR ONE DAY, and the
-                  reason it is gone is worth a line so nobody re-adds it. The
-                  client's first ruling of 2026-09-09 ("ID, created date, closed
-                  date") left the Closed tab with no title, so the reference
-                  became the leading column and took the row's navigation
-                  control with it. Her second ruling the same day put the title
-                  back — "columns for close: title (with id), type, app, raised
-                  closed" — which puts the number back where every other tab has
-                  always had it: inside the title cell, in front of the name, as
-                  the black `RecordRef` chip. One drawing of a reference, which
-                  is what `web/test/one-black-chip.test.ts` is the census for. */}
+              {/* THE ID COLUMN — client, 17 Sep 2026, over this exact table:
+                  "add the header ID for the ID." The chip is unchanged (the
+                  same `RecordRef`, the ONE component that draws one anywhere
+                  in either front door — `web/test/one-black-chip.test.ts`),
+                  it simply sits under a header of its own now instead of
+                  sharing the Title header with the name beside it. See
+                  `TICKET_COLUMN_ORDER`'s own header comment
+                  (web/lib/live-resources.ts) for the fuller history: a `ref`
+                  column existed for a day in early September, was retired in
+                  favour of leading the title cell, and is restored — on her
+                  own later, more specific ruling over this table — as a
+                  header rather than a fold back into the name. `shrink-0` is
+                  kept: a long id should never lose its tail to the column's
+                  own width. */}
+              {columns.includes("id") && (
+                <TableCell>
+                  <RecordRef value={w.ref} />
+                </TableCell>
+              )}
+              {/* THE TITLE COLUMN, ON ITS OWN NOW — client, 17 Sep 2026: "move
+                  the ticket on top of the ticket." Read together with the ID
+                  ruling beside it (both sentences, one review), this is the
+                  other half of it: the ticket's NAME leads its own cell,
+                  first and alone, rather than sitting to the right of the
+                  black chip inside a cell the two used to share. Nothing is
+                  stacked beneath it — every other fact this row carries
+                  (type, app, when it was raised, when it closed) already has
+                  its own column, and drawing a second line here would say one
+                  of them twice, which is the exact drift `TicketChips`'
+                  own header (shared/web/ticket-chips.tsx) argues against for
+                  the identical row. If a future ruling asks for a second line
+                  under the title, it is a new fact this row does not carry
+                  elsewhere — never a repeat of a column already on screen. */}
               {columns.includes("title") && (
                 <TableCell>
-                  {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
-                      title to the left, with the usual black chip design."
-                      `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
-                      since 7 Sep 2026 it is the ONLY thing in either front door
-                      that draws one: this cell used to spell the badge out itself
-                      and three other surfaces spelled the identical lozenge out
-                      beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
-                      row that puts it in front — the "before the title to the
-                      left" half of her sentence, held as one string rather than
-                      as a shape each call site remembers. Both the absent case (a
-                      ticket with no number draws nothing) and `shrink-0` (a long
-                      title truncates and the number never does, because an id
-                      with its tail cut off is not useless, it is WRONG) live
-                      inside the component now. */}
-                  <span className={REF_LEADS_NAME}>
-                    <RecordRef value={w.ref} />
-                    {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
-                        TBL-5): the call site puts a `Button variant="link"` in the
-                        first cell and that control owns the press. So the mouse
-                        gets the whole row, the keyboard and a screen reader get a
-                        real focusable control with the row's own name as its
-                        label, and neither is a second-class way in. It stops the
-                        click propagating so one press is never two `onOpen` calls.
+                  {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
+                      TBL-5): the call site puts a `Button variant="link"` in the
+                      first cell and that control owns the press. So the mouse
+                      gets the whole row, the keyboard and a screen reader get a
+                      real focusable control with the row's own name as its
+                      label, and neither is a second-class way in. It stops the
+                      click propagating so one press is never two `onOpen` calls.
 
-                        `variant="link"` is not a box (no height, no padding), so
-                        it inherits the cell's own type rather than drawing a
-                        control inside a row; `block` plus a measure is what lets a
-                        long title end in an ellipsis instead of pushing the other
-                        three columns off the screen. */}
-                    <Button
-                      variant="link"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onOpen(w.id)
-                      }}
-                      className="block max-w-[32rem] truncate text-start"
-                    >
-                      {ticketTitle(w)}
-                    </Button>
-                  </span>
+                      `variant="link"` is not a box (no height, no padding), so
+                      it inherits the cell's own type rather than drawing a
+                      control inside a row; `block` plus a measure is what lets a
+                      long title end in an ellipsis instead of pushing the other
+                      columns off the screen. */}
+                  <Button
+                    variant="link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen(w.id)
+                    }}
+                    className="block max-w-[32rem] truncate text-start"
+                  >
+                    {ticketTitle(w)}
+                  </Button>
                 </TableCell>
               )}
               {columns.includes("type") && (
@@ -2044,6 +2092,53 @@ export function TicketRowsTable<T extends TicketFace>({
       </TableBody>
     </Table>
   )
+}
+
+/** EVERY TICKET STAGE'S BOARD-COLUMN TITLE, ALL SIX — one map, read by every
+ * board in the app (`OpenBoard` and `AllBoard` below, and the app record's own
+ * board, `AppTicketsBoard` in `web/components/work/work-panels.tsx`) — EXPORTED
+ * for that third caller, the "board view by status" the client asked for
+ * twice in one ruling, 17 Sep 2026: "In Tickets inside the app, I want a board
+ * view by status. Also add this board view by status in general tickets,
+ * all." Written as `t("…")` LITERALS rather than read off
+ * `HELP_STATUS` (web/components/deep-link/shape.tsx): that map is a copy
+ * TABLE keyed by a database word, so none of its values is an extracted
+ * position (R28's `property` position only looks at named copy props) — a
+ * `t(HELP_STATUS[s])` would look up keys the catalogue never extracted and
+ * hand every non-English reader the English word, silently. A `Record` over
+ * `HELP_STATUSES` rather than a lookup with a fallback, for the same reason
+ * `OpenBoard`'s own four-entry version used to argue: a seventh stage added to
+ * the vocabulary fails this file's own type check instead of a board quietly
+ * growing a column with no name.
+ *
+ * NO DOT ON ANY OF THEM — the same ruling `OpenBoard` carries at length below
+ * ("remove the color from the status header!", 2026-09-09): a column head on
+ * a ticket board carries no colour, full stop, and that did not narrow when a
+ * second board joined the file. */
+export function ticketStatusColumnTitles(t: (s: string, vars?: Vars) => string): Record<HelpStatus, { title: string }> {
+  return {
+    new: { title: t("New") },
+    triaged: { title: t("Triaged") },
+    scheduled: { title: t("Scheduled") },
+    in_progress: { title: t("In progress") },
+    ready: { title: t("Ready") },
+    resolved: { title: t("Resolved") },
+  }
+}
+
+/** ONE CARD, FOR EVERY BOARD IN THIS FILE — lifted out of `OpenBoard` (which
+ * used to build it inline) the day a second board needed the identical one.
+ * See `OpenBoard`'s own header for the ruling behind every part of it: the
+ * shared chips (`TriageChips`), and the date that moved out of them and under
+ * the title as plain text, twice, ending with "Remove the 'Raised On' chip
+ * from the QE view" (17 Sep 2026). */
+export function ticketBoardCard(teamId: string, t: (s: string, vars?: Vars) => string, lang: Language) {
+  return (r: HelpTicket) => ({
+    id: r.id,
+    title: ticketTitle(r),
+    badges: <TriageChips teamId={teamId} ticket={r} />,
+    description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
+  })
 }
 
 /** THE OPEN TAB'S SECOND BODY — client, 2026-09-06: "for the tab open, I want
@@ -2238,12 +2333,11 @@ function OpenBoard({
    * half-wired rather than the seam left honest. The MEANING it carried is not
    * lost and was never a colour: `waitingClause` (workers/content/src/lib/help.ts)
    * is what decides who is waiting, and the column below says so in words. */
-  const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string }> = {
-    triaged: { title: t("Triaged") },
-    scheduled: { title: t("Scheduled") },
-    in_progress: { title: t("In progress") },
-    ready: { title: t("Ready") },
-  }
+  // READ OFF THE SHARED SIX rather than a four-entry literal of its own since
+  // 17 Sep 2026, the day `AllBoard` below needed the identical titles for the
+  // other two stages — one map, `ticketStatusColumnTitles` above, so "Ready"
+  // cannot read one word on this board and a different one on that one.
+  const COLUMN = ticketStatusColumnTitles(t)
   /** ONE CARD, BUILT ONCE, FOR BOTH KINDS OF COLUMN.
    *
    * The four stage columns and the Waiting column are fed by two different
@@ -2278,13 +2372,12 @@ function OpenBoard({
    *
    * AND IT GOES THROUGH `formatDate` LIKE EVERY OTHER DATE ON A SCREEN
    * (R-law: no screen shows a raw timestamp; `web/test/dates-are-formatted.test.ts`
-   * reads this file off disk to make sure). */
-  const boardCard = (r: HelpTicket) => ({
-    id: r.id,
-    title: ticketTitle(r),
-    badges: <TriageChips teamId={teamId} ticket={r} />,
-    description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
-  })
+   * reads this file off disk to make sure).
+   *
+   * LIFTED INTO `ticketBoardCard` ABOVE, 17 Sep 2026, the same day this
+   * function's four-entry `COLUMN` moved to the shared six — see that
+   * function's own header. */
+  const boardCard = ticketBoardCard(teamId, t, lang)
   return (
     <Kanban
       /* USE ALL THE WIDTH THERE IS — client, 2026-09-07: "with this 5 columns,
@@ -2437,6 +2530,109 @@ function OpenBoard({
             )
           : t(
               "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket."
+            )
+      }
+      emptyColumnLabel={t("Nothing at this stage.")}
+    />
+  )
+}
+
+/** THE ALL TAB'S SECOND BODY — client, 17 Sep 2026, verbatim: "In Tickets
+ * inside the app, I want a board view by status. Also add this board view by
+ * status in general tickets, all." The second half of that sentence is this
+ * function: `OpenBoard` above already answers "a board grouped by status" for
+ * the Open tab's own three-plus-one stages; All needs the same idea over
+ * EVERY live stage, because unlike Open it holds a ticket in any of them.
+ *
+ * ── REUSED, NOT REBUILT ─────────────────────────────────────────────────
+ *
+ * The kit's `Kanban` composition is the one this app has already adopted
+ * (`OpenBoard`'s own header — R46's exemption for it was deleted the day it
+ * was reached for real), so this is the SAME component with a wider `columns`
+ * array, never a hand-rolled board. `ticketStatusColumnTitles` and
+ * `ticketBoardCard` (above) are the two pieces `OpenBoard` used to build
+ * inline for itself; both are shared now so a stage's name and a card's shape
+ * can never read one way on one board and another way on the other.
+ *
+ * ── READ-ONLY, FOR THE SAME REASON — AND EXACTLY THE SAME REASON ──────────
+ *
+ * No `onMove`, no drag, one act (a card opens the ticket): `OpenBoard`'s own
+ * header states the two questions a draggable board would have to answer
+ * (which move is a lifecycle move made by geometry, and which count is
+ * honest under a page) and this board answers neither of them any more
+ * cheaply than that one does — it holds MORE stages, not fewer decisions.
+ *
+ * ── SIX COLUMNS, NOT FIVE, AND NO FIFTH "WAITING" COLUMN ───────────────────
+ *
+ * `HELP_STATUSES` (shared/types.ts) is the whole live vocabulary — new,
+ * triaged, scheduled, in_progress, ready, resolved — so this board is a
+ * PARTITION of the All tab exactly the way `OpenBoard`'s four stage columns
+ * partition the Open tab: every ticket has exactly one status, every status
+ * gets a column, nothing is dropped and nothing repeats. That is also why
+ * there is no sixth "Waiting" column here the way there is a fifth one on
+ * Open: Waiting is a PREDICATE over a ticket that is already sitting in one
+ * of these six stages (`waitingClause`, workers/content/src/lib/help.ts), and
+ * a predicate column only earns its keep once, on the tab that is actually
+ * ABOUT triage workload. Adding it here would repeat a card a second time on
+ * a board whose whole point is "one ticket, one column" — the client asked
+ * for "a board view by status," not a second copy of Open's five-column one.
+ *
+ * ── COUNTS ARE THE SAME `byStatus` READ THE STRIP ALREADY HOLDS ───────────
+ *
+ * `counts` is `byStatus` — the one grouped `COUNT(*)` the tab strip's own
+ * Triage/Ready/Open/Closed badges already read (built above this component) —
+ * so a sixth caller of that read costs nothing new and can never disagree
+ * with the numbers on the strip above it. Exactly `OpenBoard`'s own R16
+ * argument: an exact count while the toolbar RESTS, and a fall back to the
+ * cards actually on screen (`rows.filter(...).length`, implicitly, through
+ * the kit's own default) the moment anything is asked — `narrowed` decides
+ * which, the identical prop `OpenBoard` takes for the identical reason. */
+function AllBoard({
+  teamId,
+  rows,
+  counts,
+  narrowed,
+  onOpen,
+}: {
+  teamId: string
+  rows: readonly HelpTicket[]
+  /** the door's own grouped tally per status, over the WHOLE collection —
+   * never `cards.length`. See the header above for why every stage reads it. */
+  counts: Record<string, number> | undefined
+  /** is the toolbar asking anything? See `OpenBoard`'s identical prop. */
+  narrowed: boolean
+  onOpen: (id: string) => void
+}) {
+  const { t, lang } = useLanguage()
+  const COLUMN = ticketStatusColumnTitles(t)
+  const boardCard = ticketBoardCard(teamId, t, lang)
+  return (
+    <Kanban
+      // SIX COLUMNS SHARE THE ROW, the same fluid formula `OpenBoard` uses for
+      // its five — see that component's own note for why this is the kit's
+      // `columnWidth` prop and not a wrapper or a negative margin. One gap
+      // fewer term than five columns would need, one column wider a floor.
+      columnWidth="max(18rem, calc((100% - 5 * var(--space-2h)) / 6))"
+      columns={HELP_STATUSES.map((stage) => ({
+        id: stage,
+        title: COLUMN[stage].title,
+        // NO `dot` — the same 2026-09-09 ruling `OpenBoard` carries ("column
+        // header should have no color"), and it did not narrow when a second
+        // board joined the file.
+        count: narrowed ? undefined : counts?.[stage],
+        // A PARTITION OF THE WHOLE LIVE VOCABULARY, not a narrowing — see the
+        // header above. `OpenBoard`'s own `FIND_NARROWING_OK` exemption for
+        // this exact shape of `rows.filter(` covers this call too (both
+        // matchers tolerate the multi-line layout; shared/rules/registry.ts).
+        cards: rows.filter((r) => r.status === stage).map(boardCard),
+        emptyLabel: t("Nothing at this stage."),
+      }))}
+      onCardSelect={(card) => onOpen(card.id)}
+      footnote={
+        narrowed
+          ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")
+          : t(
+              "Each column counts every ticket at that stage — every ticket is in exactly one. Click a card to open the ticket."
             )
       }
       emptyColumnLabel={t("Nothing at this stage.")}

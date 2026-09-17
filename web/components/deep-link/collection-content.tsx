@@ -383,20 +383,23 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     // which only a real component can hold.
     return (
       <KnowledgeScreen
-        teamId={teamId as string}
+        scope={{
+          kind: "team",
+          teamId: teamId as string,
+          go,
+          sectionPath,
+          tab: ctx.query.tab,
+          onIntent,
+          knowledgeQ,
+          knowledgeShapeQ,
+          accountsQ,
+          companiesQ,
+          total: totals.knowledge,
+          knowledgeView: ctx.knowledgeView,
+          setKnowledgeView: ctx.setKnowledgeView,
+        }}
         t={t}
-        go={go}
-        sectionPath={sectionPath}
-        tab={ctx.query.tab}
         can={can}
-        onIntent={onIntent}
-        knowledgeQ={knowledgeQ}
-        knowledgeShapeQ={knowledgeShapeQ}
-        accountsQ={accountsQ}
-        companiesQ={companiesQ}
-        total={totals.knowledge}
-        knowledgeView={ctx.knowledgeView}
-        setKnowledgeView={ctx.setKnowledgeView}
       />
     )
   }

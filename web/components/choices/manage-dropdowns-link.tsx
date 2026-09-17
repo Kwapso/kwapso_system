@@ -41,6 +41,21 @@
 // because this control is not the gear and does not live in the settings host
 // (R61 keeps that file to ONE `can(`, and this is a different question asked in
 // a different place).
+//
+// PARKED, NOT DEAD — 17 Sep 2026, the cross-lane hygiene pass. The client's own
+// ruling the same day retired this link's one remaining call site: "On the add
+// ticket screen, remove the manage choices under type and replace these colors
+// with the icons for each type" (help-form-dialog.tsx, see
+// web/test/help-form-dialog-type-icons.test.tsx). That was ALSO this
+// component's only mount anywhere in either front door, so it is unreached
+// today — but the mechanism it draws (a gated signpost from a dropdown field to
+// that dropdown's own module settings page) is still exactly right for the next
+// form whose vocabulary field wants one, and `moduleSettingsPage()` still
+// resolves every segment it would ever be asked for. Deleting it would mean
+// rebuilding the same gate-plus-navigation logic from scratch the next time a
+// form needs it; parking it costs one line here instead. See
+// `PARKED` (shared/rules/registry.ts) for the entry `web/test/
+// orphan-components.test.ts` reads.
 
 import { Sliders } from "@shared/ui/foundations/icons"
 

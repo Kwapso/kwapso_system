@@ -96,6 +96,16 @@ const BOARD = (() => {
   return { at, end, text: at < 0 || end < at ? "" : code.slice(at, end) }
 })()
 
+/** THE SECOND BOARD — 17 Sep 2026, "also add this board view by status in
+ * general tickets, all". One screen, two `<Kanban>` tags now (Open's above,
+ * All's below it), so the FIRST occurrence past `BOARD.end` is unambiguously
+ * this one — the same slicing `BOARD` itself does, just started further in. */
+const ALL_BOARD = (() => {
+  const at = code.indexOf("<Kanban", BOARD.end)
+  const end = code.indexOf("\n    />", at)
+  return { at, end, text: at < 0 || end < at ? "" : code.slice(at, end) }
+})()
+
 /** EVERY TAB TOKEN THE STRIP DRAWS, resolved off the component's own source.
  *
  * Two reads, because the strip is written in two halves. The `tabs: [` array
@@ -437,14 +447,20 @@ describe("which filters a ticket tab offers", () => {
     // screen is the queue's, and it is named `waiting` rather than `rows`
     // precisely so the paged half cannot borrow it by accident.
     //
-    // ONE PLACE MAY TOUCH THOSE ROWS AND IT IS THE BOARD, which PARTITIONS them
-    // into columns rather than dropping any (its own `it` below proves that, and
-    // is where the exception is argued). Everywhere else on this screen the
-    // count is zero, and the match is whitespace-insensitive now — see
-    // NARROWS_LOADED_ROWS for the newline that used to be the whole check.
+    // TWO PLACES MAY TOUCH THOSE ROWS NOW — 17 Sep 2026 gave the All tab a
+    // board beside Open's — AND BOTH ARE THE BOARD, which PARTITIONS its rows
+    // into columns rather than dropping any (each board's own `it` below
+    // proves that, and is where the exception is argued). Everywhere else on
+    // this screen the count is zero, and the match is whitespace-insensitive
+    // now — see NARROWS_LOADED_ROWS for the newline that used to be the whole
+    // check.
     expect(BOARD.at, "the Open tab no longer draws the kit's board").toBeGreaterThan(-1)
     expect(BOARD.end, "the Kanban tag is not closed where this slice expects").toBeGreaterThan(BOARD.at)
-    const elsewhere = code.slice(0, BOARD.at) + code.slice(BOARD.end)
+    expect(ALL_BOARD.at, "the All tab no longer draws a second board").toBeGreaterThan(-1)
+    expect(ALL_BOARD.end, "the All board's Kanban tag is not closed where this slice expects").toBeGreaterThan(
+      ALL_BOARD.at
+    )
+    const elsewhere = code.slice(0, BOARD.at) + code.slice(BOARD.end, ALL_BOARD.at) + code.slice(ALL_BOARD.end)
     expect(
       [...elsewhere.matchAll(NARROWS_LOADED_ROWS)].map((m) =>
         elsewhere.slice(m.index, elsewhere.indexOf("\n", m.index)).trim()
@@ -659,5 +675,77 @@ describe("the Open tab's board", () => {
       /-m[xlrs]?-/.test(board),
       "the board pulls itself out of its card with a negative margin — nothing on this path sets a width to escape (R29)"
     ).toBe(false)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ALL TAB'S BOARD — one column per LIVE STATUS, and nothing else.
+
+   CLIENT, 17 Sep 2026, verbatim, the second half of the same ruling that
+   opened this file's other board describe block: "Also add this board view
+   by status in general tickets, all." Six columns, not five: All holds a
+   ticket in ANY stage (Open's own board deliberately does not), so its
+   partition is `HELP_STATUSES` — every live word `help.status` can hold —
+   rather than the narrower `OPEN_TAB_STATUSES`, and there is no sixth
+   "Waiting" column, because that column is a PREDICATE about triage
+   workload and this board's whole point is a plain partition by status.
+   Kept far shorter than "the Open tab's board" above: the shared pieces
+   (`ticketStatusColumnTitles`, `ticketBoardCard`) are ONE function each now,
+   so what is worth locking here is what is DIFFERENT about this board, not
+   the whole account a second time. ══════════════════════════════════════ */
+describe("the All tab's board", () => {
+  const board = (() => {
+    expect(ALL_BOARD.at, "the All tab no longer draws its own board").toBeGreaterThan(-1)
+    expect(ALL_BOARD.end, "the All board's Kanban tag is not closed where this slice expects").toBeGreaterThan(
+      ALL_BOARD.at
+    )
+    return ALL_BOARD.text
+  })()
+
+  it("takes its columns from the WHOLE live vocabulary, HELP_STATUSES, not the Open tab's narrower one", () => {
+    // Mapped off the array itself — `HELP_STATUSES` holds all six live
+    // stages (shared/types.ts) — rather than written out stage by stage, so
+    // this board cannot drift from the vocabulary the door, the strip's own
+    // badges and every other status-driven surface already agree on.
+    expect(
+      /columns=\{HELP_STATUSES\.map\(/.test(board),
+      "the All board's columns are no longer mapped off HELP_STATUSES — a hand-written column set can drift from the live status vocabulary"
+    ).toBe(true)
+    expect(HELP_STATUSES.length, "HELP_STATUSES no longer holds six live stages").toBe(6)
+  })
+
+  it("touches the loaded rows exactly once, and that touch is a PARTITION", () => {
+    const partitions = [...board.matchAll(NARROWS_LOADED_ROWS)].map((m) =>
+      board.slice(m.index, board.indexOf(")", board.indexOf("=>", m.index)) + 1).replace(/\s+/g, " ")
+    )
+    expect(
+      partitions.length,
+      "the All board no longer buckets the loaded rows exactly once — either it dropped its partition or it grew a second one"
+    ).toBe(1)
+    expect(
+      /^rows\s*\.filter\(\(\w+\) => \w+\.status === stage\)$/.test(partitions[0]),
+      `the All board's one touch of the loaded rows is \`${partitions[0]}\`, which is not a partition by the column's own stage — a filter on anything else drops cards the exact count above them still counts (R16)`
+    ).toBe(true)
+  })
+
+  it("hands the kit no dot for any column head", () => {
+    expect(
+      [...board.matchAll(/\bdot\s*:/g)].length,
+      "a column on the All board is passing the kit a `dot` — the client's 2026-09-09 ruling against a coloured column head covers every ticket board in this file, not only Open's"
+    ).toBe(0)
+  })
+
+  it("draws no sixth Waiting column — that predicate belongs to Open's board, not a plain status partition", () => {
+    expect(
+      board.includes("WAITING"),
+      "the All board names WAITING — it is a predicate over triage workload, not a status, and this board is a partition of HELP_STATUSES alone"
+    ).toBe(false)
+  })
+
+  it("a card opens the ticket, and nothing here promises a drag this board does not wire", () => {
+    expect(board.includes("onMove"), "the All board accepts onMove — see Open's own header for why a ticket board stays read-only").toBe(
+      false
+    )
+    expect(board.includes("onCardSelect"), "a card no longer opens its ticket on the All board").toBe(true)
   })
 })

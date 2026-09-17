@@ -92,6 +92,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { fileToDataUrl } from "@/lib/image"
 import { safeSrc } from "@shared/web/rich-text"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { LANGUAGES } from "@shared/i18n"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
@@ -586,7 +587,21 @@ export function AccountFormDialog({
               <AvatarFallback>{letterMark(values.name)}</AvatarFallback>
             </Avatar>
           )}
-          <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("logoUrl")} />
+          {/* THE TILE GRID SHOWS THE SAME PICTURE THE AVATAR ABOVE DOES — client
+              ruling, 17 Sep 2026 — built through the one shared seam
+              (shared/web/upload-items.ts) every FileUpload call site now
+              feeds its items with. No `onRemove`: picking a new logo is the
+              only action this field has ever offered. */}
+          <FileUpload
+            accept="image/*"
+            multiple={false}
+            files={
+              logoPreview
+                ? [storedFileToUploadItem({ id: "account-logo", name: t("Logo"), href: logoPreview })]
+                : []
+            }
+            onFilesSelected={pickImage("logoUrl")}
+          />
         </div>
       </Field>
 
@@ -600,7 +615,16 @@ export function AccountFormDialog({
                the height is the form's (80), not the well's own 16/9. */
             <Image src={coverPreview} alt={t("Cover image")} ratio={null} className="h-20 w-full" />
           )}
-          <FileUpload accept="image/*" multiple={false} onFilesSelected={pickImage("coverUrl")} />
+          <FileUpload
+            accept="image/*"
+            multiple={false}
+            files={
+              coverPreview
+                ? [storedFileToUploadItem({ id: "account-cover", name: t("Cover image"), href: coverPreview })]
+                : []
+            }
+            onFilesSelected={pickImage("coverUrl")}
+          />
         </div>
       </Field>
     </FormShellDialog>

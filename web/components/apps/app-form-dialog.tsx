@@ -50,6 +50,7 @@ import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue, safeSrc } from "@shared/web/rich-text"
 import { fileToDataUrl } from "@/lib/image"
+import { storedFileToUploadItem } from "@shared/web/upload-items"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useLanguage } from "@shared/web/language"
@@ -453,7 +454,21 @@ export function AppFormDialog({
               <img src={logoPreview} alt="" className="size-full object-cover" />
             </span>
           )}
-          <FileUpload accept="image/*" multiple={false} onFilesSelected={pickLogo} />
+          {/* THE TILE GRID SHOWS THE SAME MARK THE BOX ABOVE DOES — client
+              ruling, 17 Sep 2026 — through the one shared seam
+              (shared/web/upload-items.ts) every FileUpload call site now
+              feeds its items with. No `onRemove`: picking a new logo is the
+              only action this field has ever offered. */}
+          <FileUpload
+            accept="image/*"
+            multiple={false}
+            files={
+              logoPreview
+                ? [storedFileToUploadItem({ id: "app-logo", name: t(logoField.label), href: logoPreview })]
+                : []
+            }
+            onFilesSelected={pickLogo}
+          />
         </div>
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
