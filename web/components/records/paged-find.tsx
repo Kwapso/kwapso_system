@@ -179,6 +179,7 @@ export function PagedFind<T>({
   listKey,
   fetchPage,
   placeholder,
+  search = true,
   matches,
   facets = [],
   sorts = [],
@@ -197,8 +198,24 @@ export function PagedFind<T>({
   /** ask the door ONE page of a question. The screen owns this because it owns
    * which door it reads; everything else about finding is the same everywhere. */
   fetchPage: (query: FindQuery, cursor: string | null) => Promise<FindPage<T>>
-  /** the search box's placeholder, in the recipe's own words */
-  placeholder: string
+  /** the search box's placeholder, in the recipe's own words. Required
+   * whenever `search` is true (every existing call site); unread when it
+   * is not. */
+  placeholder?: string
+  /** WHETHER THIS ROW DRAWS A SEARCH BOX AT ALL — `true` by default, every
+   * existing call site's behaviour unchanged. The one caller-visible escape
+   * hatch this file's own header comment used to say did not exist
+   * ("draws an unconditional `<SearchInput>`, no per-caller way to switch
+   * it off"), added for the knowledge archive (B0296/T3659, 16 Sep 2026):
+   * "Remove KB search bar, convert KB view to archive/source-manager,
+   * centralize search through assistant." The facets, the sort and the view
+   * switch are UNCHANGED by this prop — only the field itself stands down,
+   * the same way `showFilters`/`showSort` already stand down empty
+   * `facets`/`sorts` rather than needing a prop of their own. A call site
+   * passing `search={false}` no longer asks the door a `q` at all (nothing
+   * ever sets `text`), so `TOOLBAR_EXEMPT` is still the record of WHY —
+   * this prop is only the mechanism. */
+  search?: boolean
   /** WHAT THE MATCH LINE SAYS — three whole sentences, in the screen's own
    * glossary words, never a synonym.
    *
@@ -707,21 +724,27 @@ export function PagedFind<T>({
                 doing the job by accident; the field's own floor is what keeps that
                 true the day a call site puts a second control in here, which is
                 exactly how `/settings/tickets` reached 23px. */}
-            <div className={TOOLBAR_SEARCH_SLOT}>
-              <SearchInput
-                value={text}
-                // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
-                // keystroke, unconditionally; only the DOOR waits (`setText`
-                // above owns that decision, so the clear path and the type path
-                // cannot drift apart). `onClear` is the same call with an empty
-                // string, which `setText` reads as the deliberate act it is.
-                onChange={(e) => setText(e.currentTarget.value)}
-                onClear={() => setText("")}
-                loading={typing || found.loading}
-                placeholder={placeholder}
-                className="w-full"
-              />
-            </div>
+            {/* `search` — false only for the knowledge archive today
+                (TOOLBAR_EXEMPT["knowledge.list"]). Everything else in this
+                track (facets, sort, view, actions) is unaffected: this is
+                the ONE field standing down, not the row. */}
+            {search && (
+              <div className={TOOLBAR_SEARCH_SLOT}>
+                <SearchInput
+                  value={text}
+                  // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
+                  // keystroke, unconditionally; only the DOOR waits (`setText`
+                  // above owns that decision, so the clear path and the type path
+                  // cannot drift apart). `onClear` is the same call with an empty
+                  // string, which `setText` reads as the deliberate act it is.
+                  onChange={(e) => setText(e.currentTarget.value)}
+                  onClear={() => setText("")}
+                  loading={typing || found.loading}
+                  placeholder={placeholder ?? ""}
+                  className="w-full"
+                />
+              </div>
+            )}
             {/* THE FILTER PILL, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
                 ruling, 2026-09-01, the toolbar spec Aurora approved that night
                 against a real Tickets mockup: search, then filters, then sort,

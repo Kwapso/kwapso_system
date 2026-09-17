@@ -419,9 +419,34 @@ function Cite({ for: id, className, ...props }: CiteProps) {
     <sup
       data-slot="agent-chat-cite"
       /* The one new thing 2A names, and it is a type step the kit already
-         has: `--text-micro`, weight medium, raised. No token is invented. */
+         has: `--text-micro`, weight medium, raised. No token is invented.
+         RAISED WITHOUT GROWING THE LINE BOX — B0297 / T3660, client review
+         16 Sep 2026: "Restore sentence-level citations in KB responses, fix
+         numbering/text overlap on smaller screens." The numbered marks were
+         pulled once already because the number collided with the line
+         above it on narrow screens; the ruling was to fix the overlap, not
+         drop the feature again.
+         `align-super` was the collider: it wins the UA `vertical-align` back
+         from the kit's own `sup`/`sub` reset (`vertical-align: baseline`,
+         `line-height: 0`) to the browser's `super`, and `text-micro` here
+         re-asserts a real line-height (`--text-micro--line-height: 1.3`) on
+         top of that reset's `line-height: 0` — so the mark is raised by
+         BOTH the reset's `position:relative;top` offset and the browser's
+         own super shift, inside a line box that is no longer pinned to
+         zero. On a sentence tightly wrapped at 375px that is enough to
+         plant the number on top of the line above. `top-[-0.35em]` raises
+         the glyph by roughly the same visual amount `align-super` did,
+         `leading-[0]` puts the line-height back to the reset's zero (the
+         trailing utility wins over `text-micro`'s own, the same order
+         `turnVariants` already relies on for `text-caption
+         leading-[var(--leading-normal)]` above), and dropping
+         `align-super` leaves `vertical-align: baseline` in force, so the
+         mark is offset by position alone and never inflates the row it
+         sits in — see `verify/agent-chat-cite/`, which measures two
+         adjacent wrapped lines' boxes at 375px and asserts they don't
+         overlap even with three consecutive citations in one sentence. */
       className={cn(
-        "align-super text-micro font-[var(--font-weight-medium)] tabular-nums",
+        "relative top-[-0.35em] text-micro leading-[0] font-[var(--font-weight-medium)] tabular-nums",
         className,
       )}
       {...props}

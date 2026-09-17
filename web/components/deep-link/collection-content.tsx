@@ -438,15 +438,23 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             onSynced={() => invalidate(knowledgeKey(teamId as string))}
           />
         </div>
-        {/* ASK IT, HERE. The list answers "what does it know?"; this answers
-            "what does it know about X?", which is the question somebody actually
-            came with. It sits ABOVE the list because a page whose first control
-            is a question box is a page people ask questions on. The answer
-            arrives in the assistant, with its sources marked at the claims and
-            room to ask the follow-up — see ask-the-assistant.tsx. */}
+        {/* ASK IT, HERE — AND NOW THE ONLY QUESTION BOX ON THIS SCREEN.
+            B0296/T3659 (client review, 16 Sep 2026, verbatim): "Remove KB
+            search bar, convert KB view to archive/source-manager, centralize
+            search through assistant." The list below used to draw its own
+            search box beside this one — two search-shaped controls asking the
+            same door two different ways — so this is where "what does it know
+            about X?" is asked now; the list under it browses what is filed,
+            it does not search. The answer arrives in the assistant, with its
+            sources marked at the claims and room to ask the follow-up — see
+            ask-the-assistant.tsx. */}
         <AskTheAssistant />
-        {/* R14's other half: the sweep only ever adds, so the search box is
-            answered by the door — over every source, not the newest fifty. */}
+        {/* THE LIST IS AN ARCHIVE, NOT A SECOND SEARCH BOX (B0296/T3659). It
+            still pages (R14) and still carries its facets and the List·Shape
+            switch — compartment/kind/active narrow what is FILED here, which
+            is a different act from asking a question of it — but the field
+            itself is off: TOOLBAR_EXEMPT["knowledge.list"] carries the reason,
+            and `search={false}` is the mechanism (paged-find.tsx). */}
         <PagedFind<KnowledgeSource>
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
@@ -455,7 +463,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           listKey={knowledgeKey(teamId as string)}
           // R53 — the row builds the switch from this config; the call site
           // never draws a `<ViewSwitch>` of its own. TWO bodies over ONE
-          // collection: the list answers "what does it know?", the shape
+          // collection: the list answers "what is filed here?", the shape
           // answers "where is what it knows, and where is there none?" — a
           // question a list of rows cannot be read for at all.
           view={{
@@ -466,7 +474,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             value: ctx.knowledgeView,
             onValueChange: (v: string) => ctx.setKnowledgeView(v === "shape" ? "shape" : "list"),
           }}
-          placeholder={t("Search")}
+          search={false}
           matches={{
             none: t("No sources match"),
             one: t("1 source matches"),

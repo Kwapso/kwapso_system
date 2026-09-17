@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 797 strings · 3 languages · 1412 of the entries below are hand-written seed.
+// 795 strings · 3 languages · 1422 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -81,7 +81,6 @@ export const CATALOGUE: Catalogue = {
   "Archived": { de: "Archiviert", es: "Archivado", ca: "Arxivat" },
   "Ask a client for something": { de: "Einen Kunden um etwas bitten", es: "Pedir algo a un cliente", ca: "Demana quelcom a un client" },
   "Ask for something": { de: "Um etwas bitten", es: "Pedir algo", ca: "Demana quelcom" },
-  "Ask the knowledge base": { de: "Die Knowledge Base abfragen", es: "Preguntar a la base de conocimientos", ca: "Pregunta la base de coneixement" },
   "Ask us for this one and we'll send it over.": { de: "Fragen Sie uns danach, wir senden es Ihnen zu.", es: "Pídenoslo y te lo enviamos.", ca: "Demaneu-nos-el i us l'enviarem." },
   "Ask us something": { de: "Fragen Sie uns etwas", es: "Pregúntanos algo", ca: "Demana'ns quelcom" },
   "Ask whoever you work with here, and try again after they've done it.": { de: "Fragen Sie, mit wem Sie hier zusammenarbeiten, und versuchen Sie es erneut, nachdem diese Person es getan hat.", es: "Pregunta a quien trabajes aquí, e intenta de nuevo después de que lo hayan hecho.", ca: "Pregunta a qui treballa aquí amb tu, i torna-ho a intentar després que ho hagi fet." },
@@ -508,7 +507,6 @@ export const CATALOGUE: Catalogue = {
   "Save notes": { de: "Notizen speichern", es: "Guardar notas", ca: "Guardar notes" },
   "Say who does": { de: "Angeben, wer es macht", es: "Indicar quién lo hace", ca: "Dir qui ho fa" },
   "Scheduled": { de: "Geplant", es: "Programado", ca: "Programat" },
-  "Search": { de: "Suchen", es: "Buscar", ca: "Cercar" },
   "Search accounts…": { de: "Konten durchsuchen…", es: "Buscar cuentas…", ca: "Cercar comptes…" },
   "Search meetings…": { de: "Meetings durchsuchen…", es: "Buscar reuniones…", ca: "Cercar reunions…" },
   "Search processes…": { de: "Prozesse durchsuchen…", es: "Buscar procesos…", ca: "Cercar processos…" },

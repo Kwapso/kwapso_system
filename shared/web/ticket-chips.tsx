@@ -198,22 +198,36 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * this same directory and is what both callers already used, so the description
  * is flattened here rather than at each call site — a title is a string, and a
  * caller that had to remember to strip the markup first is a caller that will
- * one day print `<p>` into a table cell. */
-export function ticketTitle(ticket: {
-  titleEn: string | null
-  titleDe: string | null
-  description: string
-}): string {
-  const plain = richTextPlain(ticket.description)
-  return (
-    ticket.titleEn?.trim() ||
-    ticket.titleDe?.trim() ||
-    // EIGHTY, WHICH IS THE NUMBER THE TRIAGE CARD HAS ALWAYS USED. The list's
-    // own cells truncate with an ellipsis in CSS on top of this, so the cap is
-    // not what makes a row fit — it is what stops a whole paragraph reaching an
-    // `aria-label`, a `title` attribute or a Kanban card, none of which clip.
-    (plain.length > 80 ? `${plain.slice(0, 80)}…` : plain)
-  )
+ * one day print `<p>` into a table cell.
+ *
+ * THE FALLBACK BRANCH ONLY MAY READ THE DESCRIPTION IN THE READER'S OWN
+ * LANGUAGE — B0302/T3661. `titleEn`/`titleDe` are the ticket's own fixed
+ * words (a real translation SETS `titleEn`, it never reads through this),
+ * so they are never run through a per-viewer reader; only the LAST-RESORT
+ * branch, the body itself, is — and `readDescriptionAs` is called ONLY on
+ * that branch, never when a title already answers, so a ticket that has one
+ * never even asks the reader for the body. `readDescriptionAs` defaults to
+ * identity so every caller that has no reader (the collection row, the
+ * picker, every caller before this one) keeps exactly today's behaviour —
+ * see `useHumanTranslation`'s `of` in
+ * `web/components/records/translate-human-text.tsx`, the one shape this
+ * parameter is built to accept. */
+export function ticketTitle(
+  ticket: {
+    titleEn: string | null
+    titleDe: string | null
+    description: string
+  },
+  readDescriptionAs: (text: string) => string = (text) => text
+): string {
+  const titled = ticket.titleEn?.trim() || ticket.titleDe?.trim()
+  if (titled) return titled
+  const plain = richTextPlain(readDescriptionAs(ticket.description))
+  // EIGHTY, WHICH IS THE NUMBER THE TRIAGE CARD HAS ALWAYS USED. The list's
+  // own cells truncate with an ellipsis in CSS on top of this, so the cap is
+  // not what makes a row fit — it is what stops a whole paragraph reaching an
+  // `aria-label`, a `title` attribute or a Kanban card, none of which clip.
+  return plain.length > 80 ? `${plain.slice(0, 80)}…` : plain
 }
 
 export interface TicketChipFacts {

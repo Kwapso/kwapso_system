@@ -112,8 +112,8 @@ export function AskTheAssistant({
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder={context ? t("Ask about this record…") : t("Ask the knowledge base")}
-          aria-label={t("Ask the knowledge base")}
+          placeholder={context ? t("Ask a question about this record") : t("Ask a question")}
+          aria-label={t("Ask a question")}
         />
         <Button type="submit" variant="inverse" disabled={!question.trim()} className="shrink-0 gap-1">
           <MagnifyingGlass className="size-4" aria-hidden />

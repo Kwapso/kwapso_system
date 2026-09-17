@@ -112,7 +112,6 @@ export const SEED: Catalogue = {
   Cancel: { de: "Abbrechen", es: "Cancelar", ca: "Cancel·lar" },
   Edit: { de: "Bearbeiten", es: "Editar", ca: "Editar" },
   Delete: { de: "Löschen", es: "Eliminar", ca: "Eliminar" },
-  Search: { de: "Suchen", es: "Buscar", ca: "Cercar" },
   Filter: { de: "Filtern", es: "Filtrar", ca: "Filtrar" },
   Close: { de: "Schließen", es: "Cerrar", ca: "Tancar" },
   /* THE WORKSPACE TAB SET'S OWN CLOSE VERB (2026-09-06, kit v1.2.59's
@@ -1820,10 +1819,16 @@ export const SEED: Catalogue = {
   },
   "As it is today": { de: "Wie es heute ist", es: "Como es hoy", ca: "Com és avui" },
   "As it was on": { de: "Wie es war am", es: "Como era el", ca: "Com era el" },
-  "Ask about this record…": {
-    de: "Fragen Sie zu diesem Datensatz…",
-    es: "Pregunta sobre este registro…",
-    ca: "Pregunta sobre aquest registre…",
+  /* B0296/T3659, 16 Sep 2026 — the knowledge screen's own search bar is gone
+   * (TOOLBAR_EXEMPT["knowledge.list"]), so this question box is now the one
+   * place a question goes on that screen. Reworded from "Ask about this
+   * record…"/"Ask the knowledge base" to say "question" plainly, so it never
+   * reads as the search field it replaced. */
+  "Ask a question": { de: "Frage stellen", es: "Haz una pregunta", ca: "Fes una pregunta" },
+  "Ask a question about this record": {
+    de: "Stellen Sie eine Frage zu diesem Datensatz",
+    es: "Haz una pregunta sobre este registro",
+    ca: "Fes una pregunta sobre aquest registre",
   },
   /* The assistant's own "+" tab and its scope picker (client ruling,
    * 15 Sep 2026 — see web/lib/agent-conversation-tabs.ts and
@@ -3311,25 +3316,24 @@ export const SEED: Catalogue = {
      screen without a generator run and without spending anything. */
   "Type": { de: "Typ", es: "Tipo", ca: "Tipus" },
 
-  /* ── The ticket composer's two sends, and the five seconds before either of
-     them happens (client ruling, 6 Sep 2026) ─────────────────────────────────
-     Eight sentences, written here in all three languages in the same change
+  /* ── The ticket composer's one send, and the five seconds before it happens
+     (client ruling, 6 Sep 2026; B0294/T3657, 16 Sep 2026, retired the second
+     "Send and close" send — "too easy to hit by accident … the close button
+     needs to move to the top") ─────────────────────────────────────────────
+     Six sentences, written here in all three languages in the same change
      that adds them, so R44's ceiling does not move: an untranslated string is
-     debt, and this feature is not the place to take any on. Two of the eight
+     debt, and this feature is not the place to take any on. Two of the six
      are the accessible NAME of the wordless send — the tooltip and the
      aria-label say the same two words on purpose (label-in-name), so they are
-     one entry read twice and a translator must keep them one. */
+     one entry read twice and a translator must keep them one.
+     ("Send and close" and "Sending and closing" are gone from here with
+     B0294/T3657 — pruned by `npm run lang`, since neither `t(...)` call site
+     survives in the app.) */
   "Send reply": { de: "Antwort senden", es: "Enviar respuesta", ca: "Enviar resposta" },
-  "Send and close": { de: "Senden und schließen", es: "Enviar y cerrar", ca: "Enviar i tancar" },
   "Sending your reply": {
     de: "Ihre Antwort wird gesendet",
     es: "Enviando tu respuesta",
     ca: "Enviant la teva resposta",
-  },
-  "Sending and closing": {
-    de: "Wird gesendet und geschlossen",
-    es: "Enviando y cerrando",
-    ca: "Enviant i tancant",
   },
   /* The receipt under the pending bubble, where a timestamp goes once it is
      real. `{seconds}` is a bare number and stays one in every language. */

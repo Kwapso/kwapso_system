@@ -1,7 +1,6 @@
 "use client"
 
-// THE TICKET'S REPLY COMPOSER — two sends, and five seconds before either of
-// them happens.
+// THE TICKET'S REPLY COMPOSER — one send, and five seconds before it happens.
 //
 // THE CLIENT, 6 September 2026, verbatim: "yes, do the double button the only
 // icon for send and the send and close / however, in the modal notification that
@@ -9,28 +8,36 @@
 // wait 5 seconds to actually send it and marked as closed - enough time to click
 // undo (if mistake)."
 //
+// B0294/T3657, 16 September 2026, IS WHY THIS IS ONE SEND AND NOT TWO ANY
+// MORE: "Send and close button too easy to hit by accident … the close button
+// needs to move to the top." It sat right beside the plain Send this composer
+// still draws, one keystroke away from a stray click closing a ticket she
+// meant to keep answering. The close action did not go — it MOVED, to the
+// title's own "Answer and close" (`help-detail.tsx`, offered now at every
+// status this composer used to gate its own close button on), through the
+// same `ResolveDialog` seam that button already opened. This composer went
+// back to being what its row can hold without a second target beside Send:
+// typing, and Send.
+//
 // WHY THIS IS THE APP'S COMPOSER AND NOT THE KIT'S. `TicketThread` draws the
 // thread AND a composer, and its composer has exactly one send control — one
-// `<button type="submit">` with one `sendLabel`. There is no slot beside it and
-// no icon-only mode. The kit is a dependency (a hand-edit under `shared/ui/`
-// turns the build red), so the second control cannot be added there from here;
-// what the app can do is turn the kit's composer OFF (`composer={false}`) and
-// draw this one directly beneath it, out of the kit's own Button and the kit's
-// own glyph, in the kit's own pill. The gap is logged for the design system's
-// owner: `TicketThread` wants a secondary send action and a wordless primary.
-// Everything else on this screen is still the kit's — the bubbles, the avatars,
-// the sides, the receipts.
+// `<button type="submit">` with one `sendLabel`. There is no icon-only mode,
+// and no `aria-label`/tooltip pair of the shape this screen needs. The kit is
+// a dependency (a hand-edit under `shared/ui/` turns the build red), so this
+// one is drawn app-side instead: the kit's composer turned OFF
+// (`composer={false}` on `TicketThread`) and this one drawn directly beneath
+// it, out of the kit's own Button and the kit's own glyph, in the kit's own
+// pill. Everything else on this screen is still the kit's — the bubbles, the
+// avatars, the sides, the receipts.
 //
-// WHY THE TWO CONTROLS ARE DRAWN THE WAY THEY ARE. The plain send is the ORDINARY
-// act, so it is the filled one and carries no words at all — the paper plane and
-// nothing else, which is what was asked for. "Send and close" carries words
-// because it is the one that CHANGES THE TICKET, and a control that changes a
-// record should say so in a language a person reads rather than in a glyph they
-// have to learn. The wordless one is therefore the one that needs an accessible
-// name written by hand, and it has one: `aria-label="Send reply"` on the button,
-// `aria-hidden` on the glyph so the SVG contributes nothing to that name, and a
-// tooltip saying THE SAME TWO WORDS — so somebody driving the screen by voice
-// can say what they can see and be understood (label-in-name).
+// WHY THE SEND CARRIES NO WORDS. The plain send is the ORDINARY act, so it is
+// the filled one and carries no words at all — the paper plane and nothing
+// else, which is what was asked for. Because it has no visible label it needs
+// an accessible name written by hand, and it has one: `aria-label="Send
+// reply"` on the button, `aria-hidden` on the glyph so the SVG contributes
+// nothing to that name, and a tooltip saying THE SAME TWO WORDS — so somebody
+// driving the screen by voice can say what they can see and be understood
+// (label-in-name).
 //
 // WHY THIS FILE IS A HOOK AND A COMPONENT RATHER THAN ONE COMPONENT. The hold
 // has to OUTLIVE the Conversation tab. The artifact is explicit that during the
@@ -72,10 +79,6 @@ type HeldReply = {
   /** Where the cursor was when she pressed send, so Undo puts it back exactly
    * there rather than at the end of a sentence she was editing the middle of. */
   caret: number
-  /** True for "Send and close" — the ONE difference between the two sends,
-   * besides the sentence in the toast. Same delay, same toast, same bubble,
-   * same Undo, same restored text. */
-  andClose: boolean
 }
 
 /** WHAT THE HOOK HANDS THE DRAWING. Everything the composer needs and nothing
@@ -88,8 +91,8 @@ export type ReplySend = {
   /** What is being held, or null. The pending bubble is drawn from this. */
   held: HeldReply | null
   secondsLeft: number
-  /** Press one of the two sends. `true` is "Send and close". */
-  start: (andClose: boolean) => void
+  /** Press send. */
+  start: () => void
   /** The field itself, so the caret can be read on press and restored on Undo. */
   field: React.RefObject<HTMLInputElement | null>
 }
@@ -99,14 +102,13 @@ export function useReplySend({
    * never share half a sentence. */
   ticketId,
   /** DO IT. Returns the sentence the settling toast should say — so the words
-   * for "sent" and the words for "answered and closed" are decided by the caller
-   * that knows what the door actually answered, not guessed at here. `leaving`
-   * is true only on the tab-closing path, where it must reach `fetch` as
-   * `keepalive`. */
+   * for "sent" are decided by the caller that knows what the door actually
+   * answered, not guessed at here. `leaving` is true only on the tab-closing
+   * path, where it must reach `fetch` as `keepalive`. */
   onSend,
 }: {
   ticketId: string
-  onSend: (text: string, andClose: boolean, leaving: boolean) => Promise<string>
+  onSend: (text: string, leaving: boolean) => Promise<string>
 }): ReplySend {
   const { t } = useLanguage()
   const field = React.useRef<HTMLInputElement | null>(null)
@@ -150,15 +152,13 @@ export function useReplySend({
   if (holdRef.current === null) {
     holdRef.current = createSendHold<HeldReply>({
       send: async (held, { keepalive }) => {
-        const said = await latest.current.onSend(held.text, held.andClose, keepalive)
+        const said = await latest.current.onSend(held.text, keepalive)
         // Nothing is drawn on a page that is being torn down. The request is
         // already in flight and will outlive this document; a toast would not.
         if (keepalive) return
         // A couple of seconds, and no Undo on it — because from here there is
-        // none: the row is written and, on a "Send and close", the email has
-        // left. The five seconds exist precisely so that undo never has to mean
-        // reopening a ticket, which would null the resolver and the resolved
-        // date and lose who answered it.
+        // none: the row is written. The five seconds exist precisely so that
+        // undo never has to mean pulling a message back off the thread.
         toast.success(said, { id: toastId, duration: 2600 })
       },
       onFailed: (held) => {
@@ -208,9 +208,7 @@ export function useReplySend({
     if (!held) return
     toast(
       <span role="status" className="flex min-w-0 items-baseline gap-2">
-        <span className="min-w-0">
-          {held.andClose ? t("Sending and closing") : t("Sending your reply")}
-        </span>
+        <span className="min-w-0">{t("Sending your reply")}</span>
         {/* THE NUMBER IS HIDDEN FROM THE ANNOUNCEMENT, ON PURPOSE. sonner's stack
             is a polite live region with `aria-relevant="additions text"`, so a
             number that changes inside it is read out every single second — a
@@ -267,12 +265,11 @@ export function useReplySend({
     }
   }, [hold])
 
-  function start(andClose: boolean) {
+  function start() {
     if (text.trim().length === 0) return
     hold.start({
       text,
       caret: field.current?.selectionStart ?? text.length,
-      andClose,
     })
     // The composer empties NOW, not when the send lands — she has finished with
     // these words and the next thing she types is the next message. Undo is what
@@ -295,17 +292,11 @@ export function useReplySend({
 export function ReplyComposer({
   /** The hold, owned by the screen above the tab strip. */
   send,
-  /** Draw "Send and close" at all. The caller decides: it needs `help:update`
-   * (which is what `/help/resolve` gates on), and it is not drawn on a ticket
-   * that is already answered — there is nothing left for it to do, and a control
-   * that can only be refused should not be a control. */
-  canClose,
   /** The ticket is already answered. Only the placeholder changes: a reply on a
    * closed ticket appends and touches no status, which is worth saying. */
   answered,
 }: {
   send: ReplySend
-  canClose: boolean
   answered: boolean
 }) {
   const { t } = useLanguage()
@@ -329,8 +320,9 @@ export function ReplyComposer({
         </div>
       ) : null}
 
-      {/* The kit's own composer pill, drawn here because the kit's composer holds
-          one send and this one holds two. Same shape, same tokens, same radius.
+      {/* The kit's own composer pill, drawn here because this composer needs an
+          `aria-label`/tooltip pair the kit's `sendLabel` cannot express. Same
+          shape, same tokens, same radius.
 
           `data-focus-shell` — THE STANDARD COMPOSITE-CONTROL SEAM (tokens.css
           §8, "review 1A · fix 4"), not a rule invented here, and the one thing
@@ -368,7 +360,7 @@ export function ReplyComposer({
         data-focus-shell=""
         onSubmit={(event) => {
           event.preventDefault()
-          start(false)
+          start()
         }}
         className="flex min-w-0 items-center gap-2 rounded-pill bg-card py-2 ps-4 pe-2"
       >
@@ -383,20 +375,6 @@ export function ReplyComposer({
           aria-label={t("Message")}
           className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 [font:inherit] text-caption text-foreground placeholder:text-ink-tertiary"
         />
-
-        {/* NOT HIDDEN WHILE THE FIELD IS EMPTY, DISABLED. A control that appears
-            halfway through typing moves the target under her hand. */}
-        {canClose ? (
-          <Button
-            type="button"
-            variant="cancel"
-            size="sm"
-            disabled={!ready}
-            onClick={() => start(true)}
-          >
-            {t("Send and close")}
-          </Button>
-        ) : null}
 
         <Tooltip>
           <TooltipTrigger asChild>

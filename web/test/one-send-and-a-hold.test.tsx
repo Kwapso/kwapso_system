@@ -1,12 +1,21 @@
-// THE COMPOSER AS PAINTED — two send controls, and neither of them sends
-// anything for five seconds.
+// THE COMPOSER AS PAINTED — one send control, and it does not send anything
+// for five seconds.
+//
+// FORMERLY "two-sends-and-a-hold.test.tsx". B0294/T3657, 16 Sep 2026: "Send
+// and close button too easy to hit by accident … the close button needs to
+// move to the top." The bottom "Send and close" button this file used to pin
+// sat right beside the plain Send it still draws — one stray click away from
+// closing a ticket somebody meant to keep answering. It is gone; closing now
+// happens only through the title's "Answer and close" (help-detail.tsx,
+// offered at every status `canClose` allows), which is proved separately in
+// web/test/ticket-close-moved-to-top.test.tsx. This file keeps exactly what a
+// person still gets on the composer row: typing, and Send.
 //
 // Its sibling (`five-seconds-before-it-sends.test.ts`) drives the state machine
 // directly and proves the timing. This one reads the DOM a person actually gets:
-// that the wordless send has a NAME a screen reader can say, that "Send and
-// close" is drawn beside it and only where it can do something, that pressing
-// either one empties the field and calls no door, and that Undo puts every
-// character back.
+// that the wordless send has a NAME a screen reader can say, that pressing it
+// empties the field and calls no door for five seconds, and that Undo puts
+// every character back.
 //
 // WHY THE ACCESSIBLE NAME IS A TEST RATHER THAN A CODE REVIEW NOTE: the client
 // asked for "the only icon for send", and an icon-only button whose label
@@ -21,7 +30,7 @@ import { Toaster, toast } from "@shared/ui/components/sonner/sonner"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 
 /** Every door call the composer made, in order. */
-type Sent = { text: string; andClose: boolean; leaving: boolean }
+type Sent = { text: string; leaving: boolean }
 
 /** THE TICKET SCREEN, in miniature. The hold is owned by the SCREEN and not by
  * the composer — the tab strip unmounts the panel it is not showing, and the
@@ -29,7 +38,6 @@ type Sent = { text: string; andClose: boolean; leaving: boolean }
  * test that rendered the composer alone would be testing a shape the app does
  * not have. This host calls the hook the way `help-detail.tsx` does. */
 function Host({
-  canClose,
   answered,
   onSend,
   /** False stands for another tab being open on the ticket — Radix unmounts the
@@ -37,16 +45,15 @@ function Host({
    * screen around it stays. */
   showing = true,
 }: {
-  canClose: boolean
   answered: boolean
-  onSend: (text: string, andClose: boolean, leaving: boolean) => Promise<string>
+  onSend: (text: string, leaving: boolean) => Promise<string>
   showing?: boolean
 }) {
   const send = useReplySend({ ticketId: "01TICKET", onSend })
-  return showing ? <ReplyComposer send={send} canClose={canClose} answered={answered} /> : null
+  return showing ? <ReplyComposer send={send} answered={answered} /> : null
 }
 
-function draw(options?: { canClose?: boolean; answered?: boolean; showing?: boolean }) {
+function draw(options?: { answered?: boolean; showing?: boolean }) {
   const sent: Sent[] = []
   const view = render(
     <>
@@ -55,11 +62,10 @@ function draw(options?: { canClose?: boolean; answered?: boolean; showing?: bool
           could not press the control it is meant to be proving. */}
       <Toaster />
       <Host
-        canClose={options?.canClose ?? true}
         answered={options?.answered ?? false}
         showing={options?.showing ?? true}
-        onSend={async (text, andClose, leaving) => {
-          sent.push({ text, andClose, leaving })
+        onSend={async (text, leaving) => {
+          sent.push({ text, leaving })
           return "Sent."
         }}
       />
@@ -72,11 +78,10 @@ function draw(options?: { canClose?: boolean; answered?: boolean; showing?: bool
       <>
         <Toaster />
         <Host
-          canClose={options?.canClose ?? true}
           answered={options?.answered ?? false}
           showing={false}
-          onSend={async (text, andClose, leaving) => {
-            sent.push({ text, andClose, leaving })
+          onSend={async (text, leaving) => {
+            sent.push({ text, leaving })
             return "Sent."
           }}
         />
@@ -111,7 +116,7 @@ const wait = async (seconds: number) => {
   })
 }
 
-describe("the ticket composer's two sends", () => {
+describe("the ticket composer's one send", () => {
   beforeEach(() => {
     vi.useFakeTimers()
     sessionStorage.clear()
@@ -127,7 +132,7 @@ describe("the ticket composer's two sends", () => {
     vi.useRealTimers()
   })
 
-  it("draws a wordless send that a screen reader can still name, and a worded close beside it", () => {
+  it("draws a wordless send that a screen reader can still name, and no second control beside it", () => {
     draw()
     // The name is the button's own, not the glyph's: the paper plane is
     // aria-hidden, so this can only be passing because `aria-label` is there.
@@ -136,8 +141,12 @@ describe("the ticket composer's two sends", () => {
     expect(send.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true")
     expect(send.querySelector("svg")?.getAttribute("focusable")).toBe("false")
 
-    // Its neighbour needs no label: its visible text IS its name.
-    expect(screen.getByRole("button", { name: "Send and close" })).toBeTruthy()
+    // B0294/T3657 — THE REGRESSION ITSELF. "Send and close" used to sit right
+    // here, one stray click from Send. It has no button, at any status, any
+    // more; closing moved to the title (`ticket-close-moved-to-top.test.tsx`).
+    expect(screen.queryByRole("button", { name: "Send and close" })).toBeNull()
+    // …and the row holds exactly one button — typing, and Send.
+    expect(screen.getAllByRole("button")).toHaveLength(1)
   })
 
   it("hands the focus ring to the pill, so the ring is the shape a reader sees", () => {
@@ -167,21 +176,19 @@ describe("the ticket composer's two sends", () => {
     ).toBe(true)
   })
 
-  it("draws no close control where there is nothing left to close", () => {
-    draw({ canClose: false, answered: true })
-    expect(screen.queryByRole("button", { name: "Send and close" })).toBeNull()
-    // …and says so in the placeholder rather than leaving a dead control.
+  it("says the ticket is answered in the placeholder, and still takes a reply", () => {
+    draw({ answered: true })
     expect(
       (screen.getByLabelText("Message") as HTMLInputElement).placeholder
     ).toBe("This ticket is answered. Reply anyway…")
+    // The send is still there — a reply on a closed ticket appends and touches
+    // no status, which is the whole point of the sentence above.
+    expect(screen.getByRole("button", { name: "Send reply" })).toBeTruthy()
   })
 
-  it("keeps both sends dead until something is typed", () => {
+  it("keeps send dead until something is typed", () => {
     draw()
     expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(true)
-    expect(
-      (screen.getByRole("button", { name: "Send and close" }) as HTMLButtonElement).disabled
-    ).toBe(true)
     type("Happy to — which address?")
     expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false)
   })
@@ -205,7 +212,6 @@ describe("the ticket composer's two sends", () => {
     expect(sent).toEqual([
       {
         text: "Happy to — which address should the September retainer go to?",
-        andClose: false,
         leaving: false,
       },
     ])
@@ -225,21 +231,6 @@ describe("the ticket composer's two sends", () => {
     // And it never goes, however long anybody waits.
     await wait(60)
     expect(sent).toEqual([])
-  })
-
-  it("'Send and close' is the same rule with one flag changed", async () => {
-    const { sent } = draw()
-    type("The 4th, same as every month.")
-    press("Send and close")
-
-    // Same hold, same silence.
-    await wait(4)
-    expect(sent).toEqual([])
-
-    await wait(1)
-    expect(sent).toEqual([
-      { text: "The 4th, same as every month.", andClose: true, leaving: false },
-    ])
   })
 
   it("keeps the draft per ticket as she types, so a crash costs no words", () => {
@@ -273,7 +264,7 @@ describe("the ticket composer's two sends", () => {
     // …and the rest of the wait still runs, from where it was.
     await wait(3)
     expect(sent).toEqual([
-      { text: "hold on, let me check the stories", andClose: false, leaving: false },
+      { text: "hold on, let me check the stories", leaving: false },
     ])
   })
 
@@ -289,7 +280,7 @@ describe("the ticket composer's two sends", () => {
       await vi.advanceTimersByTimeAsync(0)
     })
     expect(sent, "leaving is not a mistake — the wait is cut short, not cancelled").toEqual([
-      { text: "on my way out", andClose: false, leaving: false },
+      { text: "on my way out", leaving: false },
     ])
   })
 })

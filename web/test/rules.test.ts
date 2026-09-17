@@ -321,9 +321,15 @@ function findBars(): string[] {
  *
  * Four signals, each grounded in something this repo already holds shut:
  * `<ToolbarRow>`, which census (ii) above already requires to carry a `search`
- * prop; `<PagedFind>`, which draws an unconditional `<SearchInput>` with no
- * per-caller way to switch it off (`web/components/records/paged-find.tsx`);
- * `<SearchInput>`, the kit's own search control; and `useDoorSearch`
+ * prop; `<PagedFind>` (`web/components/records/paged-find.tsx`), which drew an
+ * unconditional `<SearchInput>` with no per-caller way to switch it off until
+ * B0296/T3659 (16 Sep 2026) gave it one `search` prop for the knowledge
+ * archive — this census still matches on the TAG rather than the prop's
+ * value, the same under-reach the header above argues for, so a `<PagedFind
+ * search={false}>` still counts as a search signal here; the reason it
+ * genuinely has none is the `TOOLBAR_EXEMPT["knowledge.list"]` entry census
+ * (i) reads, not this one; `<SearchInput>`, the kit's own search control; and
+ * `useDoorSearch`
  * (`web-portal/lib/search.ts`), the portal's way of asking the DOOR, which
  * draws no `<ToolbarRow>` on purpose (§ii-b) and which R63 already derives its
  * portal toolbar owners from. The fourth matches no wall today and is here so

@@ -18,7 +18,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
-import { TicketChips } from "@shared/web/ticket-chips"
+import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
@@ -376,14 +376,14 @@ export function HelpDetailScreen({
     invalidate(recordActivityKey("help", helpId))
   }
 
-  /** THE TWO SENDS, AND THEY ARE ONE FUNCTION ON PURPOSE.
-   *
-   * The client's ruling gives the composer two controls — a wordless send and
-   * "Send and close" — and the artifact is explicit that they behave identically
-   * for the five seconds before either of them happens: same delay, same toast,
-   * same pending bubble, same Undo, same restored text. The ONLY differences are
-   * the sentence the toast settles on and which door is called at zero. So they
-   * are one function with one flag, rather than two that will drift.
+  /** THE ORDINARY SEND. B0294/T3657, 16 Sep 2026, retired this function's other
+   * half: it used to carry a second flag for "Send and close", called from a
+   * button that sat right beside plain Send on this same composer row — "too
+   * easy to hit by accident". That flag and the button that set it are both
+   * gone; closing a ticket now happens only through the title's "Answer and
+   * close", which opens `ResolveDialog` and calls `resolve()` below — a
+   * separate, unhurried seam with its own words, not this five-second hold.
+   * This function is left with exactly what its name says.
    *
    * It is called by `ReplyComposer` only when the hold reaches zero (or is cut
    * short by her leaving), never on the press — nothing here happens during the
@@ -391,14 +391,12 @@ export function HelpDetailScreen({
    * what lets the send outlive a tab that is closing.
    *
    * It returns the words the settling toast should say, because only this
-   * function knows what the door answered — a "Send and close" on a ticket
-   * somebody else already answered comes back `alreadyResolved` and emails
-   * nobody (R17 is the send guard), and that is a different sentence.
+   * function knows what the door answered.
    *
    * IT THROWS ON A REFUSAL rather than swallowing it: the composer catches it,
    * says so, and puts her words back in the field. A reply lost to a 500 is the
    * one outcome worse than a slow one. */
-  async function sendReply(body: string, andClose: boolean, leaving: boolean): Promise<string> {
+  async function sendReply(body: string, leaving: boolean): Promise<string> {
     // The mention list is read OUT OF the sent text by name-match against the
     // members we may tag, exactly as the kit composer's own call site did.
     //
@@ -429,20 +427,6 @@ export function HelpDetailScreen({
     // thread between the wait ending and the door answering.
     primeCache(`help-thread:${helpId}`, [...prev, optimistic])
     try {
-      if (andClose) {
-        // THE HOLE THIS FILLS. "Answer and close" on the title is offered only at
-        // status `ready`, and `readyFlipForTicket` returns early on a ticket with
-        // no stories — so a Question answered in one line had NO way to be closed
-        // except Archive, which is not closing it, it is hiding it. This works at
-        // every status, and it satisfies `/help/resolve` the honest way: the door
-        // refuses without a resolution, and the reply she just typed IS the
-        // resolution, sent as the `resolution` field. The door is unchanged.
-        const r = await content.resolveHelp(helpId, body, leaving)
-        invalidate(`help-thread:${helpId}`)
-        invalidate(`help:${teamId}`)
-        invalidate(recordActivityKey("help", helpId))
-        return r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told.")
-      }
       const { replies } = await content.replyHelp(
         helpId,
         body,
@@ -733,6 +717,16 @@ export function HelpDetailScreen({
     ],
   }
 
+  /* B0294/T3657 — "the close button needs to move to the top." CLOSING IS
+   * `help:update`, the right `/help/resolve` itself gates on, and there is
+   * nothing to close on a ticket already answered — so the control is not
+   * drawn rather than drawn and refused. ONE EXPRESSION, read by the top
+   * button below AND (until 16 Sep 2026) by the bottom composer's own
+   * "Send and close" — now removed, so this is its only reader, but it keeps
+   * the name because it is still the seam: whatever "closeable" means on this
+   * screen is decided once, here. */
+  const canClose = canEdit && ticket.status !== "resolved"
+
   /* ONE PRIMARY, ONE SECONDARY, AND A MENU (UI-RULEBOOK B1, CHECKLIST 11.2).
    *
    * This title carried six controls and was the worst case in the app. The
@@ -814,15 +808,22 @@ export function HelpDetailScreen({
           `HELP_STATUSES`). The rule the old note stated still governs the two
           buttons below it: a control that can only be refused should not be a
           control. */}
-      {/* ANSWER IT AND TELL THEM. Offered from READY onward, the stage that means
-          every piece of work is done and only the telling is left, and never on a
-          ticket already answered. The panel is where the words are written,
-          because the door refuses without them (5.6). */}
+      {/* ANSWER IT AND TELL THEM. B0294/T3657, 16 Sep 2026: "Send and close
+          button too easy to hit by accident … the close button needs to move
+          to the top." It used to be offered from READY onward only — the
+          bottom composer's own "Send and close" covered every earlier status
+          instead, sitting right beside plain Send where a stray click could
+          reach it. That second control is gone (see `ReplyComposer` below);
+          this is now the ONLY way to close a ticket, so it is offered at
+          every status `canClose` allows — the same expression the bottom
+          button used to gate on, moved up rather than duplicated. The panel
+          is where the words are written, because the door refuses without
+          them (5.6). */}
       {/* R84, 16 Sep 2026 — "only mango buttons on the title level." This
           button sits in the tab panel body, not in RecordScreen's own
           `actions` row (the title), so it is black now — B1's own primary
           slot for a ticket detail is superseded on colour, not on rank. */}
-      {canEdit && ticket.status === "ready" && (
+      {canClose && (
         <Button variant="inverse" disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
           <PaperPlaneTilt className="size-3.5" />
           {t("Answer and close")}
@@ -894,11 +895,18 @@ export function HelpDetailScreen({
           AppLink={InAppLink}
         />
       }
-      // The description is rich text now, and a TITLE is one line: the words,
-      // without the markup they were typed with. The body renders formatted in
-      // the conversation below, which is where a person reads it. Translated
-      // FIRST, then flattened — a title has to say what the reader just chose.
-      title={richTextPlain(translation.of(ticket.description))}
+      // B0302/T3661 — THE SAME TITLE SEAM THE COLLECTION ROW USES
+      // (`ticketTitle`, shared/web/ticket-chips.tsx, fixed there 6 Sep 2026):
+      // titleEn, then titleDe, and the description only as the last resort —
+      // a ticket raised through this app almost always HAS a title, and this
+      // head was showing the body underneath it instead. The description is
+      // rich text and a TITLE is one line, so that fallback branch alone still
+      // flattens the markup; translated FIRST, then flattened, exactly as
+      // before — a title has to say what the reader just chose, on the one
+      // branch that is theirs to read in their own language. `titleEn`/
+      // `titleDe` are the ticket's own fixed words and are never run through
+      // the reader's toggle.
+      title={ticketTitle(ticket, translation.of)}
       // CLIENT RULING, 2026-08-31, VERBATIM: "what is this 3rd component in
       // the title under the chips? kill everywhere. chips is the last
       // component of headers!" Overrides the D5 trim above, which had kept
@@ -1109,78 +1117,82 @@ export function HelpDetailScreen({
                   saying the same word again down here is exactly the kind of
                   duplicate pill she asked removed. `sourceScreen` stays — it is
                   not a pill, and it says something the chip line does not. */}
-              <TicketThread
-                banner={
-                  ticket.sourceScreen ? (
-                    <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
-                  ) : undefined
-                }
-                messages={[
-                  {
-                    id: "description",
-                    side: "theirs",
-                    // The CONTACT this was raised for wins, whole — they are the
-                    // person the question belongs to. Failing that it is whoever
-                    // typed it, named by the R54 rule for their own population.
-                    author:
-                      ticket.raisedByContactName ||
-                      (ticket.raiserIsClient
-                        ? ticket.raiserName
-                        : staffNameFromSnapshot(ticket.raiserName)) ||
-                      undefined,
-                    body: <RichText html={translation.of(ticket.description)} />,
-                  },
-                  /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
-                     TOLD. `side: "mine"` is the bubble the kit paints
-                     `bg-surface-inverse text-ink-on-inverse` — correct, and
-                     immediately overridden by the `ArticleBody` inside it,
-                     which paints its own `--ink-secondary` and its own
-                     `--foreground` on links and bold. The description above is
-                     the same component on `bg-card` and needs nothing, which is
-                     exactly why this went unnoticed: the two bodies are one
-                     line apart and only one of them changed ground. The class
-                     is the app holding the line until the kit rules on an
-                     inverse register — rich-text-view.tsx carries the argument
-                     and the measurement, and names what to delete when it
-                     does. */
-                  ...replies.map((r) => ({
-                    id: r.id,
-                    side: "mine" as const,
-                    author: r.author,
-                    authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
-                    time: r.time,
-                    body:
-                      typeof r.body === "string" ? (
-                        <RichText html={r.body} className={ON_INVERSE_UNTIL_THE_KIT_RULES} />
-                      ) : (
-                        r.body
-                      ),
-                  })),
-                ]}
-                /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.
-                   The client ruled two sends on this composer — a wordless
-                   paper plane and "Send and close" — and `TicketThread` holds
-                   exactly one `<button type="submit">` with one `sendLabel`,
-                   with no slot beside it. The kit is a pinned dependency (a
-                   hand-edit under `shared/ui/` turns the build red), so the
-                   second control is drawn app-side, out of the kit's own Button
-                   and the kit's own glyph, in the same pill. The thread itself —
-                   the bubbles, the sides, the receipts — is still entirely the
-                   kit's. Logged for the kit's owner: `TicketThread` wants a
-                   secondary send action and a wordless primary. */
-                composer={false}
-              />
-              <ReplyComposer
-                send={reply}
-                /* CLOSING IS `help:update` — the right `/help/resolve` itself
-                   gates on — and there is nothing to close on a ticket that is
-                   already answered, so the control is not drawn rather than
-                   drawn and refused. Every OTHER status draws it, which is the
-                   whole point: the title's "Answer and close" appears only at
-                   `ready`, and a Question with no stories never reaches it. */
-                canClose={canEdit && ticket.status !== "resolved"}
-                answered={ticket.status === "resolved"}
-              />
+              {/* T3820 — "the comment (text entry) bar is very close to the
+                  latest comment, we should give some gap there." The thread
+                  (composer off) and the app's own composer were bare siblings
+                  here, so whatever space sat between them was plain block
+                  flow with nothing asking for any — zero, in practice.
+                  `TicketThread` pays its OWN trailing gap only BETWEEN its own
+                  children (`gap-4` on its outer flex column), never after the
+                  last one, so with `composer={false}` it leaves no space of
+                  its own past the last bubble — nothing here is double-paid.
+                  One column, the same panel spacing token the stages block
+                  above already uses (`gap-[var(--space-5)]`), no pixel
+                  literal. */}
+              <div className="flex flex-col gap-[var(--space-5)]">
+                <TicketThread
+                  banner={
+                    ticket.sourceScreen ? (
+                      <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
+                    ) : undefined
+                  }
+                  messages={[
+                    {
+                      id: "description",
+                      side: "theirs",
+                      // The CONTACT this was raised for wins, whole — they are the
+                      // person the question belongs to. Failing that it is whoever
+                      // typed it, named by the R54 rule for their own population.
+                      author:
+                        ticket.raisedByContactName ||
+                        (ticket.raiserIsClient
+                          ? ticket.raiserName
+                          : staffNameFromSnapshot(ticket.raiserName)) ||
+                        undefined,
+                      body: <RichText html={translation.of(ticket.description)} />,
+                    },
+                    /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
+                       TOLD. `side: "mine"` is the bubble the kit paints
+                       `bg-surface-inverse text-ink-on-inverse` — correct, and
+                       immediately overridden by the `ArticleBody` inside it,
+                       which paints its own `--ink-secondary` and its own
+                       `--foreground` on links and bold. The description above is
+                       the same component on `bg-card` and needs nothing, which is
+                       exactly why this went unnoticed: the two bodies are one
+                       line apart and only one of them changed ground. The class
+                       is the app holding the line until the kit rules on an
+                       inverse register — rich-text-view.tsx carries the argument
+                       and the measurement, and names what to delete when it
+                       does. */
+                    ...replies.map((r) => ({
+                      id: r.id,
+                      side: "mine" as const,
+                      author: r.author,
+                      authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
+                      time: r.time,
+                      body:
+                        typeof r.body === "string" ? (
+                          <RichText html={r.body} className={ON_INVERSE_UNTIL_THE_KIT_RULES} />
+                        ) : (
+                          r.body
+                        ),
+                    })),
+                  ]}
+                  /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.
+                     The client ruled two sends on this composer — a wordless
+                     paper plane, alone now (B0294/T3657 removed the bottom
+                     "Send and close" — see `ReplyComposer`) — and
+                     `TicketThread` holds exactly one `<button type="submit">`
+                     with one `sendLabel`, with no slot beside it. The kit is a
+                     pinned dependency (a hand-edit under `shared/ui/` turns
+                     the build red), so the app draws its own composer below,
+                     out of the kit's own Button and the kit's own glyph, in
+                     the same pill. The thread itself — the bubbles, the
+                     sides, the receipts — is still entirely the kit's. */
+                  composer={false}
+                />
+                <ReplyComposer send={reply} answered={ticket.status === "resolved"} />
+              </div>
             </>
           )
         }}

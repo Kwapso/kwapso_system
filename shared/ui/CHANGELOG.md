@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+### Fixed — `AgentChat`'s `Cite` mark no longer collides with the line above it at narrow widths
+
+B0297 / T3660, client review meeting, 16 Sep 2026, verbatim: *"Restore
+sentence-level citations in KB responses, fix numbering/text overlap on
+smaller screens."* And: *"NotebookLM-style per-sentence numbered citations
+were removed earlier because the numbers overlapped with text on some
+screen sizes. Decision: fix the overlap rather than dropping the feature."*
+
+THE MECHANISM WAS NEVER GONE. `Cite` has rendered a numbered `<sup>` since
+Ruling D7-2 (2026-08-24) — nothing about that ruling, the derived numbering,
+or the pill underneath was touched. The fault was the raise: `align-super`
+won the `vertical-align` back from the kit's own `sub`/`sup` reset
+(`vertical-align: baseline; line-height: 0`), and the `text-micro` utility
+re-asserted a real line-height (`1.3`) on top of that reset's `0` — so a
+mark was raised by both the browser's own `super` shift AND the reset's
+`position: relative; top` offset at once, inside a line box no longer
+pinned flat. On a sentence wrapped tightly at 375px that plants the number
+on the line above it.
+
+FIXED: `align-super` is gone, so `vertical-align: baseline` stays in force
+(the reset's own value — nothing invented) and the mark is offset by
+position alone. `top-[-0.35em]` raises it the same visual amount
+`align-super` did; `leading-[0]` puts the line-height back to the reset's
+zero, the same trailing-utility-wins order `turnVariants` already relies on
+(`text-caption leading-[var(--leading-normal)]`). `--text-micro` and
+`--font-weight-medium` are unchanged — no token invented — and nothing
+about the hit target or hover changes: `Cite`'s `<sup>` was never
+interactive itself, only the source pill below it is a link.
+
+New `verify/agent-chat-cite/`: `AgentChat` mounted at 375px (the driver
+resizes the real viewport, `verify/crumb-mobile`'s own reason — a
+fixed-width host cannot answer a question about the document's own
+cascade), one turn with a single closing citation, one with three
+CONSECUTIVE citations mid-sentence (the reported stress case), and the
+same three-citation turn again in a narrower 20rem host. `window
+.__citeOverlap()` builds each line's rect from real TEXT NODES ONLY (never
+the `<sup>` itself, so the mark's own inflation can never hide inside the
+thing it is measured against), then checks every citation's painted rect
+against the text line immediately above it. RED-PROOFED: swapped the
+pre-fix `align-super` version back in against this same harness — every
+cell measured a positive overlap (~1.48px, the number's box physically
+painting into the ascenders of the line above, confirmed by screenshot);
+restored the fix, re-ran, negative (a real gap) in all three cells.
+
+Files: `components/agent-chat/agent-chat.tsx` (`Cite`'s `<sup>`
+`className` only), `verify/agent-chat-cite/` (new — `page.tsx`, `main.tsx`,
+`index.html`, `entry.css`, `vite.config.ts`, port 5312).
+
 ### Removed — `ScreenShell`'s assistant resize feature, entirely: the aside is back to one fixed width
 
 Client, 16 Sep 2026, evening, on the shipped build: *"Let's forget about the

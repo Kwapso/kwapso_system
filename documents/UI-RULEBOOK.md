@@ -1300,6 +1300,22 @@ door.
 
 ---
 
+### D18: the thread and the reply composer share one column with spacing between them
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"the comment (text entry) bar
+is very close to the latest comment, we should give some gap there."* The activity thread
+(the stacked replies in `ActivityRail`) and the reply composer box below it share one flex
+COLUMN with a guaranteed gap, `gap-[var(--space-5)]`, so that the newest message is never
+crowding the input bar.
+
+**Where this reaches today.** `shared/web/ticket-thread-composer.tsx` mounts the thread
+and composer in one flex column with the spacing constant; `web/test/ticket-thread-composer-gap.test.tsx`
+asserts the gap renders and measures it at the expected scale.
+
+**Law.** None registered — a spacing decision on an existing component mount.
+
+---
+
 ## 4. Collections
 
 ### K1: a collection row is a title plus one meta line, and nothing else
@@ -2835,6 +2851,45 @@ held to the library-tabs rule (R3) like any other.
 
 ---
 
+### K35: a record's title is always the record's title field, never its description
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Tickets and stories inside
+the details screen and all other collections are actually displaying the description instead
+of the title."* The ticket detail head and every record's face in a collection row displays
+the TITLE field, not the description. When no title exists, the description may fall back
+as a display convenience, but the seam always prefers title-first.
+
+**Where this reaches today.** Every detail screen reaches through the one `ticketTitle()`
+seam (`shared/web/ticket-chips.tsx`), which checks the title field first and falls back
+to description if the title is empty — a translation-aware read. The collection row chip
+reads the same field. `web/test/ticket-title-seam.test.tsx` pins the behaviour, running
+every path that reads a description as fallback in `help-detail.tsx` and verifying it only
+activates when title is absent.
+
+**Law.** None registered — a read-path selection on an existing component seam.
+
+---
+
+### K36: the knowledge collection renders no search box and centralizes search through the assistant
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Remove KB search bar, convert
+KB view to archive/source-manager, centralize search through assistant."* The knowledge
+collection (`knowledge-list.tsx`) draws no search box at all; searching the knowledge base
+happens through the assistant thread instead. Facets stay, the List and Shape view controls
+stay, and the assistant box reads *"Ask a question"* to guide the reader toward the search
+surface.
+
+**Where this reaches today.** `PagedFind` mounting the knowledge toolbar passes
+`search={false}` to silence the search input; the knowledge listing is named in `TOOLBAR_EXEMPT`
+with the ruling as its reason, and [R48](../RULES.md) (`toolbar-shows-search`) covers the
+coverage. The facet and view rows stay on the toolbar because they filter/shape the known
+material that the assistant might cite. `web/test/knowledge-search-removed.test.tsx` asserts
+the search box is absent.
+
+**Law.** [R48](../RULES.md) (`toolbar-shows-search`), as the exemption.
+
+---
+
 ## 5. Buttons and actions
 
 ### B1: two visible actions maximum on any title
@@ -3501,6 +3556,34 @@ the shape to watch for.
 
 ---
 
+### B19: the Answer/close action moves to the top; the Send button stands alone with an undo hold
+
+**The rule.** Two client rulings, 16 Sep 2026, verbatim: *"Send and close button too easy
+to hit by accident"* and *"the close button needs to move to the top."* The "Answer and
+close" quick action that resolves a ticket moves to the title bar (`RecordChrome`'s own
+actions slot), where it is offered at every open status (new, triaged, scheduled, in
+progress, ready), withheld once the ticket is resolved, and styled as black (`variant="inverse"`)
+per [R84](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black), respecting
+[B1](#b1-two-visible-actions-maximum-on-any-title)'s ceiling of two title actions.
+
+In the composer at the bottom, a single **Send** button (not "Send and close") submits the
+reply and keeps the ticket open; a 5-second undo is available after send. This split
+moves the resolved/stays-open decision to the title bar (where it belongs with the record's
+own state) and the composition action to where the person is typing.
+
+**Where this reaches today.** `shared/web/ticket-thread-composer.tsx` mounts one Send
+button in the footer and zero close actions; `RecordChrome`'s title actions mount the
+"Answer and close" when the ticket is open, removing it once resolved. The move itself
+is held by R84's title-only rule. `web/test/ticket-close-moved-to-top.test.tsx` asserts
+the Answer/close button appears in the title band and vanishes on resolve.
+`web/test/one-send-and-a-hold.test.tsx` asserts the composer holds one Send button and
+the undo window opens.
+
+**Law.** [R84](../RULES.md) (`mango-in-title-only`), as the title-action ceiling; the
+action placement is a structural change to the detail screen layout.
+
+---
+
 ## 6. Forms and dialogs
 
 ### F1: every submit button says "Submit"
@@ -3977,6 +4060,26 @@ were right for a reason no check stood under. Reorder the two stylesheets and ev
 silently becomes 12px with the suite green.
 
 **Law.** [R31](../RULES.md) (`two-radii`).
+
+---
+
+### T9: citation numbers are offset to prevent overlap with text, and citations stay on
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"NotebookLM-style per-sentence
+numbered citations were removed earlier because the numbers overlapped with text on some
+screen sizes. Decision: fix the overlap rather than dropping the feature."* Citation numbers
+inline with prose are offset vertically using `relative top-[-0.35em] leading-[0]` instead of
+`align-super`, which shifts the number upward without expanding line height, so it clears the
+text it annotates. The solution is verified at 375px (narrow mobile, the tightest case) with
+three consecutive citations to confirm no overlap across sizes.
+
+**Where this reaches today.** `shared/ui/` kit version v1.2.101 and later carry the offset
+CSS on the citation number mark. Client-facing screens that render citations read the mark
+through the one seam and render it in-prose. the kit’s own verify page (verify/agent-chat-cite in kwapso-design)
+confirms the numbers render offset and do not overlap at 375px width with a three-citation
+paragraph.
+
+**Law.** None registered — a CSS offset on an existing citation mark.
 
 ---
 
@@ -5374,17 +5477,17 @@ Accounts screen is retired. What replaces it is pending her pick from a follow-u
 
 ## Rule index
 
-**173 rules.**
+**178 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L20 (20) |
-| 3. Detail screens | D1 to D17 (17) |
-| 4. Collections | K1 to K34 (34) |
-| 5. Buttons and actions | B1 to B18 (18) |
+| 3. Detail screens | D1 to D18 (18) |
+| 4. Collections | K1 to K36 (36) |
+| 5. Buttons and actions | B1 to B19 (19) |
 | 6. Forms and dialogs | F1 to F15 (15) |
-| 7. Typography | T1 to T8 (8) |
+| 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
 | 10. Copy | W1 to W14 (14) |
