@@ -1200,6 +1200,17 @@ export function HelpFormDialog({
               )
             }
             searchKey={pickerKey("companies", teamId)}
+            // WITHOUT THIS, THE CLOSED CONTROL SHOWS THE ID (RecordPicker's own
+            // documented gap): a draft restored on a cold cache — or simply this
+            // picker's first paint, before its own search has ever run — carries
+            // a real `accountId` in `value` with no matching row in `options`
+            // yet. `detailQ` is already fetching exactly this account, for the
+            // settled `fixedAccount` text above; reusing it here (R35 — a record
+            // shows its own face, never its id) needs no second door call, and
+            // resolves to "" rather than `undefined` so `??`'s last resort
+            // (`value`, the bare id) is never reached — blank until the name
+            // arrives, never the ULID.
+            selectedLabel={detailQ.data?.account.name ?? ""}
             emptyOption={{ value: NONE, label: t("Ours, no account") }}
             placeholder={t("Ours, no account")}
             searchPlaceholder={t("Search companies…")}
