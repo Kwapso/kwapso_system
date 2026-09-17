@@ -890,6 +890,11 @@ red-then-green in `verify/breadcrumb-folder/` (`tabset-shift-probe`): a real syn
 shifts the active tab without holding it, and the `<li>`'s own z (not the link's) is read
 against a trailing pinned tab's — `"1" > "0"` mid-shift, where it used to tie at `"auto"`.
 
+**AMENDED 17 Sep 2026 — status: reported a third time; pending measurement on live page.**
+The client reported the same issue on 17 Sep 2026. The fix is in the kit's verify page
+(`verify/tabstrip-parity`, kit v1.2.102) and is not reproduced there. The issue is open
+until measured against the live app on staging.
+
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Recreate the drag behavior on
@@ -908,9 +913,25 @@ every conversation tab, on both ends of any drag.
 test); `web/test/agent-tab-strip.test.tsx` pins History/"+" as non-draggable, always-last
 tabs on the assistant strip specifically.
 
----
+### L21: the page body never scrolls sideways
 
-## 3. Detail screens
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"there is a certain horizontal
+scroll. Kill that. There should be no horizontal scroll."* Every row whose natural width
+would overflow its container sits inside its own `overflow-x: auto` viewport, or is pinned
+to a registry (`SCROLL_FLOOR_EXEMPT`, `shared/rules/registry.ts`) with a written reason.
+The page body's own root `width` is never constrained to grow past the viewport, and no
+row carries a `min-w-max` or `min-w-screen` that makes it wider than the container it sits
+in. Every table, code block, and overflow-prone row reads its own width constraint from one
+source: either it fits, or it scrolls itself.
+
+**Where this reaches today.** Every literal `min-w-max` in `web/`, `web-portal/` and
+`shared/web/` is audited: pinned entries carry their reason, and every other one is wrapped
+in its own `overflow-x: auto` container. `web/test/rules.test.ts` asserts `scroll-floors`
+—  the count of `min-w-max` inside an exempt path — stays equal to the known count; any new
+`min-w-max` outside the exemption turns the build red.
+
+**Mark:** Root cause on staging is still unmeasured (17 Sep 2026); the check guards the
+known shape and will surface the culprit when it is run against the live app.
 
 ### D1: a detail screen has exactly four regions, in this order
 
@@ -2750,6 +2771,12 @@ automations status cell below moved to, and the same D17 tone table (`shipped` =
 `archived` = grey). Still unsortable, still gated on `portal_users:read`, still one column
 of the six.
 
+**AMENDED, 17 Sep 2026 — the dot carries its own gap to the label.** The client's ruling,
+verbatim: *"Validated the colors, but it's missing the space between the dot and the word.
+Fix that."* Kit v1.2.102: the `Badge` component's dot variant carries its own `gap-1`
+between the dot and its label, independent of size. `web/test/badge-dot-gap.test.tsx`
+asserts every size variant (`sm` / `md` / `lg`) renders the gap consistently.
+
 ### K32: a table row holds at most six columns — the seventh goes on a second line, never squeezed onto the end
 
 **The rule.** The client's ruling, 16 Sep 2026, over the Waves List view: *"the right side
@@ -2870,23 +2897,29 @@ activates when title is absent.
 
 ---
 
-### K36: the knowledge collection renders no search box and centralizes search through the assistant
+### K36: the knowledge collection centralizes search through the assistant; a head bar carries Ask, Sync, and gear
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Remove KB search bar, convert
-KB view to archive/source-manager, centralize search through assistant."* The knowledge
-collection (`knowledge-list.tsx`) draws no search box at all; searching the knowledge base
-happens through the assistant thread instead. Facets stay, the List and Shape view controls
-stay, and the assistant box reads *"Ask a question"* to guide the reader toward the search
-surface.
+KB view to archive/source-manager, centralize search through assistant. The gear should be
+on the very far right. this 'Bring it in' should be changed to 'Sync'. Add a Mango button
+that says something like 'Ask' or 'Assistant', and this should open a new chat on the
+assistant. it's missing the toolbar. Make it like the dashboard, so that it has its own
+container background."* The knowledge collection draws NO search box; searching happens
+through the assistant thread instead. Facets and the List/Shape view controls sit in a
+toolbar inside a `CollectionCard` with its own background, the same layout and container as
+the dashboard. Head actions above the toolbar: **Ask** (mango, `variant="default"`, opens a
+new assistant conversation scoped to the knowledge base) · **Sync** · **Settings** (gear,
+last). No search on the toolbar (`search={false}`).
 
-**Where this reaches today.** `PagedFind` mounting the knowledge toolbar passes
-`search={false}` to silence the search input; the knowledge listing is named in `TOOLBAR_EXEMPT`
-with the ruling as its reason, and [R48](../RULES.md) (`toolbar-shows-search`) covers the
-coverage. The facet and view rows stay on the toolbar because they filter/shape the known
-material that the assistant might cite. `web/test/knowledge-search-removed.test.tsx` asserts
-the search box is absent.
+**Where this reaches today.** The knowledge listing is named in `TOOLBAR_EXEMPT` with the
+ruling as its reason, and [R48](../RULES.md) (`toolbar-shows-search`) covers the exemption.
+`PagedFind` passes `search={false}` to silence the search input. The facet and view rows
+stay on the toolbar to filter/shape the material the assistant cites. `web/test/knowledge-head.test.tsx`
+asserts the Ask, Sync, and gear actions appear above the toolbar, the toolbar renders without
+search, and the list and view controls stay inside one `CollectionCard`.
 
-**Law.** [R48](../RULES.md) (`toolbar-shows-search`), as the exemption.
+**Law.** [R48](../RULES.md) (`toolbar-shows-search`), as the exemption; [R84](../RULES.md)
+(`mango-in-title-only`), as the Ask button's styling.
 
 ---
 
@@ -3261,6 +3294,11 @@ Portal column moves to the identical dot shape the same session; see K31's own a
 
 **Badge status fill (16 Sep 2026):** *"go for the kit fix"* — client. The `status` variant never drops its neutral fill; the dark-mode "building → mango" clause is gone (kit v1.2.96).
 
+**Badge dot gap (17 Sep 2026):** Kit v1.2.102: the `Badge` component's dot variant carries
+its own `gap-1` between the dot and its label, independent of size. Automations and Contacts
+both use the dot badge now; both benefit from the unified gap. `web/test/badge-dot-gap.test.tsx`
+asserts every size variant (`sm` / `md` / `lg`) renders the gap consistently.
+
 **Re-explained, 16 Sep 2026, pending her validation.** Both the Automations tab and the
 Choices tab above were walked through with her again, over a side-by-side artifact
 ("Automations and Choices Explained"). Nothing in this section changed as a result — the
@@ -3556,28 +3594,22 @@ the shape to watch for.
 
 ---
 
-### B19: the Answer/close action moves to the top; the Send button stands alone with an undo hold
+### B19: the close button moves to the top, labeled and available when the latest reply is ours
 
-**The rule.** Two client rulings, 16 Sep 2026, verbatim: *"Send and close button too easy
-to hit by accident"* and *"the close button needs to move to the top."* The "Answer and
-close" quick action that resolves a ticket moves to the title bar (`RecordChrome`'s own
-actions slot), where it is offered at every open status (new, triaged, scheduled, in
-progress, ready), withheld once the ticket is resolved, and styled as black (`variant="inverse"`)
-per [R84](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black), respecting
-[B1](#b1-two-visible-actions-maximum-on-any-title)'s ceiling of two title actions.
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Okay, but reduce to close and
+make it only available, but still visible at all times, only when the latest answer is from
+our side. Make it mango. And put a more appropriate icon for closing."* A **Close** button
+sits in the title bar (`RecordChrome`'s own actions slot), labeled "Close", styled mango
+(`variant="default"`) per [R84](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black),
+and drawn at every open status (new, triaged, scheduled, in progress, ready). It is enabled
+ONLY when the newest reply's author is not the client — checked through `latestIsOurs`
+(`help-detail.tsx`) — and renders a `CheckCircle` icon per [UI-CONVENTIONS](UI-CONVENTIONS.md).
 
-In the composer at the bottom, a single **Send** button (not "Send and close") submits the
-reply and keeps the ticket open; a 5-second undo is available after send. This split
-moves the resolved/stays-open decision to the title bar (where it belongs with the record's
-own state) and the composition action to where the person is typing.
-
-**Where this reaches today.** `web/components/tickets/help-detail.tsx` mounts one Send
-button in the footer and zero close actions; `RecordChrome`'s title actions mount the
-"Answer and close" when the ticket is open, removing it once resolved. The move itself
-is held by R84's title-only rule. `web/test/ticket-close-moved-to-top.test.tsx` asserts
-the Answer/close button appears in the title band and vanishes on resolve.
-`web/test/one-send-and-a-hold.test.tsx` asserts the composer holds one Send button and
-the undo window opens.
+**Where this reaches today.** `web/components/tickets/help-detail.tsx` reads the latest
+reply's author and passes `latestIsOurs` to `RecordChrome`; the title actions mount the
+Close button when the ticket is open, disabling it when a client reply is the most recent.
+`web/test/ticket-close-moved-to-top.test.tsx` asserts the Close button appears in the title
+band, stays visible at all times, and toggles enabled/disabled based on `latestIsOurs`.
 
 **Law.** [R84](../RULES.md) (`mango-in-title-only`), as the title-action ceiling; the
 action placement is a structural change to the detail screen layout.
@@ -5477,12 +5509,12 @@ Accounts screen is retired. What replaces it is pending her pick from a follow-u
 
 ## Rule index
 
-**178 rules.**
+**179 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L20 (20) |
+| 2. Page layout and width | L1 to L21 (21) |
 | 3. Detail screens | D1 to D18 (18) |
 | 4. Collections | K1 to K36 (36) |
 | 5. Buttons and actions | B1 to B19 (19) |

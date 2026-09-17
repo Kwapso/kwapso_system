@@ -2781,6 +2781,27 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
  * checked in both directions by `no-sort-in-calendar-views`. */
 export const NO_SORT_VIEW_EXEMPT: Record<string, string> = {}
 
+/** R29's own extension, 17 Sep 2026 — the client, verbatim, over the fixed
+ * 23.75rem assistant column: "there is a certain horizontal scroll. Kill
+ * that. There should be no horizontal scroll." `min-w-max` is a FLOOR: it
+ * tells the element its own min-content is its floor, uncapped, so it cannot
+ * shrink the way an ordinary flex item can — and if nothing between it and
+ * the page gives it its own horizontal scrollbar, that floor is the page's to
+ * absorb. That is what R29's `overflow-x: clip` root guard exists to catch
+ * only AFTER the fact, at the document edge, with no clue which row did it.
+ * This check finds the row instead: every `min-w-max` in `web/components`
+ * must carry `overflow-x-auto` on itself or a nearby ancestor within the same
+ * file, so a screen that CAN widen its body is caught at the row that would
+ * do it, not chased at the symptom. (`flex-nowrap` alone is deliberately NOT
+ * walked here — see the check's own comment, `web/test/rules.test.ts`, for
+ * why it is not the same signal and would have reported two correct, already-
+ * shipped rows as offenders.) Rot-checked in both directions, the same
+ * ratchet `SCREEN_WIDTH_EXEMPT` uses: a listed file the scan no longer
+ * matches must drop its entry. Empty on the day this law shipped — the one
+ * `min-w-max` in `web/components` today (`record-timeline.tsx`) already
+ * scrolls inside its own container. */
+export const SCROLL_FLOOR_EXEMPT: Record<string, string> = {}
+
 /** R29 — reviewed exceptions. A file listed here matches the page-container
  * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:
  * an entry whose file no longer sets a width fails the build, so a screen that

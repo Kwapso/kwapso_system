@@ -133,6 +133,84 @@ export function seedAgentTabs(threadId: string | undefined, label: string): void
   announce()
 }
 
+/** ── "UNUSED" — the client's ruling, 17 Sep 2026, verbatim ──────────────────
+ *
+ *   "On the assistant, when I have a new chat open and I create another new
+ *    one, if this new one is still unused, just open the already existing
+ *    one. What I want to avoid is having 10 new unused sessions."
+ *
+ * ZERO TURNS is the definition, read off the thread model rather than off
+ * `scope` or the composer: the server mints a thread only once a message is
+ * actually SENT (the file header, above), so `threadId` is unset for a bare
+ * "+" draft (`scope: null`), for a tab that HAS picked a scope but sent
+ * nothing yet, and even for one with unsent text currently sitting in the
+ * composer — that text lives in `use-agent-chat.tsx`, never in this store, so
+ * nothing about a draft can ever set `threadId` here. Which is exactly the
+ * client's own qualifier: "if the existing new chat has a typed draft, it
+ * still counts as unused for this purpose unless a message was sent." A
+ * history-opened tab (`openAgentTabForThread`) always arrives WITH a
+ * `threadId` — it is resuming a thread that already exists server-side — so
+ * it is never unused by this reading, which is the right answer: reopening a
+ * past conversation is not "starting a new session" this ruling is about. */
+export function isUnusedAgentTab(tab: AgentTab): boolean {
+  return !tab.threadId
+}
+
+/** The newest unused tab, or none. "Newest" is CREATION order, not strip
+ * position — a drag (L20) can move a tab without changing when it was made —
+ * read off `newTabId`'s own strictly increasing numeric suffix rather than
+ * array index, so a reorder can never change which tab "+" lands on. */
+function newestUnusedAgentTab(): AgentTab | undefined {
+  let best: AgentTab | undefined
+  let bestN = -1
+  for (const t of tabs) {
+    if (!isUnusedAgentTab(t)) continue
+    const n = Number(t.id.slice("agent-tab-".length))
+    if (n > bestN) {
+      bestN = n
+      best = t
+    }
+  }
+  return best
+}
+
+/** BOOT-TIME COLLAPSE — the other half of the same ruling: if the strip
+ * somehow already holds more than one unused (zero-turn) tab when the panel
+ * first mounts, keep only the newest and drop the rest. After this change
+ * "+" itself can never produce that shape again (see `openNewAgentTab`,
+ * below), so this exists for whatever a stale pre-fix session, or a caller
+ * that bypassed "+" altogether, could still hand the panel. NEVER TOUCHES THE
+ * SERVER: an unused tab, by `isUnusedAgentTab`'s own definition, never minted
+ * a `threadId`, so no thread exists server-side to delete for it either —
+ * dropping it here is purely LOCAL, the file header's own "not persisted"
+ * reasoning applied to a single row instead of the whole store. A no-op once
+ * at most one unused tab is open, the ordinary case. */
+export function pruneUnusedAgentTabsOnBoot(): void {
+  const unused = tabs.filter(isUnusedAgentTab)
+  if (unused.length <= 1) return
+  const keep = newestUnusedAgentTab()
+  tabs = tabs.filter((t) => !isUnusedAgentTab(t) || t.id === keep?.id)
+  if (activeId !== null && !tabs.some((t) => t.id === activeId)) {
+    activeId = keep?.id ?? tabs.at(-1)?.id ?? null
+  }
+  announce()
+}
+
+/** TEST-ONLY. Appends a raw unused draft, bypassing "+"'s own dedupe
+ * (`openNewAgentTab`, below) entirely — the only way left to build the
+ * multi-unused shape `pruneUnusedAgentTabsOnBoot` exists to clean up, now
+ * that the public "+" door can never produce it itself. Never called from
+ * app code; exists so the boot-collapse test can construct the pre-fix shape
+ * directly instead of asserting nothing (which is all the public API alone
+ * can prove once the dedupe above already holds). */
+export function __unsafeAppendUnusedAgentTabForTest(label: string): string {
+  const id = newTabId()
+  tabs = [...tabs, { id, scope: null, label }]
+  activeId = id
+  announce()
+  return id
+}
+
 /** Push a new tab onto the strip and make it active — the shared half of "+"
  * (below) and a history row's own open (`openAgentTabForThread`), evicting
  * past the ceiling exactly the same way for both: never the new tab, never
@@ -148,15 +226,28 @@ function pushTab(draft: AgentTab): void {
   activeId = draft.id
 }
 
-/** Press "+" — a fresh, scope-less tab, activated immediately so its picker
- * shows. Returns the new tab's id. Evicts the tab that has sat least far
- * forward in the strip (never the new one, never the one that was active)
- * once the ceiling is crossed — a simpler rule than `workspace-tabs.ts`'s own
- * recency ranking, defensible here because a conversation tab is opened far
- * less often than a record one and the cost of guessing wrong is one extra
- * click to reopen it from the history tab, which still holds every
- * thread. */
+/** Press "+" — opens on the newest UNUSED tab if one is already sitting open
+ * (the ruling above: "if this new one is still unused, just open the already
+ * existing one"), never a second draft beside it. Only once no unused tab
+ * exists does this actually mint a fresh, scope-less one, activated
+ * immediately so its picker shows. Returns the (new or reused) tab's id.
+ * Evicts the tab that has sat least far forward in the strip (never the new
+ * one, never the one that was active) once the ceiling is crossed on an
+ * actual creation — a simpler rule than `workspace-tabs.ts`'s own recency
+ * ranking, defensible here because a conversation tab is opened far less
+ * often than a record one and the cost of guessing wrong is one extra click
+ * to reopen it from the history tab, which still holds every thread. */
 export function openNewAgentTab(): string {
+  const existing = newestUnusedAgentTab()
+  if (existing) {
+    activeId = existing.id
+    // Landing on an already-open draft is still choosing a fresh
+    // conversation, never History — same reasoning as `activateAgentTab`,
+    // below.
+    historyOpen = false
+    announce()
+    return existing.id
+  }
   const id = newTabId()
   // `label` STARTS EMPTY, ON PURPOSE — a draft tab's provisional word ("New")
   // is user-facing text, and this store has no `t()` to say it with (it is

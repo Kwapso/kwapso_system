@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Fixed — `Badge`'s dot-to-label gap no longer depends on `size="pill"`
+
+Client review, 17 Sep 2026, over the automations status chip: *"Validated the
+colors, but it's missing the space between the dot and the word. Fix that."*
+
+THE GAP WAS NEVER THE DOT'S — it was `size="pill"`'s. `badgeVariants`'s
+`pill` step carried `gap-2` in its own class string, and `size="counter"`
+(the component's default, and the default a caller gets by leaving `size`
+off) carried none. The doc comment on `dot` said "usually paired with
+`variant="status"` and `size="pill"`" — worded as a habit, enforced by
+nothing — and a census of every real `<Badge … dot=` call site in the agency
+app (17 Sep 2026) found nineteen that had NOT paired it: the automations
+status chip (`module-automations.tsx`, `automation-edit-sheet.tsx`), the
+contacts Portal chip (`deep-link/shape.tsx`, three call sites), and fifteen
+record-detail Archived/priority/status chips besides. Three call sites
+(`apps-screen.tsx` twice, `app-detail.tsx`'s other badge) had remembered the
+pairing and were the only ones that ever looked right — which is exactly
+what made this a kit defect and not an app one: the same one-line call shape
+produced two different pictures depending on whether a caller remembered a
+second prop nothing enforced.
+
+FIXED AT THE ROOT: the gap moved off `size="pill"` entirely and onto the
+`dot` prop's own presence — `GAP_WITH_DOT` ("gap-2", the same `--space-2`
+token), applied on the outer span whenever `dot` is truthy, independent of
+`size`. A `size="counter"` badge with a dot now gets the identical 8px a
+`size="pill"` one always has; a badge with no dot is unaffected (the gap
+utility does nothing with a single flex child). This fixes every existing
+call site without touching one of them — no nineteen-file sweep, no second
+prop to remember going forward.
+
+Files: `components/badge/badge.tsx`.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system.
+
 ### Fixed — `AgentChat`'s `Cite` mark no longer collides with the line above it at narrow widths
 
 B0297 / T3660, client review meeting, 16 Sep 2026, verbatim: *"Restore

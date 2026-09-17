@@ -20,7 +20,8 @@ import {
   CollectionEmptyState,
 } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Graph, ListBullets } from "@shared/ui/foundations/icons"
+import { Button } from "@shared/ui/components/button/button"
+import { Graph, ListBullets, Sparkle, UploadSimple } from "@shared/ui/foundations/icons"
 
 import { WavesScreen } from "@/components/work/waves-screen"
 import { ProcessesScreen } from "@/components/process/processes-screen"
@@ -34,7 +35,7 @@ import {
   BrandLibraryScreen,
   PurposesScreen,
 } from "@/components/team/internal-screens"
-import { NotFound, LoadError, SectionWithCreate } from "@/components/deep-link/screen-bits"
+import { NotFound, LoadError, AddButton, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
@@ -53,6 +54,8 @@ import { content as contentApi } from "@/lib/api"
 import { knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
+import { openNewAgentTab, pickAgentTabScope } from "@/lib/agent-conversation-tabs"
+import { setAgentOpen } from "@/lib/agent-open"
 import { resolveRecipe } from "@/lib/screens"
 import type { KnowledgeSource } from "@shared/types"
 import type { ModuleContentCtx } from "./module-content"
@@ -407,38 +410,69 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       ...(companiesQ.data ?? []).map((a) => [a.id, a.name] as const),
     ])
     const loadedSources = knowledgeQ.data
+    const canCreateKnowledge = can("knowledge", "create")
     // R16: the count lives in the heading (a sidebar page has no tab strip to
     // badge), and it is the door's exact COUNT(*) — never the loaded page's
     // length, which on a paged list is just "50" forever.
     return (
       <div className="flex flex-col gap-6">
-        {/* THE HEADING AND THE SYNC AFFORDANCE ARE ONE BAND, not two blocks.
-            The owner asked for the sync button "everywhere, wherever we're
-            showing data coming from Google sources", and it stays exactly that
-            visible — it has simply stopped being a block of its own between the
-            heading and the ask box (N2 counts blocks before the primary content,
-            and this screen was at five). A heading names the collection and this
-            button refreshes the same collection, so they answer one question and
-            belong on one band (N4). `CollectionHeading` renders nothing when a
-            counted tab strip wins the arbitration, which leaves the button on
-            the band by itself and is still correct. */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* THE GEAR (R61) — the sweep, the Google pass and the two
-              retirement passes are listed on this module's own settings page
-              (R70, client 2026-09-11). */}
-          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} action={<ModuleSettingsGear teamId={teamId ?? null} segment="knowledge" />} />
-          {/* Inline on the heading band, so no caption: a toolbar control that
-              explains itself in two lines pushes the heading it sits beside out
-              of alignment, and this screen's own title already says what the
-              collection is. The Meetings foot is where the sentence belongs. */}
-          <GoogleSyncButton
-            teamId={teamId as string}
-            scope="knowledge"
-            describe={false}
-            onSynced={() => invalidate(knowledgeKey(teamId as string))}
-          />
-        </div>
-        {/* ASK IT, HERE — AND NOW THE ONLY QUESTION BOX ON THIS SCREEN.
+        {/* THE TITLE LINE — R84 (client, 16 Sep 2026 evening, verbatim: "only
+            mango buttons on the title level... the others black"). CollectionHeading
+            IS the title component, so its own `action` prop is the one legal
+            home for the mango "Ask" button — and everything nested beside it
+            in that same node counts as "inside" too, since R84's census walks
+            a Button's ancestors through a JSX attribute's own initializer.
+            THE ORDER answers her 17 Sep 2026 complaint word for word: "the
+            title alignment of the buttons is completely wrong... The gear
+            should be on the very far right." `action` is already documented
+            (collection-heading.tsx) as "pinned to the far right of the title
+            line" — nesting Ask, Sync and the gear together in ONE node, gear
+            last, is what makes the gear the rightmost thing on the whole
+            screen instead of the rightmost thing next to the count chip. */}
+        <CollectionHeading sectionKey="knowledge"
+          total={totals.knowledge}
+          action={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {/* "Add a Mango button that says something like 'Ask' or
+                  'Assistant', and this should open a new chat on the
+                  assistant." A fresh conversation, scoped straight to the
+                  knowledge base (the scope picker already offers that scope —
+                  `AgentTabScope` in agent-conversation-tabs.ts — so this
+                  skips past the picker instead of asking twice), through the
+                  same tab-store door the assistant's own "+" uses
+                  (`openNewAgentTab`), then opened — the panel's own open
+                  effect (agent-panel.tsx) hands focus to the composer the
+                  moment it becomes visible. */}
+              <Button
+                variant="default"
+                className="gap-1"
+                onClick={() => {
+                  const id = openNewAgentTab()
+                  pickAgentTabScope(id, "knowledge", t("Knowledge base"))
+                  setAgentOpen(true)
+                }}
+              >
+                <Sparkle className="size-4" aria-hidden />
+                {t("Ask")}
+              </Button>
+              {/* SYNC — her word: "this 'Bring it in' should be changed to
+                  'Sync'." Same door, same component (google-sync.tsx), only
+                  the label moved. */}
+              <GoogleSyncButton
+                teamId={teamId as string}
+                scope="knowledge"
+                describe={false}
+                onSynced={() => invalidate(knowledgeKey(teamId as string))}
+              />
+              {/* THE GEAR (R61), now the last node in the row rather than the
+                  first thing after the count chip. The sweep, the Google pass
+                  and the two retirement passes are listed on this module's
+                  own settings page (R70, client 2026-09-11). */}
+              <ModuleSettingsGear teamId={teamId ?? null} segment="knowledge" />
+            </div>
+          }
+        />
+        {/* ASK IT, HERE — AND STILL THE ONLY QUESTION BOX ON THIS SCREEN.
             B0296/T3659 (client review, 16 Sep 2026, verbatim): "Remove KB
             search bar, convert KB view to archive/source-manager, centralize
             search through assistant." The list below used to draw its own
@@ -447,14 +481,27 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             about X?" is asked now; the list under it browses what is filed,
             it does not search. The answer arrives in the assistant, with its
             sources marked at the claims and room to ask the follow-up — see
-            ask-the-assistant.tsx. */}
+            ask-the-assistant.tsx. Distinct from the mango "Ask" button above:
+            that one opens a blank conversation, this one asks a specific
+            question in place. */}
         <AskTheAssistant />
         {/* THE LIST IS AN ARCHIVE, NOT A SECOND SEARCH BOX (B0296/T3659). It
             still pages (R14) and still carries its facets and the List·Shape
             switch — compartment/kind/active narrow what is FILED here, which
             is a different act from asking a question of it — but the field
             itself is off: TOOLBAR_EXEMPT["knowledge.list"] carries the reason,
-            and `search={false}` is the mechanism (paged-find.tsx). */}
+            and `search={false}` is the mechanism (paged-find.tsx).
+
+            THE TOOLBAR ITSELF WAS NEVER SUPPRESSED — facets/sort/view already
+            draw here regardless of search. What WAS missing is the container
+            R67 asks for ("nothing on top of white background, its a rule!")
+            and her 17 Sep ruling repeats by name ("make it like the
+            dashboard, so that it has its own container background"): `wrap`
+            below is the identical call accounts-screen.tsx,
+            contacts-screen.tsx, inputs-screen.tsx, meetings-screen.tsx and
+            tickets-collection.tsx already make, and it boxes the toolbar AND
+            whichever body `children` returns — the List cards or the Shape
+            picture — in the one `CollectionCard` surface, never two. */}
         <PagedFind<KnowledgeSource>
           sorts={translatedSorts("knowledge", t)}
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
@@ -500,6 +547,38 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
               .knowledge({ ...query, cursor })
               .then((r) => ({ rows: r.sources, nextCursor: r.nextCursor, total: r.total }))
           }
+          // THE CREATE ACTIONS, in the toolbar's own slot now — moved out of
+          // a second, inner `SectionWithCreate`-drawn `CollectionCard`, which
+          // was exactly the "broken combination" screen-bits.tsx's own
+          // `CollectionCard` doc warns about, a panel inside a panel, once
+          // `wrap` below started drawing the outer one. R50 ("never toolbar
+          // on an empty collection, not even the create button") still holds
+          // without a separate `empty` prop here: this whole slot sits inside
+          // `toolbar`, which `genuinelyEmpty` already returns `null` for
+          // before `actions` is ever read (the same reason accounts-screen.tsx's
+          // own `<AddButton>` in this slot carries no `empty` prop either).
+          actions={() =>
+            canCreateKnowledge ? (
+              <>
+                {/* The third way in, beside the other two — the same
+                    "another road to the same record" affordance "Import CSV"
+                    is on the accounts screen. */}
+                <Button
+                  variant="secondary"
+                  className="gap-1"
+                  onClick={() => go(sectionPath, { panel: "add", module: "knowledge-file" })}
+                >
+                  <UploadSimple className="size-4" />
+                  {t("Upload a file")}
+                </Button>
+                <AddButton
+                  label={t("Add a source")}
+                  onClick={() => go(sectionPath, { panel: "add", module: "knowledge" })}
+                />
+              </>
+            ) : null
+          }
+          wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
             // THE PICTURE IS THE WHOLE BASE, so it stands outside the paged
@@ -507,7 +586,9 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             // fifty in the browser and the shape is a door of its own. It is
             // still INSIDE this toolbar because the switch that chose it is a
             // slot on this row (R53), and a body reached by a control belongs
-            // under that control.
+            // under that control. It is also still inside `wrap`'s one
+            // `CollectionCard` (R67) — the picture stands on the same paper
+            // the list's rows do, never bare on the page.
             if (ctx.knowledgeView === "shape") {
               if (!knowledgeShapeQ.data) return <Skeleton variant="list" lines={4} />
               return <KnowledgeShape teamId={teamId as string} {...knowledgeShapeQ.data} />
@@ -519,55 +600,36 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             // subtitle line; this row needs six facts, three of them editable
             // inline, which is exactly the "no engine block draws this" test
             // CLAUDE.md's recipe-vs-bespoke rule asks. `KnowledgeSourceCard`
-            // carries the fields; `SectionWithCreate` below drops `useKitPanel`
-            // (there is no kit collection-frame panel to hand the create button
-            // to any more) so its OWN header draws "Add a source"/"Upload a
-            // file" again — the exact branch R50's `empty` prop on this
-            // component was written for.
+            // carries the fields; the create actions above carry "Add a
+            // source"/"Upload a file" now, so this body draws only the rows
+            // (or the empty register) rather than a second header for them.
             return (
               <>
-                <SectionWithCreate
-                  show={can("knowledge", "create")}
-                  label={t("Add a source")}
-                  icon="plus"
-                  // The third way in, beside the other two. It sits in the SECONDARY
-                  // slot — the same place "Import CSV" sits on the accounts screen —
-                  // because it is the same kind of affordance: another road to the same
-                  // record, for material that already exists somewhere else.
-                  secondary={{
-                    show: can("knowledge", "create"),
-                    label: t("Upload a file"),
-                    onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
-                  }}
-                  onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
-                  empty={rows.length === 0}
-                >
-                  {rows.length === 0 ? (
-                    <CollectionEmptyState
-                      title={t("Nothing in the knowledge base yet.")}
-                      description={t(
-                        "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
-                      )}
-                      filtered={found.active}
-                      onCreate={can("knowledge", "create") ? () => go(sectionPath, { panel: "add", module: "knowledge" }) : undefined}
-                    />
-                  ) : (
-                    <CardGrid>
-                      {rows.map((source) => (
-                        <KnowledgeSourceCard
-                          key={source.id}
-                          source={source}
-                          accountNames={names}
-                          canEdit={can("knowledge", "update")}
-                          onOpen={() => onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
-                          onEditFiling={() =>
-                            go(sectionPath, { panel: "edit", module: "knowledge", id: source.id })
-                          }
-                        />
-                      ))}
-                    </CardGrid>
-                  )}
-                </SectionWithCreate>
+                {rows.length === 0 ? (
+                  <CollectionEmptyState
+                    title={t("Nothing in the knowledge base yet.")}
+                    description={t(
+                      "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
+                    )}
+                    filtered={found.active}
+                    onCreate={canCreateKnowledge ? () => go(sectionPath, { panel: "add", module: "knowledge" }) : undefined}
+                  />
+                ) : (
+                  <CardGrid>
+                    {rows.map((source) => (
+                      <KnowledgeSourceCard
+                        key={source.id}
+                        source={source}
+                        accountNames={names}
+                        canEdit={can("knowledge", "update")}
+                        onOpen={() => onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
+                        onEditFiling={() =>
+                          go(sectionPath, { panel: "edit", module: "knowledge", id: source.id })
+                        }
+                      />
+                    ))}
+                  </CardGrid>
+                )}
                 {/* R14: one source per ticket, per article, per account, plus every note
                     anybody writes — the list pages. */}
                 <LoadMore

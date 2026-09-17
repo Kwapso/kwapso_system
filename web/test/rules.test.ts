@@ -39,6 +39,7 @@ import {
   RECORD_TABS_SINGLE_PANEL,
   PALETTE_LITERAL_OK,
   SCREEN_WIDTH_EXEMPT,
+  SCROLL_FLOOR_EXEMPT,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TWO_READS_ONE_DOOR,
@@ -5727,6 +5728,82 @@ describe("nothing pushes the page sideways", () => {
     expect(header, "the bar must clip its own contents").toContain("overflow-hidden")
     expect(header, "…and must not draw the theme control").not.toContain("<ModeToggle")
     expect(bar.length).toBeGreaterThan(0)
+  })
+
+  // THE ROOT CLIP CATCHES THE SYMPTOM AT THE DOCUMENT EDGE, WITH NO CLUE WHICH
+  // ROW DID IT. The owner again, 17 Sep 2026, since the assistant column went
+  // to a fixed 23.75rem: "there is a certain horizontal scroll. Kill that.
+  // There should be no horizontal scroll." `min-w-max` is an explicit FLOOR —
+  // it tells the element its own min-content, uncapped, is its floor, so it
+  // cannot shrink below the combined width of its children the way an
+  // ordinary flex item can. A floor that sits outside its own
+  // `overflow-x-auto` box is the body's to absorb the moment the column
+  // beside it takes real width away — every `min-w-max` already in the app
+  // (`flowchart.tsx`, `compare.tsx`, `heatmap.tsx`, `timeline.tsx`,
+  // `record-timeline.tsx`) is deliberately paired with one for exactly this
+  // reason, which is what makes a future one that forgets the pairing worth
+  // catching here rather than at the viewport edge.
+  //
+  // `flex-nowrap` ALONE is NOT the same signal and is deliberately not
+  // walked by name: unlike `min-w-max` it does not by itself stop a flex
+  // child from shrinking — a `flex-nowrap` row whose non-wrapping children
+  // are `min-w-0 flex-1` (the lane) or genuinely fixed-size (`shrink-0`
+  // actions) never becomes a floor, which is exactly the shape
+  // `toolbar-row.tsx` and this app's own `wave-finder.tsx` already draw. A
+  // textual scan cannot tell "prevented from wrapping, but still able to
+  // shrink" from "prevented from wrapping AND cannot shrink" without
+  // parsing the whole flex context, so walking it by name would have
+  // reported both of those correct, load-bearing rows as offenders on the
+  // day this law shipped — a check that cries wolf teaches people to ignore
+  // it, which is worse than not checking. `min-w-max` carries no such
+  // ambiguity: it is always, unconditionally, a floor.
+  it("scroll-floors: every min-w-max row scrolls inside its own overflow-x-auto box (R29)", () => {
+    const files = sourceFiles(join(WEB, "components"), { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })
+    expect(files.length, "the component walk found nothing — it has gone blind").toBeGreaterThan(50)
+
+    const FLOOR = /\bmin-w-max\b/g
+    // Close enough to cover BOTH real shapes this scan has ever found: the
+    // scroller and the floor on the SAME className string (a few dozen
+    // characters apart), and the scroller on an ANCESTOR's opening tag,
+    // which in this codebase's own JSX always appears BEFORE its
+    // descendant's (measured: 118 characters apart in `record-timeline.tsx`,
+    // the shipping example). 600 is generous on both sides of that without
+    // reaching into an unrelated, distant scroller elsewhere in a long file.
+    const WINDOW = 600
+    let scanned = 0
+    const offenders: string[] = []
+
+    for (const f of files) {
+      const src = stripComments(f.source)
+      const scrollerOffsets = [...src.matchAll(/overflow-x-auto/g)].map((m) => m.index!)
+
+      for (const m of src.matchAll(FLOOR)) {
+        scanned++
+        const covered = scrollerOffsets.some((off) => Math.abs(off - m.index!) <= WINDOW)
+        if (!covered && !(f.rel in SCROLL_FLOOR_EXEMPT)) offenders.push(`${f.rel}:${src.slice(0, m.index).split("\n").length}`)
+      }
+    }
+
+    // A walk that stops matching must not report an all-clear.
+    expect(scanned, "the min-w-max scan found nothing — it has stopped matching").toBeGreaterThan(0)
+    expect(
+      offenders,
+      "these rows set a hard width floor (`min-w-max`) with no `overflow-x-auto` box of its own " +
+        "nearby to scroll inside — the page absorbs the overflow instead. Wrap the row in its own " +
+        "`overflow-x-auto` container, or pin it in SCROLL_FLOOR_EXEMPT with a reason:\n  " +
+        offenders.join("\n  ")
+    ).toEqual([])
+
+    // The ratchet: a pin whose file no longer contains the pattern is a
+    // record of a screen that no longer needs excusing.
+    const stale = Object.keys(SCROLL_FLOOR_EXEMPT).filter((rel) => {
+      const file = files.find((f) => f.rel === rel)
+      return !file || !/\bmin-w-max\b/.test(stripComments(file.source))
+    })
+    expect(
+      stale,
+      `these SCROLL_FLOOR_EXEMPT entries match no min-w-max any more — delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
   })
 })
 

@@ -84,9 +84,23 @@ const badgeVariants = cva(
         /**
          * The status pill and the tag — CH11's second geometry:
          * `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the
-         * drawn `padding: 6px 14px`), dot-to-label gap 8 (`--space-2`).
+         * drawn `padding: 6px 14px`).
+         *
+         * THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `GAP_WITH_DOT`
+         * below. It used to live on this size step alone, which read as "a
+         * status pill always has the gap" and is exactly backwards: the gap
+         * belongs to the DOT, not to the size. `variant="status"` docs its
+         * own `dot` as "usually paired with … `size="pill"`" — a call site
+         * that forgot the pairing (fourteen of them, 17 Sep 2026 census) got
+         * `size="counter"`'s geometry with no gap at all, the dot sitting
+         * flush against the word. Client, same day, on the automations
+         * status chip: "Validated the colors, but it's missing the space
+         * between the dot and the word. Fix that." Moving the gap onto the
+         * dot's own presence fixes every existing call site FOR FREE and
+         * makes the doc comment's "usually" true without a caller having to
+         * remember a second prop.
          */
-        pill: "h-[var(--control-height-pill)] gap-2 px-[var(--space-3h)]",
+        pill: "h-[var(--control-height-pill)] px-[var(--space-3h)]",
       },
       variant: {
         /** `.kw-badge--accent` — the brand fill, charcoal label. */
@@ -193,6 +207,14 @@ const badgeVariants = cva(
   },
 );
 
+/** The dot's own gap, `--space-2` (8px) — spent ONLY when a `dot` renders, at
+ * either size, never tied to `size="pill"`. See the note on `pill` above for
+ * why it moved: the gap is a property of having two children (a dot span and
+ * a label) to separate, not of the pill's own geometry, and a `size="counter"`
+ * badge with a dot needs the identical 8px the pill was quietly the only one
+ * offering. */
+const GAP_WITH_DOT = "gap-2";
+
 /** The ten dot tones — one per `--dot-*` token, and no mango (never a status).
  * The first six are a LIFECYCLE (shipped/building/review/blocked/archived/
  * done — App Stage, ticket and story status). The last four are a PRIORITY,
@@ -237,7 +259,9 @@ export interface BadgeProps
    * site should never pass `dot` without a text label. Ruling 04's portal
    * vocabulary reuses the same tones: With us → `building`,
    * Your answer → `review`, Done → `done`. Usually paired with
-   * `variant="status"` and `size="pill"`.
+   * `variant="status"`; `size="pill"` is the taller geometry a status chip
+   * usually wants, but the dot-to-label gap (`GAP_WITH_DOT`) no longer
+   * depends on it — a `dot` at `size="counter"` still gets its 8px.
    */
   dot?: BadgeDot;
   /**
@@ -341,7 +365,7 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         ref={ref}
         data-slot="badge"
         data-dot={dot}
-        className={cn(badgeVariants({ variant, size, dotTone: dot }), className)}
+        className={cn(badgeVariants({ variant, size, dotTone: dot }), dot ? GAP_WITH_DOT : undefined, className)}
         {...props}
       >
         {dot ? (

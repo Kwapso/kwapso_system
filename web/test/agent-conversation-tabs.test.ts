@@ -9,14 +9,17 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 
 import {
+  __unsafeAppendUnusedAgentTabForTest,
   activateAgentTab,
   agentTabsSnapshot,
   closeAgentTab,
+  isUnusedAgentTab,
   MAX_AGENT_TABS,
   openAgentTabForThread,
   openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
+  pruneUnusedAgentTabsOnBoot,
   reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
@@ -72,8 +75,134 @@ describe("openNewAgentTab — the \"+\"", () => {
   })
 
   it("evicts past the ceiling, never the new tab and never the one that was active", () => {
-    for (let i = 0; i < MAX_AGENT_TABS + 3; i++) openNewAgentTab()
+    // `openAgentTabForThread` is the eviction proof now, not a bare "+" loop:
+    // each call here carries its OWN `threadId`, so every tab is immediately
+    // USED (never a zero-turn draft) and the 17 Sep 2026 "unused" ruling
+    // below — "+" reusing an already-open draft instead of minting a new one
+    // — cannot fold the loop down to one tab before the ceiling is even
+    // reached. `pushTab` is the one function both callers share, so this
+    // still proves the eviction rule itself.
+    for (let i = 0; i < MAX_AGENT_TABS + 3; i++) openAgentTabForThread(`t-evict-${i}`, `Thread ${i}`)
     expect(agentTabsSnapshot().length).toBeLessThanOrEqual(MAX_AGENT_TABS)
+  })
+})
+
+// THE "UNUSED" RULING, 17 Sep 2026, verbatim in agent-conversation-tabs.ts's
+// own header: "when I have a new chat open and I create another new one, if
+// this new one is still unused, just open the already existing one. What I
+// want to avoid is having 10 new unused sessions." ZERO TURNS is the
+// definition this store uses (`isUnusedAgentTab`): no `threadId`, because the
+// server only mints one once a message is actually sent — so this is true for
+// a bare picker draft, a scoped-but-unsent draft, and (implicitly, since this
+// store never sees composer text at all) a typed-but-unsent draft too.
+describe("isUnusedAgentTab — zero turns, read off the thread model", () => {
+  it("a bare \"+\" draft (no scope picked) is unused", () => {
+    const id = openNewAgentTab()
+    const tab = agentTabsSnapshot().find((t) => t.id === id)!
+    expect(isUnusedAgentTab(tab)).toBe(true)
+  })
+
+  it("a draft with a scope picked but nothing sent is STILL unused", () => {
+    const id = openNewAgentTab()
+    pickAgentTabScope(id, "everything", "Everything (today's default)")
+    const tab = agentTabsSnapshot().find((t) => t.id === id)!
+    expect(tab.scope).not.toBeNull() // sanity: the pick did land
+    expect(isUnusedAgentTab(tab)).toBe(true)
+  })
+
+  it("a tab is used the instant the server mints a thread for it", () => {
+    const id = openNewAgentTab()
+    setAgentTabThread(id, "srv-thread-used")
+    const tab = agentTabsSnapshot().find((t) => t.id === id)!
+    expect(isUnusedAgentTab(tab)).toBe(false)
+  })
+
+  it("a history-resumed tab always arrives used — it already has a real thread", () => {
+    const id = openAgentTabForThread("srv-thread-history", "Past chat")
+    const tab = agentTabsSnapshot().find((t) => t.id === id)!
+    expect(isUnusedAgentTab(tab)).toBe(false)
+  })
+})
+
+describe("openNewAgentTab reuses an existing unused tab instead of doubling it", () => {
+  it("\"+\" twice in a row yields exactly one tab", () => {
+    const first = openNewAgentTab()
+    const second = openNewAgentTab()
+    expect(second).toBe(first)
+    expect(agentTabsSnapshot()).toHaveLength(1)
+  })
+
+  it("\"+\" after sending a message (the tab now has a thread) opens a real second tab", () => {
+    const first = openNewAgentTab()
+    setAgentTabThread(first, "srv-thread-sent")
+    const second = openNewAgentTab()
+    expect(second).not.toBe(first)
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([first, second])
+  })
+
+  it("reuses the NEWEST unused tab, even if it isn't the one currently active", () => {
+    const first = openNewAgentTab()
+    setAgentTabThread(first, "srv-thread-used-1") // used — no longer a candidate
+    const second = openNewAgentTab() // the newest unused tab
+    activateAgentTab(first) // look away from it without touching it
+    const third = openNewAgentTab()
+    expect(third).toBe(second)
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([first, second])
+  })
+
+  it("a draft with a scope already picked still counts as unused and is reused, not replaced", () => {
+    const id = openNewAgentTab()
+    pickAgentTabScope(id, "knowledge", "Knowledge base")
+    const reused = openNewAgentTab()
+    expect(reused).toBe(id)
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.scope).toBe("knowledge") // untouched
+  })
+})
+
+describe("pruneUnusedAgentTabsOnBoot", () => {
+  // "+" itself can no longer build the multi-unused shape this guards
+  // against (the describe block above proves that), so these reach past it
+  // with `__unsafeAppendUnusedAgentTabForTest` — the store's own test-only
+  // seam — to reconstruct exactly the pre-fix shape: several zero-turn tabs
+  // open at once, the thing a stale session could still hand this panel.
+  it("boot with three unused tabs keeps exactly one — the newest", () => {
+    __unsafeAppendUnusedAgentTabForTest("Draft 1")
+    __unsafeAppendUnusedAgentTabForTest("Draft 2")
+    const newest = __unsafeAppendUnusedAgentTabForTest("Draft 3")
+    expect(agentTabsSnapshot()).toHaveLength(3)
+
+    pruneUnusedAgentTabsOnBoot()
+
+    expect(agentTabsSnapshot()).toHaveLength(1)
+    expect(agentTabsSnapshot()[0]?.id).toBe(newest)
+  })
+
+  it("never drops a USED tab, only the extra unused ones around it", () => {
+    const used = openNewAgentTab()
+    setAgentTabThread(used, "srv-used")
+    __unsafeAppendUnusedAgentTabForTest("Draft 1")
+    const newestDraft = __unsafeAppendUnusedAgentTabForTest("Draft 2")
+
+    pruneUnusedAgentTabsOnBoot()
+
+    expect(agentTabsSnapshot().map((t) => t.id).sort()).toEqual([used, newestDraft].sort())
+  })
+
+  it("re-lands the active tab on the kept draft when its own tab was dropped", () => {
+    const oldest = __unsafeAppendUnusedAgentTabForTest("Draft 1")
+    const newest = __unsafeAppendUnusedAgentTabForTest("Draft 2")
+    activateAgentTab(oldest) // looking at the one the prune is about to drop
+
+    pruneUnusedAgentTabsOnBoot()
+
+    const { result } = renderHook(() => useActiveAgentTabId())
+    expect(result.current).toBe(newest)
+  })
+
+  it("is a no-op with zero or one unused tab open — the ordinary case", () => {
+    const id = openNewAgentTab()
+    pruneUnusedAgentTabsOnBoot()
+    expect(agentTabsSnapshot().map((t) => t.id)).toEqual([id])
   })
 })
 
@@ -104,10 +233,15 @@ describe("setAgentTabThread", () => {
 })
 
 describe("closeAgentTab", () => {
+  // THREE (or two) DISTINCT open conversations, each carrying its own thread
+  // — `openAgentTabForThread` rather than a bare "+" loop, because these
+  // tests are about closing behaviour among several already-open tabs, not
+  // about the "+" dedupe (covered above), and a threadId-less loop would now
+  // collapse to one tab before ever reaching it.
   it("lands on the tab that shifts into the closed one's own spot", () => {
-    const a = openNewAgentTab()
-    const b = openNewAgentTab()
-    const c = openNewAgentTab()
+    const a = openAgentTabForThread("srv-close-a", "A")
+    const b = openAgentTabForThread("srv-close-b", "B")
+    const c = openAgentTabForThread("srv-close-c", "C")
     activateAgentTab(b)
     const landing = closeAgentTab(b)
     expect(landing).toBe(c)
@@ -115,8 +249,8 @@ describe("closeAgentTab", () => {
   })
 
   it("falls to what is now the last tab when the active one closed was itself last", () => {
-    const a = openNewAgentTab()
-    const b = openNewAgentTab()
+    const a = openAgentTabForThread("srv-close-d", "A")
+    const b = openAgentTabForThread("srv-close-e", "B")
     activateAgentTab(b)
     const landing = closeAgentTab(b)
     expect(landing).toBe(a)
@@ -130,8 +264,8 @@ describe("closeAgentTab", () => {
   })
 
   it("leaves a BACKGROUND close's active tab untouched", () => {
-    const a = openNewAgentTab()
-    const b = openNewAgentTab()
+    const a = openAgentTabForThread("srv-close-f", "A")
+    const b = openAgentTabForThread("srv-close-g", "B")
     activateAgentTab(b)
     const landing = closeAgentTab(a)
     expect(landing).toBe(b)
@@ -251,17 +385,18 @@ describe("openAgentTabForThread — a history row was picked", () => {
 describe("reorderAgentTab — client ruling, 16 Sep 2026 (\"go with the drag order\")", () => {
   /** Three real conversation tabs, in order — never History or "+", which
    * this store does not carry a row for at all. */
+  // Each a DISTINCT, already-sent conversation (`openAgentTabForThread`, not
+  // a bare "+" loop) — a picked-but-unsent draft is still UNUSED (the 17 Sep
+  // 2026 ruling above), so three of those in a row would now collapse to one
+  // tab before there was anything left to drag.
   function threeTabs(): string[] {
     let a = ""
     let b = ""
     let c = ""
     act(() => {
-      a = openNewAgentTab()
-      pickAgentTabScope(a, "everything", "Ashworth")
-      b = openNewAgentTab()
-      pickAgentTabScope(b, "everything", "Beringer")
-      c = openNewAgentTab()
-      pickAgentTabScope(c, "everything", "Chalmers")
+      a = openAgentTabForThread("srv-reorder-a", "Ashworth")
+      b = openAgentTabForThread("srv-reorder-b", "Beringer")
+      c = openAgentTabForThread("srv-reorder-c", "Chalmers")
     })
     return [a, b, c]
   }

@@ -275,7 +275,11 @@ export function GoogleSyncButton({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button variant="secondary" size="sm" disabled={syncing} onClick={sync} className="gap-1">
         {syncing ? <Spinner /> : <ArrowsClockwise className="size-3.5" aria-hidden />}
-        {syncing ? t("Bringing it in…") : t("Bring it in")}
+        {/* RENAMED FROM "Bring it in" — her word, 17 Sep 2026: "this 'Bring it
+            in' should be changed to 'Sync'." The door (`sync()`, above) and
+            the two acts it can start are untouched; only the label a person
+            reads changed. */}
+        {syncing ? t("Syncing…") : t("Sync")}
       </Button>
       {/* A GRANT SOMEBODY REMOVED IN THEIR GOOGLE ACCOUNT IS SILENT BY NATURE —
           the app just starts finding nothing. This is the line that turns it

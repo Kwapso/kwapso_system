@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 795 strings · 3 languages · 1422 of the entries below are hand-written seed.
+// 792 strings · 3 languages · 1421 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -64,7 +64,6 @@ export const CATALOGUE: Catalogue = {
   "All sprints": { de: "Alle Sprints", es: "Todos los sprints", ca: "Tots els sprints" },
   "All tickets": { de: "Alle Tickets", es: "Todos los tickets", ca: "Tots els tiquets" },
   "Almost there": { de: "Fast fertig", es: "Casi listo", ca: "Gairebé a punt" },
-  "Answer and close": { de: "Beantworten und schließen", es: "Responder y cerrar", ca: "Respondre i tancar" },
   "Answer this ticket": { de: "Dieses Ticket beantworten", es: "Responder este ticket", ca: "Respondre aquest tiquet" },
   "Any file from your computer. We read the words out of documents, spreadsheets, PDFs and pictures so the assistant can answer from them and name the file when it does. Anything we can't read is still kept here, and we'll say so.": { de: "Beliebige Datei von Ihrem Computer. Wir lesen die Wörter aus Dokumenten, Tabellenkalkulationen, PDFs und Bildern, damit der Assistent daraus antworten und die Datei nennen kann. Alles, was wir nicht lesen können, speichern wir trotzdem hier und geben Bescheid.", es: "Cualquier archivo de tu ordenador. Leemos el texto de documentos, hojas de cálculo, PDF e imágenes para que el asistente pueda responder a partir de ellos y mencionar el archivo cuando lo haga. Cualquier cosa que no podamos leer se sigue guardando aquí, y lo diremos.", ca: "Qualsevol fitxer del vostre ordinador. Llegim les paraules dels documents, fulls de càlcul, PDF i imatges perquè l'assistent pugui respondre a partir d'ells i anomenar l'arxiu quan ho fa. Tot el que no podem llegir es manté aquí, i ho direm." },
   "Anyone on the team can read this. No client ever can, it doesn't appear in the portal, and no client login can reach it.": { de: "Jedes Mitglied des Teams kann das lesen. Kein Kunde kann es je sehen, es wird nicht im Portal angezeigt und kein Kundenkonto kann darauf zugreifen.", es: "Cualquiera del equipo puede leer esto. Ningún cliente nunca puede, no aparece en el portal, y ningún login de cliente puede acceder a ello.", ca: "Qualsevol del equip pot llegir-ho. Cap client no hi pot accedir, no apareix al portal i cap login de client no hi pot arribar." },
@@ -98,8 +97,6 @@ export const CATALOGUE: Catalogue = {
   "Booked in": { de: "Gebucht", es: "Reservado", ca: "Reservat" },
   "Brand asset": { de: "Markenasset", es: "Activo de marca", ca: "Recurs de marca" },
   "Brand library": { de: "Markensammlung", es: "Biblioteca de marca", ca: "Biblioteca de marca" },
-  "Bring it in": { de: "hinzufügen", es: "Importarlo", ca: "Porta-ho" },
-  "Bringing it in…": { de: "wird hinzugefügt…", es: "Importando…", ca: "Portant-ho…" },
   "CI importer": { de: "CI importer", es: "Importador de CI", ca: "Importador CI" },
   "CSV or Excel (.xlsx) files. Add several at once, the assistant sorts out how they connect.": { de: "CSV- oder Excel-Dateien (.xlsx). Fügen Sie mehrere gleichzeitig hinzu, der Assistent sortiert aus, wie sie sich verbinden.", es: "Archivos CSV o Excel (.xlsx). Añade varios a la vez, el asistente ordena cómo se conectan.", ca: "Arxius CSV o Excel (.xlsx). Afegeix-ne varis d'una vegada, l'assistent ordena com es connecten." },
   "Calendar": { de: "Kalender", es: "Calendario", ca: "Calendari" },

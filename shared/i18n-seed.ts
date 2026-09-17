@@ -1275,6 +1275,8 @@ export const SEED: Catalogue = {
   "Search what we handed over…": { de: "Übergebenes durchsuchen…", es: "Buscar lo que entregamos…", ca: "Cercar el que hem lliurat…"},
   "Searching…": { de: "Wird gesucht…", es: "Buscando…", ca: "Cercant…"},
   "Sending…": { de: "Wird gesendet…", es: "Enviando…", ca: "Enviant…"},
+  "Sync": { de: "Synchronisieren", es: "Sincronizar", ca: "Sincronitzar"},
+  "Syncing…": { de: "Wird synchronisiert…", es: "Sincronizando…", ca: "Sincronitzant…"},
   "Set up your profile": { de: "Ihr Profil einrichten", es: "Configura tu perfil", ca: "Configura el teu perfil"},
   "Share a folder": { de: "Einen Ordner freigeben", es: "Compartir una carpeta", ca: "Compartir una carpeta"},
   "Share a space": { de: "Einen Space freigeben", es: "Compartir un espacio", ca: "Compartir un espai"},

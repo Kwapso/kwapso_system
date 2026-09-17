@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.101",
-  "sha": "648288ab76ae6e601ab698b60288325448e5c307",
+  "tag": "v1.2.102",
+  "sha": "506265198a1513b0dfda04e92d9a4063c289dae5",
   "syncedAt": "2026-09-17"
  },
- "generatedAt": "2026-09-17T06:29:01.764Z",
+ "generatedAt": "2026-09-17T11:39:37.185Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -941,8 +941,8 @@
         },
         {
          "name": "pill",
-         "classes": "h-[var(--control-height-pill)] gap-2 px-[var(--space-3h)]",
-         "note": "The status pill and the tag — CH11's second geometry: `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the drawn `padding: 6px 14px`), dot-to-label gap 8 (`--space-2`)."
+         "classes": "h-[var(--control-height-pill)] px-[var(--space-3h)]",
+         "note": "The status pill and the tag — CH11's second geometry: `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the drawn `padding: 6px 14px`). THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `GAP_WITH_DOT` below. It used to live on this size step alone, which read as \"a status pill always has the gap\" and is exactly backwards: the gap belongs to the DOT, not to the size. `variant=\"status\"` docs its own `dot` as \"usually paired with … `size=\"pill\"`\" — a call site that forgot the pairing (fourteen of them, 17 Sep 2026 census) got `size=\"counter\"`'s geometry with no gap at all, the dot sitting flush against the word. Client, same day, on the automations status chip: \"Validated the colors, but it's missing the space between the dot and the word. Fix that.\" Moving the gap onto the dot's own presence fixes every existing call site FOR FREE and makes the doc comment's \"usually\" true without a caller having to remember a second prop."
         }
        ]
       },

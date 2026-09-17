@@ -23,7 +23,7 @@ import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
 type TicketMember = { id: string; name: string }
-import { TrayArrowUp, Archive, Translate, PencilSimple, PaperPlaneTilt, MonitorPlay } from "@shared/ui/foundations/icons"
+import { TrayArrowUp, Archive, Translate, PencilSimple, CheckCircle, MonitorPlay } from "@shared/ui/foundations/icons"
 
 /** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
  * ordinary team member and used to be offered here, which would have put a "you
@@ -727,6 +727,20 @@ export function HelpDetailScreen({
    * screen is decided once, here. */
   const canClose = canEdit && ticket.status !== "resolved"
 
+  /* THE ENABLE GATE. The client's ruling, 17 Sep 2026, verbatim: "reduce to
+   * close and make it only available, but still visible at all times, only
+   * when the latest answer is from our side." So `canClose` above still
+   * decides whether the button is DRAWN (every open status, gated on the
+   * right); this decides whether it is CLICKABLE.
+   *
+   * `newestReply` (above, by `useFollowNewest`) is the thread's own last
+   * word, and `authorIsClient` is the door's answer to who wrote it — the
+   * same R54 flag `replies` below reads to pick a bubble's side and a name.
+   * No reply at all reads as the client having said the last word too: the
+   * only thing on the thread so far is the request itself, and nothing has
+   * been answered back yet. */
+  const latestIsOurs = newestReply != null && newestReply.authorIsClient === false
+
   /* ONE PRIMARY, ONE SECONDARY, AND A MENU (UI-RULEBOOK B1, CHECKLIST 11.2).
    *
    * This title carried six controls and was the worst case in the app. The
@@ -819,14 +833,32 @@ export function HelpDetailScreen({
           button used to gate on, moved up rather than duplicated. The panel
           is where the words are written, because the door refuses without
           them (5.6). */}
-      {/* R84, 16 Sep 2026 — "only mango buttons on the title level." This
-          button sits in the tab panel body, not in RecordScreen's own
-          `actions` row (the title), so it is black now — B1's own primary
-          slot for a ticket detail is superseded on colour, not on rank. */}
+      {/* CLOSE. Client ruling, 17 Sep 2026, verbatim: "reduce to close and
+          make it only available, but still visible at all times, only when
+          the latest answer is from our side. Make it mango. And put a more
+          appropriate icon for closing." Three changes off the same control:
+          the label shortens from "Answer and close" to "Close" (the words
+          in the panel behind it, unchanged, are still what the door
+          requires — 5.6); the button is disabled rather than withheld when
+          `latestIsOurs` (above) says the client wrote the last word, so it
+          stays where the eye expects it instead of shifting the row; and the
+          icon is `CheckCircle`, the kit's own "resolved" mark — not `X`,
+          which reads as dismiss rather than done.
+
+          MANGO, NOT BLACK, per the SAME client ruling — a reversal of the
+          16 Sep 2026 one that first put this button here in black. That
+          ruling read "only mango buttons on the title level" as excluding
+          this control because, on the PAGE, it sits under the tab strip, in
+          the panel body. It does not: this whole block is the `actions`
+          variable, handed whole to `RecordScreen`'s own `actions` prop below
+          — R84's own title component, by name — so on the SOURCE, which is
+          what the census reads, it was always inside the title. `variant`
+          left off is `Button`'s own default, which is mango
+          (`web/test/mango-title-only.test.ts`, "omitted"). */}
       {canClose && (
-        <Button variant="inverse" disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
-          <PaperPlaneTilt className="size-3.5" />
-          {t("Answer and close")}
+        <Button disabled={statusBusy || !latestIsOurs} onClick={() => setResolving(true)} className="shrink-0 gap-1">
+          <CheckCircle className="size-3.5" />
+          {t("Close")}
         </Button>
       )}
       {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real work

@@ -54,6 +54,7 @@ import {
   openHistoryTab,
   openNewAgentTab,
   pickAgentTabScope,
+  pruneUnusedAgentTabsOnBoot,
   reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
@@ -488,6 +489,22 @@ export function AgentPanel({
     if (agentTabs.length === 0) seedAgentTabs(chat.threadId, t("Conversation"))
   }, [agentTabs.length, chat.threadId, t])
 
+  // BOOT-TIME CLEANUP — the other half of the client's 17 Sep 2026 "unused"
+  // ruling (`agent-conversation-tabs.ts`'s own header carries the quote in
+  // full and the whole argument): if the strip somehow already holds more
+  // than one zero-turn tab the moment this panel mounts — a shape "+" itself
+  // can no longer produce going forward, but a stale pre-fix session could
+  // still hand the panel — collapse it to the newest one before the reader
+  // ever sees the extras. `pruneUnusedAgentTabsOnBoot` is idempotent (a no-op
+  // once at most one unused tab remains), so a plain mount-once effect is
+  // enough; it needs no flag of its own to stay in step with `seedAgentTabs`'
+  // `hasEverSeeded`, because seeding only ever adds tabs, never doubles one
+  // up, so the two never race each other.
+  React.useEffect(() => {
+    pruneUnusedAgentTabsOnBoot()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // REOPENING AN EMPTY STRIP STARTS FRESH, ON THE PICKER — the other half of
   // the closing ruling, 15 Sep 2026 (see `handleCloseAgentTab` below for the
   // half that shuts the column). The seed above only ever fires ONCE per
@@ -537,9 +554,27 @@ export function AgentPanel({
     switchToAgentTab(tab)
   }
 
+  // THE "+" — client ruling, 17 Sep 2026, quoted in full in
+  // `agent-conversation-tabs.ts`: pressing "+" while an unused draft is
+  // already open just returns to that draft, never a second one.
+  // `openNewAgentTab` is what decides that (new tab vs. the newest unused
+  // one, see its own header) and hands back whichever id is now active.
+  // WHY THE `chat.newChat()` GUARD: when the tab that comes back is the one
+  // that was ALREADY active, this is not a switch at all — the reader is
+  // already looking at their one unused draft — and `chat.newChat()` resets
+  // the ONE live chat instance (`use-agent-chat.tsx`'s own module cells),
+  // composer text included, which would silently wipe whatever they had
+  // already typed into it. That is exactly the shape the client's own
+  // qualifier warns against ("if the existing new chat has a typed draft, it
+  // still counts as unused... unless a message was sent" — unused, not
+  // disposable). Only when `openNewAgentTab` actually lands on a DIFFERENT
+  // tab — a genuinely fresh one, or an existing unused one that was not the
+  // one already on screen — is this a real switch, the identical case
+  // `switchToAgentTab` handles elsewhere for a threadId-less tab.
   function handleNewAgentTab() {
-    openNewAgentTab()
-    chat.newChat()
+    const wasActiveId = activeAgentTabId
+    const id = openNewAgentTab()
+    if (id !== wasActiveId) chat.newChat()
   }
 
   // A HISTORY ROW WAS PICKED — the client's own words, "when I click on one,
