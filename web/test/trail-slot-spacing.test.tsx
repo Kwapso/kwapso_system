@@ -117,4 +117,61 @@ describe("app-shell.tsx hands the trail to that slot as a bare node", () => {
     // hand-rolled stand-in.
     expect(trailPropBlock, "the trail prop must hand the kit's own TrailLine to the slot").toContain("<TrailLine")
   })
+
+  // SABOTAGE: put `pt-[var(--space-6)] lg:pt-[var(--space-7)]` (or any other
+  // `pt-`/`mt-` utility) back on this div UNCONDITIONALLY →
+  //   × the body wrapper never pays an unconditional pt/mt when a trail can render
+  //     AssertionError: expected false to be true (or the `!hasTrail &&` guard is missing)
+  //
+  // THIS IS THE OTHER HALF OF THE 40-VS-8 BUG THE FIRST DESCRIBE LOCKS. That
+  // one proves the kit's OWN trail slot carries S3's two tokens and nothing
+  // app-owned; this proves the SAME thing about the one box downstream of it
+  // the kit cannot reach — `ScreenShell`'s body pane is rendered by
+  // `screen-shell.tsx`, but what app-shell.tsx puts INSIDE that pane, as its
+  // own ordinary (non-sticky) child, is this file's. Staging measured 40px
+  // between the trail's hairline and the title against S3's ruled 8: the
+  // kit's own boxes (the trail slot, the header band, the body pane) all read
+  // `pt-0`/0 the moment a trail renders, so a second, app-owned `pt` here was
+  // the entire 32px difference. It exists at all only because the body pane
+  // is ALSO a `position: sticky` scrollport for `PINNED_TOOLBAR` (R63) and a
+  // sticky child of a PADDED scrollport never pins flush at the true top —
+  // see the div's own comment, in place, for the full account — so the gap
+  // moved here rather than disappearing, and it must move again, to zero,
+  // whenever a trail is already paying it instead.
+  it("the body wrapper never pays an unconditional pt/mt when a trail can render", () => {
+    const src = readFileSync(join(WEB, "components/shell/app-shell.tsx"), "utf8")
+    // The wrapper is identified positionally, the same way R20/R29 identify
+    // their own targets: by the one signature of classes only this div
+    // carries (`mx-auto` + `flex` + `w-full` + `max-w-none` + `min-h-full` +
+    // `overflow-x-clip`), never by a line number, which rots the moment a
+    // comment above it grows or shrinks.
+    const marker = "mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip"
+    const markerAt = src.indexOf(marker)
+    expect(markerAt, "app-shell.tsx must still carry the screen-shell body's own content wrapper").toBeGreaterThan(-1)
+    // Bound the search at the div's own opening tag, from the `<div` before
+    // the marker to the first `>` after it — wide enough to hold a `cn(...)`
+    // call's full argument list, narrow enough never to reach the next
+    // element.
+    const divStart = src.lastIndexOf("<div", markerAt)
+    const tagEnd = src.indexOf(">", markerAt)
+    expect(divStart, "the marker must sit inside a <div ...> opening tag").toBeGreaterThan(-1)
+    expect(tagEnd, "the wrapper's own opening tag must close within the file").toBeGreaterThan(markerAt)
+    const wrapperTag = src.slice(divStart, tagEnd)
+    // The guard itself must be present and must be the thing gating the
+    // leading-space utility — not merely present somewhere unrelated in the
+    // tag (a `pb-24`/`mb-` on a different concern would not satisfy this).
+    expect(
+      wrapperTag,
+      "a trail-conditional guard (`!hasTrail && \"pt-...\"`) must gate this wrapper's own leading space"
+    ).toMatch(/!hasTrail\s*&&\s*"[^"]*\b(pt|mt)-/)
+    // And the part of the tag OUTSIDE that guard — the plain string literals
+    // — must carry no `pt-`/`mt-` utility of its own. Strip the guarded
+    // expression out first so its own `pt-`/`mt-` (which is SUPPOSED to be
+    // there) cannot trip this half.
+    const withoutGuard = wrapperTag.replace(/!hasTrail\s*&&\s*"[^"]*"/, "")
+    expect(
+      withoutGuard,
+      "the wrapper's own unconditional classes must not carry a pt-/mt- utility outside the trail guard"
+    ).not.toMatch(/[\s"](?:pt|mt)-\S/)
+  })
 })

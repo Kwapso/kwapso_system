@@ -219,6 +219,27 @@ export interface KanbanMove {
   toIndex: number;
 }
 
+/**
+ * `onCardSelect`'s own third argument — ADDED 2026-09-17, BACKWARD
+ * COMPATIBLE. `BoardCard` is `<Card>`, which is a plain `<div>`
+ * (`card.tsx`'s own root), not a `<button>` — so `onClick`, `onAuxClick` and
+ * `onMouseDown` are ordinary DOM handlers `card.tsx` already forwards
+ * through its own `{...props}` spread, and every one of the three real
+ * triggers for `onCardSelect` (a left click, a middle/`auxclick`, and
+ * Enter/Space on the keyboard) already hands this file a real event object —
+ * nothing here was ever swallowed, it was only never PASSED UP. The app
+ * needs cmd/ctrl/middle-click ("open beside") on a card, which is read off
+ * `event.metaKey`/`ctrlKey`/`button`, none of which the two-argument
+ * `(card, column)` signature could carry. `column` STAYS the second
+ * argument — it was already there before this change, and moving it would
+ * break every existing caller — so the event is appended as a THIRD,
+ * additive argument rather than inserted as the task's own wording ("the
+ * second argument") would have required; every caller that reads only
+ * `(card, column)` keeps compiling and keeps working unchanged. */
+export type KanbanCardSelectEvent =
+  | React.MouseEvent<HTMLDivElement>
+  | React.KeyboardEvent<HTMLDivElement>;
+
 /* ============================================================================
    The registers — transcribed, local
    ========================================================================= */
@@ -277,7 +298,7 @@ export interface KanbanProps extends Omit<React.ComponentPropsWithoutRef<"div">,
    */
   onMove?: (move: KanbanMove) => void;
   /** A card was pressed — opened, usually. Without it a card is not a target. */
-  onCardSelect?: (card: KanbanCard, column: KanbanColumn) => void;
+  onCardSelect?: (card: KanbanCard, column: KanbanColumn, event: KanbanCardSelectEvent) => void;
 
   /**
    * How wide one column is. `18rem` by default, which is the kit's own
@@ -776,7 +797,7 @@ function Column({
   emptyColumns: "register" | "bare";
   cardRoleLabel: string;
   moveHintLabel: string;
-  onCardSelect?: (card: KanbanCard, column: KanbanColumn) => void;
+  onCardSelect?: (card: KanbanCard, column: KanbanColumn, event: KanbanCardSelectEvent) => void;
   onCarry: (id: string | null) => void;
   onOver: (id: string | null) => void;
   onDropCard: (cardId: string, toIndex: number) => void;
@@ -966,7 +987,7 @@ function BoardCard({
   carrying: string | null;
   cardRoleLabel: string;
   moveHintLabel: string;
-  onCardSelect?: (card: KanbanCard, column: KanbanColumn) => void;
+  onCardSelect?: (card: KanbanCard, column: KanbanColumn, event: KanbanCardSelectEvent) => void;
   onCarry: (id: string | null) => void;
   onDropCard: (cardId: string, toIndex: number) => void;
   onMoveKey: (cardId: string, key: string) => void;
@@ -1035,13 +1056,45 @@ function BoardCard({
         }
         if (pressable && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
-          onCardSelect?.(card, column);
+          onCardSelect?.(card, column, event);
         }
       }}
       onClick={
         pressable
-          ? () => {
-              onCardSelect?.(card, column);
+          ? (event) => {
+              onCardSelect?.(card, column, event);
+            }
+          : undefined
+      }
+      /* THE AUX CLICK — a middle-button press, which never fires `onClick`
+         at all (that is a left-button-only event; Chrome's own contract).
+         `card.tsx`'s root is a plain `<div>`, not a `<button>`, so this is
+         an ordinary DOM handler `Card` forwards through its own `{...props}`
+         spread — nothing here needed a `<button>` to read a middle click.
+         Same callback, same three arguments: the app reads
+         `event.button === 1` off the third one to tell "middle-click" apart
+         from "left-click, cmd/ctrl held", which arrives through `onClick`
+         above instead. Gated on `pressable`, same as `onClick` — a disabled
+         or unselectable card answers no mouse button. */
+      onAuxClick={
+        pressable
+          ? (event) => {
+              onCardSelect?.(card, column, event);
+            }
+          : undefined
+      }
+      /* THE MIDDLE BUTTON'S OWN `mousedown`, PREVENTED — not because this
+         card does anything with `mousedown` itself, but because an
+         unprevented middle `mousedown` starts Chrome's autoscroll (the
+         floating scroll-dot cursor) BEFORE the matching `auxclick` above
+         ever fires, which eats the gesture the app needs "open beside" to
+         read. Gated on `pressable` for the same reason `onAuxClick` is —
+         a card nothing can select should not fight the browser's own
+         default over a button that does nothing here. */
+      onMouseDown={
+        pressable
+          ? (event) => {
+              if (event.button === 1) event.preventDefault();
             }
           : undefined
       }

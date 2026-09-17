@@ -5,13 +5,29 @@
 // cmd/ctrl-click or a middle-click opens `path` beside the active tab
 // (`openBeside`) IN THE BACKGROUND and never calls `onOpen`; +Shift on either
 // gesture opens beside AND calls `onOpen`, switching her there too.
-// `ticket-row-opens-beside.test.tsx` and `record-table.test.tsx` prove the
-// same behaviours again through each of their own tables — this is the one
-// place they are proved once, against the seam itself, and against
+// `ticket-row-opens-beside.test.tsx` and `record-table-opens-beside.test.tsx`
+// prove the same behaviours again through each of their own tables — this is
+// the one place they are proved once, against the seam itself, and against
 // `clickGesture` — the shared classifier `InAppLink` now reads the identical
 // grammar through (`in-app-link.test.tsx` proves it there).
-
-import { describe, expect, it, beforeEach, afterEach } from "vitest"
+//
+// REAL DOM EVENTS, ON A MOUNTED ELEMENT — NEVER A HAND-BUILT FAKE OBJECT.
+// Until 18 Sep 2026 every test below called `handlers.onClick(fakeEvent)` /
+// `handlers.onAuxClick(fakeEvent)` directly, with a five-field stand-in for
+// `React.MouseEvent`. That shape passed every one of these tests while the
+// live app, on staging, failed three different ways: a real `<a href>`'s
+// middle-click did nothing at all, a cmd+shift-click REPLACED the tab instead
+// of opening beside it, and a board card's cmd-click navigated in place — none
+// of which a direct function call, with a hand-rolled `preventDefault` that
+// never has to survive React's own event system or a real browser's own
+// default actions (autoscroll on a middle mousedown, a link's own navigation),
+// could ever have caught. `in-app-link.test.tsx` already tests through a
+// mounted anchor; this file now mounts `rowOpenHandlers`'s own two handlers on
+// a plain element and drives them with `fireEvent`, the identical discipline,
+// so the SEAM's own suite can no longer pass on a claim the DOM does not back.
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import * as React from "react"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { clickGesture, rowOpenHandlers } from "@/lib/row-open"
 import {
@@ -22,26 +38,23 @@ import {
   visitTrail,
 } from "@/lib/workspace-tabs"
 
-/** A MINIMAL STAND-IN FOR `React.MouseEvent` — the helper reads exactly five
- * things off it (`metaKey`, `ctrlKey`, `shiftKey`, `altKey`, `button`,
- * `preventDefault`), so a fuller fake buys nothing; a `React.MouseEvent`
- * cast would need a whole DOM event behind it for no reason a test needs. */
-function click(
-  opts: Partial<{ metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; button: number }> = {}
-) {
-  let prevented = false
-  const e = {
-    metaKey: opts.metaKey ?? false,
-    ctrlKey: opts.ctrlKey ?? false,
-    shiftKey: opts.shiftKey ?? false,
-    altKey: opts.altKey ?? false,
-    button: opts.button ?? 0,
-    preventDefault: () => {
-      prevented = true
-    },
-  }
-  return { e: e as unknown as React.MouseEvent, wasPrevented: () => prevented }
+/** THE MINIMAL ROW `rowOpenHandlers` IS BUILT FOR — a plain element with no
+ * anchor under it (the shape `TicketRowsTable`/`RecordTable`/`AppTicketsBoard`
+ * each wire the returned handlers onto), so this proves the seam the way its
+ * real callers actually reach it: through React's own synthetic event system
+ * on a mounted DOM node, driven by `fireEvent`, never by calling a handler
+ * function with a value this file constructed itself. */
+function Row({ path, label, onOpen }: { path: string; label: string; onOpen: () => void }) {
+  const handlers = rowOpenHandlers(path, label, onOpen)
+  return (
+    <div role="row" onClick={handlers.onClick} onAuxClick={handlers.onAuxClick}>
+      {label}
+    </div>
+  )
 }
+
+const auxClick = (el: Element, opts: { button: number; shiftKey?: boolean }) =>
+  fireEvent(el, new MouseEvent("auxclick", { bubbles: true, cancelable: true, ...opts }))
 
 beforeEach(() => {
   forgetOpenTabs()
@@ -51,35 +64,30 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   forgetOpenTabs()
 })
 
 describe("rowOpenHandlers — a plain click", () => {
-  it("calls onOpen, never openBeside, and mints no tab", () => {
+  it("calls onOpen, never openBeside, mints no tab, and never prevents the default", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click()
-    handlers.onClick(e)
+    const notCanceled = fireEvent.click(screen.getByText("Acme"))
     expect(opened).toBe(1)
-    expect(wasPrevented()).toBe(false)
+    expect(notCanceled, "a plain click must not call preventDefault").toBe(true)
     expect(openTabsSnapshot()).toHaveLength(before)
   })
 })
 
 describe("rowOpenHandlers — cmd/ctrl-click", () => {
-  it("meta-click opens beside and never calls onOpen", () => {
+  it("meta-click opens beside, prevents the default, and never calls onOpen", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ metaKey: true })
-    handlers.onClick(e)
+    const notCanceled = fireEvent.click(screen.getByText("Acme"), { metaKey: true })
     expect(opened).toBe(0)
-    expect(wasPrevented()).toBe(true)
+    expect(notCanceled, "a beside-opening click must call preventDefault").toBe(false)
     expect(openTabsSnapshot()).toHaveLength(before + 1)
     const opened_tab = openTabsSnapshot().at(-1)
     expect(opened_tab?.steps).toEqual([{ path: "/t/team1/accounts/acc-1", label: "Acme" }])
@@ -87,41 +95,41 @@ describe("rowOpenHandlers — cmd/ctrl-click", () => {
 
   it("ctrl-click does the same, for Windows/Linux", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e } = click({ ctrlKey: true })
-    handlers.onClick(e)
+    fireEvent.click(screen.getByText("Acme"), { ctrlKey: true })
     expect(opened).toBe(0)
     expect(openTabsSnapshot()).toHaveLength(before + 1)
   })
 })
 
-describe("rowOpenHandlers — middle-click, on onAuxClick", () => {
-  it("button 1 opens beside and never calls onOpen", () => {
+describe("rowOpenHandlers — middle-click, via a real auxclick event", () => {
+  it("button 1 opens beside, prevents the default, and never calls onOpen", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ button: 1 })
-    handlers.onAuxClick(e)
+    const notCanceled = auxClick(screen.getByText("Acme"), { button: 1 })
     expect(opened).toBe(0)
-    expect(wasPrevented()).toBe(true)
+    expect(notCanceled, "a middle-click open must call preventDefault").toBe(false)
     expect(openTabsSnapshot()).toHaveLength(before + 1)
   })
 
-  it("any other button on onAuxClick does nothing — never onOpen, never a tab", () => {
+  it("any other button on auxclick does nothing — never onOpen, never a tab, never prevented", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ button: 2 })
-    handlers.onAuxClick(e)
+    const notCanceled = auxClick(screen.getByText("Acme"), { button: 2 })
     expect(opened).toBe(0)
-    expect(wasPrevented()).toBe(false)
+    expect(notCanceled).toBe(true)
+    expect(openTabsSnapshot()).toHaveLength(before)
+  })
+
+  it("a plain click never fires the beside behaviour through onAuxClick either", () => {
+    let opened = 0
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
+    const before = openTabsSnapshot().length
+    auxClick(screen.getByText("Acme"), { button: 0 })
+    expect(opened).toBe(0)
     expect(openTabsSnapshot()).toHaveLength(before)
   })
 })
@@ -135,75 +143,66 @@ describe("rowOpenHandlers — middle-click, on onAuxClick", () => {
 // BACKGROUND" block).
 describe("rowOpenHandlers — cmd/ctrl-click opens beside IN THE BACKGROUND", () => {
   it("meta-click never fronts the new tab — the previously active tab stays active", () => {
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {})
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => {}} />)
     const beforeId = activeTabIdSnapshot()
-    const { e } = click({ metaKey: true })
-    handlers.onClick(e)
+    fireEvent.click(screen.getByText("Acme"), { metaKey: true })
     expect(activeTabIdSnapshot()).toBe(beforeId)
   })
 })
 
 describe("rowOpenHandlers — +Shift opens beside AND switches (calls onOpen too)", () => {
-  it("meta+shift-click opens beside, fronts the new tab, and calls onOpen", () => {
+  it("meta+shift-click opens beside, fronts the new tab, prevents the default, and calls onOpen", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ metaKey: true, shiftKey: true })
-    handlers.onClick(e)
+    const notCanceled = fireEvent.click(screen.getByText("Acme"), { metaKey: true, shiftKey: true })
     expect(opened).toBe(1) // switched — the plain-click action ran too
-    expect(wasPrevented()).toBe(true)
+    expect(notCanceled).toBe(false)
     expect(openTabsSnapshot()).toHaveLength(before + 1)
     const opened_tab = openTabsSnapshot().at(-1)
     expect(activeTabIdSnapshot()).toBe(opened_tab?.id)
   })
 
-  it("middle-click+shift, via onAuxClick, does the same", () => {
+  it("middle-click+shift, via a real auxclick event, does the same", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e } = click({ button: 1, shiftKey: true })
-    handlers.onAuxClick(e)
+    auxClick(screen.getByText("Acme"), { button: 1, shiftKey: true })
     expect(opened).toBe(1)
     expect(openTabsSnapshot()).toHaveLength(before + 1)
+    const opened_tab = openTabsSnapshot().at(-1)
+    expect(activeTabIdSnapshot()).toBe(opened_tab?.id)
   })
 })
 
 describe("rowOpenHandlers — Shift or Alt alone are left alone, same as a real anchor", () => {
   it("a plain shift-click does nothing — no onOpen, no tab, no preventDefault", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ shiftKey: true })
-    handlers.onClick(e)
+    const notCanceled = fireEvent.click(screen.getByText("Acme"), { shiftKey: true })
     expect(opened).toBe(0)
-    expect(wasPrevented()).toBe(false)
+    expect(notCanceled).toBe(true)
     expect(openTabsSnapshot()).toHaveLength(before)
   })
 
   it("alt alone does nothing, even combined with cmd", () => {
     let opened = 0
-    const handlers = rowOpenHandlers("/t/team1/accounts/acc-1", "Acme", () => {
-      opened++
-    })
+    render(<Row path="/t/team1/accounts/acc-1" label="Acme" onOpen={() => { opened++ }} />)
     const before = openTabsSnapshot().length
-    const { e, wasPrevented } = click({ metaKey: true, altKey: true })
-    handlers.onClick(e)
+    const notCanceled = fireEvent.click(screen.getByText("Acme"), { metaKey: true, altKey: true })
     expect(opened).toBe(0)
-    expect(wasPrevented()).toBe(false)
+    expect(notCanceled).toBe(true)
     expect(openTabsSnapshot()).toHaveLength(before)
   })
 })
 
 // `clickGesture` ITSELF — the pure classifier both `rowOpenHandlers` (above)
-// and `InAppLink` (in-app-link.test.tsx) now read a click through. Tested
-// directly here rather than only through a rendered component, because it is
-// the one function the whole grammar actually lives in.
+// and `InAppLink` (in-app-link.test.tsx) now read a click through. This part
+// alone stays a direct call: there is no DOM behaviour to bypass by calling a
+// function that reads five fields and returns a string — the whole grammar
+// lives here, and it is the one function worth pinning in isolation from any
+// element at all.
 describe("clickGesture", () => {
   const base = { metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, button: 0 }
 

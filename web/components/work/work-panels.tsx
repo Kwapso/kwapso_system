@@ -50,7 +50,7 @@ import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resource
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
-import { rowOpenHandlers } from "@/lib/row-open"
+import { applyClickGesture, clickGesture, rowOpenHandlers } from "@/lib/row-open"
 import { HELP_STATUSES } from "@shared/types"
 import type {
   AppRow,
@@ -1471,40 +1471,45 @@ function AppTicketsBoard({
   const { t, lang } = useLanguage()
   const COLUMN = ticketStatusColumnTitles(t)
   const baseCard = ticketBoardCard(teamId, t, lang)
-  // A CMD/CTRL-CLICK OR A MIDDLE-CLICK MEANS "OPEN BESIDE" here too — the
-  // last known gap in this file's own reading of the 17 Sep 2026 ruling
-  // (`row-open.ts`'s own header): every OTHER collection row/card in the app
-  // reaches `rowOpenHandlers` and this board's cards did not, because
-  // `Kanban`'s own `onCardSelect` (the kit, shared/ui) hands back the CARD
-  // and nothing about the click itself — no `metaKey`, no `ctrlKey`, no
-  // `button` — so there is no modifier for `onCardSelect` to read even if it
-  // wanted to. `Kanban`'s own card `title` accepts any node, which is the one
-  // seam this file can reach without a kit change (R39): the title carries
-  // the row's own handlers and stops the click from ALSO reaching the outer
-  // card's plain-open (`e.stopPropagation()`), the identical guard the List
-  // body's own title `<Button variant="link">` already writes, a few hundred
-  // lines up, for the identical reason — two controls over one record, and
-  // only one of them may answer a click.
-  const boardCard = (r: HelpTicket) => {
-    const card = baseCard(r)
-    const handlers = rowOpenHandlers(`${host.base}/tickets/${r.id}`, ticketTitle(r), () => onOpen(r.id))
-    return {
-      ...card,
-      title: (
-        <span
-          onClick={(e) => {
-            e.stopPropagation()
-            handlers.onClick(e)
-          }}
-          onAuxClick={(e) => {
-            e.stopPropagation()
-            handlers.onAuxClick(e)
-          }}
-        >
-          {card.title}
-        </span>
-      ),
+  // ONE GRAMMAR NOW, THROUGH THE KIT'S OWN THIRD ARGUMENT (Kanban v1.2.113,
+  // `onCardSelect(card, column, event)`) — the title `<span>` this file used
+  // to wrap every card in is gone. It existed only because `onCardSelect`
+  // used to hand back the CARD and nothing about the click — no `metaKey`, no
+  // `ctrlKey`, no `button` — so there was no modifier for it to read even if
+  // it wanted to, and the one seam this file could reach without a kit change
+  // (R39) was `Kanban`'s own card `title` node. The kit now forwards the real
+  // event off every one of the card's own three triggers (`card.tsx`: a plain
+  // `onClick`, a middle-button `onAuxClick`, and Enter/Space through
+  // `onKeyDown` — the middle button's own `mousedown` is ALSO guarded there
+  // now, so this file no longer needs a guard of its own either), so the same
+  // grammar every other row/card in the app already reaches
+  // (`clickGesture`/`applyClickGesture`, web/lib/row-open.ts) is read
+  // straight off it, once, at the board.
+  const handleCardSelect = (
+    card: { id: string },
+    _column: unknown,
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    // A KEYBOARD ACTIVATION (Enter/Space) CARRIES NO `button` AT ALL — the
+    // kit already calls `preventDefault` on it before forwarding, and there
+    // is no "open beside" gesture on a keyboard press to carve out, exactly
+    // as a real anchor's own Enter does not either. `clickGesture` reads
+    // mouse fields only, so a keyboard event is answered here directly
+    // rather than handed to it.
+    if (!("button" in event)) {
+      onOpen(card.id)
+      return
     }
+    const gesture = clickGesture(event)
+    if (gesture === null) return
+    if (gesture !== "same") event.preventDefault()
+    const row = rows.find((r) => r.id === card.id)
+    applyClickGesture(
+      gesture,
+      `${host.base}/tickets/${card.id}`,
+      row ? ticketTitle(row) : card.id,
+      () => onOpen(card.id)
+    )
   }
   return (
     <Kanban
@@ -1515,13 +1520,10 @@ function AppTicketsBoard({
       columns={HELP_STATUSES.map((stage) => ({
         id: stage,
         title: COLUMN[stage].title,
-        cards: rows.filter((r) => r.status === stage).map(boardCard),
+        cards: rows.filter((r) => r.status === stage).map(baseCard),
         emptyLabel: t("Nothing at this stage."),
       }))}
-      // STILL THE PLAIN-CLICK DOOR — a click anywhere on a card that is not
-      // the title (the chips, the description, the padding) has no nested
-      // handler of its own, so it falls through to this, unchanged.
-      onCardSelect={(card) => onOpen(card.id)}
+      onCardSelect={handleCardSelect}
       footnote={t(
         "Cards are this app's own tickets, as far as they have loaded. Click a card to open the ticket."
       )}

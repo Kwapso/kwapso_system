@@ -163,6 +163,23 @@ export function InAppLink({
         e.stopPropagation()
         applyClickGesture(gesture, safe, beside_label(children, safe), () => go(safe))
       }}
+      // THE MIDDLE BUTTON MUST BE STOPPED ON THE WAY DOWN, NOT JUST ON THE
+      // WAY UP. Found live on staging 18 Sep 2026: a middle-click on a real
+      // `<a href>` did NOTHING — no app tab, no browser tab either — because
+      // an un-prevented middle `mousedown` puts Chrome into its own autoscroll
+      // mode before the matching `auxclick` above ever fires. The fix is the
+      // same one MDN documents for this exact quirk: `preventDefault` the
+      // middle button at `mousedown` (and `pointerdown`, which some browsers
+      // dispatch autoscroll from instead). Only button 1 is touched — a left
+      // or right press is left to do exactly what it always did, and this
+      // never calls `stopPropagation`, so it carries no opinion about an
+      // ancestor row's own mousedown.
+      onMouseDown={(e) => {
+        if (e.button === 1) e.preventDefault()
+      }}
+      onPointerDown={(e) => {
+        if (e.button === 1) e.preventDefault()
+      }}
       className={className}
     >
       {children}

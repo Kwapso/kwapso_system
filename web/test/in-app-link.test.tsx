@@ -246,6 +246,61 @@ describe("a background beside-open still lands immediately right of the active t
   })
 })
 
+// ── THE MIDDLE-BUTTON AUTOSCROLL GUARD, 18 Sep 2026 ─────────────────────────
+//
+// Reproduced live on staging: middle-clicking an /accounts gallery card's
+// real `<a href>` did NOTHING — no app tab, no browser-native tab either.
+// `onAuxClick` above is correctly wired (the describe block right before this
+// one proves it fires when dispatched directly), so the gap was earlier in
+// the sequence: an un-prevented middle `mousedown` puts Chrome into its own
+// autoscroll mode before the matching `auxclick` is ever dispatched, the same
+// quirk MDN documents for exactly this gesture. jsdom does not model
+// autoscroll itself, so what these pin is the one thing that actually
+// prevents it: the real `mousedown`/`pointerdown` events this anchor now
+// receives are `defaultPrevented` for the middle button, and left alone for
+// every other one — proved on the raw DOM `Event` object `fireEvent`
+// dispatches, never a hand-built stand-in.
+describe("the middle-button mousedown/pointerdown guard — stops Chrome's own autoscroll from eating the auxclick", () => {
+  it("a middle mousedown (button 1) is defaultPrevented", () => {
+    render(<InAppLink href="/apps/A7">Eta</InAppLink>)
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 1 })
+    screen.getByText("Eta").dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it("a middle pointerdown (button 1) is defaultPrevented too", () => {
+    render(<InAppLink href="/apps/A8">Theta</InAppLink>)
+    const event = new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 1 })
+    screen.getByText("Theta").dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it("a left mousedown (button 0) is left alone", () => {
+    render(<InAppLink href="/apps/A9">Iota</InAppLink>)
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })
+    screen.getByText("Iota").dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it("a right mousedown (button 2) is left alone", () => {
+    render(<InAppLink href="/apps/A10">Kappa</InAppLink>)
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 2 })
+    screen.getByText("Kappa").dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it("the middle-click still opens beside end to end — mousedown then auxclick, the real browser sequence", () => {
+    render(<InAppLink href="/apps/A11">Lambda</InAppLink>)
+    const el = screen.getByText("Lambda")
+    const before = openTabsSnapshot().length
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 1 })
+    el.dispatchEvent(down)
+    expect(down.defaultPrevented).toBe(true)
+    fireEvent(el, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }))
+    expect(openTabsSnapshot()).toHaveLength(before + 1)
+  })
+})
+
 describe("shift and alt clicks are left to the browser", () => {
   it("a shift-click is not intercepted at all — no tab opened, no onNavigate call", () => {
     const seen: string[] = []

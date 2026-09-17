@@ -83,6 +83,7 @@ import { Waves } from "@shared/ui/foundations/icons"
 //     sit INSIDE Rail's own chip. The member card below rebuilds the chip's
 //     look with the kit's own `Avatar`/`Text` and hosts `ProfileMenu` inside it.
 import { Rail, type RailGroup } from "@shared/ui/compositions/templates/rail"
+import { cn } from "@shared/ui/lib/utils"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -603,6 +604,11 @@ export function AppShell({
   const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId)
   const trailSteps = activeWorkspaceTab?.steps ?? []
   const trailCursor = activeWorkspaceTab?.cursor ?? 0
+  // A trail of one step is a top-level location and renders no strip at all
+  // (see the `trail` prop below) — the SAME test the kit's own body div reads
+  // to decide whether TRAIL_GAP already owns the leading gap. One boolean, one
+  // definition, read by both, so the two can never answer differently.
+  const hasTrail = trailSteps.length >= 2
   // BACK/FORWARD/JUMP MOVE THE STORE'S OWN CURSOR AND HAND BACK A PATH TO GO
   // TO — see `workspace-tabs.ts`'s own doc on `back`/`forward`/`jumpTo` for
   // the one-shot flag that keeps the resulting navigation from pushing a
@@ -1853,7 +1859,7 @@ export function AppShell({
            never re-pushed as a new one (see `workspace-tabs.ts`'s own note
            on `suppressNextPush`). */
         trail={
-          trailSteps.length < 2 ? undefined : (
+          !hasTrail ? undefined : (
             <div
               onClickCapture={(e) => {
                 // Same interception as the tab strip's own `onClickCapture`,
@@ -2024,8 +2030,43 @@ export function AppShell({
          *
          * `pb-24 md:pb-0` IS STILL THE PHONE'S BOTTOM BAR, and it still has
          * to be paid inside the scroller: that bar is `fixed` and overlays
-         * the pane's last rows whether or not the page behind it moves. */}
-        <div className="mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pt-[var(--space-6)] lg:pt-[var(--space-7)] pb-24 md:pb-0">
+         * the pane's last rows whether or not the page behind it moves.
+         *
+         * `pt-[var(--space-6)] lg:pt-[var(--space-7)]` IS TRAIL-CONDITIONAL,
+         * 2026-09-17 NIGHT. `screen-shell.tsx`'s own body pane
+         * (`[data-slot="screen-shell-body"]`, `DENSITY_BODY` in the kit) is
+         * what a TRAIL-LESS screen's leading gap is supposed to be — this
+         * div's `pt` exists only because that pane is also a `position:
+         * sticky` scrollport for `PINNED_TOOLBAR` (R63), and a sticky child
+         * of a PADDED scrollport pins with a permanent gap above it forever,
+         * never flush at the pane's true top edge (measured, staging: a
+         * pinned toolbar on a trail-less screen stopped `--space-6`/`-7`
+         * short of the top on every scroll). So the kit's own leading `py`
+         * on that pane is deliberately ZERO (`screen-shell.tsx`'s own body
+         * div reads 0 computed `padding-top` on staging, trail or not) and
+         * this ordinary, non-sticky wrapper carries the same figure instead
+         * — a sticky descendant still pins flush, an ordinary one still
+         * gets its leading air.
+         *
+         * TRAIL PRESENT, THE SAME AIR IS ALREADY PAID — TWICE, MEASURED:
+         * staging read 40px between the trail's own hairline and the title
+         * against S3's ruled 8, and `screen-shell.tsx`'s trail slot supplies
+         * that whole 8 itself (`DENSITY_TRAIL`'s `pt` + `TRAIL_GAP`'s `mb`,
+         * both INSIDE the trail's own padded box, before this div is ever
+         * reached) — every kit box downstream of it (the header band, this
+         * pane) already reads `pt-0` for exactly this reason. This div is
+         * the one box the kit cannot reach — `app-shell.tsx` owns it — so it
+         * has to zero itself the same way, on the SAME test the `trail` prop
+         * a few lines up already answers (`hasTrail`): the app pays the
+         * pane's leading gap ONLY when there is no trail to pay it instead.
+         * `pb-24 md:pb-0` is untouched — the phone bar it pays for has
+         * nothing to do with the trail. */}
+        <div
+          className={cn(
+            "mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pb-24 md:pb-0",
+            !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
+          )}
+        >
           {/* IS THIS SCREEN STILL LIVE? Renders nothing while the team socket
               is up, which is nearly always — so this adds no box, no height
               and no width in the ordinary case, and R29's one page container

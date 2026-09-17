@@ -45,11 +45,20 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.join(HERE, "screen-shell.tsx");
 const CARD_FILE = path.join(HERE, "..", "..", "components", "card", "card.tsx");
+const RECORD_CHROME_FILE = path.join(HERE, "record-chrome.tsx");
+const RECORD_DETAIL_FILE = path.join(HERE, "..", "..", "components", "record-detail", "record-detail.tsx");
+const TITLE_FILE = path.join(HERE, "..", "..", "components", "title", "title.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
 const rel = path.relative(process.cwd(), FILE);
 const cardSrc = fs.readFileSync(CARD_FILE, "utf8");
 const cardRel = path.relative(process.cwd(), CARD_FILE);
+const recordChromeSrc = fs.readFileSync(RECORD_CHROME_FILE, "utf8");
+const recordChromeRel = path.relative(process.cwd(), RECORD_CHROME_FILE);
+const recordDetailSrc = fs.readFileSync(RECORD_DETAIL_FILE, "utf8");
+const recordDetailRel = path.relative(process.cwd(), RECORD_DETAIL_FILE);
+const titleSrc = fs.readFileSync(TITLE_FILE, "utf8");
+const titleRel = path.relative(process.cwd(), TITLE_FILE);
 
 // Each pattern is a working CODE SHAPE the resize feature needs — a
 // declaration, a prop signature, or a call-site — not a bare identifier, so
@@ -285,6 +294,114 @@ if (trailSpacingFindings.length > 0) {
 console.log(
   "OK screen-shell trail-spacing check: DENSITY_TRAIL pt, TRAIL_GAP, the trail's own <Separator />, and the " +
     "title slot's leading pt pinned to zero (header and body) whenever a trail renders all read S3's values.",
+);
+
+/* ============================================================================
+   THE 17 SEP 2026 NIGHT BODY-HOSTED TITLE CHECK — a THIRD place the same
+   "space above the title" figure could hide, found reading `agency-staging`
+   live (root 16px): `/tasks` and `/tickets` still measured 40px between the
+   hairline and the title AFTER the two checks above went green, because
+   neither `one`/`four`/`nine` in `verify/trail-line/` nor the two checks
+   above ever render the shape the system's own fourteen record screens
+   actually use. `RecordRoute` (`record-route.tsx`) hands `ScreenShell` NO
+   `title`/`header` at all — `band` is `null`, `screen-shell-header` never
+   renders — and passes `RecordChrome` as `children` instead, whose title is
+   drawn by `RecordDetail`'s OWN header region, inside `screen-shell-body`.
+   The two checks above pin `screen-shell.tsx`'s own render sites; they say
+   nothing about whether `record-detail.tsx`, `record-chrome.tsx` or
+   `title.tsx` themselves spend a leading `pt`/`mt` above that region, which
+   would double the gap exactly the way `DENSITY_HEADER`'s `pt` once did,
+   invisibly to every proof that only reads `screen-shell.tsx`.
+
+   MEASURED: on `agency-staging`, `screen-shell-body`'s own `paddingTop`
+   already reads 0px (the fix above IS live and IS correct) and every
+   KIT-OWNED box between it and the title — `record-chrome`'s root,
+   `record-detail`'s header region, `Title`'s own root — reads 0 padding and
+   0 margin too. The remaining 32 of the live 40 (`TRAIL_GAP`'s 8 plus 32) is
+   `--space-7` at a 16px root, paid by a wrapper `agency-staging` builds
+   around whatever it hands `ScreenShell` as `children` — a box this repo
+   does not contain (`pb-24`, `overflow-x-clip`, `max-w-none min-w-0
+   min-h-full` together match nothing here) and so cannot be asserted here
+   either; it is the pipeline owner's fact, logged in the CHANGELOG, not a
+   defect this check can catch or this file can fix.
+
+   WHAT THIS CHECK CAN AND DOES PIN: the three KIT-OWNED render sites stay at
+   zero, as working code shapes, so a regression that gives any of them a
+   leading `pt`/`mt` fails here instead of waiting for the next
+   `getComputedStyle` read to catch it by hand. `verify/trail-line/`'s own
+   `record` case renders this exact composition and reads the same 8 off the
+   live DOM — this check is the static half of that proof. */
+const bodyTitleFindings = [];
+
+const RECORD_DETAIL_HEADER_BLOCK = /data-record-region="header"[\s\S]{0,300}?className="([^"]*)"/;
+const recordDetailHeaderMatch = recordDetailSrc.match(RECORD_DETAIL_HEADER_BLOCK);
+if (!recordDetailHeaderMatch) {
+  bodyTitleFindings.push(
+    `${recordDetailRel} does not have a data-record-region="header" block with a plain className to check.`,
+  );
+} else if (/\b(?:pt|mt)-[^\s"]/.test(recordDetailHeaderMatch[1])) {
+  bodyTitleFindings.push(
+    `${recordDetailRel}'s header region (data-record-region="header") carries its own leading pt-/mt- ` +
+      `("${recordDetailHeaderMatch[1]}") — that doubles the gap above a body-hosted title exactly the way ` +
+      "DENSITY_HEADER's pt once doubled the header-band one.",
+  );
+}
+
+if (!/const SHAPE_SHELL: Record<ScreenDensity, string> = \{\s*comfortable: "gap-6",\s*calm: "gap-\[var\(--space-7\)\] mx-auto w-full max-w-\[60rem\]",\s*\};/.test(
+  fs.readFileSync(path.join(HERE, "..", "states", "states.tsx"), "utf8"),
+)) {
+  bodyTitleFindings.push(
+    "SHAPE_SHELL (compositions/states/states.tsx) no longer reads its known pt-/mt-free shape — " +
+      "record-chrome.tsx's own root spends this token and a pt/mt added there would sit above every record's title.",
+  );
+}
+
+const RECORD_CHROME_ROOT = /data-slot="record-chrome"[\s\S]{0,200}?className=\{cn\(([^)]*)\)\}/;
+const recordChromeRootMatch = recordChromeSrc.match(RECORD_CHROME_ROOT);
+if (!recordChromeRootMatch) {
+  bodyTitleFindings.push(`${recordChromeRel} does not have a data-slot="record-chrome" root with a cn(...) className to check.`);
+} else if (/\b(?:pt|mt)-[^\s"'`]/.test(recordChromeRootMatch[1])) {
+  bodyTitleFindings.push(
+    `${recordChromeRel}'s own root (data-slot="record-chrome") spends a literal pt-/mt- in its cn(...) call — ` +
+      "that sits above every record's title, header band or not.",
+  );
+}
+
+// `Title`'s OWN ROOT (`data-slot="title"`) MUST NOT CARRY AN UNCONDITIONAL
+// LEADING pt-/mt- — the one conditional case (`mt-[var(--space-1h)]` on
+// `title-heading` when `eyebrow` is set) is untouched by this check because
+// `RecordChrome` never passes `eyebrow` (override 73), so it never fires on
+// a record; this pins the ROOT div's own className, which is unconditional.
+const TITLE_ROOT_BLOCK = /data-slot="title"[\s\S]{0,700}?className=\{cn\(([\s\S]{0,700}?)\)\}/;
+const titleRootMatch = titleSrc.match(TITLE_ROOT_BLOCK);
+if (!titleRootMatch) {
+  bodyTitleFindings.push(`${titleRel} does not have a data-slot="title" root with a cn(...) className to check.`);
+} else {
+  // Only the two literal strings up to (not including) the `rule && …` ternary
+  // are unconditional — that ternary's own `pb-[var(--space-3h)]` is a real,
+  // deliberate leading-edge-adjacent value this check must not trip on, so
+  // this reads only the text BEFORE it, not the whole cn(...) argument list.
+  const unconditionalPart = titleRootMatch[1].split(/rule\s*&&/)[0];
+  if (/\b(?:pt|mt)-[^\s"]/.test(unconditionalPart)) {
+    bodyTitleFindings.push(
+      `${titleRel}'s own root (data-slot="title") carries an unconditional pt-/mt- ` +
+        `("${unconditionalPart.trim()}") — a record's title has no eyebrow above it to justify one.`,
+    );
+  }
+}
+
+if (bodyTitleFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell body-hosted-title check (S3/D2, the record shape):\n" +
+      bodyTitleFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell body-hosted-title check: record-chrome.tsx's root, record-detail.tsx's header region and " +
+    "title.tsx's own root all stay pt-/mt-free, so a record's body-hosted title carries no leading space of its " +
+    "own beyond screen-shell-body's already-checked pt-0.",
 );
 
 /* ============================================================================

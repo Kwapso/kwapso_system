@@ -35,7 +35,13 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpTicket } from "@shared/types"
-import { forgetOpenTabs, openTabsSnapshot, setWorkspaceScope, visitTrail } from "@/lib/workspace-tabs"
+import {
+  activeTabIdSnapshot,
+  forgetOpenTabs,
+  openTabsSnapshot,
+  setWorkspaceScope,
+  visitTrail,
+} from "@/lib/workspace-tabs"
 
 // A REAL RADIX SELECT UNDER THE VIEW SWITCH — jsdom measures nothing and
 // captures no pointer, so the three stand-ins `no-sort-in-calendar-views.
@@ -346,5 +352,38 @@ describe("an app's Tickets tab draws the list as a table", () => {
     const card = screen.getByText(/dispatch board stops refreshing/i)
     fireEvent(card, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }))
     expect(openTabsSnapshot()).toHaveLength(before + 1)
+  })
+
+  // THE MIDDLE-BUTTON MOUSEDOWN GUARD, ON THE CARD TITLE TOO — the same
+  // Chrome autoscroll quirk `in-app-link.test.tsx`'s own guard block pins for
+  // a real anchor (18 Sep 2026): an un-prevented middle mousedown can eat the
+  // auxclick above before it ever fires. `AppTicketsBoard`'s title span
+  // carries the identical guard (work-panels.tsx), proved here the same way —
+  // a real `mousedown`, read back off its own `defaultPrevented`.
+  it("a middle mousedown on a board card title is defaultPrevented, so the auxclick above cannot be swallowed", () => {
+    show()
+    fireEvent.click(screen.getByRole("combobox", { name: "View" }))
+    fireEvent.click(screen.getByRole("option", { name: "Board" }))
+    const card = screen.getByText(/dispatch board stops refreshing/i)
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 1 })
+    card.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  // CMD+SHIFT-CLICK ON A BOARD CARD — "beside-switch": a new tab opens beside
+  // the active one AND she is switched to it, Chrome's own "open link in new
+  // tab and switch to it." Only cmd-click (background) and middle-click were
+  // pinned above; this is the third gesture `clickGesture` names, proved
+  // through the identical title span rather than assumed from the other two.
+  it("cmd+shift-click on a board card opens beside AND switches her to it", () => {
+    show()
+    fireEvent.click(screen.getByRole("combobox", { name: "View" }))
+    fireEvent.click(screen.getByRole("option", { name: "Board" }))
+    const before = openTabsSnapshot().length
+    fireEvent.click(screen.getByText(/dispatch board stops refreshing/i), { metaKey: true, shiftKey: true })
+    expect(openTabsSnapshot()).toHaveLength(before + 1)
+    const opened = openTabsSnapshot().at(-1)
+    expect(opened?.steps[0]?.path).toBe("/t/T1/tickets/H1")
+    expect(activeTabIdSnapshot()).toBe(opened?.id) // switched, not left in the background
   })
 })

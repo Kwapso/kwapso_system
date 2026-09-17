@@ -2,6 +2,104 @@
 
 ## Unreleased
 
+### Fixed — the record shape's hairline-to-title gap, and the kanban card's mouse gesture — v1.2.113
+
+**ITEM 1 — THE LIVE 40 WAS NEVER THIS REPO'S BUG, AND THE PROOF NOW SAYS SO
+IN A SECOND PLACE.** `agency-staging.kwapso.app/tasks` and `/tickets` (root
+16px, staging `a258e3e4`) still measured content-top→trail 20px (PASS) and
+hairline→title 40px (still FAIL) after v1.2.112 shipped. Measured with
+`getComputedStyle` on every box between the hairline and the title, live,
+via Playwright with a saved session (`kwapso_system/node_modules/playwright`,
+`agency-staging.kwapso.app/tasks/01M2JDD6GYBY8CQJMWBDX4CWVE` and
+`/tickets/01M1XVSTF6A2ZA16XSWTPB30MK`): `screen-shell-body`'s own
+`paddingTop` already reads **0px** — v1.2.112's `trail && !band ? "pt-0
+lg:pt-0"` fix on `screen-shell.tsx` IS live and IS correct, and every other
+KIT-OWNED box in the chain (`record-chrome`'s root, `record-detail`'s
+header region, `Title`'s own root) reads **0 padding, 0 margin** too. The
+40 is `TRAIL_GAP`'s correct 8 plus a further 32, and 32 is `--space-7` at a
+16px root — a figure this repo does not spend anywhere between a record's
+hairline and its title. Confirmed by grep, not assumed: `pb-24`,
+`overflow-x-clip` and `max-w-none min-w-0 min-h-full` together (the class
+list on the wrapper actually carrying the 32px `padding-top`, read off the
+live DOM one level inside `screen-shell-body`) match nothing anywhere in
+this repo. That wrapper is built around whatever `agency-staging` hands
+`ScreenShell` as `children`, outside every file this repo contains — the
+pipeline owner's fact (see the tag-pinning-lag note on v1.2.112, above),
+not a defect in this one.
+
+**WHY IT TOOK A SECOND PROOF TO SAY THAT WITH CONFIDENCE.** v1.2.112 fixed
+`screen-shell.tsx`'s own two render sites (`screen-shell-header`'s
+`trail ? "pt-0"`, `screen-shell-body`'s `trail && !band ? "pt-0 lg:pt-0"`)
+and `verify/trail-line/`'s existing four cases (`none`/`one`/`four`/`nine`)
+all hand `ScreenShell` a `title` prop — the HEADER-band-hosted shape. Not
+one of the system's fourteen record screens uses that shape:
+`RecordRoute` hands `ScreenShell` no `title`/`header` at all (`band` is
+`null`) and passes `RecordChrome` as `children` instead, whose own title
+draws inside `screen-shell-body` (`RecordDetail`'s header region) — a
+THIRD place the same "space above the title" figure could have hidden,
+never rendered by this harness before tonight. `verify/trail-line/page.tsx`
+now has a fifth case, `record`, reproducing exactly that composition
+(`ScreenShell` with `trail`, no header props, `RecordChrome` as `children`)
+— and its `gapAboveTrailIs20`/`gapHairlineToTitleIs8` both read **true**,
+by construction, on this repo's own harness. Screenshot:
+`trail-line-record-1440.png` (1440 wide, the `record` case's card,
+`npm run dev` inside `verify/trail-line/`, port 5330) shows the trail sitting
+20 below the card top and the title sitting 8 below the hairline, visually,
+on the same render the probe measured.
+
+`compositions/templates/check-screen-shell.mjs` gained a fourth static
+check, the body-hosted-title check, pinning the three kit-owned render
+sites (`record-chrome.tsx`'s root, `record-detail.tsx`'s header region,
+`title.tsx`'s own root) at zero leading `pt`/`mt` as working code shapes —
+broken and restored three ways while writing it (a bare `pt-2` on each of
+the three) to confirm it actually fails before trusting it to stay green.
+
+Files: `compositions/templates/check-screen-shell.mjs`,
+`verify/trail-line/page.tsx`. No change to `screen-shell.tsx` itself —
+v1.2.112's fix there was already correct; this pass is proof and a
+regression guard for a shape it did not yet cover, plus the written-down
+finding that the remaining 32 lives outside this repo.
+
+**ITEM 2 — THE KANBAN CARD NOW FORWARDS ITS OWN EVENT.** The app needs
+Chrome's own click gestures on a board card — cmd/ctrl-click and
+middle-click both "open beside" a record. `onCardSelect?.(card, column)`
+never carried a `MouseEvent`, so no caller could read
+`metaKey`/`ctrlKey`/`button` off anything, even though `BoardCard`'s root
+(`card.tsx`) is a plain `<div>` — checked, not assumed; nothing about the
+element itself was ever the obstacle. `column` STAYS the second argument —
+it was already there before this change and moving it would break every
+existing caller — so the event is added as a THIRD, additive argument:
+`onCardSelect?.(card, column, event)`. A function reading only `(card,
+column)` keeps compiling and keeps working unchanged (TypeScript's own
+assignability rule for function types: fewer parameters is a subtype of
+more). The new `KanbanCardSelectEvent` type covers both real triggers —
+`React.MouseEvent<HTMLDivElement>` (click, auxclick) and
+`React.KeyboardEvent<HTMLDivElement>` (Enter/Space).
+
+Two new handlers on the card itself, both gated on `pressable` like
+`onClick` already is: `onAuxClick` fires the same callback for a
+middle-button press, which never fires `onClick` at all (a browser
+contract, not a bug); `onMouseDown` calls `preventDefault()` when
+`event.button === 1` so Chrome's own middle-click autoscroll cannot start
+and eat the gesture before `auxclick` fires. Both are ordinary DOM
+handlers `card.tsx` already forwards through its own `{...props}` spread
+(`CardProps extends React.ComponentPropsWithoutRef<"div">`) — no new prop
+needed on `Card` itself.
+
+`components/kanban/check-kanban.mjs` is new, wired into `npm run check`:
+pins `KanbanCardSelectEvent`'s declaration, the three-argument signature at
+all three of its declaration sites, `onClick`/`onKeyDown` both forwarding
+their own event, and `onAuxClick` + the middle-`mousedown` `preventDefault`
+both forwarding the same callback. Broken and restored four ways (stripped
+the event from `onClick`, renamed `onAuxClick` off its own prop, deleted
+the `mousedown` guard) to confirm each one actually fails before trusting
+it to stay green.
+
+Files: `components/kanban/kanban.tsx`, `components/kanban/check-kanban.mjs`
+(new), `package.json` (`check` script).
+
+`npm run check` — green, foreground, unpiped, both items included.
+
 ### Fixed — the title slot's own leading padding stops stacking under S3's `TRAIL_GAP`; the trail-to-title gap is 8px by construction, not 30 — v1.2.112
 
 **WHY.** `agency-staging.kwapso.app/tasks` measured ~12px above the trail
