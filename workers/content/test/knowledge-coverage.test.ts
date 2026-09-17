@@ -443,6 +443,73 @@ describe("the text a kind produces is knowledge, not a business card", () => {
   })
 })
 
+describe("BUILD-5 §H (18 Sep 2026) — an account or app with nothing human-typed is still a real passage", () => {
+  // "Bergman Marine" (IDS.victimSecond) exists in the shared spine with no
+  // `about`, no code, no app, no ticket — a thin account no different from a
+  // real one the owner just added and has not yet written a description for.
+  //
+  // MEASURED LIVE ON STAGING (mystery-shopper task 10, "tell me about the
+  // Confia account"): a client shaped exactly like this — its account and its
+  // app both `generated_only`, no chunk ever written for either — answered
+  // with ONE weak ticket citation and never the account or the app
+  // themselves. The account's own rollup body (its apps, its people, its
+  // open tickets) was computed EVERY sweep and discarded before a single
+  // chunk was written, purely because nobody had typed a free-text
+  // description — even though the body is real, factual, app-computed
+  // material, exactly the kind of grounded passage R23 wants quoted.
+  function seedThinAccountWithATangentialTicket(): void {
+    db().exec(`
+      UPDATE accounts SET code = 'BMAR', status = 'active_client' WHERE id = '${IDS.victimSecond}';
+      INSERT INTO apps (id, account_id, name, stage, created_at, creator_id)
+        VALUES ('AP_THIN', '${IDS.victimSecond}', 'Bergman Marine tracker', 'Maintenance', '2026-02-01', '${IDS.staffUser}');
+      INSERT INTO help (id, description, status, resolved, account_id, app_id, created_at, creator_id, creator_name)
+        VALUES ('H_THIN', 'Bergman Marine cannot filter the contracts table by start year — can we add big year buttons?',
+                'resolved', 1, '${IDS.victimSecond}', 'AP_THIN', '2026-03-01', '${IDS.victimUser}', 'Marta Ruiz');
+    `)
+  }
+
+  it("both the account and its app become real, chunked, citable passages", async () => {
+    seedThinAccountWithATangentialTicket()
+    await sweepUntilCaughtUp()
+
+    // THE ROOT CAUSE, PROVEN DIRECTLY: both sources exist, and neither is a
+    // card any more — a real chunk was written for each.
+    const acctChunks = db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM knowledge_chunks kc
+           JOIN knowledge_sources ks ON ks.id = kc.source_id
+          WHERE ks.origin_table = 'accounts' AND ks.origin_row_id = ?`
+      )
+      .get(IDS.victimSecond) as { n: number }
+    expect(acctChunks.n, "the account got no chunk at all — still a card").toBeGreaterThan(0)
+    const appChunks = db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM knowledge_chunks kc
+           JOIN knowledge_sources ks ON ks.id = kc.source_id
+          WHERE ks.origin_table = 'apps' AND ks.origin_row_id = 'AP_THIN'`
+      )
+      .get() as { n: number }
+    expect(appChunks.n, "the app got no chunk at all — still a card").toBeGreaterThan(0)
+
+    // THE ACCEPTANCE THE OWNER ACTUALLY ASKED FOR: the real question, the
+    // real door, both cited — not just the tangential ticket that happens to
+    // name it once. Proves the fused ranking too: a passage that scores on
+    // BOTH the vector arm (real semantic content about "Bergman Marine") and
+    // the lexical arm (the exact name) outranks one that only ever scores on
+    // the lexical arm alone — no separate guard needed, EXACT_WEIGHT(2) times
+    // a dual-arm hit's own vector rank already clears a lexical-only hit's
+    // ceiling.
+    const answer = await ask("What do we know about Bergman Marine?")
+    expect(answer.found, `answered out of ${answer.citations.map((c) => c.title).join(", ") || "nothing"}`).toBe(
+      true
+    )
+    const kinds = new Set(answer.citations.map((c) => c.kind))
+    const seen = answer.citations.map((c) => `${c.kind}:${c.title}`).join(", ")
+    expect(kinds.has("account"), `citations were: ${seen}`).toBe(true)
+    expect(kinds.has("app"), `citations were: ${seen}`).toBe(true)
+  })
+})
+
 describe("the two questions he actually asked", () => {
   beforeEach(async () => {
     await sweepUntilCaughtUp()
@@ -933,9 +1000,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // note and the meeting reader's v5 note describe: the digest moves, the
   // version does not, and the reason is written down where the next reader
   // meets the failure.
-  account: { version: 3, digest: "737313be220deca8" },
+  // v4 (BUILD-5 §H, 18 Sep 2026): `generatedOnly` is no longer always
+  // `!about` — an account with real rollup content (contacts, apps, sprints,
+  // processes, tickets, todos) is chunked even with no free-text `about`.
+  // See the reader's own comment for the measured incident.
+  account: { version: 4, digest: "b2df6bd2fe1badfc" },
   contact: { version: 1, digest: "83d7be3dfb3fd58b" },
-  app: { version: 1, digest: "4cc1a834e6b82312" },
+  // v2 (BUILD-5 §H, 18 Sep 2026): same change as account — `generatedOnly`
+  // now also looks at `url`/`stage`/`stakeholders`/`processes`, not only the
+  // four free-text paragraphs.
+  app: { version: 2, digest: "99b2e40eb034b375" },
   process: { version: 1, digest: "908921c603bedcd9" },
   sprint: { version: 1, digest: "d583d89b784d61ed" },
   story: { version: 1, digest: "234755039c3242c1" },
@@ -1206,7 +1280,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // never caught that because none of them routed the result through the
 // real caller. See the comment above `sweepKinds`' existing ordering for
 // why a per-kind budget share was considered and rejected instead.
-const SHARED_DIGEST = "e2b81897a336dc08"
+//
+// Moved a FOURTH time (BUILD-5 §H, 18 Sep 2026): sweepKind no longer
+// re-queries a cursor sweepKinds already read (`opts.knownCursor`), and a
+// kind whose cursor is durably null (ordinary kinds only — never `windowed`
+// or `rollup`, whose null is "always re-walk", not "nothing left") within
+// `SYNC_PRESS_SKIP_RECENT_MS` skips its own read entirely on the bounded
+// press. Both are orchestration, outside every per-kind reader; no kind's
+// TEXT changed and no textVersion moved.
+const SHARED_DIGEST = "da91809231d50f67"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
