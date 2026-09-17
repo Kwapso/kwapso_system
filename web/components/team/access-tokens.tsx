@@ -520,21 +520,29 @@ function TokenCallLog({ token }: { token: McpTokenSummary }) {
   const { t, lang } = useLanguage()
   const key = mcpCallsKey(token.id)
   const restingQ = useCached<McpCall[]>(key, () => listFetch.mcpCalls(token.id))
-  const total = useCachedValue<number>(totalKey("mcp-calls", token.id))
+  const restingTotal = useCachedValue<number>(totalKey("mcp-calls", token.id))
 
   // WHILE A SEARCH IS TYPED, THE FILTERED READ IS THE LIST — its own cache key
   // and its own cursor, the same shape `work-logs-panel.tsx`'s `personFilter`
   // takes: the resting (unsearched) read stays warm underneath, so clearing
-  // the box costs nothing.
+  // the box costs nothing. Its TOTAL rides local state rather than the shared
+  // cache (R16, the searched question's own count): a search is this reader's
+  // alone and nobody else's screen needs to hear about it, so it does not
+  // belong in a key another component could read.
   const [q, setQ] = React.useState("")
+  const [filteredTotal, setFilteredTotal] = React.useState<number | null>(null)
   const filteredKey = q ? `${key}:q:${q}` : key
   const filteredQ = useCached<McpCall[]>(q ? filteredKey : null, () =>
     mcp.calls(token.id, { q }).then((r) => {
       primeCache(cursorKey(filteredKey), r.nextCursor)
+      setFilteredTotal(r.total)
       return r.calls
     })
   )
   const calls = q ? (filteredQ.data ?? null) : (restingQ.data ?? null)
+  // THE BADGE ANSWERS THE SAME QUESTION THE ROWS DO (R16) — the searched total
+  // while a search is typed, never the whole collection's underneath it.
+  const total = q ? filteredTotal : restingTotal
   const activeFetchPage = (cursor: string) =>
     mcp.calls(token.id, { cursor, q: q || undefined }).then((r) => ({ rows: r.calls, nextCursor: r.nextCursor }))
 
