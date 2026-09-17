@@ -265,6 +265,15 @@ describe("a row that STOPS being a card between sweeps, with its body unchanged"
       indexed.content_hash
     )
 
+    // BUILD-5 §I (18 Sep 2026): `account` is a rollup kind, and the first
+    // `sync()` above already ran it to completion (cursor null), so this
+    // second `sync()` — moments later by wall-clock — would otherwise land
+    // inside ROLLUP_PRESS_SKIP_MS and skip re-reading `accounts` entirely,
+    // never reaching the per-row hash-skip this test exists to prove.
+    // Backdating `last_run_at` simulates the real elapsed time a manual
+    // press minutes later would have, same as knowledge-coverage.test.ts's
+    // own "a rollup catches a change" case.
+    db().exec(`UPDATE knowledge_ingest SET last_run_at = '2020-01-01T00:00:00.000Z' WHERE kind = 'account';`)
     await sync()
     const healed = row()
     // THE ASSERTION THAT WOULD HAVE CAUGHT THIS LIVE: the reader says this is

@@ -836,6 +836,23 @@ describe("changing what a kind SAYS really does re-index what is already there",
       .get(IDS.victimAccount) as { updated_at: string | null; created_at: string }
     expect(still, "the account row must be untouched, or this proves nothing").toEqual(untouched)
 
+    // BUILD-5 §I (18 Sep 2026) — A ROLLUP KIND'S FULL RE-WALK IS NOW BOUNDED
+    // BY THE SAME 15-MINUTE WINDOW THE CRON ITSELF SWEEPS ON, ON THE
+    // MANUAL PRESS. The guarantee this test proves still holds — a rollup
+    // DOES eventually catch a change its own cursor cannot see — it is just
+    // no longer promised on the VERY NEXT press if that press lands inside
+    // the window the first one already covered (measured live: `account`'s
+    // own per-row upsert cost, 25 sequential D1 round trips, made every
+    // press pay ~20-25s regardless of whether anything had changed, which
+    // is worse for a real person than a bounded staleness the cron already
+    // promises everywhere else in this file — see CATCHUP_BUDGET_MS's own
+    // header). So this backdates the account kind's OWN `last_run_at` past
+    // ROLLUP_PRESS_SKIP_MS, simulating the real elapsed time a second press
+    // minutes later would have — the same thing sweepUntilCaughtUp cannot
+    // simulate by calling the door twice in the same test tick.
+    db().exec(
+      `UPDATE knowledge_ingest SET last_run_at = '2020-01-01T00:00:00.000Z' WHERE kind = 'account';`
+    )
     await sweepUntilCaughtUp()
     const { body } = sourceFor("accounts", IDS.victimAccount)
     expect(body, "the rollup did not pick up a ticket raised after it was last written").toContain(
@@ -844,6 +861,33 @@ describe("changing what a kind SAYS really does re-index what is already there",
     // And the count beside it moved with it — a rollup that listed the new ticket
     // while still saying "1 still open" would be worse than one that missed both.
     expect(body).toMatch(/2 still open/)
+  })
+
+  // BUILD-5 §I's own other half, asserted directly rather than left implicit
+  // in the backdate above: within ROLLUP_PRESS_SKIP_MS of a rollup kind's
+  // last FULL walk, a second manual press genuinely does not see a change
+  // raised in that window — the cron's own next tick (or a press after the
+  // window) is what catches it, exactly as CATCHUP_BUDGET_MS's own header
+  // already promises for the read path ("an answer from a base one tick
+  // stale is still accurate"). Proven, not assumed: a press inside the
+  // window reports the account kind `caughtUp: true` while genuinely NOT
+  // having re-read the new ticket.
+  it("a rollup kind's re-walk is bounded to once per ROLLUP_PRESS_SKIP_MS on the manual press — a change inside that window waits for the cron", async () => {
+    await sweepUntilCaughtUp()
+    db().exec(
+      `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_name)
+       VALUES ('H_NEW2', 'The board is blank on Tuesdays too', 'new', 0, '${IDS.victimAccount}', '2026-04-09',
+               '${IDS.victimUser}', 'Marta Ruiz');`
+    )
+    // NO backdate this time — the very next press lands inside the window.
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge/sync")
+    const results = (await res.json()) as { results: { kind: string; caughtUp: boolean }[] }
+    const account = results.results.find((r) => r.kind === "account")
+    expect(account?.caughtUp, "the skip's whole point is to report this honestly as caught up").toBe(true)
+    expect(
+      sourceFor("accounts", IDS.victimAccount).body,
+      "a change inside the window must NOT have been picked up — that is the tradeoff, proven, not hoped"
+    ).not.toContain("The board is blank on Tuesdays too")
   })
 
   it("every kind declares a text version, and it matches the reader that is shipped", () => {
@@ -1296,7 +1340,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // silently left a card forever. `wasACard` closes it, forcing one re-index
 // exactly as `nowACard` already does the other way. Orchestration; no kind's
 // TEXT changed and no textVersion moved.
-const SHARED_DIGEST = "b23543776480f981"
+//
+// Moved a SIXTH time (BUILD-5 §I, 18 Sep 2026): a rollup kind's own re-walk
+// now skips when the cron already covered it inside its own period
+// (`ROLLUP_PRESS_SKIP_MS`, guarded by a null `knownCursor` proving that last
+// tick genuinely finished). Orchestration only, outside every per-kind
+// reader; no kind's TEXT changed and no textVersion moved.
+const SHARED_DIGEST = "8283742e47d14574"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
