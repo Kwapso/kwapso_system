@@ -241,12 +241,22 @@ describe("portal fence — every read a client can reach carries the fence", () 
   // Reachability follows route-local helpers, so the check sees what the door
   // actually runs. Guarded here because a broken walk would silently pass
   // everything below — which is exactly how the leak survived.
-  it("sees through a route-local page builder into the lib it reads with", () => {
+  //
+  // `POST /api/content/help` used to answer with `listTickets`' own unscoped
+  // page — the original leak this suite exists to catch — and this assertion
+  // pinned that name as proof the walk could see through the route-local
+  // `ticketPage` helper into the lib call underneath it. The door was
+  // narrowed (BUILD-6: a mutation answers with the ROW it touched, not the
+  // team's whole list) to `ticketMutationReply`, a sibling route-local
+  // helper that reads with `getTicket` instead — a single-row lookup rather
+  // than a list, and fenced the same way. The walk has to see through THAT
+  // helper now, or it is back to proving nothing.
+  it("sees through a route-local mutation-reply helper into the lib it reads with", () => {
     const raise = handlers.find((h) => h.door === "POST /api/content/help")
     expect(raise, "POST /api/content/help must be a target").toBeTruthy()
     expect(
-      /(?<![\w.])listTickets\s*\(/.test((raise as { body: string }).body),
-      "the reach of POST /api/content/help must include the ticket list it answers with"
+      /(?<![\w.])getTicket\s*\(/.test((raise as { body: string }).body),
+      "the reach of POST /api/content/help must include the ticket lookup it answers with"
     ).toBe(true)
   })
 

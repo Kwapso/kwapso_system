@@ -155,6 +155,35 @@ async function todoPage(
   )
 }
 
+/** WHAT A MUTATION ANSWERS WITH: the row it just touched, never the open pile's
+ * whole page — the same fix as `help.ts`'s `ticketMutationReply`, for the same
+ * reason. `createTodo` already resolves the write door needed no second lookup
+ * to answer with an id (`created.id`); this always re-reads the row so the
+ * reply carries the same fields the list would have for it. */
+async function todoMutationReply(
+  cfg: Parameters<typeof listTodos>[0],
+  guard: Parameters<typeof listTodos>[1],
+  scope: AccountScope,
+  id: string
+): Promise<Response> {
+  const [one, counts] = await Promise.all([
+    getTodo(cfg, guard, scope, id),
+    countTodos(cfg, guard, scope, {}),
+  ])
+  return pagedJson(
+    "todos",
+    { rows: one ? [one] : [], total: todoViewTotal(counts, "open"), hasMore: false, nextCursor: null },
+    {
+      openTotal: counts.open,
+      doneTotal: counts.done,
+      allTotal: counts.all,
+      waitingTotal: counts.waiting,
+      overdueTotal: counts.overdue,
+      receivedTotal: counts.received,
+    }
+  )
+}
+
 /** GET /api/content/todos — what we are waiting on, and what has come back.
  *
  * Fenced: a client login sees their company's, staff see everyone's (?accountId
@@ -271,7 +300,7 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   // that triggered it. The row is already saved and already on their screen —
   // and the send no longer sits between the write and the answer (parallel.ts).
   afterResponse(request, notifyTodoRaised(env, cfg, guard, created.id))
-  return todoPage(cfg, guard, scope, { view: "open" }, null)
+  return todoMutationReply(cfg, guard, scope, created.id)
 }
 
 /** POST /api/content/todos/complete — the client's own act (inputs:update).
@@ -429,6 +458,37 @@ async function taskPage(
     dueTodayTotal: counts.dueToday,
     dueTodayDone: counts.dueTodayDone,
   })
+}
+
+/** WHAT A MUTATION ANSWERS WITH: the row it just touched, never the open pile's
+ * whole page — the same fix as `help.ts`'s `ticketMutationReply`. Neither
+ * `createTask` nor `updateTask` used to surface the row's own id at all; this
+ * always re-reads it, so create and update both now do. */
+async function taskMutationReply(
+  cfg: Parameters<typeof listTasks>[0],
+  guard: Parameters<typeof listTasks>[1],
+  id: string
+): Promise<Response> {
+  const [one, counts] = await Promise.all([
+    getTask(cfg, guard, id),
+    countTasks(cfg, guard, {}),
+  ])
+  return pagedJson(
+    "tasks",
+    { rows: one ? [one] : [], total: counts.open, hasMore: false, nextCursor: null },
+    {
+      openTotal: counts.open,
+      allTotal: counts.all,
+      overdueTotal: counts.overdue,
+      plannedTotal: counts.planned,
+      upcomingTotal: counts.upcoming,
+      completedTotal: counts.completed,
+      calendarTotal: counts.calendar,
+      dueTodayTotal: counts.dueToday,
+      dueTodayDone: counts.dueTodayDone,
+      id,
+    }
+  )
 }
 
 /** GET /api/content/tasks — our own admin (work:read). Refused to a client login:
@@ -612,7 +672,7 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
     fileName: file?.name,
   })
   await publishChange(env, guard.teamId, "tasks", id, "add", accountId ?? undefined)
-  return taskPage(cfg, guard, { view: "open" })
+  return taskMutationReply(cfg, guard, id)
 }
 
 /** POST /api/content/tasks/update — correct a task (work:update).
@@ -665,7 +725,7 @@ export async function postUpdateTask(request: Request, env: Env): Promise<Respon
     urgent: typeof body.urgent === "boolean" ? body.urgent : false,
   })
   await publishChange(env, guard.teamId, "tasks", id, "edit", accountId ?? undefined)
-  return taskPage(cfg, guard, { view: "open" })
+  return taskMutationReply(cfg, guard, id)
 }
 
 /** POST /api/content/tasks/done — tick it, or put it back (work:update).
