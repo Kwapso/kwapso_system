@@ -2404,10 +2404,24 @@ async function sweepKind(
     // and the index agree; self-healing without a repair door anybody has to
     // remember, the same shape as the blanked hash above.
     //
-    // ONLY THIS DIRECTION NEEDS SAYING. A card that GAINS a person's words has
-    // changed its body, so its hash moves and the skip does not bite.
+    // "ONLY THIS DIRECTION NEEDS SAYING" WAS WRONG (BUILD-5 §H, 18 Sep
+    // 2026): true only while the ONLY way to leave card-status was a HUMAN
+    // typing a word, which changes the body and so moves the hash. §H's own
+    // fix widened what counts as real content (an account/app's rollup —
+    // contacts, systems, tickets) WITHOUT touching the body text those
+    // rollups already produced, so a row an OLDER sweep had classified as a
+    // card kept its old, still-matching hash after the classification
+    // changed underneath it. MEASURED LIVE ON STAGING: the textVersion bump
+    // correctly reset the cursor and re-read 134 accounts and 28 apps, and
+    // the ORIGINAL skip below — checking only content_hash and chunk
+    // progress, never whether the CLASSIFICATION had moved — silently kept
+    // every one of them a card. `wasACard` closes the gap the same way
+    // `nowACard` already does for the other direction: one forced
+    // re-index, once, and then the flag and the index agree again.
     const nowACard = (row.generatedOnly ?? false) && source.chunk_count > 0
-    if (!nowACard && source.content_hash === hash && source.indexed_chunks >= source.chunk_count) continue
+    const wasACard = !(row.generatedOnly ?? false) && source.chunk_count === 0 && source.content_hash !== null
+    if (!nowACard && !wasACard && source.content_hash === hash && source.indexed_chunks >= source.chunk_count)
+      continue
     // …AND THE SKIP THAT STOPS THE SWEEP PAYING FOR THE SAME FAILURE FOR EVER.
     // The blanked hash above is what makes a failed embedding retry, which is
     // right for a Workers AI wobble and wrong for text the model will never
@@ -2424,7 +2438,13 @@ async function sweepKind(
       givenUp.push(source.id)
       continue
     }
-    if (await indexOneSource(env, cfg, guard, source.id)) indexed++
+    // `force` when `wasACard`: `indexSource`'s own restart check reads the
+    // SAME content_hash comparison the skip above does, so without this the
+    // outer skip stops biting but the write inside still no-ops on a
+    // matching hash — real chunks land in knowledge_chunks (proven live) but
+    // `chunk_count` on the source row is never updated to agree, because
+    // that column is only written inside indexSource's own `restart` branch.
+    if (await indexOneSource(env, cfg, guard, source.id, wasACard ? { force: true } : {})) indexed++
   }
   // ONE ROW FOR THE TICK, not one per source: a kind where forty sources have
   // been given up on is one fact, and forty error rows would be the flood the

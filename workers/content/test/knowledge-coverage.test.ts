@@ -1288,7 +1288,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // `SYNC_PRESS_SKIP_RECENT_MS` skips its own read entirely on the bounded
 // press. Both are orchestration, outside every per-kind reader; no kind's
 // TEXT changed and no textVersion moved.
-const SHARED_DIGEST = "da91809231d50f67"
+//
+// Moved a FIFTH time the same day, found live on staging AFTER that deploy:
+// the hash-skip's `nowACard` self-heal had no sibling for the opposite
+// direction — a row whose CLASSIFICATION changed (§H's own account/app fix)
+// without its body text moving kept its old, still-matching hash and was
+// silently left a card forever. `wasACard` closes it, forcing one re-index
+// exactly as `nowACard` already does the other way. Orchestration; no kind's
+// TEXT changed and no textVersion moved.
+const SHARED_DIGEST = "b23543776480f981"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
