@@ -812,6 +812,20 @@ four cases directly (root open → activate; deeper in the module → new tab; a
 module → new tab; nothing open → new tab); `web/test/ticket-row-opens-beside.test.tsx`
 covers the cmd-click defect above end to end.
 
+**AMENDED 18 Sep 2026 — the two click grammars this app taught by hand (`InAppLink`
+for a real anchor, `rowOpenHandlers` for a row/card with none) are now one function,
+and cmd/ctrl-click opens beside IN THE BACKGROUND, not a same-tab navigation too.**
+The client's ruling, verbatim, is unchanged from 17 Sep 2026 above — "Unless I press
+Command and click, this would open a new tab, and the same behavior in Windows, just
+replicating Google Chrome" — but "just replicating Google Chrome" turned out to mean
+more than this rule first read it as: Chrome's own grammar leaves focus on the tab she
+clicked FROM on a plain cmd/ctrl-click or a middle-click, and only switches her to the
+new tab when Shift is added too (cmd/ctrl+Shift-click). `clickGesture`
+(`web/lib/row-open.ts`) reads a click into one of `"same" | "beside" | "beside-switch" |
+null` and both `InAppLink` and `rowOpenHandlers` now classify through it; `beside` opens
+the tab and hands focus straight back to whichever tab was active (`applyClickGesture`,
+same file), `beside-switch` opens it and navigates there too.
+
 ### L13: the trail line lives inside the content card, above the head; the Chrome shortcuts are only partly replicated
 
 **The rule.** Two rulings, the same day, the second correcting the first's geometry.

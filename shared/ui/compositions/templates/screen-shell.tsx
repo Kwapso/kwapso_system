@@ -2306,7 +2306,21 @@ const DENSITY_GUTTER: Record<ScreenDensity, string> = {
    `--space-6`/`--space-6`/`--space-5` (24/24/20, 22.5/22.5/18.75) ->
    `--space-5`/`--space-5`/`--space-4` (20/20/16, 18.75/18.75/15). `px` moves
    in lockstep with `DENSITY_TRAIL`'s own `px`, directly below — see that
-   record's own comment for why the two may never drift apart. */
+   record's own comment for why the two may never drift apart.
+
+   `pt` OVERRIDDEN TO ZERO AT THE CALL SITE WHEN A TRAIL RENDERS,
+   2026-09-17 NIGHT — S3's OWN GAP, CLOSED. This record's `pt` is what a
+   TRAIL-LESS screen spends for "space above the title" — still correct,
+   still read here, unconditionally. When `trail` IS present that space is
+   already `DENSITY_TRAIL`'s own `pt`, above the trail, and `TRAIL_GAP`
+   after it; this record's `pt` stacking on top of `TRAIL_GAP` was a second,
+   uninvited opinion about the SAME gap (measured live: 30px between the
+   hairline and the title, not S3's 8). Not fixed here, by a conditional
+   inside this record — a `Record<ScreenDensity, string>` has no `trail` to
+   read — but at the one render site that knows both (`screen-shell-header`'s
+   own `className`, below its own comment), `cn(DENSITY_HEADER[density],
+   trail ? "pt-0" : undefined)`. `px`/`pb` are untouched: only the leading
+   edge doubles up, never the trailing or horizontal ones. */
 const DENSITY_HEADER: Record<ScreenDensity, string> = {
   comfortable: "px-[var(--space-6)] pt-[var(--space-6)] pb-[var(--space-5)]",
   calm: "px-[var(--space-5)] pt-[var(--space-5)] pb-[var(--space-4)]",
@@ -4515,12 +4529,44 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 EVENING) GAVE IT ONE: `DENSITY_TRAIL`'s own `pt` now carries
                 the "more space above the breadcrumbs" half of that ruling;
                 see that record's own comment for the number. `band`'s (or
-                the body's) own `pt` is STILL UNCHANGED, so the head still
-                moves down by exactly this slot's own height (pt, content and
-                divider all included) plus `TRAIL_GAP`, not that plus a
-                second inset of `band`'s own — the equation `verify/
-                trail-line/` proves is unchanged in SHAPE, only in the
-                numbers it reads live off `DENSITY_TRAIL`/`TRAIL_GAP`.
+                the body's) own WRAPPER TOP is STILL UNCHANGED — its
+                `getBoundingClientRect()` moves down by exactly this slot's
+                own height (pt, content and divider all included) plus
+                `TRAIL_GAP`, which is the equation `verify/trail-line/`
+                proves, unchanged in SHAPE, only in the numbers it reads live
+                off `DENSITY_TRAIL`/`TRAIL_GAP`.
+
+                THAT PROOF HAS A BLIND SPOT, FOUND 2026-09-17 NIGHT MEASURING
+                LIVE: `getBoundingClientRect().top` is the WRAPPER's box, and
+                a wrapper's own `padding-top` never moves its own box top —
+                only where its CONTENT sits inside it. `DENSITY_HEADER` (the
+                band's own padding) still carried a `pt` for the trail-less
+                case (a title with no trail above it still wants "space above
+                the title"), and when `trail` IS present that same `pt` was
+                still being spent — invisibly to `verify/trail-line/`'s own
+                wrapper-top proof, which cannot see padding at all — so the
+                TITLE TEXT sat `TRAIL_GAP` (8) PLUS `DENSITY_HEADER`'s own
+                `pt` (20/24 depending on density) below the hairline, not the
+                8 S3 asked for. Live, getComputedStyle-measured: 30px between
+                the hairline and the title, not 8 — `TRAIL_GAP`'s 7.5
+                (`--space-2` at this harness's 15px root) plus
+                `DENSITY_HEADER`'s comfortable `pt`, 22.5 (`--space-6` at the
+                same root). Two tokens answering "the gap after the trail,"
+                which is exactly the class of bug `TRAIL_GAP`'s own comment
+                already named for a DIFFERENT number ("not a fourth opinion
+                about air") — this is a THIRD opinion nobody meant to state.
+
+                FIXED BY CONSTRUCTION, NOT BY A SMALLER NUMBER: `band`'s own
+                `pt` is now `pt-0` whenever `trail` renders, so exactly ONE
+                token — `TRAIL_GAP`, the trail slot's own `mb` — owns the gap
+                between the hairline and whatever follows it, the same way
+                `DENSITY_TRAIL`'s `pt` is the one token that owns the gap
+                above the trail. `band`'s `px`/`pb` are untouched — only the
+                leading edge doubles up when a trail already supplies one.
+                `verify/trail-line/`'s probe now also reads the TITLE's own
+                rendered top (not just the wrapper's), specifically to close
+                this blind spot — see that file's own comment for the new
+                reading and why the old one could not have caught this.
 
                 `min-w-0 shrink-0` MATCHES EVERY OTHER ROW IN THIS COLUMN
                 (`band`'s wrapper, `screen-shell-body`), for the identical
@@ -4566,7 +4612,15 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 data-slot="screen-shell-header"
                 data-level="header-band"
                 data-title-step={header === undefined && title !== undefined ? titleStep : undefined}
-                className={cn("min-w-0 shrink-0", DENSITY_HEADER[density])}
+                className={cn(
+                  "min-w-0 shrink-0",
+                  DENSITY_HEADER[density],
+                  // ONE TOKEN OWNS THE LEADING GAP WHEN A TRAIL IS PRESENT —
+                  // TRAIL_GAP (the trail slot's own `mb`), not this band's
+                  // `pt` as well. See the trail slot's own comment, above,
+                  // for the 30px-not-8px bug this closes.
+                  trail ? "pt-0" : undefined,
+                )}
               >
                 {band}
               </div>
@@ -4579,11 +4633,21 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 flow inside this one scroller. The column is only drawn when
                 there is more than one thing in it, so a screen that passes
                 neither gets exactly the markup it got before the collapse —
-                `children` alone in the padded body. */}
+                `children` alone in the padded body.
+
+                SAME `pt-0` RULE AS THE HEADER BAND, FOR THE SAME REASON, FOR
+                THE `!band` CASE ONLY — a screen with a `trail` but no
+                `band` (no title row at all) puts this div directly after
+                the trail slot, so IT is the thing that would double the
+                leading gap if left alone. Gated on `!band` because when
+                `band` IS present this div follows the header band, not the
+                trail, and its own `pt` is the gap AFTER the title — untouched
+                either way, S3 named only the trail's own leading/trailing
+                air. */}
             <div
               data-slot="screen-shell-body"
               data-level="body"
-              className={cn(BODY, DENSITY_BODY[density])}
+              className={cn(BODY, DENSITY_BODY[density], trail && !band ? "pt-0 lg:pt-0" : undefined)}
             >
               {strip === undefined && footerNode === null ? (
                 children

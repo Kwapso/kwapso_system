@@ -7544,20 +7544,27 @@ describe("R66 — no emoji in the words a person reads, or the data behind them"
 // navigates, never a list somebody maintains" shape `in-app-anchors` already
 // uses for the identical class of bug on a real anchor.
 //
-// NARROW ON PURPOSE: it looks only at `<TableRow>` wired straight to
-// `onOpen(`/`onRowClick(` — the two names this bug's own two occurrences
-// used. A `<TableRow>` that opens through some other callback (a bespoke
-// board's own `softNavigate`, say) is a different table this law does not yet
-// reach, named here rather than silently swept in, so this check can never
-// fail for a table nobody asked it to hold.
+// WIDENED 17 Sep 2026: it used to look only for `onOpen(`/`onRowClick(`, the
+// two names its own first two occurrences used, and said so out loud — "A
+// `<TableRow>` that opens through some other callback (a bespoke board's own
+// `softNavigate`, say) is a different table this law does not yet reach."
+// That table arrived the same day: `AppTicketsPanel`'s own List body
+// (`work-panels.tsx`) drew `<TableRow onClick={() => softNavigate(...)}>`
+// straight to the router, the identical defect wearing a third name. So
+// `softNavigate(` now reads as the same offence as `onOpen(`/`onRowClick(` —
+// any bare arrow that reaches for a navigation callback directly, instead of
+// asking `rowOpenHandlers` to read the click first, is the shape this test
+// exists to catch, whatever that callback happens to be called at the point
+// it was drawn.
 describe("row-opens-beside — a table row's click goes through rowOpenHandlers", () => {
-  it("no <TableRow> wires onClick straight to onOpen/onRowClick, bypassing the seam", () => {
+  it("no <TableRow> wires onClick straight to onOpen/onRowClick/softNavigate, bypassing the seam", () => {
     const offenders: string[] = []
     const files = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
     expect(files.length, "the component census found nothing — it has gone blind").toBeGreaterThan(50)
     // Proof the census is reading something real, the same "must not be
-    // vacuous" shape every census in this file is held to: both known rows
-    // (RecordTable's own, TicketRowsTable's) go through the seam today.
+    // vacuous" shape every census in this file is held to: every known row
+    // (RecordTable's own, TicketRowsTable's, AppTicketsPanel's List body) go
+    // through the seam today.
     let sawTheSeam = 0
     for (const { path: file, source } of files) {
       const src = stripComments(source)
@@ -7566,14 +7573,16 @@ describe("row-opens-beside — a table row's click goes through rowOpenHandlers"
         if (!/onClick=/.test(after)) continue // a header row, or one that never opens
         // WIRED THROUGH THE SEAM — `rowOpenHandlers`'s own two-handler
         // object, read field by field (`record-table.tsx`'s conditional,
-        // `TicketRowsTable`'s per-row `handlers`).
+        // `TicketRowsTable`'s and `AppTicketsPanel`'s own per-row `handlers`).
         if (/onClick=\{\s*handlers\b/.test(after)) {
           sawTheSeam++
           continue
         }
         // THE HAND-ROLLED SHAPE THIS TEST EXISTS TO CATCH: an inline arrow
-        // calling the row-open callback directly, no modifier ever read.
-        if (/onClick=\{\s*\(?\)?\s*=>\s*(onOpen|onRowClick)\(/.test(after))
+        // calling a navigation callback directly, no modifier ever read —
+        // `onOpen`/`onRowClick` (the first two occurrences) or `softNavigate`
+        // itself (the third, `work-panels.tsx`'s own List body).
+        if (/onClick=\{\s*\(?\)?\s*=>\s*(onOpen|onRowClick|softNavigate)\(/.test(after))
           offenders.push(
             `${file} — a <TableRow> opens with a bare onClick; build its handlers with rowOpenHandlers (web/lib/row-open.ts) instead`
           )

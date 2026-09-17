@@ -115,6 +115,95 @@ describe("middle-click a RecordTable row — the browser's own auxclick", () => 
   })
 })
 
+// AN ANCHOR NESTED INSIDE THE ROW — the live proof, 17 Sep 2026: an account
+// card wraps its whole surface in a real `<InAppLink>` (R37) while a
+// `RecordTable`/`TicketRowsTable` row opens through `rowOpenHandlers`
+// instead, and nothing before today taught the two seams to defer to one
+// another. No column in this app currently renders an anchor of its own —
+// see `record-table.tsx`'s own `refColumn`, which draws a chip, never a
+// link — but the shape is one `render` callback away, so this pins the RULE
+// rather than any one column.
+//
+// THE SEAM IS `stopPropagation`, ON THE NESTED CONTROL — never a guard on
+// the row's own side. `row-open.ts`'s own header explains why: the row
+// cannot tell "a click bubbled up from a nested anchor it should ignore"
+// apart from "a nested control (`TicketRowsTable`'s title `<Button>`,
+// `AppTicketsPanel`'s own) deliberately re-dispatching to THIS row's own
+// `handlers.onClick` on purpose" — both look identical from `e.target`. So
+// the row stays a plain dispatcher, and whichever control sits inside it
+// calls `e.stopPropagation()` itself before deciding what the click means,
+// the exact shape `InAppLink`'s own modified-click branch now uses
+// (in-app-link.tsx) and the exact shape this stub reproduces.
+describe("an anchor nested inside a RecordTable row — the anchor wins, the row stands down", () => {
+  function nestedAnchor(onOpenCount: { current: number }) {
+    return () => (
+      <a
+        href="/t/team1/accounts/somewhere-else"
+        onClick={(e) => {
+          // THE ANCHOR'S OWN GUARD — stops the SAME click from also reaching
+          // the row's `onClick` (`handlers.onClick`, record-table.tsx), on
+          // every branch, plain or modified: an interactive control inside a
+          // row must be the only thing that answers a click landing on it.
+          e.stopPropagation()
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault()
+            // Stands in for `openBeside` — a plain counter is enough to prove
+            // it fired exactly once; the real seam's own `openBeside` call is
+            // already pinned by `row-open.test.tsx` and by this row's OWN
+            // meta-click case above.
+            onOpenCount.current++
+          }
+        }}
+      >
+        A different record
+      </a>
+    )
+  }
+
+  it("cmd-click reaches the anchor once, never onRowClick, and mints no tab at all", () => {
+    const seen: string[] = []
+    const anchorOpens = { current: 0 }
+    render(
+      <RecordTable
+        columns={[{ key: "name", label: "Name", render: nestedAnchor(anchorOpens) }]}
+        rows={ROWS}
+        config={config}
+        onRowClick={(row) => seen.push(row.id)}
+        rowPath={(row) => `/t/team1/accounts/${row.id}`}
+        rowLabel={(row) => row.name}
+      />
+    )
+    const before = openTabsSnapshot().length
+    fireEvent.click(screen.getByText("A different record"), { metaKey: true })
+    // openBeside once — the anchor's own handler, exactly once.
+    expect(anchorOpens.current).toBe(1)
+    // onOpen never — the row's plain-click branch (`onRowClick`) is not this.
+    expect(seen).toEqual([])
+    // no navigation — the ROW's own `rowOpenHandlers` never saw this click at
+    // all (stopPropagation kept it from bubbling), so `openBeside` was never
+    // reached from the row's side either: no second tab, no tab at all from
+    // this seam (the anchor's own stand-in above isn't the real
+    // `openBeside`, so `openTabsSnapshot()` never grows here).
+    expect(openTabsSnapshot()).toHaveLength(before)
+  })
+
+  it("a plain click on the nested anchor does not also fire onRowClick", () => {
+    const seen: string[] = []
+    render(
+      <RecordTable
+        columns={[{ key: "name", label: "Name", render: nestedAnchor({ current: 0 }) }]}
+        rows={ROWS}
+        config={config}
+        onRowClick={(row) => seen.push(row.id)}
+        rowPath={(row) => `/t/team1/accounts/${row.id}`}
+        rowLabel={(row) => row.name}
+      />
+    )
+    fireEvent.click(screen.getByText("A different record"))
+    expect(seen).toEqual([])
+  })
+})
+
 describe("no rowPath — the older, narrower contract (module-automations.tsx's own shape)", () => {
   it("a plain click still calls onRowClick, and a modifier does nothing special", () => {
     const seen: string[] = []

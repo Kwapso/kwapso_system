@@ -2,6 +2,94 @@
 
 ## Unreleased
 
+### Fixed — the title slot's own leading padding stops stacking under S3's `TRAIL_GAP`; the trail-to-title gap is 8px by construction, not 30 — v1.2.112
+
+**WHY.** `agency-staging.kwapso.app/tasks` measured ~12px above the trail
+and ~40px between the trail's hairline and the title on the live product —
+not S3's 20/8 (v1.2.111, below). `DENSITY_TRAIL`'s `pt` and `TRAIL_GAP`
+were already correct in this repo and `npm run check` was already green,
+so the live gap could not be either of those two numbers being wrong.
+
+**MEASURED ON THE KIT'S OWN HARNESS**, `verify/trail-line/` (`npm run dev`
+inside that folder, port 5330, `getComputedStyle` read live at 1440x900,
+15px root — the kit's own staging measurement was unreachable this pass;
+the live app's `/tasks` DOM has no `[data-slot=screen-shell-trail]` at all,
+which is a separate, tag-pinning-lag finding for the pipeline's owner, not
+this fix): before this change, `screen-shell-header`'s own `paddingTop`
+read 22.5px (comfortable `--space-6` at this root) even when a `trail` was
+present, and the rendered gap between the hairline (`trail.lastElementChild`,
+the `<Separator />`) and the title (`[data-slot=title-heading]`) was 30px
+— `TRAIL_GAP`'s 7.5 (`--space-2`) plus that 22.5, not `TRAIL_GAP` alone.
+The gap ABOVE the trail (card top to the trail field's own top) measured
+18.75px, exactly `DENSITY_TRAIL`'s `pt` (`--space-5`) at this root — S3's
+20, converted, already correct.
+
+**WHICH BOX OWNED WHICH PX.** The 12 (wanted 20): not reproduced against
+this repo's current code — `DENSITY_TRAIL`'s `pt` already reads S3's flat
+`pt-[var(--space-5)]` at both densities (v1.2.111) and measures 20
+(18.75 at this harness's 15px root) on `verify/trail-line/`. Given the live
+page also lacks the trail slot entirely, the 12 almost certainly comes from
+an older, tag-pinned build of this kit still running on staging (see
+`design-kit-pipeline` — Alaap owns that swap), not from a defect in this
+file. The 40 (wanted 8): reproduced and fixed here — owned by
+`DENSITY_HEADER`'s own `pt` (`screen-shell-header`, the title slot's
+wrapper), which kept its trail-less "space above the title" figure even
+when a `trail` supplied its own leading air via `DENSITY_TRAIL`'s `pt` and
+its own trailing air via `TRAIL_GAP`. Two tokens answering one gap.
+`verify/trail-line/`'s own existing proof (2), "the head moves down by
+exactly `trailHeight + TRAIL_GAP`," could not see this: it reads
+`getBoundingClientRect().top` on the header WRAPPER, and a wrapper's own
+`padding-top` never moves its own box's top edge — only where its content
+sits inside it. The proof stayed green through the whole bug.
+
+**THE FIX, BY CONSTRUCTION.** `TRAIL_GAP` is now the ONE token that owns
+the gap after the trail, the same way `DENSITY_TRAIL`'s `pt` is the one
+token that owns the gap above it. `compositions/templates/screen-shell.tsx`:
+the `screen-shell-header` div's `className` now reads
+`cn("min-w-0 shrink-0", DENSITY_HEADER[density], trail ? "pt-0" : undefined)`
+— `DENSITY_HEADER`'s `pt` still applies, unchanged, for every trail-less
+screen (a title still wants space above it when nothing else supplies
+any); it is suppressed only when a trail already has. The symmetric case —
+a `trail` with no title `band` at all, where `screen-shell-body` is what
+directly follows the trail — gets the same treatment:
+`cn(BODY, DENSITY_BODY[density], trail && !band ? "pt-0 lg:pt-0" : undefined)`.
+Neither `px` nor `pb`/the rest of `py` is touched in either case — only the
+leading edge that a trail already supplies doubles up.
+
+**THE CHECK, EXTENDED.** `compositions/templates/check-screen-shell.mjs`'s
+trail-spacing check now pins the render-site code shape directly (not just
+the `DENSITY_TRAIL`/`TRAIL_GAP` constants, which were never the bug): the
+`screen-shell-header` block must read `trail ? "pt-0" : undefined`, and the
+`screen-shell-body` block must read `trail && !band ? "pt-0 lg:pt-0" :
+undefined`. Broken two ways to prove it catches what it claims, `cp`-backed
+before/after (not `git checkout --`; this repo carries no git tree
+regardless): reverting the header's `pt-0` failed with "does not read
+trail ? \"pt-0\" : undefined"; reverting the body's failed with "does not
+read trail && !band ? ...". Both restored from the copy afterward, file
+diffed byte-identical to the pre-mutation version.
+
+**THE VERIFY PAGE, EXTENDED.** `verify/trail-line/page.tsx`'s probe gained
+a third proof alongside its existing two ("the card does not move" / "the
+header's wrapper moves down by exactly `trailHeight + TRAIL_GAP`"): S3's
+own numbers, read off the RENDERED trail field and title rather than
+either wrapper — `gapAboveTrailTokens` / `gapAboveTrailIs20` and
+`gapHairlineToTitleTokens` / `gapHairlineToTitleIs8`, converted from this
+harness's 15px root to the ladder's 16px authoring reference so the
+printed numbers read as the same 20/8 the ruling and this entry state.
+Measured at 1440, all three trail-bearing cases (`one`/`four`/`nine`):
+`gapAboveTrailTokens: 20` (`true`), `gapHairlineToTitleTokens: 8` (`true`).
+Screenshots taken of the running harness (`npm run dev` in
+`verify/trail-line/`, port 5330) showing the rendered cases and the
+probe's own printed proof at 1440 — not committed as files (this repo
+does not commit generated screenshots), captured for this session's
+review.
+
+**NOT DONE THIS PASS:** confirming the 12-vs-20 figure against the actual
+live `/tasks` DOM — that page currently renders an older shell shape with
+no `screen-shell-trail` slot at all, which this lane cannot chase past
+(kit repo only, no access to what tag `agency-staging` is pinned to).
+Flagged for the pipeline owner, not silently assumed fixed by this entry.
+
 ### Changed — trail gains air, a hairline divider and a search-bar shell (S3/D2); `CardContent`/`ScreenShell` share one flattened content-inset token; the tab strip stops scrolling vertically by accident — v1.2.111
 
 Three items, all 17 Sep 2026 evening.

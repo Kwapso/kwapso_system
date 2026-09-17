@@ -47,22 +47,29 @@
 // she is on — that push is the store's own job now (`visitTrail`), not this
 // component's; this file only ever decides WHICH tab a click means.
 //
-// CMD/CTRL-CLICK, AND A MIDDLE-CLICK (mouse button 1), MEAN "OPEN BESIDE".
-// Both used to be a modified click this component let the browser have —
-// Chrome's own gesture for "open this link in a new tab" — and the ruling
-// above asks for the SAME gesture to mean the SAME thing one level down, an
-// in-app tab rather than a real browser one. Left to the browser, either
-// gesture would open `safe` in a genuine new tab/window: a second, cold copy
+// CMD/CTRL-CLICK (`e.metaKey`/`e.ctrlKey`, read inside `clickGesture` below —
+// never re-read here, so there is exactly one place that decides what a
+// modifier means), AND A MIDDLE-CLICK (mouse button 1), MEAN "OPEN BESIDE" —
+// IN THE BACKGROUND. "just replicating Google Chrome" is a literal
+// instruction, and Chrome's own grammar for these two gestures is: open a
+// new tab beside this one and leave the focus exactly where it was — she
+// stays on the page she clicked from. (An earlier version of this comment
+// claimed Chrome switches focus on a plain cmd-click; it does not, on any
+// current build, and that claim is retired 18 Sep 2026.) Only ADDING Shift
+// (cmd/ctrl+Shift-click) also switches her to the new tab — Chrome's "open
+// link in new tab and switch to it." Left to the browser, either gesture
+// would instead open `safe` in a genuine new tab/window: a second, cold copy
 // of this whole shell (R37), with no workspace tab set, no running agent, no
 // warm cache — not a faithful replica of "open beside" at all. So both are
-// taken here, `preventDefault`ed, and turned into `openBeside` plus an
-// ordinary navigation of THIS document to the same address — the client
-// asked to land in the new tab ("the same behavior... just replicating
-// Google Chrome" — Chrome itself SWITCHES focus on a plain cmd-click on
-// macOS in most builds; nothing here reads as "silently open behind you" on
-// a product with no glanceable background-tab chrome of its own). A plain
-// Shift-click or Alt-click (save-as, a real new WINDOW) is left to the
-// browser exactly as before — those are not the gesture the ruling names.
+// taken here, `preventDefault`ed, and classified by `clickGesture`
+// (`web/lib/row-open.ts` — the ONE grammar this app now reads a click
+// through, shared with `rowOpenHandlers` for a row/card with no anchor under
+// it): "beside" opens the tab and hands focus straight back to the one she
+// was on (`applyClickGesture`); "beside-switch" opens it and also navigates
+// THIS document to the same address, landing her there. A plain Shift-click
+// or Alt-click (save-as, a real new WINDOW) is left to the browser exactly
+// as before — `clickGesture` returns `null` for those and this component
+// does nothing at all.
 //
 // EVERY ROW, CHIP AND CARD THAT LINKS SOMEWHERE INSIDE THE APP GOES THROUGH
 // THIS ONE COMPONENT (R37's own census, `web/test/shell-nav.test.ts`), so
@@ -71,8 +78,8 @@
 import * as React from "react"
 
 import { softNavigate } from "@/lib/nav"
+import { applyClickGesture, clickGesture } from "@/lib/row-open"
 import { safeHref } from "@shared/web/rich-text"
-import { openBeside } from "@/lib/workspace-tabs"
 
 /** A plain string label reads straight off the link's own children; anything
  * richer (an icon plus text, a record's coloured mark) falls back to the
@@ -112,30 +119,49 @@ export function InAppLink({
     <a
       href={safe}
       onClick={(e) => {
-        // Shift/Alt belong to the browser (save-as, a real new window) —
-        // never this component's to take.
-        if (e.shiftKey || e.altKey) return
-        if (e.metaKey || e.ctrlKey) {
-          e.preventDefault()
-          openBeside(safe, beside_label(children, safe))
-          go(safe)
-          return
-        }
-        // A plain left click only from here down — a right-click, or any
-        // other button `onAuxClick` below does not cover, is left alone.
-        if (e.button !== 0) return
+        // ONE GRAMMAR, READ ONCE. `null` covers Shift/Alt (the browser's own
+        // save-as / real-new-window gestures, never this component's to
+        // take) and any other button `onAuxClick` below already owns.
+        const gesture = clickGesture(e)
+        if (gesture === null) return
         e.preventDefault()
-        go(safe)
+        if (gesture !== "same") {
+          // THIS ANCHOR OWNS THE CLICK — never an ancestor's. A `<TableRow>`
+          // or a Kanban card's own title occasionally wraps a real anchor to
+          // draw its whole surface (R37), and that ancestor may carry its
+          // OWN row-open handler (`rowOpenHandlers`, web/lib/row-open.ts).
+          // Without this, the SAME click reaches both: this handler already
+          // opened `safe` beside the active tab, and letting the event
+          // bubble on would hand the identical gesture to the row too —
+          // caught live 17 Sep 2026 on an account card (a second, redundant
+          // "open beside" is at least a duplicate; a row whose own contract
+          // differs from this one, as `rowOpenHandlers`'s did that day, is a
+          // silently wrong one). `rowOpenHandlers` itself has no guard for
+          // this — it is a plain dispatcher with no opinion about where a
+          // click came from (row-open.ts's own header explains why) — so
+          // this anchor's own `stopPropagation` is the only thing standing
+          // between one click and two handlers.
+          e.stopPropagation()
+        }
+        // "same": `go(safe)` alone. "beside": opens beside and hands focus
+        // straight back to whichever tab she was on — `go` never runs, so
+        // this document does not move. "beside-switch": opens beside AND
+        // `go(safe)` runs, landing her on the new tab. See `applyClickGesture`.
+        applyClickGesture(gesture, safe, beside_label(children, safe), () => go(safe))
       }}
       onAuxClick={(e) => {
         // Middle-click (button 1) never reaches `onClick` in a browser — it
         // fires `auxclick` instead, the same reason `app-shell.tsx`'s own
         // tab-strip middle-click-to-close handler lives here rather than on
-        // `onClick`.
-        if (e.button !== 1) return
+        // `onClick`. Only the two beside-opening outcomes are this handler's
+        // to act on.
+        const gesture = clickGesture(e)
+        if (gesture !== "beside" && gesture !== "beside-switch") return
         e.preventDefault()
-        openBeside(safe, beside_label(children, safe))
-        go(safe)
+        // Same reasoning as the modified-click branch above: this anchor's
+        // own middle-click handling must not also reach an ancestor row.
+        e.stopPropagation()
+        applyClickGesture(gesture, safe, beside_label(children, safe), () => go(safe))
       }}
       className={className}
     >

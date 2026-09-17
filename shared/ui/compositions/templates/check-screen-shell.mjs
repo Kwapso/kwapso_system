@@ -194,7 +194,28 @@ console.log(
    div, so it spans the content box, not the card's bare edge. A regression
    that reverts any one of the three — a bad merge, a "let's put it back to
    flush" edit that forgets the other two moved with it — fails here instead
-   of waiting for the next client screenshot. */
+   of waiting for the next client screenshot.
+
+   EXTENDED 2026-09-17 NIGHT — THE TITLE SLOT'S OWN LEADING PADDING, PINNED
+   TO ZERO WHEN A TRAIL RENDERS. `DENSITY_TRAIL`'s `pt` and `TRAIL_GAP` were
+   both already correct (checked above) and `npm run check` was already
+   green, yet a live `getComputedStyle` read (`verify/trail-line/`, 15px
+   root) measured 30px between the hairline and the title, not S3's 8 —
+   `DENSITY_HEADER`'s own `pt` (the space a TRAIL-LESS screen still needs
+   above its title) was stacking on top of `TRAIL_GAP` uninvited, because
+   `getBoundingClientRect().top` on the header WRAPPER — the only thing the
+   two checks above and `verify/trail-line/`'s own delta proof ever read —
+   cannot see a wrapper's own padding at all. A green check that cannot see
+   the box that owns the bug is not proof the bug is fixed, so this check
+   now pins the RENDER SITE'S code shape directly: `screen-shell-header`'s
+   own `className` must read `trail ? "pt-0" : undefined` as one of its
+   `cn(...)` arguments, and (the symmetric case, a `trail` with no `band` at
+   all, where `screen-shell-body` is what follows the trail instead)
+   `screen-shell-body`'s own `className` must read `trail && !band ?
+   "pt-0 lg:pt-0" : undefined`. Neither pattern can be satisfied by a
+   comment alone — both are call-site syntax inside a `cn(...)` argument
+   list, the same "working code shape, not a bare word" standard the file
+   header states for every check in this script. */
 const trailSpacingFindings = [];
 
 const DENSITY_TRAIL_PATTERN =
@@ -227,6 +248,33 @@ if (!/^import \{ Separator \} from "\.\.\/\.\.\/components\/separator\/separator
   trailSpacingFindings.push(`${rel} does not import Separator from components/separator/separator.`);
 }
 
+// THE TITLE SLOT'S OWN LEADING PADDING, ZEROED AT THE HEADER'S RENDER SITE
+// WHEN A TRAIL IS PRESENT — see this check's own header comment for the
+// 30px-not-8px bug a wrapper-top-only proof cannot see. Matched inside the
+// `screen-shell-header` block specifically (not anywhere in the file) so a
+// `pt-0` that landed on some unrelated div would not satisfy this.
+const HEADER_SLOT_BLOCK = /data-slot="screen-shell-header"[\s\S]{0,900}?\n\s*>/;
+const headerSlotMatch = src.match(HEADER_SLOT_BLOCK);
+if (!headerSlotMatch || !/trail\s*\?\s*"pt-0"\s*:\s*undefined/.test(headerSlotMatch[0])) {
+  trailSpacingFindings.push(
+    `The screen-shell-header slot in ${rel} does not read trail ? "pt-0" : undefined — DENSITY_HEADER's own ` +
+      "pt still stacks on top of TRAIL_GAP when a trail renders, doubling the gap the hairline sits above the title.",
+  );
+}
+
+// THE SYMMETRIC CASE — a `trail` with no `band` at all, where
+// `screen-shell-body` is the thing that would double the leading gap
+// instead of the header. Matched inside the `screen-shell-body` block for
+// the same reason as the header match above.
+const BODY_SLOT_BLOCK = /data-slot="screen-shell-body"[\s\S]{0,400}?>/;
+const bodySlotMatch = src.match(BODY_SLOT_BLOCK);
+if (!bodySlotMatch || !/trail\s*&&\s*!band\s*\?\s*"pt-0 lg:pt-0"\s*:\s*undefined/.test(bodySlotMatch[0])) {
+  trailSpacingFindings.push(
+    `The screen-shell-body slot in ${rel} does not read trail && !band ? "pt-0 lg:pt-0" : undefined — a ` +
+      "trail with no title band would still double its own leading gap against a title-less screen's body pt.",
+  );
+}
+
 if (trailSpacingFindings.length > 0) {
   console.error(
     "FAIL screen-shell trail-spacing check (S3/D2):\n" + trailSpacingFindings.map((f) => `  - ${f}`).join("\n"),
@@ -235,8 +283,8 @@ if (trailSpacingFindings.length > 0) {
 }
 
 console.log(
-  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt, TRAIL_GAP and the trail's own <Separator /> " +
-    "all read S3's 17 Sep 2026 evening values.",
+  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt, TRAIL_GAP, the trail's own <Separator />, and the " +
+    "title slot's leading pt pinned to zero (header and body) whenever a trail renders all read S3's values.",
 );
 
 /* ============================================================================

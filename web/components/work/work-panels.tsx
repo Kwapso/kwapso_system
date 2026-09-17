@@ -50,6 +50,7 @@ import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resource
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
+import { rowOpenHandlers } from "@/lib/row-open"
 import { HELP_STATUSES } from "@shared/types"
 import type {
   AppRow,
@@ -82,6 +83,7 @@ import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 import { ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
+import { ticketTitle } from "@shared/web/ticket-chips"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -1130,12 +1132,29 @@ export function AppTicketsPanel({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((ticket) => (
+        {rows.map((ticket) => {
+          // A CMD/CTRL-CLICK OR A MIDDLE-CLICK MEANS "OPEN BESIDE" — the same
+          // gesture every other collection row already teaches
+          // (`rowOpenHandlers`, web/lib/row-open.ts). This row used to wire
+          // its plain click straight to `softNavigate`, the shape
+          // `row-opens-beside` (web/test/rules.test.ts) now also reads: a
+          // bare `onClick={() => softNavigate(...)}` on a row has no anchor
+          // for the browser's own modifier handling to land on, so the
+          // gesture silently did nothing here, exactly as it once did on
+          // `RecordTable`'s and `TicketRowsTable`'s own rows before they
+          // were fixed onto this seam.
+          const handlers = rowOpenHandlers(
+            `${host.base}/tickets/${ticket.id}`,
+            ticketTitle(ticket),
+            () => softNavigate(`${host.base}/tickets/${ticket.id}`)
+          )
+          return (
           <TableRow
             key={ticket.id}
             // Tickets live at their own top-level URL, so the link is built off
             // the host prefix rather than the section we are standing in.
-            onClick={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
+            onClick={handlers.onClick}
+            onAuxClick={handlers.onAuxClick}
             className="cursor-pointer"
           >
             <TableCell>
@@ -1162,9 +1181,17 @@ export function AppTicketsPanel({
                   variant="link"
                   onClick={(e) => {
                     // The row is already opening; without this one press would
-                    // navigate twice.
+                    // navigate twice. Through the SAME seam as the row
+                    // (`handlers`, above), so a cmd/ctrl-click or a
+                    // middle-click on the title itself opens beside too,
+                    // rather than only working when the row is clicked
+                    // somewhere else.
                     e.stopPropagation()
-                    softNavigate(`${host.base}/tickets/${ticket.id}`)
+                    handlers.onClick(e)
+                  }}
+                  onAuxClick={(e) => {
+                    e.stopPropagation()
+                    handlers.onAuxClick(e)
                   }}
                   // `variant="link"` is not a box (no height, no padding), so it
                   // inherits the cell's own type rather than drawing a control
@@ -1296,7 +1323,8 @@ export function AppTicketsPanel({
               )}
             </TableCell>
           </TableRow>
-        ))}
+          )
+        })}
       </TableBody>
     </Table>
   )
@@ -1309,7 +1337,7 @@ export function AppTicketsPanel({
    * `PagedPanelBody` caller in this file) and an unrecognised value, which is
    * the same defensive default `AppTicketsTab`'s own switch takes below. */
   const renderBody = (rows: HelpTicket[]) => {
-    if (view?.value === "board") return <AppTicketsBoard teamId={teamId} rows={rows} onOpen={openTicket} />
+    if (view?.value === "board") return <AppTicketsBoard teamId={teamId} host={host} rows={rows} onOpen={openTicket} />
     if (view?.value === "queue") {
       /* THE QUEUE — client, 17 Sep 2026: "I also want the queue view for
          triaging. Empty. Show there's nothing to triage." A far smaller ask
@@ -1431,16 +1459,53 @@ export function AppTicketsPanel({
  * SAME rows, just bucketed by status rather than a second read of them. */
 function AppTicketsBoard({
   teamId,
+  host,
   rows,
   onOpen,
 }: {
   teamId: string
+  host: PanelHost
   rows: readonly HelpTicket[]
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
   const COLUMN = ticketStatusColumnTitles(t)
-  const boardCard = ticketBoardCard(teamId, t, lang)
+  const baseCard = ticketBoardCard(teamId, t, lang)
+  // A CMD/CTRL-CLICK OR A MIDDLE-CLICK MEANS "OPEN BESIDE" here too — the
+  // last known gap in this file's own reading of the 17 Sep 2026 ruling
+  // (`row-open.ts`'s own header): every OTHER collection row/card in the app
+  // reaches `rowOpenHandlers` and this board's cards did not, because
+  // `Kanban`'s own `onCardSelect` (the kit, shared/ui) hands back the CARD
+  // and nothing about the click itself — no `metaKey`, no `ctrlKey`, no
+  // `button` — so there is no modifier for `onCardSelect` to read even if it
+  // wanted to. `Kanban`'s own card `title` accepts any node, which is the one
+  // seam this file can reach without a kit change (R39): the title carries
+  // the row's own handlers and stops the click from ALSO reaching the outer
+  // card's plain-open (`e.stopPropagation()`), the identical guard the List
+  // body's own title `<Button variant="link">` already writes, a few hundred
+  // lines up, for the identical reason — two controls over one record, and
+  // only one of them may answer a click.
+  const boardCard = (r: HelpTicket) => {
+    const card = baseCard(r)
+    const handlers = rowOpenHandlers(`${host.base}/tickets/${r.id}`, ticketTitle(r), () => onOpen(r.id))
+    return {
+      ...card,
+      title: (
+        <span
+          onClick={(e) => {
+            e.stopPropagation()
+            handlers.onClick(e)
+          }}
+          onAuxClick={(e) => {
+            e.stopPropagation()
+            handlers.onAuxClick(e)
+          }}
+        >
+          {card.title}
+        </span>
+      ),
+    }
+  }
   return (
     <Kanban
       // SIX COLUMNS SHARE THE ROW — the identical fluid formula `AllBoard`
@@ -1453,6 +1518,9 @@ function AppTicketsBoard({
         cards: rows.filter((r) => r.status === stage).map(boardCard),
         emptyLabel: t("Nothing at this stage."),
       }))}
+      // STILL THE PLAIN-CLICK DOOR — a click anywhere on a card that is not
+      // the title (the chips, the description, the padding) has no nested
+      // handler of its own, so it falls through to this, unchanged.
       onCardSelect={(card) => onOpen(card.id)}
       footnote={t(
         "Cards are this app's own tickets, as far as they have loaded. Click a card to open the ticket."

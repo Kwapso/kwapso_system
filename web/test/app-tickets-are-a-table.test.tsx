@@ -32,9 +32,10 @@
 // and the fix is proved here once rather than twice.
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpTicket } from "@shared/types"
+import { forgetOpenTabs, openTabsSnapshot, setWorkspaceScope, visitTrail } from "@/lib/workspace-tabs"
 
 // A REAL RADIX SELECT UNDER THE VIEW SWITCH — jsdom measures nothing and
 // captures no pointer, so the three stand-ins `no-sort-in-calendar-views.
@@ -48,6 +49,12 @@ beforeAll(() => {
     releasePointerCapture: () => {},
     setPointerCapture: () => {},
   })
+})
+
+beforeEach(() => {
+  forgetOpenTabs()
+  setWorkspaceScope("app-tickets-board-test:team1")
+  visitTrail([{ path: "/t/T1/apps/AP_1", label: "AP_1" }])
 })
 
 // `let`, NOT `const` — two of the tests below (the Queue view, empty and not)
@@ -309,5 +316,35 @@ describe("an app's Tickets tab draws the list as a table", () => {
     // nothing to triage."
     expect(screen.getByText("Nothing to triage.")).toBeTruthy()
     expect(screen.queryByText(/dispatch board stops refreshing/i)).toBeNull()
+  })
+
+  // THE LAST KNOWN GAP, closed the same day: a board card used to open only
+  // through `Kanban`'s own `onCardSelect` (shared/ui), which hands back the
+  // card and nothing about the click — no `metaKey`, no `ctrlKey`, no
+  // `button` — so a cmd/ctrl-click or a middle-click on a card silently did
+  // the same thing a plain click did: opened in place. Fixed onto the same
+  // seam every other row/card in the app now opens through
+  // (`rowOpenHandlers`, web/lib/row-open.ts), via the one part of a board
+  // card `Kanban` lets a caller reach at all — its own `title` node
+  // (`AppTicketsBoard`, work-panels.tsx).
+  it("cmd-click on a board card opens beside, not in place", () => {
+    show()
+    fireEvent.click(screen.getByRole("combobox", { name: "View" }))
+    fireEvent.click(screen.getByRole("option", { name: "Board" }))
+    const before = openTabsSnapshot().length
+    fireEvent.click(screen.getByText(/dispatch board stops refreshing/i), { metaKey: true })
+    expect(openTabsSnapshot()).toHaveLength(before + 1)
+    const opened = openTabsSnapshot().at(-1)
+    expect(opened?.steps[0]?.path).toBe("/t/T1/tickets/H1")
+  })
+
+  it("middle-click on a board card opens beside too, via onAuxClick", () => {
+    show()
+    fireEvent.click(screen.getByRole("combobox", { name: "View" }))
+    fireEvent.click(screen.getByRole("option", { name: "Board" }))
+    const before = openTabsSnapshot().length
+    const card = screen.getByText(/dispatch board stops refreshing/i)
+    fireEvent(card, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }))
+    expect(openTabsSnapshot()).toHaveLength(before + 1)
   })
 })
