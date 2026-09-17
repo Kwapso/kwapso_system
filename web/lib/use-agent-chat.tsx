@@ -375,6 +375,17 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     // rapid delta; step rows are keyed by tool so step_end can flip the right one.
     let replyText = ""
     const stepIdByTool = new Map<string, string>()
+    // A CLEAN EARLY CLOSE IS NOT AN ERROR. `run`'s reader loop only throws when
+    // the underlying fetch itself rejects — an idle-timeout proxy that closes the
+    // response body after the `text` frames but before `sources`/`final` ends the
+    // stream with `done: true`, no exception, nothing for `send()`'s catch to see.
+    // The server had already finished the turn (citations, quota and all); the
+    // client just stopped listening one frame early. So a terminal event is
+    // tracked here, and its ABSENCE after `run` returns is treated exactly like
+    // the dropped-stream catch below already does: re-sync from the saved thread
+    // rather than leave the citation block and the quota badge silently behind
+    // what the server actually has.
+    let sawTerminal = false
     // ONE THINKING ROW PER MODEL CALL. Opened by the first `thought` delta after
     // anything else, appended to by the rest, and settled (spinner → tick) by
     // whatever the model did with that thinking: a step, the answer's first
@@ -498,6 +509,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "confirm": {
+          sawTerminal = true
           settleThought()
           // Terminal: a destructive act needs a yes/no. Adopt the thread id the event
           // carries — on a FIRST-turn confirm this is the ONLY place the client learns
@@ -518,6 +530,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "final": {
+          sawTerminal = true
           settleThought()
           const out = ev.outcome
           // The loop turns a model failure into a settled turn rather than a
@@ -540,6 +553,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           break
         }
         case "error": {
+          sawTerminal = true
           settleThought()
           // A model failure that never reached the loop's own catch — a worker
           // with no key is the ordinary one, because `selectModel` throws before
@@ -560,6 +574,18 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
         }
       }
     })
+    // The stream ended without ever telling us the turn was over — a silent
+    // early close, not a genuine failure `send()`'s catch would have seen. The
+    // server almost always finished anyway (same reasoning as `resyncAfterDrop`
+    // below): re-read the saved thread so the citation block and the quota
+    // badge come from what the server actually has, instead of staying on
+    // whatever this truncated stream happened to deliver before it cut off.
+    if (!sawTerminal) {
+      const healed = await resyncAfterDrop()
+      if (!healed) {
+        writeAssistant("The connection dropped. Reopen the chat to see what happened.")
+      }
+    }
     return handover
   }
 

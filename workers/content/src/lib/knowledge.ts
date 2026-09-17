@@ -2798,7 +2798,11 @@ export async function revisitUnhealthySources(
  * had), and correctly decided, for real, at the read-back through
  * `ownerClause`. This is not written here as documentation of a decision
  * already made — the fold-merge writer that must make it does not exist yet. */
-function labelsFor(source: {
+// Exported for one reason: scripts/rebuild-vector-index.mjs derives its
+// Vectorize metadata-index list from calling this function directly (the
+// run-shipped-worker-code-in-node pattern), rather than hand-copying its
+// keys — so the two can never drift the way a duplicated list would.
+export function labelsFor(source: {
   kind: string
   compartment: string
   account_id: string | null

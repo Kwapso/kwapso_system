@@ -171,9 +171,16 @@ beforeEach(() => {
   ticket(CHILD.ticket, CHILD.user, "Ana", "The Workshop scales are offline", IDS.victimChild)
 })
 
-describe("raising a ticket answers with YOUR tickets, never the team's", () => {
+describe("raising a ticket answers with the ONE ticket you just touched, never the team's", () => {
   // THE ONE THAT WAS REAL. No crafted request: a client asks a question through
   // the portal and reads the response body.
+  //
+  // The reply used to be the caller's whole fenced list — narrower than the
+  // leak this suite was built for (every client's tickets), but still a list a
+  // burglar's own request could read past. It is now the single row this call
+  // raised and nothing beside it, so the leak this suite exists to catch is
+  // structurally impossible rather than merely fenced: there is no second row
+  // in the reply for another client's ticket to ride in on.
   it("a client login raising a ticket never sees another client's", async () => {
     const res = await call(IDS.burglarUser, "POST /api/content/help", {
       description: "New question about our March report",
@@ -182,7 +189,7 @@ describe("raising a ticket answers with YOUR tickets, never the team's", () => {
     const ids = await ticketIds(res)
     expect(ids, "the victim's ticket must not be in a burglar's response").not.toContain(TICKETS.victim)
     expect(ids, "nor the agency's internal one").not.toContain(TICKETS.staff)
-    expect(ids, "their own ticket is still theirs to see").toContain(TICKETS.burglar)
+    expect(ids, "the reply carries exactly the ticket this call just raised").toHaveLength(1)
   })
 
   // The description text is the actual disclosure — ids alone would understate it.
@@ -194,16 +201,25 @@ describe("raising a ticket answers with YOUR tickets, never the team's", () => {
   it("the total it reports counts only what the caller may see", async () => {
     const res = await call(IDS.burglarUser, "POST /api/content/help", { description: "Third question" })
     const body = (await res.json()) as { total: number }
-    // Their own two: the seeded one plus the one just raised.
+    // Their own two: the seeded one plus the one just raised. The TOTAL still
+    // rides the fenced count (countTickets), which never shrank — only the row
+    // array did.
     expect(body.total).toBe(2)
   })
 
-  it("staff still see the whole team's tickets (the fence narrows clients only)", async () => {
+  // Staff hold no fence, so the ROW this call answers with is identical in
+  // shape to a client's — the one ticket just raised, nothing else. Where the
+  // absent fence actually shows is the TOTAL: unnarrowed, so it counts every
+  // ticket on the team rather than just the caller's own.
+  it("staff still see the whole team's total (the fence narrows clients only)", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/help", { description: "Staff note" })
-    const ids = await ticketIds(res)
-    expect(ids).toContain(TICKETS.victim)
-    expect(ids).toContain(TICKETS.burglar)
-    expect(ids).toContain(TICKETS.staff)
+    const body = (await res.json()) as { tickets?: { id: string }[]; total: number }
+    const ids = (body.tickets ?? []).map((t) => t.id)
+    expect(ids, "the reply carries exactly the ticket this call just raised").toHaveLength(1)
+    expect(ids).not.toContain(TICKETS.victim)
+    // Victim, burglar, staff (seeded) and the CHILD ticket, plus the one just
+    // raised: unnarrowed, so a staff caller's total is never "their own one".
+    expect(body.total).toBeGreaterThanOrEqual(4)
   })
 })
 

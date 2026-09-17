@@ -100,18 +100,7 @@ async function ticketPage(
   scope: AccountScope,
   filter: TicketFilter,
   cursor: string | null,
-  ordering?: Parameters<typeof listTickets>[5],
-  /** THE ROW THIS CALL JUST MADE, when it made one.
-   *
-   * The create door answers with a PAGE, which is right — every open list wants
-   * the new state — but it meant the caller never learned WHICH ticket it had
-   * raised. A form that lets somebody attach a screenshot while writing the
-   * ticket needs that id: R2 storage is addressed by ticket id, and on a create
-   * there is no id until the door answers. Finding it in the page is not an
-   * option either, because the list is drag-ranked, so the newest is not
-   * reliably first — the same reason the story door hands its id back rather
-   * than letting the form guess. */
-  createdId?: string
+  ordering?: Parameters<typeof listTickets>[5]
 ): Promise<Response> {
   const [page, counts, facets] = await Promise.all([
     listTickets(cfg, guard, scope, filter, cursor, ordering),
@@ -133,9 +122,45 @@ async function ticketPage(
       byType: facets.byType,
       byStatus: facets.byStatus,
       byAccount: facets.byAccount,
-      // Only on the door that made one, so no read carries a field that means
-      // nothing on it.
-      ...(createdId ? { id: createdId } : {}),
+    }
+  )
+}
+
+/** WHAT A MUTATION ANSWERS WITH: the row it just touched, not the team's whole
+ * unfiltered list. The doctrine above this function's old body quoted CACHING.md
+ * word for word ("patch the changed row, never refetch the list") and then did
+ * the opposite of it — every write on this door answered with `listTickets`'
+ * own newest-fifty page, computed over the whole team, to hand back one id. A
+ * mystery-shopper run measured what that actually cost: 65KB to learn a new
+ * ticket's id, 65KB again to confirm an edit that never even carried the id.
+ *
+ * The SHAPE stays a page — `tickets`, `byType`, `byStatus`, `byAccount` — the
+ * web UI's own cache merge (`mergePage`) still wants exactly this contract, and
+ * a one-row array merges into it precisely as correctly as a fifty-row one:
+ * only the ROWS shrink, from the team's newest fifty to the one this call
+ * changed. `id` rides beside it unconditionally now — the id-carrying half of
+ * the old `createdId` parameter, no longer withheld from an update. */
+async function ticketMutationReply(
+  cfg: Parameters<typeof listTickets>[0],
+  guard: Parameters<typeof listTickets>[1],
+  scope: AccountScope,
+  filter: TicketFilter,
+  id: string
+): Promise<Response> {
+  const [ticket, counts, facets] = await Promise.all([
+    getTicket(cfg, guard, scope, id),
+    countTickets(cfg, guard, scope, filter),
+    countTicketFacets(cfg, guard, scope, filter),
+  ])
+  return pagedJson(
+    "tickets",
+    { rows: ticket ? [ticket] : [], total: counts.total, hasMore: false, nextCursor: null },
+    {
+      mineTotal: counts.mineTotal,
+      byType: facets.byType,
+      byStatus: facets.byStatus,
+      byAccount: facets.byAccount,
+      id,
     }
   )
 }
@@ -307,7 +332,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null, undefined, id)
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id)
 }
 
 /** POST /api/content/help/update — edit a ticket (help:update). */
@@ -321,7 +346,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const scope = await callerScope(cfg, guard)
   const accountId = await updateTicket(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.

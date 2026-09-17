@@ -530,7 +530,13 @@ export const INGEST_KINDS: IngestKind[] = [
     // was excluding nothing — zero tickets of that kind existed on any team when
     // it was measured. Bumping would re-read and re-embed every account on the
     // estate to write back the sentence already there.
-    textVersion: 3,
+    //
+    // v4: A BUMP THIS TIME, BECAUSE THIS ONE DOES CHANGE THE TEXT — not the
+    // words, the SHAPE: `generatedOnly` went from "has anybody typed `about`"
+    // to `false`, always. Same body as before, but no longer a card, so the
+    // very same rollup that already existed gets chunked and embedded for
+    // the first time. See the flag's own comment below.
+    textVersion: 4,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -636,7 +642,30 @@ export const INGEST_KINDS: IngestKind[] = [
         const where = [r.street ?? r.address, r.postal_code, r.city, r.country].filter(Boolean).join(", ")
         return {
           originRowId: r.id,
-          generatedOnly: !(r.about),
+          // BUILD-5 §H (18 Sep 2026) — A CARD ONLY WHEN THE ROLLUP TRULY HAS
+          // NOTHING. `about` used to be the one thing that decided this
+          // ("nobody typed a word, nothing to quote"), but the body ABOVE
+          // this line is not one person's free text on the common branches —
+          // it is the account's own rollup, computed fresh every sweep: its
+          // apps, its people, its open tickets, its systems. That is real,
+          // grounded, factual material, exactly what R23's citation seam
+          // wants to quote, and it was being thrown away before a single
+          // chunk was written whenever `about` happened to be empty — which
+          // is every account nobody has written a description for yet, the
+          // ordinary state of a brand-new client. MEASURED LIVE ON STAGING
+          // (mystery-shopper task 10, "tell me about Confia"): a thin
+          // account with a real world (an app, 380 tickets) answered with
+          // one weak ticket citation and never itself, because it was a card
+          // and a card has no chunk to be found by.
+          //
+          // STILL A CARD when NONE of these exist either — an account that
+          // is genuinely just a name, a code and a status has nothing more
+          // to quote than the summary already says, and c-hijack's own tests
+          // (knowledge.test.ts) measure exactly that account shape to prove
+          // a narrow search correctly finds nothing rather than manufacture
+          // an answer out of "X is a company we work with, Status: active"
+          // repeated as if it were a passage.
+          generatedOnly: !(r.about || r.contacts || r.apps || r.sprints || r.processes || r.tickets || r.todos),
           sortAt: r.sort_at,
           title: r.name,
           summary: buildSummary({
@@ -771,7 +800,11 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "app",
     table: "apps",
     label: "apps",
-    textVersion: 1,
+    // v2 (BUILD-5 §H, 18 Sep 2026): `generatedOnly` went from "has anybody
+    // typed one of the four paragraphs" to `false`, always — see the account
+    // kind's identical bump, right above, for the measured incident and the
+    // full reasoning. Same body as before; no longer a card.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(ap.updated_at, ap.created_at)", "ap.id")
       const rows = await d1Query<{
@@ -816,7 +849,23 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
-        generatedOnly: !(r.about || r.client_context || r.solution || r.key_actors),
+        // BUILD-5 §H (18 Sep 2026) — same reasoning as the account kind
+        // right above: a card only when the row truly has nothing beyond a
+        // name. `url` and `stage` are real facts about a live system (where
+        // it lives, what stage it is in), same standing as the stakeholders
+        // and processes rollups — none of the four free-text paragraphs are
+        // required any more. See the account kind's own comment for the
+        // measured incident and why an EMPTY app still refuses honestly.
+        generatedOnly: !(
+          r.about ||
+          r.client_context ||
+          r.solution ||
+          r.key_actors ||
+          r.stakeholders ||
+          r.processes ||
+          r.url ||
+          r.stage
+        ),
         sortAt: r.sort_at,
         title: r.name,
         summary: buildSummary({
@@ -2051,18 +2100,32 @@ async function sweepKind(
   // kinds can be dominated by one slow batch. `deadline`/`now` are optional so
   // every existing caller (the cron, catchUp, every mocked test) keeps the
   // exact shape it had — this is a bound a caller opts into, not a new
-  // ceiling on the engine itself. */
-  opts: { deadline?: number; now?: () => number } = {}
+  // ceiling on the engine itself.
+  //
+  // BUILD-5 §H (18 Sep 2026) — `opts.knownCursor`. sweepKinds already reads
+  // every kind's state, ONE query, for its own oldest-first ordering — so a
+  // second, per-kind `SELECT cursor` here was a real, measured duplicate: on
+  // the real Kwapso team, thirteen of these sequential round trips alone
+  // outran the manual press's whole 10s budget. `undefined` (every other
+  // caller — direct tests, any future caller that has not already read
+  // state) keeps the SELECT exactly as it was; sweepKinds is the only
+  // caller that passes it, because it is the only one that already knows. */
+  opts: { deadline?: number; now?: () => number; knownCursor?: string | null } = {}
 ): Promise<SweepResult> {
   const stateKey = kind.stateKey ?? kind.kind
-  const state = await d1Query<{ cursor: string | null }>(
-    cfg,
-    guard.databaseId,
-    // R14: one row by primary key.
-    "SELECT cursor FROM knowledge_ingest WHERE kind = ? LIMIT 1",
-    [stateKey]
-  )
-  const cursor = parseCursor(state[0]?.cursor ?? null, kind.textVersion)
+  const rawCursor =
+    opts.knownCursor !== undefined
+      ? opts.knownCursor
+      : ((
+          await d1Query<{ cursor: string | null }>(
+            cfg,
+            guard.databaseId,
+            // R14: one row by primary key.
+            "SELECT cursor FROM knowledge_ingest WHERE kind = ? LIMIT 1",
+            [stateKey]
+          )
+        )[0]?.cursor ?? null)
+  const cursor = parseCursor(rawCursor, kind.textVersion)
   let rows = await kind.read(cfg, guard, cursor, limit, env)
   let indexed = 0
   /** Sources this tick stopped retrying (EMBED_ATTEMPT_CAP), reported once below. */
@@ -2341,10 +2404,24 @@ async function sweepKind(
     // and the index agree; self-healing without a repair door anybody has to
     // remember, the same shape as the blanked hash above.
     //
-    // ONLY THIS DIRECTION NEEDS SAYING. A card that GAINS a person's words has
-    // changed its body, so its hash moves and the skip does not bite.
+    // "ONLY THIS DIRECTION NEEDS SAYING" WAS WRONG (BUILD-5 §H, 18 Sep
+    // 2026): true only while the ONLY way to leave card-status was a HUMAN
+    // typing a word, which changes the body and so moves the hash. §H's own
+    // fix widened what counts as real content (an account/app's rollup —
+    // contacts, systems, tickets) WITHOUT touching the body text those
+    // rollups already produced, so a row an OLDER sweep had classified as a
+    // card kept its old, still-matching hash after the classification
+    // changed underneath it. MEASURED LIVE ON STAGING: the textVersion bump
+    // correctly reset the cursor and re-read 134 accounts and 28 apps, and
+    // the ORIGINAL skip below — checking only content_hash and chunk
+    // progress, never whether the CLASSIFICATION had moved — silently kept
+    // every one of them a card. `wasACard` closes the gap the same way
+    // `nowACard` already does for the other direction: one forced
+    // re-index, once, and then the flag and the index agree again.
     const nowACard = (row.generatedOnly ?? false) && source.chunk_count > 0
-    if (!nowACard && source.content_hash === hash && source.indexed_chunks >= source.chunk_count) continue
+    const wasACard = !(row.generatedOnly ?? false) && source.chunk_count === 0 && source.content_hash !== null
+    if (!nowACard && !wasACard && source.content_hash === hash && source.indexed_chunks >= source.chunk_count)
+      continue
     // …AND THE SKIP THAT STOPS THE SWEEP PAYING FOR THE SAME FAILURE FOR EVER.
     // The blanked hash above is what makes a failed embedding retry, which is
     // right for a Workers AI wobble and wrong for text the model will never
@@ -2361,7 +2438,13 @@ async function sweepKind(
       givenUp.push(source.id)
       continue
     }
-    if (await indexOneSource(env, cfg, guard, source.id)) indexed++
+    // `force` when `wasACard`: `indexSource`'s own restart check reads the
+    // SAME content_hash comparison the skip above does, so without this the
+    // outer skip stops biting but the write inside still no-ops on a
+    // matching hash — real chunks land in knowledge_chunks (proven live) but
+    // `chunk_count` on the source row is never updated to agree, because
+    // that column is only written inside indexSource's own `restart` branch.
+    if (await indexOneSource(env, cfg, guard, source.id, wasACard ? { force: true } : {})) indexed++
   }
   // ONE ROW FOR THE TICK, not one per source: a kind where forty sources have
   // been given up on is one fact, and forty error rows would be the flood the
@@ -2399,20 +2482,38 @@ async function sweepKind(
  * went wrong (R12). `last_ok_at` moves only on a clean run, so "it has been
  * running and failing since Tuesday" is readable from the row itself rather than
  * from a log nobody opens. */
-async function recordRun(
+export async function recordRun(
   cfg: D1Rest,
   guard: MemberGuard,
   kind: string,
   outcome: { cursor: string | null; indexed: number; error: string | null }
 ): Promise<void> {
   const now = new Date().toISOString()
+  // MONOTONIC ON PURPOSE: two ticks can race (the cron and a manual press, or
+  // catchUp's own 5-rows-per-kind slice, all reading the same starting cursor
+  // before either has written back). Whichever writes LAST used to win
+  // unconditionally, so a tick that processed FEWER rows than a concurrent one
+  // could overwrite a later cursor with an earlier one — rewinding the kind
+  // and making it re-visit rows it had already passed. `writeCursor` is
+  // `v<version>|<ISO date>|<id>`, and the version is fixed per kind, so a
+  // plain string comparison past that prefix orders two cursors from the SAME
+  // version correctly (ISO 8601 sorts lexicographically). A cursor is only
+  // ever overwritten by one that is EQUAL OR LATER, or by NULL — the
+  // caughtUp/reset signal, an intentional terminal state this guard leaves
+  // untouched, never a race artifact of a short tick finding nothing.
   await d1ExecScript(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_ingest (kind, cursor, last_run_at, last_ok_at, last_error, runs, sources_indexed)
      VALUES (${sqlString(kind)}, ${sqlString(outcome.cursor)}, ${sqlString(now)}, ${outcome.error ? "NULL" : sqlString(now)}, ${sqlString(outcome.error)}, 1, ${outcome.indexed})
      ON CONFLICT (kind) DO UPDATE SET
-       cursor = ${outcome.error ? "knowledge_ingest.cursor" : "excluded.cursor"},
+       cursor = CASE
+                  WHEN ${outcome.error ? "1" : "0"} THEN knowledge_ingest.cursor
+                  WHEN excluded.cursor IS NULL THEN excluded.cursor
+                  WHEN knowledge_ingest.cursor IS NULL THEN excluded.cursor
+                  WHEN excluded.cursor >= knowledge_ingest.cursor THEN excluded.cursor
+                  ELSE knowledge_ingest.cursor
+                END,
        last_run_at = excluded.last_run_at,
        last_ok_at = ${outcome.error ? "knowledge_ingest.last_ok_at" : "excluded.last_ok_at"},
        last_error = excluded.last_error,
@@ -2420,6 +2521,7 @@ async function recordRun(
        sources_indexed = knowledge_ingest.sources_indexed + ${outcome.indexed};`
   )
 }
+
 
 /** One tick over a LIST of kinds. A kind that throws is RECORDED and the rest of
  * the sweep still runs — one bad table must not stop the others from catching
@@ -2477,13 +2579,43 @@ export async function sweepKinds(
   // google-autopilot.ts: with more work than a tick can hold, the one waiting
   // longest goes first and everybody comes round. A kind that has never run
   // sorts first of all, which is the right answer for a lane just added.
+  //
+  // BUILD-5 §G2 FOLLOW-UP (16 Sep 2026) — DO NOT ALSO GIVE EACH KIND A
+  // BUDGET SHARE. Measured live: `ticket`'s real backlog cost ~8s of embed
+  // and Vectorize round trips PER ROW, and the between-row check inside
+  // `sweepKind` cannot preempt a row already in flight — so against a 10s
+  // press, no split of the budget changes what happens once a backlog kind
+  // is first: one in-flight row already spends most or all of it. This
+  // ordering already alternates fairly (ticket first on one press eats the
+  // budget; the twelve cheap, already-caught-up kinds go first on the
+  // next, and ticket is skipped that time) — a budget SHARE would only
+  // change how a slow kind's UNAVOIDABLE cost is distributed across more
+  // presses, not remove it. A rotated STARTING kind was tried and reverted
+  // the same night for a sharper reason: this sort already runs
+  // unconditionally on every call and discards whatever order its `kinds`
+  // parameter arrived in, so reordering the input before calling this
+  // function was a no-op the whole time. The manual press is a CATCH-UP,
+  // never a rebuild — the rebuild is the cron (this same engine, no
+  // budget, run from the scheduled handler) and a driven, unbounded loop
+  // like BUILD-5 §C's. Once a backlog is gone, every press here is cheap
+  // regardless of which kind lands first.
   const keys = kinds.map((k) => k.stateKey ?? k.kind)
   const lastRun = new Map<string, string>()
+  // BUILD-5 §H — the cursor this same state read already carries, threaded
+  // into sweepKind so it never re-queries what this call already knows (see
+  // sweepKind's own header), and used below to skip a kind the table already
+  // says is caught up, recently, on the bounded (manual-press) path only.
+  const knownCursor = new Map<string, string | null>()
   try {
-    for (const st of await listIngestState(cfg, guard, keys)) lastRun.set(st.kind, st.lastRunAt ?? "")
+    for (const st of await listIngestState(cfg, guard, keys)) {
+      lastRun.set(st.kind, st.lastRunAt ?? "")
+      knownCursor.set(st.kind, st.cursor)
+    }
   } catch {
     // The order is an optimisation, never a precondition. If the state cannot be
-    // read, sweep in declaration order exactly as before.
+    // read, sweep in declaration order exactly as before, and knownCursor stays
+    // empty — every kind falls back to sweepKind's own SELECT, exactly as
+    // before this change.
   }
   const ordered = [...kinds].sort((a, b) =>
     (lastRun.get(a.stateKey ?? a.kind) ?? "").localeCompare(lastRun.get(b.stateKey ?? b.kind) ?? "")
@@ -2498,11 +2630,39 @@ export async function sweepKinds(
       results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: false })
       continue
     }
+    // BUILD-5 §H — SKIP, NEVER GUESS: a kind whose cursor is NULL (the same
+    // terminal state recordRun's own comment documents as "caught up") as of
+    // a run inside SYNC_PRESS_SKIP_RECENT_MS is reported with the SAME
+    // honest `caughtUp: true` a live check would almost certainly find,
+    // without paying for the round trip to re-derive it. Bounded-call only
+    // (`opts.budgetMs !== undefined`) — the unbounded cron always re-confirms
+    // on its own 15-minute cadence, which is what "recent" is measured
+    // against in the first place.
+    //
+    // NEVER for `windowed` or `rollup` kinds — both DELIBERATELY drop their
+    // cursor to null on every catch-up (see IngestKind's own two comments):
+    // for them, null is not "nothing left", it is "always re-walk next
+    // time", because their text depends on rows a cursor cannot see at all
+    // (a rollup) or a window that slides (windowed). Skipping either on a
+    // stale null would miss a real change with no new timestamp of its own
+    // — a new ticket under an account's rollup, a re-shelved folder — for
+    // up to SYNC_PRESS_SKIP_RECENT_MS. Caught live: knowledge-coverage.test.ts's
+    // own rollup suite failed the moment this skip ignored the flag.
+    if (opts.budgetMs !== undefined && !kind.windowed && !kind.rollup && knownCursor.get(stateKey) === null) {
+      const last = lastRun.get(stateKey)
+      if (last && now() - Date.parse(last) < SYNC_PRESS_SKIP_RECENT_MS) {
+        results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: true })
+        continue
+      }
+    }
     try {
       // The SAME deadline, one level deeper — see sweepKind's own header for
       // why the between-kinds check above is not enough on its own.
       results.push(
-        await sweepKind(env, cfg, guard, kind, limit, opts.budgetMs !== undefined ? { deadline, now } : {})
+        await sweepKind(env, cfg, guard, kind, limit, {
+          ...(opts.budgetMs !== undefined ? { deadline, now } : {}),
+          ...(knownCursor.has(stateKey) ? { knownCursor: knownCursor.get(stateKey) ?? null } : {}),
+        })
       )
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e)
@@ -2555,6 +2715,21 @@ const CATCH_UP_PER_KIND = 5
  * is what let the row CAP stay at the cron's own size rather than being
  * shrunk for every caller, fast steady-state presses included. */
 export const KNOWLEDGE_SYNC_PRESS_BUDGET_MS = 10_000
+
+/** BUILD-5 §H (18 Sep 2026) — HOW RECENT "ALREADY CAUGHT UP" HAS TO BE FOR A
+ * PRESS TO TRUST IT WITHOUT RE-CHECKING. MEASURED LIVE ON STAGING, the real
+ * Kwapso team: three consecutive presses each took 26-27 SECONDS against the
+ * budget above, and three of thirteen kinds never started — not because the
+ * between-kinds check (above) was wrong, but because the OTHER ten kinds'
+ * own reads, each a real D1 round trip even with nothing to index, already
+ * spent the whole budget before reaching them.
+ *
+ * Two minutes, not the cron's own fifteen: this is the INTERACTIVE path (a
+ * person's own "bring it up to date" press), so it stays short enough that
+ * skipping a kind here is never a meaningfully staler answer than a fresh
+ * check would have given — a genuine change inside the last two minutes is
+ * still caught by the very next press, or by the cron regardless. */
+export const SYNC_PRESS_SKIP_RECENT_MS = 2 * 60_000
 
 /** BRING THE INDEX UP TO DATE BEFORE ANSWERING — the mechanism behind "no manual
  * sync button, no periodic syncs; everything is quick, everything is silent,

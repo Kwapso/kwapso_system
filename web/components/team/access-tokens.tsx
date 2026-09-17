@@ -33,20 +33,19 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Prohibit, Copy, ClockCounterClockwise } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@shared/ui/components/table/table"
 
 import type { McpCall, McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
-import { formatActivityWhen, formatDate } from "@shared/web/format"
+import { formatActivityWhen, formatDate, formatRelative } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { LoadMore } from "@/components/records/load-more"
-import { listFetch, mcpCallsKey, totalKey } from "@/lib/live-resources"
+import { cursorKey, listFetch, mcpCallsKey, totalKey } from "@/lib/live-resources"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a
@@ -500,75 +499,137 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
   )
 }
 
-/** The table of ONE token's calls (R14: paged; R16: the exact count through
- * `formatCount`). Its own component so the hooks below only run while the sheet
- * that needs them is actually open. */
+/** ONE TOKEN'S OWN CALL LOG (R14: paged; R16: the exact count through
+ * `formatCount`). Its own component so the hooks below only run while the
+ * sheet that needs them is actually open.
+ *
+ * DRAWN THROUGH THE SAME SEAMS EVERY OTHER PAGED PANEL USES — `<ToolbarRow>`
+ * with a search box that asks the DOOR (R48/R19: `q` narrows `tool_name`,
+ * the same question `countCalls` answers), the row's own required `empty`
+ * prop wired to the RESTING (unsearched) read so a genuinely empty log draws
+ * no toolbar at all (R50), and `PINNED_TOOLBAR` (worn by the row itself,
+ * R63) staying on top while the rows scroll under it — the exact three laws
+ * this panel shipped green without, because a hand-rolled `<Table>` with no
+ * `<ToolbarRow>` at all was invisible to every census that reads FROM one.
+ *
+ * A PLAIN ROW LIST, never a banded table (R80) — the same shape
+ * `work-logs-panel.tsx` already draws for the record engine's other paged,
+ * time-ordered nested collections, and `formatRelative` for the timestamp
+ * so it never wraps at 375px the way an absolute "2026-09-16 20:41" did. */
 function TokenCallLog({ token }: { token: McpTokenSummary }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const key = mcpCallsKey(token.id)
-  const callsQ = useCached<McpCall[]>(key, () => listFetch.mcpCalls(token.id))
+  const restingQ = useCached<McpCall[]>(key, () => listFetch.mcpCalls(token.id))
   const total = useCachedValue<number>(totalKey("mcp-calls", token.id))
-  const calls = callsQ.data ?? []
-  return (
-    <div className="flex flex-col gap-4 p-6">
-      <DialogTitle>{t("Calls")}</DialogTitle>
-      <DialogDescription>
-        {token.label}
-        {total ? ` · ${formatCount(total)}` : ""}
-      </DialogDescription>
-      {callsQ.error ? (
+
+  // WHILE A SEARCH IS TYPED, THE FILTERED READ IS THE LIST — its own cache key
+  // and its own cursor, the same shape `work-logs-panel.tsx`'s `personFilter`
+  // takes: the resting (unsearched) read stays warm underneath, so clearing
+  // the box costs nothing.
+  const [q, setQ] = React.useState("")
+  const filteredKey = q ? `${key}:q:${q}` : key
+  const filteredQ = useCached<McpCall[]>(q ? filteredKey : null, () =>
+    mcp.calls(token.id, { q }).then((r) => {
+      primeCache(cursorKey(filteredKey), r.nextCursor)
+      return r.calls
+    })
+  )
+  const calls = q ? (filteredQ.data ?? null) : (restingQ.data ?? null)
+  const activeFetchPage = (cursor: string) =>
+    mcp.calls(token.id, { cursor, q: q || undefined }).then((r) => ({ rows: r.calls, nextCursor: r.nextCursor }))
+
+  if (restingQ.error)
+    return (
+      <div className="flex flex-col gap-4 p-6">
+        <DialogTitle>{t("Calls")}</DialogTitle>
         <ShapeStateBody
           shape="recordChrome"
           state="error"
           copy={{ errorTitle: t("Couldn't load this token's calls.") }}
           action={
-            <Button variant="secondary" onClick={() => callsQ.refresh()}>
+            <Button variant="secondary" onClick={() => restingQ.refresh()}>
               {t("Try again")}
             </Button>
           }
         />
-      ) : callsQ.data === undefined ? (
+      </div>
+    )
+  if (restingQ.data === undefined)
+    return (
+      <div className="flex flex-col gap-4 p-6">
+        <DialogTitle>{t("Calls")}</DialogTitle>
         <Skeleton variant="list" lines={4} />
-      ) : calls.length === 0 ? (
-        <CollectionEmptyState title={t("No calls yet.")} />
-      ) : (
-        <>
-          <Table aria-label={t("Calls")}>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{t("Tool")}</TableHead>
-                <TableHead>{t("Result")}</TableHead>
-                <TableHead>{t("When")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {calls.map((c) => (
-                <TableRow key={c.id} className="hover:bg-transparent">
-                  <TableCell className="font-mono text-xs">{c.toolName}</TableCell>
-                  <TableCell>
+      </div>
+    )
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* THE HEAD, fixed — the drawer's own three-part frame (sheet.tsx's own
+       * header comment: "the head and the foot do not move and the body
+       * scrolls"). `SheetContent` carries no padding of its own, so this pays
+       * the drawer's 24px inset. */}
+      <div className="flex flex-col gap-1 p-6 pb-4">
+        <DialogTitle>{t("Calls")}</DialogTitle>
+        <DialogDescription>
+          {token.label}
+          {total ? ` · ${formatCount(total)}` : ""}
+        </DialogDescription>
+      </div>
+      {/* THE BODY, scrolling — and the scrollport `<ToolbarRow>`'s own
+       * `PINNED_TOOLBAR` pins against. `bg-popover` matches the drawer's own
+       * surface (sheet.tsx: "Overlay surface is --popover") and PUBLISHES
+       * `--pinned-ground` for it (globals.css `.bg-popover`), so the pinned
+       * row paints the same paper it is standing on instead of a hole. */}
+      <div className="bg-popover min-h-0 flex-1 overflow-y-auto">
+        <ToolbarRow
+          // R50 — the RESTING read's own row count, never the searched one: a
+          // log with zero calls ever draws no toolbar at all, but a search
+          // that narrows a non-empty log to zero keeps the box up so the box
+          // that found nothing can still be cleared.
+          empty={restingQ.data.length === 0}
+          search={
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("Search calls…")}
+              className="h-9 w-full sm:w-48"
+              aria-label={t("Search calls")}
+            />
+          }
+        />
+        <div className="px-6 pb-6">
+          {calls === null ? (
+            <Skeleton variant="list" lines={3} />
+          ) : calls.length === 0 ? (
+            <CollectionEmptyState filtered={Boolean(q)} title={t("No calls yet.")} />
+          ) : (
+            <>
+              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+                {calls.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1 basis-[12rem] truncate font-mono text-xs">{c.toolName}</span>
                     {c.ok ? (
-                      <Badge variant="secondary" className="text-badge">
+                      <Badge variant="secondary" className="shrink-0 text-badge">
                         {t("Ok")}
                       </Badge>
                     ) : (
-                      <Badge variant="secondary" className="text-destructive text-badge">
+                      <Badge variant="secondary" className="text-destructive shrink-0 text-badge">
                         {t("Refused")}
                       </Badge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {formatActivityWhen(c.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <LoadMore
-            listKey={mcpCallsKey(token.id)}
-            fetchPage={(cursor) => mcp.calls(token.id, cursor).then((r) => ({ rows: r.calls, nextCursor: r.nextCursor }))}
-          />
-        </>
-      )}
+                    <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs tabular-nums">
+                      {formatRelative(c.createdAt, t, lang)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="pt-3">
+                <LoadMore listKey={q ? filteredKey : mcpCallsKey(token.id)} fetchPage={activeFetchPage} />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

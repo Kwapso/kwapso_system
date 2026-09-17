@@ -31,9 +31,13 @@ export const mcp = {
     }>("/api/mcp/tokens", post({ label })),
   revokeToken: (id: string) =>
     api<{ ok: true; tokens: McpTokenSummary[] }>("/api/mcp/tokens/revoke", post({ id })),
-  /** R14: one PAGE of a token's own call log, newest first. */
-  calls: (tokenId: string, cursor?: string | null) =>
+  /** R14: one PAGE of a token's own call log, newest first — `q` narrows by
+   * tool name, at the door, the same question the toolbar's own search box
+   * asks and the count above answers. */
+  calls: (tokenId: string, opts: { cursor?: string | null; q?: string } = {}) =>
     api<PagedResponse<{ calls: McpCall[] }>>(
-      `/api/mcp/tokens/calls?tokenId=${enc(tokenId)}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      `/api/mcp/tokens/calls?tokenId=${enc(tokenId)}${opts.cursor ? `&cursor=${enc(opts.cursor)}` : ""}${
+        opts.q ? `&q=${enc(opts.q)}` : ""
+      }`
     ),
 }

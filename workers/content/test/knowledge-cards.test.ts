@@ -198,3 +198,83 @@ describe("a row that carries a person's own words", () => {
     expect(all.some((s) => s.pieces > 0), "nothing stayed quotable").toBe(true)
   })
 })
+
+// BUILD-5 §H (18 Sep 2026) — THE MISSING SIBLING. The hash-skip's own comment
+// above says "ONLY THIS DIRECTION NEEDS SAYING" — a card that GAINS a
+// person's words has changed its BODY, so its hash moves and the skip does
+// not bite. That reasoning holds when a HUMAN adds free text. It does not
+// hold when the CODE's own definition of "real content" widens without the
+// body changing at all — exactly what BUILD-5 §H's account/app fix did:
+// `generatedOnly` started reading the rollup lists too, but the rollup TEXT
+// those lists produce was already being computed identically before the
+// change. MEASURED LIVE ON STAGING: the fix shipped, the textVersion bumped,
+// the cursor correctly reset and re-read every account and app — and the
+// hash-skip below then silently `continue`d every one of them anyway,
+// because `content_hash` still matched. `generatedOnly` flipped from true to
+// false and the sweep believed nothing had happened.
+describe("a row that STOPS being a card between sweeps, with its body unchanged", () => {
+  it("is force-indexed once, the same self-healing the OTHER direction already gets", async () => {
+    // A BRAND NEW, ISOLATED ACCOUNT — with a contact from the very start, so
+    // it indexes with real content and a real hash under TODAY's reader.
+    const THIN = "A_CARD_THEN_NOT"
+    const CONTACT = "A_CARD_THEN_NOT_PERSON"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, status, created_at, creator_id)
+         VALUES ('${THIN}', 'entity', 'Thin Freight Ltd', 'THINF', 'active_client', '2026-01-01', '${IDS.staffUser}');
+       INSERT INTO accounts (id, account_type, name, created_at, creator_id)
+         VALUES ('${CONTACT}', 'individual', 'Priya Shah', '2026-01-01', '${IDS.staffUser}');
+       INSERT INTO account_links (id, account_id, person_account_id, relationship, created_at, creator_id)
+         VALUES ('L_CARD_THEN_NOT', '${THIN}', '${CONTACT}', 'Harbourmaster', '2026-01-01', '${IDS.staffUser}');`
+    )
+    await sync()
+    const row = () =>
+      db()
+        .prepare(
+          `SELECT s.id, s.generated_only, s.chunk_count, s.content_hash,
+                  (SELECT COUNT(*) FROM knowledge_chunks c WHERE c.source_id = s.id) AS pieces
+             FROM knowledge_sources s WHERE s.origin_table = 'accounts' AND s.origin_row_id = ?`
+        )
+        .get(THIN) as Row
+    const indexed = row()
+    expect(indexed.generated_only, "a real contact did not stop this being a card — the actual fix is broken").toBe(
+      0
+    )
+    expect(indexed.pieces, "no pieces were written for real content").toBeGreaterThan(0)
+    expect(indexed.content_hash, "no hash was ever written").not.toBeNull()
+
+    // NOW SIMULATE THE EXACT LIVE INCIDENT: a row an OLDER sweep classified
+    // as a card — `generated_only=1`, no chunks — for the SAME content,
+    // SAME hash, nothing about the account or its contact having moved
+    // since. This is precisely what BUILD-5 §H's own deploy found on
+    // staging: the code's definition of "real content" widened, the
+    // textVersion bump reset the cursor and re-read the row, and the
+    // hash-skip below STILL treated `content_hash === hash` as "nothing to
+    // do" — because it never asked whether the CLASSIFICATION had also
+    // changed underneath an unchanged hash.
+    db().exec(
+      `UPDATE knowledge_sources SET generated_only = 1, chunk_count = 0, indexed_chunks = 0
+         WHERE origin_table = 'accounts' AND origin_row_id = '${THIN}';
+       DELETE FROM knowledge_chunks WHERE source_id = (
+         SELECT id FROM knowledge_sources WHERE origin_table = 'accounts' AND origin_row_id = '${THIN}'
+       );`
+    )
+    const staged = row()
+    expect(staged.generated_only).toBe(1)
+    expect(staged.pieces).toBe(0)
+    expect(staged.content_hash, "the simulated stale row must keep the SAME hash — that is the whole bug").toBe(
+      indexed.content_hash
+    )
+
+    await sync()
+    const healed = row()
+    // THE ASSERTION THAT WOULD HAVE CAUGHT THIS LIVE: the reader says this is
+    // real content, so the index must agree — even though the hash never
+    // moved, because it was the CLASSIFICATION that was stale, not the text.
+    expect(healed.generated_only, "the reader still says card, with a real contact on it").toBe(0)
+    expect(
+      healed.pieces,
+      "still a card in the index though the flag says otherwise, and the hash matched — the hash-skip ate it"
+    ).toBeGreaterThan(0)
+    expect(healed.chunk_count).toBeGreaterThan(0)
+  })
+})

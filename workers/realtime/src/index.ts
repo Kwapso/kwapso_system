@@ -369,9 +369,17 @@ export class TeamChannel extends DurableObject<Env> {
     return { resources: [...resources], all, at: Date.now() }
   }
 
-  // Clients only listen; inbound messages are ignored. These handlers keep the
-  // object hibernation-eligible and tidy up on disconnect.
-  async webSocketMessage(): Promise<void> {}
+  // Clients only listen; every OTHER inbound message is ignored. The one
+  // exception is the client's own heartbeat (shared/web/realtime.ts): a
+  // silently-dead link — a proxy that drops the TCP session without a close
+  // frame reaching the browser — leaves `readyState` reporting OPEN on a
+  // socket nothing will ever answer on again, so the client cannot tell a
+  // healthy idle tab from a dead one without asking. Answering "ping" with
+  // "pong" is the asking: a client that hears nothing back closes the socket
+  // itself and reconnects through the same backoff `onclose` already runs.
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (message === "ping") ws.send("pong")
+  }
   async webSocketClose(ws: WebSocket): Promise<void> {
     try {
       ws.close()

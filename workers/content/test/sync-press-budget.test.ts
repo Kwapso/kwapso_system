@@ -173,3 +173,114 @@ describe("sweepKinds — the deadline reaches inside a single kind's own row bat
     expect(write).not.toContain("row4")
   })
 })
+
+// BUILD-5 §H (18 Sep 2026) — MEASURED LIVE ON STAGING, the real Kwapso team:
+// three consecutive presses each took 26-27 SECONDS against the 10s budget,
+// and three of thirteen kinds never even started. The between-kinds check
+// above is honest but cannot make the OTHER ten kinds' own reads any
+// cheaper — and sweepKind paid its OWN `SELECT cursor` round trip per kind,
+// duplicating state sweepKinds had already read one query earlier, for
+// ordering. Two leaner fixes, both scoped so no other caller's shape moves:
+// (1) thread the cursor sweepKinds already read into sweepKind, so it never
+// re-queries it; (2) a kind the table ALREADY says is caught up (`cursor IS
+// NULL`), confirmed RECENTLY, is skipped entirely on the bounded (manual
+// press) path — it reports the same honest `caughtUp: true` without paying
+// for a read that would almost certainly find nothing new.
+describe("sweepKinds — the read cost itself, not just the stop", () => {
+  beforeEach(() => {
+    d1Query.mockClear()
+    d1ExecScript.mockClear()
+  })
+
+  /** listIngestState's own SELECT, mocked to answer with real per-kind state —
+   * every other test in this file leaves d1Query at its default `[]`, which
+   * is what made sweepKind's now-removed duplicate `SELECT cursor` invisible:
+   * an empty state row and a state read from listIngestState both look like
+   * "never run" without a suite that gives each kind its own history. */
+  function mockState(rows: { kind: string; cursor: string | null; last_run_at: string | null }[]) {
+    d1Query.mockImplementation(async (..._args: unknown[]) => {
+      const sql = _args[2] as string
+      return sql.includes("FROM knowledge_ingest")
+        ? rows.map((r) => ({ ...r, last_ok_at: r.last_run_at, last_error: null, runs: 1, sources_indexed: 0 }))
+        : []
+    })
+  }
+
+  it("never re-queries a kind's cursor once sweepKinds has already read it", async () => {
+    mockState([{ kind: "kind0", cursor: "v1|2026-09-18T00:00:00.000Z|id1", last_run_at: null }])
+    const only: IngestKind = { ...KINDS[0], read: vi.fn(async () => []) }
+    await sweepKinds(env, cfg, guard, [only], 25)
+    // Exactly one d1Query call — listIngestState's own SELECT. Before this
+    // fix, sweepKind's duplicate `SELECT cursor FROM knowledge_ingest` made
+    // this two, one per kind swept.
+    const stateReads = d1Query.mock.calls.filter((c) => (c[2] as string).includes("FROM knowledge_ingest"))
+    expect(stateReads).toHaveLength(1)
+  })
+
+  it("skips a kind's own read entirely when its last run was recent and caught up", async () => {
+    const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString() // 30s ago
+    mockState([{ kind: "kind0", cursor: null, last_run_at: recentlyCaughtUp }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], read: readSpy }
+
+    const [result] = await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).not.toHaveBeenCalled()
+    expect(result).toEqual({ kind: "kind0", read: 0, indexed: 0, caughtUp: true })
+  })
+
+  it("never skips a `rollup` kind, even recently caught up — its cursor:null is 'always re-walk', not 'nothing left'", async () => {
+    const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString()
+    mockState([{ kind: "kind0", cursor: null, last_run_at: recentlyCaughtUp }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("never skips a `windowed` kind, even recently caught up — same reasoning as rollup", async () => {
+    const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString()
+    mockState([{ kind: "kind0", cursor: null, last_run_at: recentlyCaughtUp }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], windowed: true, read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("does NOT skip a kind whose last caught-up run is stale", async () => {
+    const staleRun = new Date(Date.now() - 10 * 60_000).toISOString() // 10 minutes ago
+    mockState([{ kind: "kind0", cursor: null, last_run_at: staleRun }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("does NOT skip a kind that is not actually caught up (cursor not null)", async () => {
+    const recent = new Date(Date.now() - 5_000).toISOString()
+    mockState([{ kind: "kind0", cursor: "v1|2026-09-18T00:00:00.000Z|id1", last_run_at: recent }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("the skip never applies to the unbounded call (no budgetMs) — the cron always re-confirms", async () => {
+    const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString()
+    mockState([{ kind: "kind0", cursor: null, last_run_at: recentlyCaughtUp }])
+    const readSpy = vi.fn(async () => [])
+    const only: IngestKind = { ...KINDS[0], read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [only], 25) // no opts at all — the cron's own shape
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+})
