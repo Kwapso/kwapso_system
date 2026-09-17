@@ -107,6 +107,22 @@ export function useTeamLive(): boolean {
   )
 }
 
+/** How often an OPEN socket proves it can still hear from the switchboard, and
+ * how long a ping may go unanswered before the link is declared dead.
+ *
+ * `readyState` is the browser's own belief, not the network's: a proxy that
+ * drops the TCP session without ever forwarding a close frame leaves the
+ * socket reporting OPEN forever, and `onclose` — the only thing that resets
+ * `teamConnectedAt` and triggers a reconnect — never fires. That is exactly
+ * the shape the owner hit: a tab that had been open for a while, no error, no
+ * warning, and only a full reload opened a fresh socket that actually worked.
+ * `workers/realtime`'s `webSocketMessage` answers "ping" with "pong"; a socket
+ * that misses one full round is closed on purpose so the EXISTING `onclose` →
+ * backoff → reconnect path (below) does the rest — no second recovery path to
+ * keep in sync with the first. */
+const HEARTBEAT_INTERVAL_MS = 20_000
+const HEARTBEAT_TIMEOUT_MS = 10_000
+
 /** Open one live socket to `path` (e.g. "team=<id>" / "user=<id>"), reconnecting
  * with backoff. `onReconnect` is called only on a RE-connect after a drop. */
 function useLiveChannel(
@@ -126,12 +142,19 @@ function useLiveChannel(
     let retry = 0
     let everConnected = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    let heartbeat: ReturnType<typeof setInterval> | undefined
+    let lastPong = 0
     let closed = false
     // Only the TEAM channel's uptime can vouch for team data; the user channel
     // carries identity events and knows nothing about a collection.
     const isTeamChannel = query.startsWith("team=")
 
     const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/realtime?${query}`
+
+    const stopHeartbeat = () => {
+      if (heartbeat) clearInterval(heartbeat)
+      heartbeat = undefined
+    }
 
     const connect = () => {
       if (closed) return
@@ -145,8 +168,31 @@ function useLiveChannel(
         // The coverage window starts NOW, and starts again on every re-open:
         // anything cached before this moment may have missed a ping in the gap.
         if (isTeamChannel) setTeamConnectedAt(Date.now())
+        // Heartbeat starts fresh on every open, matching the coverage window
+        // above: a pong owed to the PREVIOUS socket can't excuse this one.
+        lastPong = Date.now()
+        heartbeat = setInterval(() => {
+          if (!socket || socket.readyState !== WebSocket.OPEN) return
+          if (Date.now() - lastPong > HEARTBEAT_INTERVAL_MS + HEARTBEAT_TIMEOUT_MS) {
+            // A full interval AND a full timeout with no pong: the socket is
+            // dead even though `readyState` still calls it open. Close it
+            // ourselves so `onclose` runs the backoff/reconnect it already
+            // knows how to do — never a second reconnect path here.
+            socket.close()
+            return
+          }
+          socket.send("ping")
+        }, HEARTBEAT_INTERVAL_MS)
       }
       socket.onmessage = (e) => {
+        // THE HEARTBEAT'S OWN REPLY, never an event. Caught before the JSON
+        // parse below, which would otherwise throw on a bare "pong" and drop
+        // it as "a malformed frame" — silently correct, but it would leave
+        // `lastPong` unmoved and the watchdog closing a socket that is fine.
+        if (e.data === "pong") {
+          lastPong = Date.now()
+          return
+        }
         try {
           handlerRef.current(JSON.parse(e.data as string) as RealtimeEvent)
         } catch {
@@ -154,6 +200,7 @@ function useLiveChannel(
         }
       }
       socket.onclose = () => {
+        stopHeartbeat()
         // The window shuts the moment the link does, whether or not we are
         // going to retry — a disconnected tab must revalidate normally.
         if (isTeamChannel) setTeamConnectedAt(null)
@@ -170,6 +217,7 @@ function useLiveChannel(
     return () => {
       closed = true
       if (timer) clearTimeout(timer)
+      stopHeartbeat()
       // Unmount, a team switch, or a fence that moved: the identity of the
       // socket changed, so nothing cached under the old one is vouched for.
       if (isTeamChannel) setTeamConnectedAt(null)

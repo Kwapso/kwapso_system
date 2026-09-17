@@ -548,9 +548,24 @@ describe("/publish — the one door that reaches every team's channel", () => {
 })
 
 describe("the hibernation handlers", () => {
-  it("ignores anything a client sends — the channel is listen-only", async () => {
-    const { channel: ch } = channel([])
-    await expect(ch.webSocketMessage()).resolves.toBeUndefined()
+  // The channel is otherwise listen-only; the ONE inbound message it answers
+  // is the client's own heartbeat (shared/web/realtime.ts) — a socket that
+  // sends "ping" and never hears "pong" back closes itself and reconnects
+  // through the same backoff `onclose` already runs. Without this, a proxy
+  // that drops the TCP session without ever forwarding a close frame leaves
+  // `readyState` reporting OPEN forever and nothing else ever notices.
+  it("answers a heartbeat 'ping' with 'pong', on the SAME socket", async () => {
+    const ws = socket()
+    const { channel: ch } = channel([ws])
+    await ch.webSocketMessage(ws as never, "ping")
+    expect(ws.sent).toEqual(["pong"])
+  })
+
+  it("ignores anything else a client sends", async () => {
+    const ws = socket()
+    const { channel: ch } = channel([ws])
+    await expect(ch.webSocketMessage(ws as never, "not a ping")).resolves.toBeUndefined()
+    expect(ws.sent).toEqual([])
   })
 
   it("closes the socket on disconnect", async () => {
