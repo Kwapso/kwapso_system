@@ -102,7 +102,10 @@ const PEOPLE = [
     name: "Tomas Roig",
     companyName: null,
     relationship: null,
-    active: true,
+    // ARCHIVED — the one row of the three, so the new Status column
+    // (R86/D17, client ruling 17 Sep 2026: "contact live green") has a real
+    // grey dot to prove beside Marta's and Ines's green ones.
+    active: false,
   },
 ] as unknown as Account[]
 
@@ -157,17 +160,19 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe("the contacts screen draws a table", () => {
-  it("draws Contact, then Account, then Role, then Portal — her order, read off the DOM", async () => {
+  it("draws Contact, then Account, then Role, then Status, then Portal — her order, read off the DOM", async () => {
     draw()
     await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
-    // Portal is FOURTH — the client's 16 Sep 2026 ruling landed after the
-    // three above, and a reader who may see it (this fixture's `maySeeLogins`
-    // defaults to `true`) gets it as a fourth column, never ahead of her own
-    // three.
+    // Portal is LAST — the client's 16 Sep 2026 ruling landed after her
+    // three, and a reader who may see it (this fixture's `maySeeLogins`
+    // defaults to `true`) gets it as a further column, never ahead of her
+    // own three. Status (R86/D17, 17 Sep 2026: "contact live green") landed
+    // after Portal and is never gated, so it sits fourth, ahead of Portal.
     expect(headers(), "the client asked for the role column AFTER account").toEqual([
       "Contact",
       "Account",
       "Role",
+      "Status",
       "Portal",
     ])
   })
@@ -185,9 +190,12 @@ describe("the contacts screen draws a table", () => {
     // loosely for the same reason the Contact column's own name is.
     expect(first[1]).toContain("Bergman S.A.")
     expect(first[2]).toBe("CEO")
+    // MARTA IS LIVE (`active: true` on the fixture) — the fourth cell's own
+    // badge (client ruling, 17 Sep 2026: "contact live green").
+    expect(first[3]).toBe("Live")
     // MARTA HOLDS A LIVE GRANT (`hasPortalLogin: true` on the fixture) — the
-    // fourth cell's own badge (client ruling, 16 Sep 2026).
-    expect(first[3]).toBe("Portal")
+    // fifth cell's own badge (client ruling, 16 Sep 2026).
+    expect(first[4]).toBe("Portal")
   })
 
   it("an absent company and an absent role are an em dash, not an error", async () => {
@@ -207,11 +215,13 @@ describe("the contacts screen draws a table", () => {
     // is matched loosely too; the em dash beside it is exact.
     expect(ines[1], "a company, wearing its own face").toContain("Delaval Nord")
     expect(ines[2], "nobody's word for what she does").toBe("—")
+    // INES IS LIVE TOO — green, the fourth cell.
+    expect(ines[3], "live, said in words").toBe("Live")
     // AN ORDINARY "NO", never an em dash — a Portal cell is never blank the
     // way Account/Role can be: `hasPortalLogin` is a real fact about every
-    // person on this door (`false` on the fixture), so the fourth cell reads
+    // person on this door (`false` on the fixture), so the fifth cell reads
     // "No portal" rather than "—".
-    expect(ines[3], "not a live login, said in words").toBe("No portal")
+    expect(ines[4], "not a live login, said in words").toBe("No portal")
     const tomas = cellsOf("Tomas Roig")
     expect(tomas[0]).toContain("Tomas Roig")
     // NO COMPANY LINKED AT ALL draws the PLAIN em dash, no mark — the same
@@ -219,10 +229,14 @@ describe("the contacts screen draws a table", () => {
     // unset app: an ordinary absence is not a record with no picture, so
     // there is no face to draw and nothing to match loosely here.
     expect(tomas.slice(1, 3), "nobody has filed him under a company yet").toEqual(["—", "—"])
+    // TOMAS IS THE ARCHIVED ONE OF THE THREE (`active: false` on the
+    // fixture) — grey, the fourth cell, never a dash: an archive flag is
+    // always a real answer, not an absence.
+    expect(tomas[3], "archived, said in words").toBe("Archived")
     // TOMAS CARRIES NO `hasPortalLogin` AT ALL on this fixture (`undefined`,
     // never sent by a real door) — the same "not true" branch `null` draws,
     // so the cell reads exactly as it does for Ines rather than blanking out.
-    expect(tomas[3], "an absent field reads as a real no, never a dash").toBe("No portal")
+    expect(tomas[4], "an absent field reads as a real no, never a dash").toBe("No portal")
   })
 
   it("only the column the door can order draws a control", async () => {
@@ -242,6 +256,13 @@ describe("the contacts screen draws a table", () => {
     expect(screen.queryByRole("button", { name: /^Role/ })).toBeNull()
     expect(screen.getByText("Account"), "…they are still column headings").toBeTruthy()
     expect(screen.getByText("Role")).toBeTruthy()
+    // STATUS IS THE SAME SHAPE — no name for it on the accounts door's
+    // ordering menu either, so no control, and the words still head the
+    // column. `headers()`, not `getByText`, for the same reason Portal below
+    // reads that way: the exact word "Status" is not unique once this row's
+    // own badges are on screen too.
+    expect(screen.queryByRole("button", { name: /^Status/ })).toBeNull()
+    expect(headers(), "…still a column heading").toContain("Status")
     // PORTAL IS THE SAME SHAPE, for its own reason (this file's header, #3,
     // read the other way round): the accounts door's ordering menu has no
     // per-role variant, so a header that could be ordered would let a caller
@@ -255,15 +276,40 @@ describe("the contacts screen draws a table", () => {
   })
 })
 
+describe("the Status column (R86/D17, client ruling 17 Sep 2026)", () => {
+  // "contact live green" — green while live, grey once archived, a dot
+  // rather than a fill, the same shape the Portal column beside it already
+  // proves; `data-dot`'s presence and value are the proof.
+  it("draws green for a live contact and grey for an archived one — a dot, not a fill", async () => {
+    draw()
+    await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
+    const rowFor = (name: string) =>
+      Array.from(document.querySelectorAll("tbody tr")).find((tr) => tr.textContent?.includes(name))
+    expect(
+      rowFor("Marta Bergman")?.querySelector('[data-slot="badge"][data-dot="shipped"]'),
+      "a live contact must carry the green (shipped) dot"
+    ).toBeTruthy()
+    expect(
+      rowFor("Ines Ortiz")?.querySelector('[data-slot="badge"][data-dot="shipped"]'),
+      "a live contact must carry the green (shipped) dot"
+    ).toBeTruthy()
+    expect(
+      rowFor("Tomas Roig")?.querySelector('[data-slot="badge"][data-dot="archived"]'),
+      "an archived contact must carry the grey (archived) dot"
+    ).toBeTruthy()
+  })
+})
+
 describe("the Portal column (client ruling, 16 Sep 2026)", () => {
   it("is offered only to a reader who could already press the In portal tab", async () => {
     draw({ maySeeLogins: false })
     await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(3))
-    // No fourth header, and no "Portal"/"No portal" badge text anywhere —
+    // No Portal header, and no "Portal"/"No portal" badge text anywhere —
     // the same `maySeeLogins` the tab strip is already drawn under (this
     // file's "a role without portal_users:read is not offered the tab at
-    // all" test, above), read a second way.
-    expect(headers()).toEqual(["Contact", "Account", "Role"])
+    // all" test, above), read a second way. Status is UNGATED (R86/D17, 17
+    // Sep 2026) and stays even here.
+    expect(headers()).toEqual(["Contact", "Account", "Role", "Status"])
     expect(screen.queryByText("Portal")).toBeNull()
     expect(screen.queryByText("No portal")).toBeNull()
   })

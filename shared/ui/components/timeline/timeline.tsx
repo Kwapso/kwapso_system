@@ -225,7 +225,13 @@ const Timeline = React.forwardRef<HTMLDivElement, TimelineProps>(
         {state === "loading" && loadingState ? loadingState : null}
 
         {state === "default" || (state === "loading" && !loadingState) ? (
-          <div className="min-w-0 overflow-x-auto">
+          /* `overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x` alone
+             computes `overflow-y: auto`, and a scroller this shape can
+             round 1px tall and become silently vertically scrollable. This
+             box's own height is intrinsic (never constrained), so nothing
+             here ever needed the vertical axis. See `tabs.tsx`'s
+             `TabsList` and `foundations/rules/check-overflow-axis.mjs`. */
+          <div className="min-w-0 overflow-x-auto overflow-y-hidden">
             <div className="flex min-w-max flex-col justify-center px-[var(--space-1h)]">
               {/* Above the spine. `align-items: end` so every title sits on
                   the rule whatever height its meta line runs to. */}

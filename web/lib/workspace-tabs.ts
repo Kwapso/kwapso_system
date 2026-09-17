@@ -108,6 +108,17 @@
 //     navigation THEY caused does not turn around and push a fresh step,
 //     which would make Back always look one step forward of wherever you
 //     just went.
+//
+// ── THE THIRD ASK, ALSO 17 SEP 2026 — "PUSH THE TRAIL ON A RAIL PICK" IS
+//    ITSELF SUPERSEDED, FOR THE RAIL ONLY ────────────────────────────────────
+//
+// A rail pick (`app-shell.tsx`'s `goToSection`) no longer goes through
+// `visitTrail`'s ordinary push at all — see `railPick`, below, for the rule
+// in full and the client's own words. In outline: it activates an already-
+// open tab sitting at the clicked module's own root, or opens a fresh one
+// beside the active tab, landing AT the module's root rather than wherever
+// she left off. Every other click (an ordinary link, a row, a crumb) is
+// still governed by decision B above, unchanged.
 
 import { useSyncExternalStore } from "react"
 
@@ -523,6 +534,55 @@ export function openBeside(path: string, label: string): void {
   tabs = next
   persist()
   announce()
+}
+
+/** A RAIL PICK — clicking a module's own entry in the navigation rail
+ * (`app-shell.tsx`'s `goToSection`). REPLACES "push the trail on a rail
+ * pick" (this file's own SECOND-ASK note, above, and rulebook L12) as of a
+ * THIRD ruling, 17 Sep 2026, verbatim:
+ *
+ *   "when I click on something on the navigation bar, it should always open
+ *    in a new tab unless it's already open on the main screen. What I mean
+ *    is, for example, if I go in the navigation bar to Tickets and then I go
+ *    inside the ticket, if I click on Tickets again in the navigation bar,
+ *    it should open the Tickets screen in a new tab. If I already have the
+ *    main ticket screens open, do not open any tab, but open this tab. If,
+ *    for example, I am in an app and I click on Tickets, it should open in a
+ *    new tab."
+ *
+ * So a rail pick is neither `visitTrail`'s push nor an unconditional
+ * `openBeside` — it asks ONE question first: is some open tab's CURRENT
+ * step already this module's own root (`path`, canonicalised exactly as
+ * `openSoloTab` canonicalises it — the query string selects a screen's own
+ * inner view, never a different tab)? A tab whose current step is DEEPER
+ * inside the module (a record, not the collection) does NOT count — the
+ * client's own example is exactly that case, and her answer for it is "a
+ * new tab", not "front the one I am standing in".
+ *
+ *   · FOUND — activate it, the identical door the strip's own tab click uses
+ *     (`activateTab`): fronts the tab and arms the one-shot suppression, so
+ *     the navigation this causes lands as the address catching up rather
+ *     than a step pushed onto whichever tab was active a moment before.
+ *   · NOT FOUND — `openBeside`, unconditionally, AT THE MODULE'S ROOT PATH —
+ *     never a recalled deeper screen. This is the one place this file
+ *     deliberately stops asking `nav-memory.ts`'s `sectionClick` where she
+ *     was: the client's own words are "open the Tickets screen", the
+ *     collection root, not wherever she left off. Lands immediately right
+ *     of the active tab, fronted, exactly as every other door into
+ *     `openBeside` already does.
+ *
+ * Returns the address the caller should navigate to — the same contract
+ * `activateTab`/`back`/`forward`/`jumpTo` keep. `goToSection` hands it
+ * straight to `navigate`; every rail call site (the desktop rail, the phone
+ * bar, its "All sections" sheet) keeps calling `goToSection` unmodified —
+ * only what that one door does changed. */
+export function railPick(path: string, label: string): string {
+  if (!scope) return path
+  const rootKey = canonicalTabKey(path)
+  const existing = tabs.find((t) => canonicalTabKey(t.steps[t.cursor]?.path ?? "") === rootKey)
+  if (existing) return activateTab(existing.id) ?? path
+  openBeside(path, label)
+  return path
 }
 
 /** MOVE AN ALREADY-OPEN TAB TO SIT IMMEDIATELY RIGHT OF THE ACTIVE ONE,

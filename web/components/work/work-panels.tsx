@@ -1212,19 +1212,56 @@ export function AppTicketsPanel({
                 {ticket.helpType ?? "—"}
               </Badge>
             </TableCell>
-            {/* THE TWO QUIET COLUMNS, in secondary ink, so the title and the
-                coloured pill are what the eye lands on going down the page.
-                The stage is read through `HELP_STATUS` — the same closed
-                vocabulary this panel's own Stage facet offers — so the word a
-                person filters by and the word they read back are one string. */}
+            {/* THE STAGE, in secondary ink, so the title and the coloured pill
+                are what the eye lands on going down the page. Read through
+                `HELP_STATUS` — the same closed vocabulary this panel's own
+                Stage facet offers — so the word a person filters by and the
+                word they read back are one string. */}
             <TableCell className="text-muted-foreground">
               {t(HELP_STATUS[ticket.status])}
             </TableCell>
-            <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-              {/* Through the shared formatter and the reader's own language, so
-                  one ticket cannot carry two spellings of one day across the
-                  two screens that show it. */}
-              {formatDate(ticket.createdAt, lang)}
+            {/* RAISED — face, name AND date, one cell. Client, 17 Sep 2026,
+                over this panel's own queue body, below: "I am not seeing
+                'raised' on the queue view on triage." The queue draws
+                through this SAME `renderRows`, so the fix is here once: the
+                column used to carry only `createdAt` (a date with no
+                raiser), which is why a client who WAS looking at "Raised"
+                could still say it was missing — half the fact was never on
+                screen, on List or Queue alike.
+                THE SAME R35 FACE "Resolved by" beside it draws — a picture
+                (or an initial tile) beside a name — with the date stacked
+                under it rather than a seventh column: R82 caps a table row
+                at six, and Title · Type · Stage · Raised · Resolved date ·
+                Resolved by is already at that ceiling, so a second Raised
+                column is not available and the fact rides the one it has,
+                the same subtraction R82's own law names for a wave's App.
+                RAISERISCLIENT (R54) decides the name's shape, the same rule
+                `help-detail.tsx`'s own raiser line already applies: a
+                colleague is trimmed to a first name, a client contact who
+                raised their own question is named in full. `raiserName`
+                null (never recorded, or redacted for a portal caller) draws
+                the date alone, the same "something rather than a blank
+                cell" every other absent fact here draws. */}
+            <TableCell className="text-muted-foreground">
+              {ticket.raiserName ? (
+                <span className="flex items-center gap-2">
+                  <RecordMark
+                    picture={memberAvatar(ticket.raiserId)}
+                    name={ticket.raiserName}
+                    shape="round"
+                  />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">
+                      {ticket.raiserIsClient ? ticket.raiserName : staffNameFromSnapshot(ticket.raiserName)}
+                    </span>
+                    <span className="text-caption tabular-nums whitespace-nowrap text-muted-foreground">
+                      {formatDate(ticket.createdAt, lang)}
+                    </span>
+                  </span>
+                </span>
+              ) : (
+                <span className="tabular-nums whitespace-nowrap">{formatDate(ticket.createdAt, lang)}</span>
+              )}
             </TableCell>
             {/* RESOLVED DATE — the same em-dash treatment `TicketRowsTable`'s
                 `closed` column gives an unresolved ticket: a blank cell reads

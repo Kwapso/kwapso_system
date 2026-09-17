@@ -27,7 +27,14 @@
 
 import { describe, expect, it } from "vitest"
 
-import { formatDate, formatDateTime, formatDayMonth, formatRelative, formatTime } from "@shared/web/format"
+import {
+  formatDate,
+  formatDateTime,
+  formatDayMonth,
+  formatRelative,
+  formatStageMoment,
+  formatTime,
+} from "@shared/web/format"
 
 const NOON_UTC = "2024-03-12T12:00:00.000Z"
 
@@ -67,6 +74,39 @@ describe("formatTime / formatDateTime — same locale rule, TZ-independent shape
   it("formatDateTime: carries the same date formatDate does, in each language", () => {
     expect(formatDateTime(NOON_UTC, "en")).toContain(formatDate(NOON_UTC, "en"))
     expect(formatDateTime(NOON_UTC, "es")).toContain(formatDate(NOON_UTC, "es"))
+  })
+})
+
+describe("formatStageMoment — month, day, (year if not current), hour only, one line", () => {
+  const NOW = new Date("2026-09-17T10:00:00.000Z")
+
+  it("drops the year for a moment in the same calendar year as `now`", () => {
+    const result = formatStageMoment("2026-09-16T14:00:00.000Z", "en", NOW)
+    expect(result).not.toMatch(/2026/)
+    expect(result).toMatch(/^Sep 16 · \d{2}h$/)
+  })
+
+  it("keeps the year for a moment outside `now`'s calendar year", () => {
+    const result = formatStageMoment("2025-12-01T14:00:00.000Z", "en", NOW)
+    expect(result).toMatch(/^Dec 1, 2025 · \d{2}h$/)
+  })
+
+  it("never shows minutes — the hour alone, two digits, on one line with the date", () => {
+    const result = formatStageMoment("2026-09-16T14:37:00.000Z", "en", NOW)
+    expect(result.split("\n")).toHaveLength(1)
+    expect(result).not.toContain(":")
+    expect(result).not.toContain("37")
+  })
+
+  it("empty/invalid input renders nothing", () => {
+    expect(formatStageMoment(null, "en", NOW)).toBe("")
+    expect(formatStageMoment(undefined, "en", NOW)).toBe("")
+    expect(formatStageMoment("not a date", "en", NOW)).toBe("")
+  })
+
+  it("defaults `now` to the real clock when the caller omits it", () => {
+    const thisYear = formatStageMoment(new Date().toISOString(), "en")
+    expect(thisYear).not.toMatch(/\d{4}/)
   })
 })
 

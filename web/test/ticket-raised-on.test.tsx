@@ -12,7 +12,7 @@
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { vi } from "vitest"
 
@@ -122,27 +122,36 @@ function openTicket(status: HelpStatus = "in_progress") {
   return render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
 }
 
-describe("R86/17-Sep — the date chip is gone; the Overview fact carries date + age", () => {
-  it("the header's own chip row draws exactly three chips — ref, type, app — never a fourth for the date", async () => {
+describe("R86/17-Sep (morning) — the date chip is gone; the Overview fact carried date + age", () => {
+  // AMENDED 17 SEP 2026 (AFTERNOON) — the client's later ruling the same day,
+  // reviewing the deployed page, retired the "Raised by"/"Raised on" fact
+  // ROW this describe block used to prove entirely (verbatim, quoted in full
+  // in `help-detail.tsx`'s own comment where the row stood): the header chip
+  // count test below is updated for the SAME day's OTHER ruling (the STATUS
+  // chip after the ID, R86); the wiring test that used to prove "Raised on"
+  // sat under "Raised by" is retired along with the row itself — see
+  // `help-detail.tsx`'s own comment (the fact list's old home) for the
+  // account of which facts render nowhere on the page now.
+  it("the header's own chip row draws exactly four chips — ref, status, type, app", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const region = titleRegion()
     // `tabular-nums` is on EVERY badge (badge.tsx's own base class), so it
-    // cannot tell the retired date chip apart from the three that remain —
-    // the COUNT is what proves the fourth is gone, not a class.
+    // cannot tell the chips apart on its own — the COUNT and the TEXT
+    // together are what prove the shape.
     const chips = [...region.querySelectorAll('[data-slot="badge"]')]
-    expect(chips.map((c) => c.textContent)).toEqual(["BERG-T0412", "Bug", "Dispatch"])
+    expect(chips.map((c) => c.textContent)).toEqual(["BERG-T0412", "In progress", "Bug", "Dispatch"])
   })
 
-  // THE FACT LINE ITSELF — proved two ways, because a full render of the
-  // Overview tab's panel needs data this harness does not simulate (the
-  // ticket-stages/account-detail fetches this screen's OTHER tabs make on
-  // mount, unrelated to the fact this test is about). (1) the composition
-  // `help-detail.tsx` actually calls is proved by RUNNING it, the same
-  // `daysSince`/`formatDate`/`t` calls the component makes, not a re-typed
-  // copy. (2) that the component really wires "Raised on" to that same
-  // composition, right after "Raised by", is proved by reading its source.
-  it("the composition help-detail.tsx calls renders a real date and an exact day count", () => {
+  it("the status chip is the one coloured chip on the row (R86) — a dot, not a fill", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const region = titleRegion()
+    const statusChip = within(region).getByText("In progress").closest('[data-slot="badge"]') as HTMLElement
+    expect(statusChip.getAttribute("data-dot")).toBe("building")
+  })
+
+  it("the day-count sentence format itself is unchanged — a real date and an exact day count", () => {
     const t = translator("en")
     const sentence = t("{date} ({count} days ago)", {
       date: formatDate(CREATED_AT, "en"),
@@ -152,16 +161,12 @@ describe("R86/17-Sep — the date chip is gone; the Overview fact carries date +
     expect(sentence).toBe(`${formatDate(CREATED_AT, "en")} (${RAISED_DAYS_AGO} days ago)`)
   })
 
-  it("help-detail.tsx wires a 'Raised on' fact, right after 'Raised by', to daysSince/formatDate", () => {
+  it("help-detail.tsx no longer wires a 'Raised by'/'Raised on' fact row — retired 17 Sep 2026 (afternoon)", () => {
     const src = readFileSync(join(import.meta.dirname, "..", "components", "tickets", "help-detail.tsx"), "utf8")
-    const raisedByAt = src.indexOf('t("Raised by")')
-    const raisedOnAt = src.indexOf('t("Raised on")')
-    expect(raisedByAt, "the ticket detail's overview facts must still carry 'Raised by'").toBeGreaterThan(-1)
-    expect(raisedOnAt, "and now 'Raised on' beside it").toBeGreaterThan(-1)
-    expect(raisedOnAt, "'Raised on' sits AFTER 'Raised by' — 'under' it, the client's own word").toBeGreaterThan(raisedByAt)
-    const between = src.slice(raisedOnAt, raisedOnAt + 400)
-    expect(between).toContain("daysSince")
-    expect(between).toContain("formatDate")
-    expect(between).toContain("{date} ({count} days ago)")
+    // NOT `queryByText` on a render — the facts must not exist in the SOURCE
+    // at all any more, not merely be hidden behind a gate this fixture
+    // happens not to satisfy.
+    expect(src.includes('t("Raised by")'), "'Raised by' must not be wired anywhere in help-detail.tsx any more").toBe(false)
+    expect(src.includes('t("Raised on")'), "'Raised on' must not be wired anywhere in help-detail.tsx any more").toBe(false)
   })
 })

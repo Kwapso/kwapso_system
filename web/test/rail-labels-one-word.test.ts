@@ -91,11 +91,11 @@ describe("R85 — every rail destination is named in one word", () => {
     }
   })
 
-  it("Knowledge and Hours are the live titles today", () => {
+  it("Knowledge and Logs are the live titles today", () => {
     const knowledge = TEAM_SECTIONS.find((s) => s.key === "knowledge")
     const time = TEAM_SECTIONS.find((s) => s.key === "time")
     expect(knowledge?.title).toBe("Knowledge")
-    expect(time?.title).toBe("Hours")
+    expect(time?.title).toBe("Logs")
     // The routes and identifiers never moved.
     expect(knowledge?.segment).toBe("knowledge")
     expect(time?.segment).toBe("time")

@@ -6,7 +6,7 @@
 // is a way to have a working door and a lying list:
 //
 //   1. THE FACETS CARRY THE DOOR'S NAMES AND THE DOOR'S VALUES. `kind=meeting`,
-//      never `kind=From a meeting`, and never the shaped row's column.
+//      never `kind=Meetings`, and never the shaped row's column.
 //   2. PICKING ONE ASKS THE DOOR, from page one, in a cache key of its own —
 //      so nothing has to remember to reset, and the collection's own rows and
 //      cursor are untouched underneath.
@@ -145,7 +145,7 @@ describe("a filter on a paged collection asks the door", () => {
     expect(facets.map((f) => f.field).sort()).toEqual(["active", "compartment", "kind"])
     const kind = facets.find((f) => f.field === "kind")
     expect(
-      kind?.options?.find((o) => o.label === "From a meeting")?.value,
+      kind?.options?.find((o) => o.label === "Meetings")?.value,
       "the door matches `meeting` — the words are for the person"
     ).toBe("meeting")
     // …and a facet with nothing to offer is DROPPED rather than drawn empty.
@@ -185,7 +185,7 @@ describe("a filter on a paged collection asks the door", () => {
     renderFind(listKey, door.fetchPage)
 
     // The owner's own filter, on the owner's own screen.
-    await pick("Type", "From a meeting")
+    await pick("Type", "Meetings")
 
     await waitFor(() => expect(door.asked.length).toBe(1))
     const first = door.asked[0]
@@ -209,7 +209,7 @@ describe("a filter on a paged collection asks the door", () => {
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
 
-    await pick("Type", "From a meeting")
+    await pick("Type", "Meetings")
     await waitFor(() => expect(door.asked.length).toBe(1))
     await pick("Filed under", "Bergman S.A.")
 
@@ -226,7 +226,7 @@ describe("a filter on a paged collection asks the door", () => {
     // The find bar now says the second one, labelled.
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
-    await pick("Type", "From a meeting")
+    await pick("Type", "Meetings")
     await waitFor(() => expect(screen.getByText("52 sources match")).toBeTruthy())
   })
 })

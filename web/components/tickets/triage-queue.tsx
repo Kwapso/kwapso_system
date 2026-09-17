@@ -1043,6 +1043,7 @@ export function TriageQueue({
           rows={inOrder}
           onOpen={onOpen}
           label={t("Triage queue")}
+          teamId={teamId}
           decide={{
             // "no header" — client, asked directly, and it is what her own
             // reference screenshot does. The component keeps the column

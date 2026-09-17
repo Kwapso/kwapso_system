@@ -126,6 +126,7 @@ import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { RecordRef } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
+import { rowOpenHandlers } from "@/lib/row-open"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
@@ -161,7 +162,7 @@ import { RecordMark } from "@shared/web/record-mark"
    was its only caller, and an export nobody imports is a contract nobody agreed
    to (web/test/dead-exports.test.ts). */
 import { helpStatusDotTone } from "@shared/status-tones"
-import type { DotTone } from "@shared/app-stages"
+import type { AppStageDotTone } from "@shared/app-stages"
 import { accountsKey, appsKey, helpByAccountKey, helpFacetFilter, helpFacetKey, helpKey, helpTabColumns, helpTabFacets, helpTabOrder, helpTabSorts, listFetch, TICKET_COLUMN_ORDER, TICKET_COLUMNS_DEFAULT, OPEN_FACET, totalKey, WAITING_FACET, type HelpFacet, type TicketColumn } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -253,21 +254,27 @@ const DASHBOARD: HelpFacet = "dashboard"
 
 /** A STAGE'S TONE, AS A FILL THE FACET'S SWATCH CAN TAKE.
  *
- * `helpStatusDotTone` (shared/status-tones.ts) answers "which of the kit's six
- * dot tones is this stage" and `Badge` turns that into a Tailwind class of its
+ * `helpStatusDotTone` (shared/status-tones.ts) answers "which of the kit's ten
+ * dot tones is this stage" (six lifecycle + four widened, since the 17 Sep
+ * 2026 ruling) and `Badge` turns that into a Tailwind class of its
  * own (`DOT_FILL`, badge.tsx). The Status facet does not draw a `Badge` — a
  * badge carries the word, and inside a facet option the word is already there —
- * so it needs the same six answers as a CSS colour value, which is the one form
+ * so it needs the same answers as a CSS colour value, which is the one form
  * `<Swatch>` takes (and the same shape `type-colours.ts` hands back for exactly
  * this reason: one value an inline style, an SVG fill and a chart series can
  * all read).
  *
- * A `Record<DotTone, …>` RATHER THAN AN INTERPOLATED `var(--dot-${tone})`, and
- * that is the whole point of writing it out: a seventh tone added to the kit
- * fails this file's own type check instead of rendering a swatch filled with an
- * undefined custom property, which paints nothing and looks like a missing dot.
- * It is the same argument `status-tones.ts` makes about typing its own map as a
- * `Record<HelpStatus, …>` instead of a function with a fallback.
+ * A `Record<AppStageDotTone, …>` RATHER THAN AN INTERPOLATED
+ * `var(--dot-${tone})`, and that is the whole point of writing it out: a
+ * seventh tone added to the kit fails this file's own type check instead of
+ * rendering a swatch filled with an undefined custom property, which paints
+ * nothing and looks like a missing dot. It is the same argument
+ * `status-tones.ts` makes about typing its own map as a `Record<HelpStatus,
+ * …>` instead of a function with a fallback. WIDENED PAST THE ORIGINAL SIX,
+ * 17 Sep 2026 — `helpStatusDotTone` now reaches the same four extra tones
+ * `shared/app-stages.ts` uses for App stage (`AppStageDotTone`), because a
+ * ticket's own stages do too ("triaged orange … ready blue … scheduled
+ * purple").
  *
  * R32-CLEAN: every value is a token the kit defines, never a hex and never a
  * Tailwind ramp. The two greens are genuinely one colour (`--dot-shipped` and
@@ -275,13 +282,17 @@ const DASHBOARD: HelpFacet = "dashboard"
  * NAMING split rather than a palette one and is why the closed/finished pair is
  * still distinguishable here only by its word. That is fine and is the house
  * rule rather than a defect: the mark never carries the meaning alone. */
-const DOT_TONE_FILL: Record<DotTone, string> = {
+const DOT_TONE_FILL: Record<AppStageDotTone, string> = {
   shipped: "var(--dot-shipped)",
   building: "var(--dot-building)",
   review: "var(--dot-review)",
   blocked: "var(--dot-blocked)",
   archived: "var(--dot-archived)",
   done: "var(--dot-done)",
+  red: "var(--dot-red)",
+  orange: "var(--dot-orange)",
+  purple: "var(--dot-purple)",
+  blue: "var(--dot-blue)",
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1639,6 +1650,7 @@ export function TicketsCollection({
                         rows={rows}
                         onOpen={openTicket}
                         label={t("Tickets")}
+                        teamId={teamId}
                         columns={helpTabColumns(facet)}
                       />
                     )}
@@ -1788,6 +1800,7 @@ export function TicketRowsTable<T extends TicketFace>({
   rows,
   onOpen,
   label,
+  teamId,
   columns = TICKET_COLUMNS_DEFAULT,
   decide,
 }: {
@@ -1795,6 +1808,17 @@ export function TicketRowsTable<T extends TicketFace>({
   onOpen: (id: string) => void
   /** The table's own accessible name, for a reader who arrives out of context. */
   label: string
+  /** WHO'S TEAM — needed for exactly one thing: a cmd/ctrl-click or a
+   * middle-click on a row must open the ticket BESIDE the active tab
+   * (`rowOpenHandlers`, `web/lib/row-open.ts`), the same gesture every real
+   * `<InAppLink>` already honours (17 Sep 2026 ruling). `onOpen` only ever
+   * takes an id and always lands in the SAME tab (`onIntent`'s "open" case,
+   * `deep-link-screen.tsx`, calls `go()` — no click event reaches it, so it
+   * cannot know a modifier was held) — this row is the one place that DOES
+   * see the raw click, so it is the one place a second address, built
+   * straight from `teamId` + the row's own id, is worth computing. Client,
+   * 17 Sep 2026: "the command that I'm clicking is not opening a new tab." */
+  teamId: string
   /** WHICH FACTS THIS TAB SHOWS, and in which order — client, 2026-09-09: "ID,
    * created date, closed date. Remove the rest," about the Closed tab.
    *
@@ -1824,6 +1848,22 @@ export function TicketRowsTable<T extends TicketFace>({
 }) {
   const { t, lang } = useLanguage()
   const span = columns.length + (decide ? 1 : 0)
+  /** A CLICK ON ONE TICKET — see `teamId`'s own doc above for why this exists
+   * at all. A PLAIN click still calls `onOpen(id)` unchanged, same tab, same
+   * dispatch. Cmd/ctrl-click or a middle-click opens `/t/<teamId>/tickets/<id>`
+   * beside the active tab instead — the identical address form
+   * `RaisedByRow` (`tickets-dashboard.tsx`) already hands `InAppLink`, which
+   * this app's own trail machinery treats as the SAME record whichever URL
+   * form it arrives by (`sectionOf`, `web/lib/nav-memory.ts`).
+   *
+   * THROUGH THE ONE SEAM NOW (`rowOpenHandlers`, web/lib/row-open.ts) rather
+   * than a hand-rolled pair this file kept to itself — the same helper
+   * `RecordTable`'s own row now goes through, so a cmd/ctrl-click or a
+   * middle-click means the same thing on every table in the app. Built per
+   * row: the address and the label are the row's own. */
+  function rowHandlers(w: T) {
+    return rowOpenHandlers(`/t/${teamId}/tickets/${w.id}`, ticketTitle(w), () => onOpen(w.id))
+  }
   /** WHAT EACH COLUMN IS CALLED. One map rather than a header spelled at the
    * point it is drawn, so a tab that shows three of these and a tab that shows
    * four cannot end up calling one fact two things. "Raised" rather than "Date"
@@ -1898,9 +1938,15 @@ export function TicketRowsTable<T extends TicketFace>({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((w) => (
+        {rows.map((w) => {
+          const handlers = rowHandlers(w)
+          return (
           <React.Fragment key={w.id}>
-            <TableRow onClick={() => onOpen(w.id)} className="cursor-pointer">
+            <TableRow
+              onClick={handlers.onClick}
+              onAuxClick={handlers.onAuxClick}
+              className="cursor-pointer"
+            >
               {/* THE ID COLUMN — client, 17 Sep 2026, over this exact table:
                   "add the header ID for the ID." The chip is unchanged (the
                   same `RecordRef`, the ONE component that draws one anywhere
@@ -1953,7 +1999,11 @@ export function TicketRowsTable<T extends TicketFace>({
                     variant="link"
                     onClick={(e) => {
                       e.stopPropagation()
-                      onOpen(w.id)
+                      handlers.onClick(e)
+                    }}
+                    onAuxClick={(e) => {
+                      e.stopPropagation()
+                      handlers.onAuxClick(e)
                     }}
                     className="block max-w-[32rem] truncate text-start"
                   >
@@ -2088,7 +2138,8 @@ export function TicketRowsTable<T extends TicketFace>({
               </TableRow>
             )}
           </React.Fragment>
-        ))}
+          )
+        })}
       </TableBody>
     </Table>
   )

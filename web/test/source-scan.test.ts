@@ -173,9 +173,20 @@ describe("there is exactly one comment stripper", () => {
     // import the same code the laws do instead of re-typing it. source-scan.ts
     // re-exports it, so every TypeScript caller is unchanged; a re-export is not
     // a declaration and must not be counted as one.
+    //
+    // FILTERED AGAINST `HAND_ROLLED_STRIPPER_OK`, 17 Sep 2026 — the same
+    // registry the property test below already reads. Kit v1.2.111 added
+    // `shared/ui/foundations/rules/check-overflow-axis.mjs`, a standalone
+    // vendored-kit script that declares its OWN `stripComments` under the
+    // identical name (it cannot import this app's — see the registry's own
+    // entry for why). Without this filter a second, legitimately-reasoned
+    // declaration would fail this census the same way an un-reasoned one
+    // should: the registry is what tells the two apart, here as everywhere
+    // else in this file.
     const declared = everySourceOfOurs()
       .filter((f) => /(?:function|const)\s+stripComments\b/.test(f.source))
       .map((f) => f.rel)
+      .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel])
     expect(declared.length, "the scan found no declaration at all — it has gone blind").toBe(1)
     expect(declared).toEqual(["shared/rules/strip-comments.mjs"])
   })

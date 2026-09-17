@@ -1143,6 +1143,8 @@ export function MeetingsScreen({
                   onRowClick={(row) =>
                     onIntent({ kind: "open", module: "meetings", id: String(row.id) })
                   }
+                  rowPath={(row) => `/t/${teamId}/meetings/${String(row.id)}`}
+                  rowLabel={(row) => String(row.nameText ?? row.id)}
                 />
               )}
 

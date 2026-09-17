@@ -6,9 +6,12 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { RecordRef } from "@shared/web/record-ref"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
-/** THE CHIP LINE — three facts and nothing else: the number, the type, the
- * app. (It carried a fourth, the date, from 2026-09-06 to 17 Sep 2026 — see
- * "THE DATE CHIP IS RETIRED" below for where it went.)
+/** THE CHIP LINE — the number, the type, the app, and — on the ticket
+ * DETAIL screen only, since 17 Sep 2026 — the STATUS. (It carried a fourth
+ * fact, the date, from 2026-09-06 to 17 Sep 2026 — see "THE DATE CHIP IS
+ * RETIRED" below for where it went; the status chip that replaced that slot
+ * is a different ruling, on a different day, covered in `statusDot`'s own
+ * comment on the component below.)
  *
  * MOVED HERE FROM `web/components/tickets/tickets-collection.tsx` (where it was
  * `TriageChips`), 2026-09-06, BECAUSE THE CLIENT ASKED FOR IT TWICE IN ONE
@@ -226,6 +229,14 @@ export interface TicketChipFacts {
 
 export function TicketChips({
   ticket,
+  /** THE STATUS CHIP, AFTER THE ID — client ruling, 17 Sep 2026: "Add the
+   * status chip with the color after the ID on the title." A caller-built
+   * node, the same "hand in what is already drawn" shape `typeDot` takes
+   * (this file's own header explains why: `shared/web/` reaches neither
+   * `useLanguage` nor an app-side status map). `undefined` on a surface that
+   * has not asked for one yet (the triage card, today) — no chip, not an
+   * empty one. */
+  statusDot,
   /** The glyph already drawn for this ticket's type — an icon element
    * (`ticketTypeIconName` + `iconComponent()`, @shared/ticket-types) since
    * the client's 17 Sep 2026 ruling retired ticket type's colour; the same
@@ -247,6 +258,7 @@ export function TicketChips({
   AppLink,
 }: {
   ticket: TicketChipFacts
+  statusDot?: React.ReactNode
   typeDot?: React.ReactNode
   appHref?: string
   AppLink: React.ComponentType<{ href: string; className?: string; children: React.ReactNode }>
@@ -274,6 +286,7 @@ export function TicketChips({
           all for a null, so the guard that used to stand here is inside it now,
           where every OTHER kind's row gets it for free. */}
       <RecordRef value={ticket.ref} />
+      {statusDot}
       <Badge variant="secondary" size="pill">
         {typeDot}
         {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. An

@@ -241,12 +241,35 @@
 //     include more elements inside, not just one kind of card." The kit's
 //     `AppearancePreview` (`shared/ui/compositions/screens/settings.tsx`) is
 //     replaced below by `AppearanceTabPreview`
-//     (`shared/web/appearance-tab-preview.tsx`) — that file's own header has
+//     (`shared/web/appearance-tab-preview.tsx`) — that file's own header had
 //     the full account of the height token it names, why it is not a card
-//     inside a card, and why it reaches for real kit parts (`Card`, `Badge`,
+//     inside a card, and why it reached for real kit parts (`Card`, `Badge`,
 //     `List`) rather than hand-drawn boxes. `previewScaleStep` and the
 //     `previewTheme` wiring below are unchanged; only which component reads
-//     them moved.
+//     them moved. SUPERSEDED THE SAME DAY — see the next block.
+//
+// ── (d) "MINIATURE OF THIS VERY PAGE" — THE SAME SESSION, LATER THE SAME
+//     DAY, OVER THE PICTURE (c) HAD JUST SHIPPED ────────────────────────────
+//
+//     Verbatim: "Good, the language part. However, I'm not happy with the
+//     pre-visualization. Please create an artifact with multiple options and
+//     include the whole settings page…" — and her pick, over the side-by-
+//     side artifact: "appearance p1" = "Miniature of this very page". (c)'s
+//     picture (a generic Card/Badge/List specimen: a title row, a toolbar
+//     bar, three placeholder rows with status dots) is gone; `AppearanceTab
+//     Preview` now draws the actual frame this tab sits inside — the rail
+//     with its real groups and destinations, the workspace top strip with
+//     the open "Settings" tab and the pinned "+", and the content card
+//     holding Settings' own tab strip and a miniature of THIS Appearance
+//     panel. That file's own header has the full account: why the real
+//     `AppShell`/`Rail` cannot be mounted for real (live sockets, live
+//     session context, and — even for the kit's own presentational `Rail` —
+//     the identical `role="img"` accessibility fault this file's picture
+//     already refused for a live `<Tabs>`/`<Button>`), why the rail's real
+//     words are transcribed rather than imported (the portal's own tsconfig
+//     boundary), and why not one of those words is a new catalogue string.
+//     Nothing in THIS file changed for it — `theme`/`spine`/`scale` below
+//     are the same three props `AppearanceTabPreview` always read.
 
 import * as React from "react"
 

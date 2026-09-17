@@ -88,7 +88,6 @@ import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
 import { personInitials, personName } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { sectionClick } from "@/lib/nav-memory"
 import { LiveStatus } from "@shared/web/live-status"
 import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
@@ -136,6 +135,7 @@ import {
   jumpTo as trailJumpTo,
   NEW_TAB_PATH,
   openNewTab,
+  railPick,
   useActiveTabId,
   useOpenTabs,
 } from "@/lib/workspace-tabs"
@@ -726,12 +726,20 @@ export function AppShell({
   }, [onCloseCrumb, onNavigate, t])
 
   /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
-   * one control in the app that names a section rather than a destination, so
-   * it is the one that asks the nav memory where she was, and the one where a
-   * second click on the section you are already in resets it. The whole of that
-   * decision (and why the reset is a second click rather than a double-click)
-   * lives in `sectionClick`; the rail just draws the button. */
-  const goToSection = (path: string) => navigate(sectionClick(teamId, path, here))
+   * one control in the app that names a section rather than a destination.
+   *
+   * AMENDED 17 Sep 2026, replacing the earlier `sectionClick`/nav-memory
+   * door (rulebook L12's own "push the trail on a rail pick"). The client's
+   * ruling, verbatim: "when I click on something on the navigation bar, it
+   * should always open in a new tab unless it's already open on the main
+   * screen... if I already have the main ticket screens open, do not open
+   * any tab, but open this tab... if I am in an app and I click on Tickets,
+   * it should open in a new tab." The whole of that decision now lives in
+   * `railPick` (`workspace-tabs.ts`, the store's own rail door) — activate
+   * an already-open tab sitting at this module's root, or open a fresh one
+   * beside the active tab; the rail just draws the button and hands the
+   * store the module's path and this item's own label. */
+  const goToSection = (path: string, label: string) => navigate(railPick(path, label))
 
   // THE RAIL, IN THREE NAMED SECTIONS PLUS ONE STANDALONE ANCHOR (client
   // feedback, 31 Aug 2026 — see NavGroup in pages.ts for the client's own words,
@@ -826,7 +834,7 @@ export function AppShell({
         id: item.slug,
         label: item.title,
         icon: <Icon aria-hidden="true" />,
-        onSelect: () => goToSection(item.path),
+        onSelect: () => goToSection(item.path, item.title),
       }
     }),
   }))
@@ -1199,7 +1207,7 @@ export function AppShell({
             item={item}
             active={item.slug === activeRailId}
             collapsed={collapsed}
-            onSelect={() => goToSection(item.path)}
+            onSelect={() => goToSection(item.path, item.title)}
           />
         </div>
       ))}
@@ -2045,7 +2053,7 @@ export function AppShell({
             <button
               key={item.slug}
               type="button"
-              onClick={() => goToSection(item.path)}
+              onClick={() => goToSection(item.path, item.title)}
               aria-current={activeNav ? "page" : undefined}
               /* `min-w-0` + a box for the label: this bar is up to six
                  `flex-1` slots on 375px, so even a short label has ~59px to
@@ -2124,7 +2132,7 @@ export function AppShell({
                       type="button"
                       onClick={() => {
                         setMoreOpen(false)
-                        goToSection(item.path)
+                        goToSection(item.path, item.title)
                       }}
                       aria-current={activeNav ? "page" : undefined}
                       /* PILL, NOT A BOX — the phone's "All sections" sheet is the

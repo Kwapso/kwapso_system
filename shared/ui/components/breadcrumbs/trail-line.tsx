@@ -148,8 +148,49 @@ import {
   BreadcrumbSeparator,
 } from "../breadcrumb/breadcrumb";
 import { collapse } from "./breadcrumbs";
-import { CaretLeft, CaretRight } from "../../foundations/icons";
+import { CaretLeft, CaretRight, MagnifyingGlass } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
+
+/* ----------------------------------------------------------------------------
+   17 SEP 2026, EVENING — D2. Client, choosing among the drawings on the
+   design page: *"for the spacing, do s3. and d2."* D2 asked this file to
+   read as a search-bar-like field: "a full-width pill on the panel tone, a
+   magnifier at the left, the crumbs inside (quiet ink steps, chevrons, the
+   current step bold), and a faint '⌘K' hint at the right."
+
+   THE PILL IS CHROME, NOT A CONTROL. This is a decoration borrowed from
+   `search-input.tsx`'s own shape (glyph leads, hint trails, the row between
+   is bare) — same family of tokens, `--radius-pill` and `--surface-panel`,
+   never `search-input.tsx`'s own `--surface-raised` (that file is a RAISED
+   pill; this ruling names the PANEL tone specifically, one rung quieter,
+   because the trail sits INSIDE the card already and a second raised
+   surface stacked on the card's own paper would read as a second card). It
+   is NOT a `SearchInput`: there is no `<input>`, nothing here is typed into,
+   and the crumbs keep every one of `TrailLine`'s own ten states (weight for
+   current/quiet, `onJump`, the fold at `maxItems`) exactly as before — D2
+   changed the SHELL the trail sits in, not the trail itself.
+
+   THE FIELD DOES NOT SEARCH YET. The magnifier and the "⌘K" hint are the
+   drawing's own vocabulary for "this reads as a search field" — neither
+   wires to anything. `⌘K` is a STATIC hint, `aria-hidden`, exactly the way
+   `search-input.tsx`'s own `shortcut` prop is announced to nobody: a
+   reminder of a key the application does not yet bind. Wiring an actual
+   command-palette/search behaviour to this shell is a follow-up, not this
+   ruling.
+
+   TOKENS ONLY, NO NEW COLOUR. `--surface-panel` (the pill fill),
+   `--radius-pill` (`rounded-pill`, the shape), `--ink-tertiary` (the
+   magnifier and the hint, both already-spent quiet inks), `--space-2h`/
+   `--space-2` (the pill's own inset and internal gaps, both already on the
+   scale). `--control-height-pill` (26) is reused rather than restated so the
+   pill lines up with the arrows leading it — the same token `ARROW` below
+   already spends.
+   -------------------------------------------------------------------------- */
+const TRAIL_PILL = cn(
+  "flex min-w-0 flex-1 items-center gap-[var(--space-2)]",
+  "h-[var(--control-height-pill)] rounded-pill bg-[var(--surface-panel)]",
+  "px-[var(--space-2h)]",
+);
 
 /** One step in the trail — a place the reader has been, or could go back to. */
 export interface TrailStep {
@@ -261,12 +302,15 @@ const ARROW = cn(
  *                      pill or a trail link, and neither nudges on press.
  *  5. disabled       — an arrow with nowhere to go: `disabled`,
  *                      `--ink-disabled`, no fill, no hover (`enabled:`
- *                      guarded). `steps: []` renders no trail at all, only
- *                      the (both disabled) arrows.
+ *                      guarded). `steps: []` renders no `Breadcrumb`
+ *                      landmark, only the (both disabled) arrows and the
+ *                      D2 pill's own chrome (magnifier, hint) around them.
  *  6. loading        — does not apply. A trail is known before the screen it
  *                      describes; there is nothing here to wait for.
- *  7. empty          — `steps: []` renders both arrows disabled and no
- *                      `Breadcrumb` landmark at all — not an empty `<nav>`.
+ *  7. empty          — `steps: []` renders both arrows disabled, the pill
+ *                      shell still drawn (magnifier, hint), and no
+ *                      `Breadcrumb` landmark inside it at all — not an
+ *                      empty `<nav>`.
  *  8. error          — does not apply. A trail reports nothing.
  *  9. selected       — the crumb at `cursor`: `BreadcrumbPage`, medium
  *                      weight, `aria-current="page"`, `--foreground` (see the
@@ -356,46 +400,78 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
           </button>
         </div>
 
-        {visible.length === 0 ? null : (
-          <Breadcrumb label={label} className="min-w-0 flex-1 overflow-hidden">
-            <BreadcrumbList className="flex-nowrap overflow-hidden">
-              {rendered.map((entry, position) => {
-                const key =
-                  entry.kind === "gap" ? "trail-line-gap" : (items[entry.index]?.key ?? entry.index);
-                const isCurrent = entry.kind === "item" && entry.index === lastVisible;
+        {/* THE PILL — D2's whole shape. The magnifier and the "⌘K" hint are
+            chrome around the SAME `Breadcrumb` this file always drew; see
+            the header above `TRAIL_PILL` for why neither wires to anything
+            yet. Rendered even when `visible.length === 0`, unlike the bare
+            `Breadcrumb` it used to be: an empty search-shaped field still
+            draws its own shell (`search-input.tsx`'s own resting state
+            does the same), it just has no landmark inside it — the "no
+            `Breadcrumb` landmark when `steps: []`" rule (state 7, above)
+            is unchanged, it now governs only the landmark, not the pill. */}
+        <div data-slot="trail-line-field" className={TRAIL_PILL}>
+          <MagnifyingGlass
+            size={14}
+            aria-hidden="true"
+            className="shrink-0 text-ink-tertiary"
+          />
 
-                return (
-                  <React.Fragment key={key}>
-                    {position > 0 ? <BreadcrumbSeparator /> : null}
-                    <BreadcrumbItem className={isCurrent ? "min-w-0" : undefined}>
-                      {entry.kind === "gap" ? (
-                        <BreadcrumbEllipsis label={ellipsisLabel} />
-                      ) : isCurrent ? (
-                        <BreadcrumbPage>{entry.item.label}</BreadcrumbPage>
-                      ) : entry.item.href ? (
-                        <BreadcrumbLink
-                          href={entry.item.href}
-                          onClick={() => onJump?.(entry.index)}
-                        >
-                          {entry.item.label}
-                        </BreadcrumbLink>
-                      ) : (
-                        // No route to weld to — still pressable, via `asChild`
-                        // over a real `<button>` rather than an `<a href="#">`
-                        // that would go nowhere and dirty the address bar.
-                        <BreadcrumbLink asChild>
-                          <button type="button" onClick={() => onJump?.(entry.index)}>
+          {visible.length === 0 ? null : (
+            <Breadcrumb label={label} className="min-w-0 flex-1 overflow-hidden">
+              <BreadcrumbList className="flex-nowrap overflow-hidden">
+                {rendered.map((entry, position) => {
+                  const key =
+                    entry.kind === "gap" ? "trail-line-gap" : (items[entry.index]?.key ?? entry.index);
+                  const isCurrent = entry.kind === "item" && entry.index === lastVisible;
+
+                  return (
+                    <React.Fragment key={key}>
+                      {position > 0 ? <BreadcrumbSeparator /> : null}
+                      <BreadcrumbItem className={isCurrent ? "min-w-0" : undefined}>
+                        {entry.kind === "gap" ? (
+                          <BreadcrumbEllipsis label={ellipsisLabel} />
+                        ) : isCurrent ? (
+                          <BreadcrumbPage>{entry.item.label}</BreadcrumbPage>
+                        ) : entry.item.href ? (
+                          <BreadcrumbLink
+                            href={entry.item.href}
+                            onClick={() => onJump?.(entry.index)}
+                          >
                             {entry.item.label}
-                          </button>
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </React.Fragment>
-                );
-              })}
-            </BreadcrumbList>
-          </Breadcrumb>
-        )}
+                          </BreadcrumbLink>
+                        ) : (
+                          // No route to weld to — still pressable, via `asChild`
+                          // over a real `<button>` rather than an `<a href="#">`
+                          // that would go nowhere and dirty the address bar.
+                          <BreadcrumbLink asChild>
+                            <button type="button" onClick={() => onJump?.(entry.index)}>
+                              {entry.item.label}
+                            </button>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </React.Fragment>
+                  );
+                })}
+              </BreadcrumbList>
+            </Breadcrumb>
+          )}
+
+          {/* THE "⌘K" HINT — a static reminder, not a control. `aria-hidden`
+              exactly as `search-input.tsx`'s own `shortcut` chip is, and the
+              same badge-on-`--hair-faint` shape that file already spends, so
+              a reader who has seen one search field has seen this hint too. */}
+          <span
+            data-slot="trail-line-hint"
+            aria-hidden="true"
+            className={cn(
+              "ms-auto shrink-0 rounded-pill bg-hair-faint px-2 py-1",
+              "text-badge font-[var(--font-weight-medium)] text-ink-tertiary",
+            )}
+          >
+            ⌘K
+          </span>
+        </div>
       </div>
     );
   },

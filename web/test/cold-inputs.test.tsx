@@ -212,7 +212,7 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     expect(cells[5], "no received date on an open row").toBe("—")
   })
 
-  it("a Received row names its own Contact and Received on date, and carries no Waiting badge", async () => {
+  it("a Received row names its own Contact and Received on date, and carries a green Received badge — client ruling, 17 Sep 2026: \"switch inputs to only colored dot, received green\"", async () => {
     door = [ONE_RECEIVED]
     counts = { waiting: 0, overdue: 0, received: 1 }
     draw("received")
@@ -222,14 +222,24 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     )
     const cells = Array.from(row?.querySelectorAll("td") ?? []).map((td) => td.textContent?.trim() ?? "")
     expect(cells[2], "the client's own name, R54").toBe("Lars Bergman")
-    expect(cells[4], "waiting stops once it has been received").toBe("")
+    // WAS blank before 17 Sep 2026 ("waiting stops once it has been
+    // received"); now the same column carries the green Received chip, the
+    // way every other kind's status column never goes blank on its finished
+    // state either.
+    expect(cells[4], "a green Received chip, not a blank cell").toBe("Received")
+    expect(
+      row?.querySelector('[data-slot="badge"][data-dot="shipped"]'),
+      "the Received chip must carry the green (shipped) dot"
+    ).toBeTruthy()
     expect(cells[5], "the received date").not.toBe("—")
   })
 
-  it("the Waiting badge is orange regardless of days waited, Overdue stays red — client ruling, 16 Sep 2026 evening: \"For inputs waiting, let's use orange\"", async () => {
-    // A row waiting two days and a row waiting three weeks: before this
-    // ruling the badge graded quiet-then-amber at the seven-day mark, which
-    // is exactly the split this test proves is gone.
+  it("the Waiting dot is orange regardless of days waited, Overdue stays red, both a neutral pill — client ruling, 16 Sep 2026 evening (\"For inputs waiting, let's use orange\") and 17 Sep 2026 (\"switch inputs to only colored dot\")", async () => {
+    // A row waiting two days and a row waiting three weeks: before the 16
+    // Sep ruling the badge graded quiet-then-amber at the seven-day mark,
+    // which is exactly the split this test proves is gone. Since 17 Sep the
+    // colour lives in the DOT, never a solid fill — `data-dot` is the kit's
+    // own proof a dot was really drawn, not just that the words are unchanged.
     const recentlyRaised: Todo = { ...ONE_WAITING, createdAt: new Date(Date.now() - 2 * 86400000).toISOString() }
     const longWaiting: Todo = {
       ...ONE_WAITING,
@@ -246,9 +256,9 @@ describe("Inputs — the three tabs, no Mine tab", () => {
       tr.textContent?.includes("Send us your brand logo")
     )
     expect(
-      row?.querySelector('[data-slot="badge"]')?.className,
-      "under a week, still orange, not the old quiet grey"
-    ).toContain("bg-warning")
+      row?.querySelector('[data-slot="badge"][data-dot="orange"]'),
+      "under a week, still orange, not the old quiet grey — a dot, never a solid fill"
+    ).toBeTruthy()
 
     cleanup()
     door = [longWaiting]
@@ -257,9 +267,10 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     row = Array.from(document.querySelectorAll("tbody tr")).find((tr) =>
       tr.textContent?.includes("Send us your brand logo")
     )
-    expect(row?.querySelector('[data-slot="badge"]')?.className, "past a week, still orange").toContain(
-      "bg-warning"
-    )
+    expect(
+      row?.querySelector('[data-slot="badge"][data-dot="orange"]'),
+      "past a week, still orange — a dot, never a solid fill"
+    ).toBeTruthy()
 
     cleanup()
     door = [recentlyRaised]
@@ -268,7 +279,10 @@ describe("Inputs — the three tabs, no Mine tab", () => {
     row = Array.from(document.querySelectorAll("tbody tr")).find((tr) =>
       tr.textContent?.includes("Send us your brand logo")
     )
-    expect(row?.querySelector('[data-slot="badge"]')?.className, "Overdue stays red").toContain("bg-destructive")
+    expect(
+      row?.querySelector('[data-slot="badge"][data-dot="red"]'),
+      "Overdue stays red — a dot, never a solid fill"
+    ).toBeTruthy()
   })
 
   it("a genuinely empty Waiting tab offers the create act; Received offers none", async () => {

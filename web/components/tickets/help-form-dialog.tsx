@@ -70,6 +70,9 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { RecordPicker } from "@/components/records/record-picker"
+import type { HelpStakeholder } from "@shared/types"
+import type { PickablePerson } from "@/lib/members"
+import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 // `NEUTRAL_TYPE_COLOUR`/`ticketTypeColour` USED TO BE IMPORTED HERE, for the
 // dot on the "No type" chip and then for the type row's own swatch. Both
 // readers are gone from this file now — the "No type" chip first (see
@@ -237,6 +240,31 @@ const contactField = (required: boolean) => ({
   required,
 })
 
+/** WHO TO KEEP IN THE LOOP — moved here from the ticket page's own
+ * Stakeholders panel. Client ruling, 17 Sep 2026, reading the deployed page
+ * back (`help-stakeholders.tsx`'s own header carries the verbatim quote):
+ * "Remove all of this from stakeholders 'Pick someone to keep in the loop …
+ * You can add members, but no one is ever removed.'" The picker moves here,
+ * into the screen that already changes the ticket; the page keeps only the
+ * settled fact of who is on it.
+ *
+ * NO CAPTION AND NO TRAILING SENTENCE, and that is R81, not a trim of the
+ * client's own words. "Pick someone to keep in the loop" and "You can add
+ * members, but no one is ever removed." are both a bare, muted, three-word-
+ * or-more `<p>` sitting beside a control inside a form — the exact shape her
+ * 16 Sep 2026 ruling banned wholesale ("by default, there are no
+ * explanations, just the choice, text, or the form components"), and this
+ * file already renders through `FormShellDialog`, so both sentences would be
+ * caught by `web/test/form-hints.test.ts` the moment either landed here. The
+ * FIELD'S OWN LABEL is the whole instruction, exactly as R81 states it — a
+ * person opening a field called "Who to keep in the loop" needs no second
+ * sentence explaining what it does. */
+const loopField = {
+  ...defaultFieldConfig,
+  label: "Who to keep in the loop",
+  required: false,
+}
+
 // "NOTHING CHOSEN", as a value a control can actually hold. Radix Select can't
 // hold an empty string, and the draft this form saves has to round-trip the
 // answer either way, so every optional record field on this form parks on this
@@ -265,6 +293,10 @@ export function HelpFormDialog({
   teamId,
   helpId,
   canAttach = true,
+  stakeholders,
+  loopMembers,
+  canAddToLoop = false,
+  onAddStakeholder,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -324,6 +356,22 @@ export function HelpFormDialog({
   /** Whether this person may attach at all. The door gates on `help:update`, so a
    * control that always refused would be worse than none. */
   canAttach?: boolean
+  /** WHO IS ALREADY ON THE LOOP — undefined on a create (there is nobody to
+   * list yet; the field itself does not render). See `loopField` above for
+   * the ruling that moved the picker here. */
+  stakeholders?: HelpStakeholder[]
+  /** Our own staff only, minus whoever is already on the loop — the SAME
+   * narrowed list `help-stakeholders.tsx` used to filter for itself
+   * (`assignableMembers`, the caller's own seam). */
+  loopMembers?: PickablePerson[]
+  /** Gates the picker exactly as the page did — `help:read`, the right that
+   * put a reader on this screen at all. */
+  canAddToLoop?: boolean
+  /** ADD-ONLY, and fires the moment a chip is pressed — the same door the
+   * page called directly (`content.addStakeholder`), never folded into this
+   * form's own `onSubmit`: a stakeholder is a write against a different list,
+   * not a field on the ticket row. */
+  onAddStakeholder?: (userId: string) => Promise<void>
 }) {
   const { t, lang } = useLanguage()
   const isEdit = !!initial
@@ -1000,6 +1048,25 @@ export function HelpFormDialog({
    * upload into a thrown submit would close nothing, clear no draft, and tell
    * somebody their request was not saved when it was — so the toast names the
    * attachment and the ticket stands. The same argument the story form settled. */
+  /** ADD-ONLY, gated on `canAddToLoop`, exactly as the page's own picker was.
+   * `loopBusy` is its own flag rather than the form's `busy` — adding a
+   * stakeholder is a separate write that must not disable the rest of the
+   * form (or be disabled BY it) while a save is in flight. */
+  const [loopBusy, setLoopBusy] = React.useState(false)
+  const loopExisting = new Set((stakeholders ?? []).map((s) => s.userId))
+  const addableLoopMembers = (loopMembers ?? []).filter((m) => !loopExisting.has(m.id))
+  async function addToLoop(userId: string) {
+    if (!onAddStakeholder) return
+    setLoopBusy(true)
+    try {
+      await onAddStakeholder(userId)
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add them to the ticket."))
+    } finally {
+      setLoopBusy(false)
+    }
+  }
+
   async function attach(target: string, files: File[]) {
     for (const file of files) {
       try {
@@ -1463,6 +1530,34 @@ export function HelpFormDialog({
           disabled={busy}
         />
       </Field>
+      {/* WHO TO KEEP IN THE LOOP — moved here from the page's own Stakeholders
+          panel (client ruling, 17 Sep 2026; see `loopField`'s own comment
+          above for the quote and the R81 reasoning). EDIT ONLY, and only once
+          there is somebody left to add: on a create there is no ticket to
+          attach a stakeholder to, and a picker with nothing in it is the
+          same "row that failed to load" shape the type/app/contact rows
+          above already avoid by hiding rather than drawing empty. */}
+      {isEdit && canAddToLoop && onAddStakeholder && addableLoopMembers.length > 0 ? (
+        <Field config={loopField} htmlFor="help-loop" className={fieldSpacing}>
+          <StaffPillPicker
+            id="help-loop"
+            mode="multi"
+            ariaLabel={t(loopField.label)}
+            people={addableLoopMembers.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            lang={lang}
+            // ADD-ONLY (help-stakeholders.tsx's own rule, unchanged by the
+            // move): nothing in this row is ever "selected" state, only
+            // clicked — the chip a click adds is gone from this list on the
+            // next render, folded into the page's own people list instead.
+            value={[]}
+            onValueChange={(ids) => {
+              const picked = ids[0]
+              if (picked) void addToLoop(picked)
+            }}
+            disabled={loopBusy || busy}
+          />
+        </Field>
+      ) : null}
       {/* THE SCREENSHOT, BESIDE THE WORDS THAT DESCRIBE IT — and on BOTH halves
           of this dialog, which is the whole of the owner's ask: "while adding or
           editing them, just like we have at the story level." One field, one

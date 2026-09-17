@@ -430,6 +430,42 @@ const CardDescription = React.forwardRef<HTMLDivElement, React.ComponentPropsWit
 
 CardDescription.displayName = "CardDescription";
 
+/* ----------------------------------------------------------------------------
+   THE HORIZONTAL INSET, PULLED OUT AND NAMED, 17 SEP 2026 EVENING — RULING 2,
+   CORRECTED. The client, on the live product: "the margin on the sides
+   should be the same as the margin you now have on top of the toolbar."
+
+   MEASURED ON STAGING (`getComputedStyle`, not guessed): a toolbar-led
+   collection card's own `CardContent` reads `padding-top: 13.5px` there —
+   NOT this file's own `p-6 lg:p-[var(--space-7)]` (which would print 24/36
+   at that app's root); the app's `web/app/globals.css` (R83) overrides just
+   the top with `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` =
+   `calc(2rem - 1.25rem)` = `0.75rem`, confirmed by reading BOTH custom
+   properties and the resolved `padding-top` in the same pass. `0.75rem` IS
+   this kit's own `--space-3` — not a coincidence the app invented, R83's own
+   header derives `--toolbar-lead-gap` (`--space-7`) as "the nearest step ON
+   THE scale" to begin with, so the remainder was always going to land back
+   on a step of the SAME scale. The app's `padding-top` override cannot be
+   read from here (it lives in `web/app/globals.css`, outside this repo, and
+   a kit file may not couple itself to an app-only custom property name —
+   see `screen-shell.tsx`'s own `DENSITY_BODY` for where that boundary is
+   drawn) — but the NUMBER it lands on is already a token this kit owns, so
+   the kit's OWN horizontal inset can read that token directly, by name,
+   with no dependency on the app's CSS at all.
+
+   ONE TOKEN, TWO SEAMS, SO SIDES EQUAL TOP BY CONSTRUCTION. This constant is
+   the single source `CardContent` reads for its own left/right padding AND
+   the one `screen-shell.tsx`'s `DENSITY_BODY` imports for the shell's own
+   content inset — "the collection card's horizontal inset" and "the
+   screen-shell content inset" the ruling asked to compare are now the SAME
+   export, not two literals that happen to agree today and drift tomorrow.
+   `check-screen-shell.mjs` pins both files to this identifier by name.
+
+   VERTICAL IS UNTOUCHED — `py-6 lg:py-[var(--space-7)]`, the same two
+   figures this file always spent, just no longer sharing one `p-*` utility
+   with the horizontal figure that moved. This ruling named "the sides." */
+const CARD_CONTENT_INSET_X = "px-[var(--space-3)]";
+
 /**
  * The body. Inset only — no type, deliberately.
  *
@@ -441,15 +477,18 @@ CardDescription.displayName = "CardDescription";
  * exactly what chapter 13 draws. Logged as GAPS-F CRD-6.
  *
  * TEN STATES — none apply. It is an inset.
- * THREE BREAKPOINTS — inset 24 to `lg:`, 32 above. See `Card`.
- * RTL — safe. `p-*` is symmetrical and logical.
+ * THREE BREAKPOINTS — horizontal is now FLAT (`CARD_CONTENT_INSET_X`, one
+ * figure at every width — see that constant's own comment for the 17 Sep
+ * 2026 evening ruling this answers); vertical keeps its old two-step ladder,
+ * 24 to `lg:`, 32 above. See `Card` for the shell's own (unrelated) range.
+ * RTL — safe. `px-*`/`py-*` are both logical.
  */
 const CardContent = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<"div">>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
       data-slot="card-content"
-      className={cn("min-w-0 flex-1 p-6 lg:p-[var(--space-7)]", className)}
+      className={cn("min-w-0 flex-1 py-6 lg:py-[var(--space-7)]", CARD_CONTENT_INSET_X, className)}
       {...props}
     />
   ),
@@ -500,4 +539,5 @@ export {
   CardContent,
   CardFooter,
   cardVariants,
+  CARD_CONTENT_INSET_X,
 };

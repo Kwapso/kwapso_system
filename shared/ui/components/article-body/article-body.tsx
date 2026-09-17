@@ -163,7 +163,12 @@ const PROSE = [
   // cell. Not a fifth radius: `--radius-sm` is one of the four.
   "[&_code]:rounded-[var(--radius-sm)] [&_code]:bg-surface-quiet",
   "[&_code]:px-1 [&_code]:py-px [&_code]:text-caption [&_code]:text-ink-secondary",
-  "[&_pre]:overflow-x-auto [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet",
+  // `[&_pre]:overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x` alone
+  // computes `overflow-y: auto`, and a code block this shape can round 1px
+  // tall and become silently vertically scrollable; its own height is
+  // intrinsic (grows with the code), so the vertical axis was never needed.
+  // See `tabs.tsx`'s `TabsList` and `foundations/rules/check-overflow-axis.mjs`.
+  "[&_pre]:overflow-x-auto [&_pre]:overflow-y-hidden [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet",
   "[&_pre]:p-6 [&_pre]:text-caption [&_pre]:text-ink-secondary",
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
 

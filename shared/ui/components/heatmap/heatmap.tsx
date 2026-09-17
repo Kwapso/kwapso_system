@@ -339,8 +339,14 @@ const Heatmap = React.forwardRef<HTMLDivElement, HeatmapProps>(
 
         {state === "default" ? (
           /* The one scroller. `overflow-x` here and not on the panel, so a
-             narrow reader moves the strip and not the whole collection. */
-          <div className="min-w-0 overflow-x-auto">
+             narrow reader moves the strip and not the whole collection.
+             `overflow-y-hidden` added 17 Sep 2026 evening: `overflow-x`
+             alone computes `overflow-y: auto`, and this box can round 1px
+             tall and become silently vertically scrollable — its own
+             height is intrinsic, never constrained, so the vertical axis
+             was never needed. See `tabs.tsx`'s `TabsList` and
+             `foundations/rules/check-overflow-axis.mjs`. */
+          <div className="min-w-0 overflow-x-auto overflow-y-hidden">
             <div className="min-w-max">
               {/* The column headings. `padding: 4px 12px 8px`, as drawn. */}
               <div

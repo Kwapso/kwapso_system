@@ -831,6 +831,7 @@ export function StoriesScreen({
         config={tableRecipe.collection as CollectionConfig}
         actions={visibleActions(tableRecipe, rights, onAction)}
         onRowClick={(row) => onIntent({ kind: "open", module: "stories", id: String(row.id) })}
+        rowPath={(row) => `/t/${teamId}/stories/${String(row.id)}`}
         useKitPanel
       />
     </CollectionCreateActionProvider>

@@ -450,6 +450,18 @@ export interface TabsListProps
  *  strip no longer reads as one row of peers. `scrollbar-width: none` hides
  *  the OS bar because the strip is short enough to be dragged and a bar under
  *  a 2px rule reads as a second rule.
+ *
+ *  `overflow-y-hidden` ADDED, 17 SEP 2026 EVENING — the client, on the live
+ *  product: "sometimes there is a vertical scroll on the tabs under the
+ *  title. It should not be like that." Setting `overflow-x` alone computes
+ *  `overflow-y: auto` by the CSS spec's own default, and a strip whose
+ *  `scrollHeight` rounds up 1px past its `clientHeight` (measured live on
+ *  staging, every `[role=tablist]`) became vertically scrollable on that
+ *  1px — invisible with the scrollbar hidden (below), but still real
+ *  scrolling, which is what she felt rather than saw. This axis was never
+ *  meant to move; `overflow-y-hidden` says so instead of leaving it to a
+ *  sub-pixel rounding accident. See `foundations/rules/check-overflow-
+ *  axis.mjs` for the kit-wide check this ruling also added.
  *  Focus survives it: nothing sets `overflow: hidden`, and `scroll-p-2`
  *  (0.5rem) is more than the ring's 2px offset + 2px width, so tabbing across
  *  a scrolled strip brings each tab into view ring and all.
@@ -547,7 +559,7 @@ const TabsList = React.forwardRef<
         data-slot="tabs-list"
         data-indicator={live ? "live" : undefined}
         className={cn(
-          "relative max-w-full overflow-x-auto scroll-p-2 [scrollbar-width:none]",
+          "relative max-w-full overflow-x-auto overflow-y-hidden scroll-p-2 [scrollbar-width:none]",
           "[&::-webkit-scrollbar]:hidden",
           LIST_SKIN,
           className,

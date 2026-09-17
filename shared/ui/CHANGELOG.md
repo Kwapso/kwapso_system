@@ -2,6 +2,248 @@
 
 ## Unreleased
 
+### Changed — trail gains air, a hairline divider and a search-bar shell (S3/D2); `CardContent`/`ScreenShell` share one flattened content-inset token; the tab strip stops scrolling vertically by accident — v1.2.111
+
+Three items, all 17 Sep 2026 evening.
+
+**RULING 1 — THE TRAIL'S SPACING AND SHAPE.** Verbatim: *"Make a bit more
+space above the breadcrumbs. Reduce the space between the breadcrumbs and
+the chips. Maybe we could add a divider line."* Then, picking from the
+design page: *"for the spacing, do s3. and d2."*
+
+S3 (spacing): 20px above the trail, 8px between the trail and the
+title/chip row, plus a hairline divider under the trail spanning the
+card's inner width. `DENSITY_TRAIL` gains a flat `pt-[var(--space-5)]`
+(20) at both densities — the trail carried NO top padding of its own
+before this pass (flush with the card's top edge; the ruling's own "was
+12" reads off the design page's comparison rendering, not this exact
+prior commit). `TRAIL_GAP` drops from `mb-[var(--space-4)]` (16) to
+`mb-[var(--space-2)]` (8) — one rung past where the SAME midday ruling had
+already taken it that day (`--space-5`/20 -> `--space-4`/16, logged under
+v1.2.10x's own gutter-shrink entry); the ruling's own "was 20" matches
+that earlier midday value, not the 16 this evening's pass actually found
+in the file. A `<Separator />` (`components/separator/separator.tsx`, the
+kit's own `bg-border` hairline) is now the trail slot's last child, inside
+the same padded div `DENSITY_TRAIL`'s own `px` already insets — so it
+spans the content box, i.e. "the card's inner width," not the card's bare
+edge. No new colour: the divider is the same 8% hairline every same-tone
+card separation in this kit already spends.
+
+D2 (shape): the trail now reads as a search-bar-like field —
+`components/breadcrumbs/trail-line.tsx` wraps the crumbs (unchanged: quiet
+ink for earlier steps, bold current step, chevrons, the fold at
+`maxItems`) in a full-width pill (`rounded-pill`, `--control-height-pill`
+so it lines up with the leading arrows) on the PANEL tone
+(`--surface-panel`, one rung quieter than `search-input.tsx`'s own raised
+pill, because the trail already sits on the card's own paper). A
+`MagnifyingGlass` leads inside the pill; a faint "⌘K" hint
+(`bg-hair-faint`, the same badge shape `search-input.tsx`'s own
+`shortcut` chip already draws) trails it, `aria-hidden`, `ms-auto`. THE
+FIELD DOES NOT SEARCH YET — neither the glyph nor the hint wires to
+anything; that is stated in the file's own header, not left implicit. The
+back/forward arrows are unchanged, still leading the whole row, outside
+the pill. Tokens only: `--surface-panel`, `--radius-pill`,
+`--control-height-pill`, `--ink-tertiary`, `--hair-faint`, `--space-2`/
+`--space-2h` — no new colour, no new radius.
+
+`compositions/templates/check-screen-shell.mjs` gained a trail-spacing
+check (`DENSITY_TRAIL`'s flat `pt`, `TRAIL_GAP`'s new value, and a working
+`<Separator />` render inside the trail slot — not a bare mention of the
+word). Broken three ways to prove it catches what it claims before being
+trusted: reverting `TRAIL_GAP` to the old `--space-4` failed with "does
+not read S3's mb-[var(--space-2)]"; deleting the `<Separator />` failed
+with "divider line is missing"; both proofs run with `cp`-backed
+before/after diffs, not `git checkout --`, and the file was restored from
+the copy afterward.
+
+**RULING 2 — THE CONTENT INSET, EVERYWHERE.** Verbatim: *"can you make the
+overall full content inside this container wider, not only the toolbar,
+but everything? I'm trying to optimize the usage of space. I would say the
+margin on the sides should be the same as the margin you now have on top
+of the toolbar. That's really ideal. Make sure that you apply this change
+absolutely fucking everywhere."* SHIPPED ONCE, THEN CORRECTED THE SAME
+EVENING before tagging — the first pass measured a STACKED, two-layer
+number (36px) and misnamed it `--space-3`; it is `--space-7`, this file's
+own OLD horizontal figure, so that pass would have shipped no visible
+change at all. The corrected version below is what actually landed.
+
+MEASURED FIRST, on `https://agency-staging.kwapso.app`, headless
+Playwright (`kwapso_system`'s own `node_modules`, `chromium.launch()`),
+logged in through `POST /api/auth/admin/test-login` with the Keychain
+key, at 1440x900, comfortable density. For each screen: the px from the
+in-card tab strip's own bottom edge (`[data-slot="tabs-list"]`) to the
+toolbar's own top edge (`[data-slot="toolbar-row-column"]`), and the
+nested `Card`'s `CardContent` own left/right padding
+(`[data-slot="card-content"]`):
+
+  - Tasks (`/tasks`) — gap 36px · `CardContent` pl/pr 36px
+  - Tickets (`/tickets`, the "All" tab — "Dashboard" is the default and
+    has no toolbar) — gap 58.5px (an OUTLIER; see below) · pl/pr 36px
+  - Accounts (`/accounts`) — gap 36px · pl/pr 36px
+  - Waves (`/waves`) — gap 36px · pl/pr 36px
+  - a record screen (`/tickets/<id>`) — no in-card tab strip (n/a) ·
+    pl/pr 36px, `CardContent`'s own `pt` uncut (36px)
+  - Settings › Members (`/settings?tab=members`) — read through the SAME
+    selector as the others, which on this screen's markup matched a
+    smaller, unrelated nested card; the 58.5px/36px pair recorded for it
+    should be treated as unverified, not as a sixth data point
+
+THE 36px "GAP" IS A STACK, NOT THE TOKEN. On Tasks/Accounts/Waves that
+36px is `--tab-content-gap` (the tab strip's own trailing padding, 20px
+nominal, APP-SIDE) plus `CardContent`'s own `padding-top` — but that
+`padding-top` is NOT this kit's `--space-7` on those three screens: it is
+OVERRIDDEN, app-side, to a smaller figure. RE-MEASURED PRECISELY with
+`getComputedStyle` (not inferred from a bounding-rect diff) on `/tasks`:
+`[data-slot=card-content]`'s own `padding-top` reads `13.5px`, and the
+CSS custom properties behind it read `--toolbar-lead-gap: 2rem`,
+`--tab-content-gap: 1.25rem` — both defined in `kwapso_system/web/app/
+globals.css` (R83), which overrides just that one side with
+`calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` = `calc(2rem -
+1.25rem)` = `0.75rem`. `0.75rem` IS this kit's own `--space-3` — confirmed,
+not assumed: R83's own comment already derives `--toolbar-lead-gap` as
+"the nearest step ON the scale" to begin with, so the remainder was always
+going to land back on a step of that same scale. `0.75rem` at this app's
+measured 18px root (`getComputedStyle(document.documentElement).fontSize`)
+is 13.5px — THAT is "the margin you now have on top of the toolbar," not
+the 36px stack the first pass named.
+
+THE APP-SIDE MECHANISM STAYS APP-SIDE; THE NUMBER IT LANDS ON DOES NOT
+NEED TO. `web/app/globals.css`'s `calc(var(--toolbar-lead-gap) -
+var(--tab-content-gap))` cannot be read from this repo — a kit file may
+not couple itself to an app-only custom property name, the kit's own
+pipeline runs kit -> app and never the reverse — so this pass stops at
+the kit part and hands the app-side half (retiring the now-redundant
+`.pinned-strip + [data-slot="card"]` override once this kit ships) to a
+system lane, as asked. But `0.75rem` is already a token THIS kit owns, so
+the kit's own two seams can read it directly, by name, with zero
+dependency on the app's CSS.
+
+THE OUTLIER IS STILL FLAGGED, NOT FOLDED IN. Tickets' 58.5px comes from
+its `CardContent` not carrying the R83 override at all on that
+composition — an app-side inconsistency the coordinator will hand to a
+system lane alongside the exemption retirement above; not something this
+kit-only pass changes or averages away.
+
+ONE TOKEN, TWO SEAMS, IMPORTED RATHER THAN RESTATED. `CARD_CONTENT_INSET_X`
+(new, `components/card/card.tsx`) = `"px-[var(--space-3)]"` — the single
+export both `CardContent`'s own left/right padding and `screen-shell.tsx`'s
+`DENSITY_BODY` now read, so "the collection card's horizontal inset" and
+"the screen-shell content inset" the ruling asked to compare are the ONE
+identifier, not two literals that happen to agree today and drift the
+next time either file is touched:
+
+  - `components/card/card.tsx` — `CardContent`'s `p-6 lg:p-[var(--space-7)]`
+    (one utility, all four sides) splits into `py-6 lg:py-[var(--space-7)]`
+    (vertical, unchanged) plus `CARD_CONTENT_INSET_X` (horizontal, new).
+    This is a KIT-WIDE change to every `CardContent` — 8 direct call sites,
+    wells and dashboard tiles included, not only collection toolbars —
+    flagged here for the coordinator's own review before tagging, per the
+    ruling's own "apply this absolutely everywhere."
+  - `compositions/templates/screen-shell.tsx` — imports
+    `CARD_CONTENT_INSET_X` from `components/card/card` and `DENSITY_BODY`
+    now builds each density as `cn(CARD_CONTENT_INSET_X, "py-…")` instead
+    of a literal `px-[var(--space-3)]`.
+
+OLD -> NEW, both seams, comfortable density:
+
+  - `CardContent`: `p-6 lg:p-[var(--space-7)]` ->
+    `py-6 lg:py-[var(--space-7)]` + `CARD_CONTENT_INSET_X`
+  - `DENSITY_BODY`: `p-[var(--space-5)] lg:p-[var(--space-6)]` ->
+    `cn(CARD_CONTENT_INSET_X, "py-[var(--space-5)] lg:py-[var(--space-6)]")`
+
+MEASURED AFTER, on the kit's own `verify/content-inset/` harness (staging
+cannot show this kit yet, tag-pinned pipeline): `screenShellBody` and
+`cardContent` now BOTH read `paddingLeft`/`paddingRight` `11.25px`
+(`--space-3` at this kit's own 15px root) — identical, where before they
+were two different numbers stacking to 41.25px. Sides equal top by
+construction, not by two authors agreeing once.
+
+Before/after PNGs (scratchpad): BEFORE is the six real staging
+screenshots above (`inset-before-tasks.png`, `-tickets.png`,
+`-accounts.png`, `-waves.png`, `-ticket-record.png`,
+`-settings-members.png`); AFTER, regenerated against the corrected code,
+is `inset-after-collection.png` / `inset-after-record.png`
+(`?case=collection|record`, 1440x900).
+
+`check-screen-shell.mjs` gained a content-inset check pinning THREE things
+so the two seams cannot drift apart silently again: `card.tsx` exports
+`CARD_CONTENT_INSET_X = "px-[var(--space-3)]"`, `CardContent`'s own
+className actually spends that identifier (not a literal that happens to
+match), and `screen-shell.tsx` imports the same identifier and builds
+`DENSITY_BODY` from it at both densities. Proven red-then-green against
+`cp`-backed copies of both files before being wired in.
+
+Files: `compositions/templates/screen-shell.tsx`,
+`compositions/templates/check-screen-shell.mjs`,
+`components/card/card.tsx`, `components/breadcrumbs/trail-line.tsx`,
+`verify/content-inset/` (new), `.claude/launch.json` (this repo's own,
+plus the shared `kwapso/.claude/launch.json` entry for
+`verify-content-inset`).
+
+**ITEM 3 — THE TAB STRIP'S ACCIDENTAL VERTICAL SCROLL.** Client, on the
+live product: *"sometimes there is a vertical scroll on the tabs under the
+title. It should not be like that."* Setting `overflow-x` alone computes
+`overflow-y: auto` by the CSS spec's own default — `table.tsx`'s own
+comment in this kit already states this correctly, as the reason its
+sticky header works — and a strip whose `scrollHeight` rounds even 1px
+past its `clientHeight` (measured live on staging, on every
+`[role=tablist]`) becomes vertically scrollable on that 1px: invisible
+with the scrollbar hidden (`[scrollbar-width:none]`), but the strip still
+moves under a wheel or a touch drag, which is what "sometimes there is a
+vertical scroll" describes.
+
+FIXED WHERE IT IS GENUINELY SINGLE-AXIS, NEVER BLANKET. Grepped every
+`overflow-x-auto`/`overflow-x-scroll` under `components/`; nine files were
+a single-axis STRIP that never needed the vertical axis and gained
+`overflow-y-hidden` beside it: `tabs.tsx` (`TabsList`, named by the
+ruling), `breadcrumbs/breadcrumb-folders.tsx` (the folder strip),
+`toolbar-row.tsx` (the scrolling lane, twice — its own track AND its
+`[&_[data-slot=filter-bar-chips]]:` override), `filter-bar/filter-bar.tsx`
+(the chip row), `swimlane.tsx` (a lane's card row), `kanban.tsx` (the
+board's row of columns — each column keeps its OWN separate
+`overflow-y-auto`, untouched), `compare.tsx`, `heatmap.tsx`, `timeline.tsx`
+(three structurally identical horizontal scrollers) and
+`article-body.tsx` (`[&_pre]:`, a code block). THREE FILES ARE DELIBERATELY
+LEFT ALONE: `table.tsx` and `spreadsheet.tsx`, whose own comments already
+state they rely on `overflow-x: auto`'s `overflow-y: auto` for a sticky
+header's scrollport, and `flowchart.tsx`, whose tree can genuinely run
+taller than its panel and carries a `sticky bottom-0` legend that needs a
+real vertical scrollport to stick against.
+
+`foundations/rules/check-overflow-axis.mjs` (new, wired into `npm run
+check`): every `overflow-x-auto`/`-scroll` in `components/` must pair with
+an `overflow-y-*` utility nearby, or the file must be a reasoned
+`OVERFLOW_AXIS_EXEMPT` entry (the three above) — and an exemption is
+checked BOTH ways: it must still contain the shape its own reason depends
+on (a stale exemption whose reasoning no longer holds fails too), and it
+must NOT have quietly gained the fix anyway (a dead exemption fails as
+loudly as a missing fix). Comments are stripped before scanning, so this
+kit's own house style of EXPLAINING a class name in prose cannot register
+as the class itself. Proven red-then-green three ways against `cp`-backed
+copies: reverting `tabs.tsx`'s fix failed with the exact line; adding the
+fix to an exempted file (`table.tsx`) failed as a dead exemption; both
+restored from the copy afterward.
+
+THE APP CARRIES A NOW-REDUNDANT OVERRIDE FOR THIS SAME BUG —
+`[&>[role=tablist]]:overflow-y-hidden` in `record-chrome.tsx` and
+`tabs-view.tsx` — which the coordinator is handing to a system lane to
+retire now that the kit fixes it at the source; not touched here,
+`kwapso_system` is read-only for this lane.
+
+Files (item 3): `components/tabs/tabs.tsx`, `components/breadcrumbs/
+breadcrumb-folders.tsx`, `components/toolbar-row/toolbar-row.tsx`,
+`components/filter-bar/filter-bar.tsx`, `components/swimlane/swimlane.tsx`,
+`components/kanban/kanban.tsx`, `components/compare/compare.tsx`,
+`components/heatmap/heatmap.tsx`, `components/timeline/timeline.tsx`,
+`components/article-body/article-body.tsx`,
+`foundations/rules/check-overflow-axis.mjs` (new), `package.json` (wired
+into `check`).
+
+Not tagged. `npm run check` passes in full (foreground, unpiped): token/
+icon/state/book/tsc/contrast/conformance/overflow-axis (new)/screen-shell
+(all four blocks)/unsaved-changes-bar/toolbar-row/file-upload, every one
+`OK`.
+
 ### Added — `FileUpload`'s zone becomes a tile grid the moment a file lands — v1.2.110
 
 Client ruling, 17 Sep 2026, verbatim: *"I like the status when it's empty,

@@ -722,7 +722,12 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
             className={cn(
               "flex items-center gap-2",
               // MOBILE: one line, scrolled. From `sm` up: wrapped. See header.
-              "flex-nowrap overflow-x-auto",
+              // `overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x` alone
+              // computes `overflow-y: auto`, and a row this shape can round
+              // 1px tall and become silently vertically scrollable. See
+              // `tabs.tsx`'s `TabsList` and `foundations/rules/check-
+              // overflow-axis.mjs`.
+              "flex-nowrap overflow-x-auto overflow-y-hidden",
               /* `chips="line"` is the same one-line scroller, held at every
                  width instead of released at `sm`. It is expressed by simply
                  NOT writing the `sm:` release, rather than by a second pair of

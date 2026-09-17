@@ -453,16 +453,16 @@ export function waveState(w: { startsOn: string | null; endsOn: string | null },
 
 /** THE SAME NEUTRAL PILL FOR EVERY STATE — `variant="status"`'s own law
  * ("neutral fill, charcoal label, the state lives in the dot"), so only the
- * DOT differs; `planned`/`running`/`done` reuse the identical three tones
- * `sprint-detail.tsx` already draws for a sprint's own status pill
- * (`{sprint.completedAt ? "shipped" : sprint.active ? "building" : "archived"}`),
- * word for word: not-yet-started reads as the kit's "review" tone (the
- * portal's own "awaiting" pill wears it too), live reads `building`, and
- * done reads `shipped` — the same tone an app's own "Completed" stage wears.
+ * DOT differs. RE-RULED 17 Sep 2026, VERBATIM: "waves: planned purple" —
+ * `planned` moved off the kit's "review" tone (the portal's own "awaiting"
+ * pill still wears it) onto `purple`, read together with the rest of that
+ * session's palette so `running` still reads `building` (live reads as
+ * "black" now, her own word for the same ink token) and `done` still reads
+ * `shipped` — the same tone an app's own "Completed" stage wears, unchanged.
  * A switched-off wave never reaches this map at all: it draws `archived`
  * directly, the tone every other deactivated record in the app wears. */
 const WAVE_STATE_DOT: Record<WaveDisplayState, BadgeDot> = {
-  planned: "review",
+  planned: "purple",
   running: "building",
   done: "shipped",
 }
@@ -992,6 +992,8 @@ export function WaveCollection({
             config={listConfig}
             refColumn="ref"
             onRowClick={(row) => softNavigate(`${basePath}/${row.id}`)}
+            rowPath={(row) => `${basePath}/${row.id}`}
+            rowLabel={(row) => String(row.name ?? row.id)}
             actions={
               canEdit
                 ? [

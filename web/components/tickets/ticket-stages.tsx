@@ -162,6 +162,40 @@
 // own, which puts the DATE — the half of her sentence that was missing — on
 // the line directly under the stage's name, where it cannot be the thing that
 // gets cut.
+//
+// ── AND THEN SMALLER, 2026-09-17 — THE THIRD RULING THE SAME DAY ───────────
+//
+// The client, straight after placing the ladder above the tabs (the ruling
+// this file's second section carries): "in the ticket stages, remove the
+// stages. Make the dots smaller, and the date should take only one line.
+// Unless it's a different year, just put the month, the day, and the hour in
+// 24-hour format. Only put the hour, not the minutes, and don't put the
+// [stage word] here. We can see the colors. My whole goal is that this
+// component is just smaller." Four changes, all of them a subtraction:
+//
+//   · NO STAGE WORD. `stageLabel` — the function that wrote "New", "Triaged",
+//     "Scheduled"… under each rung — is gone outright, not merely unused; the
+//     done/current/later fill already says which stage this is (her own
+//     "we can see the colors"), and the word was saying it again.
+//   · THE DATE IS ONE LINE, not the two ("13 Jun 2026" over "14:05 · 3d")
+//     this section above defended. `formatStageMoment` (shared/web/format.ts,
+//     beside `daysSince`) replaces both: month + day, the YEAR only outside
+//     the current calendar year, and the hour alone in 24-hour with no
+//     minutes — "Sep 16 · 14h". The working-day count and the open rung's
+//     "Still here" text go with the second line; the server-side arithmetic
+//     behind the count (`shared/business-days.ts`) is untouched and still
+//     drives the triage queue's own "2 days" card, which never read this
+//     component.
+//   · THE DOTS ARE ONE KIT SIZE DOWN — `SMALLER_DOT`, below, rebinds
+//     `--control-height-pill` (26px) to the kit's own next size, 20px,
+//     scoped to this component's wrapper alone.
+//   · THE COLUMN NARROWS TO MATCH — `STAGE_COLUMN`, below, was sized for the
+//     widest STAGE WORD ("Waiting on you"); with no word left, it is sized
+//     for the widest DATE instead, and shrinks with it.
+//
+// Together the ladder is visibly shorter and narrower than it was — proved by
+// `web/test/ticket-stages-shrink.test.tsx`, which pins the live component's
+// rendered height against a fixture and asserts no stage word reaches the DOM.
 
 import * as React from "react"
 
@@ -170,49 +204,25 @@ import { StatusStepper, type StatusStage } from "@shared/ui/components/status-st
 
 import { HELP_STATUSES, RETIRED_HELP_STATUSES } from "@shared/types"
 import type { HelpStatus, HelpStatusEver, TicketStageHistory, TicketStageSpan } from "@shared/types"
-import type { Language } from "@shared/i18n"
 import { content as contentApi } from "@/lib/api"
-import { formatDate, formatTime } from "@shared/web/format"
+import { formatStageMoment } from "@shared/web/format"
 import { helpStagesKey } from "@/lib/live-resources"
 import { useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 
-/** THE LADDER, IN THE WORDS THE REST OF THE APP USES FOR IT.
+/* `stageLabel(status, t)` STOOD HERE — the word under each rung ("New",
+ * "Triaged", "Scheduled"…), written out as literals for the reason its own
+ * comment gave: the app's other status map (`HELP_STATUS`,
+ * web/components/deep-link/shape.tsx) is keyed by DATABASE words, so
+ * `t(HELP_STATUS[s])` would look up keys the catalogue does not hold.
  *
- * A FUNCTION OF `t` RATHER THAN A COPY TABLE, and the difference matters: the
- * app's other status map (`HELP_STATUS`, web/components/deep-link/shape.tsx) is
- * keyed by DATABASE words, so none of its values is an extracted position and
- * `t(HELP_STATUS[s])` would look up keys the catalogue does not hold — handing
- * every non-English reader the English word on a screen that looks finished.
- * `tickets-collection.tsx` carries the same note about its own three literals.
- * So the sentences are written out here as literals, and five of the seven were
- * already in the catalogue because other screens say them. */
-function stageLabel(status: HelpStatusEver, t: (s: string) => string): string {
-  switch (status) {
-    // A RETIRED STAGE STILL GETS ITS WORDS. `awaiting_validation` left the
-    // lifecycle on 7 Sep 2026 (shared/types.ts, `HELP_STATUSES`), and this case
-    // is why the parameter is `HelpStatusEver` and not `HelpStatus`: the rows
-    // behind this strip are `help_status_events`, which is append-only, so a
-    // ticket that really sat waiting on a client still has that rung and always
-    // will. The stage is unreachable going forward and perfectly readable
-    // looking back — the sentence a person is owed about their own ticket's
-    // past is the one we used at the time, not the raw enum and not a blank.
-    case "awaiting_validation":
-      return t("Waiting on you")
-    case "new":
-      return t("New")
-    case "triaged":
-      return t("Triaged")
-    case "scheduled":
-      return t("Scheduled")
-    case "in_progress":
-      return t("In progress")
-    case "ready":
-      return t("Ready")
-    case "resolved":
-      return t("Resolved")
-  }
-}
+ * IT IS GONE, NOT RENAMED — client ruling, 17 Sep 2026, verbatim (read beside
+ * "the dots smaller" and "the date … one line"): "don't put the [word] here.
+ * We can see the colors." The done/current/later fills already say which
+ * stage the ticket is on and which are still ahead; a second, printed name
+ * for the same fact was exactly the redundancy her "just smaller" goal was
+ * naming. The rung still carries its DATE (`formatStageMoment`, below) — the
+ * one thing that fill and position could never say by themselves. */
 
 /** EVERY RUNG THIS COMPONENT MAY DRAW, IN THE ORDER A TICKET CLIMBS THEM.
  *
@@ -324,40 +334,31 @@ function buildRungs(
 }
 
 /** THE WIDTH ONE STAGE IS NEVER SQUEEZED BELOW, and therefore the width the
- * whole rail scrolls past. Read off the longest thing a column has to say
- * rather than picked: the widest stage name the ladder holds is "Waiting on
- * you" (the retired stage, which real tickets still carry) and the widest fact
- * line is a date — both land inside 120px at the caption step, which is this
- * number. Below it the words start being cut; above it six stages still fit
- * across an ordinary record column with no scrollbar at all. */
-const STAGE_COLUMN = "7.5rem"
+ * whole rail scrolls past. NARROWED 17 Sep 2026 alongside the rest of this
+ * component's shrink: with no printed stage word left (see this file's
+ * header), the widest thing a column has to say is its own date line —
+ * `"Dec 1, 2025 · 14h"` at the outside, the one case a moment falls outside
+ * the current year — and that lands inside 96px at the caption step. Below
+ * it the date starts being cut; above it six stages still fit across an
+ * ordinary record column with no scrollbar at all. */
+const STAGE_COLUMN = "6rem"
 
-/** The record of a visit, one fact per line, or nothing at all where there is
- * no record of the move. Stacked rather than `·`-joined for the reason this
- * file's header gives: an equal column truncates, and the DATE must not be
- * what gets cut.
- *
- * THE DAY AND THE CLOCK ARE TWO LINES, THROUGH TWO SHARED FORMATTERS. It was
- * one `formatDateTime`, which is right for a full-width activity row and too
- * long for a column six of which fit on a laptop. `formatTime` exists in the
- * seam for exactly this — "the clock time alone, for a row whose DAY is
- * already said" — so nothing is lost and nothing is hand-formatted. */
-function rungLines(
-  span: TicketStageSpan | null,
-  t: (s: string, v?: Record<string, string | number>) => string,
-  lang: Language
-): string[] {
-  if (!span) return []
-  const lines = [
-    formatDate(span.from, lang),
-    [formatTime(span.from, lang), t("{count}d", { count: span.workingDays })].join(" · "),
-  ]
-  // THE OPEN RUNG. `to === null` is the stage the ticket is in NOW, and its
-  // number is counted to the moment the door answered — so it is said rather
-  // than left to read as a finished span whose count has stopped moving.
-  if (span.to === null) lines.push(t("Still here"))
-  return lines
-}
+/** THE MARK, ONE KIT SIZE DOWN — client ruling, 17 Sep 2026, verbatim: "make
+ * the dots smaller … my whole goal is that this component is just smaller."
+ * The kit's `steps` rail reads its mark's diameter off `--control-height-pill`
+ * (26px, chapter 15) with no size prop of its own to ask for anything
+ * narrower — so this rebinds that ONE custom property, scoped to this
+ * component's own wrapper, to the kit's next size down: `--control-height-
+ * pill` is exactly what `Badge`'s own 26px "pill" status chip reads (badge.tsx
+ * §"CH11 draws THREE pill geometries"), and 20px is its 20-tall "counter"
+ * geometry one step under it — a real rung on the kit's own scale, not a
+ * number invented here. Every `size="pill"` badge inside this wrapper (the
+ * "Reopened" flag, below) shrinks the identical amount, which is the same
+ * "smaller, not selectively smaller" reading R31's own two-radii law takes
+ * for a value like this one. Nothing under `shared/ui/` is edited — a CSS
+ * custom property is data a caller may rebind, the same hatch
+ * `--badge-quiet-fill` already opens for `TicketChips`/`TriageChips`. */
+const SMALLER_DOT = "[--control-height-pill:1.25rem]"
 
 export function TicketStages({ ticketId, status }: { ticketId: string; status: HelpStatus }) {
   const { t, lang } = useLanguage()
@@ -373,26 +374,26 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
     id: rung.key,
     // ONE BLOCK PER LINE INSIDE THE KIT'S OWN LABEL. The kit's label span is
     // `block w-full truncate`, so a `block` child inherits the width and gets
-    // its OWN ellipsis: the column clips each line separately instead of
-    // clipping one long line at its first fact.
+    // its OWN ellipsis. NO STAGE WORD ANY MORE (this file's own header) — the
+    // date is the only line left, through `formatStageMoment`
+    // (shared/web/format.ts), one line, month/day/(year)/hour, no minutes.
     label: (
       <>
-        <span className="block truncate">{stageLabel(rung.status, t)}</span>
         {rung.reopened ? (
-          // The one thing here that is not a line of text. It stays a Badge —
-          // this is the moment the ticket came back, and her sentence
-          // ("reopen on y") is the reason the rail has these rungs at all.
+          // The one thing here that is not the date. It stays a Badge — this
+          // is the moment the ticket came back, and her sentence ("reopen on
+          // y") is the reason the rail has these rungs at all.
           <span className="block">
             <Badge variant="warning" size="pill">
               {t("Reopened")}
             </Badge>
           </span>
         ) : null}
-        {rungLines(rung.span, t, lang).map((line) => (
-          <span key={line} className="text-muted-foreground block truncate">
-            {line}
+        {rung.span ? (
+          <span className="text-muted-foreground block truncate">
+            {formatStageMoment(rung.span.from, lang)}
           </span>
-        ))}
+        ) : null}
       </>
     ),
   }))
@@ -424,7 +425,7 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
         role="group"
         aria-labelledby={headingId}
         tabIndex={0}
-        className="min-w-0 overflow-x-auto pb-[var(--space-2)]"
+        className={`min-w-0 overflow-x-auto pb-[var(--space-2)] ${SMALLER_DOT}`}
       >
         <StatusStepper
           stages={stages}

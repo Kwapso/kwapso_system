@@ -240,7 +240,13 @@ const Compare = React.forwardRef<HTMLDivElement, CompareProps>(
         {state === "loading" && loadingState ? loadingState : null}
 
         {showFrame && !(state === "loading" && loadingState) ? (
-          <div className="min-w-0 overflow-x-auto">
+          /* `overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x` alone
+             computes `overflow-y: auto`, and a scroller this shape can
+             round 1px tall and become silently vertically scrollable. This
+             box's own height is intrinsic (never constrained), so nothing
+             here ever needed the vertical axis. See `tabs.tsx`'s
+             `TabsList` and `foundations/rules/check-overflow-axis.mjs`. */
+          <div className="min-w-0 overflow-x-auto overflow-y-hidden">
             <div className="grid min-w-max items-start gap-3" style={template}>
               {/* The label column. `padding-top: 54px` is what puts label one
                   level with value one, past the record name above it. */}

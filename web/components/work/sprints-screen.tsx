@@ -74,7 +74,7 @@ import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
-import { sprintState, todayKey, type SprintState } from "@shared/sprint-state"
+import { sprintDisplayState, sprintDotTone, sprintState, todayKey, type SprintDisplayState, type SprintState } from "@shared/sprint-state"
 
 /* --------------------------- where a sprint is up to ---------------------- */
 
@@ -185,29 +185,46 @@ function groupByKind(
   return [...groups.values()]
 }
 
-/** WHICH ENDING, on a row that has one. "Wrapped" holds both a sprint somebody
- * completed and a sprint somebody cancelled, and a row that said neither would
- * read as delivered work either way. Completed wins when a record carries both,
- * exactly as `sprintState` reads them: a block that was delivered and later
- * switched off was still delivered. A sprint still to run needs no badge — its
- * heading already said where it is. */
-function endingBadge(s: Sprint, t: Translate): React.ReactNode {
-  if (s.completedAt) return <Badge variant="secondary">{t("Complete")}</Badge>
-  if (!s.active) return <Badge variant="secondary">{t("Cancelled")}</Badge>
-  return undefined
+/** HER EXACT FOUR WORDS, 17 Sep 2026: "sprints: wrapped complete green,
+ * wrapped cancelled gray, running now black, coming up purple." The TONE
+ * lives in `shared/sprint-state.ts` (`sprintDotTone`, `SPRINT_DISPLAY_DOT_TONE`)
+ * beside the state predicate it is derived from; the WORDS stay here, the
+ * same split every other coloured kind in this file's neighbourhood keeps
+ * (`STATE_HEADING`/`STATE_MARK`, above — "what stayed here: the words"). */
+const SPRINT_DISPLAY_LABEL: Record<SprintDisplayState, string> = {
+  wrapped_complete: "Complete",
+  wrapped_cancelled: "Cancelled",
+  running: "Running",
+  upcoming: "Coming up",
+}
+
+/** THE SPRINT'S OWN STATUS DOT — every row, not only a stopped one (before 17
+ * Sep 2026 a running or upcoming sprint drew no badge here at all, only the
+ * section heading above it said where it stood). R86: the one coloured chip
+ * in this row is the record's status, and this is it — the sprint TYPE glyph
+ * beside the name stays uncoloured (client ruling, 16 Sep 2026: "they will
+ * not have colors, but icons"). Exported so `sprint-detail.tsx`'s own record
+ * head chip draws the identical words rather than a second copy of them. */
+export function sprintStatusBadge(s: Sprint, t: Translate, today: string = todayKey()): React.ReactNode {
+  const state = sprintDisplayState(s, today)
+  return (
+    <Badge variant="status" dot={sprintDotTone(s, today)}>
+      {t(SPRINT_DISPLAY_LABEL[state])}
+    </Badge>
+  )
 }
 
 /** WHAT SITS AT THE END OF AN OVERVIEW ROW: how much of the sprint is done, and
- * the badge if it has stopped.
+ * its own status badge.
  *
  * "3 of 11 done" used to be the fifth fact on the row's summary sentence, where
  * it read as prose and had to be decoded a row at a time. It is a NUMBER, and T4
  * says a number goes in the trailing slot in `tabular-nums` so a column of them
- * lines up and can be compared without reading any of them. The two states are
- * mutually exclusive with each other and nearly always absent, so on a running
- * sprint this slot holds exactly one thing. */
-function progressTrailing(s: Sprint, t: Translate): React.ReactNode {
-  const badge = endingBadge(s, t)
+ * lines up and can be compared without reading any of them. The status badge
+ * used to draw only on a stopped sprint (`endingBadge`, a quiet, uncoloured
+ * pill) — it is every row's now, coloured (`sprintStatusBadge`, above). */
+function progressTrailing(s: Sprint, t: Translate, today: string): React.ReactNode {
+  const badge = sprintStatusBadge(s, t, today)
   const done = s.storyCount - s.openStoryCount
   if (s.storyCount === 0) return badge
   return (
@@ -667,7 +684,7 @@ export function SprintsScreen({
                     // number on the right. What is left is the three facts a
                     // status line may carry (D5): whose, which app, and when.
                     subtitle: sprintLineInKindGroup(s, lang),
-                    trailing: progressTrailing(s, t),
+                    trailing: progressTrailing(s, t, today),
                   }))}
                   onItemClick={(item) => onIntent({ kind: "open", module: "sprints", id: item.id })}
                 />

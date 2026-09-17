@@ -24,6 +24,12 @@
 // view for triaging" (two more bodies on the tab's existing view switch,
 // asserted both by their OPTIONS existing and by what each one draws once
 // picked — an option nobody can reach is not a view).
+//
+// EXTENDED AGAIN, THE SAME DAY, LATER: "I am not seeing 'raised' on the
+// queue view on triage." The queue draws through this file's own table (the
+// `renderRows` List and Queue both call), so the fault was in the ONE cell
+// both bodies share — the Raised column carried only a date, no raiser —
+// and the fix is proved here once rather than twice.
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
@@ -57,18 +63,29 @@ let TICKETS: HelpTicket[] = [
     description: "The dispatch board stops refreshing after lunch",
     status: "triaged",
     createdAt: "2026-06-10T09:00:00.000Z",
+    // RAISED BY A COLLEAGUE — R54's first-name trim applies to the Raised
+    // column exactly as it already does to Resolved by (H3, below).
+    raiserId: "u5",
+    raiserName: "Diego Fischer",
+    raiserIsClient: false,
   } as HelpTicket,
   {
     // NO REFERENCE AND NO TYPE — both are real states (a client with no code
     // yet, a ticket nobody has triaged), and both are the shapes a table gets
     // wrong: an empty black lozenge, and a hole where every other row has a
     // pill. Drawn in the fixture rather than described in a comment.
+    //
+    // RAISED BY A CLIENT CONTACT — named in full, never trimmed (R54: "a
+    // contact who raised their own question is named in full").
     id: "H2",
     ref: null,
     helpType: null,
     description: "Can you add the driver column back",
     status: "new",
     createdAt: "2026-06-11T09:00:00.000Z",
+    raiserId: "c3",
+    raiserName: "Petra Ostwald",
+    raiserIsClient: true,
   } as HelpTicket,
   {
     // RESOLVED, AND BY SOMEBODY — the shape `resolverId`/`resolverName`
@@ -209,6 +226,28 @@ describe("an app's Tickets tab draws the list as a table", () => {
       third.queryByText("Marta Bergman Costa"),
       "resolved by drew the untrimmed staff snapshot"
     ).toBeNull()
+  })
+
+  it("raised shows who asked beside the date — trimmed for staff, in full for a client (R54)", () => {
+    show()
+    const first = within(screen.getAllByRole("row")[1]) // H1 — raised by a colleague
+    expect(first.getByText("Diego"), "raised did not trim a colleague to a first name (R54)").toBeTruthy()
+    expect(first.queryByText("Diego Fischer"), "raised drew the untrimmed staff snapshot").toBeNull()
+    const second = within(screen.getAllByRole("row")[2]) // H2 — raised by a client contact
+    expect(
+      second.getByText("Petra Ostwald"),
+      "a client contact who raised their own question should be named in full"
+    ).toBeTruthy()
+  })
+
+  it("the queue rows carry the same Raised column the list does — face, name and date", () => {
+    show()
+    fireEvent.click(screen.getByRole("combobox", { name: "View" }))
+    fireEvent.click(screen.getByRole("option", { name: "Queue" }))
+    // H2 is the fixture's only `new` ticket, and it is the queue's own row —
+    // her exact complaint was this view, so the proof is on it directly
+    // rather than only on List above.
+    expect(screen.getByText("Petra Ostwald"), "the queue view drew no raiser at all").toBeTruthy()
   })
 
   it("carries the view switch, and offers Board and Queue beside List and Dashboard", () => {

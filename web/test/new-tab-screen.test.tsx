@@ -3,11 +3,18 @@
 // The client's second ruling, 17 Sep 2026, verbatim: "For the new tab page,
 // implement 02 in your proposal. However, do not ask the assistant, just
 // search anything, and instead of search, put an icon there that means
-// search." This tests the four things that ruling actually asks for: every
+// search." This tests the things that ruling actually asks for: every
 // module door is asked with the reader's own `q`, Enter opens the first hit
 // IN this tab, cmd/ctrl-Enter opens it BESIDE (the same door the content
 // strip's own "+" uses), and "Recently opened" is read off the workspace
 // tab trails already stored — never a fabricated list.
+//
+// THE SCOPE-CHIP ROW IS GONE — her third ruling, the same day, verbatim:
+// "remove the quick access to tickets, accounts, stories, and so on. It's
+// not needed. Just put the recently opened because, with the quick access,
+// I already have them in the navigation bar." Search now always fans out
+// across every door; there is no chip to narrow it, so the old "a scope
+// chip narrows which doors are asked" test is gone with the row it tested.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import * as React from "react"
@@ -80,13 +87,11 @@ describe("the search wiring — every door asked with the reader's own q", () =>
     await waitFor(() => expect(screen.queryByText("Login fails on Safari")).not.toBeNull())
   })
 
-  it("a scope chip narrows which doors are asked — pressing Accounts stops asking Tickets", async () => {
+  it("draws no scope-chip row at all — quick access moved to the navigation bar", async () => {
     setWorkspaceScope("new-tab-search-user:team2")
     render(<NewTabScreen />)
-    fireEvent.click(screen.getByRole("button", { name: "Accounts" }))
-    fireEvent.change(screen.getByLabelText("Where to?"), { target: { value: "safari" } })
-    await waitFor(() => expect(accountsCalls.length).toBeGreaterThan(0))
-    expect(helpCalls).toEqual([])
+    expect(screen.queryByRole("button", { name: "Accounts" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Tickets" })).toBeNull()
   })
 })
 

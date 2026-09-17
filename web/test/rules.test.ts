@@ -7530,3 +7530,59 @@ describe("R66 — no emoji in the words a person reads, or the data behind them"
   })
 
 })
+
+// ROW-OPENS-BESIDE — the class of bug diagnosed live today: a collection row
+// drawn as `<TableRow onClick={() => onOpen(id)}>` has no anchor at all, so
+// the one door a cmd/ctrl-click or a middle-click opens through (`InAppLink`'s
+// own interception, `shell-nav.test.ts`'s `in-app-anchors`) never sees it —
+// the gesture silently does nothing. It shipped twice under a green build:
+// `RecordTable`'s own row (Accounts, Tasks, Waves, Contacts, Stories,
+// Meetings, and any recipe table drawn through it) and, by hand, the ticket
+// table's `TicketRowsTable`. Both are fixed onto ONE seam now
+// (`rowOpenHandlers`, web/lib/row-open.ts) — this reads every component off
+// disk and fails on a THIRD hand-rolled copy, the same "enumerate by what
+// navigates, never a list somebody maintains" shape `in-app-anchors` already
+// uses for the identical class of bug on a real anchor.
+//
+// NARROW ON PURPOSE: it looks only at `<TableRow>` wired straight to
+// `onOpen(`/`onRowClick(` — the two names this bug's own two occurrences
+// used. A `<TableRow>` that opens through some other callback (a bespoke
+// board's own `softNavigate`, say) is a different table this law does not yet
+// reach, named here rather than silently swept in, so this check can never
+// fail for a table nobody asked it to hold.
+describe("row-opens-beside — a table row's click goes through rowOpenHandlers", () => {
+  it("no <TableRow> wires onClick straight to onOpen/onRowClick, bypassing the seam", () => {
+    const offenders: string[] = []
+    const files = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+    expect(files.length, "the component census found nothing — it has gone blind").toBeGreaterThan(50)
+    // Proof the census is reading something real, the same "must not be
+    // vacuous" shape every census in this file is held to: both known rows
+    // (RecordTable's own, TicketRowsTable's) go through the seam today.
+    let sawTheSeam = 0
+    for (const { path: file, source } of files) {
+      const src = stripComments(source)
+      for (const m of src.matchAll(/<TableRow\b/g)) {
+        const after = src.slice(m.index ?? 0, (m.index ?? 0) + 400)
+        if (!/onClick=/.test(after)) continue // a header row, or one that never opens
+        // WIRED THROUGH THE SEAM — `rowOpenHandlers`'s own two-handler
+        // object, read field by field (`record-table.tsx`'s conditional,
+        // `TicketRowsTable`'s per-row `handlers`).
+        if (/onClick=\{\s*handlers\b/.test(after)) {
+          sawTheSeam++
+          continue
+        }
+        // THE HAND-ROLLED SHAPE THIS TEST EXISTS TO CATCH: an inline arrow
+        // calling the row-open callback directly, no modifier ever read.
+        if (/onClick=\{\s*\(?\)?\s*=>\s*(onOpen|onRowClick)\(/.test(after))
+          offenders.push(
+            `${file} — a <TableRow> opens with a bare onClick; build its handlers with rowOpenHandlers (web/lib/row-open.ts) instead`
+          )
+      }
+    }
+    expect(
+      sawTheSeam,
+      "no <TableRow> was found wired through rowOpenHandlers — the census is reading nothing"
+    ).toBeGreaterThan(0)
+    expect(offenders, offenders.join("\n")).toEqual([])
+  })
+})

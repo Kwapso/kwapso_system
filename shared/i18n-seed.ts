@@ -207,15 +207,6 @@ export const SEED: Catalogue = {
    * own retired preview gave for its own specimen row — kept UNCHANGED
    * across every language rather than "translated" into nonsense, the same
    * convention any translated product uses for placeholder Latin. */
-  Lorem: { de: "Lorem", es: "Lorem", ca: "Lorem" },
-  Ipsum: { de: "Ipsum", es: "Ipsum", ca: "Ipsum" },
-  Dolor: { de: "Dolor", es: "Dolor", ca: "Dolor" },
-  "Lorem ipsum dolor": { de: "Lorem ipsum dolor", es: "Lorem ipsum dolor", ca: "Lorem ipsum dolor" },
-  "Lorem ipsum dolor sit amet": {
-    de: "Lorem ipsum dolor sit amet",
-    es: "Lorem ipsum dolor sit amet",
-    ca: "Lorem ipsum dolor sit amet",
-  },
   "A small picture of the app, reflecting your chosen settings": {
     de: "Ein kleines Abbild der App, das Ihre gewählten Einstellungen zeigt.",
     es: "Una pequeña imagen de la aplicación que muestra tus ajustes elegidos.",
@@ -548,37 +539,6 @@ export const SEED: Catalogue = {
     de: "Wer wir sind: unser Material, unser Team und die Details, die in einen Vertrag gehören.",
     es: "Quiénes somos: nuestro material, nuestro equipo y los detalles que van en un contrato.",
     ca: "Qui som: el nostre material, el nostre equip i els detalls que van en un contracte.",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
-  "Keep in the loop": { de: "Auf dem Laufenden halten", es: "Mantener informado", ca: "Mantenir al corrent" },
-  "You can add members, but no one is ever removed.": {
-    de: "Du kannst Mitglieder hinzufügen, aber niemand wird je entfernt.",
-    es: "Puedes añadir miembros, pero nadie se elimina nunca.",
-    ca: "Pots afegir membres, però ningú no es retira mai.",
     
     
     
@@ -3434,7 +3394,6 @@ export const SEED: Catalogue = {
    * shipping in English to every non-English reader. */
   // "Show all" — the ticket detail's Related-stories preview, opening the
   // full list in a slide-in (`web/components/tickets/help-detail.tsx`).
-  "Show all": { de: "Alle anzeigen", es: "Mostrar todos", ca: "Mostra-ho tot" },
   // The tickets dashboard's "Raised by contact" panel footer
   // (`tickets-dashboard.tsx`) — the same "{count}h ago" hour-abbreviation
   // convention above, "h"/"Std." rather than a spelled-out word.
@@ -3457,15 +3416,12 @@ export const SEED: Catalogue = {
    * "unzufrieden / neutral / zufrieden", which is a survey talking, and this is
    * one question at the bottom of a request somebody raised. */
   "Stages": { de: "Phasen", es: "Etapas", ca: "Etapes"},
-  "Still here": { de: "Noch hier", es: "Sigue aquí", ca: "Encara aquí"},
   "Reopened": { de: "Wieder geöffnet", es: "Reabierto", ca: "Reobert"},
   "New": { de: "Neu", es: "Nuevo", ca: "Nou"},
-  "Waiting on you": { de: "Wartet auf Sie", es: "Esperando tu respuesta", ca: "Esperant la teva resposta"},
   /* The compact day count on a stage row. A letter rather than the word, so a
    * six-rung strip stays one line per rung on a phone — the same shape
    * `formatRelative`'s own "{count}d ago" already uses, and translated the same
    * way (T for Tage, d for días / dies). */
-  "{count}d": { de: "{count} T", es: "{count} d", ca: "{count} d"},
   "How did we do?": { de: "Wie haben wir das gemacht?", es: "¿Qué tal lo hemos hecho?", ca: "Com ho hem fet?"},
   "Not great": { de: "Nicht gut", es: "No muy bien", ca: "No gaire bé"},
   "Fine": { de: "Geht so", es: "Bien", ca: "Bé"},
@@ -3682,7 +3638,6 @@ export const SEED: Catalogue = {
   "Nothing matched. Try fewer words, or clear the filters.": { de: "Nichts gefunden. Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Nada coincide. Prueba con menos palabras o borra los filtros.", ca: "Res no coincideix. Prova amb menys paraules o esborra els filtres." },
   "Nothing waiting.": { de: "Nichts wartet.", es: "Nada en espera.", ca: "Res en espera." },
   "Nothing's on the go right now. Any one of these is a good place to start.": { de: "Gerade ist nichts in Arbeit. Jeder dieser Punkte ist ein guter Anfang.", es: "Ahora mismo no hay nada en marcha. Cualquiera de estos es un buen punto de partida.", ca: "Ara mateix no hi ha res en marxa. Qualsevol d'aquests és un bon punt de partida." },
-  "Open the recording": { de: "Aufzeichnung öffnen", es: "Abrir la grabación", ca: "Obrir la gravació" },
   "Paper": { de: "Papier", es: "Papel", ca: "Paper" },
   "Picked": { de: "Ausgewählt", es: "Elegido", ca: "Triat" },
   "Picking one files the ticket straight away. Nothing is sent to the client.": { de: "Die Auswahl legt das Ticket sofort ab. Es wird nichts an den Kunden gesendet.", es: "Elegir uno archiva el ticket de inmediato. No se envía nada al cliente.", ca: "Triar-ne un arxiva el tiquet de seguida. No s'envia res al client." },
@@ -3696,7 +3651,6 @@ export const SEED: Catalogue = {
   "Remove contact": { de: "Kontakt entfernen", es: "Eliminar contacto", ca: "Eliminar contacte" },
   "Remove {person}": { de: "„{person}“ entfernen", es: "Eliminar a {person}", ca: "Eliminar {person}" },
   "Remove {person} from {account}?": { de: "„{person}“ von „{account}“ entfernen?", es: "¿Eliminar a {person} de {account}?", ca: "Vols eliminar {person} de {account}?" },
-  "Screen recording": { de: "Bildschirmaufzeichnung", es: "Grabación de pantalla", ca: "Gravació de pantalla" },
   "Search companies": { de: "Unternehmen durchsuchen", es: "Buscar empresas", ca: "Cercar empreses" },
   "Search contacts": { de: "Kontakte durchsuchen", es: "Buscar contactos", ca: "Cercar contactes" },
   "Search inputs…": { de: "Angaben durchsuchen…", es: "Buscar aportaciones…", ca: "Cercar aportacions…" },
@@ -3804,12 +3758,6 @@ export const SEED: Catalogue = {
    * BOTH holes, so a translator can reorder the date and the day count
    * rather than gluing two separately-translated fragments together
    * (R28/R33's own discipline). */
-  "Raised on": { de: "Erstellt am", es: "Creado el", ca: "Creat el" },
-  "{date} ({count} days ago)": {
-    de: "{date} (vor {count} Tagen)",
-    es: "{date} (hace {count} días)",
-    ca: "{date} (fa {count} dies)",
-  },
   "{count} contacts match": { de: "{count} Kontakte passen", es: "{count} contactos coinciden", ca: "{count} contactes coincideixen" },
   "{count} entries match": { de: "{count} Einträge passen", es: "{count} entradas coinciden", ca: "{count} entrades coincideixen" },
   "{count} given to somebody": { de: "{count} vergeben", es: "{count} asignados a alguien", ca: "{count} assignats a algú" },
@@ -4378,5 +4326,32 @@ export const SEED: Catalogue = {
     de: "Jede Spalte zählt jedes Ticket in dieser Phase — jedes Ticket steht in genau einer. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
     es: "Cada columna cuenta todos los tickets en esa etapa — cada ticket está en exactamente una. Haz clic en una tarjeta para abrir el ticket.",
     ca: "Cada columna compta tots els tiquets en aquesta etapa — cada tiquet és exactament en una. Fes clic en una targeta per obrir el tiquet.",
+  },
+
+  /* ── 17 Sep 2026, R44 payday for the round-15 lanes' own uncommitted work —
+     three strings `npm run lang` found with no seed entry for de/es/ca.
+     "Live" is the account/contact status chip's word (contact-detail.tsx,
+     shape.tsx), her ruling that session verbatim: "contact live green" —
+     paired with "Archived" (already seeded in the generated catalogue as
+     Archiviert/Archivado/Arxivat), so this is the same active/archived
+     dichotomy "Active" already answers elsewhere in the catalogue
+     (Aktiv/Activo/Actiu) and reuses those exact words rather than borrowing
+     the English adjective, the same posture the live-connection strip's own
+     seed entry above took for a different sense of "live". "Logs" is R85's
+     one-word rail substitute for "Work logs" (web/lib/pages.ts, her verbatim
+     pick: "The word for work logs is logs") — "Work logs" itself keeps its
+     existing seed entry (Zeiterfassung/Registros de tiempo/Registres de
+     temps) everywhere else, so this is the bare, one-word noun the rail
+     needs, built off the same root the Spanish/Catalan phrase already uses.
+     "Who to keep in the loop" is the stakeholders picker's field label
+     (help-form-dialog.tsx's `loopField`) — R81 leaves the label as the whole
+     instruction, so it carries the idiom rather than a literal word-for-word
+     translation. */
+  "Live": { de: "Aktiv", es: "Activo", ca: "Actiu" },
+  "Logs": { de: "Protokolle", es: "Registros", ca: "Registres" },
+  "Who to keep in the loop": {
+    de: "Wer auf dem Laufenden gehalten werden soll",
+    es: "A quién mantener informado",
+    ca: "A qui mantenir informat",
   },
 }

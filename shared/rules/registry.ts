@@ -752,7 +752,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R85",
     dimension: "ui",
-    law: "EVERY RAIL DESTINATION IS NAMED IN ONE WORD. The client's ruling, 17 Sep 2026, verbatim: \"Make it a rule that in the navigation bar, we only have one-word names. For example, 'Knowledge Base': reduce it to 'Knowledge'. We need an alternative for work logs. Propose me multiple.\" A DESTINATION is a link a person can click to land somewhere — every `NAV` entry that carries a real `group` (not `\"none\"`) and is not `inRail: false`, and every `TEAM_SECTIONS` row with `placement: \"sidebar\"` (`web/lib/pages.ts`) — the same two lists `app-shell.tsx`'s own `universal`/`sidebarPages` read to draw the rail, so the census asks the SAME source the rail does rather than keeping a second, driftable list. Its `title`, in English (`shared/i18n-strings.json` makes English the key R28 already stands on — a translation is not held to this word count, only the source string is), must be exactly one word: no space, no hyphen. The rail's THREE GROUP HEADINGS (`NAV_GROUP_LABELS`: \"My work\", \"Build\", \"Accounts\") are a different kind of label — they title a SECTION, never a place a click lands — and are named in `RAIL_LABEL_WORDS_OK` rather than measured, because whether the client's ruling reaches them at all is still open: her example and her one open question (\"an alternative for work logs\") were both about a DESTINATION, and a heading was never named. Every one of the three sits in the table for now, reason \"groups are headings, not destinations; awaiting her word\" — not because two of them (\"Build\", \"Accounts\") would fail the count anyway, but because the exemption is honest about WHY a group is untouched rather than silently passing a check that was never asked about it. RED THE DAY THIS LAW WAS WRITTEN: \"Knowledge base\" (the `knowledge` sidebar entry) and \"Work logs\" (the `time` sidebar entry) both carried two words. \"Knowledge base\" → \"Knowledge\" everywhere it is a user-facing label (R6/R34 — the glossary term, every `t(\"Knowledge base\")` call site, the translations), the route (`/knowledge`) and every identifier unchanged. \"Work logs\" has no client pick yet: the client asked to be shown alternatives rather than have one chosen silently for her (the base's own standing practice — never ask her to choose from prose), so the `time` entry ships \"Hours\", the recommendation, live now so the law reads green, with a comment at that entry naming the four others (Time · Logs · Timesheet · Effort) for her pick. \"Work logs\" itself is untouched everywhere else it is said — the glossary term and every record's own tab (story/task/meeting/ticket detail) — because only the RAIL destination is under this law; a tab label is not a destination by this law's own definition.",
+    law: "EVERY RAIL DESTINATION IS NAMED IN ONE WORD. The client's ruling, 17 Sep 2026, verbatim: \"Make it a rule that in the navigation bar, we only have one-word names. For example, 'Knowledge Base': reduce it to 'Knowledge'. We need an alternative for work logs. Propose me multiple.\" A DESTINATION is a link a person can click to land somewhere — every `NAV` entry that carries a real `group` (not `\"none\"`) and is not `inRail: false`, and every `TEAM_SECTIONS` row with `placement: \"sidebar\"` (`web/lib/pages.ts`) — the same two lists `app-shell.tsx`'s own `universal`/`sidebarPages` read to draw the rail, so the census asks the SAME source the rail does rather than keeping a second, driftable list. Its `title`, in English (`shared/i18n-strings.json` makes English the key R28 already stands on — a translation is not held to this word count, only the source string is), must be exactly one word: no space, no hyphen. The rail's THREE GROUP HEADINGS (`NAV_GROUP_LABELS`: \"My work\", \"Build\", \"Accounts\") are a different kind of label — they title a SECTION, never a place a click lands — and are named in `RAIL_LABEL_WORDS_OK` rather than measured, because whether the client's ruling reaches them at all is still open: her example and her one open question (\"an alternative for work logs\") were both about a DESTINATION, and a heading was never named. Every one of the three sat in the table, reason \"groups are headings, not destinations; awaiting her word\" — not because two of them (\"Build\", \"Accounts\") would fail the count anyway, but because the exemption was honest about WHY a group was untouched rather than silently passing a check that was never asked about it. ANSWERED THE SAME DAY: the client's ruling, 17 Sep 2026, verbatim: \"No, the rail group heading can have two words.\" The three group headings are exempt from the one-word count BY RULING now, not merely awaiting one — `RAIL_LABEL_WORDS_OK`'s own reason carries her words. RED THE DAY THIS LAW WAS WRITTEN: \"Knowledge base\" (the `knowledge` sidebar entry) and \"Work logs\" (the `time` sidebar entry) both carried two words. \"Knowledge base\" → \"Knowledge\" everywhere it is a user-facing label (R6/R34 — the glossary term, every `t(\"Knowledge base\")` call site, the translations), the route (`/knowledge`) and every identifier unchanged. \"Work logs\" had no client pick at first: the client asked to be shown alternatives rather than have one chosen silently for her (the base's own standing practice — never ask her to choose from prose), so the `time` entry shipped \"Hours\" as the recommendation while she decided, live so the law read green — then she named it, the same day, verbatim: \"The word for work logs is logs.\" The `time` entry now ships \"Logs\". \"Work logs\" itself is untouched everywhere else it is said — the glossary term and every record's own tab (story/task/meeting/ticket detail) — because only the RAIL destination is under this law; a tab label is not a destination by this law's own definition.",
     why: "The rail is up to six slots wide on a phone before the icon even earns its keep, and a two-word label is the one shape that reliably wraps or truncates there (`app-shell.tsx`'s own comment measured it: `min-w-0` on a `flex-1` slot at 375px leaves about 59px). The client's example names the exact defect (\"Knowledge Base\" wrapping to two lines) and her own fix (\"reduce it to 'Knowledge'\"), so the law is her sentence read back as a check rather than a designer's inference from it. \"Work logs\" is the harder half on purpose: picking a silent replacement is exactly what her own standing rule (never ask her to choose from prose, but never choose FOR her either without asking) argues against, so the law's own text carries the four alternatives beside the provisional pick, the same place a future reader — or she herself — would look to change it, rather than a decision buried in a chat log RULES.md itself warns rots the moment nobody reads it there again.",
     checkId: "rail-labels-one-word",
     status: "enforced",
@@ -4783,11 +4783,18 @@ export const REF_AS_STRING_OK: RefAsString[] = [
 
 // ── source-scan (the law machinery's own guard) ─────────────────────────────
 
-/** WHO MAY STRIP A COMMENT BY HAND. Every entry here is a CSS case rather than
- * a TypeScript one: CSS's block-comment syntax has no line comment counterpart,
- * so running the TypeScript stripper over a token value would delete a `//`
- * that CSS reads as part of a URL. Everything else that used to do this has
- * been moved onto the shared `stripComments`. */
+/** WHO MAY STRIP A COMMENT BY HAND. Two shapes, both reasoned rather than
+ * assumed. Most entries are a CSS case: CSS's block-comment syntax has no
+ * line comment counterpart, so running the TypeScript stripper over a token
+ * value would delete a `//` that CSS reads as part of a URL. The newest
+ * entry (17 Sep 2026, kit v1.2.111) is a different shape — a VENDORED KIT
+ * `.mjs` RULE SCRIPT, meant to run standalone under plain `node` with no
+ * build step and no dependency on this app's own `shared/rules/strip-
+ * comments.mjs`, the same reason `scripts/*.mjs` used to re-type these
+ * regexes before 7 Sep 2026 (this file's own `source-scan.test.ts` header)
+ * — except a kit script may never import an APP module at all, so it cannot
+ * be pointed at the shared stripper the way an app script was. Everything
+ * else that used to do this has been moved onto the shared `stripComments`. */
 export const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
   "web/test/theme-tokens.test.ts":
     "strips a CSS comment out of a CSS custom property's VALUE, read from tokens.css. Not TypeScript: `//` is not a comment in CSS, it is the middle of a url(), so the shared stripper is the wrong tool here and would silently eat one",
@@ -4795,6 +4802,8 @@ export const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
     "the VENDORED KIT's token reader, and the same CSS case the entry above was written for: it walks `tokens.css`, where `//` is not a comment but the middle of a `url()`, so the shared TypeScript stripper is the wrong tool and would silently eat one. `shared/ui/` is a dependency this repo may not hand-edit at all — `web/test/vendored-kit.test.ts` recomputes its content hash — so this can only ever be fixed upstream, and a kit sync that moves it will turn this line red exactly as the last one did",
   "shared/ui/foundations/tokens/check-contrast.mjs":
     "the kit's contrast law, reading the same `tokens.css` through the same CSS rules as the reader above. It is the check that found three surfaces painting themselves onto themselves on 7-8 Sep 2026; it cannot import a TypeScript stripper from an app that vendors it, and the CSS case is not what that stripper is for",
+  "shared/ui/foundations/rules/check-overflow-axis.mjs":
+    "the kit's OWN overflow-axis law (17 Sep 2026, kit v1.2.111), scanning .tsx source for a class rather than a CSS token — not the CSS case the three entries above share. It declares its own `stripComments` (same name, same two regexes) because it is a standalone script the kit ships to run under plain `node`, the identical shape `scripts/*.mjs` used to take before 7 Sep 2026 — except a kit file may not import an app module at all (`shared/ui/` is a pinned dependency this repo may not hand-edit; `web/test/vendored-kit.test.ts` recomputes its content hash), so it can never be pointed at `shared/rules/strip-comments.mjs` the way an app script was. Fixable only upstream, in Kwapso/kwapso-ui-ux; a kit sync that moves or removes this file turns this line red exactly as the token-model.mjs one above did once",
 }
 
 /** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. `grep` classifies a
@@ -5261,17 +5270,19 @@ export const MANGO_OUTSIDE_TITLE_OK: Record<string, string> = {}
  * a place a click lands, and the client's ruling was about DESTINATIONS —
  * her own example ("Knowledge Base") and her one open question ("an
  * alternative for work logs") both named a destination, never a heading — so
- * whether the rule reaches "My work" too is genuinely undecided rather than
- * a breach quietly let through. All three groups sit here for now, not only
- * "My work" (the one that would actually fail the count): the reason is
- * "why a group is untouched", not "which ones need excusing", so the table
- * stays honest even for "Build" and "Accounts", which already read as one
- * word. Rot-checked against `NAV_GROUP_ORDER`: a key naming a group that no
- * longer exists has outlived its subject and fails too. */
+ * whether the rule reaches "My work" too is genuinely undecided at first,
+ * rather than a breach quietly let through — and then she answered it, the
+ * same day: *"No, the rail group heading can have two words."* (17 Sep
+ * 2026). All three groups sit here, not only "My work" (the one that would
+ * actually fail the count): the reason is "why a group is untouched", not
+ * "which ones need excusing", so the table stays honest even for "Build" and
+ * "Accounts", which already read as one word. Rot-checked against
+ * `NAV_GROUP_ORDER`: a key naming a group that no longer exists has
+ * outlived its subject and fails too. */
 export const RAIL_LABEL_WORDS_OK: Record<string, string> = {
-  "my-work": "groups are headings, not destinations; awaiting her word",
-  build: "groups are headings, not destinations; awaiting her word",
-  accounts: "groups are headings, not destinations; awaiting her word",
+  "my-work": "the client's ruling, 17 Sep 2026, verbatim: \"No, the rail group heading can have two words.\"",
+  build: "the client's ruling, 17 Sep 2026, verbatim: \"No, the rail group heading can have two words.\"",
+  accounts: "the client's ruling, 17 Sep 2026, verbatim: \"No, the rail group heading can have two words.\"",
 }
 
 // ── R86 (status-owns-the-chip) ──────────────────────────────────────────────
@@ -5297,4 +5308,14 @@ export const COLOURED_CHIP_OK: Record<string, string> = {
     "the task priority dot, `PRIORITY_DOT_TONE[level]` — priority, not status, and already ruled a colour on tasks " +
     "(K19a, \"Priority has its own four colours, never App Stage's\"), the one categorical field besides status " +
     "this app colours on purpose.",
+  "web/components/deep-link/shape.tsx#shapeAccountsList":
+    "an account's own live/archived state IS its status — the glossary's own words, \"an account has none [no " +
+    "status]: it is live, or it is archived\" — rewired 17 Sep 2026 (\"account active green dot\") off a filled " +
+    "success/secondary pill onto `variant=\"status\" dot={a.active ? \"shipped\" : \"archived\"}`. The census's " +
+    "own ALLOWED regex reads for the words status/stage/waiting in the resolved expression text and `a.active` " +
+    "spells none of them, even though the field it reads is exactly R86's subject.",
+  "web/components/deep-link/shape.tsx#shapeContactsTable":
+    "the identical status dot one function up (shapeAccountsList, same file), for a contact's own live/archived " +
+    "state — added 17 Sep 2026 (\"contact live green\"). Same reason: `a.active` is the record's STATUS and the " +
+    "census's word-in-the-expression regex has no way to read that from the variable's own name.",
 }

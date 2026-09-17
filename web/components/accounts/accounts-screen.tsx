@@ -578,6 +578,8 @@ export function AccountsScreen({
                     actions={visibleActions(tunedRecipe, rights, onAction)}
                     narrowedOutside={found.active}
                     onRowClick={(row) => onIntent({ kind: "open", module: "accounts", id: String(row.id) })}
+                    rowPath={(row) => `/t/${teamId}/accounts/${row.id}`}
+                    rowLabel={(row) => row.nameText}
                   />
                 ) : (
                   accountGalleryBody({

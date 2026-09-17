@@ -56,18 +56,40 @@ describe("the ticket's stage rail", () => {
   })
 
   it("stage-rail: dates come off the stage's OWN entry moment, through the shared seam", () => {
+    // AMENDED 17 Sep 2026 — the same-day "make it smaller" ruling (this
+    // file's own header, "AND THEN SMALLER") replaced the two-line
+    // `formatDate(span.from, lang)` + separate working-day caption with
+    // `formatStageMoment`, the one-line month/day/(year)/hour formatter
+    // built for this exact rung (shared/web/format.ts, beside `daysSince`).
+    // It still reads off `rung.span.from` — TicketStageSpan.from, the moment
+    // the ticket ENTERED the stage — never `span.to` (when it left) or the
+    // ticket's own `updatedAt` (when anything last changed): the field this
+    // test polices did not change, only the formatter reading it did.
     expect(
       source,
       `${RAIL} must format the moment the ticket ENTERED each stage — TicketStageSpan.from, a real ` +
         `help_status_events row. Never span.to (when it left) and never the ticket's updatedAt (when ` +
         `anything last changed): a stage wearing a date it did not happen on is worse than a stage wearing none`
-    ).toMatch(/formatDate\(\s*span\.from\s*,/)
+    ).toMatch(/formatStageMoment\(\s*rung\.span\.from\s*,/)
 
     expect(
       source,
-      `${RAIL} must take its date formatters from @shared/web/format — the one seam, in the reader's ` +
+      `${RAIL} must take its date formatter from @shared/web/format — the one seam, in the reader's ` +
         `own app language (dates-are-formatted)`
-    ).toMatch(/import\s*\{[^}]*\bformatDate\b[^}]*\}\s*from\s*"@shared\/web\/format"/)
+    ).toMatch(/import\s*\{[^}]*\bformatStageMoment\b[^}]*\}\s*from\s*"@shared\/web\/format"/)
+  })
+
+  it("stage-rail: no stage word is printed under a rung — the fill already says which stage it is", () => {
+    // AMENDED 17 Sep 2026, SAME RULING — "don't put the [stage word] here. We
+    // can see the colors." `stageLabel` (the function that used to write
+    // "New"/"Triaged"/"Scheduled"… under each rung) is gone outright, not
+    // merely unused/renamed.
+    expect(
+      source,
+      `${RAIL} must not define a stageLabel helper — the client ruled the printed stage word out ` +
+        `entirely ("don't put the [stage word] here. We can see the colors."), and the done/current/` +
+        `later fill is what says which stage a rung is now`
+    ).not.toMatch(/function\s+stageLabel\s*\(/)
   })
 
   it("stage-rail: the rail scrolls sideways in its own box, and the record does not", () => {

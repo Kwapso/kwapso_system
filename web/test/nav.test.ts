@@ -154,9 +154,11 @@ describe("the sidebar sequence the client fixed", () => {
     // also remove the tab from inside accounts", 31 Aug 2026), so both of the
     // client's own words now name a real page. INPUTS joined 15 Sep 2026
     // (Task C — "I would like to see this in the third section of the
-    // accounts section on the sidebar"), and TICKETS joined 17 Sep 2026
-    // ("put the tickets into Accounts after Contacts").
-    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts", "tickets", "inputs"])
+    // accounts section on the sidebar"), and TICKETS joined 17 Sep 2026,
+    // first after Contacts ("put the tickets into Accounts after Contacts"),
+    // then moved above it the same day, her later correction: "Move it under
+    // accounts, on top of contacts."
+    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "tickets", "contacts", "inputs"])
   })
 
   it("has exactly three named sections — Kwapso is not a fourth", () => {

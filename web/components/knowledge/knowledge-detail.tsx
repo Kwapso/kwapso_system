@@ -354,11 +354,13 @@ export function KnowledgeDetailScreen({
       collectionLabel={KNOWLEDGE_KIND[item.kind] ?? item.kind}
       chips={
         <>
-          {!item.active && (
-            <Badge variant="status" dot="archived">
-              {t("Not in use")}
-            </Badge>
-          )}
+          {/* CLIENT RULING, 17 Sep 2026, verbatim: "knowledge source in use
+              green dot." Used to draw nothing at all while a source was in
+              use — only "Not in use" had a chip. Both states carry one now:
+              green while in use, grey once not (unchanged). */}
+          <Badge variant="status" dot={item.active ? "shipped" : "archived"}>
+            {item.active ? t("In use") : t("Not in use")}
+          </Badge>
           {item.visibility === "private" && <Badge>{t("Private to you")}</Badge>}
           {item.visibility === "app" && <Badge>{item.visibleToAppName ?? t("Limited to one app")}</Badge>}
         </>

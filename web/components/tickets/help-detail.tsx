@@ -36,7 +36,6 @@ import {
   Translate,
   PencilSimple,
   CheckCircle,
-  MonitorPlay,
   Paperclip,
 } from "@shared/ui/foundations/icons"
 
@@ -59,12 +58,15 @@ function mentionableTeamMembers(
 import type {
   HelpMessage,
   HelpStakeholder,
+  HelpStatus,
   HelpTicket,
   SelectableValue,
   Story,
   TeamMember,
   WorkLogSummary,
 } from "@shared/types"
+import { helpStatusDotTone, storyStatusDotTone } from "@shared/status-tones"
+import { storyTypeIconName } from "@shared/story-types"
 // A VALUE, not a type — it must not ride the `import type` block above.
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import {
@@ -72,9 +74,8 @@ import {
   RecordScreen,
   type RecordAction,
 } from "@/components/records/record-chrome"
-import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
-import { formatRelative, formatDate, daysSince } from "@shared/web/format"
+import { formatRelative } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
@@ -91,18 +92,17 @@ import { Icon } from "@shared/web/screen-engine/icon"
 import { ResolveDialog, type ResolveFormValues } from "@/components/tickets/resolve-dialog"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
-import { StoriesPanel, sliceKey, STORY_STATUS_LABEL } from "@/components/work/work-panels"
+import { sliceKey, STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { TicketStages } from "@/components/tickets/ticket-stages"
 import { WorkLogsPanel } from "@/components/work/work-logs-panel"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
-import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { recordTimeSummaryKey, totalKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
 import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
-import { richTextPlain, safeHref } from "@shared/web/rich-text"
+import { richTextPlain } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import {
@@ -115,15 +115,54 @@ import {
 
 /** WHAT A RETIRED `?tab=` VALUE NOW SCROLLS TO. `conversation`/`overview`
  * have no panel of their own to jump past (the head IS the top of the
- * page); `overview`'s old facts live inside Stakeholders now (`overviewItems`
- * below), so it resolves there. `files` is handled separately, above this
- * table, because it opens the ⋯ menu's sheet rather than scrolling. */
+ * page); `overview` resolves to Stakeholders, the panel its facts used to
+ * sit under — the facts themselves are gone as of 17 Sep 2026 (see the note
+ * beside the panel's own JSX, below, for which of them now render nowhere on
+ * this page), but the SCROLL TARGET a stale link points at is still a real
+ * panel on the page, so it still resolves rather than landing on nothing.
+ * `files` is handled separately, above this table, because it opens the ⋯
+ * menu's sheet rather than scrolling. */
 const DEEP_LINK_TICKET_PANEL: Partial<Record<string, TicketPanelName>> = {
   conversation: "conversation",
   overview: "stakeholders",
   stories: "stories",
   time: "time",
   stakeholders: "stakeholders",
+}
+
+/** THE STATUS WORD FOR THE TITLE'S OWN CHIP — client ruling, 17 Sep 2026,
+ * verbatim: "Add the status chip with the color after the ID on the title."
+ * (Read beside R86, the SAME day's ruling: "the one that gets the chip with
+ * the color is always the status.")
+ *
+ * SIX LITERAL WORDS, KEYED BY DATABASE VALUES — the identical shape
+ * `ticket-stages.tsx`'s own retired `stageLabel` used and for the same
+ * reason its comment gave: the app's other status map (`HELP_STATUS`,
+ * web/components/deep-link/shape.tsx) is keyed by DATABASE words, so
+ * `t(HELP_STATUS[s])` would look up keys the catalogue does not hold.
+ *
+ * NO NEW TRANSLATION DEBT — every one of these six sentences is already in
+ * the catalogue: `ticket-stages.tsx` asks the identical `t("New")`,
+ * `t("Triaged")`, `t("Scheduled")`, `t("In progress")`, `t("Ready")`,
+ * `t("Resolved")` for its own rungs. R28 tracks the STRING, not the call
+ * site, so a second position asking for a sentence that already exists adds
+ * nothing to R44's ceiling — only R33's "every position sits inside a
+ * `t(...)` call" applies here, and it does. */
+function helpStatusLabel(status: HelpStatus, t: (s: string) => string): string {
+  switch (status) {
+    case "new":
+      return t("New")
+    case "triaged":
+      return t("Triaged")
+    case "scheduled":
+      return t("Scheduled")
+    case "in_progress":
+      return t("In progress")
+    case "ready":
+      return t("Ready")
+    case "resolved":
+      return t("Resolved")
+  }
 }
 
 export function HelpDetailScreen({
@@ -263,11 +302,15 @@ export function HelpDetailScreen({
   // THE FILES SHEET — B19's own pattern, one slide-in reached from the ⋯ menu
   // (`overflow` below), since Files left the tab strip with everything else.
   const [filesOpen, setFilesOpen] = React.useState(false)
-  // THE FULL "Related stories" LIST, BEHIND "Show all" — the compact preview
-  // on the page is capped (see `storiesRows` below); this is the same
-  // `<StoriesPanel>` the old tab drew, unchanged, opened in a slide-in
-  // rather than switched to.
-  const [storiesSheetOpen, setStoriesSheetOpen] = React.useState(false)
+  /* `storiesSheetOpen` STOOD HERE — the flag that opened the FULL
+   * `<StoriesPanel>` behind a "Show all" link, because the on-page preview
+   * was capped. CLIENT RULING, 17 Sep 2026, reading the deployed page back:
+   * "Remove 'Show All' because you need to show them all." The preview is
+   * uncapped now (`storiesPreviewQ`, below, rendered whole rather than
+   * sliced) and there is no separate sheet left to open — the "New story"
+   * action that lived inside that sheet (`<StoriesPanel>`'s own `onNew`)
+   * moved to a plain button on the panel's own title row instead, still
+   * opening the SAME `<StoryFormDialog>` below (`storyOpen`). */
   // NEW WORK AGAINST THIS REQUEST — and this is NOT "make it a story".
   //
   // CHECKLIST 3.10 took away three controls that CONVERTED a request into a
@@ -297,18 +340,21 @@ export function HelpDetailScreen({
   // on the record rather than a field on it. Its exact total titles the panel
   // (R16) — the same seam the old tab's badge read.
   const storiesTotal = useCachedValue<number | null>(totalKey("stories-ticket", helpId))
-  // THE COMPACT PREVIEW, CAPPED. V1's own words: "the existing PagedPanelBody/
-  // CollectionCard list, capped to the first N with a 'Show all' link" — so
-  // the on-page panel reads the SAME resting list `<StoriesPanel>` (behind
-  // "Show all", below) keys its own cache on, sliced to the first few, rather
-  // than a second fetch of its own. `sliceKey`/`totalKey` are the exact pair
-  // `StoriesPanel` primes, so whichever mounts first pays the one request.
+  // EVERY RELATED STORY, UNCAPPED. V1 shipped this "capped to the first N
+  // with a 'Show all' link"; CLIENT RULING, 17 Sep 2026, reading the deployed
+  // page back, verbatim: "In the section 'Related Stories' … Remove 'Show
+  // All' because you need to show them all." So the cap and the sheet behind
+  // "Show all" are both gone — the panel now renders the WHOLE of
+  // `storiesPreviewQ.data`, below — but the READ is unchanged: this is still
+  // the one bounded, PAGED read (R14) `<StoriesPanel>` itself would key its
+  // own cache on (`sliceKey`/`totalKey` are the exact pair it primes), so
+  // showing every row costs no second door call and no unbounded list — the
+  // bound is the door's own page size, not a client-side slice on top of it.
   //
   // GATED ON `have`, THE SAME DETERMINISTIC GATE `workSummaryQ` USES ABOVE —
   // this panel needs the record anyway, so it costs nothing on the cold path
   // (`web/test/cold-screen-hops.test.tsx`) and everything once the record is
   // actually on screen.
-  const STORIES_PREVIEW_CAP = 5
   const storiesPreviewQ = useCached<Story[]>(have ? sliceKey("stories-ticket", helpId) : null, () =>
     content.stories({ ticketId: helpId, view: "all" }).then((r) => {
       primeCache(totalKey("stories-ticket", helpId), r.total)
@@ -686,100 +732,31 @@ export function HelpDetailScreen({
     aiDrafted: r.isAgent,
   }))
 
-  // Through the one seam, so a `javascript:` address stored by anything that can
-  // write this column can never become an href (shared/web/rich-text).
-  const recordingHref = safeHref(ticket.screenRecordingLink)
-
-  const overviewItems = [
-    { label: t("Type"), value: ticket.helpType || "General" },
-    // WHICH SYSTEM, AND WHO ASKED (CHECKLIST 5.8 + 5.9). "Who asked" is not "who
-    // typed": most of a client's history is written down on their behalf, so the
-    // contact and the audit line below are two different people more often than
-    // they are one.
-    { label: t("App"), value: ticket.appName || "" },
-    { label: t("Raised by"), value: ticket.raisedByContactName || "" },
-    // "RAISED ON", UNDER "RAISED BY" — client ruling, 17 Sep 2026, verbatim:
-    // "Remove the 'Raised On' chip from the QE view, but also from the
-    // detail page in the QE view. Add it under 'Raised By' as 'Raised On'
-    // and put the date and, in brackets, how many days ago." The date chip
-    // this replaces lived in `TicketChips`/`TriageChips`
-    // (shared/web/ticket-chips.tsx), retired the same day; the fact moves
-    // here rather than disappearing. `daysSince` (shared/web/format.ts) is a
-    // WHOLE day count, never `formatRelative`'s tiered "5m ago"/"3h ago"
-    // ladder — a fact row states an exact number, it does not narrate
-    // recency. One sentence, two holes, so a translator can reorder the
-    // date and the count (`{date} ({count} days ago)`, shared/i18n-seed.ts).
-    {
-      label: t("Raised on"),
-      value: t("{date} ({count} days ago)", {
-        date: formatDate(ticket.createdAt, lang),
-        count: daysSince(ticket.createdAt) ?? 0,
-      }),
-    },
-    // BOTH TITLES, and the German one first when it is the original. 788 of the
-    // requests arriving from the previous system exist ONLY in German (BUILD-1
-    // §8), so "the title" is two fields here and the screen says so rather than
-    // picking one and hoping.
-    { label: t("Title"), value: ticket.titleDe || "" },
-    { label: t("Title (English)"), value: ticket.titleEn || "" },
-    { label: t("Raised from"), value: ticket.sourceScreen || "" },
-    // THE RECORDING SOMEBODY ATTACHED TO THE REQUEST, and the row that made this
-    // whole lane worth running. `help.screen_recording_link` has been settable
-    // since the ticket door shipped — the assistant offers it on `create_help_ticket`
-    // and `update_help_ticket`, `optionalText` validates it, the INSERT stores it,
-    // `TICKET_COLS` selects it and `screenRecordingLink` is on the Ticket type —
-    // and no screen on either front door read it back. So a person could hand the
-    // assistant a Loom link, read "Screen recording: …" on the confirm panel,
-    // press yes, and never see it again. Its sibling `sourceScreen` is the row
-    // directly above; the two are written by the same door, one line apart.
-    //
-    // A LINK, NOT A STRING. What is stored is an address, so it reaches the
-    // person as something they can open — through `safeHref`, like every other
-    // address on a screen in this app (task-detail, staff-panel, the two
-    // attachment panels). A row that printed the URL as text would be the same
-    // dead end wearing a longer word.
-    //
-    // BLANK RATHER THAN ABSENT when there is no recording, which is this
-    // screen's own convention (see `sourceScreen` above and the note in
-    // selectable-detail.tsx): the record's shape stays the same whichever
-    // ticket you open. Zero of the 2,051 tickets on staging carry one today —
-    // most requests arrive with an attachment instead (CHECKLIST 5.10) — so
-    // this row is blank on every ticket in the system until somebody fills it,
-    // which is exactly the state a dead end should leave behind.
-    {
-      label: t("Screen recording"),
-      value: recordingHref ? (
-        <a
-          href={recordingHref}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
-        >
-          <MonitorPlay className="size-4 shrink-0" />
-          <span className="min-w-0 truncate">{t("Open the recording")}</span>
-        </a>
-      ) : (
-        ""
-      ),
-    },
-    // The audit rows are NOT here any more: created-by and last-edited-by moved
-    // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
-    // stop pushing the ticket's own facts below the fold.
-    //
-    // THE STATUS ROW USED TO SAY "the status is on the header band's own
-    // line" — true while the header's chips were status/app/archived. Client
-    // ruling, 2026-09-06 (see `RecordScreen`'s own `chips` comment above):
-    // those three are gone, replaced by the same four-fact line the triage
-    // card draws (ID/type/app/date), and status is not one of the four. So as
-    // of this pass the ticket's STAGE is not shown anywhere on this screen —
-    // written down rather than discovered later, because the old comment
-    // would otherwise keep telling the next reader a true sentence about a
-    // screen that no longer exists. Not re-added here on judgement: the
-    // client asked for exactly four facts and nothing else, and where the
-    // status goes next (back here as a row, or somewhere else) is hers to
-    // decide, not a default this screen should reintroduce quietly.
-    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t, lang) : "" },
-  ]
+  /* `overviewItems`/`<OverviewList>` STOOD HERE — the fact rows below the
+   * Stakeholders panel's own pills (Type, App, Raised by, Raised on, Title,
+   * Title (English), Raised from, Screen recording, Resolved). CLIENT
+   * RULING, 17 Sep 2026, reading the deployed V1 page back, verbatim: "Remove
+   * all of this from stakeholders '… Type Issue App Kwapso System Raised by
+   * Max Mustermann Raised on Sep 16, 2026 (1 days ago) Title Title (English)
+   * Ticket and story titles Raised from Screen recording Resolved'." REMOVED,
+   * not re-homed — read this note before assuming a fact moved somewhere.
+   *
+   *   · TYPE and APP still show, unchanged, as the header's own chips
+   *     (`TicketChips`, above) — nothing lost.
+   *   · RESOLVED still shows, when the door has a recorded span for it, as
+   *     the "resolved" rung's own date on the stage ladder (`<TicketStages>`,
+   *     `headerExtra` below) — the same underlying moment, a different seam.
+   *   · RAISED BY, RAISED ON, RAISED FROM and the TITLE TRANSLATION (the
+   *     ticket's OTHER title — titleDe when the head shows titleEn, or vice
+   *     versa, whichever `ticketTitle` did not pick) NOW RENDER NOWHERE ON
+   *     THIS PAGE. Flagged here rather than silently dropped so it is a
+   *     decision the client makes, not one this screen made for her.
+   *   · SCREEN RECORDING (the `screenRecordingLink` a person can attach to a
+   *     request) also renders nowhere now — it was not named in her quote
+   *     above, and it is worth saying anyway: it was the one row on this
+   *     list with a real control (an "Open the recording" link), not only
+   *     text, and it is now unreachable rather than merely unlabelled.
+   */
 
 
   /* THE TAB STRIP IS GONE — CLIENT RULING, 17 SEP 2026, VERBATIM: "I want to
@@ -797,14 +774,17 @@ export function HelpDetailScreen({
      for a bespoke detail with no strip). Every panel it named is still
      drawn; none of it was deleted, only re-homed:
        · Conversation  → `TicketConversationPanel`, below, in the body.
-       · Overview      → folded into `overviewItems` (above), now rendered
-                          inside the Stakeholders panel — she named five
-                          things, not six, and Overview was never one of
-                          them; its facts are not stranded (R40's own
-                          argument, read for a fact list rather than a file).
-       · Related stories → a capped preview (`storiesPreviewQ`, above) with
-                          a "Show all" opening the SAME `<StoriesPanel>` this
-                          tab used to draw, now in a slide-in.
+       · Overview      → folded into a fact list inside the Stakeholders
+                          panel — she named five things, not six, and
+                          Overview was never one of them. THAT FACT LIST WAS
+                          ITSELF REMOVED ON 17 SEP 2026, reading the deployed
+                          page back: see the note beside the Stakeholders
+                          panel's own JSX, below, for which facts now render
+                          nowhere on this page.
+       · Related stories → every related story, uncapped, in the panel
+                          itself (17 Sep 2026: "Remove 'Show All' because you
+                          need to show them all" — see `storiesPreviewQ`'s
+                          own comment, above).
        · Work logs     → `<WorkLogsPanel>`, unchanged, inside its own panel.
        · Files and links → B19's own pattern: the ⋯ menu (`overflow`,
                           below), opened as a sheet.
@@ -873,16 +853,12 @@ export function HelpDetailScreen({
           },
         ]
       : []),
-    ...(canEdit
-      ? [
-          {
-            key: "edit",
-            label: t("Edit"),
-            icon: <PencilSimple className="size-3.5" />,
-            onSelect: () => setEditing(true),
-          },
-        ]
-      : []),
+    // EDIT LEFT THE MENU, 17 Sep 2026 — client ruling, reading the deployed
+    // page: "The edit button: put it outside, just the pen." It is now the
+    // standalone `PencilSimple` icon button in the title's own actions row
+    // (`actions`, below), beside Close/the timer/the ⋯ trigger — never inside
+    // it. Nothing else moved: Translate, Files and links and Archive/Restore
+    // are still exactly where they were.
     // FILES AND LINKS — B19's own pattern, the ⋯ menu opening the panel as a
     // sheet, "the way other records do." Left the tab strip with everything
     // else the strip used to hold; unconditional, exactly as the tab was —
@@ -979,6 +955,31 @@ export function HelpDetailScreen({
         canLog={canLogTime}
         disabled={ticket.status === "resolved"}
       />
+      {/* EDIT, STANDALONE — client ruling, 17 Sep 2026, verbatim: "The edit
+          button: put it outside, just the pen." It left the ⋯ menu (see
+          `overflow`'s own comment above) for an icon-only button right here,
+          in the title's actions row, opening the same edit sheet the menu
+          item used to. `PencilSimple` is the kit's own edit glyph
+          (CLAUDE.md's action-icon mapping); `aria-label` carries the word a
+          screen reader needs since an icon-only control draws no text of its
+          own.
+
+          NOT MANGO. `canClose` above already claims the one primary/mango
+          slot this title row is allowed (R84, B1 — "at most one primary and
+          one secondary"); `variant="inverse"` is the kit's own black fill,
+          the same one every other title-row control that is not the primary
+          action wears. */}
+      {canEdit && (
+        <Button
+          variant="inverse"
+          size="icon"
+          onClick={() => setEditing(true)}
+          aria-label={t("Edit")}
+          className="shrink-0"
+        >
+          <PencilSimple aria-hidden="true" focusable="false" />
+        </Button>
+      )}
       <RecordActionsMenu actions={overflow} />
     </>
   )
@@ -1031,6 +1032,17 @@ export function HelpDetailScreen({
       chips={
         <TicketChips
           ticket={ticket}
+          // THE STATUS CHIP, AFTER THE ID — client ruling, 17 Sep 2026:
+          // "Add the status chip with the color after the ID on the title."
+          // `Badge variant="status" dot={helpStatusDotTone(ticket.status)}`
+          // is the app's one status-chip shape (R86, `status-owns-the-chip`)
+          // — the colour lives in the dot, never the fill, and this is the
+          // only categorical field on this row that may be coloured at all.
+          statusDot={
+            <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
+              {helpStatusLabel(ticket.status, t)}
+            </Badge>
+          }
           // THE SAME ICON THE TYPE PICKER DRAWS, from the same map — see
           // `shared/web/ticket-chips.tsx`'s header for why this is a prop
           // rather than an import.
@@ -1063,9 +1075,13 @@ export function HelpDetailScreen({
       // component of headers!" Overrides the D5 trim above, which had kept
       // `raisedByContactName` here reasoning it wasn't shown anywhere else —
       // that reasoning no longer matters (the client's ruling drops the
-      // information regardless of duplication), and in any case "Raised by"
-      // is already a row in the Stakeholders panel's own facts (this
-      // screen's `overviewItems`), so nothing is lost. `RecordChrome`'s `meta` slot
+      // information regardless of duplication). "Raised by" WAS also a row
+      // in the Stakeholders panel's own fact list at the time this comment
+      // was written; that fact list was itself removed on 17 Sep 2026 (see
+      // the note beside the panel's own JSX, below), so "Raised by" is now
+      // absent from BOTH places rather than merely not duplicated —
+      // deliberately, on the client's own ruling, not a regression this
+      // comment failed to notice. `RecordChrome`'s `meta` slot
       // (record-chrome.tsx's `status` prop, confirmed via the kit's own
       // `data-record-region="header"` block) renders directly under the
       // chips row, which is exactly the region the ruling forbids — so
@@ -1253,25 +1269,30 @@ export function HelpDetailScreen({
           />
         }
         stories={
+          // EVERY ROW, NO "Show all" — client ruling, 17 Sep 2026, verbatim:
+          // "In the section 'Related Stories' … Remove 'Show All' because
+          // you need to show them all." No `action` slot any more — there is
+          // nothing left behind a link to open. Writing a NEW story against
+          // this ticket still has its own door (`storyOpen`/
+          // `<StoryFormDialog>`, below); it used to live inside the sheet
+          // "Show all" opened (`<StoriesPanel>`'s own `onNew`) and now sits
+          // as a plain button on this panel's title row instead.
           <TicketSidePanel
             title={t("Related stories")}
             count={formatCount(storiesTotal)}
             action={
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto shrink-0 p-0 text-xs"
-                onClick={() => setStoriesSheetOpen(true)}
-              >
-                {t("Show all")}
-              </Button>
+              canWriteWork ? (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto shrink-0 p-0 text-xs"
+                  onClick={() => setStoryOpen(true)}
+                >
+                  {t("New story")}
+                </Button>
+              ) : undefined
             }
           >
-            {/* THE CAPPED PREVIEW. Every full search/sort/paging control this
-                collection can offer is one press away — "Show all", above —
-                so this list stays what V1 asked for: the first few, and a
-                door to the rest. The FULL `<StoriesPanel>` (unchanged, the
-                same one the old tab drew) is what that door opens, below. */}
             {storiesPreviewQ.data === undefined ? (
               <Skeleton variant="list" lines={2} />
             ) : storiesPreviewQ.data.length === 0 ? (
@@ -1280,20 +1301,36 @@ export function HelpDetailScreen({
               </p>
             ) : (
               <ul className="flex min-w-0 flex-col gap-2">
-                {storiesPreviewQ.data.slice(0, STORIES_PREVIEW_CAP).map((s) => (
-                  <li key={s.id} className="flex min-w-0 flex-wrap items-center gap-2">
-                    <RecordRef value={s.ref} />
-                    <InAppLink
-                      href={`${host.base}/stories/${s.id}`}
-                      className="min-w-0 flex-1 basis-[12rem] truncate text-sm"
-                    >
-                      {s.title}
-                    </InAppLink>
-                    <Badge variant="secondary" className="shrink-0 text-badge">
-                      {t(STORY_STATUS_LABEL[s.status])}
-                    </Badge>
-                  </li>
-                ))}
+                {storiesPreviewQ.data.map((s) => {
+                  // THE STORY TYPE, AS A CHIP WITH ITS ICON (K26) — the same
+                  // closed, five-entry glyph map every other story surface
+                  // reads (`storyTypeIconName`, @shared/story-types), never a
+                  // colour: R86 reserves the one coloured chip for STATUS.
+                  const typeIconName = storyTypeIconName(s.storyType)
+                  return (
+                    <li key={s.id} className="flex min-w-0 flex-wrap items-center gap-2">
+                      <RecordRef value={s.ref} />
+                      <InAppLink
+                        href={`${host.base}/stories/${s.id}`}
+                        className="min-w-0 flex-1 basis-[12rem] truncate text-sm"
+                      >
+                        {s.title}
+                      </InAppLink>
+                      <Badge variant="secondary" size="pill" className="shrink-0">
+                        {typeIconName ? (
+                          <Icon name={typeIconName} className="size-3.5 shrink-0" />
+                        ) : null}
+                        {s.storyType ?? "—"}
+                      </Badge>
+                      {/* THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot,
+                          never a fill: `variant="status" dot={…}` is the
+                          app's one status-chip shape. */}
+                      <Badge variant="status" dot={storyStatusDotTone(s.status)} className="shrink-0">
+                        {t(STORY_STATUS_LABEL[s.status])}
+                      </Badge>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </TicketSidePanel>
@@ -1317,45 +1354,27 @@ export function HelpDetailScreen({
           ) : null
         }
         stakeholders={
+          // FACES + NAMES ONLY — client ruling, 17 Sep 2026, reading the
+          // deployed V1 page back (help-stakeholders.tsx's own header carries
+          // the verbatim quote). The picker moved into the edit sheet
+          // (`<HelpFormDialog>`'s own `stakeholders`/`loopMembers`/
+          // `onAddStakeholder` props, below); the fact list that used to sit
+          // under the pills (`overviewItems`, above) is REMOVED, not
+          // re-homed — see that comment's own header for which of its facts
+          // now render nowhere else on this page.
           <TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>
-            <HelpStakeholders
-              stakeholders={stakeholdersQ.data ?? []}
-              members={assignableMembers(membersQ.data)}
-              canAdd={can("help", "read")}
-              onAdd={addStakeholder}
-            />
-            {/* THE OVERVIEW TAB'S OWN FACTS, BELOW THE PILLS — V1 named
-                "Raised by / Raised on" explicitly ("the facts … below them");
-                the rest of the record's own fields (type, app, both titles,
-                where it came from, the resolved date) were never a named
-                panel of their own and are folded in beside them rather than
-                dropped — the same list `OverviewList` always rendered, only
-                re-homed off a retired tab. */}
-            <OverviewList items={overviewItems} />
+            <HelpStakeholders stakeholders={stakeholdersQ.data ?? []} />
           </TicketSidePanel>
         }
       />
 
-      {/* THE FULL RELATED-STORIES LIST, BEHIND "Show all" — the same
-          `<StoriesPanel>` the old Related stories tab drew, unchanged, now a
-          slide-in rather than a tab (R59's own shape for anything that was
-          reached by a click and is not a yes/no warning). */}
-      <EdgePanel
-        open={storiesSheetOpen}
-        onClose={() => setStoriesSheetOpen(false)}
-        title={t("Related stories")}
-        closeLabel={t("Close")}
-      >
-        <StoriesPanel
-          marks={markMap(selectableQ.data, MARK_GROUP.story)}
-          ownerKind="ticket"
-          ownerId={helpId}
-          filter={{ ticketId: helpId }}
-          host={host}
-          onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
-          emptyText={t("No work written down against this ticket yet.")}
-        />
-      </EdgePanel>
+      {/* THE FULL RELATED-STORIES SLIDE-IN, BEHIND "Show all", STOOD HERE —
+          `<StoriesPanel>`'s own EdgePanel. CLIENT RULING, 17 Sep 2026: "Remove
+          'Show All' because you need to show them all." The panel on the page
+          now renders every row itself (`stories`, above), so there is no
+          second, fuller list behind a click any more — and "New story" moved
+          onto that panel's own title row, still opening the identical
+          `<StoryFormDialog>` below (`storyOpen`). */}
 
       {/* FILES AND LINKS, BEHIND THE ⋯ MENU — B19's own pattern, "the way
           other records do": a sheet, not a tab. `help:EDIT` since the door
@@ -1451,6 +1470,16 @@ export function HelpDetailScreen({
         onSubmit={editTicket}
         helpId={helpId}
         canAttach={canEdit}
+        // WHO TO KEEP IN THE LOOP — moved here from the page's own
+        // Stakeholders panel (client ruling, 17 Sep 2026; see
+        // `help-stakeholders.tsx`'s own header and `loopField`'s comment in
+        // help-form-dialog.tsx for the quote and the R81 reasoning). Same
+        // data, same door (`addStakeholder`), the page never called it
+        // through this form's own `onSubmit`.
+        stakeholders={stakeholdersQ.data ?? []}
+        loopMembers={assignableMembers(membersQ.data)}
+        canAddToLoop={can("help", "read")}
+        onAddStakeholder={addStakeholder}
       />
 
       {archiveDialog}

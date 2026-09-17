@@ -86,6 +86,7 @@ import {
 } from "@shared/ui/components/table/table"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
+import { rowOpenHandlers } from "@/lib/row-open"
 
 export type TableRowData = Record<string, unknown>
 
@@ -325,6 +326,8 @@ export function RecordTable<T extends TableRowData>({
   order,
   actions = [],
   onRowClick,
+  rowPath,
+  rowLabel,
   refColumn,
   className,
   useKitPanel,
@@ -343,6 +346,27 @@ export function RecordTable<T extends TableRowData>({
   order?: CollectionOrder
   actions?: TableAction<T>[]
   onRowClick?: (row: T) => void
+  /** THE ROW'S OWN ADDRESS — the same `/t/<teamId>/<module>/<id>` (or,
+   * top-level, `/<module>/<id>`) form the record's own `<InAppLink>` would
+   * carry, computed by the caller because only it knows the module (and, for
+   * a row like a Contact that opens at a DIFFERENT record's address, the
+   * substitution — `onIntent`'s own "a contact opens at its account address"
+   * note, `deep-link-screen.tsx`).
+   *
+   * PRESENT + `onRowClick` TOGETHER is what turns a cmd/ctrl-click or a
+   * middle-click into "open beside" (`rowOpenHandlers`, web/lib/row-open.ts) —
+   * the same gesture `TicketRowsTable` teaches its own row. ABSENT keeps this
+   * component's older, narrower contract (`onRowClick` alone, a plain click
+   * only) exactly as it behaved before this existed, which is what
+   * `module-automations.tsx`'s row — editing a setting inline, never opening a
+   * record — still gets. */
+  rowPath?: (row: T) => string
+  /** THE TAB'S OWN LABEL, for a beside-open. Absent falls back to the address
+   * itself — `InAppLink`'s own `beside_label` keeps the identical fallback for
+   * the identical reason: not every row's plain name is cheaply in reach at
+   * this layer, and a tab titled by its own path is corrected the next time
+   * it is actually visited, exactly as a stale ancestor crumb is. */
+  rowLabel?: (row: T) => string
   className?: string
   /** Forwarded straight to `CollectionFrame` — see its own doc. A table is a
    * `renderItems` callback same as a list's; the toolbar/panel/create-button
@@ -475,12 +499,27 @@ export function RecordTable<T extends TableRowData>({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {page.map((row, i) => (
+              {page.map((row, i) => {
+                // A CMD/CTRL-CLICK OR A MIDDLE-CLICK MEANS "OPEN BESIDE" —
+                // the same gesture `TicketRowsTable`'s own row teaches, and
+                // through the same seam (`rowOpenHandlers`, web/lib/row-open.ts)
+                // — only when the caller handed over the row's own address
+                // (`rowPath`'s own doc, above). Without it this keeps its
+                // older, narrower contract: `onRowClick` alone, a plain click
+                // only.
+                const handlers =
+                  onRowClick && rowPath
+                    ? rowOpenHandlers(rowPath(row), rowLabel ? rowLabel(row) : rowPath(row), () =>
+                        onRowClick(row)
+                      )
+                    : null
+                return (
                 <TableRow
                   key={String(row.id ?? i)}
                   role={onRowClick ? "button" : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onClick={handlers ? handlers.onClick : onRowClick ? () => onRowClick(row) : undefined}
+                  onAuxClick={handlers ? handlers.onAuxClick : undefined}
                   onKeyDown={
                     onRowClick
                       ? (e) => {
@@ -537,7 +576,8 @@ export function RecordTable<T extends TableRowData>({
                     </TableCell>
                   )}
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         )

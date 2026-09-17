@@ -15,6 +15,15 @@
 // the workspace tab trails already stored — no hand-off to the assistant, an
 // icon-only trigger rather than a worded "Search" button.
 //
+// THE THIRD, 17 Sep 2026, verbatim: "remove the quick access to tickets,
+// accounts, stories, and so on. It's not needed. Just put the recently
+// opened because, with the quick access, I already have them in the
+// navigation bar." So the scope-chip row the second ruling asked for is
+// GONE — the search bar and the Recently opened list are what is left.
+// `MODULES` stays: it is still the six-door fan-out `searchModule` asks
+// (and the group label over each door's own results once a query is
+// typed), it just no longer draws a row of its own to narrow by.
+//
 // SO THE PLACEHOLDER LINE THE FIRST RULING ASKED FOR IS GONE — superseded,
 // not forgotten (git history carries it). This is the search page it was
 // standing in for.
@@ -51,7 +60,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
@@ -77,8 +85,13 @@ const MODULES: readonly { key: ModuleKey; title: string }[] = [
   { key: "stories", title: "Stories" },
   { key: "apps", title: "Apps" },
   { key: "contacts", title: "Contacts" },
-  { key: "knowledge", title: "Knowledge base" },
+  { key: "knowledge", title: "Knowledge" },
 ]
+
+/** Every door's own key, precomputed once — `MODULES` is a module-level
+ * constant, so this array is the same reference every render, and search
+ * always fans out across all six now that the scope-chip row is gone. */
+const MODULE_KEYS: readonly ModuleKey[] = MODULES.map((m) => m.key)
 
 /** A DISPLAY cap (R14's own distinction: this bounds what ONE quick-search
  * box shows, never a claim about a collection's real size — a real page of
@@ -204,7 +217,6 @@ function recentSteps(): RecentRow[] {
 export function NewTabScreen() {
   const t = useT()
   const [q, setQ] = React.useState("")
-  const [scope, setScope] = React.useState<ReadonlySet<ModuleKey>>(() => new Set())
   const [results, setResults] = React.useState<Record<ModuleKey, ResultRow[]>>(EMPTY_RESULTS)
   const [searching, setSearching] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -221,8 +233,6 @@ export function NewTabScreen() {
   React.useEffect(() => {
     inputRef.current?.focus()
   }, [])
-
-  const activeModules = scope.size > 0 ? MODULES.filter((m) => scope.has(m.key)) : MODULES
 
   const runSearch = useDebouncedCallback((query: string, modules: readonly ModuleKey[]) => {
     const trimmed = query.trim()
@@ -249,23 +259,14 @@ export function NewTabScreen() {
       })
   }, 250)
 
-  function toggleModule(key: ModuleKey) {
-    setScope((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
   React.useEffect(() => {
-    runSearch(q, activeModules.map((m) => m.key))
-    // `runSearch` is stable across renders (`useDebouncedCallback`); `activeModules`
-    // is a fresh array every render, so its own KEYS are the real dependency.
+    runSearch(q, MODULE_KEYS)
+    // `runSearch` is stable across renders (`useDebouncedCallback`), the one
+    // real dependency this omits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, scope])
+  }, [q])
 
-  const flatResults = activeModules.flatMap((m) => results[m.key])
+  const flatResults = MODULES.flatMap((m) => results[m.key])
   const hasQuery = q.trim().length > 0
   const hasResults = flatResults.length > 0
 
@@ -317,27 +318,10 @@ export function NewTabScreen() {
             </Button>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-[var(--space-2)]">
-            {MODULES.map((m) => {
-              const selected = scope.has(m.key)
-              return (
-                <button
-                  key={m.key}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => toggleModule(m.key)}
-                >
-                  <Badge variant={selected ? "inverse" : "secondary"}>{t(m.title)}</Badge>
-                </button>
-              )
-            })}
-          </div>
-
           {hasQuery ? (
             <div className="flex w-full max-w-[640px] flex-col gap-[var(--space-4)] text-left">
               {hasResults
-                ? activeModules
-                    .filter((m) => results[m.key].length > 0)
+                ? MODULES.filter((m) => results[m.key].length > 0)
                     .map((m) => (
                       <div key={m.key} className="flex flex-col gap-[var(--space-1h)]">
                         <Text size="caption" tone="tertiary">

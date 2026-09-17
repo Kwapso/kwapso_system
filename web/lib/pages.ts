@@ -385,11 +385,12 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //   [was] occasional  Meetings · Apps · Sprints · Brand library · Settings
   //
   // The new sequence, this list's real order (titles as of R85, 17 Sep 2026 —
-  // "Knowledge base" → "Knowledge", "Work logs" → "Hours" provisionally; see
-  // the note beside `knowledge` and `time` below):
-  //   My work   Tasks · Meetings · Knowledge · Tickets · Hours
+  // "Knowledge base" → "Knowledge", "Work logs" → "Logs" (her pick, after
+  // "Hours" shipped provisionally); see the note beside `knowledge` and `time`
+  // below):
+  //   My work   Tasks · Meetings · Knowledge · Logs
   //   Build     Waves · Apps · Stories
-  //   Accounts  Accounts · Contacts
+  //   Accounts  Accounts · Tickets · Contacts · Inputs
   //   (none)    Home, Kwapso — see NAV in this file
   //
   // BUILD LOST A ROW AND REORDERED, 15 SEP 2026 (client ruling, verbatim in
@@ -427,18 +428,42 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // fetched, not a new capability. Its count key is the SAME exact server total
   // the old Companies/Contacts/All strip badged (`accounts-individual`),
   // primed by the one `listFetch.accounts` read either page already makes.
-  { key: "contacts", title: "Contacts", module: "contacts", segment: "contacts", placement: "sidebar", countCacheKey: "accounts-individual", group: "accounts" },
   // Tickets is the one place in this table where the URL segment is NOT the
   // permission module. The section, the page and the address bar say `tickets`,
   // because that is the word for the thing (glossary, SCOPE ch.02). The right the
   // server enforces is still `help`: it is the string sitting in every role's
   // permission sheet, in every team database, and renaming it would be a data
   // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
-  // in lib/screens.ts is the one seam that translates between the two. Moved to
-  // the Accounts group after Contacts, per client ruling, 17 Sep 2026.
+  // in lib/screens.ts is the one seam that translates between the two.
+  //
+  // ORDER, CORRECTED THE SAME DAY. It first joined the Accounts group AFTER
+  // Contacts, on an earlier ruling the same session ("put the tickets into
+  // Accounts after Contacts") — then the client ruled again, 17 Sep 2026,
+  // verbatim: "Move it under accounts, on top of contacts." That is this row's
+  // real position now: Accounts, Tickets, Contacts, Inputs.
   { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "accounts" },
-  // INPUTS — third in the Accounts group, the client's own placement
-  // ("the third section of the accounts section on the sidebar"). Same
+  // CONTACTS — every person linked into the customer spine, across every
+  // account, promoted to a real sidebar page (client, 31 Aug 2026: "contacts as
+  // a real sidebar page, also remove the tab from inside accounts" — see the
+  // note this entry replaces, below the old two-bucket history a few lines
+  // down). It was a tab on ONE account's own record (`account-detail.tsx`,
+  // `contacts:read`) until now; that tab is gone, and an account's Overview
+  // carries the same add/link/remove controls for ITS OWN people instead (see
+  // account-detail.tsx's own note on why).
+  //
+  // SAME module, SAME right, SAME door as before (`accounts`, narrowed to
+  // `type=individual`) — this is a second address for rows the app already
+  // fetched, not a new capability. Its count key is the SAME exact server total
+  // the old Companies/Contacts/All strip badged (`accounts-individual`),
+  // primed by the one `listFetch.accounts` read either page already makes.
+  //
+  // ORDER: below Tickets now (client ruling, 17 Sep 2026, on `tickets` above).
+  { key: "contacts", title: "Contacts", module: "contacts", segment: "contacts", placement: "sidebar", countCacheKey: "accounts-individual", group: "accounts" },
+  // INPUTS — the client's own placement in the Accounts group (Task C, 15 Sep
+  // 2026: "the third section of the accounts section on the sidebar" — true
+  // then, when the group held three rows; Tickets joining after Contacts the
+  // same day, and then moving above Contacts, 17 Sep 2026, leaves Inputs last
+  // rather than third — its own position was never re-ruled). Same
   // module as the permission box the door now gates on (`inputs`, renamed
   // from `todos` 15 Sep 2026) — the segment IS the module, like Contacts.
   // `countCacheKey` names the resource the screen's own `<CollectionHeading
@@ -484,18 +509,16 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // already sent each other, and a slug is not a word anybody reads. Not named
   // in the client's list — kept in My work, the closest reading of daily.
   //
-  // "HOURS", PROVISIONALLY — R85, the rail's one-word law, client's ruling,
-  // 17 Sep 2026, verbatim: "we only have one-word names... We need an
-  // alternative for work logs. Propose me multiple." "Work logs" stays the
-  // word everywhere else in the app (the glossary term, and every record's
-  // own tab — story/task/meeting/ticket detail); only THIS rail destination
-  // needed a one-word substitute. She asked to be shown options rather than
-  // have one picked for her, so "Hours" ships as the recommendation — live
-  // now so the law reads green — and stays provisional until she names her
-  // pick from the alternatives:
-  //   Hours · Time · Logs · Timesheet · Effort
-  // The URL segment (`time`) and the module (`work`) are unchanged either way.
-  { key: "time", title: "Hours", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
+  // "LOGS" — her pick. R85, the rail's one-word law, client's ruling, 17 Sep
+  // 2026, first asked to be shown options rather than have one chosen for her
+  // ("we only have one-word names... We need an alternative for work logs.
+  // Propose me multiple") and "Hours" shipped as the provisional
+  // recommendation while she decided. Her answer, the same day: "The word for
+  // work logs is logs." Only THIS rail destination needed a one-word
+  // substitute — "Work logs" stays the word everywhere else in the app (the
+  // glossary term, and every record's own tab — story/task/meeting/ticket
+  // detail). The URL segment (`time`) and the module (`work`) are unchanged.
+  { key: "time", title: "Logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
   // ── BUILD: the work engine's remaining destinations ─────────────────────────
   //
   // WAVES IS FIRST NOW — CLIENT RULING, 2026-09-15, verbatim: "Regarding

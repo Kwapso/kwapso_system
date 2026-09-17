@@ -1,34 +1,153 @@
 "use client"
 
-// THE APPEARANCE PREVIEW — a taller, more populated miniature of the shell
-// itself, replacing the kit's `AppearancePreview` (`shared/ui/compositions/
-// screens/settings.tsx`) on this one tab.
+// THE APPEARANCE PREVIEW — a miniature of the WHOLE APP FRAME, not a picture
+// of "a screen". Replaces this file's own earlier draft (below, kept as
+// history) at the client's ruling.
 //
-// THE RULING, 2026-09-17: "I want the preview on Settings > Appearance to be
-// slightly taller. Currently, it's a container inside a container, so
-// that's not accurate. Try to represent more of the real look of the app
-// and include more elements inside, not just one kind of card." Three
-// things in one sentence:
+// THE RULING, 17 SEP 2026, VERBATIM (the same session as the "taller, more
+// populated" pass this file used to describe as current): "Good, the
+// language part. However, I'm not happy with the pre-visualization. Please
+// create an artifact with multiple options and include the whole settings
+// page…" — and her pick, over the side-by-side artifact: "appearance p1" =
+// "Miniature of this very page". Three words that reset the brief:
+//
+//   MINIATURE OF *THIS VERY PAGE* — not a generic specimen screen standing
+//   for "the app" in the abstract (the retired draft's Card/Badge/List
+//   picture, three placeholder rows with status dots), but the actual frame
+//   Settings › Appearance sits inside RIGHT NOW: the rail with its real
+//   groups and destinations, the top workspace strip with the pinned "+" and
+//   the open tab, and the content card holding Settings' own tab strip and
+//   the Appearance panel itself.
+//
+// REUSE, NOT REPAINT — AND WHERE THAT RAN INTO TWO WALLS.
+//
+//   WALL 1, THE REAL SHELL. `web/components/shell/app-shell.tsx` (2,200+
+//   lines) is not a presentational component — mounting it opens a live
+//   realtime socket for the active team (`useRealtime`) and the signed-in
+//   user's own channel (`useUserRealtime`), reads `ActiveTeam` session
+//   context this preview has none of, drives real History-API navigation
+//   (`softNavigate`), owns the open-workspace-tab store, and fires a
+//   background Google catch-up fetch on mount. Mounting it here to draw a
+//   static picture would mean paying every one of those side effects — real
+//   sockets, real fetches — for a thumbnail, which is exactly what "stay
+//   lean" (CLAUDE.md's first prime directive) refuses.
+//
+//   WALL 2, EVEN THE KIT'S OWN `Rail`. `shared/ui/compositions/templates/
+//   rail.tsx` needs no team/session context and looked like the honest
+//   answer to "through the same components the app uses" — until its own
+//   rows turned out to be REAL `<a>`/`<button>` elements with real
+//   `onClick` handlers and a disclosure `useState` for group collapse. This
+//   file already carries the law that forecloses that (see "WHY THE TAB
+//   STRIP AND THE TITLE ACTION ARE NOT THE KIT'S OWN `<Tabs>` AND `<Button>`"
+//   below): a real, keyboard-focusable control inside a node whose whole
+//   contract is `role="img"` — "this is a picture, read my label and stop"
+//   — is the identical accessibility fault this file already refused for
+//   Radix tabs and a live `<Button>`. Mounting the real `Rail` would commit
+//   it a third time, in the one part of the picture the client just asked
+//   to be MORE real.
+//
+//   WALL 3, THE REGISTRY ITSELF. Even without a component in the way, this
+//   file cannot import the DATA — `web/lib/pages.ts`'s `NAV` / `TEAM_SECTIONS`
+//   — either. `web-portal/tsconfig.json` states outright: "the portal reaches
+//   its own tree and shared/ — and NOTHING else… a front door that compiled
+//   out of the other front door's source had an undeclared dependency on it."
+//   `shared/web/` is in BOTH `web/tsconfig.json`'s program and
+//   `web-portal/tsconfig.json`'s (the identical `../shared/**/*.tsx` glob), so
+//   an import of `@/lib/pages` here resolves against the PORTAL's own `@/*`
+//   alias too under its own typecheck — which points at `web-portal/lib`, not
+//   `web/lib` — and breaks that program even though `AppearancePanel` is not
+//   mounted in the portal today (confirmed: no `web-portal` file references
+//   either component). A lane that owns exactly two files in `shared/web/`
+//   has no business opening that boundary for a settings picture.
+//
+// SO: A FAITHFUL PRESENTATIONAL COPY, IN THIS FILE, OF REAL WORDS — never a
+// live `Rail`, never an import of `web/lib/pages.ts`. `RAIL_GROUPS` and
+// `SETTINGS_TABS` below are TRANSCRIBED, verbatim and in file order, from the
+// live registries — the exact `grep` that produced them is in each table's
+// own comment, dated, so the next reader can re-run it rather than trust this
+// sentence. This is the same shape as `GROUND` further down (already
+// transcribed from the kit's own `APPEARANCE_PREVIEW_GROUND` for the same
+// "cannot import the source" reason) and the same shape every other
+// reasoned, rot-checked exemption in this codebase takes: `web/test/
+// settings-appearance.test.tsx` lives inside `web/`'s OWN program, so IT can
+// import `@/lib/pages` freely and asserts these two tables against the live
+// source on every run — a peer session renaming "Hours" to "Logs" (which
+// happened mid-build of this very change; see the note on `RAIL_GROUPS`)
+// fails that test instead of rotting here silently.
+//
+// NOT ONE NEW STRING. Every word transcribed below — every rail group
+// heading, every destination title, every Settings tab label, "Settings"
+// itself — is already `t(...)`-wrapped somewhere the app walks (`app-
+// shell.tsx`'s own `railGroups`/`universal` map, `settings-screen.tsx`'s own
+// `tabsConfig` and its page `<Headline>`). R28's catalogue is a SET of
+// strings, not a set of call sites, so calling `t("Waves")` a second time
+// from here adds no row to `shared/i18n-strings.json` — confirmed by reading
+// each string's existing call site above, not assumed.
+//
+// THE FIXED-ASPECT, SCALED FRAME. The rail + top strip + content card below
+// are authored on a FIXED 1280×800 design canvas (`DESIGN_WIDTH`/
+// `DESIGN_HEIGHT`, exactly 16:10) in literal pixels — never `rem` — because
+// `rem` inside a `transform: scale()`'d subtree still resolves against the
+// REAL document's root font-size (the signed-in user's own chosen Size,
+// `applyScale`), which has nothing to do with the miniature's own layout and
+// would make the picture's proportions drift with a setting this preview
+// does not otherwise represent. `usePreviewScale` (below) measures the outer
+// box's own rendered width via `ResizeObserver` (guarded exactly the way the
+// kit's own `Clamp` guards it — `typeof ResizeObserver === "undefined"`,
+// shared/ui/components/clamp/clamp.tsx) and derives `scale = width /
+// DESIGN_WIDTH`; the design frame is transformed by that scale from its
+// top-left corner, which is what makes a 1280px canvas fill a ~380px sticky
+// column exactly, and re-measures on every resize of that column.
+//
+// THE OUTER BOX CARRIES `data-theme` NOW, ON TOP OF THE TOKEN OVERRIDE BELOW
+// — NOT INSTEAD OF IT. `previewTokens` (below) is still how the picture
+// actually PAINTS the pending theme (see this file's older header, kept
+// below, for why: `tokens.css` binds dark mode at `:root[data-theme="dark"]`
+// specifically, so a `data-theme` on a non-root wrapper cascades nothing).
+// `data-theme={theme}` is added here as the ruling's own stated shape — "the
+// draft's theme is applied to the thumbnail's subtree only (`data-theme` on
+// the box and the spine token override)" — and as a plain, cheap assertion
+// point: a test can read `box.getAttribute("data-theme")` against
+// `document.documentElement.getAttribute("data-theme")` without reaching
+// into the token machinery to prove the split holds.
+//
+// `pointer-events: none` IS NEW TOO. Nothing in here was ever meant to be
+// clickable (every row is `aria-hidden`, the whole box is `role="img"`), but
+// nothing said so in CSS either — a stray hover ring or a browser
+// autofill affordance on a form ancestor could otherwise land on this
+// picture. Stated now, structurally, rather than left to the accident of
+// nothing inside currently being focusable.
+//
+// ──────────────────────────────────────────────────────────────────────────
+// THE PREVIOUS RULING'S OWN HEADER, KEPT — the reasoning below (taller, not a
+// container-inside-a-container, the `role="img"` contract, why theme can be
+// previewed with no document mutation, the `GROUND` transcription) is
+// UNCHANGED by this pass and still governs the parts of this file it
+// describes.
+//
+// THE RULING, 2026-09-17 (EARLIER THE SAME DAY): "I want the preview on
+// Settings > Appearance to be slightly taller. Currently, it's a container
+// inside a container, so that's not accurate. Try to represent more of the
+// real look of the app and include more elements inside, not just one kind
+// of card." Two things survive verbatim from that pass:
 //
 //   1. TALLER. `APPEARANCE_PREVIEW_MIN_HEIGHT` below — 22rem, up from the
-//      kit picture's 17rem — the height token this file names for the
-//      report the brief asked for.
-//   2. NOT A CONTAINER INSIDE A CONTAINER. The kit picture drew ground →
-//      floating card → soft panel → row, three nested boxes standing
-//      inside `AppearancePanel`'s own `SettingsSection` (a fourth). This
-//      file draws ground → ONE floating `<Card>` holding a title row, a
-//      toolbar bar and a `<List>` — the list's own rows are NOT a second
-//      nested surface (R67's own "not a card inside a card": `<List
-//      variant="panel">` draws hairline-separated rows inside the card's
-//      own padding, never a second painted box).
-//   3. MORE OF THE REAL LOOK, MORE KINDS OF ELEMENT. Not just one kind of
-//      card: a rail strip, a two-tab strip, a card with a title and a
-//      toolbar row, a list of three rows carrying a status dot each and a
-//      count badge on one of them, and one mango title action — the exact
-//      list the brief itemised, each one a real kit part (`Card`, `Badge`,
-//      `List`) rather than a hand-drawn box standing in for it, so a future
-//      kit restyle (a new radius, a new shadow, a new hover) reaches this
-//      picture automatically the same way it reaches the real screen.
+//      kit picture's 17rem — is UNCHANGED: a floor under the new fixed-aspect
+//      box, not replaced by it (a very narrow sticky column would otherwise
+//      shrink the 16:10 frame below a legible height).
+//   2. NOT A CONTAINER INSIDE A CONTAINER. Still true, sharper now: the ONE
+//      floating `<Card>` below stands for `ScreenShell`'s own card (the
+//      single raised surface every main screen draws on), and nothing
+//      painted inside it — the rail, the tab strips, the mini Appearance
+//      panel — is a second nested surface.
+//
+// The THIRD clause of that ruling — "include more elements … not just one
+// kind of card" — is superseded by the sharper instruction this header
+// opens with: more elements was the right direction and "a miniature of
+// this very page" is the specific shape it turned out to mean. The generic
+// three-row list with status dots and a count badge that pass used to draw
+// is gone; every element below now names something real on Settings ›
+// Appearance itself rather than standing in for "a collection, generically".
 //
 // WHY THE TAB STRIP AND THE TITLE ACTION ARE NOT THE KIT'S OWN `<Tabs>` AND
 // `<Button>`. This whole picture carries `role="img"` — one accessible name
@@ -37,15 +156,11 @@
 // `<button>` inside an `img`-rolen node is a genuine accessibility fault
 // (assistive tech cannot reliably reach — or usefully act on — a control
 // buried inside a node that has told it "this is a picture, read my label
-// and stop"), so the tab strip is drawn with plain, inert `<span>`s carrying
-// the kit's own type and hairline tokens, and the title action reuses the
-// kit's own `buttonVariants()` class function on a `<span aria-hidden>`
-// rather than a live `<Button>` — the kit's STYLE, not a live control that
-// has nothing to do once pressed. `Card`, `Badge` and `List` are mounted for
-// real: none of the three is interactive here (no `interactive` prop on
-// `Card`, no `onRowSelect` on `List`, and `Badge` is a label, never a
-// control — see each component's own header), so nothing about them
-// contradicts the `role="img"` contract.
+// and stop"), so every tab strip below (workspace AND Settings') is drawn
+// with plain, inert `<span>`s carrying the kit's own type and hairline
+// tokens. `Card` is mounted for real (no `interactive` prop, nothing inside
+// it is a control), so nothing about it contradicts the `role="img"`
+// contract.
 //
 // WHY THEME CAN BE PREVIEWED WITHOUT DOCUMENT-LEVEL SUPPORT. The kit's own
 // `AppearancePreview` states the constraint plainly: dark-mode tokens bind at
@@ -79,24 +194,10 @@
 // the exemption names the real fix (a kit-side theme-preview primitive) and
 // this file is rebuilt on it, and this comment deleted with it, the day
 // that primitive ships.
-//
-// LOREM, ON PURPOSE, SAME REASONING THE KIT'S OWN PREVIEW GIVES FOR ITS OWN
-// SPECIMEN ROW: a picture of the SHAPE a screen takes, not of anyone's real
-// data, and language-neutral so it never reads as a bug beside the language
-// switcher one control away. Unlike the kit file, this one is NOT exempt
-// from the app's translation walk (`shared/ui/` is; `shared/web/` is not),
-// so every word below is a real, wrapped `t(…)` call — the seed
-// (`shared/i18n-seed.ts`) carries the Lorem Ipsum words UNCHANGED across
-// German, Spanish and Catalan, the same convention any translated product
-// uses for placeholder Latin, and the one real sentence (the accessible
-// name) is properly translated.
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/components/badge/badge"
-import { buttonVariants } from "@shared/ui/components/button/button"
 import { Card } from "@shared/ui/components/card/card"
-import { List, type ListRow } from "@shared/ui/components/list/list"
 import { Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
@@ -105,11 +206,55 @@ import { useLanguage } from "./language"
 
 /** The height token this file names for the ruling's own "name the height
  * token you chose" — 22rem, up from the kit picture's 17rem (v1.2.79's own
- * floor, grown once already for three specimen rows; this preview holds a
- * tab strip, a title row, a toolbar bar and a three-row list, so it earns a
- * second step). A floor, not a cap: the column this sits in has no fixed
- * height, so nothing here clips. */
+ * floor). Unchanged by the fixed-aspect pass above: a FLOOR under the
+ * 16:10 box, never a cap — the column this sits in has no fixed height, so
+ * nothing here clips on an ordinary column width. */
 export const APPEARANCE_PREVIEW_MIN_HEIGHT = "min-h-[22rem]"
+
+/** The design canvas every pixel below is authored on, and the ratio the
+ * ruling asked for (16:10). Literal `px`, never `rem` — see this file's own
+ * header, "THE FIXED-ASPECT, SCALED FRAME". */
+const DESIGN_WIDTH = 1280
+const DESIGN_HEIGHT = 800
+
+/**
+ * Measures the outer preview box's own rendered width and returns the ratio
+ * to scale the fixed `DESIGN_WIDTH` canvas down to it — `[ref, scale]`, the
+ * ref goes on the box being measured. Guarded for `ResizeObserver` exactly
+ * the way the kit's own `Clamp` guards it (`typeof ResizeObserver ===
+ * "undefined"`, shared/ui/components/clamp/clamp.tsx): a browser (or a test
+ * environment) with none simply keeps the initial guess and never throws.
+ *
+ * THE INITIAL GUESS IS NOT 1. A scale of 1 would render the full 1280px
+ * canvas at native size for one frame before the effect corrects it — a
+ * visible flash of an oversized picture blowing out of its sticky column.
+ * 0.3 approximates the common case (a ~380px sticky column at the `lg`
+ * breakpoint this preview normally renders in) closely enough that the
+ * correction, when it lands, is a small step rather than a lurch; it is
+ * replaced with a real measurement on mount and on every resize after that.
+ */
+function usePreviewScale(): [React.RefObject<HTMLDivElement | null>, number] {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [scale, setScale] = React.useState(0.3)
+
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const measure = () => {
+      const width = el.clientWidth
+      if (width > 0) setScale(width / DESIGN_WIDTH)
+    }
+    measure()
+
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return [ref, scale]
+}
 
 /** Ground per spine, per resolved theme — the identical pair the kit's own
  * `APPEARANCE_PREVIEW_GROUND` resolves to, transcribed as `var(--kw-*)`
@@ -123,8 +268,8 @@ const GROUND: Record<Spine, { light: string; dark: string }> = {
 }
 
 /** The card's own title/body scale — the same two sizes the kit's specimen
- * row moved with, read one step smaller because this frame now spends most
- * of its height on the list rather than on one row. */
+ * row moved with. Still read off the `scale` prop the panel already passes
+ * (`previewScaleStep(pendingScale)`), unchanged by this pass. */
 const TITLE_SIZE: Record<"compact" | "default" | "large", number> = {
   compact: 13,
   default: 15,
@@ -132,12 +277,12 @@ const TITLE_SIZE: Record<"compact" | "default" | "large", number> = {
 }
 
 /** Redefine the handful of tokens every real kit part below reads
- * (`Card`/`Badge`/`List`'s own `--card`, `--popover`, `--foreground`,
- * `--surface-panel`, `--secondary*`, `--muted-foreground`, `--border`) to
- * the PENDING theme's values, scoped to one wrapper div — see this file's
- * own header, "WHY THEME CAN BE PREVIEWED WITHOUT DOCUMENT-LEVEL SUPPORT".
- * Every value is a `var(--kw-*)` reference or a `color-mix()` over one,
- * never a hex or an rgba literal. */
+ * (`Card`'s own `--card`, `--popover`, `--foreground`, `--surface-panel`,
+ * `--secondary*`, `--muted-foreground`, `--border`) to the PENDING theme's
+ * values, scoped to one wrapper div — see this file's own header, "WHY
+ * THEME CAN BE PREVIEWED WITHOUT DOCUMENT-LEVEL SUPPORT". Every value is a
+ * `var(--kw-*)` reference or a `color-mix()` over one, never a hex or an
+ * rgba literal. */
 function previewTokens(theme: "light" | "dark"): React.CSSProperties {
   const ink = theme === "dark" ? "var(--kw-off-beige)" : "var(--kw-charcoal)"
   const card = theme === "dark" ? "var(--kw-unlit-raised)" : "var(--kw-off-beige)"
@@ -156,6 +301,64 @@ function previewTokens(theme: "light" | "dark"): React.CSSProperties {
   } as React.CSSProperties
 }
 
+/**
+ * THE RAIL'S REAL GROUPS AND DESTINATIONS — transcribed, in file order,
+ * verbatim from `web/lib/pages.ts` on 2026-09-17 by:
+ *
+ *   grep -n 'placement: "sidebar"' web/lib/pages.ts
+ *   sed -n '/export const NAV_GROUP_ORDER/,/^}/p;/export const NAV_GROUP_LABELS/,/^}/p' web/lib/pages.ts
+ *
+ * NAV_GROUP_ORDER is `["my-work", "build", "accounts"]`; each group below
+ * lists its `placement: "sidebar"` destinations in the FILE'S OWN order.
+ * Home ("Welcome") carries `inRail: false` in that file — it is reached
+ * through the brand mark, not a rail row — so it is correctly ABSENT here
+ * too, not an omission.
+ *
+ * A LIVE RE-RUN CAUGHT THE FIRST DRAFT MID-BUILD: this table's `time` row
+ * read "Hours" from an early grep and "Logs" from a second one taken minutes
+ * later — a peer session (this repo's own working agreement: "peer sessions
+ * share the repo") renamed it while this file was being written. "Logs" is
+ * the value the final grep returned and the value below; `web/test/
+ * settings-appearance.test.tsx`'s own rot-check re-derives this table from
+ * the live source on every run, so the NEXT rename fails a test instead of
+ * drifting here unnoticed. See this file's own header, "WALL 3, THE
+ * REGISTRY ITSELF", for why the table is transcribed rather than imported.
+ */
+export const RAIL_GROUPS: readonly { heading: string; items: readonly string[] }[] = [
+  { heading: "My work", items: ["Tasks", "Meetings", "Knowledge", "Logs"] },
+  { heading: "Build", items: ["Waves", "Apps", "Stories"] },
+  { heading: "Accounts", items: ["Accounts", "Tickets", "Contacts", "Inputs"] },
+]
+
+/**
+ * THE SETTINGS SCREEN'S OWN TAB STRIP — transcribed, in order, from
+ * `web/components/screens/settings-screen.tsx`'s own `tabsConfig.tabs` on
+ * 2026-09-17 (`grep -n 'value: "' web/components/screens/settings-screen.tsx`).
+ * "Appearance" leads because it is the outer tab this preview itself always
+ * renders inside — the miniature is drawn FROM that tab, so it is always the
+ * active one in the picture, never a guess.
+ */
+export const SETTINGS_TABS: readonly string[] = [
+  "Appearance",
+  "Members",
+  "Roles",
+  "Integrations",
+  "Modules",
+  "Automations",
+  "Choices",
+]
+
+/**
+ * THE MINI APPEARANCE PANEL'S OWN FOUR SECTIONS, IN ORDER — Language · Size
+ * · Appearance · Background, `appearance-panel.tsx`'s own order (see that
+ * file's header, "ONE CONTAINER, FOUR SECTIONS"). Each micro-label is
+ * transcribed from its real section file (`language-section.tsx`,
+ * `scale-section.tsx`, `theme-section.tsx`, `spine-section.tsx`), which all
+ * already draw a bare micro-label over a row of pills with no box of their
+ * own — the same bare shape this picture draws them in, at design scale.
+ */
+const MINI_PANEL_SECTIONS: readonly string[] = ["Language", "Size", "Appearance", "Background"]
+
 export interface AppearanceTabPreviewProps {
   /** Already resolved — never "system". The panel's own `ThemeSection`
    * resolves "system" once, the same way the kit picture always required. */
@@ -168,100 +371,172 @@ export interface AppearanceTabPreviewProps {
 }
 
 /**
- * A small, live picture of the shell itself: the rail, a two-tab strip, one
- * floating card (a title row, a toolbar bar, a three-row list), and one
- * mango title action — pure and prop-driven, so a caller can re-render it on
- * every control press with nothing stale.
+ * A small, live picture of the WHOLE APP FRAME this very tab sits inside:
+ * the rail (real groups, real destinations), the workspace top strip (the
+ * open "Settings" tab and the pinned "+"), and one floating card holding
+ * Settings' own tab strip and a miniature of the Appearance panel itself —
+ * pure and prop-driven, so a caller can re-render it on every control press
+ * with nothing stale.
  */
 export function AppearanceTabPreview({ theme, spine, scale = "default" }: AppearanceTabPreviewProps) {
   const { t } = useLanguage()
   const ground = GROUND[spine][theme]
   const titleSize = TITLE_SIZE[scale]
   const tokens = previewTokens(theme)
+  const [frameRef, previewScale] = usePreviewScale()
 
-  const lorem = t("Lorem")
-  const ipsum = t("Ipsum")
-  const dolor = t("Dolor")
-  const texture = t("Lorem ipsum dolor sit amet")
-
-  const rows: ListRow[] = [
-    { title: lorem, description: texture, action: <Badge variant="status" dot="shipped">{lorem}</Badge> },
-    { title: ipsum, description: texture, action: <Badge variant="status" dot="review">{ipsum}</Badge> },
-    {
-      title: dolor,
-      description: texture,
-      count: 3,
-      action: <Badge variant="status" dot="blocked">{dolor}</Badge>,
-    },
-  ]
+  const settingsLabel = t("Settings")
 
   return (
     <div
+      ref={frameRef}
       role="img"
       aria-label={t("A small picture of the app, reflecting your chosen settings")}
+      data-theme={theme}
       className={cn(
-        "flex w-full overflow-hidden rounded-[var(--radius)] motion-hover",
+        "relative w-full overflow-hidden rounded-[var(--radius)] motion-hover pointer-events-none",
+        "aspect-[16/10]",
         APPEARANCE_PREVIEW_MIN_HEIGHT
       )}
       style={{ background: ground }}
     >
-      {/* THE RAIL — lies on the ground and paints nothing of its own, the
-          same convention the kit's own preview and `screen-shell.tsx` state. */}
-      <span data-slot="preview-rail" className="w-[2.875rem] shrink-0 min-[45rem]:w-[3.375rem]" aria-hidden="true" />
-      <div aria-hidden="true" className="flex min-w-0 flex-1 flex-col gap-2 p-3" style={tokens}>
-        {/* THE TAB STRIP — two inert tabs. See this file's own header for why
-            these are plain spans rather than the kit's live `<Tabs>`. */}
-        <div data-slot="preview-tabs" className="flex shrink-0 items-center gap-4 px-1">
-          <span
-            data-slot="preview-tab"
-            className="shadow-[inset_0_-2px_0_0_var(--foreground)] pb-1 text-xs font-[var(--font-weight-medium)]"
-            style={{ color: "var(--foreground)" }}
-          >
-            {lorem}
-          </span>
-          <span data-slot="preview-tab" className="pb-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
-            {ipsum}
-          </span>
+      {/* THE DESIGN FRAME — a fixed 1280×800 canvas, scaled down to the box's
+          own measured width. See this file's own header, "THE FIXED-ASPECT,
+          SCALED FRAME". */}
+      <div
+        aria-hidden="true"
+        data-slot="preview-frame"
+        className="absolute left-0 top-0 flex"
+        style={{
+          width: DESIGN_WIDTH,
+          height: DESIGN_HEIGHT,
+          transform: `scale(${previewScale})`,
+          transformOrigin: "top left",
+          ...tokens,
+        }}
+      >
+        {/* THE RAIL — real groups, real destinations (see `RAIL_GROUPS`
+            above), lying on the ground and painting nothing of its own — the
+            same convention the kit's own `Rail` and `screen-shell.tsx`
+            state. Plain inert text, never the kit's own live `Rail` — see
+            this file's own header, "WALL 2, EVEN THE KIT'S OWN `Rail`". */}
+        <div data-slot="preview-rail" className="flex w-[210px] shrink-0 flex-col gap-[18px] px-[16px] py-[20px]">
+          {RAIL_GROUPS.map((group) => (
+            <div key={group.heading} data-slot="preview-rail-group" className="flex flex-col gap-[6px]">
+              <span
+                className="text-[9px] font-[var(--font-weight-medium)] uppercase tracking-[0.08em]"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                {t(group.heading)}
+              </span>
+              {group.items.map((item) => (
+                <span
+                  key={item}
+                  data-slot="preview-rail-item"
+                  className="truncate text-[11px]"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  {t(item)}
+                </span>
+              ))}
+            </div>
+          ))}
         </div>
-        {/* THE FLOATING CARD — the one raised thing on this ground; nothing
-            painted inside it is a second nested box (R67's own "not a card
-            inside a card"). */}
-        <Card className="flex flex-1 flex-col gap-2 p-3">
-          {/* THE TITLE ROW — a fake record name and the one mango title
-              action, R84's own shape (a mango control belongs only in a
-              screen's title component) drawn here as a picture of it. */}
-          <div className="flex shrink-0 items-center justify-between gap-2">
+
+        <div className="flex min-w-0 flex-1 flex-col gap-[10px] p-[14px]">
+          {/* THE WORKSPACE TOP STRIP — the open "Settings" tab (this very
+              page) and the pinned "+", the client's own two nouns
+              ("the top strip with the pinned '+' and open tabs"). Never the
+              kit's own live `BreadcrumbFolders` — same reasoning as the
+              rail: a real tab strip is a set of real, focusable controls. */}
+          <div data-slot="preview-tabs" className="flex shrink-0 items-center gap-[8px] px-[2px]">
+            <span
+              data-slot="preview-tab"
+              data-active=""
+              className="shadow-[inset_0_-2px_0_0_var(--foreground)] pb-[4px] text-[11px] font-[var(--font-weight-medium)]"
+              style={{ color: "var(--foreground)" }}
+            >
+              {settingsLabel}
+            </span>
+            <span
+              data-slot="preview-tab-new"
+              className="flex items-center justify-center rounded-pill px-[6px] py-[2px]"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              <Plus aria-hidden="true" className="size-[10px]" />
+            </span>
+          </div>
+
+          {/* THE FLOATING CARD — the one raised thing on this ground,
+              standing for `ScreenShell`'s own card; nothing painted inside
+              it is a second nested box (R67's own "not a card inside a
+              card"). Holds Settings' own title, its own tab strip, and a
+              miniature of the Appearance panel — this very page. */}
+          <Card className="flex flex-1 flex-col gap-[10px] overflow-hidden p-[14px]">
             <span
               className="truncate font-[var(--font-weight-medium)] transition-[font-size] duration-200"
               style={{ fontSize: `${titleSize}px`, color: "var(--foreground)" }}
             >
-              {t("Lorem ipsum dolor")}
+              {settingsLabel}
             </span>
-            <span
-              data-slot="preview-title-action"
-              className={cn(buttonVariants({ variant: "default", size: "sm" }), "pointer-events-none h-6 shrink-0 px-2")}
-            >
-              <Plus className="size-3" aria-hidden="true" />
-            </span>
-          </div>
-          {/* THE TOOLBAR ROW — a bare bar standing for the search/filter row
-              every collection draws above its body (R48). */}
-          <div
-            data-slot="preview-toolbar"
-            className="h-6 w-full shrink-0 rounded-pill"
-            style={{ background: "var(--surface-panel)" }}
-          />
-          {/* THE LIST — three rows, each with its own status dot; the third
-              also carries a count badge, so both "a status dot" and "a
-              badge" are on screen at once. */}
-          <List
-            label={t("A small picture of the app, reflecting your chosen settings")}
-            variant="panel"
-            density="compact"
-            rows={rows}
-            className="flex-1"
-          />
-        </Card>
+
+            {/* SETTINGS' OWN TAB STRIP — see `SETTINGS_TABS` above.
+                "Appearance" leads and is the one always drawn active: this
+                picture is always rendered FROM that tab. */}
+            <div data-slot="preview-settings-tabs" className="flex shrink-0 flex-wrap items-center gap-[14px]">
+              {SETTINGS_TABS.map((label, index) => {
+                const active = index === 0
+                return (
+                  <span
+                    key={label}
+                    data-slot="preview-settings-tab"
+                    data-active={active ? "" : undefined}
+                    className={cn(
+                      "pb-[3px] text-[10px]",
+                      active
+                        ? "shadow-[inset_0_-2px_0_0_var(--foreground)] font-[var(--font-weight-medium)]"
+                        : undefined
+                    )}
+                    style={{ color: active ? "var(--foreground)" : "var(--muted-foreground)" }}
+                  >
+                    {t(label)}
+                  </span>
+                )
+              })}
+            </div>
+
+            {/* THE MINI APPEARANCE PANEL — Language · Size · Appearance ·
+                Background, `appearance-panel.tsx`'s own order, each a bare
+                micro-label over a short row of pills — the same shape their
+                real section files draw (no box of their own; see
+                `MINI_PANEL_SECTIONS` above), never a nested card. */}
+            <div data-slot="preview-appearance-panel" className="flex flex-1 flex-col justify-around gap-[8px]">
+              {MINI_PANEL_SECTIONS.map((label, sectionIndex) => (
+                <div key={label} className="flex flex-col gap-[6px]">
+                  <span
+                    className="text-[8px] font-[var(--font-weight-medium)] uppercase tracking-[0.08em]"
+                    style={{ color: "var(--muted-foreground)" }}
+                  >
+                    {t(label)}
+                  </span>
+                  <div className="flex gap-[6px]">
+                    {[0, 1, 2].map((pillIndex) => (
+                      <span
+                        key={pillIndex}
+                        data-slot="preview-pill"
+                        className="h-[14px] w-[46px] rounded-pill"
+                        style={{
+                          background: pillIndex === sectionIndex % 3 ? "var(--foreground)" : "var(--surface-panel)",
+                          opacity: pillIndex === sectionIndex % 3 ? 1 : 0.6,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   )

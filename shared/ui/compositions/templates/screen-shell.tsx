@@ -927,7 +927,13 @@ import { Avatar, AvatarFallback } from "../../components/avatar/avatar";
 import { Badge } from "../../components/badge/badge";
 import { BreadcrumbFolders } from "../../components/breadcrumbs/breadcrumb-folders";
 import { Button } from "../../components/button/button";
+// `CARD_CONTENT_INSET_X` only — this file renders no `Card` of its own.
+// Imported, not restated, so `DENSITY_BODY`'s own horizontal figure and
+// `CardContent`'s can never drift apart. See `DENSITY_BODY`'s own comment
+// (17 Sep 2026 evening, Ruling 2) for why.
+import { CARD_CONTENT_INSET_X } from "../../components/card/card";
 import { CursorGlow } from "../../components/cursor-glow/cursor-glow";
+import { Separator } from "../../components/separator/separator";
 import {
   Sheet,
   SheetContent,
@@ -2022,8 +2028,32 @@ const CARD_JOINED = "md:rounded-ss-none";
    of those two files is this lane's to edit, so this rung and theirs now
    read two different numbers for what used to be one shared idea. Logged in
    the CHANGELOG as a follow-up for their owner, not silently reconciled
-   here. */
-const TRAIL_GAP = "mb-[var(--space-4)]";
+   here.
+
+   STEPPED DOWN AGAIN, ONE RUNG FURTHER, 2026-09-17 EVENING — S3, THE OTHER
+   HALF OF `DENSITY_TRAIL`'s OWN `pt` ABOVE. Client, verbatim: "Reduce the
+   space between the breadcrumbs and the chips." Her pick: "s3", whose own
+   figure for this gap is 8 (`--space-2`) — `--space-4` (16) one more rung
+   down the scale. FLAT, LIKE `DENSITY_TRAIL`'s NEW `pt`: the ruling named
+   one number, not a density pair, so both densities read `--space-2` now;
+   `TRAIL_GAP` stops being a `Record<ScreenDensity, string>` in spirit (it
+   was already a single string, not a record — this only states plainly that
+   the single string no longer varies BY INTENT, not by oversight).
+
+   THE DIVIDER RIDES THIS SAME GAP. S3's third sentence — "Maybe we could add
+   a divider line" — is drawn as `<Separator />` (`components/separator/
+   separator.tsx`), the kit's own hairline rule, immediately after the trail
+   in `screen-shell-trail`'s own markup below, so it lays out INSIDE that
+   div's padding (`DENSITY_TRAIL`'s `px`) rather than at the card's bare
+   edge — `w-full` on a padded parent is 100% of the CONTENT box, which is
+   exactly "spanning the card's inner width," the same width `band`'s own
+   title row reads, with no new inset of its own. `TRAIL_GAP`, still the
+   wrapper's `mb`, is what puts air BETWEEN the divider and whatever follows
+   (`band`, or the body) — the divider itself sits flush under the crumbs,
+   no separate top margin invented for it. Not a new colour: `Separator`'s
+   default variant is `bg-border`, the same 8% hairline every same-tone card
+   separation in this kit already spends. */
+const TRAIL_GAP = "mb-[var(--space-2)]";
 
 /* ----------------------------------------------------------------------------
    THE BODY — the card's tone, and NOT a container.
@@ -2302,10 +2332,23 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
    REASON THE COMMENT ABOVE GIVES: this record's own `px` is a COPY of
    `DENSITY_HEADER`'s, not a slice of it, so the two must be edited together
    or the trail's arrows stop landing under the title's own left edge. See
-   `DENSITY_HEADER` for the ruling and the old/new numbers. */
+   `DENSITY_HEADER` for the ruling and the old/new numbers.
+
+   `pt` ADDED, 2026-09-17 EVENING — S3. Client, verbatim: "Make a bit more
+   space above the breadcrumbs. Reduce the space between the breadcrumbs and
+   the chips. Maybe we could add a divider line." Her pick from the design
+   page: "for the spacing, do s3." S3's own figure for "above the trail" is
+   20 (`--space-5`), ONE FLAT NUMBER, not a density pair — the ruling never
+   named a second, calmer figure the way `DENSITY_HEADER`'s own pt/pb do, so
+   this reads `--space-5` at BOTH densities rather than inventing a calm
+   figure nobody asked for. The trail was flush with the card's own top edge
+   before this (see the `trail` prop's own doc, and the paragraph below —
+   "no `pt`/`pb` of its own" is no longer true of `pt` and is corrected
+   there too). See `TRAIL_GAP`, further down, for the other half of S3 (the
+   gap AFTER the trail, now 8, and the divider). */
 const DENSITY_TRAIL: Record<ScreenDensity, string> = {
-  comfortable: "px-[var(--space-6)]",
-  calm: "px-[var(--space-5)]",
+  comfortable: "px-[var(--space-6)] pt-[var(--space-5)]",
+  calm: "px-[var(--space-5)] pt-[var(--space-5)]",
 };
 
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` and
@@ -2318,10 +2361,54 @@ const DENSITY_TRAIL: Record<ScreenDensity, string> = {
    (16/20, 15/18.75). `DENSITY_STACK` (the gap BETWEEN the figures/content/
    footer stacked inside this padding, not the padding itself) is
    deliberately untouched — it is not one of the outer edges the ruling
-   named. */
+   named.
+
+   HORIZONTAL SPLIT OUT AND FLATTENED, 2026-09-17 EVENING — RULING 2, THEN
+   CORRECTED THE SAME EVENING. Client: "make the overall full content inside
+   this container wider... not only the toolbar, but everything... the
+   margin on the sides should be the same as the margin you now have on top
+   of the toolbar... apply this absolutely everywhere."
+
+   THE FIRST PASS GOT THE ARITHMETIC WRONG. It read a STACKED, two-layer
+   figure (this shell's own gutter plus `CardContent`'s own inset, 36
+   measured px at this app's root) and called that number `--space-3` — it
+   is not; 36 measured px at this app's 18px root is `--space-7` (2rem),
+   this file's OWN horizontal figure before this pass, so the "fix" would
+   have changed nothing.
+
+   MEASURED AGAIN, PRECISELY, WITH `getComputedStyle` (staging, headless
+   Playwright, admin test-login): a toolbar-led collection card's own
+   `CardContent` reads `padding-top: 13.5px` there, not this file's figure —
+   `kwapso_system/web/app/globals.css` (R83) overrides just that ONE side
+   with `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` =
+   `calc(2rem - 1.25rem)` = `0.75rem`, read directly off both custom
+   properties in the same pass, not inferred. `0.75rem` IS this kit's own
+   `--space-3` — confirmed, not assumed: R83's own comment already derives
+   `--toolbar-lead-gap` as "the nearest step ON the scale", so the remainder
+   was always going to land back on a step of that same scale. THAT is "the
+   margin you now have on top of the toolbar" — 12px nominal, 13.5px at this
+   app's root — not the 36 the first pass named.
+
+   ONE TOKEN, TWO SEAMS, IMPORTED RATHER THAN RESTATED. The app's own
+   `padding-top` override cannot be read from here — it lives in
+   `web/app/globals.css`, outside this repo, and a kit file may not couple
+   itself to an app-only custom property name (the direction of this kit's
+   own pipeline runs kit -> app, never the other way) — but the NUMBER it
+   lands on is already a token this kit owns. `CARD_CONTENT_INSET_X`
+   (`components/card/card.tsx`) is that token, spent by `CardContent`'s own
+   left/right padding; this record imports the SAME identifier rather than
+   repeating the literal `px-[var(--space-3)]`, so "the collection card's
+   horizontal inset" and "the screen-shell content inset" the ruling asked
+   to compare are the one export, not two strings that happen to agree
+   today and drift the next time either file is touched.
+   `check-screen-shell.mjs` and `card.tsx`'s own check both pin the import,
+   not just the value, for exactly that reason.
+
+   VERTICAL (`py`) IS UNCHANGED from the figures immediately above — this
+   ruling named only "the sides." */
 const DENSITY_BODY: Record<ScreenDensity, string> = {
-  comfortable: "p-[var(--space-5)] lg:p-[var(--space-6)]",
-  calm: "p-[var(--space-4)] lg:p-[var(--space-5)]",
+  comfortable: cn(CARD_CONTENT_INSET_X, "py-[var(--space-5)] lg:py-[var(--space-6)]"),
+  calm: cn(CARD_CONTENT_INSET_X, "py-[var(--space-4)] lg:py-[var(--space-5)]"),
 };
 
 /* The air between the three things the body can hold — the figure strip, the
@@ -4424,12 +4511,16 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 `DENSITY_TRAIL` for why the horizontal inset is
                 `DENSITY_HEADER`'s own value rather than a new number.
 
-                NO TOP PADDING OF ITS OWN — the trail sits flush with the
-                card's top edge; `band`'s (or the body's) own `pt` is
-                UNCHANGED, so the head moves down by exactly this slot's
-                height plus `TRAIL_GAP`, not that plus a second inset. See
-                `TRAIL_GAP` for the exact equation `verify/trail-line/`
-                proves.
+                NO LONGER FLUSH WITH THE CARD'S TOP EDGE — S3 (2026-09-17
+                EVENING) GAVE IT ONE: `DENSITY_TRAIL`'s own `pt` now carries
+                the "more space above the breadcrumbs" half of that ruling;
+                see that record's own comment for the number. `band`'s (or
+                the body's) own `pt` is STILL UNCHANGED, so the head still
+                moves down by exactly this slot's own height (pt, content and
+                divider all included) plus `TRAIL_GAP`, not that plus a
+                second inset of `band`'s own — the equation `verify/
+                trail-line/` proves is unchanged in SHAPE, only in the
+                numbers it reads live off `DENSITY_TRAIL`/`TRAIL_GAP`.
 
                 `min-w-0 shrink-0` MATCHES EVERY OTHER ROW IN THIS COLUMN
                 (`band`'s wrapper, `screen-shell-body`), for the identical
@@ -4449,6 +4540,16 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 className={cn("min-w-0 shrink-0", DENSITY_TRAIL[density], TRAIL_GAP)}
               >
                 {trail}
+                {/* THE DIVIDER — S3's third sentence, "maybe we could add a
+                    divider line." A child of THIS padded div, not a sibling
+                    of it, so `w-full` below reads 100% of the CONTENT box
+                    (this div's own `px` already subtracted) — "spanning the
+                    card's inner width," not the card's bare edge-to-edge
+                    width. See `TRAIL_GAP`'s own comment for why it carries
+                    no margin of its own above the line. Default variant and
+                    orientation — `bg-border`, `h-px w-full` — nothing here
+                    overrides either. */}
+                <Separator />
               </div>
             ) : null}
 

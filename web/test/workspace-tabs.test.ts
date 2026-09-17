@@ -48,6 +48,7 @@ import {
   openNewTab,
   openSoloTab,
   openTabsSnapshot,
+  railPick,
   reorderTab,
   setWorkspaceScope,
   tabStripState,
@@ -333,6 +334,55 @@ describe("openSoloTab — the Import wizard's own ruling (L11): fronted, never d
     openSoloTab("/apps/import", "Import CSV")
     expect(openTabsSnapshot()).toHaveLength(2)
     expect(activeTabPathSnapshot()).toBe("/apps/import")
+  })
+})
+
+describe("railPick — the rail's own door (17 Sep 2026, replacing \"push the trail on a rail pick\")", () => {
+  it("activates the tab already sitting on the module's root, rather than opening a new one", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    openBeside("/tickets", "Tickets") // [Apps, Tickets(active)]
+    openBeside("/accounts", "Accounts") // [Apps, Tickets, Accounts(active)]
+    const ticketsId = openTabsSnapshot()[1]?.id
+    if (!ticketsId) throw new Error("expected a Tickets tab")
+    expect(railPick("/tickets", "Tickets")).toBe("/tickets")
+    expect(openTabsSnapshot()).toHaveLength(3) // no new tab minted
+    expect(activeTabIdSnapshot()).toBe(ticketsId)
+  })
+
+  it("a tab whose current step is DEEPER in the module does not count as open — a new tab beside the active one instead", () => {
+    visitTrail(at(["/tickets", "Tickets"]))
+    visitTrail(at(["/tickets", "Tickets"], ["/tickets/T1", "T1"])) // she opened a ticket
+    const before = openTabsSnapshot().length
+    expect(railPick("/tickets", "Tickets")).toBe("/tickets")
+    expect(openTabsSnapshot()).toHaveLength(before + 1)
+    expect(openTabsSnapshot().at(-1)?.steps).toEqual([{ path: "/tickets", label: "Tickets" }])
+    expect(activeTabPathSnapshot()).toBe("/tickets") // fronted
+  })
+
+  it("clicking a module from inside a DIFFERENT module opens a new tab beside the active one", () => {
+    visitTrail(at(["/apps", "Apps"]))
+    visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
+    expect(railPick("/tickets", "Tickets")).toBe("/tickets")
+    const tabs = openTabsSnapshot()
+    expect(tabs).toHaveLength(2)
+    expect(tabs[1]?.steps).toEqual([{ path: "/tickets", label: "Tickets" }])
+    expect(activeTabPathSnapshot()).toBe("/tickets")
+  })
+
+  it("nothing open at all — a rail pick still opens a new tab", () => {
+    expect(openTabsSnapshot()).toHaveLength(0)
+    expect(railPick("/tickets", "Tickets")).toBe("/tickets")
+    expect(openTabsSnapshot()).toHaveLength(1)
+    expect(activeTabPathSnapshot()).toBe("/tickets")
+  })
+
+  it("lands at the module's ROOT, never a query-string variant already open deeper in the trail", () => {
+    // The root tab holds a filtered view of the collection (a query string),
+    // which canonicalises to the same tab — still "the main screen", per
+    // `openSoloTab`'s own canonicalisation.
+    visitTrail(at(["/tickets?status=open", "Tickets"]))
+    expect(railPick("/tickets", "Tickets")).toBe("/tickets?status=open")
+    expect(openTabsSnapshot()).toHaveLength(1) // activated, not duplicated
   })
 })
 

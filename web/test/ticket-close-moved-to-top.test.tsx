@@ -212,7 +212,18 @@ describe("the top close action, at every status the bottom composer used to cove
     expect(path?.getAttribute("d")).toContain("104.11,104.11,0,0,0,128,24Z")
   })
 
-  it("keeps the title to at most two visible actions beside the overflow menu (B1)", async () => {
+  // AMENDED 17 Sep 2026 — B1's own ceiling ("two visible actions maximum on
+  // any title", UI-RULEBOOK.md) named ONE primary and ONE secondary; the
+  // client's ruling reviewing the deployed page, same day, verbatim: "The
+  // edit button: put it outside, just the pen" — a THIRD control on this one
+  // title row, specifically the standalone edit icon, never folded into the
+  // "one primary, one secondary" count B1 states for the rest of the app.
+  // `help-detail.tsx`'s own comment beside the button carries the ruling and
+  // the R84 reasoning for why it is `variant="inverse"`, not mango. Flagged
+  // here rather than left as a quiet test change: UI-RULEBOOK.md's own B1
+  // entry has not yet been updated with this ticket-detail-specific
+  // amendment (see the session report).
+  it("keeps the title to at most three visible actions beside the overflow menu (B1, amended 17 Sep 2026 for this screen's standalone Edit)", async () => {
     openTicket("triaged", [message("m1", false)])
     const region = titleRegion()
     await within(region).findByRole("button", { name: "Close" })
@@ -220,7 +231,18 @@ describe("the top close action, at every status the bottom composer used to cove
     const overflow = buttons.filter((b) => b.getAttribute("aria-label") === "More actions")
     const visible = buttons.filter((b) => b.getAttribute("aria-label") !== "More actions")
     expect(overflow.length).toBe(1)
-    // "Close" (primary) + the timer (secondary) — B1's ceiling.
-    expect(visible.length).toBeLessThanOrEqual(2)
+    // "Close" (primary) + the timer (secondary) + the standalone Edit pen —
+    // B1's ceiling for THIS screen, amended 17 Sep 2026.
+    expect(visible.length).toBeLessThanOrEqual(3)
+  })
+
+  it("draws the standalone Edit pen — client ruling, 17 Sep 2026: \"just the pen\" — never mango (R84 leaves that to Close)", async () => {
+    openTicket("triaged", [message("m1", false)])
+    const region = titleRegion()
+    const edit = await within(region).findByRole("button", { name: "Edit" })
+    expect(edit.className).toContain("--btn-inverse-fill")
+    expect(edit.className).not.toContain("--btn-primary-fill")
+    // JUST THE PEN — an icon-only control, no visible label text beside it.
+    expect(edit.textContent?.trim()).toBe("")
   })
 })

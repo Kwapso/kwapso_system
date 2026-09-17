@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.110",
-  "sha": "9ef5ff8b4cebc3e002481e66c28b2426c14fd306",
+  "tag": "v1.2.111",
+  "sha": "f47ad05e829af2e0fad68bd80a0feaf6c993c0b1",
   "syncedAt": "2026-09-17"
  },
- "generatedAt": "2026-09-17T17:59:26.525Z",
+ "generatedAt": "2026-09-17T19:06:54.704Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -636,8 +636,8 @@
     {
      "file": "components/article-body/article-body.tsx",
      "name": "articleBodyVariants",
-     "line": 268,
-     "base": "min-w-0 text-ink-secondary [&>*+*]:mt-[var(--space-3h)] [&>:is(h2,h3,h4)+p]:mt-[var(--space-2h)] [&>*+:is(h2,h3)]:mt-[var(--space-8)] [&>*+h4]:mt-6 [&_h2]:text-3xl [&_h2]:font-[var(--font-weight-medium)] [&_h3]:text-2xl [&_h3]:font-[var(--font-weight-medium)] [&_h4]:text-xl [&_h4]:font-[var(--font-weight-medium)] [&_:is(h2,h3,h4)]:text-balance [&_:is(h2,h3,h4)]:text-foreground [&_p]:text-pretty [&_:is(ul,ol)]:ps-5 [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:leading-[var(--leading-loose)] [&_li+li]:mt-1 [&_li>:is(ul,ol)]:mt-1 [&_ol]:tabular-nums [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong [&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso [&_a:hover]:decoration-current [&_:is(strong,b)]:font-[var(--font-weight-medium)] [&_:is(strong,b)]:text-foreground [&_:is(em,i)]:italic [&_blockquote_p]:text-inherit [&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)] [&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal [&_blockquote_footer]:text-ink-tertiary [&_code]:rounded-[var(--radius-sm)] [&_code]:bg-surface-quiet [&_code]:px-1 [&_code]:py-px [&_code]:text-caption [&_code]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet [&_pre]:p-6 [&_pre]:text-caption [&_pre]:text-ink-secondary [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_hr]:my-[var(--space-8)] [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-hair-strong [&_img]:block [&_img]:h-auto [&_img]:w-full [&_img]:rounded-[var(--radius)] [&_figure]:my-[var(--space-8)] [&_figcaption]:mt-3 [&_figcaption]:text-caption [&_figcaption]:text-ink-tertiary [&_dt]:font-[var(--font-weight-medium)] [&_dt]:text-foreground [&_dd]:mt-1 [&_dd+dt]:mt-3 [&_:is(time,data)]:tabular-nums",
+     "line": 273,
+     "base": "min-w-0 text-ink-secondary [&>*+*]:mt-[var(--space-3h)] [&>:is(h2,h3,h4)+p]:mt-[var(--space-2h)] [&>*+:is(h2,h3)]:mt-[var(--space-8)] [&>*+h4]:mt-6 [&_h2]:text-3xl [&_h2]:font-[var(--font-weight-medium)] [&_h3]:text-2xl [&_h3]:font-[var(--font-weight-medium)] [&_h4]:text-xl [&_h4]:font-[var(--font-weight-medium)] [&_:is(h2,h3,h4)]:text-balance [&_:is(h2,h3,h4)]:text-foreground [&_p]:text-pretty [&_:is(ul,ol)]:ps-5 [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:leading-[var(--leading-loose)] [&_li+li]:mt-1 [&_li>:is(ul,ol)]:mt-1 [&_ol]:tabular-nums [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong [&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso [&_a:hover]:decoration-current [&_:is(strong,b)]:font-[var(--font-weight-medium)] [&_:is(strong,b)]:text-foreground [&_:is(em,i)]:italic [&_blockquote_p]:text-inherit [&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)] [&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal [&_blockquote_footer]:text-ink-tertiary [&_code]:rounded-[var(--radius-sm)] [&_code]:bg-surface-quiet [&_code]:px-1 [&_code]:py-px [&_code]:text-caption [&_code]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:overflow-y-hidden [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet [&_pre]:p-6 [&_pre]:text-caption [&_pre]:text-ink-secondary [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_hr]:my-[var(--space-8)] [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-hair-strong [&_img]:block [&_img]:h-auto [&_img]:w-full [&_img]:rounded-[var(--radius)] [&_figure]:my-[var(--space-8)] [&_figcaption]:mt-3 [&_figcaption]:text-caption [&_figcaption]:text-ink-tertiary [&_dt]:font-[var(--font-weight-medium)] [&_dt]:text-foreground [&_dd]:mt-1 [&_dd+dt]:mt-3 [&_:is(time,data)]:tabular-nums",
      "groups": [
       {
        "name": "size",
@@ -1667,6 +1667,10 @@
     },
     {
      "name": "CardFooter",
+     "file": "components/card/card.tsx"
+    },
+    {
+     "name": "CARD_CONTENT_INSET_X",
      "file": "components/card/card.tsx"
     }
    ],

@@ -151,6 +151,11 @@ const CONTACT_COLUMNS = [
   // React node there would be unsearchable ("[object Object]").
   field("accountCell", "Account"),
   field("role", "Role"),
+  // THE STATUS COLUMN — client ruling, 17 Sep 2026: "contact live green."
+  // Never gated (unlike Portal below): every reader who can see this table
+  // at all can see whether a contact is live or archived. Four columns is
+  // still inside R82's six-column budget with Portal added.
+  field("status", "Status"),
 ]
 
 /** THE FOURTH, GATED COLUMN — see this file's own header. A `field`, not a
@@ -415,6 +420,11 @@ export function ContactsScreen({
                     // is a row of the accounts table and has one address.
                     onIntent({ kind: "open", module: "contacts", id: String(row.id) })
                   }
+                  /* THE SAME SUBSTITUTION `onIntent`'s "open" case makes — a
+                     contact opens at ITS ACCOUNT's address, never a second
+                     `/contacts/<id>` URL for a record that already has one. */
+                  rowPath={(row) => `/t/${teamId}/accounts/${String(row.id)}`}
+                  rowLabel={(row) => String(row.name ?? row.id)}
                 />
                 <LoadMore
                   listKey={found.listKey ?? accountsKey(teamId)}

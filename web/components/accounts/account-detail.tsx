@@ -684,16 +684,15 @@ export function AccountDetailScreen({
       // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31, reading
       // their own screenshot of an account back: a status chip carries a dot).
       // An account's only two states are live and archived (glossary: "An
-      // account has none [no status]: it is live, or it is archived"), so the
-      // one unambiguous colour here is the kit's own `archived` dot tone —
-      // nothing is invented for the live half, which stays wordless as it
-      // always has.
+      // account has none [no status]: it is live, or it is archived").
+      // REWIRED 17 Sep 2026 — her ruling that session, verbatim: "account
+      // active green dot." The live half used to stay wordless; it carries
+      // the kit's own `shipped` (green) dot now, the same live/put-away pair
+      // every other kind in this ruling reaches for. Archived is unchanged.
       chips={
-        account.active ? null : (
-          <Badge variant="status" dot="archived">
-            {t("Archived")}
-          </Badge>
-        )
+        <Badge variant="status" dot={account.active ? "shipped" : "archived"}>
+          {account.active ? t("Active") : t("Archived")}
+        </Badge>
       }
       title={account.name}
       actions={

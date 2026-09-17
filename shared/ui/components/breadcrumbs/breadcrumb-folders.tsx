@@ -302,7 +302,12 @@ const STRIP = cn(
   // exactly 6.75px). `gap-0` wins the same merge `gap-1` used to and leaves
   // none of it standing.
   "flex flex-nowrap items-end isolate gap-0",
-  "max-w-full overflow-x-auto scroll-p-2 [scrollbar-width:none]",
+  // `overflow-y-hidden` — 17 Sep 2026 evening, the same fix `tabs.tsx`'s own
+  // `TabsList` took: `overflow-x` alone computes `overflow-y: auto`, and a
+  // strip this shape can round 1px tall, which makes it silently vertically
+  // scrollable. This strip never moves on that axis. See `tabs.tsx` and
+  // `foundations/rules/check-overflow-axis.mjs`.
+  "max-w-full overflow-x-auto overflow-y-hidden scroll-p-2 [scrollbar-width:none]",
   "[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0",
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",

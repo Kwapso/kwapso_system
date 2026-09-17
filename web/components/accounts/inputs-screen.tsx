@@ -77,7 +77,7 @@
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/components/badge/badge"
+import { Badge, type BadgeDot } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -123,29 +123,31 @@ function inputSortOptions(t: (s: string) => string): SortOption[] {
 
 /** THE WAITING BADGE — days since the input was RAISED (`createdAt`), never
  * since its due date: an input with no due date at all still waits, and the
- * client's own word is "waiting", not "late". Blank on Received (the row has
- * finished waiting, and `receivedOn` carries that column's own fact instead —
- * there is no third tone to draw here since nothing green-coded renders on
- * this tab at all) — through the kit's own Badge tones, never a bespoke
- * colour.
+ * client's own word is "waiting", not "late".
  *
  * ONE TONE PER STATE, NOT A DAY THRESHOLD — client ruling, 16 Sep 2026
  * evening, verbatim: "For inputs waiting, let's use orange." This used to
  * grade the Waiting tab itself, quiet (`secondary`) under a week and only
  * `warning` past it — a second, undocumented tier her sentence does not
- * make room for. The STATE is what carries the colour now, same as Overdue's
- * `destructive` already did and still does (the door has already decided the
- * row is overdue; this reads that fact rather than re-deriving it from a
- * date in the browser) — every Waiting row is `warning` (kit `--warning`,
- * the orange token), regardless of how many days it has been waiting; the
- * day count itself still prints, inside the same orange pill. */
+ * make room for.
+ *
+ * NO SOLID FILL, 17 Sep 2026 — her follow-up, read with the rest of that
+ * session's palette ("switch inputs to only colored dot, received green"):
+ * a filled `warning`/`destructive` pill is the one shape every OTHER
+ * coloured kind in this app abandoned for `variant="status"` + a dot
+ * (Portal's own column made the identical move on 16 Sep — see
+ * `shapeContactsTable`'s header). This column now draws the neutral pill
+ * with a coloured dot, like everyone else: Waiting orange, Overdue red,
+ * Received green — and Received is a real state of this column now, not a
+ * blank cell (`todo.completedAt` used to return `null` here outright,
+ * before this column carried any colour for that tab at all). */
 function waitingBadge(todo: Todo, view: InputView, t: (s: string, vars?: Record<string, unknown>) => string) {
-  if (todo.completedAt) return null
+  const dot: BadgeDot = todo.completedAt ? "shipped" : view === "overdue" ? "red" : "orange"
   const days = Math.max(0, Math.floor((Date.now() - new Date(todo.createdAt).getTime()) / 86400000))
-  const tone = view === "overdue" ? "destructive" : "warning"
+  const label = todo.completedAt ? t("Received") : t("{count} days", { count: days })
   return (
-    <Badge variant={tone} size="pill">
-      {t("{count} days", { count: days })}
+    <Badge variant="status" dot={dot} size="pill">
+      {label}
     </Badge>
   )
 }

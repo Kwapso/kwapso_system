@@ -108,14 +108,24 @@ export function KnowledgeSourceCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-1.5 text-sm">
-        {/* KIND — the one fact a title alone cannot say (a calendar entry
-            beside a ticket beside a file somebody uploaded), in the same
-            words the record's own Overview tab and the Type facet already
-            use (`KNOWLEDGE_KIND`), so this card never coins a second name for
-            the same thing. */}
-        <Badge variant="secondary" className="w-fit">
-          {KNOWLEDGE_KIND[source.kind] ?? source.kind}
-        </Badge>
+        <span className="flex flex-wrap items-center gap-1.5">
+          {/* KIND — the one fact a title alone cannot say (a calendar entry
+              beside a ticket beside a file somebody uploaded), in the same
+              words the record's own Overview tab and the Type facet already
+              use (`KNOWLEDGE_KIND`), so this card never coins a second name
+              for the same thing. Plain, uncoloured — R86: the one coloured
+              chip on this card is the STATUS badge beside it. */}
+          <Badge variant="secondary" className="w-fit">
+            {KNOWLEDGE_KIND[source.kind] ?? source.kind}
+          </Badge>
+          {/* STATUS, WITH THE COLOUR — client ruling, 17 Sep 2026: "knowledge
+              source in use green dot." Green while in use, grey once not,
+              the same `knowledge-detail.tsx` head chip draws for the record
+              itself now. */}
+          <Badge variant="status" dot={source.active ? "shipped" : "archived"}>
+            {source.active ? t("In use") : t("Not in use")}
+          </Badge>
+        </span>
         {/* THE ONE META LINE. "Last edited" beats a count of pieces or
             sightings here: it is the one fact true of every source (a note,
             a file, a mirrored record) and the one a reader scanning a wall of

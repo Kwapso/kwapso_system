@@ -128,12 +128,15 @@ beforeEach(() => {
 describe("a story written from a ticket reaches the app's own Stories tab", () => {
   it("invalidates the app's stories slice, not just the ticket's own", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
-    // AMENDED 17 Sep 2026 — V1's "no tabs" body retired the Related stories
-    // tab this used to click into (see story-born-on-a-ticket.test.tsx's own
-    // `relatedStoriesTab` comment for the full account). The real
-    // `<StoriesPanel>` — and its `onNew` button — now lives behind the
-    // capped preview's "Show all" link, in a slide-in.
-    fireEvent.click(await screen.findByRole("button", { name: "Show all" }))
+    // AMENDED 17 Sep 2026, TWICE — V1's "no tabs" body first retired the
+    // Related stories tab this used to click into, behind a capped preview's
+    // "Show all" link opening the real `<StoriesPanel>` (and its `onNew`) in
+    // a slide-in. THEN the client, reading the deployed page: "Remove 'Show
+    // All' because you need to show them all" (see
+    // story-born-on-a-ticket.test.tsx's own `relatedStoriesTab` comment for
+    // the full account) — the panel renders every row itself now, and "New
+    // story" sits directly on the panel's own title row with nothing left
+    // behind a link to open first.
     fireEvent.click(await screen.findByRole("button", { name: "New story" }))
 
     fireEvent.click(await screen.findByRole("button", { name: "fire onSubmit" }))

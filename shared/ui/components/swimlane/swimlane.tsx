@@ -385,7 +385,13 @@ const Swimlane = React.forwardRef<HTMLDivElement, SwimlaneProps>(
             >
               {laneName(lane, cards)}
 
-              <div className="min-w-0 snap-x snap-mandatory scroll-p-1 overflow-x-auto min-[45rem]:snap-none min-[45rem]:overflow-visible">
+              {/* `overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x`
+                  alone computes `overflow-y: auto`, and a lane this shape
+                  can round 1px tall and become silently vertically
+                  scrollable. Released at `min-[45rem]` along with the rest
+                  of this element's scroll, same as before. See `tabs.tsx`'s
+                  `TabsList` and `foundations/rules/check-overflow-axis.mjs`. */}
+              <div className="min-w-0 snap-x snap-mandatory scroll-p-1 overflow-x-auto overflow-y-hidden min-[45rem]:snap-none min-[45rem]:overflow-visible">
                 <div className={cn("grid items-start gap-3", LADDER_COLS)}>
                   {laneEmpty ? (
                     <span className="col-span-full px-1 py-[var(--space-3h)] text-caption text-ink-tertiary">

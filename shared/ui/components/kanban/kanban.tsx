@@ -659,7 +659,15 @@ const Kanban = React.forwardRef<HTMLDivElement, KanbanProps>(
         <div
           data-slot="kanban-board"
           className={cn(
-            "hidden min-w-0 snap-x snap-mandatory gap-[var(--space-2h)] overflow-x-auto scroll-p-1 pb-2",
+            // `overflow-y-hidden` — 17 Sep 2026 evening: `overflow-x` alone
+            // computes `overflow-y: auto`, and a row this shape can round
+            // 1px tall and become silently vertically scrollable. Each
+            // column manages its own vertical scroll independently
+            // (`kanban-column-cards`' own `overflow-y-auto`, conditional on
+            // `columnMaxHeight`); the board itself never scrolls on this
+            // axis. See `tabs.tsx`'s `TabsList` and `foundations/rules/
+            // check-overflow-axis.mjs`.
+            "hidden min-w-0 snap-x snap-mandatory gap-[var(--space-2h)] overflow-x-auto overflow-y-hidden scroll-p-1 pb-2",
             "min-[45rem]:flex",
           )}
         >

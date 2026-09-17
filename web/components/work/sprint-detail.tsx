@@ -44,6 +44,7 @@ import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
+import { sprintStatusBadge } from "@/components/work/sprints-screen"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { OverviewList } from "@/components/records/overview-list"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -292,13 +293,15 @@ export function SprintDetailScreen({
       recordNumber={sprint.ref || undefined}
       collectionLabel={kindWord}
       // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
-      // scheme is not only for tickets … map colors"). A sprint has no stored
-      // status word — `completedAt` and `active` are the two facts this same
-      // three-way sentence already reads on the `status` line below — so the
-      // dot reuses that same reading rather than a new field: `shipped` once
-      // it is cut (closed, successfully, same tone as an app's "Completed"),
-      // `building` while it runs, `archived` once switched off unfinished
-      // (the "Cancelled" tier every other put-away record uses).
+      // scheme is not only for tickets … map colors"). REWIRED 17 Sep 2026
+      // onto the shared register (`sprintStatusBadge`, sprints-screen.tsx) —
+      // the three-way ternary that used to live here never had a reading for
+      // an UPCOMING sprint at all (it fell into the "running" branch, black,
+      // the same tone a sprint actually running wore), which her four-tone
+      // ruling that day ("wrapped complete green, wrapped cancelled gray,
+      // running now black, coming up purple") both names and fixes: this
+      // head chip, the Overview list row and the board card (none today) now
+      // read one function rather than three copies of the same three facts.
       chips={
         <>
           {/* THE TYPE, ICON + WORD, NO COLOUR — the client's ruling, 16 Sep
@@ -314,12 +317,7 @@ export function SprintDetailScreen({
               {kindWord}
             </Badge>
           )}
-          <Badge
-            variant="status"
-            dot={sprint.completedAt ? "shipped" : sprint.active ? "building" : "archived"}
-          >
-            {sprint.completedAt ? t("Complete") : sprint.active ? t("Running") : t("Cancelled")}
-          </Badge>
+          {sprintStatusBadge(sprint, t)}
           {/* THE THIRD PILL, "the most relevant container parent" (client
               ruling, 2026-08-31). The glossary's own words settle it: "sprint:
               a block of delivery work sold to ONE ACCOUNT" — the account it

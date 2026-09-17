@@ -152,18 +152,22 @@ async function markChangesNoProcess() {
   fireEvent.click(await screen.findByRole("option", { name: "This changes no process" }))
 }
 
-/** AMENDED 17 Sep 2026 — V1's "no tabs" body (client ruling: "I want to see,
- * on one single screen with no tabs, the content of tickets … related
- * stories, work logs, stakeholders") retired the Related stories TAB this
- * helper used to click into. The capped on-page preview carries no create
- * action of its own (V1: "capped to the first N with a 'Show all' link"); the
- * create action still lives exactly where it always did — the full
- * `<StoriesPanel>`'s own `onNew` — now reached through that "Show all" link,
- * which opens it in a slide-in instead of switching a tab. Same panel, same
- * `onNew` wiring, same gate; only the door to it moved. */
+/** AMENDED 17 Sep 2026, TWICE. First, V1's "no tabs" body (client ruling: "I
+ * want to see, on one single screen with no tabs, the content of tickets …
+ * related stories, work logs, stakeholders") retired the Related stories TAB
+ * this helper used to click into, in favour of a capped on-page preview
+ * behind a "Show all" link that opened the full `<StoriesPanel>` (and its
+ * own `onNew`) as a slide-in. THEN, reading the deployed page, the client's
+ * ruling, verbatim: *"In the section 'Related Stories' … Remove 'Show All'
+ * because you need to show them all."* The panel now renders every row
+ * itself — there is nothing left behind a link to open, so the slide-in
+ * `<StoriesPanel>` is gone — and "New story" moved to a plain button on the
+ * panel's own title row (`help-detail.tsx`'s `TicketSidePanel action` slot),
+ * visible the moment the ticket screen is, same wiring (`setStoryOpen`),
+ * same gate (`canWriteWork`). Nothing left to open first any more. */
 async function relatedStoriesTab() {
   openTicket()
-  fireEvent.click(await screen.findByRole("button", { name: "Show all" }))
+  await screen.findByText("Related stories")
 }
 
 describe("writing a story on the ticket that asked for it", () => {

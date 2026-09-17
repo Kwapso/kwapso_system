@@ -101,8 +101,23 @@
 // exactly what `awaiting_validation` meant and what the waiting predicate
 // means now; it is simply no longer the only reason this file hands the tone
 // out.
-import type { DotTone } from "./app-stages"
+import type { AppStageDotTone, DotTone } from "./app-stages"
 import type { HelpStatus, StoryStatus } from "./types"
+
+// RE-RULED, 17 Sep 2026, VERBATIM (read together with the ticket half of the
+// same session's rulings): "tickets: triaged orange, ready blue, in progress
+// black, scheduled purple" and "charcoal never means in progress." A
+// TICKET's six stages now reach past `Badge`'s original six-tone `DotTone`
+// into the four extra tones `shared/app-stages.ts` already widens App stage
+// to (`AppStageDotTone` — `red`/`orange`/`purple`/`blue`, the kit's own other
+// four `--dot-*` tokens, `shared/ui/components/badge/badge.tsx`'s `DOT_FILL`),
+// so `HELP_STATUS_DOT_TONE` and `helpStatusDotTone` are typed to that wider
+// union below. A STORY's four stages are UNCHANGED by this ruling ("stories
+// as it is," her own words the same session) and stay on the original
+// six-tone `DotTone`. "Black" is what she calls the tone this file and the
+// kit still spell `building` (`--dot-building`, literal ink) — the token
+// name does not change, only the English gloss for it, everywhere a label or
+// a comment used to say "charcoal" for that tone.
 
 /** A TICKET'S SIX STAGES → THE CHIP'S DOT. `Record<HelpStatus, …>` rather
  * than a function with a fallback, on purpose — the same reason the portal's
@@ -115,27 +130,35 @@ import type { HelpStatus, StoryStatus } from "./types"
  * HISTORY is drawn from words, not dots (`stageLabel`,
  * web/components/tickets/ticket-stages.tsx), so a retired stage needs no row here and
  * adding one back would re-open the `Record` to a word no chip can be handed. */
-const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
+const HELP_STATUS_DOT_TONE: Record<HelpStatus, AppStageDotTone> = {
   // Raised, nobody has read it yet — the "Not started" tier, RED since the
   // 16 Sep 2026 evening ruling quoted at the top of this file ("tickets
-  // new" is one of her three). `blocked` is the tone that carries red in
-  // this six-value union — see that ruling's own paragraph for the hex.
+  // new" is one of her three), UNCHANGED by the 17 Sep re-ruling ("new"
+  // stays red). `blocked` is the tone that carries red in this union — see
+  // that ruling's own paragraph for the hex.
   new: "blocked",
-  // Read and sorted, not yet scheduled — the "somebody is looking at this"
-  // tier, same as an app still being scoped.
-  triaged: "review",
-  // Work exists and is booked into a sprint — real, committed motion.
-  scheduled: "building",
-  // A timer is literally running against it.
+  // Read and sorted, not yet scheduled — ORANGE since 17 Sep 2026
+  // ("triaged orange"), replacing the "somebody is looking at this" `review`
+  // reading this tier used to carry.
+  triaged: "orange",
+  // Work exists and is booked into a sprint — PURPLE since 17 Sep 2026
+  // ("scheduled purple"), no longer sharing `in_progress`'s own tone.
+  scheduled: "purple",
+  // A timer is literally running against it — BLACK (`building`, this file's
+  // own ink token) since 17 Sep 2026 ("in progress black"). Unchanged in
+  // VALUE from before the ruling; only her word for it changed, from
+  // "charcoal" to "black".
   in_progress: "building",
-  // Every story closed; nobody has told the client yet.
-  ready: "done",
-  // The answer was sent. Closed.
+  // Every story closed; nobody has told the client yet — BLUE since 17 Sep
+  // 2026 ("ready blue"), replacing the `done` reading this tier used to
+  // carry.
+  ready: "blue",
+  // The answer was sent. Closed. UNCHANGED — green, same as before.
   resolved: "shipped",
 }
 
 /** The dot tone for a ticket's status. */
-export function helpStatusDotTone(status: HelpStatus): DotTone {
+export function helpStatusDotTone(status: HelpStatus): AppStageDotTone {
   return HELP_STATUS_DOT_TONE[status]
 }
 

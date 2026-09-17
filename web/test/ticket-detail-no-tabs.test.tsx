@@ -13,18 +13,25 @@
 //     stories, Work logs, Stakeholders;
 //   · a `?tab=stories` deep link still resolves — it scrolls to the panel
 //     rather than switching to a tab that no longer exists;
-//   · Files and links is reachable from the ⋯ menu, as a sheet;
-//   · the Stakeholders panel carries the "Raised by" / "Raised on" facts
-//     (ticket-raised-on.test.tsx proves the SOURCE wiring; this proves the
-//     DOM actually renders them, inside the right panel).
+//   · Files and links is reachable from the ⋯ menu, as a sheet.
 // `ticket-close-moved-to-top.test.tsx` already proves the mango Close button
-// stays the title's one primary action — unaffected by this file's own
-// change, so it is not re-proved here.
+// stays the title's one primary action, and the standalone Edit pen beside
+// it — unaffected by this file's own change, so neither is re-proved here.
+//
+// AMENDED 17 Sep 2026 — the client's review of the deployed page retired the
+// Stakeholders panel's own fact list (Type/App/Raised by/Raised on/Title/
+// Raised from/Screen recording/Resolved) and its member picker, and asked
+// that every related story show, uncapped, with no "Show all". The two
+// describe blocks below that used to prove the OLD shapes ("the stakeholders
+// panel carries the raiser facts") are replaced with what the page does now;
+// `help-stakeholders.test.tsx` proves the panel component alone, and
+// `help-form-dialog-loop-field.test.tsx` proves the picker's NEW home, in
+// the edit sheet.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpStakeholder, HelpTicket, HelpStatus, TicketStageHistory } from "@shared/types"
+import type { HelpStakeholder, HelpTicket, HelpStatus, Story, TicketStageHistory } from "@shared/types"
 
 const BASE_TICKET = {
   id: "help-1",
@@ -65,6 +72,29 @@ const STAKEHOLDER: HelpStakeholder = {
   origin: "admin",
 } as unknown as HelpStakeholder
 
+// TWO RELATED STORIES — enough to prove "no cap" means something (V1 capped
+// at five; two is not a cap-proving number on its own, but the type/status
+// chip assertions below need only one, and a second row is what proves nothing
+// besides `.slice(0, N)` was quietly reintroduced under a different name).
+const RELATED_STORIES = [
+  {
+    id: "story-1",
+    ref: "BERG-S0188",
+    title: "Fix the dispatch board's stuck spinner",
+    status: "in_review",
+    storyType: "Bug",
+    ticketId: "help-1",
+  },
+  {
+    id: "story-2",
+    ref: "BERG-S0189",
+    title: "Add a retry button to the dispatch board",
+    status: "open",
+    storyType: "Feature",
+    ticketId: "help-1",
+  },
+] as unknown as Story[]
+
 const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
 vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: perms.can }) }))
 
@@ -91,7 +121,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       helpThread: async () => ({ replies: [], total: 0 }),
       helpStakeholders: async () => ({ stakeholders: [STAKEHOLDER] }),
       helpStages: async () => EMPTY_STAGE_HISTORY,
-      stories: async () => ({ stories: [], total: 0, nextCursor: null, hasMore: false }),
+      stories: async () => ({ stories: RELATED_STORIES, total: RELATED_STORIES.length, nextCursor: null, hasMore: false }),
       sprints: async () => ({ sprints: [], total: 0 }),
       workLogs: async () => ({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false }),
       workLogSummary: async () => ({ total: 0, totalSeconds: 0, people: [], kinds: [], weeks: [] }),
@@ -194,18 +224,67 @@ describe("the two-column body renders all four panels", () => {
   })
 })
 
-describe("the stakeholders panel carries the raiser facts", () => {
-  it("renders 'Raised by' and 'Raised on' inside the Stakeholders panel, below the people pills", async () => {
+// AMENDED 17 Sep 2026 — client ruling, reading the deployed page back,
+// verbatim: "Remove all of this from stakeholders 'Pick someone to keep in
+// the loop … Type Issue App Kwapso System Raised by Max Mustermann Raised on
+// Sep 16, 2026 (1 days ago) Title Title (English) Ticket and story titles
+// Raised from Screen recording Resolved … You can add members, but no one is
+// ever removed.'" The panel keeps only the people themselves.
+describe("the stakeholders panel is faces + names only", () => {
+  it("renders the stakeholder's name and no fact list, no picker, no intro sentence", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const panel = screen.getByText("Stakeholders").closest('[data-slot="card"]') as HTMLElement
-    expect(within(panel).getByText("Raised by")).toBeTruthy()
-    expect(within(panel).getByText("Raised on")).toBeTruthy()
-    // The pills sit ABOVE the facts (V1: "plus the facts … below them") —
-    // the stakeholder's own name renders before "Raised by" in DOM order.
-    const html = panel.innerHTML
-    expect(html.indexOf("Aurora")).toBeGreaterThan(-1)
-    expect(html.indexOf("Aurora")).toBeLessThan(html.indexOf("Raised by"))
+    expect(within(panel).getByText("Aurora")).toBeTruthy()
+
+    // THE FACT LIST IS GONE — every label the old OverviewList drew.
+    for (const label of ["Type", "Raised by", "Raised on", "Raised from", "Screen recording", "Resolved"]) {
+      expect(within(panel).queryByText(label), `"${label}" must not render in the panel any more`).toBeNull()
+    }
+    // THE PICKER AND ITS SENTENCES ARE GONE — moved to the edit sheet
+    // (help-form-dialog-loop-field.test.tsx proves the new home).
+    expect(within(panel).queryByText("Pick someone to keep in the loop")).toBeNull()
+    expect(within(panel).queryByText("You can add members, but no one is ever removed.")).toBeNull()
+    // THE OLD INTRO SENTENCE IS GONE TOO.
+    expect(
+      within(panel).queryByText("Everyone kept in the loop on this ticket, the person who raised it, your admins, and anyone mentioned.")
+    ).toBeNull()
+  })
+})
+
+// CLIENT RULING, 17 Sep 2026, verbatim: "In the section 'Related Stories',
+// also show the type as a chip with the icon and the color dot for the
+// status. Remove 'Show All' because you need to show them all."
+describe("related stories show every row, uncapped, with a type chip and a status dot", () => {
+  it("renders every related story with no 'Show all' link", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+    expect(within(panel).getByText("Fix the dispatch board's stuck spinner")).toBeTruthy()
+    expect(within(panel).getByText("Add a retry button to the dispatch board")).toBeTruthy()
+    expect(within(panel).queryByRole("button", { name: "Show all" })).toBeNull()
+  })
+
+  it("carries the story's own TYPE as a chip with its icon, and STATUS as a coloured dot", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+    const row = within(panel).getByText("Fix the dispatch board's stuck spinner").closest("li") as HTMLElement
+    // THE TYPE CHIP — plain, quiet (never coloured — R86 reserves colour for
+    // status), carrying the word AND an icon glyph beside it.
+    expect(within(row).getByText("Bug")).toBeTruthy()
+    expect(row.querySelector("svg")).toBeTruthy()
+    // THE STATUS — a coloured dot badge, `variant="status"`, never plain
+    // `variant="secondary"` the way it drew before this ruling.
+    const statusBadge = within(row).getByText("In review").closest('[data-slot="badge"]') as HTMLElement
+    expect(statusBadge.getAttribute("data-dot")).toBe("review")
+  })
+
+  it("offers 'New story' on the panel's own title row, replacing the old 'Show all' door to it", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const panel = screen.getByText("Related stories").closest('[data-slot="card"]') as HTMLElement
+    expect(await within(panel).findByRole("button", { name: "New story" })).toBeTruthy()
   })
 })
 

@@ -1,11 +1,17 @@
 // THE CARD, NOT THE GENERIC ENGINE'S — locking the four facts left on it
-// after the client's 17 Sep 2026 ruling ("I want the cards smaller, so I
-// want to see at least four in one row. Also, the edit button is deleted
-// from the card. It should just be on the detail page."): mark, title, kind,
-// one meta line. Compartment, app, sharing, pieces and sightings — and the
-// inline "Edit filing" pencil that used to write them — moved off the card
-// entirely; `web/test/knowledge-gallery-card.test.tsx` proves the pencil is
-// gone and that the detail page still offers edit.
+// after the client's 17 Sep 2026 (morning) ruling ("I want the cards
+// smaller, so I want to see at least four in one row. Also, the edit button
+// is deleted from the card. It should just be on the detail page."): mark,
+// title, kind, one meta line. Compartment, app, sharing, pieces and
+// sightings — and the inline "Edit filing" pencil that used to write them —
+// moved off the card entirely; `web/test/knowledge-gallery-card.test.tsx`
+// proves the pencil is gone and that the detail page still offers edit.
+//
+// A FIFTH FACT LANDED THE SAME DAY, LATER — R86 (`status-owns-the-chip`):
+// "knowledge source in use green dot." The KIND badge stays the plain,
+// uncoloured pill it always was; a STATUS badge beside it now carries the
+// one colour this card draws, green while in use and grey once not — the
+// last test in this file locks the dot.
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -75,7 +81,7 @@ describe("KnowledgeSourceCard — four facts, mark/title/kind/one meta line", ()
 
   it("shows the kind in the app's own words, not the schema's raw value", () => {
     render(<KnowledgeSourceCard source={makeSource({ kind: "file" })} onOpen={noop} />)
-    expect(screen.getByText("From a file")).toBeTruthy()
+    expect(screen.getByText("Uploads")).toBeTruthy()
     expect(screen.queryByText("file")).toBeNull()
   })
 
@@ -141,5 +147,18 @@ describe("KnowledgeSourceCard — four facts, mark/title/kind/one meta line", ()
     // onOpen/onKeyDown handlers, above) — a second one would be a nested
     // control the card's own click could no longer reach cleanly.
     expect(screen.queryAllByRole("button")).toHaveLength(1)
+  })
+
+  // R86 / D17, client ruling 17 Sep 2026: "knowledge source in use green
+  // dot." Green (`shipped`) while in use, grey (`archived`) once not — the
+  // kit stamps `data-dot` on the badge only when a dot is really drawn, so
+  // its presence and value are the proof, not just the words beside it.
+  it("draws the status dot — green while in use, grey once not", () => {
+    const { rerender } = render(<KnowledgeSourceCard source={makeSource({ active: true })} onOpen={noop} />)
+    expect(screen.getByText("In use")).toBeTruthy()
+    expect(document.querySelector('[data-slot="badge"][data-dot="shipped"]')).toBeTruthy()
+
+    rerender(<KnowledgeSourceCard source={makeSource({ active: false })} onOpen={noop} />)
+    expect(document.querySelector('[data-slot="badge"][data-dot="archived"]')).toBeTruthy()
   })
 })

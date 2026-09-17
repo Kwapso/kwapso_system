@@ -167,6 +167,40 @@ export function daysSince(iso: string | null | undefined): number | null {
   return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
 }
 
+/** "Sep 16 · 14h" — A STAGE RUNG'S OWN MOMENT, ON ONE LINE.
+ *
+ * BUILT FOR THE TICKET STAGES LADDER (`web/components/tickets/ticket-stages.tsx`,
+ * client ruling, 17 Sep 2026, verbatim: "the date should take only one line.
+ * Unless it's a different year, just put the month, the day, and the hour in
+ * 24-hour format. Only put the hour, not the minutes." Three clauses, all
+ * here: month + day always; the YEAR only when the moment falls outside the
+ * CURRENT calendar year (never `formatDate`'s own always-on year); and the
+ * clock is the hour alone, 24-hour, with no minutes at all — never
+ * `formatTime`'s own "14:05".
+ *
+ * `now` IS A PARAMETER, NOT `new Date()` INLINE, for the same reason
+ * `daysSince` above takes nothing ambient: a caller that needs to know
+ * whether a date rolled into a new calendar year has to say WHEN "now" is
+ * rather than let the test suite's own clock decide it, so a test can pin it
+ * and a real caller can simply omit it. */
+export function formatStageMoment(iso: string | null | undefined, lang: Language, now: Date = new Date()): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const day = d.toLocaleDateString(lang, {
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  })
+  // THE HOUR ALONE. `hour12: false` is what asks for 24-hour in the first
+  // place; some locales' ICU data still decorates a bare hour with a
+  // trailing colon or a leading zero pattern of its own; stripping every
+  // character but the digits is what keeps the result "14h" — never
+  // "14:00h" or "14 h" — in every language this app ships.
+  const hour = d.toLocaleTimeString(lang, { hour: "2-digit", hour12: false }).replace(/[^0-9]/g, "").slice(-2)
+  return `${day} · ${hour}h`
+}
+
 // ── the datetime-local pair ───────────────────────────────────────────────────
 // `<input type="datetime-local">` speaks LOCAL WALL-CLOCK with no offset on it,
 // and the doors store instants. These two are that boundary, in both directions.

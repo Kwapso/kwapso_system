@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 790 strings · 3 languages · 1435 of the entries below are hand-written seed.
+// 785 strings · 3 languages · 1431 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -204,7 +204,6 @@ export const CATALOGUE: Catalogue = {
   "Email me a code": { de: "Senden Sie mir einen Code per E-Mail", es: "Envíame un código", ca: "Envia'm un codi per correu" },
   "Ends": { de: "Endet", es: "Finaliza", ca: "Finalitza" },
   "Every version this way of working has been through. Open one to read its steps and the times they were agreed at, version 1 is how the work was done before us, and every saving is measured from it.": { de: "Jede Version, die diese Arbeitsweise durchlaufen hat. Öffnen Sie eine, um ihre Schritte und die Zeiten zu lesen, auf die sie vereinbart wurden. Version 1 ist, wie die Arbeit vor uns durchgeführt wurde, und jede Speicherung wird davon aus gemessen.", es: "Todas las versiones por las que ha pasado este método de trabajo. Abre una para leer sus pasos y cuándo fueron acordados. La versión 1 es cómo se hacía el trabajo antes que nosotros, y cada guardado se mide a partir de ella.", ca: "Totes les versions que aquesta forma de treballar ha travessat. Obriu-ne una per llegir els seus passos i els moments en què van ser acordats, la versió 1 és com es feia el treball anteriorment, i cada estalvi es mesura a partir d'aquesta." },
-  "Everyone kept in the loop on this ticket, the person who raised it, your admins, and anyone mentioned.": { de: "Alle sind bei diesem Ticket informiert, die Person, die es eingereicht hat, Ihre Administratoren und alle erwähnten Personen.", es: "Todos los involucrados en este ticket, la persona que lo creó, tus administradores y cualquier persona mencionada.", ca: "Tothom mantingut al corrent d'aquesta tasca, la persona que la va crear, els teus administradors, i qualsevol persona mencionada." },
   "Everything else": { de: "Alles Übrige", es: "Todo lo demás", ca: "La resta" },
   "Expired": { de: "Abgelaufen", es: "Vencido", ca: "Caducat" },
   "Expires": { de: "Läuft ab", es: "Vence", ca: "Caduca" },
@@ -286,7 +285,6 @@ export const CATALOGUE: Catalogue = {
   "Kind": { de: "Art", es: "Tipo", ca: "Tipus" },
   "Kind of work": { de: "Art der Arbeit", es: "Tipo de trabajo", ca: "Tipus de treball" },
   "Knowledge": { de: "Wissen", es: "Conocimiento", ca: "Coneixement" },
-  "Knowledge base": { de: "Wissensdatenbank", es: "Base de conocimiento", ca: "Base de coneixement" },
   "Kwapso": { de: "kwapso", es: "kwapso", ca: "kwapso" },
   "Language": { de: "Sprache", es: "Idioma", ca: "Idioma" },
   "Language changed.": { de: "Sprache geändert.", es: "Idioma cambiado.", ca: "Idioma canviat." },
@@ -443,7 +441,6 @@ export const CATALOGUE: Catalogue = {
   "Photo": { de: "Foto", es: "Foto", ca: "Foto" },
   "Pick a story or a ticket": { de: "Geschichte oder Ticket auswählen", es: "Elige un relato o un ticket", ca: "Tria una història o una incidència" },
   "Pick a version": { de: "Version auswählen", es: "Elige una versión", ca: "Tria una versió" },
-  "Pick someone to keep in the loop": { de: "Wählen Sie jemanden, der informiert bleiben soll", es: "Elige a alguien para mantenerlo informado", ca: "Tria algú per mantenir al corrent" },
   "Pick the app": { de: "App auswählen", es: "Elige la aplicación", ca: "Tria l'aplicació" },
   "Pick the person who's a contact of": { de: "Wählen Sie die Person, die ein Kontakt von", es: "Elige a la persona que es contacto de", ca: "Tria la persona que és un contacte de" },
   "Pinned to": { de: "Angeheftet an", es: "Fijado a", ca: "Fixat a" },
@@ -466,7 +463,6 @@ export const CATALOGUE: Catalogue = {
   "Questions about this?": { de: "Fragen dazu?", es: "¿Preguntas sobre esto?", ca: "Preguntes sobre això?" },
   "Raise ticket": { de: "Ticket erstellen", es: "Crear ticket", ca: "Obrir incidència" },
   "Raised by": { de: "Erstellt von", es: "Creado por", ca: "Creat per" },
-  "Raised from": { de: "Ausgelöst von", es: "Creado desde", ca: "Creat des de" },
   "Read from your calendar": { de: "Aus Ihrem Kalender auslesen", es: "Leer desde tu calendario", ca: "Llegir del calendari" },
   "Read the transcript": { de: "Transkript lesen", es: "Lee la transcripción", ca: "Llegeix la transcripció" },
   "Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just yourself stays answerable to you alone.": { de: "Liest nur über IHRE Verbindung, daher müssen Sie selbst fragen. Alles, das Sie nur mit sich selbst geteilt haben, bleibt nur für Sie beantwortbar.", es: "Lee solo a través de TU conexión, por lo que tienes que ser tú quien pregunte. Cualquier cosa que hayas compartido solo contigo mismo sigue siendo respondible solo para ti.", ca: "Llegeix només a través de LA TEVA connexió, així que has de ser tu qui ho preguntis. Tot el que has compartit només amb tu mateix segueix sent responsable només per a tu." },
@@ -644,7 +640,6 @@ export const CATALOGUE: Catalogue = {
   "Timer started.": { de: "Timer gestartet.", es: "Cronómetro iniciado.", ca: "Cronòmetre iniciat." },
   "Timer stopped.": { de: "Timer gestoppt.", es: "Cronómetro detenido.", ca: "Cronòmetre aturat." },
   "Title": { de: "Titel", es: "Título", ca: "Títol" },
-  "Title (English)": { de: "Titel (Englisch)", es: "Título (inglés)", ca: "Títol (anglès)" },
   "To": { de: "Zu", es: "Para", ca: "A" },
   "Today's tasks": { de: "Heutige Aufgaben", es: "Tareas de hoy", ca: "Tasques d'avui" },
   "Token revoked.": { de: "Token widerrufen.", es: "Token revocado.", ca: "Token revocat." },

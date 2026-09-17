@@ -1687,6 +1687,22 @@ const PANEL_BELOW_TABS =
  * fixed in the same pass rather than left to be reported a second time. */
 export const STICKY_TABS =
   "[&>[role=tablist]]:bg-surface-raised [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
+  /* NO STRIP MAY EVER SCROLL VERTICALLY — client, 17 Sep 2026: "sometimes
+   * there is a vertical scroll on the tabs under the title. It should not
+   * be like that." Measured live on staging (App detail, Account detail):
+   * `[role=tablist]` reported `scrollHeight` 1px above `clientHeight`, not a
+   * real overflow of content but the CSS Overflow spec's own "the other axis
+   * computes to auto too" rule.
+   *
+   * RETIRED HERE, 17 Sep 2026, SAME DAY — kit v1.2.111 added
+   * `overflow-y-hidden` straight onto its own `TabsList` (shared/ui/
+   * components/tabs/tabs.tsx), the same ruling, fixed at the root rather
+   * than escaped around from here. This strip's own override was the
+   * workaround while the kit didn't have it; now every `<Tabs>` this app
+   * draws gets the closed axis for free, so re-stating it on this exact
+   * selector bought nothing but a second place to forget it. See
+   * `web/test/tab-strip-no-vertical-scroll.test.ts`, which now reads the
+   * kit's own `TabsList` instead of this constant. */
   "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
   "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +

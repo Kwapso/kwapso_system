@@ -397,6 +397,22 @@ export type FolderTabStrip = {
    of them was told. */
 export const STICKY_FOLDER_TABS =
   `bg-surface-raised sticky top-0 z-10 pb-[var(--tab-content-gap)] ${PINNED_STRIP_MARK} ` +
+  /* NO STRIP MAY EVER SCROLL VERTICALLY — client, 17 Sep 2026: "sometimes
+   * there is a vertical scroll on the tabs under the title. It should not
+   * be like that." Measured live on staging (a Playwright read of the
+   * tablist's own `scrollHeight`/`clientHeight`): `scrollHeight` sat 1px
+   * ABOVE `clientHeight` on every collection strip checked (Tickets, Waves,
+   * Settings) — not a genuine overflow of content, a sub-pixel rounding gap
+   * between the flex row's measured height and its own box.
+   *
+   * RETIRED HERE, 17 Sep 2026, SAME DAY — kit v1.2.111 closed the axis on
+   * its own `TabsList` (shared/ui/components/tabs/tabs.tsx sets
+   * `overflow-y-hidden` straight on the element), the identical ruling
+   * fixed upstream rather than escaped around per strip. This constant's
+   * own override was the workaround while the kit didn't have one; every
+   * `<Tabs>` in the app now gets the closed axis without this selector
+   * restating it. See `web/test/tab-strip-no-vertical-scroll.test.ts`,
+   * which now reads the kit's own `TabsList` instead of this constant. */
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place

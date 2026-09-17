@@ -1239,6 +1239,8 @@ export function TasksScreen({
         config={tableRecipe.collection as CollectionConfig}
         actions={visibleActions(tableRecipe, rights, onAction)}
         onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
+        rowPath={(row) => `/t/${teamId}/tasks/${String(row.id)}`}
+        rowLabel={(row) => String(row.name ?? row.id)}
         useKitPanel
         // `frame="bare"` — VESTIGIAL, kept only because `record-table.tsx`'s
         // own type still names it (R80's own doc there). It started as this

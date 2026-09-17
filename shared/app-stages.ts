@@ -66,9 +66,15 @@
 // ARCHIVED KEEPS THE `archived` TONE — the one pairing that was never in
 // question (the grey, muted dot every other put-away record in this app
 // already wears) — and `Build` keeps the `building` tone its own name already
-// carries. The rest are assigned for maximum spread across the seven hues
-// rather than for a semantic story neither the client nor this codebase has
-// written yet: read the mapping in the array below, not this paragraph.
+// carries.
+//
+// RE-RULED AGAIN, 17 Sep 2026 — "audit orange, refinements blue, validaton
+// purple, plan & buid black … charcoal never means in progress." Plan now
+// shares `Build`'s own `building` tone (both read as "black" in her words),
+// which is a DELIBERATE pairing rather than the "maximum spread, no two
+// stages share one" rule this paragraph used to state — that rule is retired
+// as of this ruling. Every other stage still takes a hue none of its
+// siblings wears: read the mapping in the array below, not this paragraph.
 //
 // THE ACTIVE / INACTIVE SPLIT is one boolean per stage, and the default for a
 // stage the code has never met is ACTIVE. A team that invents "Pilot" should see
@@ -138,13 +144,25 @@ export type AppStage = {
 // That is why `mark` and `dotTone` above are plain strings, never a component
 // or a colour token reference.
 
+// RE-RULED, 17 Sep 2026, VERBATIM: "audit orange, refinements blue, validaton
+// purple, plan & buid black … charcoal never means in progress." `building`
+// is renamed in MEANING here, not in spelling: it is still the token this
+// file and the kit call `building` (`--dot-building`, `var(--foreground)` —
+// literal ink, #1A1918 in light mode, paper in dark), and it is what she
+// means by "black". Everywhere this file or its neighbours said "charcoal"
+// for that tone, the word is "black" now; the CSS custom property and the
+// `DotTone` union member keep their names unchanged; only the ENGLISH gloss
+// moves. Two stages now draw it — Plan and Build — which is new: until today
+// every stage in this array drew a hue none of its seven siblings wore
+// (the paragraph above this array used to say so in full). That claim no
+// longer holds and is corrected below rather than left to rot.
 export const APP_STAGES: AppStage[] = [
   { name: "Not started", mark: "NS", dotTone: "blocked", closed: false },
-  { name: "Audit", mark: "AU", dotTone: "review", closed: false },
-  { name: "Plan", mark: "PL", dotTone: "purple", closed: false },
+  { name: "Audit", mark: "AU", dotTone: "orange", closed: false },
+  { name: "Plan", mark: "PL", dotTone: "building", closed: false },
   { name: "Build", mark: "BD", dotTone: "building", closed: false },
-  { name: "Validation", mark: "VL", dotTone: "orange", closed: false },
-  { name: "Refinements", mark: "RF", dotTone: "shipped", closed: false },
+  { name: "Validation", mark: "VL", dotTone: "purple", closed: false },
+  { name: "Refinements", mark: "RF", dotTone: "blue", closed: false },
   { name: "Enhancement", mark: "EN", dotTone: "done", closed: false },
   { name: "Archived", mark: "AR", dotTone: "archived", closed: true },
 ]

@@ -16,10 +16,18 @@
 //       or calls its persistence door before Save is pressed.
 //   (c) "I want the preview ... to be slightly taller ... represent more of
 //       the real look of the app and include more elements inside, not just
-//       one kind of card." — `AppearanceTabPreview` draws the rail, the
-//       two-tab strip, one card (a title row, a toolbar bar, a three-row
-//       list with a status dot each and one count badge), inside ONE paper
-//       container.
+//       one kind of card." Superseded the same day by a fourth ruling — see
+//       (d) below — but the height floor it set survives unchanged.
+//   (d) "Good, the language part. However, I'm not happy with the pre-
+//       visualization ... " and her pick over the side-by-side artifact,
+//       "appearance p1" = "Miniature of this very page". `AppearanceTab
+//       Preview` now draws the actual frame this tab sits inside: the rail
+//       with its real groups and destinations, the workspace top strip with
+//       the open "Settings" tab and the pinned "+", and the content card
+//       holding Settings' own tab strip and a miniature of the Appearance
+//       panel itself — see that file's own header for the full account,
+//       including why the real shell cannot be mounted live and why its
+//       words are transcribed rather than imported.
 //
 // `web/test/form-hints.test.ts` already censuses the SOURCE for hint shapes
 // across every form file; this file renders the actual tab and asserts what
@@ -32,8 +40,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AppearancePanel } from "@shared/web/appearance-panel"
-import { AppearanceTabPreview } from "@shared/web/appearance-tab-preview"
+import { AppearanceTabPreview, RAIL_GROUPS } from "@shared/web/appearance-tab-preview"
 import { LanguageProvider } from "@shared/web/language"
+// THE ROT-CHECK'S OWN ORACLE — this test file lives inside web/'s own
+// program (unlike shared/web/, which the portal's tsconfig also compiles),
+// so IT may import the live rail registry directly. See appearance-tab-
+// preview.tsx's own header, "WALL 3, THE REGISTRY ITSELF", for why the
+// component itself may not.
+import { NAV_GROUP_LABELS, NAV_GROUP_ORDER, TEAM_SECTIONS } from "@/lib/pages"
 
 afterEach(() => {
   cleanup()
@@ -180,10 +194,32 @@ describe("Settings › Appearance is a draft until Save (client ruling 2026-09-1
   })
 })
 
-describe("The Appearance preview (client ruling 2026-09-17)", () => {
+// A minimal ResizeObserver double for the "scales with the container" test
+// below — jsdom ships none, and the component itself already guards for
+// that (`typeof ResizeObserver === "undefined"`, the same guard the kit's
+// own `Clamp` uses). Recording the constructed instance is enough to fire
+// its callback by hand, standing in for a real layout resize.
+class FakeResizeObserver {
+  static instances: FakeResizeObserver[] = []
+  private readonly callback: ResizeObserverCallback
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback
+    FakeResizeObserver.instances.push(this)
+  }
+  observe() {
+    /* no-op — the test drives `trigger()` directly */
+  }
+  unobserve() {}
+  disconnect() {}
+  trigger() {
+    this.callback([] as unknown as ResizeObserverEntry[], this as unknown as ResizeObserver)
+  }
+}
+
+describe("The Appearance preview — a miniature of this very page (client ruling 2026-09-17, 'appearance p1')", () => {
   beforeEach(() => cleanup())
 
-  it("draws each listed element once, inside one paper container", () => {
+  it("draws the rail's real groups and destinations, the workspace top strip, and the Settings content card — once each, inside one paper container", () => {
     render(
       <LanguageProvider value="en">
         <AppearanceTabPreview theme="light" spine="paper" />
@@ -191,7 +227,8 @@ describe("The Appearance preview (client ruling 2026-09-17)", () => {
     )
 
     // ONE paper container — R67's own "not a card inside a card": a single
-    // floating <Card>, never a card standing inside another.
+    // floating <Card>, standing for ScreenShell's own card, never a card
+    // standing inside another.
     const cards = document.querySelectorAll('[data-slot="card"]')
     expect(cards.length, "exactly one floating card").toBe(1)
     expect(
@@ -199,34 +236,115 @@ describe("The Appearance preview (client ruling 2026-09-17)", () => {
       "no card nested inside the one card"
     ).toBeNull()
 
-    // The rail strip.
-    expect(document.querySelectorAll('[data-slot="preview-rail"]').length, "one rail strip").toBe(1)
+    // THE RAIL — three real groups (My work / Build / Accounts,
+    // NAV_GROUP_ORDER in web/lib/pages.ts), each carrying its own real
+    // destinations, never a bare empty strip.
+    expect(document.querySelectorAll('[data-slot="preview-rail"]').length, "one rail").toBe(1)
+    const railGroups = document.querySelectorAll('[data-slot="preview-rail-group"]')
+    expect(railGroups.length, "three named rail groups").toBe(3)
+    const railText = document.querySelector('[data-slot="preview-rail"]')?.textContent ?? ""
+    for (const destination of ["Tasks", "Meetings", "Knowledge", "Waves", "Apps", "Stories", "Accounts", "Tickets", "Contacts", "Inputs"]) {
+      expect(railText.includes(destination), `the rail names the real destination "${destination}"`).toBe(true)
+    }
+    // Never a fabricated destination — the rail draws nothing this app does
+    // not actually navigate to.
+    expect(railText.includes("Lorem"), "no placeholder text in the rail").toBe(false)
 
-    // A tab strip with two tabs.
-    expect(document.querySelectorAll('[data-slot="preview-tab"]').length, "two tabs").toBe(2)
+    // THE WORKSPACE TOP STRIP — the open "Settings" tab (this very page,
+    // always active in the picture) and the pinned "+".
+    const openTabs = document.querySelectorAll('[data-slot="preview-tab"]')
+    expect(openTabs.length, "one open tab").toBe(1)
+    expect(openTabs[0]?.textContent, "the open tab is this very page").toBe("Settings")
+    expect(document.querySelector('[data-slot="preview-tab-new"]'), "the pinned + tab").toBeTruthy()
 
-    // One mango title action, inside the card.
-    const titleAction = document.querySelector('[data-slot="preview-title-action"]')
-    expect(titleAction, "one title action").toBeTruthy()
-    expect(cards[0]?.contains(titleAction), "the title action sits inside the card").toBe(true)
+    // THE CARD'S OWN CONTENT — Settings' real tab strip (Appearance leads
+    // and is active, since the picture is always drawn from that tab), and
+    // a miniature of the Appearance panel's own four sections.
+    const settingsTabs = document.querySelectorAll('[data-slot="preview-settings-tab"]')
+    expect(settingsTabs.length, "seven Settings tabs").toBe(7)
+    expect(settingsTabs[0]?.textContent, "Appearance leads").toBe("Appearance")
+    expect(settingsTabs[0]?.getAttribute("data-active"), "Appearance is the active tab").toBe("")
+    for (const label of ["Members", "Roles", "Integrations", "Modules", "Automations", "Choices"]) {
+      expect(cards[0]?.textContent?.includes(label), `Settings' own "${label}" tab is drawn`).toBe(true)
+    }
 
-    // A toolbar row, inside the card.
-    const toolbar = document.querySelector('[data-slot="preview-toolbar"]')
-    expect(toolbar, "one toolbar row").toBeTruthy()
-    expect(cards[0]?.contains(toolbar), "the toolbar sits inside the card").toBe(true)
-
-    // A list of three rows, each with its own status dot, and one badge
-    // beyond the three dots (the count badge on the third row).
-    const rows = document.querySelectorAll('[role="listitem"]')
-    expect(rows.length, "three rows").toBe(3)
-    const dots = document.querySelectorAll('[data-slot="badge-dot"]')
-    expect(dots.length, "one status dot per row").toBe(3)
-    const badges = document.querySelectorAll('[data-slot="badge"]')
-    expect(badges.length, "three status badges plus one count badge").toBe(4)
+    const miniPanel = document.querySelector('[data-slot="preview-appearance-panel"]')
+    expect(miniPanel, "the mini Appearance panel").toBeTruthy()
+    expect(cards[0]?.contains(miniPanel), "the mini panel sits inside the card").toBe(true)
+    for (const label of ["Language", "Size", "Appearance", "Background"]) {
+      expect(miniPanel?.textContent?.includes(label), `the mini panel names its "${label}" section`).toBe(true)
+    }
   })
 
   it("names the height token — taller than the kit's retired 17rem picture", async () => {
     const { APPEARANCE_PREVIEW_MIN_HEIGHT } = await import("@shared/web/appearance-tab-preview")
     expect(APPEARANCE_PREVIEW_MIN_HEIGHT).toBe("min-h-[22rem]")
   })
+
+  it("reflects a draft theme change on its own subtree while the document root stays unchanged", () => {
+    render(
+      <LanguageProvider value="en">
+        <AppearanceTabPreview theme="dark" spine="paper" />
+      </LanguageProvider>
+    )
+    const box = document.querySelector('[role="img"]')
+    expect(box?.getAttribute("data-theme"), "the box carries the pending theme").toBe("dark")
+    expect(
+      document.documentElement.getAttribute("data-theme"),
+      "the real document root never moves — nothing here waits for Save"
+    ).toBeNull()
+  })
+
+  it("scales the fixed 1280px design frame to the container's own measured width", async () => {
+    const originalRO = globalThis.ResizeObserver
+    // A test double standing in for the browser's own ResizeObserver — `Reflect.set`
+    // rather than a direct assignment so no `@ts-expect-error` is needed for the
+    // narrower constructor shape.
+    Reflect.set(globalThis, "ResizeObserver", FakeResizeObserver)
+    FakeResizeObserver.instances = []
+    try {
+      render(
+        <LanguageProvider value="en">
+          <AppearanceTabPreview theme="light" spine="paper" />
+        </LanguageProvider>
+      )
+      const box = document.querySelector('[role="img"]') as HTMLElement
+      const frame = document.querySelector('[data-slot="preview-frame"]') as HTMLElement
+      Object.defineProperty(box, "clientWidth", { value: 640, configurable: true })
+      const observer = FakeResizeObserver.instances.at(-1)
+      expect(observer, "the component observed the box").toBeTruthy()
+      observer?.trigger()
+      await waitFor(() => expect(frame.style.transform).toBe("scale(0.5)"))
+    } finally {
+      Reflect.set(globalThis, "ResizeObserver", originalRO)
+    }
+  })
+})
+
+describe("The preview's rail transcription does not drift from the live registry (rot-check)", () => {
+  it("RAIL_GROUPS names exactly the live sidebar groups, in the live order, each with its real destinations", () => {
+    // Rebuilt straight off web/lib/pages.ts — the same derivation web-shell.tsx's
+    // own `namedGroups` uses (NAV_GROUP_ORDER, then each group's `placement:
+    // "sidebar"` rows in file order) — never hand-typed here, so a rename or a
+    // re-order in the live registry fails THIS assertion instead of rotting
+    // inside the transcription silently.
+    const expected = NAV_GROUP_ORDER.map((group) => ({
+      heading: NAV_GROUP_LABELS[group],
+      items: TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && (s.group ?? "my-work") === group).map(
+        (s) => s.title
+      ),
+    })).filter((g) => g.items.length > 0)
+
+    expect(RAIL_GROUPS.map((g) => g.heading)).toEqual(expected.map((g) => g.heading))
+    expect(RAIL_GROUPS.map((g) => [...g.items])).toEqual(expected.map((g) => g.items))
+  })
+
+  // SETTINGS_TABS (the Settings screen's own tab strip) has no equivalent
+  // oracle: `web/components/screens/settings-screen.tsx`'s `tabsConfig` is a
+  // local literal inside the component function, not an exported table, and
+  // exporting one is a change to a file outside this lane's ownership
+  // (shared/web/appearance-tab-preview.tsx, shared/web/appearance-panel.tsx
+  // and their tests only). Logged rather than silently skipped: a future
+  // lane that touches settings-screen.tsx should export `tabsConfig.tabs`'
+  // label list so this file can grow the same rot-check RAIL_GROUPS has.
 })

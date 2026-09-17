@@ -694,8 +694,15 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
                scrollWidth 74px past its clientWidth and the PAGE scrolled
                sideways. It contains what is already inside the lane; it is not
                an anchor offered to anything outside it, and a panel that a
-               control opens belongs in `panel`, in flow. */
-            className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto py-[var(--space-1)] my-[calc(var(--space-1)*-1)]"
+               control opens belongs in `panel`, in flow.
+
+               `overflow-y-hidden` — 17 Sep 2026 evening, the same fix
+               `tabs.tsx`'s own `TabsList` took: `overflow-x` alone computes
+               `overflow-y: auto`, and a lane this shape can round 1px tall,
+               which makes it silently vertically scrollable. This lane
+               never moves on that axis. See `foundations/rules/check-
+               overflow-axis.mjs`. */
+            className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto overflow-y-hidden py-[var(--space-1)] my-[calc(var(--space-1)*-1)]"
           >
             {search ? (
               /* THE ROW'S ONE ELASTIC SLOT: it takes the slack when there is
@@ -773,6 +780,12 @@ const ToolbarRow = React.forwardRef<HTMLDivElement, ToolbarRowProps>(
                      "read a filtered list as an empty one". */
                   "[&_[data-slot=filter-bar-chips]]:flex-nowrap",
                   "[&_[data-slot=filter-bar-chips]]:overflow-x-auto",
+                  // `overflow-y-hidden` — 17 Sep 2026 evening, the same fix
+                  // `tabs.tsx`'s own `TabsList` took: `overflow-x` alone
+                  // computes `overflow-y: auto`, and this row can round 1px
+                  // tall and become silently vertically scrollable. See
+                  // `foundations/rules/check-overflow-axis.mjs`.
+                  "[&_[data-slot=filter-bar-chips]]:overflow-y-hidden",
                 )}
               >
                 {filters}

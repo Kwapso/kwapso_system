@@ -294,41 +294,56 @@ export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
   message: "chat-teardrop",
 }
 
+// SHORTENED, ONE WORD (OR THE SHORTEST NOUN) PER KIND — the client's ruling,
+// 17 Sep 2026, verbatim, over the Knowledge screen's own tab strip: "the
+// names of the tabs are too long. Instead of 'From a meeting,' say
+// 'Meetings,' and so on. In all the cases, just make the names shorter."
+// This map is the ONE place a kind's word is written (knowledge-screen.tsx's
+// tab strip, the Type facet and every source card all read it, never their
+// own copy), so shortening it here is the whole fix. Every "From a…"/"About
+// a…" sentence became a short plural noun, the glossary's own term (R34)
+// where this app already has one — `dropdown` reads "Choices"
+// (`dropdownValues`, shared/glossary.ts), not the literal "Dropdowns" a
+// blind pluralisation would have written. `note` and `file` were not
+// spared for already being short: "Note" became the plural "Notes" to match
+// every other tab, and "From a file" became "Uploads" — the word for the
+// thing a person actually did, not a literal shrink of the old sentence.
 export const KNOWLEDGE_KIND: Record<string, string> = {
-  note: "Note",
-  file: "From a file",
-  ticket: "From a ticket",
+  note: "Notes",
+  file: "Uploads",
+  ticket: "Tickets",
   // A KIND WITH NO MODULE BEHIND IT ANY MORE. Learning went on 17 Aug 2026 and
   // its 41 articles stayed, already indexed — so this word still names what a
   // source IS even though nothing writes a new one.
-  article: "From an article",
-  account: "From an account",
+  article: "Articles",
+  account: "Accounts",
   // EVERY KIND THE SWEEP WRITES NEEDS A WORD HERE. A kind missing from this map
   // falls through to its own bare name, so the Type filter offered "sprint" and
-  // "account_links" beside "From a ticket" — and the six kinds added on 18 Aug
+  // "account_links" beside "Tickets" — and the six kinds added on 18 Aug
   // would have made most of the filter read that way. Held to the kind list by
   // workers/content/test/knowledge-coverage.test.ts, which reads this map off
   // disk — so a new kind cannot ship without a word for it here.
-  contact: "From a contact",
-  app: "From an app",
-  process: "From a process map",
-  sprint: "From a sprint",
-  story: "From a story",
-  meeting: "From a meeting",
-  todo: "From an input",
-  task: "From a task",
-  // The four that arrive through somebody's own Google connection — named for
-  // the thing rather than the service, the same way the kinds themselves are.
-  document: "From a document",
-  email: "From an email",
-  event: "From a calendar entry",
-  message: "From a chat message",
-  // R47's three (1 Sep 2026). `person` reads "About a colleague" rather than
-  // "From a colleague": the source is ABOUT them and was not written by them,
-  // and every other line in this map is the second sentence.
-  person: "About a colleague",
-  dropdown: "From a dropdown list",
-  portal_login: "From a portal login",
+  contact: "Contacts",
+  app: "Apps",
+  process: "Processes",
+  sprint: "Sprints",
+  story: "Stories",
+  meeting: "Meetings",
+  todo: "Inputs",
+  task: "Tasks",
+  // The four that arrive through somebody's own Google connection — still
+  // named for the thing, not the service, the same way every other kind is.
+  document: "Docs",
+  email: "Emails",
+  event: "Events",
+  message: "Messages",
+  // R47's three (1 Sep 2026). `person` used to read "About a colleague"
+  // rather than "From a colleague" — the source is ABOUT them and was not
+  // written by them — and the short form keeps that distinction the only way
+  // a noun can: a person IS a colleague, never "from" one.
+  person: "Colleagues",
+  dropdown: "Choices",
+  portal_login: "Logins",
 }
 
 /* -------------------------------- meetings -------------------------------- */
@@ -651,11 +666,16 @@ export function shapeAccountsList(
         // `active`, worded and, per the Choices rule, coloured where the word
         // carries a colour. It does not sit in a `selectable_data` group (it is
         // not a Choice at all, it is the archive flag), so there is no vocabulary
-        // colour to read off one — `success`/`secondary` are the kit's own
-        // closest pair (R32: a token, never a hex), matching the quiet grey
-        // every other archived row in this app already wears.
+        // colour to read off one.
+        //
+        // REWIRED 17 Sep 2026, her ruling that session: "account active green
+        // dot." This was a FILLED pill (`success`/`secondary`) until now — the
+        // shape every other coloured kind in this ruling abandoned for
+        // `variant="status"` + a dot (the Portal column a few lines down made
+        // the identical move on 16 Sep). `shipped` (green) while live,
+        // `archived` (grey) once put away — unchanged in word, only in shape.
         status: (
-          <Badge variant={a.active ? "success" : "secondary"}>
+          <Badge variant="status" dot={a.active ? "shipped" : "archived"}>
             {a.active ? t("Active") : t("Archived")}
           </Badge>
         ),
@@ -796,6 +816,18 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
         "—"
       ),
       role: a.relationship ?? "—",
+      // THE STATUS COLUMN, 17 Sep 2026 — her ruling that session: "contact
+      // live green." A live/archived dot, the same `variant="status"` +
+      // `shipped`/`archived` pair the Portal column right below already
+      // draws for its own two states, never a filled pill (the `name`
+      // column's own "(archived)" suffix a few lines up stays exactly as it
+      // was — a second, plain-text answer to the same question costs
+      // nothing and this column is not replacing it).
+      status: (
+        <Badge variant="status" dot={a.active ? "shipped" : "archived"}>
+          {a.active ? t("Live") : t("Archived")}
+        </Badge>
+      ),
       // THE PORTAL COLUMN — see this function's own header. `!== true` rather
       // than `!a.hasPortalLogin` catches `null` (withheld) and `false`
       // (really not) in the same "No portal" branch, on purpose: the caller

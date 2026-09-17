@@ -453,11 +453,14 @@ export function ContactDetailScreen({
       // constant subtype fact the eyebrow's bare "Account" doesn't say.)
       chips={
         <>
-          {account.active ? null : (
-            <Badge variant="status" dot="archived">
-              {t("Archived")}
-            </Badge>
-          )}
+          {/* CLIENT RULING, 17 Sep 2026, verbatim: "contact live green." Used
+              to draw nothing at all on an active contact — only the archived
+              half of this pair had a chip. Both states carry one now, the
+              same live/put-away pair every other kind in this ruling reaches
+              for: green while live, grey once archived (unchanged). */}
+          <Badge variant="status" dot={account.active ? "shipped" : "archived"}>
+            {account.active ? t("Live") : t("Archived")}
+          </Badge>
           {liveLogin ? <Badge>{t("Can sign in")}</Badge> : null}
         </>
       }

@@ -136,7 +136,7 @@ describe("the assistant's answer carries its sources", () => {
       (english) => english
     )
     expect(pills).toHaveLength(1)
-    expect(pills[0].collection).toBe("From a file")
+    expect(pills[0].collection).toBe("Uploads")
     expect(pills[0].record).toBe("Ostwald retainer")
     // No in-app href on a pill: the kit renders it as a bare anchor, which would
     // throw the whole shell away (R37). See agent-sources.tsx.

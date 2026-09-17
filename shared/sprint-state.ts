@@ -15,6 +15,8 @@
 // records `Sprint status` as a `"labels"` group for exactly this reason: nothing
 // stores a sprint's state, so nothing can rewrite it.
 
+import type { AppStageDotTone } from "./app-stages"
+
 /** THE THREE STATES. */
 export type SprintState = "running" | "upcoming" | "wrapped"
 
@@ -80,4 +82,61 @@ export function sprintState(s: SprintTiming, today: string): SprintState {
  * date to ask. */
 export function sprintIsRunning(s: SprintTiming, today: string = todayKey()): boolean {
   return sprintState(s, today) === "running"
+}
+
+// ── THE STATUS DOT, ADDED 17 SEP 2026 ────────────────────────────────────────
+//
+// SPRINTS HAD NO STATUS COLOUR AT ALL until the client's ruling this session,
+// read together with the rest of that day's palette: "sprints: wrapped
+// complete green, wrapped cancelled gray, running now black, coming up
+// purple." Every other coloured kind in this app answers "which dot" through
+// one map beside its own state predicate (`HELP_STATUS_DOT_TONE`,
+// `APP_STAGES`, `WAVE_STATE_DOT`) — this is a sprint's own register, in the
+// same file as `sprintState` because the dot is DERIVED from the identical
+// three facts (`completedAt`, `active`, `startsOn`) that function already
+// reads, not a new column.
+//
+// FOUR DISPLAY STATES, NOT THREE — `sprintState`'s own "wrapped" answers
+// "is it over", and the client's ruling wants that told apart by WHICH
+// ending it was (delivered vs switched off), the same split
+// `waves-screen.tsx`'s own `waveStateLabel` already makes for a wave whose
+// package ran to term. `SprintDisplayState` widens `sprintState`'s three
+// words into the four her ruling names, built from that function rather than
+// re-deriving the same three facts a second way.
+
+/** THE FOUR WORDS HER RULING NAMES. `"running"` and `"upcoming"` are spelled
+ * identically to `SprintState`'s own two words on purpose — they are the
+ * same two states, unsplit — so a caller who already has one can widen it
+ * with a single extra branch (`sprintDisplayState` below) rather than a
+ * second lookup. */
+export type SprintDisplayState = "wrapped_complete" | "wrapped_cancelled" | "running" | "upcoming"
+
+/** `sprintState`, with "wrapped" told apart by which ending it was —
+ * `completedAt` wins when a record somehow carries both, the same order
+ * `sprintState`'s own comment reads them in ("a block that was delivered and
+ * later switched off was still delivered"). */
+export function sprintDisplayState(s: SprintTiming, today: string = todayKey()): SprintDisplayState {
+  const state = sprintState(s, today)
+  if (state === "wrapped") return s.completedAt ? "wrapped_complete" : "wrapped_cancelled"
+  return state
+}
+
+/** THE DOT, her exact four tones: green (`shipped`) for a sprint delivered,
+ * grey (`archived`) for one called off, black (`building` — this app's own
+ * token for the ink tone she calls "black", never "charcoal") for one
+ * running right now, and purple for one still to come. `AppStageDotTone`
+ * (`shared/app-stages.ts`) is the same widened ten-tone union every other
+ * re-ruled kind this session reaches for, imported rather than restated. */
+const SPRINT_DISPLAY_DOT_TONE: Record<SprintDisplayState, AppStageDotTone> = {
+  wrapped_complete: "shipped",
+  wrapped_cancelled: "archived",
+  running: "building",
+  upcoming: "purple",
+}
+
+/** The dot tone for a sprint's own status — the list row, the board card (if
+ * any — sprints have none today) and the record head chip all read this one
+ * function, never their own copy of the ternary. */
+export function sprintDotTone(s: SprintTiming, today: string = todayKey()): AppStageDotTone {
+  return SPRINT_DISPLAY_DOT_TONE[sprintDisplayState(s, today)]
 }
