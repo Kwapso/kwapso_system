@@ -3521,10 +3521,80 @@ describe("RULES — the laws of the base", () => {
       `R48 — every wall or register of records searches, or is a bounded room named in TOOLBAR_EXEMPT:\n  ${wallOffenders.join("\n  ")}`
     ).toEqual([])
 
+    // v · THE PAGED-READER CENSUS — the gap none of the above can see, because
+    // (i)/(ii)/(iv) all walk FORWARD from something the FIX itself puts on the
+    // page: a recipe's own `searchable`, a `<ToolbarRow>` tag, a wall's own kit
+    // import. A file that reads a paged door (renders its own `<LoadMore>`, the
+    // one client-side mark every paged collection carries, R14) and draws NO
+    // toolbar of any shape at all is invisible to all three — which is exactly
+    // how the token call-log panel (`access-tokens.tsx#TokenCallLog`) shipped a
+    // hand-built `<Table>` with its own `<LoadMore>` and no search box, green,
+    // on 16 Sep 2026: nothing here was reading BACKWARD from "this collection
+    // pages" to ask whether anything drew a toolbar over it.
+    //
+    // So this one walks backward. Every `.tsx` under either front door that
+    // renders `<LoadMore` must ALSO render `<ToolbarRow` — directly, or through
+    // one of the app's other toolbar-drawing shared bodies (`<PagedFind>`,
+    // `PagedPanelBody`, `<ActivityPanel>`/`<ActivityRail>`, which each already
+    // draw a `<ToolbarRow>` of their own and are proved to by census (ii)) — or
+    // be named in `TOOLBAR_EXEMPT` with the real reason. The four files that
+    // DECLARE one of those shared bodies are excluded, the same way
+    // `screen-bits.tsx` already is from census (ii): a declaration is not a
+    // call site.
+    const readerDeclaringFiles = new Set([
+      "web/components/deep-link/screen-bits.tsx", // declares <ToolbarRow>
+      "web/components/records/paged-find.tsx", // declares <PagedFind> (and draws <ToolbarRow> itself)
+      "web/components/work/work-panels.tsx", // declares PagedPanelBody (and draws <ToolbarRow> itself)
+      "web/components/records/activity-panel.tsx", // the shared body <ActivityRail> wraps
+    ])
+    const readerFiles = sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })
+    const readerOffenders: string[] = []
+    const readerExemptUsed = new Set<string>()
+    let readerScanned = 0
+    for (const f of readerFiles) {
+      if (readerDeclaringFiles.has(f.rel)) continue
+      const src = stripComments(f.source)
+      if (!src.includes("<LoadMore")) continue
+      readerScanned++
+      const drawsToolbar =
+        src.includes("<ToolbarRow") ||
+        src.includes("<PagedFind") ||
+        src.includes("PagedPanelBody") ||
+        src.includes("<ActivityPanel") ||
+        src.includes("<ActivityRail")
+      if (drawsToolbar) continue
+      if (f.rel in TOOLBAR_EXEMPT) {
+        readerExemptUsed.add(f.rel)
+        continue
+      }
+      readerOffenders.push(
+        `${f.rel}: renders <LoadMore> (reads a paged door, R14) but draws no <ToolbarRow>/<PagedFind>/` +
+          `PagedPanelBody/<ActivityPanel> and is not in TOOLBAR_EXEMPT — a hand-rolled paged list with no ` +
+          `toolbar is invisible to censuses (i)/(ii)/(iv), which only ever walk FORWARD from one`
+      )
+    }
+    // Both halves of the same tripwire censuses (i)/(ii)/(iv) already carry:
+    // a scan that stops matching passes "everything has a toolbar" perfectly.
+    expect(
+      readerScanned,
+      "R48 §v found almost no paged readers — the <LoadMore> mark or the file walk has changed shape. " +
+        "Fix the derivation, never this number: a scan over nothing reports all clear"
+    ).toBeGreaterThan(5)
+    expect(
+      readerOffenders,
+      `R48 (census v) — every file that reads a paged door draws a toolbar of some shape, or is named in TOOLBAR_EXEMPT:\n  ${readerOffenders.join("\n  ")}`
+    ).toEqual([])
+
     // iii · THE RATCHET, BOTH DIRECTIONS — the same shape R29/R31/R32 already
     // run: an entry nothing uses is a pin left behind by a screen that got
     // fixed, and it has to go, or the list stops being able to only shrink.
-    const usedKeys = new Set([...recipeExemptUsed, ...rowExemptUsed, ...roomExemptUsed, ...wallExemptUsed])
+    const usedKeys = new Set([
+      ...recipeExemptUsed,
+      ...rowExemptUsed,
+      ...roomExemptUsed,
+      ...wallExemptUsed,
+      ...readerExemptUsed,
+    ])
     const stale = Object.keys(TOOLBAR_EXEMPT).filter((k) => !usedKeys.has(k))
     expect(
       stale,

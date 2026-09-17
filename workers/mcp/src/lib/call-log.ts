@@ -17,6 +17,7 @@
 
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { boundedInner, isCapped, reportedTotal } from "@shared/workers/count"
+import { likeLiteral } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import type { Env } from "../env"
 
@@ -64,12 +65,24 @@ const toCall = (r: CallLogDbRow): McpCallRow => ({
 
 /** "This token, newest first" — the one question the read door ever asks, so
  * there is one fixed order and `sig` is always "" (the same convention a
- * cursor minted before ordering existed already decodes as). */
-export async function listCalls(env: Env, tokenId: string, userId: string, cursor: string | null): Promise<Page<McpCallRow>> {
+ * cursor minted before ordering existed already decodes as). `q` narrows by
+ * TOOL NAME (the toolbar's own search box) — the SAME question the count
+ * below answers, so a searched badge and a searched page agree. */
+export async function listCalls(
+  env: Env,
+  tokenId: string,
+  userId: string,
+  cursor: string | null,
+  q?: string
+): Promise<Page<McpCallRow>> {
   const pos = decodeCursor(cursor, "")
   const after = keysetAfter(pos, "created_at", "desc", "id")
   const where = ["token_id = ?", "user_id = ?", ...(after.sql ? [after.sql] : [])]
   const params: (string | number)[] = [tokenId, userId, ...after.params]
+  if (q) {
+    where.push("tool_name LIKE ? ESCAPE '\\'")
+    params.push(`%${likeLiteral(q)}%`)
+  }
   const rows = await env.DB.prepare(
     `SELECT id, tool_name, ok, trace_id, created_at FROM mcp_call_log
       WHERE ${where.join(" AND ")}
@@ -83,12 +96,25 @@ export async function listCalls(env: Env, tokenId: string, userId: string, curso
 
 /** R16: the exact server COUNT(*) for the badge, bounded to TOTAL_COUNT_CAP —
  * never `rows.length`, and never an unbounded scan over a table this call log
- * exists precisely because it will keep growing. */
-export async function countCalls(env: Env, tokenId: string, userId: string): Promise<{ total: number; totalCapped: boolean }> {
+ * exists precisely because it will keep growing. Takes the SAME `q` the list
+ * above does, so a searched badge counts the searched question and not the
+ * whole collection underneath it. */
+export async function countCalls(
+  env: Env,
+  tokenId: string,
+  userId: string,
+  q?: string
+): Promise<{ total: number; totalCapped: boolean }> {
+  const where = ["token_id = ?", "user_id = ?"]
+  const params: string[] = [tokenId, userId]
+  if (q) {
+    where.push("tool_name LIKE ? ESCAPE '\\'")
+    params.push(`%${likeLiteral(q)}%`)
+  }
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM ${boundedInner("SELECT 1 FROM mcp_call_log WHERE token_id = ? AND user_id = ?")}`
+    `SELECT COUNT(*) AS n FROM ${boundedInner(`SELECT 1 FROM mcp_call_log WHERE ${where.join(" AND ")}`)}`
   )
-    .bind(tokenId, userId)
+    .bind(...params)
     .first<{ n: number }>()
   const total = reportedTotal(row?.n ?? 0)
   return { total, totalCapped: isCapped(total) }

@@ -4236,7 +4236,12 @@ export const SEED: Catalogue = {
   // "Tool" already has a seed entry above (the client-tool sense, kept as the
   // English loanword) — this screen's column header reuses that same string
   // and inherits it rather than adding a second, conflicting entry.
-  "Result": { de: "Ergebnis", es: "Resultado", ca: "Resultat" },
   "Ok": { de: "Ok", es: "Ok", ca: "Ok" },
   "Refused": { de: "Verweigert", es: "Rechazada", ca: "Rebutjada" },
+
+  /* ── 17 Sep 2026, the SAME panel's toolbar search box (R48) — two more
+     strings the R48 fix added, hand-translated for the same reason as the
+     seven above. */
+  "Search calls": { de: "Aufrufe durchsuchen", es: "Buscar llamadas", ca: "Cerca trucades" },
+  "Search calls…": { de: "Aufrufe durchsuchen…", es: "Buscar llamadas…", ca: "Cerca trucades…" },
 }

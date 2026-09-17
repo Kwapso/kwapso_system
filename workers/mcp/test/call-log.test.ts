@@ -140,4 +140,35 @@ describe("a token's own call log pages, newest first", () => {
     expect(counted.total).toBe(2)
     expect(counted.totalCapped).toBe(false)
   })
+
+  it("the toolbar's own search narrows by tool name, at the door", async () => {
+    const t = fresh()
+    await insertCall(t.env, TOKEN, USER, "create_role", true, "t1")
+    await insertCall(t.env, TOKEN, USER, "whoami", true, "t2")
+    await insertCall(t.env, TOKEN, USER, "create_account", true, "t3")
+
+    const page = await listCalls(t.env, TOKEN, USER, null, "create")
+    expect(page.rows.map((r) => r.toolName).sort()).toEqual(["create_account", "create_role"])
+
+    const counted = await countCalls(t.env, TOKEN, USER, "create")
+    expect(counted.total, "the badge counts the SAME searched question the rows answer").toBe(2)
+  })
+
+  it("a search with no matches answers zero, not the whole log", async () => {
+    const t = fresh()
+    await insertCall(t.env, TOKEN, USER, "whoami", true, "t1")
+    const page = await listCalls(t.env, TOKEN, USER, null, "nonexistent_tool")
+    expect(page.rows).toEqual([])
+    expect((await countCalls(t.env, TOKEN, USER, "nonexistent_tool")).total).toBe(0)
+  })
+
+  it("a LIKE special character in the search is taken literally, not as a wildcard", async () => {
+    const t = fresh()
+    await insertCall(t.env, TOKEN, USER, "tool_with_underscore", true, "t1")
+    await insertCall(t.env, TOKEN, USER, "toolXwithXunderscore", true, "t2")
+    // A bare `_` is a single-character LIKE wildcard — escaped, it must match
+    // only the literal underscore, never stand in for the X too.
+    const page = await listCalls(t.env, TOKEN, USER, null, "tool_with")
+    expect(page.rows.map((r) => r.toolName)).toEqual(["tool_with_underscore"])
+  })
 })
