@@ -229,16 +229,20 @@ describe("sweepKinds — the read cost itself, not just the stop", () => {
     expect(result).toEqual({ kind: "kind0", read: 0, indexed: 0, caughtUp: true })
   })
 
-  it("never skips a `rollup` kind, even recently caught up — its cursor:null is 'always re-walk', not 'nothing left'", async () => {
-    const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString()
-    mockState([{ kind: "kind0", cursor: null, last_run_at: recentlyCaughtUp }])
-    const readSpy = vi.fn(async () => [])
-    const only: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
-
-    await sweepKinds(env, cfg, guard, [only], 25, { budgetMs: 10_000 })
-
-    expect(readSpy).toHaveBeenCalled()
-  })
+  // "never caught by THIS (§H) skip" USED TO BE PROVABLE HERE, by the result
+  // shape alone: §H reported `caughtUp: true` unconditionally on recency,
+  // and an early version of §I's own rollup skip reported `caughtUp: false`
+  // — so the boolean told you which mechanism fired. BUILD-5 §I (18 Sep
+  // 2026) corrected that skip to also report `true`, proven by the same
+  // cursor-null state rather than recency alone (see sync-press-budget.test.ts's
+  // own §I suite for why) — so the two mechanisms are now genuinely
+  // indistinguishable from outside `sweepKinds`, and a test that could only
+  // ever assert "the read wasn't called" would no longer be testing §H
+  // specifically. §H's own `!kind.windowed && !kind.rollup` guard is still
+  // real code, still worth trusting — it is exercised by construction every
+  // time an ORDINARY kind is skipped in the tests above, and by §I's own
+  // "cut short" test proving a rollup kind is never trusted on recency
+  // alone by EITHER mechanism.
 
   it("never skips a `windowed` kind, even recently caught up — same reasoning as rollup", async () => {
     const recentlyCaughtUp = new Date(Date.now() - 30_000).toISOString()
@@ -280,6 +284,104 @@ describe("sweepKinds — the read cost itself, not just the stop", () => {
     const only: IngestKind = { ...KINDS[0], read: readSpy }
 
     await sweepKinds(env, cfg, guard, [only], 25) // no opts at all — the cron's own shape
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+})
+
+// BUILD-5 §I (18 Sep 2026) — MEASURED LIVE ON STAGING: `account`'s own
+// SELECT is fast (313-398ms for a 25-row batch via EXPLAIN QUERY PLAN and
+// direct wall time — every correlated subquery uses a real index, no plan
+// change needed). The 20-25 SECONDS a press actually spends is the per-row
+// UPSERT that follows it — one D1 round trip PER ROW, 25 of them,
+// sequential — and that upsert is the shared filing logic every kind's
+// sweep runs through, not something the account reader owns, so rewriting
+// it is a bigger, separately-reviewed change than tonight's. A rollup kind
+// (`account`, `dropdown`) is the one shape that pays this cost on EVERY
+// press regardless — it never trusts a cursor, so `SYNC_PRESS_SKIP_RECENT_MS`
+// (which only ever applies to a durably-null, non-rollup cursor) never
+// reaches it. The cron already re-walks every rollup kind in full, every 15
+// minutes, by design — so within that same window a manual press gains
+// nothing from repeating the SAME full walk, and skips it honestly instead.
+describe("sweepKinds — a rollup kind the cron has already re-walked recently skips its own re-walk", () => {
+  beforeEach(() => {
+    d1Query.mockClear()
+    d1ExecScript.mockClear()
+  })
+
+  function mockState(rows: { kind: string; cursor: string | null; last_run_at: string | null }[]) {
+    d1Query.mockImplementation(async (..._args: unknown[]) => {
+      const sql = _args[2] as string
+      return sql.includes("FROM knowledge_ingest")
+        ? rows.map((r) => ({ ...r, last_ok_at: r.last_run_at, last_error: null, runs: 1, sources_indexed: 0 }))
+        : []
+    })
+  }
+
+  it("skips a rollup kind's own read when the cron swept it inside its own period, fully", async () => {
+    const sweptByTheCron = new Date(Date.now() - 5 * 60_000).toISOString() // 5 minutes ago
+    mockState([{ kind: "kind0", cursor: null, last_run_at: sweptByTheCron }])
+    const readSpy = vi.fn(async () => [])
+    const rollupKind: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
+
+    const [result] = await sweepKinds(env, cfg, guard, [rollupKind], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).not.toHaveBeenCalled()
+    // HONEST, not a guess: the persisted cursor is null, which a rollup kind
+    // only ever writes when its last tick reached the natural end (see
+    // recordRun's own CASE) — so `caughtUp: true` is PROVEN by the state
+    // already on disk, not assumed from recency alone.
+    expect(result).toEqual({ kind: "kind0", read: 0, indexed: 0, caughtUp: true })
+  })
+
+  it("does NOT skip a rollup kind whose last tick was cut short — a real cursor position, not null, even if recent", async () => {
+    // The load-bearing guard, proven directly: a rollup kind's OWN deadline
+    // cut a huge backlog short last time (recordRun's cursor CASE writes the
+    // real position, not null, exactly when `caughtUp` was false for that
+    // tick) — recent or not, this must never be trusted as done.
+    const cutShortJustNow = new Date(Date.now() - 5_000).toISOString()
+    mockState([{ kind: "kind0", cursor: "v1|2026-09-18T00:00:00.000Z|id1", last_run_at: cutShortJustNow }])
+    const readSpy = vi.fn(async () => [])
+    const rollupKind: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [rollupKind], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("does NOT skip a rollup kind whose last cron sweep is older than the cron's own period", async () => {
+    const staleRun = new Date(Date.now() - 20 * 60_000).toISOString() // 20 minutes ago
+    mockState([{ kind: "kind0", cursor: null, last_run_at: staleRun }])
+    const readSpy = vi.fn(async () => [])
+    const rollupKind: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [rollupKind], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("does NOT skip a NON-rollup kind on this path — only the rollup-specific window applies", async () => {
+    const sweptByTheCron = new Date(Date.now() - 5 * 60_000).toISOString()
+    mockState([{ kind: "kind0", cursor: null, last_run_at: sweptByTheCron }])
+    const readSpy = vi.fn(async () => [])
+    // NOT a rollup kind — an ordinary kind this recent-and-null still catches
+    // via SYNC_PRESS_SKIP_RECENT_MS, but that window is 2 minutes, not 15;
+    // 5 minutes is stale for THAT skip, so this must fall through to a real
+    // read, proving the two skips are independent and neither over-reaches.
+    const ordinary: IngestKind = { ...KINDS[0], read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [ordinary], 25, { budgetMs: 10_000 })
+
+    expect(readSpy).toHaveBeenCalled()
+  })
+
+  it("the skip never applies to the unbounded call (no budgetMs) — the cron always re-walks its own rollups", async () => {
+    const sweptByTheCron = new Date(Date.now() - 5 * 60_000).toISOString()
+    mockState([{ kind: "kind0", cursor: null, last_run_at: sweptByTheCron }])
+    const readSpy = vi.fn(async () => [])
+    const rollupKind: IngestKind = { ...KINDS[0], rollup: true, read: readSpy }
+
+    await sweepKinds(env, cfg, guard, [rollupKind], 25) // no opts — the cron's own shape
 
     expect(readSpy).toHaveBeenCalled()
   })
