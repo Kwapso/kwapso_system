@@ -2655,6 +2655,52 @@ export async function sweepKinds(
         continue
       }
     }
+    // BUILD-5 §I (18 Sep 2026) — A ROLLUP KIND'S OWN FULL RE-WALK, MEASURED
+    // EXPENSIVE ON A REAL TEAM, SKIPPED WHEN THE CRON JUST DID IT. Measured
+    // directly against the real Kwapso team: `account`'s own SELECT is
+    // FAST (313-398ms for 25 rows, EXPLAIN QUERY PLAN shows every
+    // correlated subquery using a real index — no query rewrite would have
+    // helped). The 20-25 SECONDS a press actually spends is the per-row
+    // UPSERT that follows the read, one D1 round trip PER ROW, 25 of them
+    // in sequence — shared filing logic every kind's sweep runs through,
+    // not something the account reader owns, so rewriting IT is a bigger,
+    // separately-reviewed change than tonight's.
+    //
+    // A rollup kind is the one shape that pays this cost on EVERY press
+    // regardless of the SYNC_PRESS_SKIP_RECENT_MS skip above — it never
+    // trusts a cursor at all (see the flag's own comment), so that skip's
+    // `!kind.rollup` guard correctly never reaches it. But the CRON already
+    // re-walks every rollup kind in full, every ROLLUP_PRESS_SKIP_MS — so a
+    // manual press inside that same window gains nothing from repeating the
+    // identical full walk.
+    //
+    // `knownCursor.get(stateKey) === null` IS THE LOAD-BEARING GUARD, not an
+    // optional extra — a rollup kind's own cursor write is `null` ONLY when
+    // its last real tick reached the natural end (`caughtUp && kind.rollup`,
+    // see recordRun's own cursor CASE); a tick cut short by its OWN deadline
+    // (a genuine backlog) writes a REAL cursor position instead, and still
+    // stamps `last_run_at` regardless. Skipping on recency alone, the first
+    // version of this fix, made a genuinely INCOMPLETE rollup report
+    // `caughtUp: true` for up to fifteen minutes — worse than the bug this
+    // whole change exists to fix. Guarded, `caughtUp: true` here is honest
+    // for a different reason than the read-cost saving: the persisted state
+    // already PROVES the last attempt finished, so reporting anything else
+    // would be the dishonest answer. Caught live by this file's own test
+    // suite: `sweepUntilCaughtUp`-style loops (this file, and
+    // knowledge-coverage.test.ts, and knowledge.test.ts) spin forever on a
+    // `caughtUp: false` skip, because once a rollup kind genuinely finishes
+    // its `last_run_at` stays "recent" for the SAME fifteen minutes the skip
+    // itself watches — the door would never again say "everything is in
+    // step" for a person watching the real screen, either. The unbounded
+    // cron call (`opts.budgetMs === undefined`) is untouched: it keeps
+    // re-walking every rollup kind every tick, exactly as designed.
+    if (opts.budgetMs !== undefined && kind.rollup && knownCursor.get(stateKey) === null) {
+      const last = lastRun.get(stateKey)
+      if (last && now() - Date.parse(last) < ROLLUP_PRESS_SKIP_MS) {
+        results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: true })
+        continue
+      }
+    }
     try {
       // The SAME deadline, one level deeper — see sweepKind's own header for
       // why the between-kinds check above is not enough on its own.
@@ -2730,6 +2776,16 @@ export const KNOWLEDGE_SYNC_PRESS_BUDGET_MS = 10_000
  * check would have given — a genuine change inside the last two minutes is
  * still caught by the very next press, or by the cron regardless. */
 export const SYNC_PRESS_SKIP_RECENT_MS = 2 * 60_000
+
+/** BUILD-5 §I (18 Sep 2026) — THE SAME PERIOD THE CRON ITSELF SWEEPS ON
+ * (`SWEEP_EVERY_MS`, `workers/content/src/index.ts` — not imported directly,
+ * to avoid a cycle into the file that imports THIS one; kept in step by
+ * being the same round number, 15 minutes, and named the same way). A
+ * rollup kind the cron has already fully re-walked inside this window gets
+ * nothing more from a manual press repeating the identical walk — the
+ * next cron tick is already close, and the press's own budget is better
+ * spent on every OTHER kind it can still make real progress on. */
+export const ROLLUP_PRESS_SKIP_MS = 15 * 60_000
 
 /** BRING THE INDEX UP TO DATE BEFORE ANSWERING — the mechanism behind "no manual
  * sync button, no periodic syncs; everything is quick, everything is silent,
