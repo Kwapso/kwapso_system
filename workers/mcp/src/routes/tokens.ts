@@ -82,9 +82,10 @@ export async function getCalls(request: Request, env: Env): Promise<Response> {
   const { searchParams } = new URL(request.url)
   const tokenId = requireText(searchParams.get("tokenId"), "Token", TEXT_LIMITS.short)
   const cursor = queryText(searchParams.get("cursor"), "Cursor") ?? null
+  const q = queryText(searchParams.get("q"), "Search")
   const [page, counted] = await Promise.all([
-    listCalls(env, tokenId, user.id, cursor),
-    countCalls(env, tokenId, user.id),
+    listCalls(env, tokenId, user.id, cursor, q),
+    countCalls(env, tokenId, user.id, q),
   ])
   return pagedJson(
     "calls",
