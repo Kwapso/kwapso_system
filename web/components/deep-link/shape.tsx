@@ -46,6 +46,7 @@ import type { MeetingTypeIcon } from "@shared/meeting-icons"
 import { translator, type Language } from "@shared/i18n"
 import { sprintTypeIcon } from "@shared/sprint-types"
 import { storyTypeIconName } from "@shared/story-types"
+import { TICKET_TYPE_GROUP, ticketTypeIconName, type TicketTypeIconName } from "@shared/ticket-types"
 import { appStageDotTone } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
@@ -271,14 +272,21 @@ export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
   // The app's own records borrow the rail's icon for the same concept.
   ticket: "tray",
   account: "buildings",
-  contact: "address-book",
+  // WAS "address-book" / "check-square" — client ruling, 17 Sep 2026,
+  // verbatim, over the whole rail: "For contacts, use the user circle in the
+  // field" / "For tasks, use the checks in plural in regular." Kept in step
+  // with `CONCEPT_ICON.contacts`/`.tasks` (web/lib/pages.ts) and
+  // `SECTION_ICONS.contacts`/`.tasks` (app-shell.tsx) per this map's own rule,
+  // above: a kind that IS one of the app's own records borrows that record's
+  // rail icon.
+  contact: "user-circle",
   app: "app-window",
   process: "git-fork",
   sprint: "calendar-dots",
   story: "puzzle-piece",
   meeting: "chat",
   todo: "clipboard-text",
-  task: "check-square",
+  task: "checks--regular",
   // The four that arrive through somebody's own Google connection.
   document: "file-text",
   email: "envelope",
@@ -348,6 +356,23 @@ const MEETING_TYPE_ICON_CENSUS: { icon: MeetingTypeIcon }[] = [
   { icon: "target" },
 ]
 void MEETING_TYPE_ICON_CENSUS
+
+// THE FOUR TICKET-TYPE ICONS, NAMED LITERALLY — the same census-bait shape
+// `MEETING_TYPE_ICON_CENSUS` just above holds for its own eight, and for the
+// identical reason: `ticketTypeIconName` (@shared/ticket-types) resolves a
+// NAME at runtime through `iconComponent()`, never a literal `icon: "…"` a
+// source scan can see, so without this the generated `icon-map.ts`
+// (scripts/icon-map.mjs) would never import `Bug`/`Question`/`PlusCircle`/
+// `ChatCircleText` for THIS reason (any of the four may still be pulled in by
+// an unrelated call elsewhere) — a silent hole, not a build failure. Kept
+// beside the map it census-checks so the two can never drift.
+const TICKET_TYPE_ICON_CENSUS: { icon: TicketTypeIconName }[] = [
+  { icon: "bug" },
+  { icon: "question" },
+  { icon: "plus-circle" },
+  { icon: "chat-circle-text" },
+]
+void TICKET_TYPE_ICON_CENSUS
 
 /** One meeting, as a row: when it was, who it was with and why. The date leads
  * because a calendar is scanned by date — the title is what you read once you have
@@ -903,15 +928,20 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
  * `usePermissions` a question of its own.
  *
  * `colour` AND `icon` ARE THE WHOLE MENU (client, 14 Sep 2026: "the only thing
- * that choices can have is either a color or an icon"). `colour` is wired —
- * `ticketTypeColour` (`web/lib/type-colours.ts`), the one group that has one
- * today (`module-settings-screen.tsx`). `icon` is the SEAM and not yet a real
- * one: no group carries a per-value icon today, so nothing sets this key —
- * it is typed here so the day a type gains one, `shapeChoicesTable` needs no
- * second edit, the same reason `colour` was typed before a second group ever
- * used it. NEVER BOTH on one group — a value has a colour or an icon, never
- * two marks fighting for the same slot, which is the same "one glyph, one
- * slot" rule `type-marks.ts` states for the mark this replaces. */
+ * that choices can have is either a color or an icon"). `colour` WAS wired to
+ * `ticketTypeColour` (`web/lib/type-colours.ts`) — the one group that had one,
+ * `module-settings-screen.tsx` — until the client's 17 Sep 2026 ruling ("the
+ * one that gets the chip with the color is always the status … for tickets,
+ * we need to find icons for the ticket type") retired it: no `ModuleSettings
+ * Section` sets `colour` any more, so this slot is unwired today, kept typed
+ * for the group that earns one next. `icon` is likewise unwired here — Ticket
+ * type's own icon is read directly in `choiceDetailsCell` below
+ * (`ticketTypeIconName`), the same shape Story type's already takes, rather
+ * than through this resolver, because the Details column and not the Value
+ * column is where her ruling wants it (see that function's own header). NEVER
+ * BOTH on one group — a value has a colour or an icon, never two marks
+ * fighting for the same slot, which is the same "one glyph, one slot" rule
+ * `type-marks.ts` states for the mark this replaces. */
 export type ChoiceGroupHome = {
   segment: string
   title: string
@@ -930,21 +960,25 @@ export type ChoiceGroupHome = {
  * The client's fifth ruling on emoji, 14 Sep 2026, and the one that finally
  * reaches this screen rather than just the write door: *"kill all the
  * emojis. I don't want to see it. The only thing that choices can have is
- * either a color or an icon. So far, only ticket types have color."* Before
- * this, a value with no colour fell back to its own `mark` — a two-letter
- * code by convention, but in LIVE data sometimes exactly the pictograph she
- * has ruled against four times already (R66, CLAUDE.md; `0088`'s migration is
- * the data-side sweep). `v.mark` is not read here AT ALL any more, by any
- * group, for any reason — not a filtered "unless it looks like an emoji", a
- * flat refusal, because the ruling is flat too ("kill ALL the emojis").
+ * either a color or an icon. So far, only ticket types have color."* — a
+ * sentence her 17 Sep 2026 ruling (this file's own header, above) narrowed
+ * further: colour is the status's alone now, so "ticket types have color" is
+ * no longer true anywhere this table reads. Before this, a value with no
+ * colour fell back to its own `mark` — a two-letter code by convention, but
+ * in LIVE data sometimes exactly the pictograph she has ruled against four
+ * times already (R66, CLAUDE.md; `0088`'s migration is the data-side sweep).
+ * `v.mark` is not read here AT ALL any more, by any group, for any reason —
+ * not a filtered "unless it looks like an emoji", a flat refusal, because the
+ * ruling is flat too ("kill ALL the emojis").
  *
- * WHAT MAY STILL DRAW BESIDE THE WORD is exactly her sentence: a COLOUR
- * swatch, if the value's group carries one (`ChoiceGroupHome.colour` —
- * `ticketTypeColour`, the one group that has one today), or an ICON, if it
- * carries one (`ChoiceGroupHome.icon` — typed and ready, unset by every group
- * today because none has a per-value icon yet; see that type's own header).
+ * WHAT MAY STILL DRAW BESIDE THE WORD is a COLOUR swatch, if the value's
+ * group carries one (`ChoiceGroupHome.colour` — unwired today, see that
+ * type's own header), or an ICON, if it carries one
+ * (`ChoiceGroupHome.icon` — likewise unwired; Ticket type's own icon draws in
+ * the DETAILS column instead, not here — see `choiceDetailsCell`'s header).
  * NEVER BOTH: `icon` is only ever consulted when `colour` came back nothing.
- * A group with neither draws the bare word, same as before.
+ * A group with neither draws the bare word, which is every group today,
+ * Ticket type included.
  *
  * A PLAIN STRING WHEN THERE IS NOTHING TO DRAW BESIDE THE WORD, and that is
  * a search/sort decision as much as a visual one: `record-table.tsx`'s
@@ -1017,9 +1051,12 @@ export type ChoiceGroupHome = {
  *     only Sprint type rows are ever written with one.
  *   • App stage — a DOT TONE only (`appStageDotTone`), the same tone
  *     `apps-screen.tsx`'s own stage pill already draws.
- *   • Ticket type already draws its colour in the VALUE cell above
- *     (`ChoiceGroupHome.colour`) — repeating it here would be the same fact
- *     twice, so Ticket type's Details cell is empty on purpose.
+ *   • Ticket type — an ICON only (`ticketTypeIconName`, @shared/ticket-types),
+ *     added 17 Sep 2026 the same day the colour it replaces was retired from
+ *     the VALUE cell above: the client's ruling names icons for ticket type
+ *     and colour for status, and this is where Story type's identical
+ *     ICON-only case already lives, so Ticket type takes the same seat next
+ *     to it rather than a bespoke one in the Value column.
  *   • Every other type (Department, Industry, Country, Brand asset
  *     category, Deliverable kind, and the three "labels" groups) carries
  *     nothing beyond its word — an honest empty cell, no dash, no hint
@@ -1042,6 +1079,10 @@ function choiceDetailsCell(v: SelectableValue, t: ReturnType<typeof translator>)
   }
   if (v.type === "Story type") {
     const iconName = storyTypeIconName(v.value)
+    return iconName ? <Icon name={iconName} className="text-muted-foreground size-4 shrink-0" /> : null
+  }
+  if (v.type === TICKET_TYPE_GROUP) {
+    const iconName = ticketTypeIconName(v.value)
     return iconName ? <Icon name={iconName} className="text-muted-foreground size-4 shrink-0" /> : null
   }
   if (v.type === SELECTABLE_GROUPS.appStage) {

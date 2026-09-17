@@ -1,5 +1,5 @@
 // The navigation order is a locked owner decision: Home first, then the team pages
-// (Knowledge base, Tickets), Settings last — the SAME order on the desktop rail and the
+// (Knowledge, Tickets), Settings last — the SAME order on the desktop rail and the
 // mobile bottom bar (no centre-pinning). These lock the mobile derivation.
 
 import { readFileSync } from "node:fs"
@@ -21,7 +21,7 @@ const composed = [
   { slug: "settings" },
 ]
 
-describe("bottomNavItems — Home, Knowledge base, Tickets, Settings", () => {
+describe("bottomNavItems — Home, Knowledge, Tickets, Settings", () => {
   it("keeps the composed order (Home FIRST, not centre-pinned)", () => {
     expect(bottomNavItems(composed).map((i) => i.slug)).toEqual([
       "home",
@@ -127,10 +127,11 @@ describe("the sidebar sequence the client fixed", () => {
   it("puts My work first among the named sections, in the client's order", () => {
     // Tasks and Meetings are the client's own explicit pair ("My work: today,
     // tasks, meetings" — "today" is Home, standalone, not repeated here — see
-    // the note on NavGroup in pages.ts). Knowledge base, Tickets and Work logs
+    // the note on NavGroup in pages.ts). Knowledge and Work logs
     // were not named; they keep the closest reading of the daily half they used
-    // to sit in, after the two the client did name.
-    expect(composeLikeTheShell().named[0]).toEqual(["tasks", "meetings", "knowledge", "tickets", "time"])
+    // to sit in, after the two the client did name. Tickets moved to Accounts
+    // (17 Sep 2026).
+    expect(composeLikeTheShell().named[0]).toEqual(["tasks", "meetings", "knowledge", "time"])
   })
 
   it("puts Build second, Waves leading it — the client's later, narrower ruling", () => {
@@ -145,7 +146,7 @@ describe("the sidebar sequence the client fixed", () => {
     expect(composeLikeTheShell().named[1]).toEqual(["waves", "apps", "stories"])
   })
 
-  it("puts Accounts third, all three pages the client named", () => {
+  it("puts Accounts third, with four pages", () => {
     // "accounts: accounts, contacts" — Contacts had no first-class page to
     // point a rail entry at when this suite first named the gap (it was a tab
     // on the account record, gated by its own `contacts` right); the client
@@ -153,8 +154,9 @@ describe("the sidebar sequence the client fixed", () => {
     // also remove the tab from inside accounts", 31 Aug 2026), so both of the
     // client's own words now name a real page. INPUTS joined 15 Sep 2026
     // (Task C — "I would like to see this in the third section of the
-    // accounts section on the sidebar"), third in the group, after both.
-    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts", "inputs"])
+    // accounts section on the sidebar"), and TICKETS joined 17 Sep 2026
+    // ("put the tickets into Accounts after Contacts").
+    expect(composeLikeTheShell().named[2]).toEqual(["accounts", "contacts", "tickets", "inputs"])
   })
 
   it("has exactly three named sections — Kwapso is not a fourth", () => {

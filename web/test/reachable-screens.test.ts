@@ -23,7 +23,7 @@
 //      model stands on), a page shell under web/app (or a reload 404s), and the
 //      gateway forwarding its sub-paths (or a deep link to a record 404s).
 //      Every one of those four was broken for at least one live section when
-//      this check was written: Knowledge base and Work were missing from
+//      this check was written: Knowledge and Work were missing from
 //      TOP_LEVEL_MODULES, and the Brand library and
 //      Meeting purposes had no page shell at all — four sidebar links that
 //      404'd on reload, in a green build.

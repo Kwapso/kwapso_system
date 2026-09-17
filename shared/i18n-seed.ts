@@ -59,12 +59,17 @@ export const SEED: Catalogue = {
   Process: { de: "Prozess", es: "Proceso", ca: "Procés" },
   Meetings: { de: "Termine", es: "Reuniones", ca: "Reunions" },
   Meeting: { de: "Termin", es: "Reunión", ca: "Reunió" },
+  // "Work logs" stays — it is still the word on every record's own tab
+  // (story/task/meeting/ticket detail). Only the RAIL destination renamed,
+  // provisionally, to "Hours" (R85, the client's one-word rail law, 17 Sep
+  // 2026); see the comment beside its `time` entry in web/lib/pages.ts for
+  // the alternatives still awaiting her pick.
   "Work logs": { de: "Zeiterfassung", es: "Registros de tiempo", ca: "Registres de temps" },
-  "Knowledge base": {
-    de: "Wissensdatenbank",
-    es: "Base de conocimiento",
-    ca: "Base de coneixement",
-  },
+  Hours: { de: "Stunden", es: "Horas", ca: "Hores" },
+  // RENAMED FROM "Knowledge base" — R85, the same ruling: "'Knowledge Base':
+  // reduce it to 'Knowledge'." The route (/knowledge) and every identifier
+  // are unchanged.
+  Knowledge: { de: "Wissen", es: "Conocimiento", ca: "Coneixement" },
   Settings: { de: "Einstellungen", es: "Ajustes", ca: "Configuració" },
   Home: { de: "Start", es: "Inicio", ca: "Inici" },
   Members: { de: "Mitglieder", es: "Miembros", ca: "Membres" },
@@ -120,12 +125,30 @@ export const SEED: Catalogue = {
    * tab: Halloway"), so the verb itself has to say "tab" rather than leave the
    * join to carry that word alone — see `app-shell.tsx`'s `closeLabel` prop. */
   "Close tab": { de: "Tab schließen", es: "Cerrar pestaña", ca: "Tancar pestanya" },
-  /* THE STRIP'S OWN CLOSE-ALL VERB (2026-09-16, kit v1.2.92's own
-   * `BreadcrumbFoldersProps.closeAllLabel`). Announced whole, with no crumb
-   * to join against — it closes every tab but the one she is on, not one
-   * named tab — so it needs no second half the way `"Close tab"` does. */
-  "Close all tabs": { de: "Alle Tabs schließen", es: "Cerrar todas las pestañas", ca: "Tancar totes les pestanyes" },
+  /* THE CONTENT STRIP'S OWN "+" (17 Sep 2026) — the pinned, icon-only tab
+   * `app-shell.tsx` adds after the last open one, mirroring the assistant
+   * strip's own History/"+" pair (`agent-tab-strip.tsx`). Its `sr-only` label
+   * IS the tab's `label` too (`workspace-tabs.ts`'s `openNewTab`), so one
+   * string does both jobs. */
+  "New tab": { de: "Neuer Tab", es: "Nueva pestaña", ca: "Pestanya nova" },
+  /* THE NEW-TAB SCREEN ITSELF (`new-tab-screen.tsx`), 17 Sep 2026's second
+   * ruling: a search page rather than the placeholder sentence the first
+   * ruling asked for that same day. `"Where to?"` is the page's own title;
+   * `"Search"` names the icon-only trigger beside the bar (R84 — it is not
+   * the title's own mango act, so it carries no visible word, only this
+   * accessible one); `"Recently opened"` labels the list of steps read off
+   * the open tabs' own trails. */
+  "Where to?": { de: "Wohin?", es: "¿Adónde?", ca: "On?" },
+  Search: { de: "Suchen", es: "Buscar", ca: "Cercar" },
+  "Recently opened": { de: "Zuletzt geöffnet", es: "Abierto recientemente", ca: "Obert recentment" },
+  "No results.": { de: "Keine Treffer.", es: "Sin resultados.", ca: "Sense resultats." },
   Back: { de: "Zurück", es: "Atrás", ca: "Enrere" },
+  /* THE TRAIL LINE'S OWN TWO ARROWS AND ITS LANDMARK NAME (client ruling, 17
+   * Sep 2026 — see `shared/ui/components/breadcrumbs/trail-line.tsx` and its
+   * mount in `web/components/shell/app-shell.tsx`). `Back` already existed
+   * and is reused as-is; `Forward` and `Trail` are new. */
+  Forward: { de: "Vorwärts", es: "Adelante", ca: "Endavant" },
+  Trail: { de: "Verlauf", es: "Historial", ca: "Historial" },
   "Start timer": {
     de: "Zeit starten",
     es: "Iniciar temporizador",
@@ -146,15 +169,6 @@ export const SEED: Catalogue = {
   Language: { de: "Sprache", es: "Idioma", ca: "Idioma" },
   "Language changed.": { de: "Sprache geändert.", es: "Idioma cambiado.", ca: "Idioma canviat." },
 
-  /* ── Settings › Appearance's own live preview caption, added 2026-09-14 —
-   * the artifact's own sentence (`appearance-layouts.html`, option 3), kept
-   * neutral in every language rather than switching to direct address, the
-   * same register "That didn't save. Try again." already keeps below. */
-  "Live preview — updates as you press a control": {
-    de: "Live-Vorschau — aktualisiert sich mit jeder Auswahl.",
-    es: "Vista previa en directo — se actualiza con cada selección.",
-    ca: "Previsualització en directe — s'actualitza amb cada selecció.",
-  },
 
   /* ── Settings › Appearance's Save bar, added 2026-09-14 alongside the panel
    * itself — the debt R44 let in on the same day (`TRANSLATION_CEILING`'s own
@@ -184,10 +198,28 @@ export const SEED: Catalogue = {
     es: "Tienes cambios sin guardar.",
     ca: "Tens canvis sense desar.",
   },
-  "Language changes right away. Size, appearance and background wait for Save.": {
-    de: "Die Sprache ändert sich sofort. Größe, Darstellung und Hintergrund warten auf Speichern.",
-    es: "El idioma cambia de inmediato. Tamaño, apariencia y fondo esperan a guardar.",
-    ca: "L'idioma canvia de seguida. Mida, aparença i fons esperen a desar.",
+
+  /* ── Settings › Appearance's taller preview, added 2026-09-17
+   * (`shared/web/appearance-tab-preview.tsx`) alongside the ruling that
+   * deleted the two captions directly above. The accessible name is real,
+   * translated copy; everything else the preview draws is Lorem Ipsum, the
+   * same "a picture of the SHAPE, not of anyone's data" reasoning the kit's
+   * own retired preview gave for its own specimen row — kept UNCHANGED
+   * across every language rather than "translated" into nonsense, the same
+   * convention any translated product uses for placeholder Latin. */
+  Lorem: { de: "Lorem", es: "Lorem", ca: "Lorem" },
+  Ipsum: { de: "Ipsum", es: "Ipsum", ca: "Ipsum" },
+  Dolor: { de: "Dolor", es: "Dolor", ca: "Dolor" },
+  "Lorem ipsum dolor": { de: "Lorem ipsum dolor", es: "Lorem ipsum dolor", ca: "Lorem ipsum dolor" },
+  "Lorem ipsum dolor sit amet": {
+    de: "Lorem ipsum dolor sit amet",
+    es: "Lorem ipsum dolor sit amet",
+    ca: "Lorem ipsum dolor sit amet",
+  },
+  "A small picture of the app, reflecting your chosen settings": {
+    de: "Ein kleines Abbild der App, das Ihre gewählten Einstellungen zeigt.",
+    es: "Una pequeña imagen de la aplicación que muestra tus ajustes elegidos.",
+    ca: "Una petita imatge de l'aplicació que mostra els teus ajustos triats.",
   },
 
   /* ── The one unsaved-changes confirm, added 2026-09-14 beside
@@ -1213,7 +1245,6 @@ export const SEED: Catalogue = {
   "Nothing in Meetings this month.": { de: "Diesen Monat keine Termine.", es: "Nada en Reuniones este mes.", ca: "Res a Reunions aquest mes."},
   "Nothing logged yet": { de: "Noch nichts erfasst", es: "Aún no se ha registrado nada", ca: "Encara no s'ha registrat res"},
   "Nothing matched.": { de: "Nichts gefunden.", es: "Nada coincide.", ca: "Res no coincideix."},
-  "Nothing matched “{term}”.": { de: "Nichts passt zu „{term}“.", es: "Nada coincide con «{term}».", ca: "Res no coincideix amb «{term}»."},
   "Nothing new to bring in.": { de: "Es gibt nichts Neues zu importieren.", es: "No hay nada nuevo que importar.", ca: "No hi ha res nou per importar."},
   "Nothing to read yet.": { de: "Noch nichts zu lesen.", es: "Nada que leer todavía.", ca: "Encara no hi ha res per llegir."},
   "Nothing was deleted, this puts it back in front of the assistant.": { de: "Es wurde nichts gelöscht, damit steht es dem Assistenten wieder zur Verfügung.", es: "No se borró nada, esto vuelve a ponerlo delante del asistente.", ca: "No s'ha esborrat res, això el torna a posar davant de l'assistent."},
@@ -1646,6 +1677,9 @@ export const SEED: Catalogue = {
   "Search waves…": { de: "Wellen durchsuchen…", es: "Buscar waves…", ca: "Cercar waves…" },
   "Sort by": { de: "Sortieren nach", es: "Ordenar por", ca: "Ordenar per" },
   "Start": { de: "Start", es: "Inicio", ca: "Inici" },
+  // THE WAVES TABLE'S OWN "End" COLUMN, beside "Start" one line up — a wave's
+  // end date, the same header pair task/sprint date ranges already carry.
+  "End": { de: "Ende", es: "Fin", ca: "Fi" },
   "Sprint planned, and it is in this wave.": {
     de: "Sprint geplant und in dieser Welle.",
     es: "Sprint planificado y dentro de esta wave.",
@@ -3052,6 +3086,10 @@ export const SEED: Catalogue = {
     es: "Todavía no hay nada en la base de conocimiento.",
     ca: "Encara no hi ha res a la base de coneixement.",
   },
+  /* THE KNOWLEDGE SCREEN'S OWN CARD GRID LABEL — the eyebrow over the source
+   * cards (files and notes) once there is at least one, beside the empty
+   * state seeded above it. */
+  "Sources": { de: "Quellen", es: "Fuentes", ca: "Fonts" },
   /* ── A CALL'S OWN CONNECTIONS TAB (9 Sep 2026) ───────────────────────────
    * The meeting screen's map. Same register as the knowledge base's beside it:
    * plain, short, sentence case. "Call" rather than "meeting" in the empty
@@ -3209,6 +3247,16 @@ export const SEED: Catalogue = {
     es: "Tendencia",
     ca: "Tendència",
   },
+  /* 7A — WHO ASKED, RANKED (client, 17 Sep 2026: "put the faces"). A panel
+     title, the same shape as "Tendency" above: a noun naming the picture. */
+  "Raised by": {
+    de: "Gemeldet von",
+    es: "Solicitado por",
+    ca: "Sol·licitat per",
+  },
+  /* THE RANKING'S OWN FOOTER — the two whole-population numbers the top five
+     rows above cannot say on their own (this file's own `TicketDashboard`
+     comment: "the footer names the full ranking, not the five drawn"). */
   /* FOUR PANEL SUBTITLES AND TWO SUB-HEADINGS WERE RETIRED HERE, 6 Sep 2026 —
      client: "rmoeve all subtitles: Every open ticket, as one pipeline per kind
      down a shared set of stages. Open tickets against the thing you built. Open
@@ -3381,6 +3429,23 @@ export const SEED: Catalogue = {
     es: "Dígito {position} de {total}",
     ca: "Dígit {position} de {total}",
   },
+  /* ── Three strings the translation ceiling caught missing entirely (17 Sep
+   * 2026) — extracted and wrapped in `t(...)` but never seeded, so they were
+   * shipping in English to every non-English reader. */
+  // "Show all" — the ticket detail's Related-stories preview, opening the
+  // full list in a slide-in (`web/components/tickets/help-detail.tsx`).
+  "Show all": { de: "Alle anzeigen", es: "Mostrar todos", ca: "Mostra-ho tot" },
+  // The tickets dashboard's "Raised by contact" panel footer
+  // (`tickets-dashboard.tsx`) — the same "{count}h ago" hour-abbreviation
+  // convention above, "h"/"Std." rather than a spelled-out word.
+  "of {total} · {people} people": {
+    de: "von {total} · {people} Personen",
+    es: "de {total} · {people} personas",
+    ca: "de {total} · {people} persones",
+  },
+  // The ticket detail's total-hours badge (`help-detail.tsx`) — same
+  // abbreviation as "{count}h ago" above ("Std."/"h"), a bare number in front.
+  "{hours}h": { de: "{hours} Std.", es: "{hours} h", ca: "{hours} h" },
   /* ── The stages a ticket went through, and how the client says we did ────
    * Team migrations 0066 and 0067, 2026-09-07. Written by hand at the same
    * commit as the English, so the ceiling (R44) never rises: a string shipped
@@ -3731,6 +3796,20 @@ export const SEED: Catalogue = {
   "Your team has no ticket types set up yet.": { de: "Ihr Team hat noch keine Tickettypen eingerichtet.", es: "Tu equipo aún no tiene tipos de ticket configurados.", ca: "El teu equip encara no té tipus de tiquet configurats." },
   "next": { de: "weiter", es: "siguiente", ca: "següent" },
   "raised {date}": { de: "erstellt am {date}", es: "creado el {date}", ca: "creat el {date}" },
+  /* THE "RAISED ON" FACT ROW — client ruling, 17 Sep 2026, verbatim: "Remove
+   * the 'Raised On' chip from the QE view, but also from the detail page in
+   * the QE view. Add it under 'Raised By' as 'Raised On' and put the date
+   * and, in brackets, how many days ago." One label ("Raised on", mirroring
+   * "Received on"'s own am/el/el pattern) and one composite sentence with
+   * BOTH holes, so a translator can reorder the date and the day count
+   * rather than gluing two separately-translated fragments together
+   * (R28/R33's own discipline). */
+  "Raised on": { de: "Erstellt am", es: "Creado el", ca: "Creat el" },
+  "{date} ({count} days ago)": {
+    de: "{date} (vor {count} Tagen)",
+    es: "{date} (hace {count} días)",
+    ca: "{date} (fa {count} dies)",
+  },
   "{count} contacts match": { de: "{count} Kontakte passen", es: "{count} contactos coinciden", ca: "{count} contactes coincideixen" },
   "{count} entries match": { de: "{count} Einträge passen", es: "{count} entradas coinciden", ca: "{count} entrades coincideixen" },
   "{count} given to somebody": { de: "{count} vergeben", es: "{count} asignados a alguien", ca: "{count} assignats a algú" },
@@ -3831,6 +3910,21 @@ export const SEED: Catalogue = {
   "Deactivated roles": { de: "Deaktivierte Rollen", es: "Roles desactivados", ca: "Rols desactivats" },
   "No deactivated roles.": { de: "Keine deaktivierten Rollen.", es: "No hay roles desactivados.", ca: "No hi ha rols desactivats." },
   "No modules match your search.": { de: "Keine Module passen zu Ihrer Suche.", es: "Ningún módulo coincide con tu búsqueda.", ca: "Cap mòdul coincideix amb la teva cerca." },
+  /* THE ROLES TOOLBAR, AMENDED 17 SEP 2026 — "Deactivated" moves again, from
+   * the actions-slot button above into a real filter facet ("roles' status:
+   * Active/Deactivated" — see roles-matrix.tsx's own header), and the row
+   * gains a Module name sort. Two more strings, seeded in all three so
+   * TRANSLATION_CEILING stays 0/0/0: the facet's own label ("Status") and
+   * the sort field's name. "Active" itself is NOT re-seeded here — it is
+   * the same key ~19 other call sites already share (shape.tsx, internal-
+   * screens.tsx, accounts-screen.tsx, waves-screen.tsx, …), almost all of
+   * them pairing it with "Inactive"/"Archived" rather than "Deactivated",
+   * so the dictionary singular ("Activo"/"Actiu", seeded once above) wins
+   * over this one screen's plural agreement with "Desactivados"/
+   * "Desactivats" — a per-screen key would need its own translated string,
+   * not a second entry under the same English source text. */
+  "Status": { de: "Status", es: "Estado", ca: "Estat" },
+  "Module name": { de: "Modulname", es: "Nombre del módulo", ca: "Nom del mòdul" },
   /* The legend's THIRD register, new with kit v1.2.75 and drawn only once the
    * grid actually withholds something (it does: 15 of the 88 boxes in a role's
    * band, R36). It teaches the em dash that stands where a switch would be, and
@@ -4162,11 +4256,8 @@ export const SEED: Catalogue = {
      in every language, same as the German seed's own treatment of "Sprint"
      and "Ticket" above. */
   "\"{name}\" looks like it belongs to an account you already have on file.": { de: "„{name}“ sieht aus, als gehöre es zu einem Kunden, den Sie schon erfasst haben.", es: "«{name}» parece pertenecer a una cuenta que ya tienes registrada.", ca: "«{name}» sembla pertànyer a un compte que ja tens registrat." },
-  "1 app": { de: "1 App", es: "1 app", ca: "1 app" },
   "Almost done…": { de: "Gleich fertig…", es: "Casi listo…", ca: "Gairebé llest…" },
-  "Edit filing": { de: "Ablage bearbeiten", es: "Editar archivado", ca: "Editar arxivat" },
   "File this under {account}?": { de: "Unter „{account}“ ablegen?", es: "¿Archivar esto bajo «{account}»?", ca: "Vols arxivar això sota «{account}»?" },
-  "Found in search — never quoted in an answer.": { de: "Wird bei der Suche gefunden — aber nie in einer Antwort zitiert.", es: "Se encuentra en la búsqueda — pero nunca se cita en una respuesta.", ca: "Es troba en la cerca — però mai es cita en una resposta." },
   "I looked at 1 piece of material.": { de: "Ich habe mir 1 Stück Material angesehen.", es: "He revisado 1 fragmento de material.", ca: "He revisat 1 fragment de material." },
   "I looked at {count} pieces of material.": { de: "Ich habe mir {count} Stück Material angesehen.", es: "He revisado {count} fragmentos de material.", ca: "He revisat {count} fragments de material." },
   "KB is kept in full and every word of it is searchable. Open the original below to read the rest.": { de: "KB werden vollständig aufbewahrt, und jedes Wort davon ist durchsuchbar. Öffnen Sie unten das Original, um den Rest zu lesen.", es: "KB se guardan completos, y cada palabra es buscable. Abre el original de abajo para leer el resto.", ca: "KB es guarden sencers, i cada paraula és cercable. Obre l'original de sota per llegir la resta." },
@@ -4175,8 +4266,6 @@ export const SEED: Catalogue = {
   "May this name narrow a knowledge base search on its own?": { de: "Darf dieser Name eine Wissensdatenbank-Suche von sich aus eingrenzen?", es: "¿Puede este nombre acotar por sí solo una búsqueda en la base de conocimiento?", ca: "Pot aquest nom acotar per si sol una cerca a la base de coneixement?" },
   "Must never narrow a search on its own": { de: "Darf eine Suche nie von sich aus eingrenzen", es: "Nunca debe acotar una búsqueda por sí sola", ca: "Mai ha d'acotar una cerca per si sola" },
   "New meeting type": { de: "Neuer Termintyp", es: "Nuevo tipo de reunión", ca: "Nou tipus de reunió" },
-  "Not filed under an app": { de: "Keiner App zugeordnet", es: "No archivado bajo ninguna app", ca: "No arxivat sota cap app" },
-  "Not indexed yet": { de: "Noch nicht indexiert", es: "Aún no indexado", ca: "Encara no indexat" },
   "Not reviewed": { de: "Nicht geprüft", es: "Sin revisar", ca: "Sense revisar" },
   "Not this one": { de: "Das ist es nicht", es: "No es esto", ca: "No és això" },
   "Nothing on our own list.": { de: "Nichts auf unserer eigenen Liste.", es: "Nada en nuestra propia lista.", ca: "Res a la nostra pròpia llista." },
@@ -4201,9 +4290,6 @@ export const SEED: Catalogue = {
   "captions": { de: "Untertitel", es: "subtítulos", ca: "subtítols" },
   "description": { de: "Beschreibung", es: "descripción", ca: "descripció" },
   "transcript": { de: "Transkript", es: "transcripción", ca: "transcripció" },
-  "{count} accounts": { de: "{count} Kunden", es: "{count} cuentas", ca: "{count} comptes" },
-  "{count} apps": { de: "{count} Apps", es: "{count} apps", ca: "{count} apps" },
-  "{count} pieces": { de: "{count} Stück", es: "{count} fragmentos", ca: "{count} fragments" },
   "{title} (not in use)": { de: "{title} (nicht in Gebrauch)", es: "{title} (sin usar)", ca: "{title} (sense ús)" },
 
   /* ── R44 TRANSLATION-CEILING PAYDOWN, 15 Sep 2026, SAME DAY, LATER — the

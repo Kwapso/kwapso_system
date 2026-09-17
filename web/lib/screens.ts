@@ -374,8 +374,11 @@ const ticketsListRecipe: ScreenRecipe = {
   // client retired the ticket type's glyph on 2026-09-07 — *"for type, kill
   // the emojis. this is legacy. in current system we use colors"* — so
   // `MARK_GROUP` (web/lib/type-marks.ts) has no `ticket` key, the union is
-  // closed, and no screen can look one up: the tickets collection draws
-  // `Swatch` + `ticketTypeColour` instead. This recipe is also no longer the
+  // closed, and no screen can look one up: the tickets collection drew
+  // `Swatch` + `ticketTypeColour` instead, until the client's 17 Sep 2026
+  // ruling retired the colour too ("for tickets, we need to find icons for
+  // the ticket type") — it draws `Icon` + `ticketTypeIconName`
+  // (@shared/ticket-types) now. This recipe is also no longer the
   // path that screen takes (`tickets-collection.tsx` composes its own rows;
   // `shapeHelpList`'s `marks` argument reaches it from nowhere in `web/`), so
   // the slot resolves to no glyph at all. Left named rather than deleted

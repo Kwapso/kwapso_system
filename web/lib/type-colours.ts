@@ -1,5 +1,22 @@
-// THE COLOUR A TICKET TYPE IS KNOWN BY — one map, read by every screen that
-// draws a type, and the sibling of `type-marks.ts` next door.
+// THE COLOUR A TICKET TYPE IS KNOWN BY — NARROWED TO THE DASHBOARD'S CHART
+// SERIES, 17 Sep 2026. Client ruling, verbatim: "I have changed my mind
+// regarding chips. In a database where there are different columns, the one
+// that gets the chip with the color is always the status. This means that
+// for tickets, we need to find icons for the ticket type and assign colors
+// to the status." `ticketTypeColour` no longer draws a CHIP anywhere — the
+// list's Type cell, the board cards, `TicketChips` (shared/web/ticket-chips.tsx),
+// the type picker's own option dot, `work-panels.tsx`'s linked-ticket chip
+// and the portal's ticket rows all read `ticketTypeIconName`
+// (shared/ticket-types.ts) instead, the same icon-map pattern
+// `storyTypeIconName` already stands for stories. What is LEFT reading this
+// file is `tickets-dashboard.tsx`: a chart's series colour is not the "chip
+// with the color" her ruling names — a bar, a legend swatch and a node on a
+// relationship map are an AGGREGATE view over many tickets at once, the exact
+// domain `type-colours.ts`'s own closing section below ("the four are the
+// chart series") already argued this map into, and retiring it there too
+// would leave four bars on a graph with no way to tell them apart. This file
+// stays for exactly that reader; it is deleted only once the dashboard reads
+// nothing from it either.
 //
 // THE WORDS THEMSELVES ARE NOT DECIDED HERE. `TICKET_TYPES`
 // (shared/ticket-types.ts) is the one list of the four, and this file supplies

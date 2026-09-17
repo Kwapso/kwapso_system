@@ -113,16 +113,27 @@ function helpTextCensus(files: { path: string; tree: ts.SourceFile }[]): HelpTex
 
 type ParagraphOffence = { file: string; line: number; text: string }
 
-/** Does this file render a form at all? R4's own marker: every form/dialog
- * renders through the shared FormShell. A file that never imports it has no
- * "between fields" for a bare hint to sit in. */
+/** Markers for "this file is a form" — R4's own (every form/dialog renders
+ * through the shared FormShell) plus, since 2026-09-17, the kit's
+ * `UnsavedChangesBar`: a Settings tab staged behind Save/Discard is a form in
+ * every way this law cares about (a label, a control, nothing else between
+ * them) even though it never imports `FormShell` — she said so directly,
+ * over Settings › Appearance: "too many descriptions everywhere ... delete
+ * these live preview updates as you press a control." Two panels draw the
+ * bar today (`shared/web/appearance-panel.tsx`, `web/components/team/
+ * roles-matrix.tsx`); neither carried a bare-`<p>` hint at the time this
+ * marker widened, so the second clause below extends the census's REACH
+ * without moving its own goalposts. */
+const FORM_FILE_MARKERS = ["@shared/web/form-shell", "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"]
+
+/** Does this file render a form at all? See `FORM_FILE_MARKERS` above. */
 function importsFormShell(tree: ts.SourceFile): boolean {
   let found = false
   const visit = (node: ts.Node) => {
     if (
       ts.isImportDeclaration(node) &&
       ts.isStringLiteral(node.moduleSpecifier) &&
-      node.moduleSpecifier.text === "@shared/web/form-shell"
+      FORM_FILE_MARKERS.includes(node.moduleSpecifier.text)
     ) {
       found = true
     }

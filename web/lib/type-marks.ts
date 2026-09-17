@@ -31,10 +31,14 @@ export const MARK_GROUP = {
    * vocabulary group. What was retired is the READ, on every surface that drew
    * a ticket's kind: the list's Type cell and the Ready split pane
    * (tickets-collection.tsx), the ticket's own header band (help-detail.tsx)
-   * and an app's Tickets panel (app-detail.tsx). The colour is the mark now —
-   * `Swatch` + `ticketTypeColour`, web/lib/type-colours.ts — which is what her
-   * "we use colors" names and what the type facet, the picker option and the
-   * chip line have drawn all along.
+   * and an app's Tickets panel (app-detail.tsx). The colour WAS the mark from
+   * this ruling until 17 Sep 2026 — `Swatch` + `ticketTypeColour`,
+   * web/lib/type-colours.ts, what her "we use colors" named and what the type
+   * facet, the picker option and the chip line drew for ten days. Her later
+   * ruling retired it in turn ("the one that gets the chip with the color is
+   * always the status … for tickets, we need to find icons for the ticket
+   * type"): the mark is an ICON now — `Icon` + `ticketTypeIconName`,
+   * shared/ticket-types.ts — on the identical four surfaces.
    *
    * WHY THE KEY IS DELETED RATHER THAN LEFT UNUSED. A display ruling that lives
    * as a habit ("don't call this one") is undone by the next person who needs a

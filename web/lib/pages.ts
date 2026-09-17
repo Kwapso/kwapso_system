@@ -384,8 +384,10 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //   [was] daily       Home · Accounts · Knowledge base · Tickets · Stories · Tasks
   //   [was] occasional  Meetings · Apps · Sprints · Brand library · Settings
   //
-  // The new sequence, this list's real order:
-  //   My work   Tasks · Meetings · Knowledge base · Tickets · Work logs
+  // The new sequence, this list's real order (titles as of R85, 17 Sep 2026 —
+  // "Knowledge base" → "Knowledge", "Work logs" → "Hours" provisionally; see
+  // the note beside `knowledge` and `time` below):
+  //   My work   Tasks · Meetings · Knowledge · Tickets · Hours
   //   Build     Waves · Apps · Stories
   //   Accounts  Accounts · Contacts
   //   (none)    Home, Kwapso — see NAV in this file
@@ -426,6 +428,15 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // the old Companies/Contacts/All strip badged (`accounts-individual`),
   // primed by the one `listFetch.accounts` read either page already makes.
   { key: "contacts", title: "Contacts", module: "contacts", segment: "contacts", placement: "sidebar", countCacheKey: "accounts-individual", group: "accounts" },
+  // Tickets is the one place in this table where the URL segment is NOT the
+  // permission module. The section, the page and the address bar say `tickets`,
+  // because that is the word for the thing (glossary, SCOPE ch.02). The right the
+  // server enforces is still `help`: it is the string sitting in every role's
+  // permission sheet, in every team database, and renaming it would be a data
+  // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
+  // in lib/screens.ts is the one seam that translates between the two. Moved to
+  // the Accounts group after Contacts, per client ruling, 17 Sep 2026.
+  { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "accounts" },
   // INPUTS — third in the Accounts group, the client's own placement
   // ("the third section of the accounts section on the sidebar"). Same
   // module as the permission box the door now gates on (`inputs`, renamed
@@ -447,16 +458,15 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // out. Gated by its own module, so a role without it never sees the
   // destination at all. Not named in the client's list — kept in My work, the
   // closest reading of the daily half it used to sit in.
-  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "my-work" },
-  // Tickets is the one place in this table where the URL segment is NOT the
-  // permission module. The section, the page and the address bar say `tickets`,
-  // because that is the word for the thing (glossary, SCOPE ch.02). The right the
-  // server enforces is still `help`: it is the string sitting in every role's
-  // permission sheet, in every team database, and renaming it would be a data
-  // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
-  // in lib/screens.ts is the one seam that translates between the two. Not named
-  // in the client's list — kept in My work for the same reason as Knowledge base.
-  { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "my-work" },
+  //
+  // "KNOWLEDGE", not "Knowledge base" — the client's ruling, 17 Sep 2026,
+  // verbatim, over the rail's one-word law (R85): "Make it a rule that in the
+  // navigation bar, we only have one-word names. For example, 'Knowledge
+  // Base': reduce it to 'Knowledge'." The glossary term (shared/glossary.ts,
+  // `knowledgeBase`) and every t("Knowledge base") call site renamed with it
+  // (R6/R34 — one word, everywhere it's read); the route (/knowledge), the
+  // module, the segment and every identifier are unchanged.
+  { key: "knowledge", title: "Knowledge", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "my-work" },
   // TIME — a work log is the row every figure in this app is eventually built
   // on, and there was nowhere to go and look at one until 24 Aug 2026: the whole
   // list lived in a panel at the FOOT of the Stories page, under the backlog,
@@ -473,7 +483,19 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // The URL segment is deliberately left alone: `/time` is a link people have
   // already sent each other, and a slug is not a word anybody reads. Not named
   // in the client's list — kept in My work, the closest reading of daily.
-  { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
+  //
+  // "HOURS", PROVISIONALLY — R85, the rail's one-word law, client's ruling,
+  // 17 Sep 2026, verbatim: "we only have one-word names... We need an
+  // alternative for work logs. Propose me multiple." "Work logs" stays the
+  // word everywhere else in the app (the glossary term, and every record's
+  // own tab — story/task/meeting/ticket detail); only THIS rail destination
+  // needed a one-word substitute. She asked to be shown options rather than
+  // have one picked for her, so "Hours" ships as the recommendation — live
+  // now so the law reads green — and stays provisional until she names her
+  // pick from the alternatives:
+  //   Hours · Time · Logs · Timesheet · Effort
+  // The URL segment (`time`) and the module (`work`) are unchanged either way.
+  { key: "time", title: "Hours", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "my-work" },
   // ── BUILD: the work engine's remaining destinations ─────────────────────────
   //
   // WAVES IS FIRST NOW — CLIENT RULING, 2026-09-15, verbatim: "Regarding
@@ -524,11 +546,13 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // glossary is Story. The URL segment moved with the title rather than being
   // kept for old links: nothing outside this app has ever linked to /work, and
   // a segment that disagrees with its heading is a cost paid for ever (Tickets
-  // pays it because a permission STRING in every team's database is behind it
-  // — there is no such string here, the module is `work` either way). LAST in
-  // Build, per the client's explicit order — moved out of the old daily/My-work
-  // run it shared with Tasks, since the client's own grouping puts it with the
-  // rest of the work engine rather than with the team's day-to-day admin.
+  // used to pay it until moved to Accounts, 17 Sep 2026 — there the permission
+  // STRING in every team's database is behind it, which a rename could only ever
+  // take somebody's access away; there is no such string here, the module is
+  // `work` either way). LAST in Build, per the client's explicit order — moved out
+  // of the old daily/My-work run it shared with Tasks, since the client's own
+  // grouping puts it with the rest of the work engine rather than with the team's
+  // day-to-day admin.
   { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "build" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is
@@ -592,13 +616,17 @@ export const CONCEPT_ICON = {
   // nothing spells is a word the app no longer says.
   // The customer spine's own vocabulary: an account, the people on it, and a login.
   accounts: "buildings",
-  contacts: "address-book",
+  // WAS "address-book" — client ruling, 17 Sep 2026, verbatim, over the whole
+  // rail ("they all look too similar"): "For contacts, use the user circle in
+  // the field." Phosphor draws `user-circle` at fill weight (the kit's
+  // default), same as `address-book` was.
+  contacts: "user-circle",
   portal: "key",
-  // WAS "hard-drives" — client ruling, 17 Sep 2026, verbatim: "can we change
-  // the icon of the knowledge base? I was thinking a brain." Phosphor draws
-  // `brain` (fill weight, shared/ui/foundations/icons), the literal ask
-  // rather than a closest-match substitute.
-  knowledge: "brain",
+  // WAS "brain" — a same-day second correction. The 17 Sep 2026 brain ruling
+  // above stood for a few hours before the client's own rail-wide ruling, same
+  // day, replaced it: "for knowledge, use bookmark simple in fill solid."
+  // Phosphor draws `bookmark-simple` at fill weight (the kit's default).
+  knowledge: "bookmark-simple",
   tickets: "tray",
   // The map and the numbers drilled through it: a process is a route someone
   // follows, a step is one stop on it, a version is a point in its history, and
@@ -614,13 +642,25 @@ export const CONCEPT_ICON = {
   // clock running on any of it.
   stories: "puzzle-piece",
   sprints: "calendar-dots",
-  // The package a client bought — several sprints arriving together.
+  // The package a client bought — several sprints arriving together. Same
+  // name, same kit export, as of 17 Sep 2026 a different WEIGHT — client
+  // ruling, verbatim, over the whole rail ("they all look too similar"):
+  // "For waves, use the regular, not solid." The kit's `Waves.svg` moved from
+  // fill to regular in place (foundations/icons/ATTRIBUTION.md); nothing here
+  // changed, the glyph under this name simply looks different now.
   waves: "waves",
   apps: "app-window",
   // WHAT WE HAND OVER on a system: the parcel, because that is what a
   // deliverable is — the thing that leaves our hands and arrives in theirs.
   deliverables: "package",
-  tasks: "check-square",
+  // WAS "check-square" — client ruling, 17 Sep 2026, verbatim, over the whole
+  // rail: "For tasks, use the checks in plural in regular." Phosphor's
+  // `checks` (plural, two overlapping ticks) at REGULAR weight — the kit
+  // already drew `Checks` at fill for two unrelated confirm actions
+  // (a sprint's "Complete" button, the draft review's submit/"Keep all"
+  // buttons), so the regular weight ships as a second, coexisting glyph,
+  // `ChecksRegular` (foundations/icons/ATTRIBUTION.md), kebab "checks--regular".
+  tasks: "checks--regular",
   // A meeting is two people and an hour — the icon says the hour, because that
   // is what distinguishes it from every other list in the rail.
   meetings: "chat",

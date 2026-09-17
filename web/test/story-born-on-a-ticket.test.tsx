@@ -89,6 +89,14 @@ vi.mock("@/lib/api", async (importOriginal) => {
 })
 
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+// V1 (17 Sep 2026) DRAWS EVERY PANEL AT ONCE — see ticket-close-moved-to-top.test.tsx's
+// own comment beside this same mock for the full account.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: toasts,
   Toaster: () => null,
@@ -144,10 +152,18 @@ async function markChangesNoProcess() {
   fireEvent.click(await screen.findByRole("option", { name: "This changes no process" }))
 }
 
-/** Open Related stories and press the create action the tab promises. */
+/** AMENDED 17 Sep 2026 — V1's "no tabs" body (client ruling: "I want to see,
+ * on one single screen with no tabs, the content of tickets … related
+ * stories, work logs, stakeholders") retired the Related stories TAB this
+ * helper used to click into. The capped on-page preview carries no create
+ * action of its own (V1: "capped to the first N with a 'Show all' link"); the
+ * create action still lives exactly where it always did — the full
+ * `<StoriesPanel>`'s own `onNew` — now reached through that "Show all" link,
+ * which opens it in a slide-in instead of switching a tab. Same panel, same
+ * `onNew` wiring, same gate; only the door to it moved. */
 async function relatedStoriesTab() {
   openTicket()
-  fireEvent.mouseDown(await screen.findByRole("tab", { name: /related stories/i }))
+  fireEvent.click(await screen.findByRole("button", { name: "Show all" }))
 }
 
 describe("writing a story on the ticket that asked for it", () => {
@@ -166,7 +182,6 @@ describe("writing a story on the ticket that asked for it", () => {
       !(module === "work" && right === "create")
     )
     await relatedStoriesTab()
-    await screen.findByRole("tab", { name: /related stories/i })
     expect(screen.queryByRole("button", { name: "New story" })).toBeNull()
   })
 
@@ -180,7 +195,13 @@ describe("writing a story on the ticket that asked for it", () => {
     await pickStoryType()
     // …and the explicit "it changes no process", which the door refuses to infer.
     await markChangesNoProcess()
-    fireEvent.submit(document.querySelector("form") as HTMLFormElement)
+    // SCOPED TO THE DIALOG — V1 (17 Sep 2026) mounts every panel at once, so
+    // the reply composer's own `<form data-slot="reply-composer">` is on the
+    // page beside this one; a bare `document.querySelector("form")` would
+    // grab whichever comes first in DOM order rather than the one this test
+    // means to submit.
+    const dialog = await screen.findByRole("dialog")
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement)
 
     await waitFor(() => expect(api.createStory).toHaveBeenCalled())
     const sent = api.createStory.mock.calls[0][0]
@@ -209,7 +230,8 @@ describe("writing a story on the ticket that asked for it", () => {
     })
     await pickStoryType()
     await markChangesNoProcess()
-    fireEvent.submit(document.querySelector("form") as HTMLFormElement)
+    // SCOPED TO THE DIALOG — see the same note in the test above.
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement)
     await waitFor(() => expect(api.createStory).toHaveBeenCalled())
 
     // AND THIS IS NOT A CONVERSION. "Make it a story" turned the request INTO

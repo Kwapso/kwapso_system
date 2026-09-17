@@ -704,7 +704,7 @@ export function AgentPanel({
       scope === "record"
         ? (currentRecordLabel ?? t("This record"))
         : scope === "knowledge"
-          ? t("Knowledge base")
+          ? t("Knowledge")
           : t("Everything (today's default)")
     pickAgentTabScope(activeAgentTabId, scope, label, scope === "record" ? currentRecordLabel : undefined)
     const target = scope === "record" ? ["records"] : scope === "knowledge" ? ["articles"] : [...SOURCE_CHIP_KEYS]

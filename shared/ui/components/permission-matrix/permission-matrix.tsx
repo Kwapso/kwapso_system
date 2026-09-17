@@ -127,7 +127,94 @@
    letter measures what a live letter measures. Nothing is dimmed, so nothing
    is lost, and the two numbers above stop existing rather than being excused.
 
-   WHAT MARKS IT, AND WHERE THAT COMES FROM. The mark is not invented. The
+   ══════════════════════════════════════════════════════════════════════════
+   THE 2026-09-17 RULING OVERTURNS B, D4-B AND D6-B. EVERYTHING FROM "WHAT
+   MARKS IT" THROUGH "THE LOCKED REGISTER LEAVES THE LEGEND" BELOW IS KEPT AS
+   HISTORY — RULES §11.1: a ruling that changes is logged, not erased — AND
+   NONE OF IT DESCRIBES THE COMPONENT AS IT NOW RENDERS. ("THE UNCHECKED
+   HAIRLINE", the section after it, is NOT superseded — it is about the live
+   not-held slot's own edge, untouched by any of this.) Read this block first.
+
+   THE CLIENT, VERBATIM, 17 SEP 2026:
+
+       "In Permissions, the ones that are locked and cannot be changed, we
+        need a different color, maybe a kind of solid grayed-out."
+
+   and, choosing among the drawings this put in front of her:
+
+       "For how a locked permission should look, I choose option A: solid
+        gray field."
+
+   WHAT THIS OVERTURNS, PRECISELY. D4-B ruled a locked run drawn exactly as a
+   live one, with nothing to look at until you tried to press it. That ruling
+   is REPLACED, not amended — a locked capability now takes its own fill,
+   `lockedSlotSkin` a few hundred lines below, and D6-B's "word only" row
+   mark — the phrase beside the collection's name — goes with it, because the
+   fill is now doing what the word alone used to have to. WHAT SURVIVES: every
+   *other* fact D4-B and D6-B established stays true today — no border, no
+   opacity, no invented hue (RULES §2.2 and §2.3 both still hold, only the
+   token changed), never a tab stop, and the reason travels with the mark
+   rather than being assumed. B's own measurements (above) are the numbers
+   THIS design walked away from, not numbers this design repeats.
+
+   OPTION A, READ AS A SPEC:
+     · THE SEGMENT KEEPS ITS SHAPE. A locked slot is still `SLOT_SHAPE` at its
+       ordinary 1.375rem, in its ordinary place in the run — position still
+       carries the meaning approach A (the file's other "approach A", chosen
+       2026-08-something for the run itself) was built on, and a locked
+       capability disappearing from the grid would break that the same way an
+       unoffered one disappearing would.
+     · IT LOSES ITS INK, NOT ITS FILL. "Solid grayed-out" is a fill everyone
+       shares — `--surface-quiet`, the kit's own quiet surface and already
+       `--btn-disabled-fill`'s value, so RULES §2.2's closed palette is never
+       touched. What tells HELD apart from RELEASED inside that shared fill is
+       the LETTER's own ink: `--ink-secondary` (mid-grey, held) against
+       `--ink-disabled` (light grey, released) — both already named members of
+       the "ink-disabled family" `--btn-disabled-label` opens, never a fifth
+       tier invented for this file. See `lockedSlotSkin`'s own header for the
+       measured numbers.
+     · IT IS PER RIGHT. The client's own words: "there are different options
+       and you can have many… all variations are possible" (2026-08-24, still
+       true) now compose with this ruling as "one locked letter inside an
+       otherwise editable cell takes the same fill" — a single capability can
+       be locked while its three siblings in the same cell stay live and
+       pressable. `PermissionModule.locked` grows a third shape for exactly
+       this (see its own doc block), and `PermissionRun` asks
+       `isCapabilityLocked` once per slot rather than once per run.
+     · IT IS NOT PRESSABLE, and the client's own three symptoms are all
+       literal here: no hover (no `enabled:hover:` rule reaches a `<span>`),
+       no focus ring (nothing to ring — it is never a `<button>`, so
+       tokens.css §8 has nothing to attach to), `aria-disabled="true"` (the
+       DOM says so explicitly rather than by omission), `cursor: default`
+       (not `not-allowed` — chapter 10's disabled cursor was B's choice for a
+       mark trying to look pressable; a mark that already reads as inert by
+       its OWN fill does not also need the cursor arguing the same point).
+     · THE REASON MOVES OFF THE ROW. D6-B's row-level phrase —
+       "Locked by policy: <role>" — is not deleted; it is relocated, onto the
+       ONE locked segment it explains, as that segment's `title` and (where
+       the run is interactive) its `Tooltip`. `lockedLabel` and
+       `formatLockedLabel` are the same two props D4-B/D6-B shipped, doing the
+       same formatting, called from a new place — RULES §9.1, nothing dropped.
+     · THE ROW'S OWN MARK IS RETIRED FROM THE KIT. `data-slot=
+       "permission-matrix-locked"` no longer renders anywhere in this file.
+       The brief for this change records that the consuming application was
+       already hiding it, which is the outside confirmation that the row-level
+       phrase had stopped earning its keep once the segment itself could say
+       so.
+
+   VERIFIED — `verify/permission-locked/`: an editable cell, a fully locked
+   cell and a MIXED cell (one locked right beside three live ones) in one
+   grid; computed backgrounds asserted to differ between locked and editable
+   segments; held-locked ink asserted to differ from released-locked ink;
+   a locked segment's click asserted to fire no `onChange`; `aria-disabled`
+   and the `title` asserted present. `verify/permission-turn/`'s own probe for
+   the retired row mark (`__locks()`) is updated in step — see that file's own
+   header for what changed and why.
+   ══════════════════════════════════════════════════════════════════════════
+
+   WHAT MARKS IT, AND WHERE THAT COMES FROM — HISTORY, SUPERSEDED ABOVE. The
+   mark described below is the row-level phrase 2026-09-17 retired; it is kept
+   for how it got there, not as a description of the current render. The
    artifact was searched for how it draws a thing that cannot be changed, and
    it draws exactly four things, none of them a glyph and none of them a
    colour:
@@ -188,7 +275,9 @@
    read in greyscale the mark is still English words. Ruling 26 has nothing to
    fail on, and there is no longer even a fill to argue about.
 
-   THE MARK SITS AT THE SCOPE OF THE LOCK, and there is one rule for that: the
+   THE MARK SITS AT THE SCOPE OF THE LOCK — HISTORY. The row mark this
+   describes is retired; a locked slot's reason now sits on the SLOT, not the
+   row. Kept for the record: the
    row that holds a locked cell carries the mark, in its name cell, beside the
    collection. When every shown role is locked on that row the mark is the
    phrase alone; when only some are, IT NAMES THEM — "Locked by policy: Lead,
@@ -197,7 +286,10 @@
    `disabled` is the case where every row is fully locked, so the same rule
    draws the same phrase on every row without a second code path.
 
-   POINTER AND KEYBOARD STILL SAY NO, AND THAT IS THE COST OF B PAID.
+   POINTER AND KEYBOARD STILL SAY NO, AND THAT IS THE COST OF B PAID — HISTORY.
+   `cursor-not-allowed` on the whole run and a single whole-run `Tooltip` are
+   both gone; today's equivalents are `cursor-default` and a `Tooltip` per
+   locked SLOT. Kept for the record:
      · The slots were never tab stops when locked and still are not. 120 dead
        tab stops would be worse than none.
      · A locked run takes `cursor-not-allowed` — chapter 10's own stated
@@ -218,9 +310,13 @@
        `onChange` a run is a plain mark with NO not-allowed cursor and NO lock
        phrase, because a reference table is not a frozen form. State 10.
 
-   THE LOCKED REGISTER LEAVES THE LEGEND. A legend translates a mark that is
-   not words into words; this mark IS words, sitting on the row a few
-   millimetres away. And a locked run drawn in the legend would now be
+   THE LOCKED REGISTER LEAVES THE LEGEND — HISTORY, AND NOW REVERSED. This
+   section's own conclusion no longer holds: the legend REGAINS a locked
+   register today, in `LegendRun` and the fourth `hasLocked` block near the
+   end of this file, because a locked slot now has a fill of its own to
+   translate. Kept for why it left in the first place: a legend translates a
+   mark that is not words into words; this mark IS words, sitting on the row a
+   few millimetres away. And a locked run drawn in the legend would now be
    pixel-identical to the "held" and "not held" registers beside it — the same
    duplication this file already refuses for the capability-order line. So
    `lockedLabel` is no longer a legend phrase: it is the mark's own text, and
@@ -308,7 +404,8 @@
        simply does not count it.
      · SAID IN WORDS. The cell's accessible sentence names the capabilities
        this collection does not offer, once per cell, and the slot is
-       `aria-hidden` — the same rule `LockMark` follows. `formatCellLabel`
+       `aria-hidden` for the same reason — the fact is already in that
+       sentence. `formatCellLabel`
        takes them as a FIFTH PARAMETER rather than a second prop: a function
        of four parameters is assignable to a type of five, so no call site
        breaks, and word order stays in the formatter a caller already owns.
@@ -443,10 +540,12 @@
      from the grid, and so is a role — not greyed, not locked, not a row or a
      column of blanks. A matrix with nothing visible renders its empty
      register, and one the reader may not open at all renders nothing.
-   · A SLOT THE READER MAY NOT CHANGE IS NOT A CONTROL. It is the same mark
-     without a press. 120 dead tab stops would be worse than none.
-   · Disabled is a fill and an ink. Never an opacity. LOCKED IS NEITHER — it
-     is a word on the row, ruled D4-B, and the cell keeps its full contrast.
+   · A SLOT THE READER MAY NOT CHANGE IS NOT A CONTROL. Never a `<button>`,
+     never a tab stop. 120 dead tab stops would be worse than none.
+   · Disabled is a fill and an ink. Never an opacity. LOCKED IS NOW ONE TOO
+     — client ruling, 2026-09-17, overturning D4-B: `--surface-quiet` under
+     `--ink-secondary` (held) or `--ink-disabled` (released), the kit's own
+     quiet-surface / ink-disabled family and no fifth colour invented for it.
    · The row is 56 — `--control-height-row`, ruling 28 — because `TableRow`
      says so, at every width.
    · The header is the kit's micro uppercase eyebrow on the `--hair-strong`
@@ -660,15 +759,31 @@ export interface PermissionModule {
    */
   rights?: readonly string[];
   /**
-   * Roles whose cell cannot be changed here. `true` locks the whole row.
+   * What cannot be changed here, and at what grain.
    *
-   * The CELLS are unchanged by this — D4-B: a locked run is drawn exactly as a
-   * live one and keeps every distance a live one has. What it earns is
-   * `cursor-not-allowed`, the lock's phrase on hover, no tab stop, and a
-   * `lockedLabel` mark beside the collection's name that names these roles
-   * when they are not all of them.
+   * `true` locks every capability for every role. `readonly string[]` locks
+   * every capability for the named roles — unchanged since the prop was
+   * introduced. THE THIRD SHAPE IS NEW, 2026-09-17: a record keyed by role id
+   * whose value is either `true` (that role's whole row in this collection)
+   * or a `readonly string[]` of the CAPABILITY ids locked for that role alone
+   * — "one locked letter inside an otherwise editable cell", the client's own
+   * phrase for it. A role with no entry in the record is not locked at all.
+   *
+   * D4-B (2026-08-24) ruled a locked run drawn exactly as a live one, with the
+   * lock stated only as a word on the row. THE CLIENT'S 2026-09-17 RULING
+   * OVERTURNS THAT: locked capabilities now take a visible skin of their own
+   * — see `slotSkin` / the file header's "THE 2026-09-17 RULING" section —
+   * and the word moves off the row and onto the capability it names, as that
+   * capability's tooltip / `title`. `cursor-not-allowed` is gone with it: a
+   * locked slot now READS as different before the pointer ever asks, so the
+   * cursor only needs to say "there is nothing to press here", which is
+   * `cursor-default`, chapter 10's own answer for a mark that is not a
+   * control.
    */
-  locked?: boolean | readonly string[];
+  locked?:
+    | boolean
+    | readonly string[]
+    | Readonly<Record<string, boolean | readonly string[]>>;
   /**
    * The reader may not see this collection. `false` removes the ROW entirely
    * — ch24.6. Defaults to `true`.
@@ -796,14 +911,25 @@ export interface PermissionMatrixProps
    * They name the state in every cell's accessible sentence, and they label
    * the legend's third register.
    *
-   * THE LEGEND EARNS THAT REGISTER, unlike the locked one that left it: a
-   * legend turns a mark that is not words into words, the lock's mark IS
-   * words on the row a few millimetres away, and this mark is an em dash. It
-   * is drawn only when a shown row actually withholds something, because a
-   * register teaching a mark the grid does not contain is a mark the reader
-   * has to hold for nothing.
+   * THE LEGEND EARNS THAT REGISTER — a legend turns a mark that is not words
+   * into words, and this mark is an em dash. It is drawn only when a shown
+   * row actually withholds something, because a register teaching a mark the
+   * grid does not contain is a mark the reader has to hold for nothing.
+   * (Locked, below, earns a fourth register the same way, 2026-09-17.)
    */
   notOfferedLabel?: string;
+  /**
+   * THE LEGEND'S WORD FOR A LOCKED SLOT — new 2026-09-17, alongside
+   * `lockedSlotSkin`. Unlike `notOfferedLabel`, above, this register was
+   * NEVER earned before today: D4-B took the locked register out of the
+   * legend because a locked run drew identically to a live one and there was
+   * nothing left for a legend to translate. The client's ruling gives locked
+   * capabilities a fill of their own, so the legend has a mark again and this
+   * is its word — drawn only when a shown cell actually holds a locked
+   * capability, the same restraint `notOfferedLabel`'s register already
+   * follows.
+   */
+  lockedRegisterLabel?: string;
   /**
    * THE MARK'S OWN WORDS — the artifact's phrase, ch10. Drawn BARE, running
    * on from the collection's name after an em dash in `--ink-tertiary`, on
@@ -923,18 +1049,58 @@ interface GridRow {
    Reading the data
    ------------------------------------------------------------------------- */
 
-/** True when this role's cell on this row cannot be changed. */
+/**
+ * WHICH CAPABILITIES ARE LOCKED for this role, on this collection —
+ * `"all"` when the whole row is, otherwise the capability ids and nothing
+ * else. The one place `PermissionModule.locked`'s three shapes are read, so
+ * `isLocked` and `isCapabilityLocked` below cannot disagree about what a
+ * value means.
+ */
+function lockedCapabilitiesFor(
+  module: PermissionModule,
+  roleId: string,
+  disabled: boolean,
+): "all" | readonly string[] {
+  if (disabled) return "all";
+  const { locked } = module;
+  if (locked === undefined || locked === false) return [];
+  if (locked === true) return "all";
+  if (Array.isArray(locked)) {
+    return (locked as readonly string[]).includes(roleId) ? "all" : [];
+  }
+  /* The record shape: keyed by role id, `true` for the whole row or a
+     capability-id array for that role alone. */
+  const forRole = (locked as Readonly<Record<string, boolean | readonly string[]>>)[
+    roleId
+  ];
+  if (forRole === undefined || forRole === false) return [];
+  return forRole === true ? "all" : forRole;
+}
+
+/** True when ANY capability of this role's cell on this row is locked. */
 function isLocked(
   module: PermissionModule,
   roleId: string,
   disabled: boolean,
 ): boolean {
-  if (disabled) return true;
-  if (module.locked === true) return true;
-  if (Array.isArray(module.locked)) {
-    return (module.locked as readonly string[]).includes(roleId);
-  }
-  return false;
+  const locked = lockedCapabilitiesFor(module, roleId, disabled);
+  return locked === "all" || locked.length > 0;
+}
+
+/**
+ * True when THIS ONE capability is locked, in this role's cell on this row —
+ * the grain the 2026-09-17 ruling draws at. A cell may hold both a pressable
+ * capability and a locked one side by side; this is what tells `PermissionRun`
+ * which is which, slot by slot.
+ */
+function isCapabilityLocked(
+  module: PermissionModule,
+  roleId: string,
+  capabilityId: string,
+  disabled: boolean,
+): boolean {
+  const locked = lockedCapabilitiesFor(module, roleId, disabled);
+  return locked === "all" || locked.includes(capabilityId);
 }
 
 /**
@@ -997,24 +1163,61 @@ const SLOT_SHAPE = [
 ].join(" ");
 
 /**
- * THE TWO SKINS — and there are two, not four, which is the whole of D4-B.
+ * THE TWO LIVE SKINS. D4-B (2026-08-24) had these covering a locked slot too
+ * — see the header — but the client's 2026-09-17 ruling gives locked its own
+ * pair, `lockedSlotSkin` below, so this function now draws an EDITABLE slot
+ * only: pressable, or read-only with no lock on it.
  *
  * HELD      `--surface-inverse` + `--ink-on-inverse`, and NO hairline — the
  *           fill is the edge once it is on, which is what lets adjacent held
  *           slots fuse.
  * NOT-HELD  `--card` + `--ink-tertiary` behind `--hairline-strong`, override
  *           42's resting field edge.
- *
- * A LOCKED CELL TAKES THE SAME TWO. It used to take a swapped disabled pair
- * that measured 1.004 on soft paper in dark; the client ruled D4-B and the
- * locked skin is gone rather than excused. `locked` is not an argument here
- * because it no longer changes a single declaration — it changes the cursor,
- * the hover pill and the row's mark, which are elsewhere and are not fills.
  */
 function slotSkin(held: boolean): string {
   return held
     ? "bg-surface-inverse text-ink-on-inverse"
     : "bg-card text-ink-tertiary shadow-[var(--hairline-strong)]";
+}
+
+/**
+ * THE LOCKED SKIN — Option A, client ruling 2026-09-17, verbatim: *"In
+ * Permissions, the ones that are locked and cannot be changed, we need a
+ * different color, maybe a kind of solid grayed-out."* … *"For how a locked
+ * permission should look, I choose option A: solid gray field."*
+ *
+ * ONE FILL, TWO INKS, NO NEW HUE. Both registers share `--surface-quiet` —
+ * the kit's own quiet surface, already `--btn-disabled-fill`'s fill and
+ * already the well behind every disabled and read-only field in this system
+ * — so a locked segment is drawn from the SAME closed palette a live one is,
+ * per RULES §2.2, never a literal grey invented for this file. The two inks
+ * are the quiet tail of the ink ramp `--btn-disabled-label` already opens:
+ *
+ *   HELD (locked)      `--ink-secondary`  — the mid-grey, ruling's own words
+ *   RELEASED (locked)  `--ink-disabled`   — the light grey, same wording
+ *
+ * MEASURED against `--surface-quiet`, transitions suppressed:
+ *
+ *       ink-secondary   6.656 light / 7.691 dark   (held-locked)
+ *       ink-disabled    1.817 light / 2.508 dark   (released-locked)
+ *
+ * against 4.5:1 for text. The held register clears it in both palettes — a
+ * locked capability someone actually holds stays legible. The released
+ * register is deliberately the system's own quiet-on-quiet pairing, the same
+ * shape this file already accepts for the live not-held slot's own edge
+ * (1.526 / 2.185 against a 3:1 floor, "THE UNCHECKED HAIRLINE" above): a
+ * capability that is both released AND locked is the coldest fact on the
+ * grid, and reading faint is the point, not a defect to excuse.
+ *
+ * NO HAIRLINE, EITHER REGISTER. The live not-held skin needs one because its
+ * fill is `--card` — the same paper as the page behind it — and the edge is
+ * the only thing saying "control here". `--surface-quiet` is never the page's
+ * own paper, so the fill alone already reads as a distinct field; adding
+ * override 42's ring on top of an already-opaque grey would be the same
+ * sentence said twice, which §2.7 already forbids for a live control.
+ */
+function lockedSlotSkin(held: boolean): string {
+  return held ? "bg-surface-quiet text-ink-secondary" : "bg-surface-quiet text-ink-disabled";
 }
 
 /**
@@ -1044,9 +1247,9 @@ function slotSkin(held: boolean): string {
  * a row hidden from the reader, an imported record with no VAT). It is not a
  * string prop: it is the same glyph in Arabic, Urdu and Persian, and the
  * WORDS for this state are `notOfferedLabel`, which is a prop. It carries
- * `aria-hidden` for the reason `LockMark` does — the cell's own sentence
- * already names every capability the row does not offer, and announcing it
- * per slot as well would read the same fact five times.
+ * `aria-hidden` because the cell's own sentence already names every
+ * capability the row does not offer, and announcing it per slot as well
+ * would read the same fact five times.
  */
 const SLOT_UNOFFERED = "text-ink-tertiary";
 
@@ -1086,112 +1289,103 @@ const RUN_SHELL =
  * register rather than for a cell. `held` decides each slot, so the same two
  * lines draw "held" and "not held".
  *
- * There is no third call. The locked register left the legend when the locked
- * skin left the component: a run drawn locked would now be pixel-identical to
- * one of these two, and the mark for a lock is a word on the row.
+ * `locked`, 2026-09-17: THE THIRD CALL, BACK. D4-B took it away because a
+ * locked run used to be pixel-identical to one of the other two; the client's
+ * ruling gives locked its own fill, so the legend has something to translate
+ * again — a legend turns a mark that is not words into words, and a fill is
+ * exactly that kind of mark.
  */
 function LegendRun({
   capabilities,
   held,
   offered,
+  locked,
 }: {
   capabilities: readonly PermissionCapability[];
   held: (index: number) => boolean;
   /** Absent — every slot is a switch, which is the two original registers. */
   offered?: (index: number) => boolean;
+  /** Absent — no slot in this example run is locked. */
+  locked?: (index: number) => boolean;
 }) {
   return (
     <span aria-hidden="true" className={RUN_SHELL}>
-      {capabilities.map((capability, index) =>
-        offered !== undefined && !offered(index) ? (
-          <span key={capability.id} className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}>
-            {NO_VALUE}
-          </span>
-        ) : (
-          <span key={capability.id} className={cn(SLOT_SHAPE, slotSkin(held(index)))}>
+      {capabilities.map((capability, index) => {
+        if (offered !== undefined && !offered(index)) {
+          return (
+            <span key={capability.id} className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}>
+              {NO_VALUE}
+            </span>
+          );
+        }
+        const isHeldSlot = held(index);
+        const isLockedSlot = locked !== undefined && locked(index);
+        return (
+          <span
+            key={capability.id}
+            className={cn(
+              SLOT_SHAPE,
+              isLockedSlot ? lockedSlotSkin(isHeldSlot) : slotSkin(isHeldSlot),
+            )}
+          >
             {initialOf(capability)}
           </span>
-        ),
-      )}
+        );
+      })}
     </span>
   );
 }
 
 /**
- * THE MARK — the artifact's own phrase, and now the artifact's own SHAPE for
- * it, which is no shape at all.
+ * THE ROW-LEVEL MARK IS RETIRED, 2026-09-17. `LockMark` and the
+ * `data-slot="permission-matrix-locked"` span it drew are gone from this
+ * file: the consuming application already hides the row's own sentence (this
+ * ruling's brief records that in as many words), and the reason a slot is
+ * locked no longer needs a second, coarser statement beside the collection's
+ * name now that the slot carries its own skin AND its own tooltip. See
+ * `lockedReasonFor` inside `PermissionMatrix` below — it is the
+ * `describeLock` formatter this mark used to call, now called once per
+ * locked SEGMENT instead of once per row, which is the whole of "the
+ * existing 'Locked by policy: <role>' text moves here, off the row."
  *
- * RULED "WORD ONLY", 2026-08-24. It shipped this morning on a
- * `Badge variant="secondary"`. The chip's FILL measured 1.339 / 1.214 light
- * and 1.324 / 1.471 dark against the row's paper, short of a 3:1 non-text
- * floor, and went back to the client as `verify/decide-2.html` §D6. Their
- * answer, verbatim: **"d6. i dont understand, did i not decide like
- * permissions word only? if unclear do another visual"** — which is an
- * answer, and it reads on the ruling they had already given: "a word on the
- * row" never meant a pill around the word. So the pill goes. No `Badge`, no
- * fill, no radius, and therefore no fill left to fail a floor.
- *
- * THE REGISTER IS THE ARTIFACT'S, AND IT IS NOT THE EYEBROW. The kit's micro
- * uppercase eyebrow was on the table as an option, but the artifact uses it
- * in exactly one way — as a HEADING ABOVE A TITLE ("System · 5 roles" over
- * "Roles", "Group · 118 archived" over "Collection", "Read-only while
- * editing" over a field group). It never annotates a row with it. What the
- * artifact DOES draw for a state on a row, twice, is bare words at the row's
- * own size in `--fg3` after an EM DASH:
- *
- *     Shift-handover.docx — unsupported format
- *     Some selected — indeterminate
- *
- * The second is a row in a list whose state is named; the first is the same
- * shape on a file row. That is this case exactly, so that is what is built:
- *
- *     Capacity — Locked by policy: Lead, Guest
- *
- * AND THE EM DASH IS LOAD-BEARING. It is what stops the phrase reading as a
- * suffix to the collection's name — three separations at once and none of
- * them a container: the dash, the drop to `--ink-tertiary`, and the drop out
- * of the name cell's medium weight to light. Remove any one and it starts to
- * look like part of the name; that is the whole risk of taking the pill away
- * and it is answered with the kit's own device rather than a new one.
- *
- * Still no hue, so ruling 26 is still satisfied by there being nothing for
- * colour to say alone — and now there is not even a fill to argue about.
- *
- * It is `aria-hidden` because the same phrase is already inside every locked
- * cell's accessible name in that cell's own sentence. Announced here too it
- * would be read once per row and once per cell, which is six extra readings
- * of a fact the reader has already been given.
+ * `lockedLabel` and `formatLockedLabel` are UNCHANGED props — RULES §9.1, an
+ * export is never dropped — and are still what builds that sentence; only
+ * where it is rendered moved.
  */
-function LockMark({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      aria-hidden="true"
-      data-slot="permission-matrix-locked"
-      /* No size of its own: it inherits the row's, which is what both of the
-         artifact's two instances do. Light, so it cannot be read as more of
-         the name — the name cell is medium by `TableCell`'s own rule. */
-      className="font-light text-ink-tertiary"
-    >
-      {" — "}
-      {children}
-    </span>
-  );
-}
 
 /**
  * The run: every capability, always in the same place, read as one shape.
  *
- * `pressable` decides the element and nothing else about the drawing. A
- * pressable run is a group of real checkboxes; a static one is a single
- * labelled image, because 120 marks that do nothing must not be 120 tab
- * stops.
+ * EVERY SLOT DECIDES ITS OWN ELEMENT NOW, 2026-09-17 — before this ruling a
+ * `locked` cell was a single boolean the whole run answered to (D4-B: a
+ * locked run is a live run, just not a pressable one). The client's ruling is
+ * PER RIGHT: "one locked letter inside an otherwise editable cell takes the
+ * same fill", so a cell can hold a pressable slot beside a locked one, and
+ * `isCapabilityLocked` is asked once per capability rather than once per run.
+ *
+ * FOUR SLOT SHAPES, not two:
+ *   · NOT OFFERED    the em dash, `aria-hidden`, no control — unchanged.
+ *   · LOCKED          `lockedSlotSkin`, `aria-disabled="true"`, `cursor-default`,
+ *                      never a tab stop, and the reason on its OWN tooltip /
+ *                      `title` — never on the run.
+ *   · PRESSABLE       a real `<button role="checkbox">`, unchanged.
+ *   · READ-ONLY LIVE  no `onToggle` at all (state 10): a plain labelled mark,
+ *                      unchanged — a reference table is not a frozen form,
+ *                      and this is still not what `locked` means.
+ *
+ * THE RUN'S OWN ROLE follows whether ANYTHING in it is pressable: `"group"`
+ * when `onToggle` exists (a locked slot inside it is one dead member of a
+ * live group, same as an unoffered one always was), `"img"` when it does
+ * not — the whole run is then one label, the same shape §10's read-only
+ * state has always drawn, and a locked slot inside it is `aria-hidden` like
+ * every other slot in that shape.
  */
 function PermissionRun({
   capabilities,
   isHeld,
   isOffered,
-  locked,
-  lockedLabel,
+  isCapabilityLocked,
+  lockedReason,
   cellLabel,
   slotLabel,
   onToggle,
@@ -1205,71 +1399,27 @@ function PermissionRun({
    * member.
    */
   isOffered: (capability: PermissionCapability) => boolean;
-  locked: boolean;
-  /** The lock's phrase, raised on hover over a locked run. */
-  lockedLabel: string;
+  /** Whether THIS capability, in this cell, cannot be changed. Per slot. */
+  isCapabilityLocked: (capability: PermissionCapability) => boolean;
+  /** The tooltip / `title` a locked slot carries — built once per slot. */
+  lockedReason: (capability: PermissionCapability) => string;
   cellLabel: string;
   slotLabel: (capability: PermissionCapability, held: boolean) => string;
   /** Absent — the run is a mark, not a control. */
   onToggle?: (capability: PermissionCapability, next: boolean) => void;
 }) {
-  const pressable = onToggle !== undefined && !locked;
+  const interactive = onToggle !== undefined;
 
   /* No explicit width: the run is `capabilities.length` × 1.375rem, which for
      the client's four is the 5.5rem the design page states, and which a fifth
      capability widens without a second number to keep in step. */
-  if (!pressable) {
-    /* The same drawing whether it is locked or merely read-only — D4-B: a
-       locked run is a live run. What separates the two is not a fill:
-         · LOCKED  takes `cursor-not-allowed`, chapter 10's own disabled
-           cursor, so the pointer says no before a click can be spent on it;
-           and it raises the lock's phrase on hover, so the reason is on the
-           cell and not only on the row.
-         · READ-ONLY (state 10, no `onChange`) takes neither. A reference
-           table is not a frozen form and must not claim to be one. */
-    const run = (
-      <span
-        className={cn(RUN_SHELL, locked && "cursor-not-allowed")}
-        role="img"
-        aria-label={cellLabel}
-      >
-        {capabilities.map((capability) => (
-          <span
-            key={capability.id}
-            aria-hidden="true"
-            className={cn(
-              SLOT_SHAPE,
-              isOffered(capability)
-                ? slotSkin(isHeld(capability))
-                : SLOT_UNOFFERED,
-            )}
-          >
-            {isOffered(capability) ? initialOf(capability) : NO_VALUE}
-          </span>
-        ))}
-      </span>
-    );
-
-    if (!locked) return run;
-
-    return (
-      <Tooltip>
-        {/* `asChild` on a span: Radix attaches the hover and the
-            `aria-describedby` and adds NO tab stop, which is the whole
-            requirement — the reason reaches the pointer without turning 120
-            dead marks into 120 dead stops. The same words are already in
-            `cellLabel`, so nothing here is pointer-only. */}
-        <TooltipTrigger asChild>{run}</TooltipTrigger>
-        <TooltipContent>{lockedLabel}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
   return (
-    <span className={RUN_SHELL} role="group" aria-label={cellLabel}>
+    <span
+      className={RUN_SHELL}
+      role={interactive ? "group" : "img"}
+      aria-label={cellLabel}
+    >
       {capabilities.map((capability) => {
-        const held = isHeld(capability);
-
         /* NOT A DEAD CONTROL — NO CONTROL. It keeps its place and takes the
            no-value mark, with no button, no tab stop and no tooltip: the
            tooltip on a live slot says the capability's WORD, and naming a
@@ -1284,6 +1434,52 @@ function PermissionRun({
               className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}
             >
               {NO_VALUE}
+            </span>
+          );
+        }
+
+        const held = isHeld(capability);
+
+        if (isCapabilityLocked(capability)) {
+          const reason = lockedReason(capability);
+          /* NOT PRESSABLE — client ruling, verbatim in the file header:
+             no hover, no focus ring (a `<span>`, never a `<button>`, so
+             tokens.css §8's ring has nothing to attach to), `aria-disabled`,
+             `cursor-default`. `title` carries the reason with no Radix
+             underneath it, so it reaches a reader even where a `Tooltip`
+             cannot — the narrow render's `live=false` pass renders this same
+             branch with `interactive` false, and Radix's hover model has
+             nothing to attach to on a card nobody is pointing at. */
+          const mark = (
+            <span
+              key={capability.id}
+              role={interactive ? "checkbox" : undefined}
+              aria-checked={interactive ? held : undefined}
+              aria-disabled={interactive ? "true" : undefined}
+              aria-hidden={interactive ? undefined : "true"}
+              title={reason}
+              className={cn(SLOT_SHAPE, lockedSlotSkin(held), "cursor-default")}
+            >
+              <span aria-hidden="true">{initialOf(capability)}</span>
+            </span>
+          );
+          if (!interactive) return mark;
+          return (
+            <Tooltip key={capability.id}>
+              <TooltipTrigger asChild>{mark}</TooltipTrigger>
+              <TooltipContent>{reason}</TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        if (!interactive) {
+          return (
+            <span
+              key={capability.id}
+              aria-hidden="true"
+              className={cn(SLOT_SHAPE, slotSkin(held))}
+            >
+              {initialOf(capability)}
             </span>
           );
         }
@@ -1351,17 +1547,21 @@ function PermissionRun({
  *                      `table.tsx` records that rather than inventing a width.
  *  4. active/pressed — the capability flips. The change is instant, which is
  *                      what the footnote states.
- *  5. disabled       — per cell (`module.locked`) or whole grid (`disabled`),
- *                      and under the client's D4-B ruling it is NOT a skin.
- *                      The run is drawn exactly as a live one and keeps every
- *                      distance a live one has; the lock is the artifact's
- *                      phrase in BARE WORDS — no chip, D6-B "word only" —
- *                      running on from the collection's name after an em dash
- *                      in `--ink-tertiary`, naming the roles when only some
- *                      are locked. The run takes `cursor-not-allowed` and
- *                      raises the phrase on hover, and is still no tab stop.
- *                      The old swapped disabled pair measured 1.004 on soft
- *                      paper in dark and is gone rather than excused.
+ *  5. disabled       — per capability (`module.locked`, now readable at role
+ *                      OR role+capability grain) or whole grid (`disabled`).
+ *                      SUPERSEDED 2026-09-17 — D4-B (2026-08-24) is
+ *                      overturned by direct client ruling: "we need a
+ *                      different color, maybe a kind of solid grayed-out" ·
+ *                      "option A: solid gray field." A locked capability now
+ *                      takes `lockedSlotSkin` — `--surface-quiet` under
+ *                      `--ink-secondary` (held) or `--ink-disabled`
+ *                      (released), no new hue — is `aria-disabled="true"`,
+ *                      `cursor-default`, never a tab stop, and carries the
+ *                      lock's reason as its OWN tooltip / `title`. A cell may
+ *                      hold a locked capability beside a pressable one; only
+ *                      the locked slot takes the skin. D6-B's "word only" row
+ *                      mark is retired with it — see `PermissionRun`'s and
+ *                      `LegendRun`'s headers.
  *  6. loading        — `state="loading"`: skeleton rows inside the body, and
  *                      skeleton cards narrow. The HEADER stays, because it is
  *                      the part that names the roles being fetched, and
@@ -1451,6 +1651,7 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
       heldLabel = "held",
       notHeldLabel = "not held",
       notOfferedLabel = "not offered",
+      lockedRegisterLabel = "locked",
       /* Sentence case since D4-B: it is a chip's label on a row now, not a
          clause in a legend. Inside an accessible name it reads identically. */
       lockedLabel = "Locked by policy",
@@ -1562,6 +1763,13 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
        run too short to have a second. */
     const gap = Math.min(1, capabilities.length - 1);
 
+    /* Does any shown CELL hold a locked capability? Locking is per (module,
+       role), not per module alone, so both shown axes are walked — the same
+       restraint `hasUnoffered` applies to its own register. */
+    const hasLocked = shownModules.some((module) =>
+      shownRoles.some((role) => isLocked(module, role.id, disabled)),
+    );
+
     /* A 7.5rem name column, and one run plus `TableCell`'s own `px-3` inset
        per COLUMN. Derived from both counts so nothing has to be re-typed when
        either changes — including when the columns become the collections. */
@@ -1571,36 +1779,10 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
 
     const stickyPaper = STICKY_GROUND[stickyGround];
 
-    /**
-     * THE ROW'S MARK, at the scope of the lock — `null` when the row holds no
-     * locked cell. One rule covers all three ways a lock can arrive: a whole
-     * grid `disabled`, a whole row `locked`, and a list of role ids. The first
-     * two lock every cell on the row and take the bare phrase; the third names
-     * what it locked, because a bare mark on a partly-locked row is a lie.
-     *
-     * IT NAMES THE OTHER AXIS, whichever that is. A collection's row names the
-     * ROLES that are locked on it; a role's row names the COLLECTIONS. The
-     * lock itself never moved — it is still stated per role inside a module —
-     * so this reads the same cells either way and only the words change.
-     */
-    const lockMarkFor = (row: GridRow): React.ReactNode => {
-      const locked = row.cells.filter((cell) =>
-        isLocked(cell.module, cell.role.id, disabled),
-      );
-      if (locked.length === 0) return null;
-      const words =
-        locked.length === row.cells.length
-          ? lockedLabel
-          : describeLock(
-              lockedLabel,
-              locked.map((cell) =>
-                rowsAreRoles
-                  ? plain(cell.module.label, cell.module.id)
-                  : plain(cell.role.label, cell.role.id),
-              ),
-            );
-      return <LockMark>{words}</LockMark>;
-    };
+    /* THE ROW'S MARK IS RETIRED, 2026-09-17 — see `LegendRun`'s header. There
+       is no `lockMarkFor` here any more; `describeLock` (the doc block above
+       this, unchanged) now builds a SINGLE-ROLE reason inside `renderRun`
+       instead of a whole row's roll call. */
 
     /** One cell, wide or narrow — the same run either way. */
     const renderRun = (module: PermissionModule, role: PermissionRole, live: boolean) => {
@@ -1622,8 +1804,14 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
           capabilities={capabilities}
           isHeld={(capability) => holds(module, role.id, capability.id)}
           isOffered={(capability) => offers(module, capability.id)}
-          locked={locked}
-          lockedLabel={lockedLabel}
+          isCapabilityLocked={(capability) =>
+            isCapabilityLocked(module, role.id, capability.id, disabled)
+          }
+          /* THE MARK'S WORDS, MOVED ONTO THE SLOT — "Locked by policy: <role>",
+             `describeLock`'s own shape, reused rather than re-invented, and
+             now built with a ONE-element role list because a slot already
+             belongs to exactly one role at every orientation. */
+          lockedReason={() => describeLock(lockedLabel, [roleName])}
           cellLabel={describeCell(name, roleName, heldWords, locked, notOfferedWords)}
           slotLabel={(capability, held) =>
             describeSlot(name, roleName, capability.label, held)
@@ -1725,17 +1913,11 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                       className={stickyNames ? stickyPaper : undefined}
                     >
                       <span className="flex flex-col">
-                        {/* The name, and running on from it the lock's own
-                            words. Plain inline flow, not a flex row with a
-                            gap: the em dash IS the separation, which is the
-                            artifact's own shape for this, and the phrase must
-                            sit on the name's baseline rather than beside it as
-                            a box. It stays on the name's LINE, so a locked row
-                            is still the 56 ruling 28 gives it. */}
-                        <span>
-                          {row.label}
-                          {lockMarkFor(row)}
-                        </span>
+                        {/* The name alone, 2026-09-17 — the row's own lock
+                            mark is retired (see `LegendRun`'s header); a
+                            locked cell now says so on the cell itself, not
+                            beside the name. */}
+                        <span>{row.label}</span>
                         {row.description !== undefined && row.description !== null ? (
                           /* The quiet line under the row's name — the caption
                              step in tertiary ink, and it MAY wrap even though
@@ -1794,14 +1976,10 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                       {...row.attr}
                       className="rounded-[var(--radius)] bg-surface-panel p-4"
                     >
-                      {/* The same mark in the same place and the same shape —
-                          running on from the row's name after an em dash — so
-                          the narrow render and the grid say the lock the same
-                          way. Inline flow here too, and this one MAY wrap: a
-                          card is narrow and the phrase is prose. */}
+                      {/* The name alone, 2026-09-17 — same retirement as the
+                          wide grid's name cell, immediately above. */}
                       <div className="text-sm font-[var(--font-weight-medium)]">
                         {row.label}
-                        {lockMarkFor(row)}
                       </div>
                       {row.description !== undefined && row.description !== null ? (
                         <div className="mt-1 text-caption font-light text-ink-tertiary">
@@ -1901,6 +2079,26 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                     offered={(index) => index !== gap}
                   />
                   <span className="text-badge">{notOfferedLabel}</span>
+                </span>
+              ) : null}
+
+              {/* THE FOURTH REGISTER, 2026-09-17 — new alongside
+                  `lockedSlotSkin`. D4-B had removed the locked register
+                  because a locked run drew pixel-identical to "held" or "not
+                  held"; the client's ruling gives it a fill neither of those
+                  two owns, so it is taught here the same way the third
+                  register is: drawn only when a shown cell actually has one.
+                  ALTERNATING `held`, so the ONE swatch carries BOTH locked
+                  inks — mid-grey and light-grey — rather than needing two
+                  legend rows to say one word. */}
+              {hasLocked ? (
+                <span className="inline-flex items-center gap-[var(--space-2h)]">
+                  <LegendRun
+                    capabilities={capabilities}
+                    held={(index) => index % 2 === 0}
+                    locked={() => true}
+                  />
+                  <span className="text-badge">{lockedRegisterLabel}</span>
                 </span>
               ) : null}
             </div>

@@ -417,6 +417,15 @@ export const APP_MODULE_CAP = 1000
  * the query rather than implied by the shape of the data. */
 export const TICKET_FACET_CAP = 500
 
+/** Rows the knowledge collection's kind-tab tally may return (R14). It is a
+ * GROUP BY over `kind` — a fixed, code-owned vocabulary (`KNOWLEDGE_KINDS`,
+ * workers/content/src/lib/knowledge.ts) that cannot run away, the same shape
+ * `TICKET_FACET_CAP` already caps for the ticket sub-tab strip one line up.
+ * The vocabulary is 17 wide today; the ceiling is generous for the same
+ * reason that one is, to make the bound VISIBLE at the query rather than
+ * implied by the shape of the data. */
+export const KNOWLEDGE_KIND_FACET_CAP = 100
+
 /** Rows ONE grouped read on the Tickets dashboard may return (R14).
  *
  * SMALLER THAN `TICKET_FACET_CAP` ON PURPOSE, and the difference is what the

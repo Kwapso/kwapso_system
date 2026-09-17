@@ -100,7 +100,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
         if (value === undefined || value === null) continue
         if (value && typeof value === "object" && !Array.isArray(value)) {
           // A permission sheet: every module row must be there (see below).
-          expect(text, `${tool.name}.${key} must be spelled out`).toContain("Knowledge base: read, create")
+          expect(text, `${tool.name}.${key} must be spelled out`).toContain("Knowledge: read, create")
           continue
         }
         if (typeof value === "string" && value) {
@@ -128,7 +128,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
       value: { knowledge: { read: true, create: true, edit: false }, help: { read: true } },
     })
     const text = lines.join("\n")
-    expect(text).toContain("Knowledge base: read, create")
+    expect(text).toContain("Knowledge: read, create")
     // The permission KEY is still `help` (the string in every role's sheet); the
     // LABEL the panel prints is the word a person reads, and that word is Tickets.
     expect(text).toContain("Tickets: read")
@@ -138,7 +138,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     for (const m of TEAM_MODULE_CATALOG)
       expect(text, `${m.label} must appear`).toContain(`${m.label}:`)
     // "edit: false" is not access — it must not read as granted.
-    expect(text).not.toContain("Knowledge base: read, create, edit")
+    expect(text).not.toContain("Knowledge: read, create, edit")
   })
 
   it("still spells the sheet out when the payload carries a stray extra key", () => {

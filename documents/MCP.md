@@ -590,7 +590,7 @@ Today it covers:
     included).
   - the knowledge base, `add_knowledge_source`, `update_knowledge_source`,
     `set_knowledge_source_active`, `sync_knowledge`, `sync_google_knowledge`. The
-    same acts a person has on the Knowledge base screen, gated by the same
+    same acts a person has on the Knowledge screen, gated by the same
     `knowledge:create` / `:update` / `:delete` rights — so a token whose role cannot
     take a source away cannot ask the assistant to take one away either.
     `sync_knowledge` brings the base into step with the app's own rows one bounded

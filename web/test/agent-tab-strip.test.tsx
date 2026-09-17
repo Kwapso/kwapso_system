@@ -125,48 +125,55 @@ describe("AgentTabStrip", () => {
     })
   })
 
-  describe("stacking — the active tab paints above its pinned neighbours (client ruling, 16 Sep 2026)", () => {
+  describe("stacking — the active tab paints above its pinned neighbours (client ruling, 16 Sep 2026, amended 17 Sep 2026)", () => {
     // Her screenshot, verbatim account: "Conversation ×" (active, FIRST) then
     // the clock tab then "+" — and the pinned pair's grey fill covering the
     // active tab's right edge. `agent-tab-strip.tsx` places every open
     // conversation ahead of History and "+" (see this file's own header), so
     // the active tab is very often the LEFTMOST one here, the opposite shape
     // from the main content strip (whose active crumb is always the trail's
-    // own last one). Proven wrong at the source rather than assumed fixed:
-    // `breadcrumb-folders.tsx` keys each tab's z-index to whether IT is live
-    // (`TAB_LIVE`, `z-[1]`) or not (`TAB_REST`, `z-0`) — never to DOM
-    // position — so this reads the actual rendered class list, the same
+    // own last one).
+    //
+    // AMENDED 17 Sep 2026, kit v1.2.108-era: once the tabs began overlapping
+    // ON PURPOSE (`TAB_OVERLAP_MARGIN`), a flat two-value z-index (live vs.
+    // rest, both classes) stopped being enough to rank two OVERLAPPING rest
+    // tabs against each other, so `breadcrumb-folders.tsx` moved the number
+    // off the inner link's `className` entirely: every tab now carries its
+    // OWN `style={{ zIndex: stackZ }}` on the `<li>` itself
+    // (`[data-slot="breadcrumb-item"]`) — `1`, flat, for the live tab, and
+    // `restZIndex(position)` (`-position`, strictly descending by render
+    // order) for every rest tab, so the earlier tab always outranks a later
+    // one it now overlaps. Proven wrong at the source rather than assumed
+    // fixed: this reads the actual rendered inline style, the same
     // discipline the portal and "look" tests above already hold, rather than
     // trusting the mechanism's own comment.
     const activeFirst: AgentTab[] = [
       { id: "a", threadId: "t-a", scope: "everything", label: "Conversation" },
     ]
 
-    /** The one kit element each crumb draws (never more than one: this strip
-     * passes no `onCurrentActivate`, so a live crumb is always
-     * `BreadcrumbPage`, never the current-activate `<button>`). Read its
-     * z-index utility off the actual `className`, not off a role query —
-     * History and "+" are both `role="link"` and the active crumb is not a
-     * link at all, so a single, slot-based lookup covers all three. */
-    const zUtility = (li: Element): string | undefined => {
-      const control = li.querySelector('[data-slot="breadcrumb-link"], [data-slot="breadcrumb-page"]')
-      expect(control, "every crumb draws exactly one breadcrumb-link/breadcrumb-page").toBeTruthy()
-      return Array.from(control!.classList).find((c) => c === "z-0" || c === "z-[1]")
-    }
+    /** The stacking authority lives on the `<li>` itself now
+     * (`shared/ui/CHANGELOG.md`'s own "Z-INDEX, NOT DOM ORDER" entry), as an
+     * inline style rather than a class — `restZIndex`'s own comment explains
+     * why it cannot be a class: the value depends on render-time position,
+     * which Tailwind cannot see. Read `style.zIndex` directly rather than
+     * `getComputedStyle`, because jsdom applies no stylesheet and the value
+     * was written inline in the first place. */
+    const stackZ = (li: Element): string => (li as HTMLElement).style.zIndex
 
-    it("the active conversation tab (index 0) carries TAB_LIVE's z-[1]; History and \"+\" carry TAB_REST's z-0", () => {
+    it("the active conversation tab (index 0) carries the live z-index 1; History and \"+\" descend strictly by position", () => {
       render(<AgentTabStrip {...baseProps()} tabs={activeFirst} activeId="a" />)
       const items = document.querySelectorAll('[data-slot="breadcrumb-item"]')
       // Conversation (active) · History · "+" — nothing else in this strip.
       expect(items).toHaveLength(3)
       const [conversation, history, plus] = Array.from(items)
-      expect(zUtility(conversation), "the active tab, first in the DOM, is still TAB_LIVE").toBe("z-[1]")
-      expect(zUtility(history), "the pinned History tab, trailing in the DOM, is TAB_REST").toBe("z-0")
-      expect(zUtility(plus), "the pinned \"+\" tab, trailing in the DOM, is TAB_REST").toBe("z-0")
-      // z-[1] > z-0 regardless of paint order, which is the whole mechanism:
+      expect(stackZ(conversation), "the active tab, first in the DOM, is still the flat live 1").toBe("1")
+      expect(stackZ(history), "History, one position after the live tab, is restZIndex(1)").toBe("-1")
+      expect(stackZ(plus), "\"+\", two positions after the live tab, is restZIndex(2)").toBe("-2")
+      // 1 > -1 > -2 regardless of paint order, which is the whole mechanism:
       // an active tab ahead of its neighbours in the DOM still paints over
       // them, exactly as the main content strip's own (always-last) active
-      // crumb already does over ITS neighbours.
+      // crumb already does over ITS neighbours — and an earlier rest tab
+      // still outranks a later one it now overlaps on purpose.
     })
 
     it("still holds with a second, background conversation tab open", () => {
@@ -175,10 +182,10 @@ describe("AgentTabStrip", () => {
       // Conversation (active) · Beringer (background) · History · "+".
       expect(items).toHaveLength(4)
       const [conversation, beringer, history, plus] = Array.from(items)
-      expect(zUtility(conversation)).toBe("z-[1]")
-      expect(zUtility(beringer), "a background conversation tab is TAB_REST too").toBe("z-0")
-      expect(zUtility(history)).toBe("z-0")
-      expect(zUtility(plus)).toBe("z-0")
+      expect(stackZ(conversation)).toBe("1")
+      expect(stackZ(beringer), "a background conversation tab is restZIndex(1) too").toBe("-1")
+      expect(stackZ(history)).toBe("-2")
+      expect(stackZ(plus)).toBe("-3")
     })
   })
 })
@@ -328,7 +335,7 @@ describe("AgentTabStrip mounted as ScreenShell's asideTabs", () => {
 // This does, reproducing `agent-panel.tsx`'s own shape: a sibling component
 // reads `useAgentDockTabs()` and portals `<AgentTabStrip>` into it, exactly
 // as the root-mounted `AgentPanel` does.
-function PortalledAgentTabStrip(props: ReturnType<typeof baseProps>) {
+function PortalledAgentTabStrip(props: ReturnType<typeof baseProps> & { onReorder?: (fromIndex: number, toIndex: number) => void }) {
   const dockTabs = useAgentDockTabs()
   if (!dockTabs) return null
   return createPortal(<AgentTabStrip {...props} />, dockTabs)
@@ -360,6 +367,88 @@ describe("AgentTabStrip through the real AgentDockTabsSlot portal (agent-panel.t
       </>
     )
     fireEvent.click(screen.getByRole("button", { name: "Close tab: Beringer" }))
+    expect(props.onClose).toHaveBeenCalledWith("b")
+  })
+
+  // THE LIVE-PAGE REGRESSION, 17 Sep 2026 — "I still cannot switch or close
+  // tabs." Measured on staging (main 1a1a86c3) with real mouse clicks in
+  // headless Chromium (scratchpad/assistant-clicks.mjs): a genuine
+  // pointerdown+pointerup on the × — no drag, no movement — produces
+  // `Element.setPointerCapture` on the tab's own `<li>` (the kit's
+  // `onTabPointerDown`, `breadcrumb-folders.tsx`, fires on ANY primary-button
+  // pointerdown inside a `movable` tab, unconditionally on target) BEFORE the
+  // browser ever synthesizes the `click`. Per the Pointer Events spec, once an
+  // element holds pointer capture the derived `click` for that gesture is
+  // retargeted to the CAPTURING element — here the `<li>` — rather than to
+  // whatever was visually under the cursor. The `<li>` (`BreadcrumbItem`)
+  // carries no `onClick` of its own, so the click is swallowed in the browser
+  // before it ever reaches the close `<button>`'s handler — `onClose` never
+  // fires. The test above (line ~352) missed this because it calls
+  // `fireEvent.click` directly, skipping the pointerdown that triggers the
+  // capture, and because `baseProps()` passes no `onReorder` — the tab is
+  // `movable: false`, so the kit's drag-pickup handler is never attached in
+  // the FIRST PLACE and the bug cannot reproduce. Production always wires
+  // `onReorder` (`agent-panel.tsx`: `onReorder={reorderAgentTab}`), so every
+  // real conversation tab IS movable, and every real close click is exposed.
+  //
+  // THE FIX IS `agent-tab-strip.tsx`'s OWN `onPointerDownCapture`, ADDED
+  // BELOW `onClickCapture` on the same `<BreadcrumbFolders>` call: a
+  // capture-phase pointerdown handler on the `<nav>` (an ANCESTOR of the
+  // `<li>` in both the DOM and the fiber tree) that calls `stopPropagation`
+  // when the pointerdown's target sits inside `[data-slot="breadcrumb-
+  // folders-close"]` — the kit's own stable data-slot for the close control.
+  // Capture-phase handlers run top-down, strictly before any bubble-phase
+  // handler on a descendant, so stopping propagation there means the kit's
+  // own `onPointerDown` (a BUBBLE handler on the `<li>`) never runs for a
+  // gesture that started on the close button — `setPointerCapture` is never
+  // called, and the click reaches the button exactly as it would on an
+  // ordinary (non-draggable) tab. Nothing about dragging the TAB ITSELF
+  // changes: a pointerdown anywhere else inside the `<li>` (the label, the
+  // shape) still reaches the kit's handler unmodified.
+  //
+  // The kit's own pointer-capture-on-pointerdown is the deeper defect — the
+  // SAME mechanism silently breaks a plain (non-drag) click on a background
+  // tab's own LINK too, confirmed live on the content/workspace tab strip
+  // (`app-shell.tsx`, the same `BreadcrumbFolders` with its own `onReorder`):
+  // a real, no-movement pointerdown+pointerup on a background tab's link also
+  // calls `setPointerCapture` on that `<li>` and the tab never activates. The
+  // durable fix belongs upstream, in `breadcrumb-folders.tsx`'s
+  // `onTabPointerDown` — defer `setPointerCapture` to the first `pointermove`
+  // that actually crosses a movement threshold (inside `onTabPointerMove`),
+  // rather than taking it unconditionally on `pointerdown`, so an ordinary
+  // click never engages capture/retargeting in the first place. This test
+  // pins the half of that bug this file can fix without touching the kit —
+  // the assistant's own close control.
+  it("closing a DRAGGABLE conversation tab still works after a real pointerdown+click on the ×, through the real portal", () => {
+    const props = baseProps()
+    render(
+      <>
+        <ScreenShell asideOpen aside={<div>panel body</div>} asideTabs={<AgentDockTabsSlot />}>
+          <div>content</div>
+        </ScreenShell>
+        <PortalledAgentTabStrip {...props} onReorder={vi.fn()} />
+      </>
+    )
+    const closeButton = screen.getByRole("button", { name: "Close tab: Beringer" })
+    const li = closeButton.closest('[data-slot="breadcrumb-item"]')
+    expect(li, "the close button is the tab's <li> sibling").toBeTruthy()
+    expect(li!.className, "this tab must actually be a drag source for the regression to be live").toMatch(/motion-drag/)
+
+    // jsdom implements neither real pointer capture nor click retargeting
+    // (the drag test above stubs the same method for the same reason) — a
+    // spy is enough to prove the kit's drag-pickup handler never claims a
+    // pointerdown that started on the close control, which is what keeps the
+    // real browser's retargeting from ever having anything to retarget.
+    const captureSpy = vi.fn()
+    ;(li as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture = captureSpy
+
+    fireEvent.pointerDown(closeButton, { button: 0, pointerId: 7 })
+    expect(
+      captureSpy,
+      "the drag-pickup handler must not capture the pointer for a gesture that started on the close control — a real browser retargets the click that follows to the capturing <li>, which has no onClick, and the close button never hears about it"
+    ).not.toHaveBeenCalled()
+    fireEvent.pointerUp(closeButton, { button: 0, pointerId: 7 })
+    fireEvent.click(closeButton)
     expect(props.onClose).toHaveBeenCalledWith("b")
   })
 })

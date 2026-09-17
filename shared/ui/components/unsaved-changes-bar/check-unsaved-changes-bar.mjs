@@ -67,6 +67,36 @@ for (const ground of ["bare", "page", "panel"]) {
         'so at least one corner is square. The client\'s ruling was "round on all corners".',
     );
   }
+
+  /* ── 1b · STICKINESS, 17 SEP 2026 — "floating and visible at all times,
+     directly under the tabs, even if I'm very down in the scroll." Only
+     `bare` (the shape both real call sites render, under a tab strip) may
+     carry it; `page`/`panel` must stay exactly as static as they always
+     were, or a caller that never intended a pinned bar gets one anyway. */
+  const stickyPattern = /\bsticky\b/;
+  const topPattern = /\btop-\[calc\(var\(--pinned-chrome-h,0px\)_\+_var\(--tab-strip-h,0px\)\)\]/;
+  if (ground === "bare") {
+    if (!stickyPattern.test(value)) {
+      findings.push(
+        `\`ground="bare"\` is ${JSON.stringify(value)} — missing \`sticky\`. The client's ruling was ` +
+          '"floating and visible at all times, directly under the tabs, even if I\'m very down in the scroll."',
+      );
+    }
+    if (!topPattern.test(value)) {
+      findings.push(
+        `\`ground="bare"\` is ${JSON.stringify(value)} — missing the two-offset sticky \`top\` ` +
+          "(\`calc(var(--pinned-chrome-h, 0px) + var(--tab-strip-h, 0px))\`), so it cannot sit directly under the tabs.",
+      );
+    }
+    if (!/\bz-20\b/.test(value)) {
+      findings.push(`\`ground="bare"\` is ${JSON.stringify(value)} — missing a z-index to stay above the content it covers.`);
+    }
+  } else if (stickyPattern.test(value)) {
+    findings.push(
+      `\`ground="${ground}"\` is ${JSON.stringify(value)} — carries \`sticky\`, but only \`bare\` (the tab-strip ` +
+        "shape) is meant to float; the client's ruling never touched `page`/`panel`.",
+    );
+  }
 }
 
 /* ── 2 · THE ORANGE/WARNING TOKEN, NEVER A LITERAL COLOUR ────────────────
@@ -128,6 +158,33 @@ if (!/\bbg-warning\b(?!\/)/.test(src)) {
   findings.push("the dot no longer reads a bare `bg-warning` — the kit's own `--warning` token.");
 }
 
+/* ── 3 · THE MESSAGE'S OWN TYPE STEP, 17 SEP 2026 ────────────────────────
+   Client: "I'm not sure of the size of this typography... make sure that
+   this is in the kit because it looks too small." One rung up `Text`'s own
+   ladder — `text-caption` (13) -> `text-sm` (14), never a raw px, never a
+   two-rung jump to `text-base` (16), which is more than she asked for.
+   Scoped to the message wrapper's own class string so a `text-caption` or
+   `text-sm` elsewhere in the file (there is none today) can't produce a
+   false pass or a false fail. */
+const messageSpanMatch = src.match(/<span className="flex min-w-0 items-center gap-2 ([^"]*)">/);
+if (!messageSpanMatch) {
+  findings.push("could not find the message wrapper span (`flex min-w-0 items-center gap-2 ...`) to check its type step.");
+} else {
+  const messageClasses = messageSpanMatch[1];
+  if (!/\btext-sm\b/.test(messageClasses)) {
+    findings.push(
+      `the message wrapper is ${JSON.stringify(messageClasses)} — missing \`text-sm\`. The client's ruling was ` +
+        '"make sure that this is in the kit because it looks too small" — one rung up from `text-caption`.',
+    );
+  }
+  if (/\btext-caption\b/.test(messageClasses)) {
+    findings.push(
+      `the message wrapper is ${JSON.stringify(messageClasses)} — still carries \`text-caption\`, the step the ` +
+        "client ruled too small.",
+    );
+  }
+}
+
 if (findings.length > 0) {
   console.error("FAIL unsaved-changes-bar check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -135,5 +192,6 @@ if (findings.length > 0) {
 
 console.log(
   "OK unsaved-changes-bar check: `bare`/`page`/`panel` all round on `rounded-[var(--radius)]` " +
-    "(all four corners), and the fill stays on the kit's `--warning` token.",
+    "(all four corners), the fill stays on the kit's `--warning` token, `bare` alone is sticky " +
+    "directly under the tabs, and the message reads `text-sm`.",
 );

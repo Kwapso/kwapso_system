@@ -148,7 +148,6 @@ import { SettingsChoicesPanel } from "@/components/screens/settings-choices-pane
 import { MeetingTypesPanel } from "@/components/team/internal-screens"
 import type { Can, Right } from "@/lib/perms"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
-import { ticketTypeColour } from "@/lib/type-colours"
 import { usePermissions } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
@@ -239,23 +238,28 @@ export type ModuleSettingsSection =
        * so the Value column draws a `Swatch` beside the word, on both scopes
        * of `SettingsChoicesPanel` alike.
        *
-       * The client, 2026-09-10: *"on ticket type, show it like chips with their
-       * color, not a list."* A ticket type is already a coloured mark everywhere
-       * else in the app — the list's Type cell, the triage card, the type picker,
-       * every panel on the dashboard — and it was a stack of grey rows only on the
-       * one screen where the words are SET. Her ruling of 2026-09-07 is the same
-       * sentence read from the other end: *"for type, kill the emojis. this is
-       * legacy. in current system we use colors."*
+       * UNWIRED SINCE 17 SEP 2026. The client, 2026-09-10: *"on ticket type,
+       * show it like chips with their color, not a list."* — Ticket type was
+       * the one group that ever set this, and her later ruling retired it:
+       * *"the one that gets the chip with the color is always the status …
+       * for tickets, we need to find icons for the ticket type."* Ticket
+       * type's own glyph now draws in the Details column instead
+       * (`choiceDetailsCell`, `ticketTypeIconName`), the same seat Story
+       * type's icon already sits in — see this section's `types` field, no
+       * `colour` below it any more.
        *
        * A FUNCTION AND NOT A COLUMN, because a value's colour is not stored:
        * `selectable_data` has four meaningful columns and none of them is a colour
-       * (`web/lib/type-colours.ts` argues that out at length and is the ONE place a
-       * ticket type's colour is decided). Passing the resolver down is what keeps
-       * that true — the table draws whatever colour it is handed and knows nothing
-       * about ticket types, and a second group that gains a palette hands its own.
+       * (`web/lib/type-colours.ts` argues that out at length, narrowed now to the
+       * tickets dashboard's own chart series — never a chip — see that file's
+       * own header). Passing the resolver down is what keeps that true — the
+       * table draws whatever colour it is handed and knows nothing about
+       * ticket types, and a group that gains a palette some day hands its own.
        *
-       * ABSENT MEANS A PLAIN WORD, which is every other vocabulary: Sprint types
-       * and Story types carry no palette and their rows read as plain text. */
+       * ABSENT MEANS A PLAIN WORD, which is every vocabulary today: Sprint
+       * types, Story types and Ticket types alike carry no palette and their
+       * rows read as plain text (Ticket type's icon sits in Details, not
+       * here — see that field's own header). */
       colour?: (value: string) => string
     })
   | (ModuleSettingsSectionBase & {
@@ -433,10 +437,11 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // place, which is the whole distinction `shared/ticket-types.ts` draws:
         // the lock is about a fifth ROW, never about the wording.
         create: false,
-        // THE COLOUR, WHICH IS WHAT MAKES THIS SECTION A WALL OF CHIPS — the
-        // one map the whole app reads a ticket type's colour from, handed in
-        // rather than re-derived (`ModuleSettingsSection.colour` above).
-        colour: ticketTypeColour,
+        // NO `colour` HERE ANY MORE (17 Sep 2026) — see `ModuleSettingsSection
+        // .colour`'s own header. Ticket type's glyph draws in the Choices
+        // table's Details column instead, read directly off
+        // `ticketTypeIconName` in `choiceDetailsCell` (deep-link/shape.tsx),
+        // so this section needs no icon resolver either.
       },
       // TICKET STATUSES USED TO BE THE SECOND SECTION, AND THE CLIENT TOOK IT
       // OFF ON 2026-09-10: *"remove ticket status, this cannot be adjusted from

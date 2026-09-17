@@ -96,6 +96,14 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// V1 (17 Sep 2026) DRAWS EVERY PANEL AT ONCE — see ticket-close-moved-to-top.test.tsx's
+// own comment beside this same mock for the full account.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
   Toaster: () => null,
@@ -120,7 +128,12 @@ beforeEach(() => {
 describe("a story written from a ticket reaches the app's own Stories tab", () => {
   it("invalidates the app's stories slice, not just the ticket's own", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
-    fireEvent.mouseDown(await screen.findByRole("tab", { name: /related stories/i }))
+    // AMENDED 17 Sep 2026 — V1's "no tabs" body retired the Related stories
+    // tab this used to click into (see story-born-on-a-ticket.test.tsx's own
+    // `relatedStoriesTab` comment for the full account). The real
+    // `<StoriesPanel>` — and its `onNew` button — now lives behind the
+    // capped preview's "Show all" link, in a slide-in.
+    fireEvent.click(await screen.findByRole("button", { name: "Show all" }))
     fireEvent.click(await screen.findByRole("button", { name: "New story" }))
 
     fireEvent.click(await screen.findByRole("button", { name: "fire onSubmit" }))

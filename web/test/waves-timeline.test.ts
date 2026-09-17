@@ -316,12 +316,12 @@ describe("waveListRows / waveListColumns — R80's shape", () => {
     expect(rows[0]!.accountName).toBe("Hogo")
   })
 
-  // Her exact order, 16 Sep 2026: "1. Wave 2. Status 3. Sprints 4. Start 5.
-  // Account" — End dropped, five columns under R82's own six-column ceiling.
+  // Her exact order, 17 Sep 2026: "1. Wave 2. Status 3. Sprints 4. Start 5.
+  // End 6. Account" — six columns within R82's own six-column ceiling.
   // The App fact still rides Account's own second line, never a column.
-  it("declares exactly five columns in her order — Wave, Status, Sprints, Start, Account", () => {
+  it("declares exactly six columns in her order — Wave, Status, Sprints, Start, End, Account", () => {
     const cols = waveListColumns(t)
-    expect(cols.map((c) => c.key)).toEqual(["name", "state", "sprints", "start", "account"])
+    expect(cols.map((c) => c.key)).toEqual(["name", "state", "sprints", "start", "end", "account"])
   })
 })
 

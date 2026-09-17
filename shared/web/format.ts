@@ -147,6 +147,26 @@ export function formatRelative(iso: string | null | undefined, t: Translate, lan
   return formatDate(iso, lang)
 }
 
+/** A WHOLE COUNT OF DAYS since a stored moment — never the tiered "just
+ * now"/"5m ago"/"3h ago" ladder `formatRelative` climbs, and never rounded
+ * the way that function's own `Math.round` is: a moment eighteen hours old is
+ * `0` here, not `1`, because "1 day ago" said about something that happened
+ * this afternoon is wrong in a way a reader notices.
+ *
+ * BUILT FOR THE TICKET DETAIL'S "RAISED ON" FACT (client ruling, 17 Sep
+ * 2026: "put the date and, in brackets, how many days ago") — a full date
+ * plus an exact day count read together, never `formatRelative`'s own short
+ * ladder, which is built for a conversation timestamp scanned at speed and
+ * says nothing past a week. `null` for an unparseable/absent moment, so a
+ * caller can tell "no date" from "today" (`0`) without a sentinel. */
+export function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return null
+  const ms = Date.now() - then
+  return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
+}
+
 // ── the datetime-local pair ───────────────────────────────────────────────────
 // `<input type="datetime-local">` speaks LOCAL WALL-CLOCK with no offset on it,
 // and the doors store instants. These two are that boundary, in both directions.

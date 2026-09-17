@@ -152,7 +152,7 @@ describe("openNewAgentTab reuses an existing unused tab instead of doubling it",
 
   it("a draft with a scope already picked still counts as unused and is reused, not replaced", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "knowledge", "Knowledge base")
+    pickAgentTabScope(id, "knowledge", "Knowledge")
     const reused = openNewAgentTab()
     expect(reused).toBe(id)
     expect(agentTabsSnapshot().find((t) => t.id === id)?.scope).toBe("knowledge") // untouched
@@ -216,10 +216,10 @@ describe("pickAgentTabScope", () => {
     expect(tab?.recordLabel).toBe("Beringer")
   })
 
-  it("names it \"Knowledge base\" / \"Everything…\" for the other two picks", () => {
+  it("names it \"Knowledge\" / \"Everything…\" for the other two picks", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "knowledge", "Knowledge base")
-    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("Knowledge base")
+    pickAgentTabScope(id, "knowledge", "Knowledge")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("Knowledge")
   })
 })
 

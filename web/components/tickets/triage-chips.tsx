@@ -117,8 +117,8 @@ import { InAppLink } from "@/components/shell/in-app-link"
 // is not any more: which order a tab opens in is a per-tab answer now
 // (`helpTabSorts`), and a screen holding both would be two places deciding one
 // thing — with the tab's answer silently losing on whichever prop forgot.
-import { Swatch } from "@/components/records/record-picker"
-import { ticketTypeColour } from "@/lib/type-colours"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { ticketTypeIconName } from "@shared/ticket-types"
 /* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
    still fills the swatch on each option of the Status facet below (`DOT_TONE_FILL`
    + `helpFacets`), which is a menu of STATUSES and is untouched by the 2026-09-09
@@ -128,8 +128,9 @@ import { ticketTypeColour } from "@/lib/type-colours"
    was its only caller, and an export nobody imports is a contract nobody agreed
    to (web/test/dead-exports.test.ts). */
 
-/** THE CHIP LINE — four facts and nothing else: the number, the type, the
- * app, the date.
+/** THE CHIP LINE — the number, the type, the app (the date chip that used to
+ * lead a fourth was retired 17 Sep 2026 — `shared/web/ticket-chips.tsx`'s own
+ * header carries the ruling).
  *
  * MOVED OUT OF THIS FILE, 2026-09-06, INTO `shared/web/ticket-chips.tsx`
  * (`TicketChips`) — the client, reading this card next to the ticket DETAIL
@@ -140,11 +141,11 @@ import { ticketTypeColour } from "@/lib/type-colours"
  * numberless ticket draws no chip, the `#F7F2EB`/`--surface-panel` paper and
  * why it is a rebind rather than a class, the app pill's 2026-09-06 return
  * ("bring the app back in the chips at the top, without the icon") and why it
- * stays a link, and the date chip's word-for-word wording — is recorded there
- * now, in full, rather than duplicated here. This wrapper exists only because
- * `Swatch`, `ticketTypeColour` and `InAppLink` are `web/`-only (the shared
- * file's own header says why they cannot be imported from `shared/web/`
- * itself) and `teamId` is this screen's own routing fact — so this is the one
+ * stays a link — is recorded there now, in full, rather than duplicated here.
+ * This wrapper exists only because
+ * `InAppLink` is `web/`-only (the shared file's own header says why it cannot
+ * be imported from `shared/web/` itself) and `teamId` is this screen's own
+ * routing fact — so this is the one
  * place that supplies them, and every other ticket surface (the ticket detail
  * screen, `web/components/tickets/help-detail.tsx`, among them) supplies its own the
  * same way.
@@ -156,30 +157,28 @@ import { ticketTypeColour } from "@/lib/type-colours"
  * pairing) — renaming the wrapper would have made every one of those a
  * dangling reference for no reader benefit. */
 /* IT TAKES `TicketChipFacts` NOW, NOT `TriageWaiting` (2026-09-06). Two more
-   ticket surfaces on this screen draw the same four chips — the Kanban card on
+   ticket surfaces on this screen draw the same chips — the Kanban card on
    the Open tab and the reading pane on Ready — and both hold a `HelpTicket`
    rather than a queue row. The shared component underneath has always typed its
-   argument by the FACTS it needs (ref, kind, app, date) rather than by any one
+   argument by the FACTS it needs (ref, kind, app) rather than by any one
    row shape, so widening this wrapper to the same type is what lets three
    surfaces share one chip line instead of two of them growing a fourth and a
    fifth way to draw a ticket's number — which is the exact thing the client's
-   ruling behind `ticket-chips.tsx` forbids. */
-/* AND IT FORWARDS `omitDate` (2026-09-07), which is the whole of what the
-   board's own ruling costs this file. Client, reading the Open tab's board:
-   "lets put the date below title as simole tex". `OpenBoard` is the one caller
-   that passes it, and it draws the date itself in the kit card's `description`
-   slot — the shared line still owns what a ticket's date LOOKS like (through
-   `formatDate`, and through the sentence the client dictated for this exact
-   position), the board only owns where it sits. See `shared/web/ticket-chips.tsx`
-   for why that is a subtraction rather than a second chip line. */
+   ruling behind `ticket-chips.tsx` forbids.
+
+   `omitDate` STOOD HERE FROM 2026-09-07 TO 17 SEP 2026 and forwarded to
+   `TicketChips` for the one caller that drew the date itself, under a board
+   card's title. The date CHIP it toggled is gone now (client: "Remove the
+   'Raised On' chip from the QE view … Add it under 'Raised By'"), and with
+   no chip left to omit the prop went with it — `OpenBoard`'s own board-card
+   caption (`shared/web/ticket-chips.tsx`'s header) is untouched, it was
+   never the chip this ruling names. */
 export function TriageChips({
   teamId,
   ticket,
-  omitDate,
 }: {
   teamId: string
   ticket: TicketChipFacts
-  omitDate?: boolean
 }) {
   return (
     // THE ONE PLACE THIS SCREEN NAMES THE PAPER — see `shared/web/ticket-chips.tsx`'s
@@ -192,14 +191,18 @@ export function TriageChips({
     <span className="[--badge-quiet-fill:var(--surface-panel)]">
       <TicketChips
         ticket={ticket}
-        // THE SAME DOT THE PICKER ROW DRAWS, from the same component and the
-        // same map — so the colour a person clicks and the colour they read
-        // back afterwards cannot be two different objects that happen to
-        // agree today.
-        typeDot={<Swatch colour={ticketTypeColour(ticket.helpType)} />}
+        // THE SAME ICON THE PICKER ROW DRAWS, from the same map — so the
+        // glyph a person clicks and the glyph they read back afterwards
+        // cannot be two different objects that happen to agree today.
+        // Client ruling, 17 Sep 2026: ticket type takes an icon, colour
+        // stays the status's alone (`shared/ticket-types.ts`'s own header).
+        typeDot={
+          ticketTypeIconName(ticket.helpType) ? (
+            <Icon name={ticketTypeIconName(ticket.helpType)!} className="text-muted-foreground size-3.5 shrink-0" />
+          ) : undefined
+        }
         appHref={ticket.appId ? `/t/${teamId}/apps/${ticket.appId}` : undefined}
         AppLink={InAppLink}
-        omitDate={omitDate}
       />
     </span>
   )

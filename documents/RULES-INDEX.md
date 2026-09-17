@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-84 laws, 81 resolved to at least one check file, 3 unresolved.
+86 laws, 84 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (27)
 
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (48)
+## UI (50)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -48,7 +48,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R6 | enforced | `glossary-wellformed` | `web/test/rules.test.ts` |
 | R7 | enforced | `forms-persist-drafts` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts` |
 | R8 | enforced | `tab-counts-derived` | `web/test/rules.test.ts` |
-| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/count-seam.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
+| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/count-seam.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
 | R25 | enforced | `savings-caption` | `web/test/rules.test.ts` |
 | R28 | enforced | `catalogued-strings` | `web/test/catalogued-strings.test.ts` |
 | R29 | enforced | `one-page-width` | `web/test/linked-emails.test.ts`<br>`web/test/rules.test.ts` |
@@ -62,7 +62,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R44 | enforced | `translation-ceiling` | `web/test/translation-ceiling.test.ts` |
 | R45 | enforced | `composition-coverage` | `web/test/rules.test.ts` |
 | R46 | enforced | `component-coverage` | `web/test/rules.test.ts` |
-| R48 | enforced | `toolbar-shows-search` | `web/test/rules.test.ts` |
+| R48 | enforced | `toolbar-shows-search` | `web/test/rules.test.ts`<br>`web/test/tickets-dashboard-no-toolbar.test.tsx` |
 | R49 | enforced | `toolbar-content-gap` | `web/test/rules.test.ts` |
 | R50 | enforced | `empty-toolbar` | `web/test/rules.test.ts` |
 | R51 | enforced | `aside-collapse` | `web/test/rules.test.ts` |
@@ -82,14 +82,16 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R72 | enforced | `no-default-subtitles` | `web/test/no-default-subtitles.test.ts` |
 | R74 | enforced | `import-opens-a-tab` | `web/test/import-opens-a-tab.test.ts` |
 | R75 | enforced | `alphabetical-options` | `web/test/alphabetical-options.test.ts` |
-| R77 | enforced | `tab-strips-pin` | `web/test/tab-strips-pin.test.ts` |
+| R77 | enforced | `tab-strips-pin` | `web/test/knowledge-kind-tabs.test.tsx`<br>`web/test/tab-strips-pin.test.ts` |
 | R78 | enforced | `no-sort-in-calendar-views` | `web/test/no-sort-in-calendar-views.test.tsx`<br>`web/test/staff-pill-row.test.ts` |
 | R79 | enforced | `staff-pill-row` | `web/test/staff-pill-row.test.ts` |
 | R80 | enforced | `rows-are-a-list` | `web/test/rows-are-a-list.test.ts` |
-| R81 | enforced | `form-carries-no-hints` | *unresolved — see below* |
+| R81 | enforced | `form-carries-no-hints` | `web/test/settings-appearance.test.tsx` |
 | R82 | enforced | `table-column-budget` | `web/test/table-column-budget.test.ts` |
-| R83 | enforced | `toolbar-lead-gap` | `web/test/toolbar-lead-gap.test.ts` |
+| R83 | enforced | `toolbar-lead-gap` | `web/test/toolbar-lead-gap-card.test.tsx`<br>`web/test/toolbar-lead-gap.test.ts` |
 | R84 | enforced | `mango-in-title-only` | `web/test/mango-title-only.test.ts` |
+| R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
+| R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
 
 ## Workflow (2)
 
@@ -116,7 +118,6 @@ None of the three patterns this generator looks for matched anywhere under the c
 
 - R69 (`guarded-sighting-writes`, enforced)
 - R76 (`protected-is-active`, enforced)
-- R81 (`form-carries-no-hints`, enforced)
 
 ---
 

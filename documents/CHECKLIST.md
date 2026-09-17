@@ -204,7 +204,7 @@ longer builds the purged ones.
 | 11.8 | An emoji per type on every collection, editable in Dropdown values | **PART DONE**, the law was **changed** on 17 Aug rather than worked around: it now says no emoji **in copy**, and defines a type mark that may sit where an icon sits. The glyphs are seeded on the ticket, story and sprint words, they are EDITABLE on the Dropdown values screen (a Mark field on the form, the glyph on every row), and they show in the header band of every record. They do NOT show in a collection ROW yet, and the reason is one line of library: the screen engine maps a row to a title and a subtitle and passes no icon slot, and putting a glyph inside the title is the one shape the law refuses. UI-GAPS #16 |
 | 11.9 | Less text in every collection row | **DONE**, a ticket row was a reference glued to a title over four facts; it is a title over two. Stories, accounts and meetings the same. The reference is not lost: it leads the eyebrow on the record's own screen, which is where somebody looks when a client says it out loud |
 
-## 12 · Knowledge base
+## 12 · Knowledge
 
 | # | The thing | Status |
 |---|---|---|

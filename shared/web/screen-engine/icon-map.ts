@@ -2,14 +2,13 @@
 //
 // The kit glyphs this app names as DATA, imported explicitly so a bundler can
 // drop the other 1433. See the script's header for why a namespace
-// import cannot work here: indexing one dynamically pins all 1512 exports, which
+// import cannot work here: indexing one dynamically pins all 1513 exports, which
 // shipped a 1.0 MB chunk on the first build after the Iconoir swap.
 //
 // Regenerate with `node scripts/icon-map.mjs`. web/test/icon-vocabulary.test.ts
 // fails when this file is stale.
 
 import {
-  AddressBook,
   AppWindow,
   Archive,
   ArrowClockwise,
@@ -17,7 +16,7 @@ import {
   ArrowsLeftRight,
   Article,
   Asterisk,
-  Brain,
+  BookmarkSimple,
   Bug,
   Building,
   Buildings,
@@ -27,12 +26,12 @@ import {
   CalendarDots,
   ChartDonut,
   Chat,
+  ChatCircleText,
   ChatTeardrop,
-  ChatTeardropDots,
   Check,
   CheckCircle,
   CheckFat,
-  CheckSquare,
+  ChecksRegular,
   ClipboardText,
   ClockCounterClockwise,
   ClockUser,
@@ -67,8 +66,10 @@ import {
   Paperclip,
   PiggyBank,
   Plus,
+  PlusCircle,
   Prohibit,
   PuzzlePiece,
+  Question,
   RocketLaunch,
   Scroll,
   SealCheck,
@@ -82,7 +83,7 @@ import {
   Tray,
   UploadSimple,
   User,
-  UserGear,
+  UserCircle,
   Users,
   UsersThree,
   Warning,
@@ -93,7 +94,6 @@ import {
 import type * as React from "react"
 
 export const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  AddressBook,
   AppWindow,
   Archive,
   ArrowClockwise,
@@ -101,7 +101,7 @@ export const ICON_MAP: Record<string, React.ComponentType<{ size?: number; class
   ArrowsLeftRight,
   Article,
   Asterisk,
-  Brain,
+  BookmarkSimple,
   Bug,
   Building,
   Buildings,
@@ -111,12 +111,12 @@ export const ICON_MAP: Record<string, React.ComponentType<{ size?: number; class
   CalendarDots,
   ChartDonut,
   Chat,
+  ChatCircleText,
   ChatTeardrop,
-  ChatTeardropDots,
   Check,
   CheckCircle,
   CheckFat,
-  CheckSquare,
+  ChecksRegular,
   ClipboardText,
   ClockCounterClockwise,
   ClockUser,
@@ -151,8 +151,10 @@ export const ICON_MAP: Record<string, React.ComponentType<{ size?: number; class
   Paperclip,
   PiggyBank,
   Plus,
+  PlusCircle,
   Prohibit,
   PuzzlePiece,
+  Question,
   RocketLaunch,
   Scroll,
   SealCheck,
@@ -166,7 +168,7 @@ export const ICON_MAP: Record<string, React.ComponentType<{ size?: number; class
   Tray,
   UploadSimple,
   User,
-  UserGear,
+  UserCircle,
   Users,
   UsersThree,
   Warning,

@@ -140,12 +140,14 @@ describe("PagedFind's own `search` default — the mechanism", () => {
   })
 })
 
-describe("the real knowledge call site (collection-content.tsx) — the wiring", () => {
+describe("the real knowledge call site (knowledge-screen.tsx) — the wiring", () => {
   it("carries a real placeholder, never `search={false}`, and still passes facets and a view switch", () => {
-    const src = readFileSync(
-      join(ROOT, "web", "components", "deep-link", "collection-content.tsx"),
-      "utf8"
-    )
+    // SPLIT OUT OF collection-content.tsx, 17 Sep 2026 (K2 by kind) — the
+    // knowledge branch became its own component the same way accounts/
+    // contacts/tickets already are, because the kind-tab strip's own R16
+    // badges need a live sidecar read only a real component can hold. The
+    // wiring this test proves moved with it.
+    const src = readFileSync(join(ROOT, "web", "components", "knowledge", "knowledge-screen.tsx"), "utf8")
     const at = src.indexOf("<PagedFind<KnowledgeSource>")
     expect(at, "the knowledge module's own <PagedFind<KnowledgeSource>> call site").toBeGreaterThan(-1)
 
@@ -168,10 +170,7 @@ describe("the real knowledge call site (collection-content.tsx) — the wiring",
   })
 
   it("no longer mounts the inline AskTheAssistant box — client ruling, 17 Sep 2026: \"remove the whole modal 'Ask a question'\"", () => {
-    const src = readFileSync(
-      join(ROOT, "web", "components", "deep-link", "collection-content.tsx"),
-      "utf8"
-    )
+    const src = readFileSync(join(ROOT, "web", "components", "knowledge", "knowledge-screen.tsx"), "utf8")
     expect(src).not.toMatch(/<AskTheAssistant\s*\/>/)
     expect(src).not.toMatch(/from "@\/components\/assistant\/ask-the-assistant"/)
   })

@@ -134,8 +134,8 @@ describe("RULES — R75, the options a person picks from are A→Z", () => {
     const src = stripComments(read(join(WEB, "components", "team", "roles-matrix.tsx")))
     expect(
       src,
-      "R75 — roles-matrix.tsx's moduleColumns must open with sortedOptions(sheets[0]?.perms.modules …) — this list builds a kit row config rather than a <SelectItem>, so it is invisible to the derived census below and is read directly instead, the same move R74 makes for Home's own import tile"
-    ).toMatch(/sortedOptions\(sheets\[0\]\?\.perms\.modules/)
+      "R75 — roles-matrix.tsx's moduleColumns must open with sortedOptions(sheets?.[0]?.perms.modules …) — this list builds a kit row config rather than a <SelectItem>, so it is invisible to the derived census below and is read directly instead, the same move R74 makes for Home's own import tile"
+    ).toMatch(/sortedOptions\(sheets\?\.\[0\]\?\.perms\.modules/)
   })
 
   it("alphabetical-options: every FilterFacet.ordered flag is registered in FACET_ORDER_OK, both ways", () => {

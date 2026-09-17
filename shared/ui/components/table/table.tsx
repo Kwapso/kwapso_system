@@ -6,10 +6,19 @@
    drawn table (chapter 07's state matrix). Every decision below is transcribed
    from it rather than taken from a shadcn default:
      · `border-collapse: collapse`, `width: 100%`, body type at `--text-body-s`.
-     · `th` is a MICRO UPPERCASE eyebrow in tertiary ink at the 0.08em
-       eyebrow tracking, aligned to the inline start, on a
-       `--hair-strong` rule — the section-rule weight, because the header is a
-       section boundary and not a same-tone split.
+     · `th` is a MICRO eyebrow in tertiary ink at the 0.08em eyebrow tracking,
+       aligned to the inline start, on a `--hair-strong` rule — the
+       section-rule weight, because the header is a section boundary and not
+       a same-tone split. **THE CASE TRANSFORM IS GONE, 2026-09-17** — client
+       ruling, verbatim over the Choices table's Details header: *"why all
+       caps? 'Details' pls."* Her screenshots the same day showed it was
+       general (Roles' MODULE/ADMIN/CLIENT, Contacts' ACCOUNT/ROLE/PORTAL),
+       so the ruling is general too: a column heading reads in sentence case
+       AS WRITTEN. `design-mothership/specimens/_fragments/f3.css`'s own
+       `.kw-matrix th` still draws `text-transform: uppercase` — this file no
+       longer transcribes that one rule from it, on purpose, and everything
+       else about the eyebrow (the micro size, the tertiary ink, the 0.08em
+       tracking) is unchanged. See `TableHead` below.
      · `td` sits on a `--hair` rule; `tr:last-child td` drops it.
      · `td:first-child` is `--weight-strong` and `white-space: nowrap` — the
        record's name column does not wrap.
@@ -654,12 +663,17 @@ export interface TableHeadProps extends React.ComponentPropsWithoutRef<"th"> {
 /**
  * A column heading.
  *
- * `.kw-matrix th`: micro UPPERCASE at the 0.08em eyebrow tracking, tertiary
- * ink, aligned to the start — the kit's specimen says "align everything to
+ * `.kw-matrix th`: micro at the 0.08em eyebrow tracking, tertiary ink,
+ * aligned to the start — the kit's specimen says "align everything to
  * the left", which here is `text-start`, so it is the inline start in Arabic
  * too — on the `--hair-strong` section rule. `text-micro` is a real
  * utility and carries the size, the leading and that tracking together, so no
- * arbitrary value is needed and none is written.
+ * arbitrary value is needed and none is written. NOT UPPERCASE, since
+ * 2026-09-17 — the client's verbatim ruling on the Choices table's Details
+ * header, generalised from her same-day screenshots of Roles and Contacts:
+ * a column heading is sentence case, exactly as its call site wrote the
+ * word. The eyebrow's other three properties (size, ink, tracking) are
+ * untouched — only the case transform is gone.
  *
  * TEN STATES — the header's block covers all ten. A sortable heading puts a
  * `Button variant="ghost"` inside itself; every interactive state then belongs
@@ -687,7 +701,9 @@ const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
            see this block's own TEN STATES — so the pinned heading takes the
            paper and none of the row washes. */
         sticky && STICKY_CELL,
-        "text-micro uppercase font-[var(--font-weight-medium)] text-ink-tertiary",
+        // NOT `uppercase` — client ruling 2026-09-17, see the file header and
+        // this component's own doc comment. Size, ink and tracking stay.
+        "text-micro font-[var(--font-weight-medium)] text-ink-tertiary",
         /* The header's rule is the 20% section hairline, as an inset shadow. */
         "shadow-[var(--hairline-under-strong)]",
         // A header cell holding a checkbox is square at the row height.

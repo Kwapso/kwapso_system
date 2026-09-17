@@ -166,6 +166,15 @@ const DOOR_ORDERED: Record<string, string> = {
     "with no header to click. The cell is real (`formatDate`) and the column " +
     "is real, but neither the door nor the browser ever compares it."
   ),
+  end: (
+    "Waves' own List (web/components/work/waves-screen.tsx, waveListColumns). " +
+    "The identical `start` shape: `WaveFinder`'s own toolbar `<SortControl>` " +
+    "(\"When it runs\") is the one control this bounded, browser-held collection " +
+    "is ordered by, and `waveListColumns` gives none of its six columns a " +
+    "`sort` key — `record-table.tsx`'s `ordered()` returns the rows untouched " +
+    "with no header to click. The cell is real (`formatDate`) and the column " +
+    "is real, but neither the door nor the browser ever compares it."
+  ),
   due: (
     "Inputs (web/components/accounts/inputs-screen.tsx). The identical " +
     "`deadline`/`start` shape: the screen's `<PagedFind>` passes " +

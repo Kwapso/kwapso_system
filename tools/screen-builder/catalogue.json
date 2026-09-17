@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.103",
-  "sha": "f6094b8912c7b4760207157bde352eebda4671b1",
+  "tag": "v1.2.108",
+  "sha": "5e05893efacfd5ed647de3656e2fadda88189f24",
   "syncedAt": "2026-09-17"
  },
- "generatedAt": "2026-09-17T13:12:14.936Z",
+ "generatedAt": "2026-09-17T16:35:08.410Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -17,7 +17,7 @@
   "typedEnumProps": 43,
   "typedBooleanProps": 317,
   "compositions": 47,
-  "icons": 1512,
+  "icons": 1513,
   "tokens": 367,
   "tokenDeclarations": 567,
   "unresolved": 0
@@ -1260,7 +1260,8 @@
    "kind": "component",
    "files": [
     "components/breadcrumbs/breadcrumb-folders.tsx",
-    "components/breadcrumbs/breadcrumbs.tsx"
+    "components/breadcrumbs/breadcrumbs.tsx",
+    "components/breadcrumbs/trail-line.tsx"
    ],
    "exports": [
     {
@@ -1274,6 +1275,10 @@
     {
      "name": "Breadcrumbs",
      "file": "components/breadcrumbs/breadcrumbs.tsx"
+    },
+    {
+     "name": "TrailLine",
+     "file": "components/breadcrumbs/trail-line.tsx"
     }
    ],
    "cva": [],
@@ -1294,6 +1299,12 @@
     {
      "file": "components/breadcrumbs/breadcrumbs.tsx",
      "type": "BreadcrumbsProps",
+     "variantsFrom": [],
+     "props": []
+    },
+    {
+     "file": "components/breadcrumbs/trail-line.tsx",
+     "type": "TrailLineProps",
      "variantsFrom": [],
      "props": []
     }
@@ -8734,7 +8745,7 @@
     {
      "file": "components/unsaved-changes-bar/unsaved-changes-bar.tsx",
      "name": "unsavedChangesBarVariants",
-     "line": 165,
+     "line": 204,
      "base": "flex min-w-0 flex-nowrap items-center justify-between gap-3 px-4 py-3 bg-warning/10 shadow-[inset_0_0_0_0.0625rem_color-mix(in_srgb,var(--warning)_35%,transparent)]",
      "groups": [
       {
@@ -8742,8 +8753,8 @@
        "options": [
         {
          "name": "bare",
-         "classes": "rounded-[var(--radius)]",
-         "note": "ALL FOUR CORNERS, `rounded-[var(--radius)]` — CORRECTED 2026-09-16. Used to be TOP ONLY (`rounded-t-[var(--radius)]`): the reasoning was that the wrapper's own `PINNED_TOOLBAR` `::before` (`shared/web/pinned-chrome.ts`, R63 part 4) already rounds those same top corners one layer further out, and the bottom edge had nothing below it to be separated from — the container's own content keeps scrolling under this row and shares that edge. The client looked at the shipped bar and ruled directly against that: \"use the orange color in the kit and make sure the container is round on all corners, because currently two corners are not round.\" Riding `PINNED_TOOLBAR` still rounds the SAME top pair a second, now-redundant way at the wrapper's own border box, which is harmless — two coincident radii on the same corner draw as one — but the bottom pair no longer stays square waiting on a distinction the client never asked for."
+         "classes": "sticky top-[calc(var(--pinned-chrome-h,0px)_+_var(--tab-strip-h,0px))] z-20 rounded-[var(--radius)]",
+         "note": "ALL FOUR CORNERS, `rounded-[var(--radius)]` — CORRECTED 2026-09-16. Used to be TOP ONLY (`rounded-t-[var(--radius)]`): the reasoning was that the wrapper's own `PINNED_TOOLBAR` `::before` (`shared/web/pinned-chrome.ts`, R63 part 4) already rounds those same top corners one layer further out, and the bottom edge had nothing below it to be separated from — the container's own content keeps scrolling under this row and shares that edge. The client looked at the shipped bar and ruled directly against that: \"use the orange color in the kit and make sure the container is round on all corners, because currently two corners are not round.\" Riding `PINNED_TOOLBAR` still rounds the SAME top pair a second, now-redundant way at the wrapper's own border box, which is harmless — two coincident radii on the same corner draw as one — but the bottom pair no longer stays square waiting on a distinction the client never asked for. STICKY, 2026-09-17 — see the header, \"POSITION — REVERSED FOR `ground=\"bare\"` ONLY\". Client: \"needs to be floating and visible at all times, directly under the tabs, even if I'm very down in the scroll.\" `sticky` plus `top`, at the app's own two offsets (`--pinned-chrome-h` for whatever fixed chrome sits above the scroll container, `--tab-strip-h` for the tab row this bar sits \"directly under\"), each falling back to `0px` so a call site that sets neither still renders correctly pinned to the very top. `z-20`: comfortably above this row's own scroll container's ordinary content in ITS OWN local stacking context — the app's `PINNED_TOOLBAR` wrapper must not open a stacking context of its own between this row and the content it is meant to cover, or a higher z-index here would not help (the same class of bug `screen-shell.tsx`'s own top-bar comment measures, \"a control you can see and cannot press\")."
         },
         {
          "name": "page",

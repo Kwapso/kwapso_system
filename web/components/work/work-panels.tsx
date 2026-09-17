@@ -48,9 +48,8 @@ import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
-import { AddButton, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
-import { Swatch } from "@/components/records/record-picker"
-import { ticketTypeColour } from "@/lib/type-colours"
+import { AddButton, CollectionCard, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
@@ -293,6 +292,25 @@ function PagedPanelBody<T>({
       // above is this panel's whole answer to "does it have any rows yet",
       // computed once and forwarded rather than re-derived per panel.
       restingEmpty={restingData.length === 0}
+      // THE NESTED CARD, EVERY ONE OF THESE FIVE PANELS SKIPPED. Client, 17
+      // Sep 2026, over the app's Tickets tab: "there is still the space
+      // between the point and the type missing, and also they are missing
+      // the background card." The record's own outer chrome already stands
+      // on ONE shared card (`RecordDetail`'s own, `overview-list.tsx`'s own
+      // header has the citation) — right for a plain fact list, and not the
+      // surface a COLLECTION stands on: `SprintsPanel`/`AppsPanel`, two
+      // sibling nested panels in this very file, already draw their OWN
+      // `bg-surface-panel` (`CollectionFrame useKitPanel`), so a tab that
+      // skipped it read as the one with the card missing. `CollectionCard`
+      // (`screen-bits.tsx`) is the exact wrapper `<PagedFind>`'s own `wrap`
+      // prop is written for — this is a RULE, not a per-panel fix: every
+      // caller of `PagedPanelBody` gets it at once (Stories, Maps, App
+      // meetings, App tickets — both the app's own and the account's, since
+      // both mount `AppTicketsTab` — and To-dos). See `web/test/
+      // sections-stand-on-paper.test.ts`'s "R67, widened" describe block and
+      // `RECORD_DETAIL_COLLECTION_OK`'s own header (`shared/rules/
+      // registry.ts`) for the full account.
+      wrap={(toolbarAndRows) => <CollectionCard>{toolbarAndRows}</CollectionCard>}
       view={view}
       fetchPage={fetchPage}
     >
@@ -1127,14 +1145,22 @@ export function AppTicketsPanel({
               </span>
             </TableCell>
             <TableCell>
-              {/* THE SAME DOT, FROM THE SAME MAP as the chip line and the type
-                  picker draw — `Swatch` + `ticketTypeColour` rather than a
-                  second lozenge that agrees with them today. A ticket with no
-                  type still gets its pill, saying so with an em dash: a column
-                  with a pill on four rows and a hole on the fifth reads as the
-                  broken row rather than the untyped one. */}
+              {/* THE SAME ICON, FROM THE SAME MAP as the chip line and the type
+                  picker draw — `ticketTypeIconName` rather than a second
+                  resolution that agrees with them today. Colour retired here
+                  17 Sep 2026 (client: "the one that gets the chip with the
+                  color is always the status … for tickets, we need to find
+                  icons for the ticket type"). A ticket with no type still gets
+                  its pill, saying so with an em dash: a column with a pill on
+                  four rows and a hole on the fifth reads as the broken row
+                  rather than the untyped one. */}
               <Badge variant="secondary" size="pill">
-                <Swatch colour={ticketTypeColour(ticket.helpType)} />
+                {ticketTypeIconName(ticket.helpType) && (
+                  <Icon
+                    name={ticketTypeIconName(ticket.helpType)!}
+                    className="text-muted-foreground size-3.5 shrink-0"
+                  />
+                )}
                 {ticket.helpType ?? "—"}
               </Badge>
             </TableCell>
@@ -1309,6 +1335,12 @@ export function AppTicketsTab({
   }
 
   if (view === "dashboard")
+    // NO TOOLBAR HERE ANY MORE (client ruling, 17 Sep 2026: "Remove the
+    // toolbar from the tickets dashboard") — `<TicketsDashboard>` no longer
+    // accepts `viewSlot`/`actions`, nothing left to draw them into. The
+    // List↔Dashboard switch (`viewSlot`) and "Raise a ticket" (`onNew`)
+    // still reach the reader through the LIST view's own toolbar below
+    // (`<AppTicketsPanel view={viewSlot}>`), which is the one this tab keeps.
     return (
       <TicketsDashboard
         teamId={teamId}
@@ -1320,15 +1352,6 @@ export function AppTicketsTab({
         // vocabularies of one thing.
         helpTypeOptions={helpTypeOptions ?? []}
         ticketTotal={ticketTotal ?? undefined}
-        viewSlot={viewSlot}
-        // "RAISE A TICKET", ON BOTH VIEWS OF THIS TAB. The list view gets it
-        // from `PagedPanelBody`'s own `onNew`, which builds exactly this
-        // `<AddButton>` into `<PagedFind>`'s `actions` slot; the dashboard's own
-        // `<ToolbarRow>` had no actions at all until 6 Sep 2026 ("on the
-        // dashboard, I'm missing the full toolbar"). Same label, same glyph,
-        // same slot in the same fixed order, so pressing the view switch does
-        // not move the button that sits beside it.
-        actions={onNew ? <AddButton label={t("Raise a ticket")} onClick={onNew} /> : null}
       />
     )
 

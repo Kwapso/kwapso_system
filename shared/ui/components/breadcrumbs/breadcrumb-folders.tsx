@@ -182,15 +182,15 @@ import {
   DropdownMenuTrigger,
 } from "../dropdown-menu/dropdown-menu";
 import { FolderShape } from "../folder/folder";
-import { X, XSquare } from "../../foundations/icons";
+import { X } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
 
 /* ----------------------------------------------------------------------------
    The strip.
 
-   `flex items-end gap-1` and the two block-axis margins are 24.3/24.6's own
-   folder strip, moved off `tabs.tsx`'s `LIST_SKIN.folder`:
+   `flex items-end` and the two block-axis margins are 24.3/24.6's own folder
+   strip, moved off `tabs.tsx`'s `LIST_SKIN.folder`:
 
      · `mb-[calc(var(--folder-tab-overlap)*-1)]` is the whole attachment
        mechanic. The strip ends 17.02 ABOVE where it appears to, so whatever
@@ -212,11 +212,35 @@ import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
        end. The fold is what keeps a deep trail short; scrolling is the
        fallback for one very long label.
 
+   NO `gap-1` ANY MORE — REMOVED 17 Sep 2026, HER FOURTH REPORT ON THIS EXACT
+   SHAPE, verbatim: "The inactives on the assistant are overlapping, so
+   they're on top of the active tab, and that's incorrect. They should be
+   behind." Two live-staging screenshots (`live-assistant-boundary-zoom.png`,
+   `live-content-strip-1440.png`) measured what "overlapping" actually means
+   here: every tab is a rounded top-left corner and a sloping right shoulder,
+   the silhouette never overhangs its own box, and `gap-1` (4px) used to hold
+   consecutive tabs apart so their boxes never shared a pixel at rest. That is
+   the opposite of a Chrome tab strip, where consecutive tabs NEST — the next
+   tab's rounded corner sits UNDER the previous tab's shoulder, by exactly the
+   shoulder's own run. A 4px gap cannot produce that: it is smaller than the
+   shoulder (`--folder-shoulder`, 29.52px) in every direction, so the two
+   shapes either float apart (gap positive) or, the instant a caller's own
+   layout tightened it even slightly, the FOLLOWING tab's own square-cornered
+   box-before-its-curve-renders edge would land in front of the previous
+   tab's shoulder — which reads exactly as "the inactive is on top", her
+   words, for either sibling. The fix is not a smaller gap; it is no gap and
+   a real, deliberate overlap of exactly the shoulder's own width, with
+   z-index — not proximity — deciding who paints on top. See the per-`<li>`
+   `ms-[calc(var(--folder-shoulder)*-1)]` below (rendered in the `.map`, not
+   here, because the FIRST tab in the strip must not pull itself left off the
+   strip's own edge) and `restZIndex`'s own comment for the stacking half of
+   this.
+
    The three classes it OVERRIDES on `BreadcrumbList` are named here so the
    override is legible rather than accidental: `flex-wrap` -> `flex-nowrap`,
    `items-center` -> `items-end` (a tab stands on its feet), `gap-1.5` ->
-   `gap-1` (`--space-1`, the strip's own seam). `text-caption` survives the
-   merge and is the tab's own type step, so it is not restated.
+   no gap at all (the overlap above replaces the seam). `text-caption`
+   survives the merge and is the tab's own type step, so it is not restated.
 
    REVERSED 2026-09-03, SAME DAY AS THE CHANGE ITSELF. A same-day pass tried
    `w-full` on the strip + `grow` on the live tab, reasoning that a short
@@ -243,13 +267,74 @@ import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
    remaining engines. Wheel and drag scrolling are untouched — hiding the bar
    is a paint change, not an `overflow` one, and `overflow-x-auto` still
    reads its own value below. */
+/* `isolate` — 17 Sep 2026, ALONGSIDE `restZIndex`'s NEGATIVE integers, and
+   load-bearing rather than decorative. MEASURED, not assumed: without it, a
+   tab whose `<li>` carries a NEGATIVE `z-index` (every rest tab after the
+   first two — `restZIndex`'s own comment has the formula) is still drawn in
+   the right PLACE but stops being clickable at all, in real Chromium — a
+   pointer at the exact centre of its own box hit-tests to an ANCESTOR of
+   this `<ol>` instead (confirmed: `document.elementFromPoint` at a
+   `z-index: -2` tab's own centre returned this file's page-level wrapper
+   `<div>`, several DOM levels up, not the tab or even the `<ol>`). This is
+   what a negative `z-index` on a flex item MEANS when the flex container
+   itself is not a stacking context: CSS Flexbox's own z-order rule paints
+   flex items "exactly as inline blocks", and a negative z-index there does
+   not mean "behind my SIBLINGS", it means "behind the nearest ANCESTOR that
+   establishes a stacking context" — and an `<ol>` with `flex` and
+   `overflow-x-auto` but no `position`, no `z-index` of its own and no
+   `isolation` is not one, so that ancestor is whatever IS one further up
+   the tree, which is the caller's own layout and not this component's to
+   assume. `isolate` (`isolation: isolate`) makes THIS `<ol>` that stacking
+   context, so every child's z-index — the live tab's `1`, every rest tab's
+   `-position` — is compared and painted entirely inside the strip, never
+   escaping to fight a caller's own unrelated content for a pixel two
+   ancestors away. It costs nothing else: `isolation` does not affect
+   layout, and the strip already had no `position` for anything to
+   conflict with. */
 const STRIP = cn(
-  "flex flex-nowrap items-end gap-1",
+  // `gap-0` IS NOT A NO-OP — MEASURED, NOT ASSUMED. `BreadcrumbList`'s own
+  // base classes (`breadcrumb.tsx`) include `gap-1.5`, which the strip used
+  // to win against by MERGING IN `gap-1` (tailwind-merge drops the earlier
+  // utility in the same group). Simply REMOVING that override, tried first,
+  // left `gap-1.5`'s 6.75px standing — a real, measured 6.75px of unwanted
+  // positive space eating into every tab's `TAB_OVERLAP_MARGIN` pull (a
+  // strip whose overlap read 26.45px against a 33.21px shoulder, short by
+  // exactly 6.75px). `gap-0` wins the same merge `gap-1` used to and leaves
+  // none of it standing.
+  "flex flex-nowrap items-end isolate gap-0",
   "max-w-full overflow-x-auto scroll-p-2 [scrollbar-width:none]",
   "[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0",
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",
 );
+
+/* THE OVERLAP ITSELF — one negative margin, applied per-`<li>` in the
+   `.map` below to every rendered tab AFTER THE FIRST (never the first: it
+   has no earlier shoulder to sit under, and pulling it left would run it off
+   the strip's own start). `--folder-shoulder` (29.52px) is the exact run of
+   the curve a tab's OWN shoulder draws before it lands on the body — see
+   `folder.tsx`'s `SHAPE.shoulder` — so a tab dressed with this margin sits
+   with its rounded top-left corner exactly under where the PREVIOUS tab's
+   shoulder lands, and nothing further: `overlap == shoulder`, not
+   "roughly nested". */
+const TAB_OVERLAP_MARGIN = "ms-[calc(var(--folder-shoulder)*-1)]";
+
+/* …AND THE ROOM IT COSTS THE LABEL. The lip's own leading padding (`TAB`'s
+   `ps-5`, `TAB_ICON_ONLY`'s `ps-[var(--space-3)]`) clears the shoulder CURVE
+   drawn inside this tab's own box — it says nothing about a NEIGHBOUR's
+   shoulder now sitting, physically, on top of this tab's own leading edge.
+   Without extra room the label would start underneath the previous tab's
+   paper, half hidden by it. So every tab after the first adds the same
+   `--folder-shoulder` back, on the INSIDE, to its own leading padding — the
+   margin pulls the box left, the padding pushes the content right by the
+   identical amount, and the visible label lands exactly where it would have
+   sat with no overlap at all. Only the label moves; the SHAPE (the box
+   `FolderShape` measures) is untouched, so the silhouette draws at its usual
+   proportions — see `verify/tabstrip-parity`'s `silhouetteParity` check,
+   which is exactly what would fail if this padding were skipped and the box
+   narrowed instead. */
+const TAB_OVERLAP_PS = "ps-[calc(var(--space-5)_+_var(--folder-shoulder))]";
+const TAB_ICON_ONLY_OVERLAP_PS = "ps-[calc(var(--space-3)_+_var(--folder-shoulder))]";
 
 /* ----------------------------------------------------------------------------
    THE TWO DRAWINGS AND THE ONE GATE BETWEEN THEM.
@@ -559,35 +644,70 @@ const TAB_ICON_ONLY = cn(
 
    THIS PAIR IS NO LONGER THE ONLY PLACE THE NUMBER IS WRITTEN — 16 Sep 2026,
    second correction on this exact silhouette. The `<li>` (`BreadcrumbItem`,
-   the render below) now carries the identical `z-0`/`z-[1]` itself, and that
-   is not a decorative echo. AT REST, WITH NOTHING TRANSFORMED ANYWHERE IN THE
-   STRIP, this pair alone was always sufficient — the reasoning two paragraphs
-   up holds and the client's own screenshot of the STATIC compact strip could
-   not be reproduced against it (measured, not assumed). What breaks it is a
-   TRANSFORM landing on a sibling `<li>` that carries no z-index of its own:
-   `onTabPointerMove`, below, slides every tab a drag has moved past —
-   active or not, dragged or not — by writing a bare `style.transform`
-   straight onto that `<li>`. A transformed element is its own stacking
-   context regardless of its `z-index` (`auto` included), so the MOMENT the
-   live tab is merely shifted out of a dragged neighbour's way, its `z-[1]`
-   here on the link stops competing in the strip's shared context at all —
-   it is sealed inside the `<li>`'s new, unnumbered context, which the OUTER
-   comparison then treats as one opaque box at the "auto" level, tied to
-   every other untransformed rest tab by DOM order alone. A pinned tab drawn
-   AFTER the live one — History, "+", both trailing by design — wins that
-   tie every time: the exact "inactive tab in front of the active one"
-   defect, now reachable without ever dragging the active tab itself. The
-   `<li>`'s own explicit class-level number is what closes it: a flex item
-   of `STRIP`'s `<ol>` takes `z-index` as if positioned (CSS Flexbox), so
-   writing `z-0`/`z-[1]` there needs no `position` of its own, is never
-   touched by a transform (a separate property), and never touched by the
-   one inline `zIndex` the drag handlers DO write (only on the tab actually
-   held) — so it stays explicit and numeric through every shift, and the
-   outer comparison is always a real 1-vs-0, never a DOM-order tie standing
-   in for one. See the `<li>`'s own class list, and `onTabPointerMove`'s
-   comment, for the rest of this. */
+   the render below) carries the SAME kind of number itself, and that is not
+   a decorative echo. AT REST, WITH NOTHING TRANSFORMED ANYWHERE IN THE
+   STRIP, this pair alone was always sufficient — the reasoning two
+   paragraphs up holds. What breaks it is a TRANSFORM landing on a sibling
+   `<li>` that carries no z-index of its own: `onTabPointerMove`, below,
+   slides every tab a drag has moved past — active or not, dragged or not —
+   by writing a bare `style.transform` straight onto that `<li>`. A
+   transformed element is its own stacking context regardless of its
+   `z-index` (`auto` included), so the MOMENT a tab is merely shifted out of
+   a dragged neighbour's way, its z-index here on the link stops competing
+   in the strip's shared context at all — it is sealed inside the `<li>`'s
+   new, unnumbered context, which the OUTER comparison then treats as one
+   opaque box at the "auto" level, tied to every other untransformed tab by
+   DOM order alone. The `<li>`'s own explicit, per-tab number is what closes
+   it: a flex item of `STRIP`'s `<ol>` takes `z-index` as if positioned (CSS
+   Flexbox), so writing it there needs no `position` of its own, is never
+   touched by a transform (a separate property), and is restored — not
+   cleared — by `releaseTransforms` once a drag ends (see that function's own
+   comment for why clearing to `""` would have silently flattened every rest
+   tab back to DOM-order ties the instant a drag finished). See the `<li>`'s
+   own inline `style`, and `onTabPointerMove`'s comment, for the rest of
+   this.
+
+   NO LONGER A FLAT PAIR, SINCE 17 SEP 2026 — HER FOURTH REPORT, AND THE ONE
+   THAT NAMED THE ACTUAL DEFECT: "The inactives on the assistant are
+   overlapping, so they're on top of the active tab… They should be behind."
+   Two rest tabs never used to SHARE a pixel — the retired `gap-1` kept every
+   tab clear of every other, so `z-0` for the whole rest set settled nothing
+   because there was never a tie to settle. `TAB_OVERLAP_MARGIN` (on `STRIP`,
+   above) now puts two boxes on the same pixels ON PURPOSE — her own ruling
+   is that the earlier tab's shoulder sits OVER the later tab's corner,
+   Chrome's own nesting — and CSS's ordinary tie-break (equal z-index, later
+   DOM order wins) hands that pixel to the WRONG tab: the later, not the
+   earlier. So rest tabs no longer share one number. `restZIndex`, below,
+   gives every tab in the strip — rest AND live — its own value, strictly
+   DESCENDING by strip position: the earlier (visually left) tab always
+   outranks a later rest tab, and the live tab still outranks every rest tab
+   regardless of where it sits, still strictly under the card's `z-[2]`. It
+   is written as an inline `style` rather than a class for the reason every
+   other per-tab number in this file is (`onTabPointerDown`'s own inline
+   `zIndex = "2"`, for one): Tailwind can only emit CSS for class strings it
+   can see verbatim in source, and a value that depends on `entry.index` and
+   `rendered.length` does not exist until render.
+
+   INTEGERS ONLY — MEASURED, NOT ASSUMED, AFTER A FIRST DRAFT SHIPPED
+   FRACTIONS AND SILENTLY DID NOTHING. `z-index`'s own CSS grammar is
+   `auto | <integer>` — no other number is a valid value at all — and a
+   browser that receives an invalid one does not clamp or round it, it
+   REFUSES the whole declaration: `el.style.zIndex = "0.833"` (what the
+   first draft's `(total - position) / (total + 1)` produced) leaves
+   `getComputedStyle(el).zIndex` reading `"auto"`, exactly as if nothing had
+   ever been written — confirmed against a real Chromium render, where every
+   rest tab but the leading one came back `auto` and the whole mechanism
+   this comment describes was quietly inert. So the formula is `-position`:
+   the leading rest tab keeps the EXACT value it always had (`0`, position
+   `0`), and every tab after it steps one further NEGATIVE integer per
+   position — still strictly descending, still integers throughout, and
+   still strictly under the live tab's flat `1` for every position (`0` is
+   the largest value this function ever returns). */
+function restZIndex(position: number): number {
+  return -position;
+}
+
 const TAB_REST = cn(
-  "z-0",
   "text-ink-secondary font-[var(--font-weight-light)]",
   "hover:text-ink-secondary hover:font-[var(--font-weight-medium)]",
   "hover:no-underline",
@@ -608,6 +728,47 @@ const TAB_LIVE = "z-[1] cursor-default";
 /** The two papers, as `color` for the shape's `currentColor`. */
 const FILL_REST = "text-[var(--kw-crumb-rest)]";
 const FILL_LIVE = "text-[var(--kw-crumb-live)]";
+
+/**
+ * THE SILHOUETTE'S OWN HOVER — added 17 Sep 2026, client ruling, verbatim:
+ * "When I'm hovering over a tab and I'm talking, both in the main container
+ * and in the assistant, I want it to have a hover color apart from the
+ * changes in the text that are already there." Until today a rest tab's
+ * hover moved only the LABEL — ink to `--ink-secondary` (a no-op colour-wise,
+ * see `TAB_REST`'s own comment) and the weight preview — and the paper under
+ * it, the shape THIS constant paints, never moved at all. This is the
+ * SILHOUETTE's own step, one rung up from the rest paper: `--accent`, the
+ * SAME token `TAB_CLOSE`'s own hover already uses on this exact strip ("the
+ * kit's neutral item wash"), so a reader who has already learned what an
+ * accent wash means on the × learns nothing new reading it on the tab
+ * itself. `--kw-crumb-hover` is a THIRD custom property beside
+ * `--kw-crumb-rest`/`--kw-crumb-live` (declared alongside them, on the same
+ * `<nav>`, for TAB-C1's own reason: a caller that rebinds `--accent` around
+ * the strip must not be able to make the hover wash disagree with every
+ * other hover in its own tree) rather than a THIRD literal here, so a future
+ * spine that repoints the rest paper can repoint the hover the same way
+ * without this file changing.
+ *
+ * `group-hover:`, NOT a bare `hover:` on the shape itself — the shape is
+ * `pointer-events-none` (`CrumbShape`'s own comment) and can never be the
+ * element `:hover` fires on. `group` now lives on the `<li>`
+ * UNCONDITIONALLY (previously only on a closable tab, for the identical
+ * reason `TAB_REST`'s own weight-preview note gives: the close button is a
+ * SIBLING of the link, laid over it, so hovering the × must not drop the
+ * tab back to its resting state either). Passed as `CrumbShape`'s
+ * `hoverFill` — a SECOND shape, not a swap of `FILL_REST` (see that
+ * component's own comment for why a straight swap to a 5%-alpha token reads
+ * as the tab vanishing rather than gaining a tint) — ONLY where the crumb
+ * also passes `fill={FILL_REST}`, never where it passes `FILL_LIVE`, because
+ * the client's own words draw the line: "both in the main container and in
+ * the assistant" names every REST tab on both strips, and a hover response
+ * on the tab you are already on invites a click that does nothing, the same
+ * reason `BreadcrumbPage` has no hover of its own at all (see that class's
+ * own comment). Icon-only shares `FILL_REST` with every text tab —
+ * `item.iconOnly` only ever changes `TAB`'s insets, never which fill a crumb
+ * draws — so it takes this for free.
+ */
+const FILL_REST_HOVER = "group-hover:text-[var(--kw-crumb-hover)]";
 
 /* ----------------------------------------------------------------------------
    THE CLOSE CONTROL — THE ROOM IT NEEDS, AND THE CONTROL ITSELF.
@@ -692,39 +853,19 @@ const TAB_CLOSE = cn(
 );
 
 /* ----------------------------------------------------------------------------
-   THE CLOSE-ALL CONTROL — one per STRIP, not per tab, added 2026-09-16 for
-   the app's "close all tabs" ask. This is the concrete call site the file's
-   own closing note asked for: "nothing is logged as owed until a call site
-   names the control it wants" — a trailing "+" was the example that note
-   gave; this is the same shape of ask, a control that WEARS the strip
-   without being a crumb, and it is shipped as a real element rather than as
-   exported tab classes for exactly the reason that note argues.
-
-   IT IS NOT A TAB. It carries no `FolderShape`, no paper, no label — a
-   member of the SET is a place you can visit; this acts on the set itself,
-   the same distinction `onClose`'s own doc draws between a trail and a set
-   of peers. So it is drawn like `TAB_CLOSE` — the kit's other "acts on the
-   strip" control — rather than like `TAB`/`TAB_REST`.
-
-   IN FLOW, NOT ABSOLUTE, AND THAT IS THE ONE GEOMETRY DIFFERENCE FROM
-   `TAB_CLOSE`. A per-tab × is laid OVER its own tab because the tab's label
-   already owns that box; this control owns no box of its own to sit over, so
-   it is the strip's last flex child instead — sized to `--folder-lip` (the
-   same band a close button centres inside) and pulled up by
-   `--folder-tab-overlap`, the identical two numbers `TAB_CLOSE`'s own
-   comment measures, read as a margin instead of a `top`/`absolute` pair
-   because there is no ancestor tab to be absolute WITHIN. */
-const CLOSE_ALL_WRAP = cn(
-  "flex h-[var(--folder-lip)] shrink-0 items-center justify-center",
-  "mb-[var(--folder-tab-overlap)]",
-);
-
-const CLOSE_ALL = cn(
-  "inline-grid size-[var(--control-height-pill)] place-content-center",
-  "cursor-pointer appearance-none rounded-pill border-0 bg-transparent",
-  "text-ink-tertiary hover:bg-accent hover:text-foreground",
-  "transition-colors duration-[var(--duration-colour)] ease-kwapso",
-);
+   THE CLOSE-ALL CONTROL — RETIRED 17 Sep 2026, CLIENT RULING, VERBATIM: "I
+   don't know what it is (this X button that you added in the tabs in the
+   main content that closes everything), but no one asked you, so delete
+   it." Shipped 2026-09-16 for the app's own "close all tabs" ask, one day
+   before this ruling killed it outright — `onCloseAll`, `closeAllLabel`,
+   `CLOSE_ALL_WRAP`, `CLOSE_ALL` and the trailing `<li>` they drew are all
+   gone, not deprecated: there is no dead body left around for a future
+   session to trip on, the same standard this file's own header holds every
+   other retirement to. THE APP'S OWN WIRING (`closeAllTabs` in
+   `app-shell.tsx`/`workspace-tabs.ts`) IS ANOTHER LANE'S — this file only
+   ever owed it the prop, and removing the prop is what makes that call site
+   fail to compile until that lane removes its own side of it; that failure
+   is the correct, loud signal, not a bug in this change. */
 
 /* ----------------------------------------------------------------------------
    The silhouette behind one tab.
@@ -736,8 +877,26 @@ const CLOSE_ALL = cn(
    header), so every tab, leading or not, is now this one element and nothing
    more. `data-slot="breadcrumb-folder-square"` no longer exists anywhere in
    this file; a harness that still queries for it should expect zero.
-   -------------------------------------------------------------------------- */
-function CrumbShape({ fill }: { fill: string }) {
+
+   `hoverFill` — ADDED 17 Sep 2026, THE SAME CLIENT RULING `FILL_REST_HOVER`
+   ARGUES. A SECOND silhouette, not a swap of the first: `--accent` (the wash
+   token, `rgba(…, .05)`, the SAME one `TAB_CLOSE`'s own hover already reads)
+   is designed to be COMPOSITED OVER an opaque layer, not to BE one — the
+   kit's own row-hover idiom is always a translucent wash on a solid base,
+   never a base colour swapped for a translucent one. Filling the WHOLE tab's
+   currentColor with a 5%-alpha token directly, tried first, reads as the tab
+   nearly vanishing against the ground rather than gaining a tint. So this
+   draws the identical `crop="lip"` shape TWICE, stacked in the same box:
+   `fill` (opaque, always) underneath, `hoverFill` (the wash) on top of it,
+   `opacity-0` at rest and `group-hover:opacity-100` — the wash tints the
+   opaque paper beneath it exactly the way `TAB_CLOSE`'s own `hover:bg-accent`
+   tints ITS OWN opaque tab, and does nothing at all when `hoverFill` is
+   omitted (`FILL_LIVE`'s own two call sites never pass it — "the active tab
+   does not change on hover", her words). The opacity transition, not a
+   colour one, because there is nothing to interpolate BETWEEN — one shape is
+   fading in over a second, unmoving one, not one colour turning into
+   another. */
+function CrumbShape({ fill, hoverFill }: { fill: string; hoverFill?: string }) {
   return (
     <span
       aria-hidden="true"
@@ -748,6 +907,20 @@ function CrumbShape({ fill }: { fill: string }) {
       className={cn("pointer-events-none absolute inset-0 -z-10", fill)}
     >
       <FolderShape crop="lip" />
+      {hoverFill ? (
+        <span
+          aria-hidden="true"
+          data-slot="breadcrumb-folder-fill-hover"
+          className={cn(
+            "pointer-events-none absolute inset-0 opacity-0",
+            "transition-opacity duration-[var(--duration-colour)] ease-kwapso",
+            "group-hover:opacity-100",
+            hoverFill,
+          )}
+        >
+          <FolderShape crop="lip" />
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -766,6 +939,31 @@ function CrumbShape({ fill }: { fill: string }) {
  * genuinely narrower slot can say so, and its default is this.
  */
 const FOLD_AFTER = 4;
+
+/**
+ * How far the pointer must travel, in px, before `onTabPointerMove` counts a
+ * gesture as a DRAG rather than a TAP that happens to have jittered a
+ * little. 4px, the same figure browsers themselves use for their own native
+ * drag threshold (`-webkit-user-drag`'s own implementations, and the figure
+ * `dnd`-style libraries converge on independently).
+ *
+ * ADDED 17 Sep 2026, over her report that clicking a tab, its ×, or the
+ * pinned "+" stopped doing anything once `onReorder` shipped. Two bugs, not
+ * one, and this fixes the SECOND. The first — and the one that mattered for
+ * her own report, reproduced with a zero-delta synthetic click — is that
+ * `setPointerCapture` (`onTabPointerDown`) retargets the eventual `click` to
+ * THIS `<li>` rather than the element actually pressed, so even a perfectly
+ * still tap never reached the anchor; `onTabPointerEnd`'s own tap-forward
+ * comment is the fix for that one. This threshold is the belt beside that
+ * braces: a REAL mouse or trackpad rarely lands its `pointerup` on the exact
+ * device pixel its `pointerdown` started on, and this file's own comparison
+ * used to be a bare `!== 0` — so ordinary human input, not only a script,
+ * could still end a plain click flagged as `moved`, install the swallow
+ * guard, and lose the tap-forward that only runs when `!drag.moved`. Anything
+ * up to this many pixels now still counts as a tap; anything past it is a
+ * real drag, exactly as it read before this constant existed.
+ */
+const DRAG_MOVE_THRESHOLD_PX = 4;
 
 /**
  * What the fold keeps beside the head: the parent and the current location.
@@ -928,25 +1126,6 @@ export interface BreadcrumbFoldersProps
    *     same conclusion. See `textTrail`.
    */
   onClose?: (item: BreadcrumbFoldersItem, index: number) => void;
-  /**
-   * Close every tab EXCEPT the live one — Chrome's "Close other tabs",
-   * under whatever verb the caller's own label gives it. A trailing control
-   * at the strip's own end, after the last crumb, drawn only when `onClose`
-   * is also given (this is a tab-SET action, meaningless on a plain trail)
-   * AND there are at least two items — with one tab open the action is a
-   * no-op, and a control that does nothing is worse than an absent one.
-   *
-   * IT NEVER TOUCHES THE LIVE TAB. The set that survives is exactly the one
-   * item this call already marks live (`activeIndex`, or the last item by
-   * the same default) — the control does not ask which crumbs to spare, it
-   * is asked once, structurally, by never being handed the live one.
-   */
-  onCloseAll?: () => void;
-  /**
-   * The close-all control's own accessible name. A prop with a default
-   * because it is announced, and anything announced must be translatable.
-   */
-  closeAllLabel?: string;
   /**
    * The verb in every close control's accessible name. A prop with a default
    * because it is announced, and anything announced must be translatable.
@@ -1170,8 +1349,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       listClassName,
       activeIndex,
       onClose,
-      onCloseAll,
-      closeAllLabel = "Close all tabs",
       closeLabel = "Close",
       formatCloseLabel,
       onCurrentActivate,
@@ -1222,6 +1399,17 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
        the DOM (closed, folded) removes its own entry. */
     const itemRefs = React.useRef<Map<number, HTMLLIElement>>(new Map());
 
+    /* EVERY RENDERED `<li>`'s OWN BASELINE STACK NUMBER, BY `items` INDEX —
+       written fresh on every render (see the `.map` below, right beside the
+       ref callback that populates `itemRefs`) and read back by
+       `releaseTransforms` once a drag ends. It exists because
+       `restZIndex`'s value depends on where a tab sits AMONG THE CURRENTLY
+       RENDERED tabs (`entry`'s position and `rendered.length`), which a
+       `useCallback` closed over once could not see change — a `ref`, read at
+       call time rather than closed over, always answers with the number the
+       MOST RECENT render gave that tab, fold or reorder included. */
+    const zIndexRef = React.useRef<Map<number, number>>(new Map());
+
     /* THE CONTIGUOUS RUN A DRAGGED TAB MAY REORDER WITHIN — walked outward
        from `fromIndex` while the neighbour on each side is itself movable.
        A pinned tab (`closable: false`) stops the walk on that side without
@@ -1271,30 +1459,57 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
          handler). */
       toIndex: number;
       moved: boolean;
+      /* THE ELEMENT THE POINTER ACTUALLY WENT DOWN ON — the anchor, the
+         live tab's button, or the per-tab × — captured at pick-up so a tap
+         that never moved can REPLAY its click there on release. See
+         `onTabPointerEnd`'s own comment for why the browser's own click
+         cannot be trusted to reach it once this `<li>` has captured the
+         pointer. */
+      originTarget: HTMLElement | null;
     } | null>(null);
 
     /* Return every `<li>` this gesture touched — the dragged one and every
        `other` — to its resting transform, with (`animate`) or without
-       (an aborted gesture that never moved) a settle transition. */
+       (an aborted gesture that never moved) a settle transition.
+
+       THE Z-INDEX IS RESTORED, NOT CLEARED — CHANGED 17 Sep 2026 ALONGSIDE
+       `restZIndex`. Clearing `style.zIndex` to `""` used to be enough,
+       because the CSS fallback it fell back to (`TAB_REST`'s class-level
+       `z-0`, on the `<li>`'s inner link — see that constant's own comment)
+       was the SAME number every rest tab shared. It is not any more: each
+       tab's real number now only exists as the inline `style` React wrote at
+       render time (`zIndexRef`, above — Tailwind cannot emit a class for a
+       value it never saw in source). `el.style.zIndex = ""` would have
+       fallen through to `auto` on every tab this gesture touched — the exact
+       "DOM-order tie, no real ranking" shape the whole mechanism above exists
+       to prevent, reintroduced the instant any drag finished. Reading
+       `zIndexRef.current.get(index)` instead puts each `<li>` back at the
+       SAME number the current render gave it, dragged tab included (its
+       `"2"` lift, written by `onTabPointerDown`, is a transient it never
+       owned outside the gesture). */
     const releaseTransforms = React.useCallback((indices: number[], animate: boolean) => {
       for (const index of indices) {
         const el = itemRefs.current.get(index);
         if (!el) continue;
+        const baselineZ = zIndexRef.current.get(index);
+        const restoreZ = () => {
+          el.style.zIndex = baselineZ === undefined ? "" : String(baselineZ);
+        };
         if (animate) {
           el.style.transition = "transform var(--duration-settle) var(--ease-move)";
-          // THE Z-INDEX LIFT OUTLIVES THE TRANSFORM, BY DESIGN — cleared only
-          // once the settle transition has actually finished, not the
-          // instant release fires. Dropping it early would let a `z-0`
-          // sibling it is still sliding past win the tie again for the last
+          // THE Z-INDEX LIFT OUTLIVES THE TRANSFORM, BY DESIGN — restored
+          // only once the settle transition has actually finished, not the
+          // instant release fires. Dropping it early would let a sibling it
+          // is still sliding past win the tie again for the last
           // `--duration-settle` of the animation, which is the "inactive in
           // front" shape one settle-frame late rather than fixed.
           window.setTimeout(() => {
             el.style.transition = "";
-            el.style.zIndex = "";
+            restoreZ();
           }, 260);
         } else {
           el.style.transition = "";
-          el.style.zIndex = "";
+          restoreZ();
         }
         el.style.transform = "";
       }
@@ -1324,9 +1539,16 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         let runStart = 0;
         let runEnd = 0;
         let previousRight: number | null = null;
-        let gap = 4; // `--space-1` at the kit's own 16px authoring base; a
-        // measured sample below replaces this the moment there are two
-        // adjacent tabs in the run to measure it from.
+        // `--folder-shoulder`'s own NEGATIVE run at the kit's own 16px
+        // authoring base — tabs OVERLAP at rest now (`TAB_OVERLAP_MARGIN`,
+        // above `STRIP`), so the "gap" between two adjacent boxes is itself
+        // negative. This literal is never actually read: the measured
+        // sample below replaces it the moment there are two adjacent tabs in
+        // the run to measure it from, and a lone tab in its run (nothing to
+        // shift) never consults `gap` at all. It is written as the honest
+        // resting value anyway, not the old `+4`, so a reader mid-file is
+        // not misled about which regime this file draws today.
+        let gap = -29.52;
 
         for (let index = min; index <= max; index += 1) {
           const el = itemRefs.current.get(index);
@@ -1372,6 +1594,22 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
           others,
           localSlot: others.filter((other) => other.index < fromIndex).length,
           toIndex: fromIndex,
+          // THE NEAREST REAL CONTROL, NOT `event.target` VERBATIM — every
+          // icon inside a tab (the × Phosphor draws, `CrumbShape`'s own
+          // silhouette) is SVG, and `SVGElement` has no native `.click()`
+          // (that method is `HTMLElement`'s alone; measured, not assumed —
+          // a first cut of this fix stored `event.target` directly behind an
+          // `instanceof HTMLElement` guard, which is FALSE for an
+          // `SVGPathElement`, and silently dropped `originTarget` to `null`
+          // on every tap that happened to land on the × glyph rather than
+          // its button). `.closest("a, button")` walks up from wherever the
+          // pointer actually landed to the one element in a tab that is ever
+          // meant to receive a click — the crumb's own link, the live tab's
+          // button (`onCurrentActivate`), or the × — so a tap on the icon
+          // and a tap on its label forward identically. `null` when neither
+          // exists (a tap on bare padding), which is a correct no-op.
+          originTarget:
+            event.target instanceof Element ? (event.target.closest("a, button") as HTMLElement | null) : null,
           moved: false,
         };
         setCarryingIndex(fromIndex);
@@ -1379,24 +1617,25 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         /* THE SECOND RULING, APPLIED HERE — 16 Sep 2026, same session: "the
            inactive tabs' shape appears in front of the active one … it
            should be behind", the same class of bug the main content strip
-           needed several passes to close (TAB_REST's own `z-0` note, above,
-           tells that history). `TAB_REST`/`TAB_LIVE` already answer it AT
-           REST — every inactive tab is `z-0`, the active one `z-[1]` — but a
-           tab sliding under drag can be ANY tab, active or not, and it now
-           visually crosses siblings it never used to share a pixel with (the
-           strip's own `gap-1` used to keep every rest tab clear of every
-           other). Left at its resting `z-0`, a rest tab being dragged RIGHT
-           over later, still-`z-0` siblings would lose the DOM-order
-           tie-break to them — the exact "inactive in front" shape of the
-           complaint, just triggered by a drag instead of a static layout.
-           `transform` already makes this `<li>` its own stacking context
-           (the file's own `z-0 IS STILL A STACKING CONTEXT` note, restated
-           for a transform rather than a position), so `2` here settles the
-           tie the same way the live tab's own `z-[1]` settles ITS tie
-           against a `z-0` neighbour — with room held below the card's own
-           `z-[2]` (a DOM-order tie there, nav before card, still resolves to
-           the card, so a horizontal drag still never paints over content).
-           Cleared with everything else on release, in `releaseTransforms`.
+           needed several passes to close. A tab sliding under drag can be
+           ANY tab, active or not, and it now visually crosses siblings —
+           which, since 17 Sep 2026, it does AT REST too (`TAB_OVERLAP_MARGIN`
+           puts every tab's box under its predecessor's shoulder on purpose;
+           see `STRIP`'s own note and `restZIndex`'s). Left at its resting
+           number, a rest tab being dragged RIGHT over a LATER, higher-
+           ranked-by-`restZIndex` sibling would lose to it — every rest tab
+           still outranks a later one, so a tab dragged rightward would paint
+           BEHIND something it is visually sliding on top of. `transform`
+           already makes this `<li>` its own stacking context (the file's own
+           "z-index IS STILL A STACKING CONTEXT" note, restated for a
+           transform rather than a position), so `2` here settles that —
+           strictly above the live tab's own flat `1` and every rest tab's
+           fractional value, both always `< 1` — with room held below the
+           card's own `z-[2]` (a DOM-order tie there, nav before card, still
+           resolves to the card, so a horizontal drag still never paints over
+           content). Restored to its OWN `restZIndex` — not cleared — on
+           release, in `releaseTransforms` (see that function's own note for
+           why clearing would have been wrong since 17 Sep 2026).
 
            THIS INLINE `"2"` WAS NOT THE WHOLE FIX — 16 Sep 2026, third
            correction on this exact silhouette, over a screenshot of the
@@ -1405,22 +1644,19 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
            lifts the tab actually held; `onTabPointerMove` below ALSO writes
            a bare `style.transform` onto every OTHER tab a drag moves past —
            active or not — with no accompanying z-index, and a transform
-           alone creates a stacking context. So the live tab, merely
-           SHIFTED (never dragged, never touched here), lost its own
-           `z-[1]` the instant it moved: sealed inside a new, unnumbered
-           context, tied on DOM order against a later, untransformed pinned
-           tab, and losing — "inactive in front", reachable without this
-           tab ever being the one under the pointer. The `<li>`'s own class-
-           level `z-0`/`z-[1]` (this render's own className, above the
-           switch on `live`) is what actually closes it: a number that lives
-           on the class rather than an inline style is never cleared or
-           escaped by the plain `transform` `onTabPointerMove` writes, so
-           the shifted tab stays explicitly ranked through the whole
-           gesture. This `"2"` still matters on top of that — it is what
-           lets the HELD tab beat even the live tab's own `z-[1]` while it
-           is being dragged, which the class-level pair alone would not
-           do (1 vs 1 is a DOM-order tie, and the held tab is not always
-           later in DOM). */
+           alone creates a stacking context. So a tab merely SHIFTED (never
+           dragged, never touched here) would lose its own rank the instant
+           it moved: sealed inside a new, unnumbered context, tied on DOM
+           order against a later, untransformed sibling. The `<li>`'s own
+           per-tab number — an inline `style`, written at render and restored
+           by `releaseTransforms`, not a class — is what actually closes it:
+           a number that lives on the element itself is never touched by the
+           plain `transform` `onTabPointerMove` writes (a different CSS
+           property), so the shifted tab stays explicitly ranked through the
+           whole gesture. This `"2"` still matters on top of that — it is
+           what lets the HELD tab beat even the live tab's own `1` while it
+           is being dragged, which no tab's own resting number, live or rest,
+           would otherwise do (every resting number is `<= 1`). */
         draggedEl.style.zIndex = "2";
       },
       [onReorder, isMovable, movableRange],
@@ -1449,7 +1685,21 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       const rawDeltaX = event.clientX - drag.startClientX;
       const newLeft = Math.min(Math.max(drag.draggedLeft + rawDeltaX, drag.minLeft), drag.maxLeft);
       const deltaX = newLeft - drag.draggedLeft;
-      if (deltaX !== 0) drag.moved = true;
+      // THE THRESHOLD IS ON `rawDeltaX`, NOT THE CLAMPED `deltaX` — a tab
+      // already pinned against the run's own edge (`minLeft`/`maxLeft`)
+      // reads `deltaX === 0` for real, sustained pointer travel in the
+      // direction it cannot go, and thresholding the clamped number would
+      // read that as "never moved" and wrongly replay a click at the end of
+      // a genuine (if fruitless) drag attempt. `DRAG_MOVE_THRESHOLD_PX`
+      // exists for the opposite reason `onTabPointerEnd`'s own tap-forward
+      // does: ordinary human input rarely lands a mouseup at the EXACT pixel
+      // a mousedown started on, so a bare `!== 0` test (this file's own,
+      // before today) flagged nearly every plain click as "moved" and let
+      // the click-guard below swallow it — a second contributor to "after
+      // you implemented the drag tabs, I can no longer click them to open
+      // them", her words, alongside the retargeting bug that guard's own
+      // comment explains.
+      if (Math.abs(rawDeltaX) > DRAG_MOVE_THRESHOLD_PX) drag.moved = true;
 
       const draggedEl = itemRefs.current.get(drag.fromIndex);
       if (draggedEl) draggedEl.style.transform = `translateX(${deltaX}px)`;
@@ -1490,9 +1740,8 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
 
     /* RELEASE (or cancel). Fires `onReorder` at most once, with the FINAL
        slot only — never mid-drag — and only when the slot actually changed;
-       a tap with no movement (`toIndex === fromIndex`) is a correct no-op,
-       which is also what keeps an ordinary click through to the tab's own
-       link working unchanged (see the click guard just below). */
+       a tap with no movement (`toIndex === fromIndex`) is a correct no-op
+       for reordering, and is handled below as the ordinary click it is. */
     const onTabPointerEnd = React.useCallback(
       (event: React.PointerEvent<HTMLLIElement>) => {
         const drag = dragRef.current;
@@ -1513,15 +1762,50 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         const committed = event.type === "pointerup" && drag.toIndex !== drag.fromIndex;
         if (committed) onReorder?.(drag.fromIndex, drag.toIndex);
 
+        /* THE TAP FORWARD — 17 Sep 2026, her report: "after you implemented
+           the drag tabs, I can no longer click them to open them" — every
+           tab, on BOTH strips, its × included, real clicks measured doing
+           nothing (no navigation, no hash change, no console error).
+           MEASURED, not guessed: `setPointerCapture` (`onTabPointerDown`,
+           on pick-up) makes this `<li>` the target of every later pointer
+           event for this gesture AND of the `click` the browser derives from
+           it — not "the click reaches the `<li>` first and bubbles from the
+           anchor", the click's OWN `.target` becomes the `<li>` directly,
+           which is the ancestor of the anchor/button/× a reader actually
+           meant to press, never the element itself or a descendant of it.
+           An event does not re-dispatch itself down into descendants of its
+           own target, so the anchor's native "follow this link" and the
+           button's `onClick` never fire — for a PLAIN TAP exactly as much as
+           for a real drag, since capture is taken on every `pointerdown`
+           this handler ever sees, movement or none. Confirmed against a real
+           Chromium `pointerdown`/`pointerup` pair with no synthetic click
+           dispatched by hand: the browser's own derived `click` lands with
+           `event.target` equal to this `<li>`, never the anchor beneath it.
+
+           So a tap that never became a drag needs its click REPLAYED, at
+           the exact element the pointer went down on (`drag.originTarget`,
+           captured before capture could retarget anything) — `.click()`,
+           called directly on that element, is a fresh dispatch targeted
+           exactly where it is called, not subject to the retargeting above,
+           the same activation the browser's own click would have produced
+           had this `<li>` never captured a pointer at all. Gated on
+           `!drag.moved` (never fires for a real drag — see the swallow
+           guard below, which still exists for a DIFFERENT reason) and on
+           `event.type === "pointerup"` (never for `pointercancel`, an
+           aborted gesture with no activation to replay). */
+        if (event.type === "pointerup" && !drag.moved && drag.originTarget) {
+          drag.originTarget.click();
+        }
+
         /* THE CLICK GUARD. A pointer gesture that actually moved still ends
-           in an ordinary `click` on whatever element was under the pointer
-           at pick-up — the SAME anchor, since capture kept every event
-           addressed to it — and left alone that click re-selects the tab
-           the reader just finished dragging, which reads as the strip
-           fighting the gesture it just drew. Swallowed once, on the
-           dragged element itself, only when the gesture actually moved; a
-           plain tap (`drag.moved` false) never installs this and its click
-           reaches the app's own `onClickCapture` exactly as before. */
+           in the browser's own derived `click`, retargeted to this `<li>`
+           by the SAME mechanism the tap-forward above works around — so, as
+           of today, that click was never going to reach the anchor or
+           re-select anything on its own. This guard is kept anyway, as a
+           second line of defence against any future change that stops
+           relying on capture's retargeting (a `<li>` with its own `onClick`
+           some day, say): swallowed once, on the dragged element itself,
+           only when the gesture actually moved. */
         if (draggedEl && drag.moved) {
           const swallow = (clickEvent: MouseEvent) => {
             clickEvent.preventDefault();
@@ -1860,6 +2144,13 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                the alternatives drawn. */
             "[--kw-crumb-live:var(--surface-raised)]",
             "[--kw-crumb-rest:var(--spine-crumb-rest,var(--surface-panel))]",
+            // THE THIRD PAPER — `FILL_REST_HOVER`'s own comment has the
+            // client ruling and the reasoning; declared here for TAB-C1's
+            // reason, same as the two above: a caller that rebinds
+            // `--accent` around the strip must not be able to make the
+            // hover wash disagree with the accent every other hover in its
+            // own tree already uses.
+            "[--kw-crumb-hover:var(--accent)]",
             className,
             /* LAST, AND CONDITIONAL. Last so a caller's own display utility
                cannot win the gate off this element in tailwind-merge — the
@@ -1873,16 +2164,38 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
           {...props}
         >
           <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
-            {rendered.map((entry) => {
+            {rendered.map((entry, i) => {
+              /* `i` IS THE STRIP'S OWN VISUAL POSITION, LEFT TO RIGHT —
+                 EVERY RENDERED TILE, THE ELISION INCLUDED, NOT `entry.index`
+                 (which skips whatever the fold hid). Two things read it:
+                 `i === 0` is "the first tab in the strip has no earlier
+                 shoulder to sit under", which gates BOTH `TAB_OVERLAP_MARGIN`
+                 (the `<li>`'s own leading pull) and the matching overlap
+                 padding on the tab's inner lip (`TAB_OVERLAP_PS` /
+                 `TAB_ICON_ONLY_OVERLAP_PS`, below) — and `restZIndex(i)` is
+                 this tile's own stacking number, which must be assigned by
+                 where it actually sits, not by its
+                 index into the caller's original array. */
+              const notFirst = i > 0;
               if (entry.kind === "gap") {
                 return (
-                  <BreadcrumbItem key="breadcrumb-folders-gap" className="shrink-0">
+                  <BreadcrumbItem
+                    key="breadcrumb-folders-gap"
+                    className={cn("shrink-0", notFirst && TAB_OVERLAP_MARGIN)}
+                    style={{ zIndex: restZIndex(i) }}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         data-slot="breadcrumb-folders-fold"
-                        className={cn(TAB, TAB_REST)}
+                        style={{ zIndex: restZIndex(i) }}
+                        // `group` HERE, NOT ON AN ANCESTOR — this tile has no
+                        // close button and no sibling to hover independently
+                        // of; the trigger IS the whole hoverable box, so it
+                        // is its own group for `FILL_REST_HOVER`'s
+                        // `group-hover:`.
+                        className={cn(TAB, TAB_REST, "group", notFirst && TAB_OVERLAP_PS)}
                       >
-                        <CrumbShape fill={FILL_REST} />
+                        <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
                         {/* The kit's own elision, reused whole: the glyph is
                             `aria-hidden` and the announced label sits OUTSIDE
                             that wrapper, which is the half of this component
@@ -1931,6 +2244,19 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
               const closable = onClose !== undefined && (item.closable ?? true);
               const movable = isMovable(entry.index);
 
+              /* THIS TAB'S OWN STACK NUMBER — `1`, flat, for the live tab
+                 (unchanged since 2026-09-03); `restZIndex(i)`
+                 for every other one, strictly descending by strip position so
+                 the earlier tab always outranks a later one it now overlaps
+                 on purpose (`TAB_OVERLAP_MARGIN`'s own note, on `STRIP`).
+                 Written into `zIndexRef` HERE, during render, so
+                 `releaseTransforms` can restore exactly this number once a
+                 drag that touched this tab ends — see that function's own
+                 comment for why reading it back matters more than it used
+                 to. */
+              const stackZ = live ? 1 : restZIndex(i);
+              zIndexRef.current.set(entry.index, stackZ);
+
               return (
                 <BreadcrumbItem
                   key={key}
@@ -1977,48 +2303,65 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                         }
                       : undefined
                   }
+                  /* THE SILHOUETTE'S OWN STACKING AUTHORITY LIVES HERE, ON
+                     THE `<li>`, AS AN INLINE STYLE — NOT A CLASS, AND NOT
+                     ONLY ON THE INNER LINK/BUTTON. Client, 16 Sep 2026, over
+                     a screenshot of the compact assistant strip: "the
+                     inactive tabs' shape appears in front of the active one.
+                     That's wrong. It should be behind." — and again, 17 Sep
+                     2026, once the strip's tabs began overlapping ON PURPOSE
+                     (`TAB_OVERLAP_MARGIN`): "The inactives on the assistant
+                     are overlapping, so they're on top of the active tab…
+                     They should be behind." `stackZ`, computed above, is a
+                     real per-tab number now (a flat pair could not rank two
+                     rest tabs against each other; see `restZIndex`'s own
+                     comment), so it cannot be a class — Tailwind only emits
+                     CSS for a class string it can see verbatim in source,
+                     and this value depends on `i` and `rendered.length`,
+                     neither of which exists until render. `style={{ zIndex:
+                     stackZ }}` compares directly against every other tab's
+                     OWN inline zIndex in the strip's own stacking context,
+                     no matter how deep the DOM nesting, PROVIDED nothing
+                     between this `<li>` and that shared context ever becomes
+                     a stacking context itself. Something does:
+                     `onTabPointerMove` writes a bare `style.transform` onto
+                     every tab a drag carries PAST — the active tab included,
+                     whether or not it is the one being dragged — and a
+                     transformed element is a NEW stacking context by itself,
+                     `z-index: auto` or not. That would trap a shifted tab's
+                     own number inside a box the outer context now sees as
+                     one opaque unit tied on DOM order alone against a later
+                     sibling — which is exactly the "inactive in front of
+                     active" defect, reproduced by a drag that never touches
+                     the active tab directly. A `<li>` is a flex item of
+                     `BreadcrumbList`'s own `<ol>` (`STRIP`'s `flex`), so
+                     `z-index` applies to it exactly as if it were `position:
+                     relative` — CSS Flexbox §z-index — with no `position`
+                     needed on this element for that alone. Because the
+                     number lives on THIS element rather than a descendant,
+                     `transform` (a different property) never touches it, so
+                     it stays explicit and numeric on every tab, transformed
+                     or not, dragged or shifted or neither — and because
+                     `releaseTransforms` RESTORES it (rather than clearing
+                     it) once a gesture ends, it survives a drag too. See
+                     that function's own comment, and `onTabPointerDown`'s
+                     inline `style.zIndex = "2"` (the tab actually held,
+                     which still wins over every resting number here — every
+                     one is `<= 1`). */
+                  style={{ zIndex: stackZ }}
                   className={cn(
                     "shrink-0",
-                    // THE SILHOUETTE'S OWN STACKING AUTHORITY LIVES HERE, ON
-                    // THE `<li>` — NOT ONLY ON THE INNER LINK/BUTTON. Client,
-                    // 16 Sep 2026, over a screenshot of the compact assistant
-                    // strip: "the inactive tabs' shape appears in front of
-                    // the active one. That's wrong. It should be behind."
-                    // `TAB_REST`/`TAB_LIVE`'s own `z-0`/`z-[1]` (below, on the
-                    // link) already answer this AT REST WITH NO TRANSFORM
-                    // ANYWHERE IN THE STRIP — that inner z-index escapes this
-                    // `<li>` (which carries no z-index of its own here) and
-                    // compares directly against every other tab's inner
-                    // z-index in the strip's own stacking context, no matter
-                    // how deep the DOM nesting, PROVIDED nothing between the
-                    // link and that shared context ever becomes a stacking
-                    // context itself. Something does: `onTabPointerMove`
-                    // writes a bare `style.transform` onto every tab a drag
-                    // carries PAST — the active tab included, whether or not
-                    // it is the one being dragged — and a transformed element
-                    // is a NEW stacking context by itself, `z-index: auto` or
-                    // not. That traps the shifted tab's inner `z-[1]` inside
-                    // a box the outer context now sees as one opaque unit at
-                    // the "auto" level, tied on DOM order alone against any
-                    // LATER, untransformed rest tab — which is exactly the
-                    // "inactive in front of active" defect, reproduced by a
-                    // drag that never touches the active tab directly. A
-                    // `<li>` is a flex item of `BreadcrumbList`'s own `<ol>`
-                    // (`STRIP`'s `flex`), so `z-index` applies to it exactly
-                    // as if it were `position: relative` — CSS Flexbox §z-
-                    // index — with no `position` needed on this element for
-                    // that alone. Written here as a CLASS (never touched by
-                    // the drag handlers, which only ever write `transform`
-                    // and, on the one currently held, an inline `zIndex`),
-                    // this number cannot be trapped: it stays explicit and
-                    // numeric on every tab, transformed or not, dragged or
-                    // shifted or neither, so the outer comparison is always a
-                    // real 1-vs-0 rather than a DOM-order tie-break in
-                    // disguise. `onTabPointerDown`'s own inline
-                    // `style.zIndex = "2"` on the tab actually held still
-                    // wins over both — see that handler's comment.
-                    live ? "z-[1]" : "z-0",
-                    closable && "group relative",
+                    notFirst && TAB_OVERLAP_MARGIN,
+                    // UNCONDITIONAL SINCE 17 Sep 2026, WAS `closable &&`
+                    // ALONGSIDE `relative` — the silhouette's own hover
+                    // (`FILL_REST_HOVER`, that constant's own comment) needs
+                    // `group-hover:` on every rest tab, closable or not, so
+                    // the marker moved out from behind that gate. `relative`
+                    // stays gated: it exists only to give the close button a
+                    // positioning parent, and a tab with no close button has
+                    // nothing to position.
+                    "group",
+                    closable && "relative",
                     // `touch-action: none` ONLY on a movable tab, and only
                     // because it is one: without it a touch drag along the
                     // strip's own axis is also a scroll gesture the browser
@@ -2058,12 +2401,14 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                            rather than "Assistant"), not to rescue it. */
                         aria-label={currentActivateLabel}
                         onClick={onCurrentActivate}
+                        style={{ zIndex: stackZ }}
                         className={cn(
                           TAB,
                           TAB_LIVE,
                           "cursor-pointer",
                           closable && TAB_CLOSABLE,
                           item.iconOnly && TAB_ICON_ONLY,
+                          notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                         )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
@@ -2071,7 +2416,14 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                       </button>
                     ) : (
                       <BreadcrumbPage
-                        className={cn(TAB, TAB_LIVE, closable && TAB_CLOSABLE, item.iconOnly && TAB_ICON_ONLY)}
+                        style={{ zIndex: stackZ }}
+                        className={cn(
+                          TAB,
+                          TAB_LIVE,
+                          closable && TAB_CLOSABLE,
+                          item.iconOnly && TAB_ICON_ONLY,
+                          notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
+                        )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
                         {entry.item.label}
@@ -2087,9 +2439,17 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                        one current location and it is the live tab. */
                     <BreadcrumbPage
                       aria-current={undefined}
-                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary", closable && TAB_CLOSABLE, item.iconOnly && TAB_ICON_ONLY)}
+                      style={{ zIndex: stackZ }}
+                      className={cn(
+                        TAB,
+                        TAB_REST,
+                        "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary",
+                        closable && TAB_CLOSABLE,
+                        item.iconOnly && TAB_ICON_ONLY,
+                        notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
+                      )}
                     >
-                      <CrumbShape fill={FILL_REST} />
+                      <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
                       {entry.item.label}
                     </BreadcrumbPage>
                   ) : (
@@ -2106,11 +2466,13 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                          read-only trail's links keep their ordinary browser
                          behaviour. */
                       draggable={movable ? false : undefined}
+                      style={{ zIndex: stackZ }}
                       className={cn(
                         TAB,
                         TAB_REST,
                         closable && TAB_CLOSABLE,
                         item.iconOnly && TAB_ICON_ONLY,
+                        notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                         /* THE WEIGHT PREVIEW SURVIVES REACHING FOR THE ×.
                            `TAB_REST`'s hover is written on the link, and the
                            close button is laid OVER the link rather than
@@ -2124,7 +2486,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                         closable && "group-hover:font-[var(--font-weight-medium)]",
                       )}
                     >
-                      <CrumbShape fill={FILL_REST} />
+                      <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
                       {entry.item.label}
                     </BreadcrumbLink>
                   )}
@@ -2186,25 +2548,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                 </BreadcrumbItem>
               );
             })}
-            {/* ── CLOSE ALL TABS — see `CLOSE_ALL_WRAP`'s own comment for the
-                geometry and `onCloseAll`'s doc for the gate. `items.length >
-                1` rather than `> 0`: with one tab open, every OTHER tab is
-                the empty set, and a control that closes nothing is a control
-                that does nothing — the same "no-op is worse than absent"
-                call `onClose`'s own per-item `closable` makes. */}
-            {onClose && onCloseAll && items.length > 1 ? (
-              <li className={cn(CLOSE_ALL_WRAP, "shrink-0")}>
-                <button
-                  type="button"
-                  data-slot="breadcrumb-folders-close-all"
-                  aria-label={closeAllLabel}
-                  onClick={onCloseAll}
-                  className={CLOSE_ALL}
-                >
-                  <XSquare size={16} aria-hidden="true" />
-                </button>
-              </li>
-            ) : null}
           </BreadcrumbList>
         </Breadcrumb>
       </>

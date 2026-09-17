@@ -24,29 +24,54 @@
    what was never saved). This file holds no copy of either word; see PROPS.
 
    WHAT THIS FILE DOES NOT DECIDE, ON PURPOSE
-   · POSITION. `position: sticky` is the pin's own decision app-side (R63,
-     `shared/web/pinned-chrome.ts`, `PINNED_TOOLBAR`) — the same seam the
-     kit's `ToolbarRow` is wrapped in at every one of its own pinned call
-     sites, never sticky by itself. This component draws the flag and the two
-     acts on one row and nothing about where that row sits; the call site
-     wraps it in `<div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>`
-     exactly as it already wraps `ToolbarRow`, which is also how the rounded
-     top corners the client asked for a second time ("when pin, I still want
-     it round") arrive here for free — they are the wrapper's `::before`, not
-     a radius this file draws.
-   · GROUND, NARROWED 2026-09-15. Used to be `ToolbarRow`'s own `ground`
-     prop, matching this row's own fill to whatever paper it stood on —
-     `bare` painted nothing so `PINNED_TOOLBAR`'s wrapper could paint the
-     container's own tone straight through. That was the bug the client
-     rang in about (see "AN ACCENT DOES BECOME A BACKGROUND" below): a row
-     whose whole job is being visible cannot also be the same colour as its
-     container. So `ground` no longer picks a fill — every value now paints
-     the identical `--warning` wash, which is the fix, because a translucent
-     accent reads as distinct against ANY backdrop without being told which
-     one it is (see "MEASURED"). What `ground` still decides is the one
-     thing that genuinely differs by context: which corners round (see
-     "RADIUS" below) — `bare` rides `PINNED_TOOLBAR`'s own corner
-     engineering, `page`/`panel` stand alone and round on their own.
+   · POSITION — REVERSED FOR `ground="bare"` ONLY, 2026-09-17. Used to be the
+     pin's own decision app-side (R63, `shared/web/pinned-chrome.ts`,
+     `PINNED_TOOLBAR`), unconditionally: this component drew the flag and the
+     two acts on one row and nothing about where that row sat. Client, on the
+     shipped bar, verbatim: *"The 'You haven't saved changes' needs to be
+     floating and visible at all times, directly under the tabs, even if I'm
+     very down in the scroll."* "Even if I'm very down in the scroll" is a
+     requirement on THIS row, not on whatever wraps it — a caller could
+     already stick `PINNED_TOOLBAR` to the viewport, but this bar lives
+     inside a SCROLLING panel (Settings › Appearance, Settings › Team ›
+     Roles), and a sticky ancestor does not make a static descendant sticky
+     with it. So `ground="bare"` — "the `bare` ground used under a tab
+     strip", the one real shape both call sites render — now carries its own
+     `position: sticky` (see the cva block); `page`/`panel` do not, because
+     neither is the shape a tab strip sits under and neither has a scroll
+     ancestor this row is meant to survive. `PINNED_TOOLBAR`'s own corner
+     engineering is UNCHANGED and still supplies the rounded top corners "when
+     pin, I still want it round" asked for — this reversal is about `top`,
+     not about the wrapper going away.
+   · THE STICKY OFFSET IS TWO APP-SUPPLIED NUMBERS, NEVER ONE WRITTEN HERE.
+     `top: calc(var(--pinned-chrome-h, 0px) + var(--tab-strip-h, 0px))` —
+     `--pinned-chrome-h` is whatever fixed/sticky chrome already sits above
+     this row at the viewport (a page header, a global toolbar; 0 when there
+     is none), and `--tab-strip-h` is the tabs this bar is meant to sit
+     "directly under" ("directly under the tabs", her own words) — the
+     Settings navigation's own tab row, whatever it measures at the app's own
+     type scale. Neither number is this file's to know: R28's boundary means
+     this file never reads the app's layout constants, so both arrive as CSS
+     custom properties with a `0px` fallback each, the same idiom
+     `--pinned-chrome-h` already uses on its own. A call site that sets
+     neither gets a bar stuck at `top: 0`, which is still correct the day
+     there is no chrome above it at all.
+   · GROUND, NARROWED 2026-09-15, AND NOW ALSO POSITION. Used to be
+     `ToolbarRow`'s own `ground` prop, matching this row's own fill to
+     whatever paper it stood on — `bare` painted nothing so `PINNED_TOOLBAR`'s
+     wrapper could paint the container's own tone straight through. That was
+     the bug the client rang in about (see "AN ACCENT DOES BECOME A
+     BACKGROUND" below): a row whose whole job is being visible cannot also
+     be the same colour as its container. So `ground` no longer picks a fill
+     — every value now paints the identical `--warning` wash, which is the
+     fix, because a translucent accent reads as distinct against ANY backdrop
+     without being told which one it is (see "MEASURED"). What `ground`
+     decides now: which corners round (see "RADIUS" below) — `bare` rides
+     `PINNED_TOOLBAR`'s own corner engineering, `page`/`panel` stand alone
+     and round on their own — AND, as of today, whether the row is sticky at
+     all, for the identical reason the two were already paired: `bare` is the
+     shape standing under a tab strip and pinned to a scrolling panel; the
+     other two are not.
    · COPY. Not one string lives in this file. `message`, `saveLabel`,
      `discardLabel` and `savingLabel` are all props — R28's own boundary
      (`resolveImport` in the consuming app refuses every specifier under
@@ -147,6 +172,18 @@
    action group wears `shrink-0` — one flex row, no breakpoint, no second
    layout to maintain.
 
+   THE MESSAGE STEPS UP ONE RUNG, 2026-09-17. Client, on the shipped bar:
+   *"I'm not sure of the size of this typography. Make sure that this is in
+   the kit because it looks too small."* It already was a kit step
+   (`text-caption`, `--text-caption`, 13/300) — never a raw px — so "make
+   sure it's in the kit" is answered by moving it to the NEXT rung on the
+   same ladder `Text`'s own `size` variant states (`components/typography/
+   typography.tsx`: `caption` 13 -> `sm` 14 -> `base` 16), not by inventing a
+   fourth. `text-sm` (`--text-sm`, 14/300) is that next rung — one step, not
+   two: `base` is `Text`'s own reading size and a full three points up, which
+   is more than "too small" asked for. The dot, the buttons and the row's own
+   padding are unchanged; only the sentence's own step moved.
+
    RENDERING CONTEXT
    No `"use client"`. This module holds no state and calls no hook; every
    click it draws calls back to the props it was handed.
@@ -161,7 +198,9 @@ import { Button } from "../button/button";
 /* CLIENT RULING, 2026-09-15 — see the header, "AN ACCENT DOES BECOME A
    BACKGROUND HERE". This row now paints its own warning wash unconditionally
    instead of matching whatever paper it stands on, so `ground` decides only
-   the corner radius below — see "RADIUS" in the header. */
+   the corner radius below — see "RADIUS" in the header. AS OF 2026-09-17,
+   `ground` ALSO decides stickiness — see "POSITION" in the header and the
+   `bare` variant's own comment below. */
 const unsavedChangesBarVariants = cva(
   [
     "flex min-w-0 flex-nowrap items-center justify-between gap-3",
@@ -198,8 +237,24 @@ const unsavedChangesBarVariants = cva(
          * second, now-redundant way at the wrapper's own border box, which
          * is harmless — two coincident radii on the same corner draw as
          * one — but the bottom pair no longer stays square waiting on a
-         * distinction the client never asked for. */
-        bare: "rounded-[var(--radius)]",
+         * distinction the client never asked for.
+         *
+         * STICKY, 2026-09-17 — see the header, "POSITION — REVERSED FOR
+         * `ground="bare"` ONLY". Client: "needs to be floating and visible
+         * at all times, directly under the tabs, even if I'm very down in
+         * the scroll." `sticky` plus `top`, at the app's own two offsets
+         * (`--pinned-chrome-h` for whatever fixed chrome sits above the
+         * scroll container, `--tab-strip-h` for the tab row this bar sits
+         * "directly under"), each falling back to `0px` so a call site that
+         * sets neither still renders correctly pinned to the very top.
+         * `z-20`: comfortably above this row's own scroll container's
+         * ordinary content in ITS OWN local stacking context — the app's
+         * `PINNED_TOOLBAR` wrapper must not open a stacking context of its
+         * own between this row and the content it is meant to cover, or a
+         * higher z-index here would not help (the same class of bug
+         * `screen-shell.tsx`'s own top-bar comment measures, "a control you
+         * can see and cannot press"). */
+        bare: "sticky top-[calc(var(--pinned-chrome-h,0px)_+_var(--tab-strip-h,0px))] z-20 rounded-[var(--radius)]",
         /** Standing directly on off-beige, un-pinned — the day a caller
          * mounts this bar without `PINNED_TOOLBAR`. An ordinary box, all four
          * corners: `rounded-[var(--radius)]`. */
@@ -301,7 +356,7 @@ const UnsavedChangesBar = React.forwardRef<HTMLDivElement, UnsavedChangesBarProp
         className={cn(unsavedChangesBarVariants({ ground }), className)}
         {...props}
       >
-        <span className="flex min-w-0 items-center gap-2 text-caption text-ink-secondary">
+        <span className="flex min-w-0 items-center gap-2 text-sm text-ink-secondary">
           {/* The dot carries no meaning alone (the kit's own law, Alert's
               header) — the sentence beside it already says what changed, so
               the mark is `aria-hidden` and purely visual. Warning, not

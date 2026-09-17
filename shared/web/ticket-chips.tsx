@@ -3,15 +3,12 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { formatDate } from "@shared/web/format"
-import { useLanguage } from "@shared/web/language"
 import { RecordRef } from "@shared/web/record-ref"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
-/** THE CHIP LINE — four facts and nothing else: the number, the type, the
- * app, the date. (One surface draws the fourth of them under the title
- * instead of in the row, and says so with `omitDate`; the row is still these
- * four facts and no fifth.)
+/** THE CHIP LINE — three facts and nothing else: the number, the type, the
+ * app. (It carried a fourth, the date, from 2026-09-06 to 17 Sep 2026 — see
+ * "THE DATE CHIP IS RETIRED" below for where it went.)
  *
  * MOVED HERE FROM `web/components/tickets/tickets-collection.tsx` (where it was
  * `TriageChips`), 2026-09-06, BECAUSE THE CLIENT ASKED FOR IT TWICE IN ONE
@@ -22,7 +19,7 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * line; the fix is not a second implementation that happens to match it, it
  * is deleting the question of whether two ticket screens agree by making
  * agreement structural — one component, every ticket surface that shows
- * these four facts imports it.
+ * these facts imports it.
  *
  * ── WHAT THE CLIENT MOVED, AND WHY IT IS A RULE RATHER THAN A TIDY-UP ───────
  * (held over verbatim from the triage card, because the ruling did not
@@ -38,8 +35,8 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  *
  * THE CUT IS NOT ARBITRARY AND IT IS WORTH NAMING, because it is the thing
  * that keeps this line from growing back. What sits here are the ticket's own
- * FACTS — its number, its kind, its age — none of which is a record you could
- * go and open. What goes below is every RECORD the ticket points at, all of
+ * FACTS — its number and its kind — none of which is a record you could go
+ * and open. What goes below is every RECORD the ticket points at, all of
  * them navigable. A chip is a fact; a link is a record. Once that is the
  * rule, "should the app be a chip?" has an answer instead of a preference —
  * except the app is the one record that gets BOTH treatments at once (see
@@ -60,61 +57,33 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * THE APP IS BACK IN THE CHIPS, WITHOUT ITS LOGO — client, 2026-09-06: "bring
  * the app back in the chips at the top, without the icon". It is a FACT about
  * the ticket in the same breath as its number and its type, which is how she
- * reads a ticket. No logo: the row is four chips scanned at speed and a
- * picture in the middle of them is a third kind of mark competing with the
- * type's dot.
+ * reads a ticket. No logo: the row is chips scanned at speed and a picture in
+ * the middle of them is a third kind of mark competing with the type's glyph.
  *
  * STILL A LINK, because navigating to the app was the whole reason she asked
  * for these to be clickable in the first place. `Badge` takes no `asChild`,
  * so the anchor wraps the badge rather than the badge becoming one — which
  * also keeps the black `#ref` chip the only inverse lozenge in the row.
  *
- * THE DATE CHIP CARRIES WHAT AN OLDER LAYOUT SAID UNDER THE DESCRIPTION, word
- * for word — "raised 10 June 2025", the client's own phrasing — and keeps
- * `tabular-nums`, which is what "monospaced" means everywhere else in this
- * app. A second font family would be a type decision nobody has taken. The
- * word "raised" is not on the chip itself — client: "in the chip do not say
- * raised on date, but only date" — a chip that needs explaining in a scanned
- * row is one word too many, so what it is stays in the accessible name
- * instead, where a reader who cannot see the row's shape still hears which
- * date this is.
+ * ── THE DATE CHIP IS RETIRED, 17 SEP 2026 ───────────────────────────────────
  *
- * ── ONE SURFACE DRAWS THE DATE SOMEWHERE ELSE, AND ASKS FOR IT BY OMISSION ─
- *
- * CLIENT, 2026-09-07, over the Open tab's board: *"lets put the date below
- * title as simole tex"*. A board card is the one ticket surface with a slot
- * UNDER the title — the kit's `KanbanCard.description`, a quiet tertiary-ink
- * caption line — and she wants the date in it rather than as the fourth chip
- * in a row above it. So the board asks for `omitDate` and renders the date
- * itself, one line down.
- *
- * WHY A PROP AND NOT A SECOND CHIP LINE, WHICH IS THE ONLY OTHER SHAPE. This
- * component exists because the client ruled that every ticket surface draws
- * the same face ("everywhere else where tickets have pills, reuse this"), and
- * the failure that ruling forbids is a fifth way of drawing a ticket's number.
- * A board-flavoured copy of this file would have its own `RecordRef`, its own
- * type chip, its own app link and its own null rules, and it would be right on
- * the day it was written and wrong the first time any of the four moved. A
- * boolean that SUBTRACTS one chip cannot drift from the three it leaves
- * standing, because they are still the same three elements.
- *
- * AND WHY THE PROP IS A SUBTRACTION RATHER THAN A POSITION. The tempting
- * shape is `datePlacement: "chip" | "below"` — this component drawing the
- * caption line itself. It cannot: the line does not belong to this component's
- * box on the board at all. It is a slot in the KIT's card, drawn under a title
- * this file never sees, between the chips and whatever `content` the card
- * carries. A `datePlacement` would either have to render outside its own
- * fragment (it cannot) or make the board card's layout this file's business,
- * which is exactly the coupling the `typeDot`/`AppLink` props exist to avoid.
- * The caller owns the placement; this file owns the four facts and is told
- * when one of them has already been said.
- *
- * IT IS THE DATE AND ONLY THE DATE. There is no `omitRef`, no `omitApp` and
- * no `omitType`, and none should be added on the strength of this one: the
- * date is the only fact the client has moved off the chip row, and a general
- * "which chips do you want" prop is the fifth-implementation problem again
- * wearing an options bag. A second surface that wants a second omission is a
- * second client ruling, and it can add its own named boolean then.
+ * The client's ruling, verbatim: "On tickets: Remove the 'Raised On' chip
+ * from the QE view, but also from the detail page in the QE view. Add it
+ * under 'Raised By' as 'Raised On' and put the date and, in brackets, how
+ * many days ago." So the fourth chip — the one this header used to spend six
+ * paragraphs defending, including an `omitDate` prop for the one surface that
+ * drew it elsewhere — is gone from every caller: the list row, the board
+ * card, the type picker's own surfaces, and this component's own signature,
+ * which no longer takes a date at all. The FACT moved rather than
+ * disappeared: it is a "Raised on" line beside "Raised by" in the ticket
+ * detail's own Overview facts (`help-detail.tsx`'s `overviewItems`), reading
+ * the date and the day count together — `formatDate` plus a whole-day count,
+ * one translated sentence with two holes so a translator can reorder them
+ * (`{date} ({count} days ago)`, `shared/i18n-seed.ts`). `omitDate` is gone
+ * with it: the board's own caption line under a card's title (`KanbanCard
+ * .description`, "raised {date}") is untouched — that line was never the
+ * chip this ruling names, and the argument the OLD header made for keeping
+ * it a subtraction rather than a position never applied to it either.
  *
  * ── WHY THE PAPER IS NEVER NAMED HERE (dependency injection, not an
  *    oversight) ──────────────────────────────────────────────────────────
@@ -131,9 +100,9 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * time either surface's paper changes on its own schedule. Each call site
  * rebinds the property on ITS OWN wrapper, over the exact same span this
  * component renders into — a fill is data about the screen, not about the
- * four facts.
+ * facts above.
  *
- * ── WHY `Swatch`, `ticketTypeColour` AND `InAppLink` ARE PROPS, NOT IMPORTS ─
+ * ── WHY THE TYPE GLYPH AND `InAppLink` ARE PROPS, NOT IMPORTS ───────────────
  *
  * `shared/web/` is read by BOTH front doors (`web/` and `web-portal/`), and
  * nothing in this directory imports an app-side `@/...` module — the
@@ -143,15 +112,23 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * `web/components/records/activity-panel.tsx` directly: `@/` resolves to two different
  * folders depending on which door is compiling. (That particular prop is gone —
  * it existed for the Activity tabs the client killed on 2026-09-06 — but the
- * REASON it had that shape is the reason these three are props, and it is the
+ * REASON it had that shape is the reason these two are props, and it is the
  * clearest worked example of it in the codebase.)
- * `Swatch` (the type's coloured dot), `ticketTypeColour` (the map from a
- * type's name to that colour) and `InAppLink` (the only legal way to write a
- * link inside the app, R37) all live under `web/` today, so a caller hands in
- * the DOT already drawn (`typeDot`) and the anchor COMPONENT itself
- * (`AppLink`) rather than this file reaching for any of the three. Nothing
- * here assumes which door is asking — a portal ticket surface, should one
- * ever draw these same four facts, hands in its own dot and its own link
+ * `typeDot` USED TO BE A COLOURED DOT (`Swatch` + `ticketTypeColour`, both
+ * `web/`-only) AND ISN'T ANY MORE — the client's 17 Sep 2026 ruling retired
+ * ticket type's colour ("the one that gets the chip with the color is always
+ * the status … for tickets, we need to find icons for the ticket type"), so
+ * every caller now hands in an icon element (`ticketTypeIconName` +
+ * `iconComponent()`, @shared/ticket-types, the same seam `storyTypeChip`
+ * already resolves through). The PROP KEPT ITS NAME rather than forcing a
+ * rename across every call site for a shape that is still exactly "the
+ * glyph already drawn, handed in as a node" — this file never inspects what
+ * `typeDot` actually is, so a dot and an icon are the identical contract
+ * from here. `InAppLink` (the only legal way to write a link inside the app,
+ * R37) lives under `web/` today, so a caller hands in the anchor COMPONENT
+ * itself (`AppLink`) rather than this file importing it. Nothing here
+ * assumes which door is asking — a portal ticket surface, should one ever
+ * draw these same four facts, hands in its own glyph and its own link
  * component and gets the identical chip line for free. */
 /** WHAT A TICKET IS CALLED — ONE FUNCTION, EVERYWHERE, AND THAT IS THE POINT.
  *
@@ -239,16 +216,25 @@ export interface TicketChipFacts {
   helpType: string | null
   appId: string | null
   appName: string | null
+  /** NO LONGER READ BY `TicketChips` ITSELF (the date chip retired 17 Sep
+   * 2026, see the header) — kept on this shape because callers still need
+   * it: the board card's own caption line ("raised {date}") and the ticket
+   * detail's new "Raised on" fact both read a ticket's `createdAt` straight,
+   * outside this component. */
   createdAt: string
 }
 
 export function TicketChips({
   ticket,
-  /** The coloured dot already drawn for this ticket's type — the same
-   * `<Swatch colour={ticketTypeColour(...)} />` element the type picker and
-   * every other ticket surface draws, so the colour a person clicks and the
-   * colour they read back afterwards are one object, never two maps that
-   * happen to agree today. `undefined` draws the type chip with no dot. */
+  /** The glyph already drawn for this ticket's type — an icon element
+   * (`ticketTypeIconName` + `iconComponent()`, @shared/ticket-types) since
+   * the client's 17 Sep 2026 ruling retired ticket type's colour; the same
+   * element the type picker and every other ticket surface draws, so the
+   * icon a person clicks and the icon they read back afterwards are one
+   * object, never two maps that happen to agree today. Kept the name
+   * `typeDot` (see this file's header) — this component never inspects the
+   * node, so a caller handing in the old `<Swatch colour={…} />` still works
+   * exactly as before. `undefined` draws the type chip with no glyph. */
   typeDot,
   /** Where the app chip's `AppLink` should point — built by the caller
    * (`/t/<teamId>/apps/<appId>`), because this component knows nothing about
@@ -259,21 +245,14 @@ export function TicketChips({
    * on the agency side today. See the header comment for why this is a prop
    * and not an import. */
   AppLink,
-  /** THE DATE HAS ALREADY BEEN SAID, one line down, by the caller. The Open
-   * tab's board card is the only surface that passes this today — see the
-   * header for the ruling and for why the prop subtracts a chip rather than
-   * moving one. A caller that sets this and then draws no date anywhere has
-   * silently dropped a fact; the flag is a statement that it is drawn
-   * elsewhere, not permission to lose it. */
-  omitDate = false,
 }: {
   ticket: TicketChipFacts
   typeDot?: React.ReactNode
   appHref?: string
   AppLink: React.ComponentType<{ href: string; className?: string; children: React.ReactNode }>
-  omitDate?: boolean
 }) {
-  const { t, lang } = useLanguage()
+  // THE DATE CHIP IS RETIRED (17 Sep 2026) — see the header. This component
+  // no longer formats a date at all, so `useLanguage()` is gone with it.
   // THE URL SEAM, EVEN THOUGH EVERY CALLER BUILDS THIS FROM A TEAM ID AND A
   // ROW ID. `web/test/rich-text.test.ts`'s URL census reads every `href=`
   // JSX attribute off disk and demands a literal, a `safeHref`/`safeSrc` call,
@@ -298,7 +277,7 @@ export function TicketChips({
       <Badge variant="secondary" size="pill">
         {typeDot}
         {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. An
-            absent chip here would leave a hole where the other three chips
+            absent chip here would leave a hole where the other chips
             have a fact. */}
         {ticket.helpType ?? "—"}
       </Badge>
@@ -327,21 +306,6 @@ export function TicketChips({
             {ticket.appName}
           </Badge>
         </AppLink>
-      )}
-      {/* THE FOURTH CHIP, unless the caller has already said this fact under
-          the title — see `omitDate` and the header's ruling. Guarded here
-          rather than at the three call sites that still want it, so the chip
-          and its accessible name stay one object: a surface that opted out
-          cannot end up with the lozenge gone and the label still spoken. */}
-      {!omitDate && (
-        <Badge
-          variant="secondary"
-          size="pill"
-          className="tabular-nums"
-          aria-label={t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
-        >
-          {formatDate(ticket.createdAt, lang)}
-        </Badge>
       )}
     </span>
   )

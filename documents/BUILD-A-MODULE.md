@@ -1153,6 +1153,18 @@ again, which is the only property that matters here.
   computed `variant` that could resolve to mango needs a real, reasoned line
   in `MANGO_OUTSIDE_TITLE_OK` (`shared/rules/registry.ts`), keyed by file and
   enclosing function.
+- **R85 `rail-labels-one-word`** — if your module gets a rail destination (a
+  `NAV` entry with a real `group`, or a `TEAM_SECTIONS` row with
+  `placement: "sidebar"`, in `web/lib/pages.ts`), its English title is exactly
+  one word: no space, no hyphen. A destination that genuinely cannot be said
+  in one word is named in `RAIL_LABEL_WORDS_OK` (`shared/rules/registry.ts`)
+  with the real reason.
+- **R86 `status-owns-the-chip`** — a list row, a board card or your module's
+  own record head may colour exactly ONE categorical field: its STATUS
+  (`shared/status-tones.ts`/`shared/app-stages.ts`). Every OTHER categorical
+  field on that row (a type, a category) draws an icon or plain text, never a
+  colour — a coloured dot for anything but status needs a real, reasoned line
+  in `COLOURED_CHIP_OK` (`shared/rules/registry.ts`).
 
 **The words** (the ones that catch every new module, every time)
 

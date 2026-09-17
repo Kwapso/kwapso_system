@@ -49,9 +49,10 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, Brain, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree, ClipboardText } from "@shared/ui/foundations/icons"
-// `Waves` is the audit module's mark and the kit's 96 have no glyph of that
-// name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, BookmarkSimple, ChecksRegular, Palette, UserCircle, GitFork, Gear, Tray, Timer, DotsThree, ClipboardText, Plus } from "@shared/ui/foundations/icons"
+// `Waves` draws at REGULAR weight now (client ruling, 17 Sep 2026 — see
+// foundations/icons/ATTRIBUTION.md) — same export, same import, the kit's own
+// Waves.svg simply looks different.
 import { Waves } from "@shared/ui/foundations/icons"
 // THE NAVBAR ITSELF (R45). Was hand-rolled — its own button markup reading the
 // same `--spine-*` tokens the kit's Rail reads, its own group/divider layout,
@@ -119,6 +120,25 @@ import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot, AgentDockTabsSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
+// THE TRAIL LINE (client ruling, 17 Sep 2026) — the active workspace tab's
+// OWN back-history, drawn on the ground with a back/forward arrow at the far
+// left. The kit's own composition (`shared/ui/components/breadcrumbs/
+// trail-line.tsx`) and `ScreenShell`'s own `trail` slot (rendered between the
+// tab strip and the card) landed together — this file supplies the node, the
+// same way it already supplies `breadcrumb`; it does not draw the arrows or
+// the crumbs itself. The four store reads below are the tab/trail wiring
+// this file owns — see the `trail` prop, further down, for where it lands.
+import { TrailLine } from "@shared/ui/components/breadcrumbs/trail-line"
+import {
+  activateTab,
+  back as trailBack,
+  forward as trailForward,
+  jumpTo as trailJumpTo,
+  NEW_TAB_PATH,
+  openNewTab,
+  useActiveTabId,
+  useOpenTabs,
+} from "@/lib/workspace-tabs"
 
 /** A list with at least one thing in it, said in the type.
  *
@@ -141,6 +161,11 @@ function nonEmpty<T>(xs: T[]): xs is NonEmpty<T> {
 // same way `settings` already sat here unused, so `NavItem.icon`'s union
 // stays fully covered rather than needing a cast at the one call site below.
 const NAV_ICONS = { home: House, settings: Gear, kwapso: SealCheck } as const
+// THE CONTENT STRIP'S PINNED "+" — a fragment, deliberately never a real
+// in-app path (`NEW_TAB_PATH`, `/new`, itself). See the item's own long note
+// where it is built, and `agent-tab-strip.tsx`'s identical `NEW_TAB_HREF` for
+// the pattern this mirrors on the assistant's own strip.
+const WORKSPACE_NEW_TAB_HREF = "#workspace-tab:new"
 // The lucide component for each team SIDEBAR page in the rail — the same concept
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
@@ -155,28 +180,39 @@ const NAV_ICONS = { home: House, settings: Gear, kwapso: SealCheck } as const
 // insists every icon is distinct, so a silent fallback cannot ship again.
 const SECTION_ICONS: Record<string, typeof House> = {
   accounts: Briefcase,
-  // The same glyph `CONCEPT_ICON.contacts` ("contact") resolves to everywhere
-  // else it is drawn (the alias chain in shared/web/screen-engine/icon-names.ts
-  // — "contact" → "profile-circle" → AddressBook) — one concept, one icon,
-  // whether the rail draws it as a component or a screen draws it by name.
-  contacts: AddressBook,
+  // The same glyph `CONCEPT_ICON.contacts` resolves to everywhere else it is
+  // drawn (KNOWLEDGE_KIND_ICON.contact, web/components/deep-link/shape.tsx,
+  // among them) — one concept, one icon, whether the rail draws it as a
+  // component or a screen draws it by name. WAS AddressBook — client ruling,
+  // 17 Sep 2026, verbatim, over the whole rail: "For contacts, use the user
+  // circle in the field."
+  contacts: UserCircle,
   // Same glyph CONCEPT_ICON.inputs resolves to — one concept, one icon,
   // whether the rail draws it as a component or a screen draws it by name.
   // NOT `Tray`: Tickets already holds it, and this map's own header rule is
   // one distinct icon per concept.
   inputs: ClipboardText,
   tickets: Tray,
-  // WAS HardDrives — client ruling, 17 Sep 2026, verbatim: "can we change the
-  // icon of the knowledge base? I was thinking a brain." Same glyph
-  // CONCEPT_ICON.knowledge now resolves to ("brain", web/lib/pages.ts).
-  knowledge: Brain,
+  // WAS Brain (itself briefly, 17 Sep 2026, WAS HardDrives before that) — the
+  // client's ruling that put `brain` here stood a few hours before her own
+  // same-day, rail-wide correction: "for knowledge, use bookmark simple in
+  // fill solid." Same glyph CONCEPT_ICON.knowledge now resolves to
+  // ("bookmark-simple", web/lib/pages.ts).
+  knowledge: BookmarkSimple,
   processes: GitFork,
   stories: PuzzlePiece,
   sprints: CalendarDots,
-  // The package a client bought — several sprints arriving together.
+  // The package a client bought — several sprints arriving together. Same
+  // export as always — `Waves.svg` itself moved from fill to regular weight
+  // in the kit, 17 Sep 2026 (foundations/icons/ATTRIBUTION.md).
   waves: Waves,
   apps: AppWindow,
-  tasks: CheckSquare,
+  // WAS CheckSquare — client ruling, 17 Sep 2026, verbatim, over the whole
+  // rail: "For tasks, use the checks in plural in regular." The kit's `Checks`
+  // is already spoken for at fill weight (two unrelated confirm buttons), so
+  // this draws the coexisting regular-weight sibling, `ChecksRegular`
+  // (foundations/icons/ATTRIBUTION.md).
+  tasks: ChecksRegular,
   time: Timer,
   meetings: Chat,
   brand: Palette,
@@ -365,7 +401,6 @@ export function AppShell({
   onNavigate,
   onCloseCrumb,
   onReorderCrumb,
-  onCloseAllTabs,
   activeCrumbIndex,
   activePath,
 }: {
@@ -389,15 +424,6 @@ export function AppShell({
    * has no opinion about what moving a tab means, only about drawing a
    * strip that can be dragged. */
   onReorderCrumb?: (fromIndex: number, toIndex: number) => void
-  /** CLOSE EVERY TAB EXCEPT THE ONE SHE IS ON — Chrome's "close other tabs",
-   * under the client's own name for it ("Close all tabs"). Given only
-   * alongside `onCloseCrumb`, for the same reason: it is a tab-SET action,
-   * meaningless on a plain trail, so an ordinary breadcrumb screen never
-   * grows it. Wired straight to the kit's own `onCloseAll` (`BreadcrumbFolders`,
-   * kit v1.2.92) — the kit itself decides when there is nothing to close (one
-   * tab open) and draws no control at all rather than one that would do
-   * nothing. */
-  onCloseAllTabs?: () => void
   /** WHICH CRUMB IN `breadcrumbs` IS THE TAB BEING LOOKED AT — the kit's own
    * `activeIndex` (`BreadcrumbFoldersProps`, v1.2.59), forwarded untouched.
    * Given only alongside `onCloseCrumb`, for the same reason and never
@@ -563,6 +589,38 @@ export function AppShell({
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
+  // ── THE TRAIL LINE'S OWN DATA — read straight off the store, not threaded
+  // in as a prop. Unlike the workspace TAB SET (`breadcrumbs`/`onCloseCrumb`/
+  // …), which the deep-link host still builds because it alone knows the
+  // screen's own crumbs, the active tab's back-history is a fact the STORE
+  // already holds in full — nothing this file's caller computes — so reading
+  // it here rather than growing `AppShellProps` by five more fields is the
+  // narrower wiring, and it is what "tab/trail wiring only" (this file's own
+  // ownership) means in practice: the tab SET stays the host's to hand over,
+  // the trail LINE is this file's own read.
+  const workspaceTabs = useOpenTabs()
+  const activeWorkspaceTabId = useActiveTabId()
+  const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId)
+  const trailSteps = activeWorkspaceTab?.steps ?? []
+  const trailCursor = activeWorkspaceTab?.cursor ?? 0
+  // BACK/FORWARD/JUMP MOVE THE STORE'S OWN CURSOR AND HAND BACK A PATH TO GO
+  // TO — see `workspace-tabs.ts`'s own doc on `back`/`forward`/`jumpTo` for
+  // the one-shot flag that keeps the resulting navigation from pushing a
+  // fresh step onto the history it just walked. `null` (the boundary, or a
+  // click on the step already active) means nothing to do, not an error.
+  const handleTrailBack = () => {
+    const path = trailBack()
+    if (path) navigate(path)
+  }
+  const handleTrailForward = () => {
+    const path = trailForward()
+    if (path) navigate(path)
+  }
+  const handleTrailJump = (index: number) => {
+    const path = trailJumpTo(index)
+    if (path) navigate(path)
+  }
+
   // ── THE CLOSE AFFORDANCE ON A TAB — NOW THE KIT'S OWN BUTTON ────────────────
   //
   // The client, 2026-09-06: "then we'll need a x icon on the tabs to close
@@ -582,25 +640,90 @@ export function AppShell({
   // (`onCloseCrumb`, wired straight to the kit's `onClose` in the `breadcrumb`
   // slot). Nothing here draws a glyph, sizes a hit region, or intercepts a
   // click for this any more — the kit owns all three now.
-  const crumbItems: BreadcrumbFoldersItem[] = trail.map((crumb, index) => ({
-    // A STABLE KEY, WHICH THE TAB SET NEEDS AND THE TRAIL NEVER DID. Crumbs
-    // used to be keyed by position, and position is stable in a trail because
-    // the trail is rebuilt whole on every address change. A tab set is not: a
-    // close removes one item from the middle and React must move the survivors
-    // rather than relabel them, or the tab under the pointer inherits the
-    // closed one's identity. The address is that identity.
-    key: crumb.closeKey ?? `crumb-${String(index)}`,
-    href: crumb.href,
-    label: crumb.label,
-    // ONLY A CRUMB WITH ITS OWN ADDRESS TO CLOSE MAY BE SHUT. `onClose` on the
-    // strip (below) makes EVERY item closable by default (`closable ?? true`
-    // is the kit's own rule) — so a plain trail crumb with no `closeKey` has
-    // to opt out explicitly, or it would grow a × with nothing for
-    // `onCloseCrumb` to identify it by. Harmless either way when
-    // `onCloseCrumb` itself is absent: the kit ignores `closable` entirely
-    // when it is never given an `onClose` to call.
-    closable: crumb.closeKey !== undefined,
-  }))
+  const crumbItems: BreadcrumbFoldersItem[] = [
+    ...trail.map((crumb, index) => ({
+      // A STABLE KEY, WHICH THE TAB SET NEEDS AND THE TRAIL NEVER DID. Crumbs
+      // used to be keyed by position, and position is stable in a trail because
+      // the trail is rebuilt whole on every address change. A tab set is not: a
+      // close removes one item from the middle and React must move the survivors
+      // rather than relabel them, or the tab under the pointer inherits the
+      // closed one's identity. The address is that identity.
+      key: crumb.closeKey ?? `crumb-${String(index)}`,
+      href: crumb.href,
+      label: crumb.label,
+      // ONLY A CRUMB WITH ITS OWN ADDRESS TO CLOSE MAY BE SHUT. `onClose` on the
+      // strip (below) makes EVERY item closable by default (`closable ?? true`
+      // is the kit's own rule) — so a plain trail crumb with no `closeKey` has
+      // to opt out explicitly, or it would grow a × with nothing for
+      // `onCloseCrumb` to identify it by. Harmless either way when
+      // `onCloseCrumb` itself is absent: the kit ignores `closable` entirely
+      // when it is never given an `onClose` to call.
+      closable: crumb.closeKey !== undefined,
+    })),
+    // THE STRIP'S OWN PINNED "+" — the client's ruling, 17 Sep 2026, over the
+    // content strip growing the same door the assistant strip already has:
+    // "also add the plus tab, like in the assistant. And the same rules as
+    // there." So this mirrors `agent-tab-strip.tsx`'s own trailing item byte
+    // for byte in shape: `iconOnly` (kit v1.2.95 — a text tab's 128px floor
+    // reads as an empty grey block on an icon with no label) and
+    // `closable: false` (the kit's own opt-out — there is no tab here for a
+    // × to shut). Given only in tab-SET mode (`onCloseCrumb`), the identical
+    // guard every other tab-set-only prop on this strip already uses — an
+    // ordinary trail has no "+" because it is not a set of open places.
+    //
+    // ITS `href` IS A FRAGMENT, NEVER `/new` ITSELF — the same reasoning
+    // `agent-tab-strip.tsx`'s own `NEW_TAB_HREF` gives: pressing "+" is not
+    // "follow this link", it is "run `openNewTab`, which may REUSE an
+    // already-open tab instead of navigating this one to a new address" — a
+    // decision the click handler below has to make BEFORE any navigation
+    // happens, which a real `href` handed straight to `softNavigate` cannot
+    // express. `WORKSPACE_NEW_TAB_HREF` is never a real in-app path, so R37's
+    // anchor census (which only judges an href starting with `/`) has nothing
+    // to say about it, exactly as it has nothing to say about the assistant
+    // strip's identical fragment.
+    ...(onCloseCrumb
+      ? [
+          {
+            key: "workspace-new-tab",
+            href: WORKSPACE_NEW_TAB_HREF,
+            label: (
+              <>
+                <Plus aria-hidden className="size-[var(--icon-button)]" />
+                <span className="sr-only">{t("New tab")}</span>
+              </>
+            ),
+            iconOnly: true,
+            closable: false,
+          } satisfies BreadcrumbFoldersItem,
+        ]
+      : []),
+  ]
+
+  // CMD/CTRL-T — THE SAME DOOR AS THE PINNED "+", FROM THE KEYBOARD. The
+  // client's ruling on the content strip growing a "+" named cmd-T in the
+  // very same breath the first design round did ("Unless I press Command and
+  // click... Yes to Chrome navigation"), and Chrome's own binding for "open a
+  // new tab" is exactly this chord. Guarded the same way the pinned "+" item
+  // above is (`onCloseCrumb` — no tab set, nothing to open beside) and against
+  // stealing the letter "t" out of whatever she is actually typing: a text
+  // field, a textarea or a contentEditable (the Notes editor) all own their
+  // own "t" keystroke, and only an ELSE — nothing focused, or focus sitting on
+  // an ordinary button/link/the document body — hands this chord to the tab
+  // set instead.
+  React.useEffect(() => {
+    if (!onCloseCrumb) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== "t" || !(e.metaKey || e.ctrlKey)) return
+      const el = document.activeElement as HTMLElement | null
+      const typing = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)
+      if (typing) return
+      e.preventDefault()
+      openNewTab(t("New tab"))
+      ;(onNavigate ?? softNavigate)(NEW_TAB_PATH)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+  }, [onCloseCrumb, onNavigate, t])
 
   /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
    * one control in the app that names a section rather than a destination, so
@@ -1612,14 +1735,6 @@ export function AppShell({
                  own `onReorderCrumb` prop (see its doc). `undefined` on every
                  ordinary trail, same guard as `onClose`. */
               onReorder={onReorderCrumb}
-              /* THE TRAILING CLOSE-ALL CONTROL — kit v1.2.92's own
-                 `onCloseAll`, given only when `onCloseCrumb` is (a tab set,
-                 never a plain trail). The kit draws it after the last tab
-                 and decides on its own when there is nothing to close (one
-                 tab open); this file's only job is to hand it the callback
-                 and the translated label, same as `closeLabel` above. */
-              onCloseAll={onCloseAllTabs}
-              closeAllLabel={t("Close all tabs")}
               /* NO `foldAfter` ANY MORE. It used to be the only lever this
                  file had for "do not fold a set of open tabs into a `···`
                  menu" — passing the set's own ceiling so nothing could ever
@@ -1640,12 +1755,35 @@ export function AppShell({
                 // on it for a press on the link; the kit's own close button is
                 // a sibling of the link rather than a descendant, so a click on
                 // it never reaches this handler carrying an `<a>` ancestor at
-                // all, and there is nothing left here to special-case.
+                // all. THE ONE THING LEFT TO SPECIAL-CASE is the pinned "+"
+                // below — its fragment href never starts with "/", so it
+                // would otherwise fall straight through the ordinary-path
+                // guard and let the browser append a bare hash to the address
+                // bar instead of opening anything.
                 const a = (e.target as HTMLElement).closest("a")
                 if (!a) return
                 const href = a.getAttribute("href")
+                if (href === WORKSPACE_NEW_TAB_HREF) {
+                  e.preventDefault()
+                  openNewTab(t("New tab"))
+                  ;(onNavigate ?? softNavigate)(NEW_TAB_PATH)
+                  return
+                }
                 if (!href || !href.startsWith("/")) return
                 e.preventDefault()
+                // SWITCHING TABS, NOT NAVIGATING WITHIN ONE — only in tab-SET
+                // mode (`onCloseCrumb` given), and only for a crumb that IS an
+                // open tab (`closeKey` — see `activateTab`'s own doc for why
+                // the strip needs this and an ordinary crumb click does not).
+                // `activateTab` arms the same one-shot suppression `back`/
+                // `forward`/`jumpTo` use, so the `visitTrail` call the
+                // navigation below triggers lands as the address catching up
+                // rather than a step pushed onto whichever tab was active a
+                // moment ago.
+                if (onCloseCrumb) {
+                  const clicked = trail.find((crumb) => crumb.href === href && crumb.closeKey)
+                  if (clicked?.closeKey) activateTab(clicked.closeKey)
+                }
                 ;(onNavigate ?? softNavigate)(href)
               }}
               // MIDDLE-CLICK CLOSES A TAB, which is the gesture the client is
@@ -1678,6 +1816,68 @@ export function AppShell({
            down a rung. A screen with no trail at all is a top-level screen,
            which is the kit's own default and what `|| 1` says out loud. */
         breadcrumbDepth={trail.length || 1}
+        /* THE TRAIL LINE — the active workspace tab's own back-history,
+           handed to the kit's own `trail` slot (`screen-shell.tsx`) as a
+           NODE this file places and does not draw or position itself — see
+           `TrailLine`'s own import above for why. WHERE THE SLOT PUTS IT IS
+           THE KIT'S OWN CALL, not restated here, because it already moved
+           once: the client's first ruling, 17 Sep 2026, put it "in the
+           background, outside the container, on top... on the very far
+           left"; her very next one, same day, corrected it — "I love the
+           direction that we are going, but put the breadcrumbs and the
+           navigation inside the container" — and the kit is moving the slot
+           to the first row INSIDE the card for that reason (v1.2.105). This
+           file's own job is unchanged across both: hand the slot the same
+           four values (`steps`, `cursor`, `onBack`/`onForward`/`onJump`) and
+           let `screen-shell.tsx` decide where they land. A tab with one step
+           (or no active tab at all — Welcome, the first paint)
+           draws nothing: `TrailLine` itself returns two disabled arrows and
+           no crumb at `steps.length <= 1`... but at `steps.length === 0` it
+           still draws both arrows disabled, so this file gates the whole
+           node on there being an active tab with real history, rather than
+           hand `steps={[]}` to a control with nothing to say. `href` is
+           each step's real in-app path — a genuine `<a>`, same as the
+           strip's own crumbs — so `onClickCapture` below intercepts it into
+           the soft-navigation bus (R37) instead of letting the browser
+           reload the shell; the actual cursor move is `onJump`, which (like
+           `onBack`/`onForward`) goes through the store's own
+           `back`/`forward`/`jumpTo` so a step already visited is REVISITED,
+           never re-pushed as a new one (see `workspace-tabs.ts`'s own note
+           on `suppressNextPush`). */
+        trail={
+          trailSteps.length < 2 ? undefined : (
+            <div
+              onClickCapture={(e) => {
+                // Same interception as the tab strip's own `onClickCapture`,
+                // just below: a real anchor keeps middle-click and copy-
+                // address working, and only the plain left click is ours —
+                // the actual navigation happens through `onJump` (bound to
+                // the store's `jumpTo`), this capture's only job is to stop
+                // the browser's own hard navigation.
+                const a = (e.target as HTMLElement).closest("a")
+                if (!a) return
+                const href = a.getAttribute("href")
+                if (!href || !href.startsWith("/")) return
+                e.preventDefault()
+              }}
+            >
+              <TrailLine
+                steps={trailSteps.map((step, index) => ({
+                  label: step.label,
+                  href: step.path,
+                  key: `${String(index)}-${step.path}`,
+                }))}
+                cursor={trailCursor}
+                onBack={handleTrailBack}
+                onForward={handleTrailForward}
+                onJump={handleTrailJump}
+                backLabel={t("Back")}
+                forwardLabel={t("Forward")}
+                label={t("Trail")}
+              />
+            </div>
+          )
+        }
         header={
           /* THE HEADER BAND HOLDS THE RUNNING TIMER, AND ONLY WHEN ONE IS
            * RUNNING. The breadcrumbs used to share this row; they are on the
@@ -1848,17 +2048,19 @@ export function AppShell({
               onClick={() => goToSection(item.path)}
               aria-current={activeNav ? "page" : undefined}
               /* `min-w-0` + a box for the label: this bar is up to six
-                 `flex-1` slots on 375px, so a label like "Knowledge base"
-                 has ~59px and overflows it. The portal's bar carries the
-                 measured numbers for the same defect. */
+                 `flex-1` slots on 375px, so even a short label has ~59px to
+                 work with — and a LOCALIZED one can still run longer than its
+                 English original (R85's rail law, 17 Sep 2026, keeps every
+                 title one English word; a translation is not held to that).
+                 The portal's bar carries the measured numbers for the same
+                 defect. */
               className={`motion-hover flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[var(--radius)] py-1.5 text-badge font-medium ${
                 activeNav ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               <Icon className="size-5 shrink-0" />
-              {/* MOBILE NAV LABELS: Localized names like "Knowledge base" /
-                  "Wissensdatenbank" / "Base de conocimiento" / "Base de coneixement"
-                  exceed the available space (fifth of 375px) and wrap to two lines
+              {/* MOBILE NAV LABELS: a localized name can still exceed the
+                  available space (fifth of 375px) and wrap to two lines
                   without `white-space` control. Titles must equal nav names (L10),
                   so shortening is ruled out. `truncate` (nowrap + ellipsis) keeps
                   one line at every width while preserving the full text for screen

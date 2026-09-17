@@ -47,6 +47,7 @@ import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
+import { NewTabScreen } from "@/components/shell/new-tab-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
@@ -59,14 +60,14 @@ import type { TaskView, StoryView, InputView } from "@/lib/live-resources"
 import { consumeGoGuardSkip, guardNavigate, registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
 import {
-  closeAllTabs,
   closeTab,
   reorderTab,
   setWorkspaceScope,
+  useActiveTabId,
   useOpenTabs,
   tabStripState,
   visitTrail,
-  type OpenTab,
+  type TrailStep,
 } from "@/lib/workspace-tabs"
 import { RememberedScreen, useRemembered } from "@shared/web/remembered"
 import { usePermissions } from "@/lib/perms"
@@ -95,6 +96,11 @@ const ACCOUNT_TAB_TITLE: Record<string, string> = {
   kwapso: "Kwapso",
   invitations: "Invites",
   profile: "Your profile",
+  // THE NEW-TAB SCREEN'S OWN LABEL — "New tab", the exact string
+  // `workspace-tabs.ts`'s `openNewTab` already seeds the tab with, so the
+  // crumb built here (from this table) and the label the tab opened with
+  // never disagree before the first real visit corrects either.
+  new: "New tab",
 }
 
 /** IS THERE ROOM FOR A TAB STRIP — the whole of the workspace tabs' mobile
@@ -489,7 +495,7 @@ export function DeepLinkScreen() {
   // last, which is the page you are on and carries none by design (a crumb for
   // where you already are is not a link). So the current address fills that one
   // in, and the result is the trail expressed as tabs, outermost first.
-  const tabEntries: OpenTab[] = screenCrumbs.map((crumb) => ({
+  const tabEntries: TrailStep[] = screenCrumbs.map((crumb) => ({
     path: crumb.href ?? currentPath,
     label: crumb.label,
   }))
@@ -565,31 +571,43 @@ export function DeepLinkScreen() {
     currentPath,
     roomForTabs
   )
+  // A TAB'S OWN DISPLAYED WORD IS ITS CURRENT STEP NOW, NOT ITSELF — since
+  // 17 Sep 2026 a tab carries its own back-history (`workspace-tabs.ts`'s
+  // `OpenTab.steps`/`cursor`), so the strip shows `steps[cursor]`, never a
+  // flat `.label`/`.path` a tab no longer has.
   const stripCrumbs: Crumb[] = showTabSet
-    ? openTabs.map((tab, index) => ({
-        label: tab.label,
-        // The live tab is the page you are on and carries no href, exactly as
-        // the last crumb of a trail does; every other tab is a real link, so
-        // middle-click and copy-address keep working on a workspace tab the way
-        // they already do on a crumb (R37 — the shell intercepts the plain left
-        // click and nothing else).
-        //
-        // BY ACTIVE, NOT BY POSITION — corrected 8 Sep 2026, and it is the last
-        // line in this file that had not caught up with the paragraph above
-        // `tabStripState`. That paragraph says it exactly: while activating a
-        // tab moved it to the end, "last" and "active" were ONE fact, so asking
-        // `index === openTabs.length - 1` was asking the right question in the
-        // cheaper words. The store stopped re-ordering on the same day the kit
-        // gained `activeIndex`, and this expression kept asking the old one — so
-        // on any tab but the last, the LAST tab lost its href and could not be
-        // clicked, while the tab you were already on kept a link to itself. The
-        // owner reported it as "I cannot click the last tab", which is precisely
-        // what it does. `activeTabIndex` is `tabStripState`'s own answer and is
-        // already in scope three lines up; `showTabSet` is only true when it is
-        // >= 0, so inside this branch it always names a real tab.
-        href: index === activeTabIndex ? undefined : tab.path,
-        closeKey: tab.path,
-      }))
+    ? openTabs.map((tab, index) => {
+        const current = tab.steps[tab.cursor]
+        return {
+          label: current?.label ?? "",
+          // The live tab is the page you are on and carries no href, exactly as
+          // the last crumb of a trail does; every other tab is a real link, so
+          // middle-click and copy-address keep working on a workspace tab the way
+          // they already do on a crumb (R37 — the shell intercepts the plain left
+          // click and nothing else).
+          //
+          // BY ACTIVE, NOT BY POSITION — corrected 8 Sep 2026, and it is the last
+          // line in this file that had not caught up with the paragraph above
+          // `tabStripState`. That paragraph says it exactly: while activating a
+          // tab moved it to the end, "last" and "active" were ONE fact, so asking
+          // `index === openTabs.length - 1` was asking the right question in the
+          // cheaper words. The store stopped re-ordering on the same day the kit
+          // gained `activeIndex`, and this expression kept asking the old one — so
+          // on any tab but the last, the LAST tab lost its href and could not be
+          // clicked, while the tab you were already on kept a link to itself. The
+          // owner reported it as "I cannot click the last tab", which is precisely
+          // what it does. `activeTabIndex` is `tabStripState`'s own answer and is
+          // already in scope three lines up; `showTabSet` is only true when it is
+          // >= 0, so inside this branch it always names a real tab.
+          href: index === activeTabIndex ? undefined : current?.path,
+          // `closeKey` IS THE TAB'S `id` NOW, NOT ITS PATH — since two tabs may
+          // now hold the same path (cmd-click twice on one link, `in-app-
+          // link.tsx`'s `openBeside`), a path can no longer say which tab a ×
+          // means. `closeTab` and `reorderTab` all take an `id` the
+          // same way below.
+          closeKey: tab.id,
+        }
+      })
     : screenCrumbs
   // CLOSING ONE. The store decides where the survivors leave you; this only
   // MOVES when the tab that closed was the one being looked at — closing a
@@ -605,18 +623,23 @@ export function DeepLinkScreen() {
   // nothing on screen. Deferring the whole close-and-land step means Keep
   // editing truly moves nothing: the tab is still there, still active, still
   // showing the same draft.
+  // THE ACTIVE TAB'S `id` — read here (rather than only inside
+  // `app-shell.tsx`'s own trail wiring) because closing, reordering and
+  // "close all" all need to know WHICH tab is the one mounted on screen, and
+  // a path can no longer answer that (two tabs may share one).
+  const activeWorkspaceTabId = useActiveTabId()
   const closeWorkspaceTab = React.useCallback(
-    (path: string) => {
-      if (path !== currentPath) {
-        closeTab(path) // a background tab never navigates — nothing mounted is at risk
+    (id: string) => {
+      if (id !== activeWorkspaceTabId) {
+        closeTab(id) // a background tab never navigates — nothing mounted is at risk
         return
       }
       guardNavigate(() => {
-        const landing = closeTab(path)
+        const landing = closeTab(id)
         go(landing ?? sectionPath)
       })
     },
-    [currentPath, go, sectionPath]
+    [activeWorkspaceTabId, go, sectionPath]
   )
 
   // DRAG A TAB TO A NEW POSITION — client ruling 16 Sep 2026, "go with the
@@ -630,20 +653,11 @@ export function DeepLinkScreen() {
     (fromIndex: number, toIndex: number) => {
       const moving = openTabs[fromIndex]
       if (!moving) return
-      reorderTab(moving.path, toIndex)
+      reorderTab(moving.id, toIndex)
     },
     [openTabs]
   )
 
-  // CLOSE ALL TABS — keeps the tab she is standing on, stays active, nothing
-  // else changes about it. `closeAllTabs` never navigates (see its own doc:
-  // every OTHER open tab is a background tab by construction, and only the
-  // one in front can ever be holding a draft), so this is a plain call with
-  // no `guardNavigate` and no `go` — the same shape `closeWorkspaceTab` takes
-  // for a BACKGROUND close, extended to every tab but this one at once.
-  const closeAllWorkspaceTabs = React.useCallback(() => {
-    closeAllTabs(currentPath)
-  }, [currentPath])
 
   // A CSS selector the agent asked us to ring briefly (the traced control).
   const traceHighlight = useTraceRing({ teamId, onTeam, go })
@@ -762,7 +776,6 @@ export function DeepLinkScreen() {
         breadcrumbs={stripCrumbs}
         onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
         onReorderCrumb={showTabSet ? reorderWorkspaceTab : undefined}
-        onCloseAllTabs={showTabSet ? closeAllWorkspaceTabs : undefined}
         activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
         onNavigate={go}
         activePath={currentPath}
@@ -798,6 +811,7 @@ export function DeepLinkScreen() {
           ))}
         {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
+        {module === "new" && <NewTabScreen />}
         </RememberedScreen>
       </AppShell>
     )
@@ -899,7 +913,6 @@ export function DeepLinkScreen() {
       breadcrumbs={stripCrumbs}
       onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
       onReorderCrumb={showTabSet ? reorderWorkspaceTab : undefined}
-      onCloseAllTabs={showTabSet ? closeAllWorkspaceTabs : undefined}
       activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
       onNavigate={go}
       activePath={currentPath}
@@ -1027,7 +1040,7 @@ export function DeepLinkScreen() {
            the top of a list. `replace`, not `go`, is unchanged — the dead
            address must not stay in the history for Back to return to. */
         onRecordGone={() => {
-          const landing = showTabSet ? closeTab(currentPath) : null
+          const landing = showTabSet && activeWorkspaceTabId ? closeTab(activeWorkspaceTabId) : null
           replace(landing ?? sectionPath)
         }}
       />

@@ -1,14 +1,11 @@
-// THE CARD, NOT THE GENERIC ENGINE'S — locking the six facts the hub's brief
-// asked for (compartment · app · sharing · pieces · sightings · last modified)
-// and the one thing most likely to look broken: a `generatedOnly` source with
-// zero pieces is a CARD, on purpose, and must never read as an error or an
-// empty state.
-//
-// THE EMPTY CASES ARE WHAT THIS TESTS, not the populated one — every column
-// this card reads (`accounts`, `apps`, `sharedWith`, `sightingsCount`) is
-// empty/zero on every row in the base today (DATA-MODEL.md: nothing writes
-// them yet), so a card that only renders correctly with rich data would pass
-// every manual check on staging and be broken on every real row.
+// THE CARD, NOT THE GENERIC ENGINE'S — locking the four facts left on it
+// after the client's 17 Sep 2026 ruling ("I want the cards smaller, so I
+// want to see at least four in one row. Also, the edit button is deleted
+// from the card. It should just be on the detail page."): mark, title, kind,
+// one meta line. Compartment, app, sharing, pieces and sightings — and the
+// inline "Edit filing" pencil that used to write them — moved off the card
+// entirely; `web/test/knowledge-gallery-card.test.tsx` proves the pencil is
+// gone and that the detail page still offers edit.
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -65,234 +62,84 @@ function makeSource(over: Partial<KnowledgeSource>): KnowledgeSource {
 
 const noop = () => {}
 
-describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
-  // THE ONE THING MOST LIKELY TO LOOK BROKEN, per the brief itself: zero
-  // pieces on a `generatedOnly` source is a CARD, findable but never quoted —
-  // not an error, not an empty state, not "Not indexed yet".
-  it("a generated-only source with zero pieces reads as a card, not an error", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ chunkCount: 0, generatedOnly: true })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Found in search — never quoted in an answer.")).toBeTruthy()
-    expect(screen.queryByText("Not indexed yet")).toBeNull()
-  })
-
-  // THE SIBLING CASE this test suite would otherwise miss if it only tested
-  // the generated-only branch: a genuinely unindexed, ordinary source (zero
-  // pieces, NOT generated-only) must say something different — "not yet",
-  // never the card sentence, and never a bare "0 pieces" that reads as a bug.
-  it("a genuinely unindexed source (not generated-only) says so, not the card sentence", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ chunkCount: 0, generatedOnly: false })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Not indexed yet")).toBeTruthy()
-    expect(screen.queryByText(/never quoted in an answer/)).toBeNull()
-  })
-
-  it("a source with real pieces shows the count", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ chunkCount: 12, generatedOnly: false })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("12 pieces")).toBeTruthy()
-  })
-
-  // `accounts` is the new 0073 array; every row on today's base has it empty
-  // (nothing writes it yet), so the card MUST fall back to the singular
-  // `accountId`/`compartment` the door has always written — otherwise every
-  // card in the base would read "filed nowhere" the moment this ships.
-  it("compartment falls back to the singular accountId when accounts[] is empty", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ accounts: [], accountId: "ACC-1" })}
-        accountNames={new Map([["ACC-1", "Bergman S.A."]])}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Bergman S.A.")).toBeTruthy()
-  })
-
-  it("compartment reads the new array once it carries more than one account", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ accounts: ["ACC-1", "ACC-2"], accountId: "ACC-1" })}
-        accountNames={new Map([["ACC-1", "Bergman S.A."], ["ACC-2", "Confia"]])}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("2 accounts")).toBeTruthy()
-  })
-
-  it("a source filed under nothing reads as the agency's own", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ accounts: [], accountId: null })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("The agency")).toBeTruthy()
-  })
-
-  // `apps` has no singular column to fall back to (unlike accounts/compartment)
-  // — an empty array is exactly what today's data is, and it must say so
-  // plainly rather than as a blank or a dash that reads as missing data.
-  it("app reads plainly when nothing has filed it under one", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ apps: [] })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Not filed under an app")).toBeTruthy()
-  })
-
-  // ZERO IS THE TRUE STATE OF EVERY ROW TODAY (nothing writes a sighting
-  // yet), and it is a fact about this BUILD, not about the material — so the
-  // line is not drawn at all, never "0" and never the schema's own word.
-  it("draws no line at all when the count is zero — the true state of every row today", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ sightingsCount: 0 })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.queryByText(/reached us/i)).toBeNull()
-    expect(screen.queryByText(/sighting/i)).toBeNull()
-  })
-
-  it("uses the singular for exactly one person, and never the schema's word for it", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ sightingsCount: 1 })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Reached us through one person")).toBeTruthy()
-    expect(screen.queryByText(/sighting/i)).toBeNull()
-  })
-
-  it("uses the plural once more than one person has brought it in", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ sightingsCount: 3 })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText("Reached us through 3 people")).toBeTruthy()
-  })
-
-  it.each([
-    ["private", "Only me"],
-    ["app", "Only the members on one app"],
-    ["team", "Anyone who can read the knowledge base"],
-  ] as const)("sharing says the same sentence the edit dialog offers for %s", (visibility, expected) => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ visibility })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
-    expect(screen.getByText(expected)).toBeTruthy()
+describe("KnowledgeSourceCard — four facts, mark/title/kind/one meta line", () => {
+  it("shows the title", () => {
+    render(<KnowledgeSourceCard source={makeSource({ title: "Press me" })} onOpen={noop} />)
+    expect(screen.getByText("Press me")).toBeTruthy()
   })
 
   it("a deactivated source still shows and says it is not in use", () => {
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({ active: false, title: "Old contract" })}
-        accountNames={new Map()}
-        onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
-      />
-    )
+    render(<KnowledgeSourceCard source={makeSource({ active: false, title: "Old contract" })} onOpen={noop} />)
     expect(screen.getByText("Old contract (not in use)")).toBeTruthy()
   })
 
-  // THE FIRST THREE ARE EDITABLE — the pencil calls the edit callback and
-  // never the card's own open callback, because the two press targets sit one
-  // inside the other and a click on the smaller one must not also fire the
-  // bigger one underneath it.
-  it("the edit pencil opens filing, not the record, and only when the caller may edit", () => {
-    const onOpen = vi.fn()
-    const onEditFiling = vi.fn()
-    render(
-      <KnowledgeSourceCard
-        source={makeSource({})}
-        accountNames={new Map()}
-        onOpen={onOpen}
-        onEditFiling={onEditFiling}
-        canEdit={true}
-      />
-    )
-    fireEvent.click(screen.getByLabelText("Edit filing"))
-    expect(onEditFiling).toHaveBeenCalledTimes(1)
-    expect(onOpen).not.toHaveBeenCalled()
+  it("shows the kind in the app's own words, not the schema's raw value", () => {
+    render(<KnowledgeSourceCard source={makeSource({ kind: "file" })} onOpen={noop} />)
+    expect(screen.getByText("From a file")).toBeTruthy()
+    expect(screen.queryByText("file")).toBeNull()
   })
 
-  it("without the edit right, no pencil renders at all", () => {
+  it("shows the last-edited meta line when there is a date to show", () => {
     render(
       <KnowledgeSourceCard
-        source={makeSource({})}
-        accountNames={new Map()}
+        source={makeSource({ updatedAt: "2026-09-10T00:00:00.000Z", createdAt: "2026-09-01T00:00:00.000Z" })}
         onOpen={noop}
-        onEditFiling={noop}
-        canEdit={false}
       />
     )
-    expect(screen.queryByLabelText("Edit filing")).toBeNull()
+    expect(screen.getByText(/Last edited/)).toBeTruthy()
   })
 
-  it("the card itself opens the record", () => {
-    const onOpen = vi.fn()
+  it("draws no meta line at all when there is neither an update nor a create date", () => {
+    render(<KnowledgeSourceCard source={makeSource({ updatedAt: null, createdAt: "" as unknown as string })} onOpen={noop} />)
+    expect(screen.queryByText(/Last edited/)).toBeNull()
+  })
+
+  // THE SIX FACTS THE OLD CARD DREW ARE GONE FROM IT — they are still real,
+  // on the record's own Overview tab, but this card no longer says them.
+  it("draws none of the retired facts — compartment, app or sharing", () => {
     render(
       <KnowledgeSourceCard
-        source={makeSource({ title: "Press me" })}
-        accountNames={new Map()}
-        onOpen={onOpen}
-        onEditFiling={noop}
-        canEdit={false}
+        source={makeSource({ accounts: ["ACC-1"], apps: ["APP-1"], visibility: "private" })}
+        onOpen={noop}
       />
     )
+    expect(screen.queryByText(/account/i)).toBeNull()
+    expect(screen.queryByText(/app/i)).toBeNull()
+    expect(screen.queryByText("Only me")).toBeNull()
+  })
+
+  it("draws no pieces or sightings line", () => {
+    render(<KnowledgeSourceCard source={makeSource({ chunkCount: 12, sightingsCount: 3 })} onOpen={noop} />)
+    expect(screen.queryByText(/piece/i)).toBeNull()
+    expect(screen.queryByText(/reached us/i)).toBeNull()
+  })
+
+  it("the card itself opens the record — the whole cell is the one press target", () => {
+    const onOpen = vi.fn()
+    render(<KnowledgeSourceCard source={makeSource({ title: "Press me" })} onOpen={onOpen} />)
     fireEvent.click(screen.getByText("Press me"))
     expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it("Enter/Space on the card also opens the record (the same keyboard path every card in the app offers)", () => {
+    const onOpen = vi.fn()
+    render(<KnowledgeSourceCard source={makeSource({})} onOpen={onOpen} />)
+    fireEvent.keyDown(screen.getByRole("button"), { key: "Enter" })
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  // THE CLIENT'S SECOND SENTENCE, PROVED DIRECTLY ON THE COMPONENT: no pencil,
+  // no "Edit filing" control, nothing with an edit affordance anywhere in the
+  // rendered card — regardless of what the caller passes, because the props
+  // that used to drive it (`onEditFiling`, `canEdit`) no longer exist on this
+  // component at all.
+  it('carries no "Edit filing" control, or any edit control, anywhere in the card', () => {
+    render(<KnowledgeSourceCard source={makeSource({})} onOpen={noop} />)
+    expect(screen.queryByLabelText("Edit filing")).toBeNull()
+    expect(screen.queryByLabelText(/^edit/i)).toBeNull()
+    // THE ONE `role="button"` ON THE CELL IS THE CARD ITSELF (its own
+    // onOpen/onKeyDown handlers, above) — a second one would be a nested
+    // control the card's own click could no longer reach cleanly.
+    expect(screen.queryAllByRole("button")).toHaveLength(1)
   })
 })

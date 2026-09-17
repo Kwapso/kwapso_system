@@ -290,6 +290,61 @@
   padding-top: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
 }
 
+/* ============================================================================
+   A CARD LED BY A HEADING PAYS THE WHOLE --toolbar-lead-gap, NOT THE STRIP'S
+   REMAINDER (R83, generalised 17 Sep 2026 — the other half of this fix is in
+   web/components/deep-link/collection-content.tsx's own knowledge branch).
+   ============================================================================
+   The client, today, verbatim, over the Knowledge base screen: "for some
+   reason, there is too much space on top of the toolbar, way too much. We
+   reduced that already." Knowledge draws no `renderFolderTabs(...)` strip
+   above its `<CollectionCard>` (K36 — its toolbar carries the search now, but
+   the collection itself has no tabs to switch), so nothing above the card
+   ever wears `.pinned-strip` and the rule above never reaches it.
+   `CollectionHeading` (web/components/records/collection-heading.tsx) sat
+   there instead, inside the SAME `flex flex-col gap-6` column as the card — a
+   second, unrelated 24px on top of `CardContent`'s own untouched
+   `p-4`/`lg:p-[var(--space-7)]` leading inset (16px, 32 at `lg`): 40px to
+   56px above the toolbar, measured off the classes, against the 32px every
+   strip-led screen now pays.
+
+   THE SAME MECHANISM, GENERALISED RATHER THAN A SECOND PIXEL. The strip's own
+   rule above reaches a card by DOM ADJACENCY alone
+   (`.pinned-strip + [data-slot="card"]`), never a prop a call site has to
+   remember to pass — so a heading-led card is reached the identical way, off
+   `Headline`'s own `data-slot="headline"` (shared/ui/components/typography/
+   typography.tsx), which every `CollectionHeading` renders whether or not it
+   takes an `action`: with one, the heading is wrapped in a plain row `<div>`
+   (collection-heading.tsx's own `justify-between` branch), so the selector
+   below reaches THAT row too (`:has(> […])`), not only the bare case.
+   UNLIKE A STRIP, a heading pays no trailing gap of its own toward this
+   distance — there is no `--tab-content-gap` it has already spent — so the
+   card here owes the WHOLE `--toolbar-lead-gap`, never the strip's `calc()`
+   remainder; the caller owes the other half, a gapless column between the
+   heading and the card, the identical shape every `renderFolderTabs` call
+   site already stands in. Proved by `web/test/toolbar-lead-gap-card.test.tsx`
+   and `web/test/knowledge-head.test.tsx`.
+
+   CHECKED AGAINST EVERY OTHER `<Headline>`/`CollectionHeading` CALL SITE IN
+   `web/` before this landed (stories, time, processes, settings, home, the
+   record chrome, the toolbar row's own internal title, the kit's empty-state
+   heading): every one of them either leads a STRIP first (settings-screen.tsx,
+   module-settings-screen.tsx, kwapso-screen.tsx, stories-screen.tsx's
+   `folderTabs`), or is never immediately followed by a `[data-slot="card"]`
+   sibling at all (home-screen.tsx's team name, app-detail.tsx's fallback
+   title, time-screen.tsx's `HoursByWeekCard` — a bare `<section>`, never the
+   kit's `Card` — the toolbar row's own `title` prop, which sits INSIDE the
+   pinned box rather than beside the card, and the sr-only headings
+   `members-gallery.tsx`/`roles-matrix.tsx` draw before their own pinned bar).
+   Knowledge is the one call site this rule reaches today. */
+:is([data-slot="headline"], :has(> [data-slot="headline"])) + [data-slot="card"] {
+  --pinned-lead: var(--toolbar-lead-gap);
+}
+
+:is([data-slot="headline"], :has(> [data-slot="headline"])) + [data-slot="card"] > [data-slot="card-content"] {
+  padding-top: var(--toolbar-lead-gap);
+}
+
 /* WHAT IS BEHIND A CONTAINER THAT INSETS A PINNED TOOLBAR (R63, part 4).
    The other half of the corner, and the reason it needs a rule at all.
 

@@ -116,7 +116,7 @@ import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { isVideoLink } from "@shared/media-links"
-import { EMBED_ATTEMPT_CAP, INDEX_REVISIT_LIMIT, numberVar } from "@shared/workers/limits"
+import { EMBED_ATTEMPT_CAP, INDEX_REVISIT_LIMIT, KNOWLEDGE_KIND_FACET_CAP, numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
   optionalDocument,
@@ -1253,6 +1253,40 @@ export async function countSources(
     `SELECT 1 FROM knowledge_sources WHERE ${narrowed.sql.join(" AND ")}`,
     narrowed.params
   )
+}
+
+/** THE KIND-TAB BADGES, IN ONE READ (R16 + the client's 17 Sep 2026 ruling,
+ * "Knowledge page K2 by kind": All, then one tab per source kind).
+ *
+ * A strip of up to seventeen tabs cannot cost seventeen counts: the strip is
+ * on the screen every knowledge visit shows, so sixteen extra bounded scans
+ * per page load is exactly the cost `countTicketFacets` (workers/content/src/
+ * lib/help.ts) was written to avoid for the ticket sub-tab strip. ONE grouped
+ * read, the identical shape one file over — the server's own tally per kind,
+ * over the same WHERE the list uses, minus the `kind` filter itself (a strip
+ * whose "Meeting" badge was counted while narrowed to Meetings would read "N"
+ * on every tab, the exact R16 failure `countTicketFacets`'s own header names).
+ *
+ * BOUNDED like every other count here (R14): the vocabulary is fixed and
+ * code-owned (`KNOWLEDGE_KINDS` above), so `GROUP BY kind` returns at most one
+ * row per declared kind, capped at `KNOWLEDGE_KIND_FACET_CAP` for the same
+ * "make the bound visible" reason that constant's own header gives. */
+export async function countSourceKinds(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: SourceFilters = {}
+): Promise<Record<string, number>> {
+  const narrowed = sourcesWhere(guard, { ...filter, kind: undefined })
+  const rows = await d1Query<{ kind: string; n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT kind, COUNT(*) AS n FROM knowledge_sources
+      WHERE ${narrowed.sql.join(" AND ")} GROUP BY kind LIMIT ${KNOWLEDGE_KIND_FACET_CAP}`,
+    narrowed.params
+  )
+  const byKind: Record<string, number> = {}
+  for (const r of rows) byKind[r.kind] = Number(r.n) || 0
+  return byKind
 }
 
 /** One source by id, or null. */

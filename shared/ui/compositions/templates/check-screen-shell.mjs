@@ -107,3 +107,74 @@ console.log(
   "OK screen-shell resize rot check: no working trace of the removed resize feature; " +
     'ASIDE_WIDTH is the one fixed "23.75rem" measure.',
 );
+
+/* ============================================================================
+   THE 17 SEP 2026 GUTTER-SHRINK CHECK — client, verbatim: "Because adding the
+   breadcrumbs took up considerable screen space, let's reduce the margin that
+   we have on the sides above and below both the main content and the
+   assistant. Let's optimize the height. Let's not leave so much blank space
+   there." Every block-direction contributor to the outer gutter around the
+   content column and the aside — `--shell-gutter`, `--aside-inset`,
+   `DENSITY_HEADER`'s `pt`/`pb`/`px`, `DENSITY_TRAIL`'s `px` (which must keep
+   mirroring `DENSITY_HEADER`'s, see that record's own comment), `DENSITY_BODY`'s
+   `p`, and `TRAIL_GAP` — steps down exactly one rung on the scale already in
+   `tokens.css` (`--space-5` -> `--space-4`, `--space-7` -> `--space-6`,
+   `--space-6` -> `--space-5`, calm's `--space-5` -> `--space-4`). Asserted as
+   working code shapes, the same style the resize-rot check above uses, so a
+   revert back to the pre-17-Sep numbers fails here instead of waiting for the
+   next client screenshot.
+
+   `--rail-inset` (`DENSITY_RAIL`) IS DELIBERATELY NOT ASSERTED HERE. Today's
+   ruling names only "the main content and the assistant" — not the rail — so
+   this check does not require it to move, even though leaving it at
+   `--space-5` while `--shell-gutter` drops to `--space-4` reopens the exact
+   22.5-against-18.75 mismatch `DENSITY_RAIL`'s own header spent a whole
+   ruling fixing on 2026-09-06. Flagged in the CHANGELOG for the owner to rule
+   on; not this lane's call to make unasked. */
+const gutterFindings = [];
+
+const GUTTER_SHAPES = [
+  {
+    name: "DENSITY_GUTTER (--shell-gutter)",
+    pattern: /const DENSITY_GUTTER: Record<ScreenDensity, string> = \{\s*comfortable: "\[--shell-gutter:var\(--space-4\)\]",\s*calm: "\[--shell-gutter:var\(--space-4\)\]",\s*\};/,
+  },
+  {
+    name: "DENSITY_ASIDE (--aside-inset)",
+    pattern: /const DENSITY_ASIDE: Record<ScreenDensity, string> = \{\s*comfortable: "\[--aside-inset:var\(--space-4\)\]",\s*calm: "\[--aside-inset:var\(--space-4\)\]",\s*\};/,
+  },
+  {
+    name: "DENSITY_HEADER",
+    pattern: /const DENSITY_HEADER: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[var\(--space-6\)\] pt-\[var\(--space-6\)\] pb-\[var\(--space-5\)\]",\s*calm: "px-\[var\(--space-5\)\] pt-\[var\(--space-5\)\] pb-\[var\(--space-4\)\]",\s*\};/,
+  },
+  {
+    name: "DENSITY_TRAIL (mirrors DENSITY_HEADER's px)",
+    pattern: /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[var\(--space-6\)\]",\s*calm: "px-\[var\(--space-5\)\]",\s*\};/,
+  },
+  {
+    name: "DENSITY_BODY",
+    pattern: /const DENSITY_BODY: Record<ScreenDensity, string> = \{\s*comfortable: "p-\[var\(--space-5\)\] lg:p-\[var\(--space-6\)\]",\s*calm: "p-\[var\(--space-4\)\] lg:p-\[var\(--space-5\)\]",\s*\};/,
+  },
+  {
+    name: "TRAIL_GAP",
+    pattern: /const TRAIL_GAP = "mb-\[var\(--space-4\)\]";/,
+  },
+];
+
+for (const { name, pattern } of GUTTER_SHAPES) {
+  if (!pattern.test(src)) {
+    gutterFindings.push(
+      `${name} in ${rel} does not read the 17 Sep 2026 gutter-shrink values — the block gutters around ` +
+        "the content column and the aside must be one rung smaller (see the CHANGELOG entry for the old/new numbers).",
+    );
+  }
+}
+
+if (gutterFindings.length > 0) {
+  console.error("FAIL screen-shell gutter-shrink check:\n" + gutterFindings.map((f) => `  - ${f}`).join("\n"));
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell gutter-shrink check: --shell-gutter/--aside-inset/DENSITY_HEADER/DENSITY_TRAIL/" +
+    "DENSITY_BODY/TRAIL_GAP all read the 17 Sep 2026 one-rung-smaller values.",
+);

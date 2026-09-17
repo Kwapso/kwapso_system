@@ -84,10 +84,18 @@ export const TOP_LEVEL_MODULES = [
   // The agency itself (CHECKLIST 10.1) — an account-level screen like Settings,
   // because it is about the team rather than a collection inside one.
   "home", "kwapso", "settings", "invitations", "profile",
+  // THE NEW-TAB SCREEN (17 Sep 2026) — Chrome's own blank tab, this app's
+  // shape of it. Reached only through the deliberate doors that open a tab
+  // beside the one she is on (the content strip's pinned "+", cmd/ctrl-T —
+  // `app-shell.tsx`, `workspace-tabs.ts`'s `openNewTab`), never a rail row
+  // and never a link inside a screen — an account-level module like Home for
+  // the identical reason: it needs the shell's chrome and the active team,
+  // and nothing team-scoped underneath it.
+  "new",
 ]
 
 /** The account-level screens the shell renders directly (not team-scoped module content). */
-export const ACCOUNT_MODULES = ["home", "kwapso", "settings", "invitations", "profile"]
+export const ACCOUNT_MODULES = ["home", "kwapso", "settings", "invitations", "profile", "new"]
 
 export function parseRoute(pathname: string, search: string): Route {
   const segs = pathname.split("/").filter(Boolean) // ["t", teamId, module?, id?] OR [module, id?]

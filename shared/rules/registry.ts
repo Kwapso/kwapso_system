@@ -749,6 +749,21 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "mango-in-title-only",
     status: "enforced",
   },
+  {
+    id: "R85",
+    dimension: "ui",
+    law: "EVERY RAIL DESTINATION IS NAMED IN ONE WORD. The client's ruling, 17 Sep 2026, verbatim: \"Make it a rule that in the navigation bar, we only have one-word names. For example, 'Knowledge Base': reduce it to 'Knowledge'. We need an alternative for work logs. Propose me multiple.\" A DESTINATION is a link a person can click to land somewhere — every `NAV` entry that carries a real `group` (not `\"none\"`) and is not `inRail: false`, and every `TEAM_SECTIONS` row with `placement: \"sidebar\"` (`web/lib/pages.ts`) — the same two lists `app-shell.tsx`'s own `universal`/`sidebarPages` read to draw the rail, so the census asks the SAME source the rail does rather than keeping a second, driftable list. Its `title`, in English (`shared/i18n-strings.json` makes English the key R28 already stands on — a translation is not held to this word count, only the source string is), must be exactly one word: no space, no hyphen. The rail's THREE GROUP HEADINGS (`NAV_GROUP_LABELS`: \"My work\", \"Build\", \"Accounts\") are a different kind of label — they title a SECTION, never a place a click lands — and are named in `RAIL_LABEL_WORDS_OK` rather than measured, because whether the client's ruling reaches them at all is still open: her example and her one open question (\"an alternative for work logs\") were both about a DESTINATION, and a heading was never named. Every one of the three sits in the table for now, reason \"groups are headings, not destinations; awaiting her word\" — not because two of them (\"Build\", \"Accounts\") would fail the count anyway, but because the exemption is honest about WHY a group is untouched rather than silently passing a check that was never asked about it. RED THE DAY THIS LAW WAS WRITTEN: \"Knowledge base\" (the `knowledge` sidebar entry) and \"Work logs\" (the `time` sidebar entry) both carried two words. \"Knowledge base\" → \"Knowledge\" everywhere it is a user-facing label (R6/R34 — the glossary term, every `t(\"Knowledge base\")` call site, the translations), the route (`/knowledge`) and every identifier unchanged. \"Work logs\" has no client pick yet: the client asked to be shown alternatives rather than have one chosen silently for her (the base's own standing practice — never ask her to choose from prose), so the `time` entry ships \"Hours\", the recommendation, live now so the law reads green, with a comment at that entry naming the four others (Time · Logs · Timesheet · Effort) for her pick. \"Work logs\" itself is untouched everywhere else it is said — the glossary term and every record's own tab (story/task/meeting/ticket detail) — because only the RAIL destination is under this law; a tab label is not a destination by this law's own definition.",
+    why: "The rail is up to six slots wide on a phone before the icon even earns its keep, and a two-word label is the one shape that reliably wraps or truncates there (`app-shell.tsx`'s own comment measured it: `min-w-0` on a `flex-1` slot at 375px leaves about 59px). The client's example names the exact defect (\"Knowledge Base\" wrapping to two lines) and her own fix (\"reduce it to 'Knowledge'\"), so the law is her sentence read back as a check rather than a designer's inference from it. \"Work logs\" is the harder half on purpose: picking a silent replacement is exactly what her own standing rule (never ask her to choose from prose, but never choose FOR her either without asking) argues against, so the law's own text carries the four alternatives beside the provisional pick, the same place a future reader — or she herself — would look to change it, rather than a decision buried in a chat log RULES.md itself warns rots the moment nobody reads it there again.",
+    checkId: "rail-labels-one-word",
+    status: "enforced",
+  },
+  {
+    id: "R86",
+    dimension: "ui",
+    law: "IN ANY COLLECTION, THE ONE COLOURED CHIP IS THE RECORD'S STATUS. The client's ruling, 17 Sep 2026, verbatim: \"I have changed my mind regarding chips. In a database where there are different columns, the one that gets the chip with the color is always the status. This means that for tickets, we need to find icons for the ticket type and assign colors to the status.\" A list row, a board card or a record's own head chip row may colour exactly ONE categorical field — its STATUS (`shared/status-tones.ts`, `shared/app-stages.ts`, D17) — and every other categorical field (a type, a category) draws an ICON or plain text, never a colour. PRIORITY ON TASKS IS THE ONE ALREADY-RULED EXCEPTION (K19a, \"Priority has its own four colours, never App Stage's\") and is named rather than silently allowed. Tickets are this ruling's own worked example: `ticketTypeColour` (`web/lib/type-colours.ts`) drew a coloured dot for a ticket's TYPE on the list row, the board card, `TicketChips`, the type picker and the portal's own row since 2026-09-06 — retired everywhere a CHIP reads it, replaced by `ticketTypeIconName` (`shared/ticket-types.ts`), the identical closed-map, kebab-case, `iconComponent()`-resolved pattern `storyTypeIconName` (`shared/story-types.ts`) already stands for story type (K26). Four glyphs, verified against the kit's own generated exports: Issue → `Bug`, Question → `Question`, Extra → `PlusCircle`, Feedback → `ChatCircleText`. `ticketTypeColour` is NOT deleted — the tickets dashboard's own chart series (bars, legends, a relationship map's node colours) is the one reader left, because an AGGREGATE chart's series colour is a different domain from a record's own chip, never itself \"the chip with the color\" her ruling names. CHECKED as a source census, `status-owns-the-chip` (`web/test/status-owns-the-chip.test.ts`), over `shape.tsx` and the ticket collection/detail components her ruling's own worked example touched (plus `tasks-screen.tsx`, home of the one named exception): every `<Badge variant=\"status\" dot={…}>` and `<Swatch colour={…}>` is resolved through at most a few local `const` hops to what it actually names, and passes only when that resolves to something naming status, stage or waiting, or the file+function is named in `COLOURED_CHIP_OK` with the real reason (rot-checked both ways, so the list can only shrink) — an expression whose root traces to a function PARAMETER (the generic `ChoiceGroupHome.colour` seam no group has wired) is out of reach by construction, the same posture R84 takes for a computed `variant`.",
+    checkId: "status-owns-the-chip",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -1842,55 +1857,65 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["t(page.title)", "t(section.title)"],
     why: "MODULE_SETTINGS — the same shape as every copy table above, and the reason it is one is the client's own ruling of 2026-09-09 (*\"a lot of them are specific to the module\"*): a module's settings page is DATA, so that the second module is an entry in a list rather than a screen somebody writes. A page's `title` and each section's `title`/`description` sit beside the `segment` the URL is built from and the `types` the vocabulary is keyed on, which are names of data and are never translated — so the words cannot be split off into a `t(...)` at the constant without splitting the row that holds them, and `t` is a hook a module-level table could not call anyway. Every one of the three is read through `t` on the way to the screen (`t(page.title)`, `t(section.title)`, `t(section.description)`), and the gear reads the page title through `t` a second time for its own tooltip and accessible name. THE PAGE'S OWN `description` WAS THE FOURTH until 2026-09-10, when the client ruled *\"in ticket settings (or any other module) no subtitle\"* and the field was deleted rather than left unread — a column nothing renders is a sentence translated into three languages on every build for nobody, which is R28 calling it an orphan and this entry claiming it is translated where it is read.",
   },
-  "web/components/work/tasks-screen.tsx": {
-    kinds: ["field-label", "property"],
-    via: ["translateFields(columns, t)", "t(tab.label)"],
-    why: "a screen that composes its OWN table columns and its own six-tab strip. The columns are spread onto the recipe after `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` is that same rule called at the place they are spread in; the tab labels are read through `t` where the strip is built.",
-  },
-  "web/components/work/stories-screen.tsx": {
-    kinds: ["field-label", "property"],
-    via: ["translateFields(columns, t)", "t(tab.label)"],
-    why: "`tasks-screen.tsx`'s own pattern, ported for the Stories tab strip (client ruling, 15 Sep 2026): the List view's own table columns (`MINE_COLUMNS`/`COMPLETED_COLUMNS`/`EVERYONE_COLUMNS`) are spread onto the recipe AFTER `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` at the point they are spread in is the one place they can ask. The five tab labels (`STORY_TABS`/`EVERYONE_TAB`) are read through `t` where the folder-tab strip is built, the same call site tasks-screen.tsx's own tabs use.",
-  },
-  "web/components/accounts/inputs-screen.tsx": {
-    kinds: ["field-label", "property"],
-    via: ["translateFields(INPUT_COLUMNS, t)", "t(tab.label)"],
-    why: "`tasks-screen.tsx`'s own pattern, ported a second time for the Inputs screen (Task C, 15 Sep 2026): INPUT_COLUMNS is spread onto the recipe inside `<PagedFind>`'s own render, after `resolveRecipe` has already run, so `translateRecipe` never sees it — `translateFields` at the point it is spread in is the one place it can ask. The three tab labels (`INPUT_TABS`) are read through `t` where the folder-tab strip is built, the same call site tasks-screen.tsx's own tabs use.",
-  },
-  "web/components/accounts/contacts-screen.tsx": {
-    kinds: ["field-label"],
-    via: ["translateFields(CONTACT_COLUMNS, t)"],
-    why: "the contacts table's three column headings — Contact, Account, Role — the client's own 2026-09-09 ruling (\"for contacts lets do view table, also add column role after account\"). The columns are the HOST's, spread onto the recipe AFTER `resolveRecipe` has translated it, so `translateRecipe` never sees them and `translateFields` at the point they are spread in is the one place they can ask. Declared at module level because a `TableColumn` array is a constant and `t` is a hook. (Meetings' own Table view drew through the identical pattern until 2026-09-15 evening, when the client's ruling — \"replace the view table for list\" — retired the table and this pin with it.)",
-  },
-  "web/components/knowledge/google-connections.tsx": {
+  "web/components/shell/new-tab-screen.tsx": {
     kinds: ["property"],
-    via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope, BRAND)"],
-    why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t` — carrying `BRAND` since 5 Sep 2026, because the calendar sentence names the app and now says `{brand}` rather than spelling it out (shared/brand.ts is the one place that word is decided). The privacy sentence in particular is the one a person most needs in their own language.",
+    via: ["t(m.title)"],
+    why: "MODULES — the new tab's own six-item scope-chip row, the same shape as `APP_SORTS`/`DELIVERABLE_SORTS` above: a module-level table so the scope chips and the six search doors share one declaration order (this file's own header), with `title` sitting beside the `key` each door switch is keyed on, which is a name of code and is never translated. `t` is a hook that table could not call at declaration, so the words are translated on the way to the screen instead, both places a chip's word is drawn (`<Badge>{t(m.title)}</Badge>` in the scope row, and the same `t(m.title)` again as the results section's own group caption).",
   },
-  "web/components/knowledge/google-scope-dialog.tsx": {
+  "web-portal/components/portal-shell.tsx": {
     kinds: ["property"],
-    via: ["t(m.title)", "t(m.description, BRAND)", "t(EVENT_KINDS[kind].title)"],
-    why: "`MODES` and `EVENT_KINDS` — two closed vocabularies. MODES is keyed by SERVICE on purpose: the same two answers mean opposite things on the two connections (Gmail's 'only' takes mail away; Calendar's can hand more over, because kwapso reads only the primary calendar today), so the sentences cannot be shared and the table is what keeps them apart. EVENT_KINDS' `value` is Google's own event-type word, passed straight to events.list, so the table is a translation of an API constant and never a mapping. Every half is read through `t` in the same file — `m.description` carrying `BRAND`, because the calendar mode names the app through a `{brand}` hole rather than spelling it out.",
-  },
-  "web/components/knowledge/google-source-dialog.tsx": {
-    kinds: ["property"],
-    via: ["t(k.title)", "t(s.description)"],
-    why: "`SHELVES` and `KINDS` — two closed vocabularies whose `value` is a database column value and whose `title`/`description` are the words offered beside it. Both halves are read through `t` in the same file. (The FIELD configs in this file are not pinned: they are positional, through `shared/web/field.tsx`.)",
-  },
-  "web/components/team/internal-record-dialog.tsx": {
-    kinds: ["property"],
-    via: ["label: f.label", "t(f.placeholder)"],
-    why: "one form for three record kinds, each supplying its FIELDS as data (`brandAssetFields`, `deliverableFields`, `purposeFields`). The label reaches the screen through this file's `<Field config={{ ...defaultFieldConfig, label: f.label }}>`, which is the translating seam; the placeholder is put through `t` beside it.",
+    via: ["t(label)"],
+    why: "DESTINATIONS — the portal's own bottom nav bar, the same shape as the agency's `web/lib/pages.ts` two entries up: a module-level table so the five tabs and the five routes they switch on share one declaration (this file's own header explains the fixed order and the five-tab ceiling), with `label` sitting beside the `href` each `<Link>` is built from and the `icon` component reference, neither of which is a sentence. `t` is a hook the table could not call at declaration, so `DESTINATIONS.map` destructures `label` and reads it through `t(label)` as it draws each tab.",
   },
   "web-portal/components/ticket-row.tsx": {
     kinds: ["property"],
     via: ["t(status.label)"],
-    why: "`STATUS_WORDS` — the client's words for each ticket status, keyed by the status the row holds (SCOPE ch.06). The key is our vocabulary and the label is theirs; the row reads it through `t`.",
+    why: "STATUS_WORDS — the portal's own six-state vocabulary for a ticket's status chip, a client-facing rewording of the agency's internal stage names (this file's own header explains why: \"Scheduled\" is our word, \"Booked in\" is theirs). Keyed by the door's own status value, with `label` sitting beside the `variant` `<Badge>` needs, which is a token name and never a sentence — so the words cannot be split off into a `t(...)` at the module-level constant, and `TicketRow` reads the one row it needs through `t(status.label)`.",
   },
-  "web-portal/components/portal-shell.tsx": {
+  "web/components/accounts/contacts-screen.tsx": {
+    kinds: ["field-label"],
+    via: ["translateFields"],
+    why: "CONTACT_COLUMNS/PORTAL_COLUMN — this file's own header already says it: the host's own table columns, spread on after `resolveRecipe` has translated the recipe, so they are translated the same way, by `translateFields(columns, t)` (`web/lib/screens.ts`, the identical seam `web/lib/screens.ts`'s own entry above names) at the point the recipe is built for the table.",
+  },
+  "web/components/accounts/inputs-screen.tsx": {
+    kinds: ["property", "field-label"],
+    via: ["t(tab.label)", "translateFields"],
+    why: "TWO TABLES, the same two shapes named elsewhere in this file: `INPUT_TABS` (the three tabs — Waiting/Overdue/Received) is read through `t(tab.label)` as the strip is drawn; `INPUT_COLUMNS` is the host's own table columns, translated the same way as `contacts-screen.tsx` one entry up, through `translateFields(INPUT_COLUMNS, t)` on the way to the table recipe.",
+  },
+  "web/components/knowledge/google-connections.tsx": {
     kinds: ["property"],
-    via: ["{t(label)}"],
-    why: "the portal's four destinations, as data beside the href and the icon each belongs to. The bottom bar reads every label through `t` as it draws the link.",
+    via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope, BRAND)"],
+    why: "SERVICE_COPY — the four Google services (Drive/Gmail/Calendar/Chat) and the one privacy sentence each earns (this file's own header: \"a privacy sentence that is 99% true is worse than a longer one that is true\"). `label` sits beside nothing codey — it is a copy table because the four rows share one shape a screen renders identically, keyed by `GoogleService`, which is a name of data. Both fields are read through `t` where the row is drawn.",
+  },
+  "web/components/knowledge/google-scope-dialog.tsx": {
+    kinds: ["property"],
+    via: [
+      "t(m.title)",
+      "t(m.description, BRAND)",
+      "t(EVENT_KINDS[kind].title)",
+      "t(EVENT_KINDS[kind].description)",
+    ],
+    why: "TWO COPY TABLES. `MODES` (gmail/calendar × everything/only) is read through `t(m.title)`/`t(m.description, BRAND)` as the dialog's own two radio cards are drawn. `EVENT_KINDS` — \"Google's six kinds of calendar entry, in words a person recognises\" (this file's own header) — is keyed by `GoogleEventType`, Google's own API value, which is never translated, and its `title`/`description` are read through `t` beside each kind's own checkbox.",
+  },
+  "web/components/knowledge/google-source-dialog.tsx": {
+    kinds: ["property"],
+    via: ["t(k.title)", "t(k.description)", "t(s.title)", "t(s.description)"],
+    why: "TWO COPY TABLES, same shape as google-scope-dialog.tsx above. `KINDS` (folder/file — \"the two shapes a Drive share can take\") is read through `t(k.title)`/`t(k.description)`. `SHELVES` (private/team — who can read a shared source) is read through `t(s.title)`/`t(s.description)`; this file's own comment on `SHELVES` already explains why title and description are catalogued together rather than one translated and one not.",
+  },
+  "web/components/team/internal-record-dialog.tsx": {
+    kinds: ["property"],
+    via: ["t(f.placeholder)", "config={{ ...defaultFieldConfig, label: f.label }}"],
+    why: "SIX FIELD-DEFINITION TABLES (brandAssetFields, deliverableFields, and four more below them) — one `InternalField[]` per internal record kind, kept beside the form rather than at each call site because \"the CREATE panel and the EDIT panel for one record kind have to offer the same fields, and two lists that must match are one list\" (this file's own header). Each field's `placeholder` is read through `t(f.placeholder)` at the input. Each field's `label` is NOT read at the declaration — it rides into a FRESH object built at render (`config={{ ...defaultFieldConfig, label: f.label, required: !!f.required }}`), which is the positional field-config exemption R33's own law text describes, one level removed: the declaration array is plain data, and the object that actually spreads `defaultFieldConfig` is the one `<Field>` builds from it.",
+  },
+  "web/components/work/stories-screen.tsx": {
+    kinds: ["property", "field-label"],
+    via: ["t(tab.label)", "translateFields"],
+    why: "TWO TABLES, the same two shapes as inputs-screen.tsx above. `STORY_TABS`/`EVERYONE_TAB` (Now/Planned/Backlog/Completed, plus the permission-gated fifth) are read through `t(tab.label)` as the strip is drawn. The table columns are translated through `translateFields(columns, t)` on the way to each view's own recipe, the same seam `web/lib/screens.ts`'s own entry above names.",
+  },
+  "web/components/work/tasks-screen.tsx": {
+    kinds: ["property", "field-label"],
+    via: ["t(tab.label)", "translateFields"],
+    why: "TWO TABLES, the identical shape as stories-screen.tsx above — the two screens share the \"mine\" tab strip pattern (this file's own header: \"three tabs, plus a fourth for whoever may see everyone's\"). `TASK_TABS` is read through `t(tab.label)`; `TASK_COLUMNS`/`EVERYONE_COLUMNS` are translated through `translateFields(columns, t)` on the way to each view's own recipe.",
   },
 }
 /** R34 — WORDS THE APP MAY NOT SAY, and the glossary term each one competes with.
@@ -2218,7 +2243,7 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   "accounts.list":
     "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx, which always renders a SearchInput. Same reason as tickets.list: the recipe's own search sees only the loaded page.",
   "knowledge.list":
-    "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/deep-link/collection-content.tsx (the same file as accounts.list, a second call site), which renders a real SearchInput again — client ruling, 17 Sep 2026: \"Also add the search to the toolbar. It's missing.\" REVERSES B0296/T3659 (16 Sep 2026), which had this call site pass `search={false}` and this entry stand for zero search boxes on the screen; that shape is gone, and this entry now names the SAME structural reason every other paged recipe carries — the recipe's own in-memory search (`searchable: !paged`, screens.ts) sees only the loaded page, so the real box lives in the host's <PagedFind> instead, same reason as tickets.list.",
+    "paged (R14) — its search box is the host's own <PagedFind>, drawn in web/components/knowledge/knowledge-screen.tsx (moved out of collection-content.tsx's pure module switch, 17 Sep 2026, K2 by kind — the same move accounts/contacts/tickets already made), which renders a real SearchInput again — client ruling, 17 Sep 2026: \"Also add the search to the toolbar. It's missing.\" REVERSES B0296/T3659 (16 Sep 2026), which had this call site pass `search={false}` and this entry stand for zero search boxes on the screen; that shape is gone, and this entry now names the SAME structural reason every other paged recipe carries — the recipe's own in-memory search (`searchable: !paged`, screens.ts) sees only the loaded page, so the real box lives in the host's <PagedFind> instead, same reason as tickets.list.",
   "contacts.list":
     "paged (R14) — its search box is the host's own <PagedFind> in contacts-screen.tsx, which always renders a SearchInput. Same reason as tickets.list.",
   "inputs.list":
@@ -2633,7 +2658,125 @@ export const UNCONTAINED_SECTION_OK: Record<string, string> = {
     "a ticket's attachments on the client's side — the skeleton and the drop target are on the page ground; the file rows themselves paint.",
   "web-portal/components/waiting-on-you.tsx":
     "the loading skeleton for what is awaiting the client's input. Its error and its rows both paint, so this is the loading state alone — the section jumps onto paper the moment the read lands.",
+  // ── `ticket-stages.tsx` (17 Sep 2026) — BARE BY NAMED REFERENCE, NOT BY
+  // OVERSIGHT. The stage ladder moved onto the ticket record's `headerExtra`
+  // (help-detail.tsx), above the tab strip, on the client's ruling to put it
+  // "on top of the tabs" — and a first pass gave it its own `bg-card` box,
+  // reading R67 as the default it is. She then pointed at a SIBLING placement
+  // and overrode that default for this one control specifically, same day:
+  // "In Tasks, the Today's Task Progress view should have no container
+  // behind it, and this is exactly the position for reference that I want
+  // the ticket progress to be." `web/components/work/tasks-screen.tsx`'s own
+  // progress strip is the reference named — see that file's entry below,
+  // filed the same day for the same words, once that lane's own change
+  // lands.
+  "web/components/tickets/ticket-stages.tsx":
+    "the stage ladder, drawn on `RecordScreen`'s `headerExtra` above the ticket's tab strip. No fill by her own instruction, quoted above — not a container nobody got round to adding. Its error state (the retry sentence) is the same bare section, on purpose: the copy explains a failure, not an absence, and there is nothing else in this component to wrap it in that isn't the same bare ground.",
+  // THE REFERENCE `ticket-stages.tsx`'s OWN ENTRY NAMES, LANDED — the client's
+  // ruling, quoted in full above: "In Tasks, the Today's Task Progress view
+  // should have no container behind it, and this is exactly the position for
+  // reference that I want the ticket progress to be." This is the position:
+  // the "Today's tasks" strip, between the heading and the tab strip, on every
+  // Tasks tab. It used to carry `bg-surface-panel` (R67's own default) —
+  // deleted along with the padding it justified, so the section is now text
+  // and the progress bar only, standing on the same bare page ground the tab
+  // strip below it already sits on.
+  "web/components/work/tasks-screen.tsx":
+    "the \"Today's tasks\" progress strip — a `<section>` with no heading of its own (named by `aria-label`, the same shape `sections-stand-on-paper.test.ts`'s amendment 4 already admits). `KpiProgress` and the caption beneath it are drawn directly on the page: no fill, no radius, no inset. Neither reads as a title block being moved out of a container — the bar is a MEASUREMENT and the caption says WHO the number counts, exactly the reasoning this file's own header already carried before the container itself was removed.",
 }
+
+// ── R67, WIDENED — A COLLECTION NESTED IN A RECORD-DETAIL TAB NEEDS ITS OWN
+//    CARD; THE RECORD'S OWN OUTER CHROME IS NOT THE SAME SURFACE ───────────
+//
+// Client feedback, 17 Sep 2026, over an app's Tickets tab, verbatim: "I
+// noticed that when I go into the tickets tab inside an app, there is still
+// the space between the point and the type missing, and also they are
+// missing the background card. Make sure that you apply rules, not just
+// specific hard-coded fixes, to all the feedback I'm giving you."
+//
+// R67's own panel census (amendment 3, `sections-stand-on-paper.test.ts`)
+// already walks every `<TabsView renderPanel={…}>` host — INCLUDING the
+// eleven record details (`STICKY_TABS`, `record-chrome.tsx`) — but shape (a)
+// ("the mount is boxed by an ancestor") passes every one of them on the
+// strength of ONE shared box: `RecordScreen` hands its whole `TabsView` to
+// the kit's `RecordDetail`, which draws ONE outer `Card` around whatever
+// `panel` is (`web/components/records/overview-list.tsx`'s own header: "the
+// kit still draws the ONE outer Card around the panel — that OUTER seam
+// stands"). That box is right for a plain fact list — `OverviewList`'s own
+// history is the client REJECTING a second, nested card around one ("no
+// nested card at all… container inside a container") — and it is NOT the
+// same surface the app's own COLLECTIONS stand on: `SprintsPanel`/`AppsPanel`
+// (`CollectionFrame useKitPanel`) and the main Tickets/Accounts/Apps screens
+// (`<PagedFind wrap={…}>`) each draw their OWN nested `bg-surface-panel`
+// card INSIDE whatever they are already standing in, unchallenged — the
+// established pattern this law is naming, not inventing. So a collection
+// hung off a record's tab that skips that nested card (the app's own Tickets
+// tab, `AppTicketsPanel` via `PagedPanelBody`, no `wrap`) sat on the SAME
+// outer record card every OTHER tab shares, with nothing of its own — which
+// reads as "missing the background card" exactly because its neighbours have
+// one and it does not.
+//
+// THE FIX IS THE SEAM, NOT THE SCREEN: `PagedPanelBody` (`web/components/
+// work/work-panels.tsx`) now always wraps its `<PagedFind>` in `CollectionCard`
+// (`web/components/deep-link/screen-bits.tsx`), so every panel built from it —
+// Stories, Maps (`ProcessesPanel`), App meetings, App tickets (both the app's
+// own Tickets tab AND the account's, since both mount the same
+// `AppTicketsTab`), and To-dos — gets the identical nested card
+// `SprintsPanel`/`AppsPanel` already draw. `DeliverablesPanel` drew its own
+// `<ToolbarRow>` over a bare grid of `bg-card` tiles (a wall of cards on the
+// page ground, R67's own named failure shape) and is fixed the same way, by
+// hand, at the one call site.
+//
+// THE CENSUS: `web/test/sections-stand-on-paper.test.ts` re-walks
+// every `STICKY_TABS` `renderPanel` host R67's own amendment 3 already finds,
+// this time WITHOUT the ancestor short-circuit, and asks the per-body
+// question of every branch that is shaped like a COLLECTION (references
+// `ToolbarRow`/`PagedFind`/`CollectionFrame`/`RecordTable`/`Table`,
+// transitively through the same file — a plain `OverviewList`/
+// `AskTheAssistant` panel is out of this narrower census's population by the
+// same reasoning that keeps a lone act or an overlay out of R67 itself).
+// Keyed `file#tabValue`, same grain as `UNCONTAINED_SECTION_OK`, and
+// rot-checked the same way: a key nothing flags any more must be deleted.
+//
+// A key here for a file OUTSIDE this lane's ownership
+// (`web/components/accounts/contact-detail.tsx`, `work/task-detail.tsx`,
+// `meetings/meeting-detail.tsx`, `process/process-detail.tsx`,
+// `knowledge/knowledge-detail.tsx` — five more `STICKY_TABS` hosts this
+// census reaches) is left for the lane that owns that screen to fix or
+// reason about; this lane's brief is the record-detail PANEL wrappers listed
+// in its own brief, not those five files' bodies.
+export const RECORD_DETAIL_COLLECTION_OK: Record<string, string> = {}
+
+// ── A HAND-ROLLED STATUS DOT NEVER SHIPS ────────────────────────────────────
+//
+// Client feedback, 17 Sep 2026, over an app's Tickets tab, verbatim: "I
+// noticed that when I go into the tickets tab inside an app, there is still
+// the space between the point and the type missing, and also they are
+// missing the background card." At the start of this session the component
+// drawing the gapless dot was `AppTicketsPanel`'s own Type column
+// (`web/components/work/work-panels.tsx`): a `<Badge variant="secondary"
+// size="pill">` with NO `dot` prop, holding a hand-placed `<Swatch
+// colour={ticketTypeColour(ticket.helpType)} />` as an ordinary child — so
+// `badge.tsx`'s own `GAP_WITH_DOT` (the kit v1.2.102 fix, spent the moment
+// `dot` is passed) was never reached. The identical shape stood at three
+// more call sites reachable from a ticket
+// (`web/components/tickets/tickets-collection.tsx`'s own Type column,
+// `triage-queue.tsx`'s sitting tally, `shared/web/ticket-chips.tsx`'s
+// `typeDot`), all four confirmed by reading the source before any fix
+// landed.
+//
+// A CONCURRENT LANE RETIRED THE UNDERLYING DOT THE SAME SESSION: R86 ("in
+// any collection, the one coloured chip is the record's status") moved a
+// ticket's TYPE from a coloured `Swatch` to an icon (`ticketTypeIconName`)
+// across every one of those four files, which is a stronger fix than a gap
+// patch — there is no longer a dot on that column at all. This registry
+// entry, and `web/test/hand-rolled-status-dot.test.ts`, are the forward
+// guard: the RULE ("a status is drawn ONLY through `<Badge dot={tone}>`,
+// never a hand-placed dot span") outlives the one bug it was written about,
+// so the next hand-rolled dot — on STATUS itself, a priority chip, a portal
+// status chip — is still caught. Empty on the day this law shipped: the
+// census found nothing left to excuse.
+export const HAND_ROLLED_DOT_OK: Record<string, string> = {}
 
 export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
   "web/components/accounts/account-detail-panels.tsx":
@@ -2742,12 +2885,26 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
     "THE SAME SHAPE AS WorkLogsPanel ONE ROW UP: a call log is READ IN CALL ORDER (newest first) and PAGES (`<LoadMore>`, R14, db/core `mcp_call_log`). A browser-side reorder of the loaded page would present a shuffled window as the order of a token's whole history — the audit trail this table exists for is specifically WHEN something happened, in sequence. If this ever earns a sort it belongs on the door, as a query parameter, not here.",
   "web/components/accounts/contact-panels.tsx#ContactTicketsPanel":
     "A PAGE-ONE SUMMARY OF A PAGED LIST (`<LoadMore>`, R14) on somebody's record — the whole ticket collection has its own screen, with its own door-backed search, filters and sort. Same reason as WorkLogsPanel above: ordering the loaded page and calling it the order of the list is the lie R14 exists to stop.",
-  "web/components/tickets/tickets-dashboard.tsx#TicketsDashboard":
-    "A DASHBOARD IS NOT A LIST, AND HAS NO ROW ORDER TO OFFER. The client asked for this toolbar in the same breath as the exemption — \"dashboard should also have toolbar / filter by client and type / no sort\", 6 Sep 2026 — and the reason is structural rather than a preference. There are no rows on this tab at ALL: every number on it is a COUNT(*) or a quantile the database took over the whole backlog, and the six panels under this row are a pipeline grid, a stacked bar per system, two ranked lists the DOOR ordered (busiest first), a 4×4 matrix, a duration distribution and the monthly trend beside it. Not one of them is a sequence a reader could ask to see differently — the pipeline's order is the ticket lifecycle, the matrix's is the ticket vocabulary, and the rankings are already the answer to \"who has the most\", which is the question. A `<SortControl>` here would offer to reorder a picture. The three NARROWINGS it does carry — the two filters and, since 7 Sep 2026, the search box (\"still missing full toolbar!\", which is why this row now has a search box and this entry still has no sort) — are not the browser narrowing loaded rows either (there are none to narrow): they are parameters of `GET /api/content/help/dashboard`, spent in the WHERE clause of all nine of its grouped reads and carried in the cache key, which is the only shape that can work when the screen holds no data of its own. SEARCHING A BACKLOG AND REORDERING A PICTURE ARE DIFFERENT ACTS, which is why this entry survived the change that deleted this component's `TOOLBAR_EXEMPT` line: a term is a WHERE clause the door can answer, and an order is a sequence that does not exist here. The app record's own Dashboard view is this same component with an `appId` and four panels instead of six, and it changes nothing here: a pipeline, a matrix and a duration distribution are no more orderable for one system than for all of them.",
+  // DELETED 17 SEP 2026 — `web/components/tickets/tickets-dashboard.tsx#TicketsDashboard`.
+  // The entry argued a dashboard has no row order to offer, over a
+  // `<ToolbarRow>` that carried a search box and two facets and needed a
+  // reason for the one slot it left unfilled. The client's ruling the same
+  // day removed the whole row: "Remove the toolbar from the tickets
+  // dashboard." There is no `<ToolbarRow>` left on this component for the
+  // census to find missing a `sort` prop, so the entry matches nothing —
+  // deleted rather than left standing, the same rot-check every other table
+  // here is held to.
   "web/components/work/sprints-screen.tsx#SprintsScreen":
     "THE BESPOKE ROW SERVES TWO BODIES THAT ARE NOT FLAT LISTS — Overview, which groups sprints under their own state headings, and Calendar, a month grid. A sort chip would either fight the grouping or reorder squares by something other than the date they sit on. The third tab, \"All sprints\", is a flat list drawn by the recipe engine, and it gets its picker from `frameSortOptions` off its own columns — which is why this screen looks sorted where it is a list and unsorted where it is not.",
-  "web/components/team/roles-matrix.tsx#RolesMatrix":
-    "THE ROWS ARE THE TEAM'S OWN MODULE CATALOGUE, not a list a reader fills up. `TEAM_MODULES` (shared/team-modules.ts) is a fixed, deliberately-ordered set — the order a permission matrix is read in, top to bottom, the same one `PermissionMatrix` has always drawn — and there is no second, equally valid sequence (alphabetical, by activity, by anything) that a reader would ask this grid for instead. A sort control here would offer to reorder the one axis this screen exists to make legible AT REST.",
+  // DELETED 17 SEP 2026 — `web/components/team/roles-matrix.tsx#RolesMatrix`.
+  // The entry argued the rows are `TEAM_MODULES`'s own fixed order and there
+  // is "no second, equally valid sequence... that a reader would ask this
+  // grid for instead". The client's own screenshot of this exact toolbar
+  // disagreed the same day: "in the toolbar, I want to be able to sort by
+  // Module Name." The screen now passes `sort` (Module name, A→Z / Z→A,
+  // `SortControl`'s own direction button) over the module catalogue's
+  // translated labels, applied before the search filter narrows the same
+  // list — see `sortDir`/`orderedModules` in that file.
 }
 
 /** R78 — reviewed exceptions, keyed the same way `TOOLBAR_SORT_EXEMPT` above
@@ -3407,7 +3564,12 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "sources",
     listRecipe: "knowledge.list",
     webKey: "knowledgeKey(",
-    pagerFile: "components/deep-link/collection-content.tsx",
+    // MOVED, 17 Sep 2026 (K2 by kind) — the knowledge branch split out of
+    // collection-content.tsx's pure module switch into its own component
+    // (knowledge-screen.tsx), the same move accounts/contacts/tickets/tasks/
+    // processes/stories/waves already made, because the kind-tab strip's own
+    // R16 badges need a live sidecar read only a real component can hold.
+    pagerFile: "components/knowledge/knowledge-screen.tsx",
     pagerKey: "knowledgeKey(",
     why: "one source per ticket, per article, per account, plus every note anybody writes — the agency's own history is thousands of rows on day one and the sweep only ever adds",
   },
@@ -3700,6 +3862,27 @@ export const RECORD_TABS_SINGLE_PANEL: Record<string, string> = {
     "what fixed the footer: it used to sit between the old three-field " +
     "Overview block and the profile section bolted on beside it; now it is " +
     "the true last thing on the page, same as Contact's and Ticket's.",
+  "help-detail":
+    "the client's ruling, 17 Sep 2026, verbatim: \"I want to see, on one " +
+    "single screen with no tabs, the content of tickets: the stages, the " +
+    "kind of conversation with the customer, related stories, work logs, " +
+    "stakeholders. We currently, in our legacy system, have it on one page, " +
+    "and it's very practical. We don't want to change that\" — and her pick " +
+    "over the decision page (https://claude.ai/artifact/34udsj1HpzcojN15Sq97tt), " +
+    "\"For ticket 1 page, I choose to implement it v1.\" The five things she " +
+    "named are drawn AT ONCE, never behind a click: the stage ladder rides " +
+    "`headerExtra` (the kit's own hero region, above wherever the body " +
+    "begins — a tab strip stood there until this same ruling), and the body " +
+    "itself is `TicketDetailBody` (web/components/tickets/ticket-detail-body.tsx) " +
+    "— one two-column layout, not a strip choosing between four things a " +
+    "reader used to click through one at a time. Files moved to the ⋯ menu " +
+    "(a sheet, the pattern B19 already put the Close action's neighbour " +
+    "through) and Activity stays exactly where the 7 Sep 2026 ruling put it, " +
+    "off the footer's own eyebrow — neither was named on the page, so " +
+    "neither earns a spot on it. `web/test/ticket-stages-above-tabs.test.tsx` " +
+    "and `web/test/ticket-detail-no-tabs.test.tsx` prove the shape from the " +
+    "render: the ladder sits above the body in DOM order, and no `tablist` " +
+    "renders anywhere on the screen.",
 }
 
 /** R55 — tables that store a `ref` and have no KIND minting one for them.
@@ -3765,7 +3948,10 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // web/components/team/roles-matrix.tsx carry the whole of it.
   // `selectable-detail.overview` STOOD HERE and went with the screen on
   // 11 Sep 2026 — see RECORD_TABS_SINGLE_PANEL above for the whole account.
-  "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
+  // `help-detail.overview` STOOD HERE TOO, and went the same way on
+  // 17 Sep 2026: the whole tab strip it named a tab on is gone
+  // (RECORD_TABS_SINGLE_PANEL["help-detail"] carries the ruling), and its
+  // own facts moved into the Stakeholders panel rather than staying a tab.
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, and the paragraph about it. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
   "account-detail.organisation":
@@ -4545,6 +4731,16 @@ export const REF_AS_STRING_OK: RefAsString[] = [
       "the dates on that row. Kept as the key because a sprint's reference is the " +
       "stablest thing about it.",
   },
+  {
+    file: "web/components/shell/new-tab-screen.tsx",
+    contains: "label: row.ref ?",
+    why:
+      "`ResultRow.label` is typed `string` — the same slot feeds `RecordMark`'s " +
+      "`name` prop (which needs a plain string to derive the initial mark) and " +
+      "the `<Text>` beside it, for six different door reads sharing one row " +
+      "shape (tickets, accounts, stories, apps, contacts, knowledge). A search " +
+      "hit reads its number the way the picker options above already do.",
+  },
 ]
 
 // ── source-scan (the law machinery's own guard) ─────────────────────────────
@@ -4744,7 +4940,18 @@ export const AUTH_PUBLISH_EXEMPT: Record<string, string> = {
  * (2026-08-27, once the kit shipped `RecordChrome`) and
  * `agent-markdown.tsx`'s link transition (2026-09-13, once the assistant's
  * prose and `ArticleBody`'s were unified onto one renderer). */
-export const HAND_ROLLED_OK: Record<string, string> = {}
+export const HAND_ROLLED_OK: Record<string, string> = {
+  "shared/web/appearance-tab-preview.tsx":
+    "The Appearance panel's live preview animates its fake title's `font-size` " +
+    "in step with the heading-cap slider (`transition-[font-size] duration-200`), " +
+    "so a reader sees the cap move rather than jump. None of the four named " +
+    "shapes fits a resizing property tied to a live prop rather than a hover, a " +
+    "row or a route: `motion-hover` transitions colour/border/fill/stroke only, " +
+    "never `font-size`, and there is no fifth 'a value scrubbed live' class in " +
+    "the kit's vocabulary to reach for instead. The preview's OWN ground colour " +
+    "swap two lines above this one is not pinned here — it is a genuine fill " +
+    "swap and now reads `motion-hover`.",
+}
 
 // ── tab-shape (rules.test.ts) ───────────────────────────────────────────────
 
@@ -4993,3 +5200,49 @@ export const TOOLBAR_LEAD_GAP_EXEMPT: Record<string, string> = {}
  * Empty on purpose — a future entry here is a real, reasoned exception, never
  * a placeholder for "do this later". */
 export const MANGO_OUTSIDE_TITLE_OK: Record<string, string> = {}
+
+// ── R85 (rail-labels-one-word) ──────────────────────────────────────────────
+
+/** R85 — the rail's own GROUP headings (`NAV_GROUP_LABELS` in
+ * `web/lib/pages.ts`), keyed by their `NavGroup` id, named here rather than
+ * measured against the one-word count. A group heading titles a SECTION, not
+ * a place a click lands, and the client's ruling was about DESTINATIONS —
+ * her own example ("Knowledge Base") and her one open question ("an
+ * alternative for work logs") both named a destination, never a heading — so
+ * whether the rule reaches "My work" too is genuinely undecided rather than
+ * a breach quietly let through. All three groups sit here for now, not only
+ * "My work" (the one that would actually fail the count): the reason is
+ * "why a group is untouched", not "which ones need excusing", so the table
+ * stays honest even for "Build" and "Accounts", which already read as one
+ * word. Rot-checked against `NAV_GROUP_ORDER`: a key naming a group that no
+ * longer exists has outlived its subject and fails too. */
+export const RAIL_LABEL_WORDS_OK: Record<string, string> = {
+  "my-work": "groups are headings, not destinations; awaiting her word",
+  build: "groups are headings, not destinations; awaiting her word",
+  accounts: "groups are headings, not destinations; awaiting her word",
+}
+
+// ── R86 (status-owns-the-chip) ──────────────────────────────────────────────
+
+/** R86 — a `<Badge variant="status" dot={…}>` / `<Swatch colour={…}>` the
+ * census resolved to something naming neither status, stage nor waiting,
+ * keyed `${file path relative to repo root}#${enclosing function name}`.
+ * Rot-checked both ways: a line naming a function the census does not find,
+ * or one whose chip has since gone (an icon, plain text, or a real status
+ * seam), has outlived its subject and fails too — so the list can only
+ * shrink.
+ *
+ * ONE ENTRY ON THE DAY THIS LAW SHIPPED (17 Sep 2026): the task PRIORITY dot,
+ * `PriorityChip` (`web/components/work/tasks-screen.tsx`) — `PRIORITY_DOT_
+ * TONE[level]` names PRIORITY, not status, and it is coloured on purpose:
+ * K19a ("Priority has its own four colours, never App Stage's") already
+ * ruled it, the one categorical field besides status this app colours by
+ * design. Every ticket-type colour the same sweep found — the list row, the
+ * board card, `TicketChips`, both type pickers and the portal's own row —
+ * was converted to `ticketTypeIconName` rather than excused. */
+export const COLOURED_CHIP_OK: Record<string, string> = {
+  "web/components/work/tasks-screen.tsx#PriorityChip":
+    "the task priority dot, `PRIORITY_DOT_TONE[level]` — priority, not status, and already ruled a colour on tasks " +
+    "(K19a, \"Priority has its own four colours, never App Stage's\"), the one categorical field besides status " +
+    "this app colours on purpose.",
+}

@@ -1,98 +1,43 @@
 "use client"
 
-// ONE SOURCE, AS A CARD — the row the knowledge list actually needs, and the
-// one the generic engine (screen-renderer.tsx's `display: "cards"` path)
-// cannot draw: a title and a kind used to be the whole card, and a person
-// correcting where something is filed or who may use it had to open the
-// record to do either. This is a host-composed component rather than a
-// recipe (CLAUDE.md's "engine-expressible → a recipe; bespoke → a
-// host-composed component") because three of its six facts are editable
-// inline and the engine's card has no slot for that at all.
+// ONE SOURCE, AS A CARD — the row the knowledge gallery actually needs, and
+// the one the generic engine (screen-renderer.tsx's `display: "cards"` path)
+// cannot draw on its own: this collection's own kind glyph (KNOWLEDGE_KIND_ICON)
+// and a card small enough that four fit across a row, which is exactly what
+// the engine's stock card was never asked to be. This stays a host-composed
+// component rather than a recipe (CLAUDE.md's "engine-expressible → a
+// recipe; bespoke → a host-composed component") for that reason alone now —
+// see below for what moved OUT of it.
 //
-// SIX FACTS, IN THE ORDER THE HUB'S BRIEF ASKS FOR THEM: compartment, app,
-// sharing, pieces, sightings, last modified. The first three are editable —
-// and they are editable through the ONE door that already writes them
-// (`content.updateKnowledge`, wired here as `onEditFiling`), never a second
-// write path invented for the row. Compartment and sharing share ONE edit
-// affordance on purpose: the door writes `account_id`/`compartment` and
-// `owner_user_id`/`visible_to_app_id` in the SAME statement (`updateSource`,
-// workers/content/src/lib/knowledge.ts), so offering two separate pencils
-// would promise two independent writes the door does not have.
+// FOUR FACTS NOW, NOT SIX — client ruling, 17 Sep 2026, verbatim: "On the
+// knowledge base, I want the cards smaller, so I want to see at least four in
+// one row. Also, the edit button is deleted from the card. It should just be
+// on the detail page." Mark, title, kind, one meta line (R81's spirit: no
+// hint, no explanatory paragraph riding along with the facts a reader did not
+// ask this card for). Compartment, app, sharing, pieces and sightings are
+// gone from the CARD — every one of them is still readable, in full, on the
+// record's own Overview tab (`knowledge-detail.tsx`'s `overviewItems`), which
+// is where a reader who wants the whole picture already goes to open it.
 //
-// APP IS READ-ONLY. `apps` (0073's JSON array, "which apps this concerns")
-// has no write door anywhere in the app yet — `SourceInput` never reads it —
-// so an edit control here would be a control that always refuses. Flagged to
-// the hub rather than guessed at.
-//
-// THE ONE THING MOST LIKELY TO LOOK BROKEN: a `generated_only` source with
-// zero pieces is a CARD, on purpose (findable, never quoted) — see
-// `piecesLabel` below. Its wording ("Found in search — never quoted in an
-// answer.") is the hub's, chosen deliberately in ordinary English rather than
-// the schema's own word for it: the glossary defines neither "passage" nor
-// "sighting", so putting either on screen would have shipped undefined
-// product vocabulary past R34 (a check that reads the glossary file, never
-// the copy). It renders as plain text, never a warning or an error tone.
+// THE EDIT PENCIL IS GONE, NOT MOVED. It used to write `accountId` and
+// `visibility`/`visibleToAppId` in place, through `content.updateKnowledge`
+// (`onEditFiling`). `knowledge-detail.tsx` already carries an icon-only Edit
+// button on the record's own title (client ruling, 2026-08-31: "edit, only
+// the pencil icon") that opens the identical `KnowledgeFormDialog` and writes
+// the identical fields — so nothing this card's pencil could do is now
+// unreachable; it is reachable in exactly one place instead of two, which is
+// what she asked for.
 
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Button } from "@shared/ui/components/button/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui/components/card/card"
-import { PencilSimple } from "@shared/ui/foundations/icons"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { formatRelative, type Translate } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
 
-import { KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
+import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
 import type { KnowledgeSource } from "@shared/types"
-
-/** Who may read it, in the caller's own words — the exact three sentences
- * `knowledge-form-dialog.tsx`'s "Who can use it" select already offers, so a
- * card never says something its edit dialog would contradict. */
-function sharingLabel(source: KnowledgeSource, t: Translate): string {
-  if (source.visibility === "private") return t("Only me")
-  if (source.visibility === "app") return t("Only the members on one app")
-  return t("Anyone who can read the knowledge base")
-}
-
-/** Where it is filed. `accounts` (0073's array) leads when it carries
- * anything; every row does today reads empty (nothing writes it yet — see
- * DATA-MODEL.md), so this falls back to the singular `accountId` the door
- * has always written, which is what keeps this card honest against today's
- * real data instead of showing "filed nowhere" on every row in the base. */
-function compartmentLabel(
-  source: KnowledgeSource,
-  accountNames: Map<string, string>,
-  t: Translate
-): string {
-  const ids = source.accounts.length > 0 ? source.accounts : source.accountId ? [source.accountId] : []
-  if (ids.length === 0) return t("The agency")
-  if (ids.length === 1) return accountNames.get(ids[0]) ?? t("An account")
-  return t("{count} accounts", { count: String(ids.length) })
-}
-
-/** What it concerns. No fallback here — unlike the compartment, there is no
- * pre-existing singular column this can read instead (`appId` names what a
- * MIRRORED source is about, rewritten by the sweep on every pass, not a
- * person's filing decision) — so an empty array reads as exactly what it is
- * today: nothing has filed this under an app yet. */
-function appLabel(source: KnowledgeSource, t: Translate): string {
-  if (source.apps.length === 0) return t("Not filed under an app")
-  if (source.apps.length === 1) return t("1 app")
-  return t("{count} apps", { count: String(source.apps.length) })
-}
-
-/** How many searchable pieces it became — and the one case that is not an
- * error: `generatedOnly` with zero pieces is a CARD (KB-AUDIT.md §4.3), a
- * source that produced nothing beyond the sentence the app wrote for it.
- * Findable, never quoted, and that is by design, so it reads as plain text
- * rather than a warning. */
-function piecesLabel(source: KnowledgeSource, t: Translate): string {
-  if (source.chunkCount === 0 && source.generatedOnly)
-    return t("Found in search — never quoted in an answer.")
-  if (source.chunkCount === 0) return t("Not indexed yet")
-  return t("{count} pieces", { count: String(source.chunkCount) })
-}
 
 /** HOW IT REACHED US — the true fact behind the count, in the hub's own
  * words, never the schema's own term for it ("sighting" was ruled out
@@ -105,10 +50,11 @@ function piecesLabel(source: KnowledgeSource, t: Translate): string {
  * one that has simply never been swept. `null` means the line is not drawn
  * at all, not drawn empty.
  *
- * EXPORTED because `knowledge-form-dialog.tsx`'s mirrored-source edit form
- * says the same fact, on purpose — reusing the one function that decided the
- * wording is what keeps the two from drifting into two different sentences
- * for one number. */
+ * NO LONGER RENDERED ON THE CARD ITSELF (the card's one meta line is "last
+ * edited" now, below) — STILL EXPORTED, because `knowledge-form-dialog.tsx`'s
+ * mirrored-source edit form says the same fact on its own, reusing the one
+ * function that decided the wording rather than drifting into a second
+ * sentence for one number. */
 export function sightingsLine(source: Pick<KnowledgeSource, "sightingsCount">, t: Translate): string | null {
   if (source.sightingsCount === 0) return null
   if (source.sightingsCount === 1) return t("Reached us through one person")
@@ -117,24 +63,16 @@ export function sightingsLine(source: Pick<KnowledgeSource, "sightingsCount">, t
 
 export function KnowledgeSourceCard({
   source,
-  accountNames,
   onOpen,
-  onEditFiling,
-  canEdit,
 }: {
   source: KnowledgeSource
-  /** account id → name, the same map the compartment facet already builds
-   * (collection-content.tsx) — read here rather than fetched again (R56). */
-  accountNames: Map<string, string>
   /** open the record itself — the whole card is the press target, same as
-   * every other card in the app (screen-renderer.tsx's own reasoning). */
+   * every other card in the app (screen-renderer.tsx's own reasoning), and
+   * now the ONLY press target: there is no second control on the cell to
+   * intercept a click before it reaches this one. */
   onOpen: () => void
-  /** open the one dialog that writes compartment + sharing together. */
-  onEditFiling: () => void
-  canEdit: boolean
 }) {
   const { t, lang } = useLanguage()
-  const sightings = sightingsLine(source, t)
   return (
     <Card
       variant="raised"
@@ -149,105 +87,49 @@ export function KnowledgeSourceCard({
         }
       }}
     >
-      <CardHeader className="flex-row flex-wrap items-start gap-3">
-        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-[var(--radius)]">
+      <CardHeader className="flex-row flex-wrap items-start gap-2.5">
+        <span className="bg-muted text-muted-foreground grid size-8 shrink-0 place-items-center rounded-[var(--radius)]">
           <Icon
             name={(KNOWLEDGE_KIND_ICON[source.kind] ?? "file") as IconName}
             aria-hidden
             className="size-4"
           />
         </span>
-        {/* WAS `truncate`, ONE LINE, ON PURPOSE — until the owner asked
-            otherwise. The comment this replaces said the row's single-line
-            shape was "that layout's requirement, not a style choice"; it
-            was a style choice, and the owner made a different one, 15 Sep
-            2026, verbatim: "the title of each knowledge base source is
-            getting cut off.. for all screen sizes.. wrap text or reduce
-            size." Real titles were clipping mid-word even at the card's
-            full ~360px width ("Assecuranz: Script for…",
-            "Accepted: Padelbase: Sync u…") — widening the basis in the
-            earlier fix bought more characters, not a different shape.
-
-            `line-clamp-2 break-words`, not an unbounded wrap: the same
-            pattern this app already uses for a title that can run long
-            (`shared/web/record-heading.tsx`'s `clampRecordHeading`,
-            `home-screen.tsx`'s team-name heading) — matched here rather
-            than minting a second one, though this card does not reuse
-            `clampRecordHeading` itself, since that helper's own header
-            scopes it to the two record-DETAIL heading call sites
-            specifically, not cards. An unbounded wrap would make every
-            card's height a function of its title length in a 3-up desktop
-            grid; two lines bounds it to two states instead. The native
-            `title` attribute is the same seam's other half — a name a
-            reader can still read in full, on hover or by a screen reader,
-            even clamped.
-
-            `items-start` on the header (was `items-center`): a header row
-            with a fixed-size icon beside a title that can now be two lines
-            needs the icon pinned to the top, not floating to the row's
-            vertical middle once the title is taller than it is.
-
-            UPDATED 15 Sep 2026, SAME DAY: two lines at `text-lg` (20.25px)
-            was measured on staging to still clip 16 of 50 real cards at
-            phone width — these are machine-generated calendar titles
-            ("Accepted: HOGO: Optimising the candidate CV upload workflow @
-            Tue Sep 1, 2026 7:15pm - 7:45pm (IST) (Alaap Kanchwala) (not in
-            use)", 130 characters) that no reasonable clamp fits whole; the
-            `title` attribute already carries the full text, so an ellipsis
-            staying visible is correct and expected, not a residual bug.
-            `text-base sm:text-lg` and `line-clamp-3 sm:line-clamp-2`: a
-            smaller step and a third line below the kit's `sm` breakpoint
-            (640px, the same threshold `CardGrid`'s own column ladder
-            already keys off, so "phone" here means the same thing it means
-            to the grid around it), unchanged at `sm` and above — desktop
-            measured 0 of 50 clipped before this change and nothing here
-            touches it. NO EXISTING PATTERN for responsive type size existed
-            anywhere in this app before this line; checked
-            documents/UI-RULEBOOK.md and the rest of web/ first, found
-            nothing to match, so this is a new one, kept to the smallest
-            shape (a variant prefix on the existing utilities, no new
-            component, no new token). */}
+        {/* CLAMPED TO TWO LINES, not three — a narrower card (four to a row
+            instead of three) has less room for a long title before it starts
+            crowding the kind chip and the meta line beneath it. The native
+            `title` attribute still carries the name in full, exactly as the
+            wider card did. */}
         <CardTitle
-          className="min-w-0 flex-1 line-clamp-3 sm:line-clamp-2 text-base sm:text-lg break-words"
+          className="min-w-0 flex-1 line-clamp-2 text-sm break-words"
           title={source.active ? source.title : t("{title} (not in use)", { title: source.title })}
         >
           {source.active ? source.title : t("{title} (not in use)", { title: source.title })}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 text-sm">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge>{compartmentLabel(source, accountNames, t)}</Badge>
-          <Badge variant="secondary">{appLabel(source, t)}</Badge>
-          {canEdit && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("Edit filing")}
-              className="ms-auto size-7"
-              onClick={(e) => {
-                // The card underneath opens the record; this opens the
-                // dialog instead, so the two press targets cannot fire
-                // together.
-                e.stopPropagation()
-                onEditFiling()
-              }}
-            >
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
-        </div>
-        <p className="text-muted-foreground">{sharingLabel(source, t)}</p>
-        <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
-          <span>{piecesLabel(source, t)}</span>
-          {sightings && <span>{sightings}</span>}
-          <span>
-            {source.updatedAt || source.createdAt
-              ? t("Last edited {when}", {
-                  when: formatRelative(source.updatedAt ?? source.createdAt, t, lang),
-                })
-              : null}
-          </span>
-        </div>
+      <CardContent className="flex flex-col gap-1.5 text-sm">
+        {/* KIND — the one fact a title alone cannot say (a calendar entry
+            beside a ticket beside a file somebody uploaded), in the same
+            words the record's own Overview tab and the Type facet already
+            use (`KNOWLEDGE_KIND`), so this card never coins a second name for
+            the same thing. */}
+        <Badge variant="secondary" className="w-fit">
+          {KNOWLEDGE_KIND[source.kind] ?? source.kind}
+        </Badge>
+        {/* THE ONE META LINE. "Last edited" beats a count of pieces or
+            sightings here: it is the one fact true of every source (a note,
+            a file, a mirrored record) and the one a reader scanning a wall of
+            these actually wants at a glance — is this stale? Everything else
+            this card used to carry (where it's filed, who may use it, how
+            many pieces, how it reached us) is still on the record's own
+            Overview tab, one press away through the card itself. */}
+        {(source.updatedAt || source.createdAt) && (
+          <p className="text-muted-foreground text-xs">
+            {t("Last edited {when}", {
+              when: formatRelative(source.updatedAt ?? source.createdAt, t, lang),
+            })}
+          </p>
+        )}
       </CardContent>
     </Card>
   )

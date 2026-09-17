@@ -174,7 +174,7 @@ import { describe, expect, it } from "vitest"
 
 import ts from "typescript"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { UNCONTAINED_SECTION_OK, OVERLAY_FAMILY_OK } from "@shared/rules/registry"
+import { UNCONTAINED_SECTION_OK, OVERLAY_FAMILY_OK, RECORD_DETAIL_COLLECTION_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -1910,5 +1910,370 @@ describe("R67 — a titled section stands on paper", () => {
       stale,
       "these UNCONTAINED_SECTION_OK entries match nothing any more — the sections are contained, so delete the entry:"
     ).toEqual([])
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // R67, WIDENED — A COLLECTION NESTED IN A RECORD-DETAIL TAB STANDS ON ITS
+  // OWN CARD; THE RECORD'S OUTER CHROME IS A DIFFERENT SURFACE.
+  //
+  // See `RECORD_DETAIL_COLLECTION_OK`'s own header (`shared/rules/
+  // registry.ts`) for the client's ruling and the full account. In short:
+  // amendment 3 just above already visits every `STICKY_TABS` record-detail
+  // `renderPanel` host, and shape (a) — "the mount is boxed by an ancestor" —
+  // passes every one of them on the strength of the ONE shared `Card` the
+  // kit's `RecordDetail` draws around whatever `panel` is
+  // (`overview-list.tsx`'s own header has the citation). That box is the
+  // right answer for a plain fact list (the client rejected a SECOND nested
+  // card around `OverviewList`, "container inside a container") and the
+  // wrong answer for an actual COLLECTION — `SprintsPanel`/`AppsPanel`
+  // already draw their OWN nested card inside it
+  // (`CollectionFrame useKitPanel`), unchallenged, so a sibling collection
+  // tab that skips that nested card reads as the one with "the background
+  // card" missing, which is exactly what she reported about the app's
+  // Tickets tab.
+  //
+  // So this second census asks R67's own per-body question a second time,
+  // for the SAME hosts, WITHOUT shape (a)'s ancestor shortcut — but only of
+  // a body that is actually shaped like a collection (a toolbar over rows),
+  // never of a plain fact list or a lone act: widening this to every panel
+  // body would refight the settled `OverviewList` question. "Shaped like a
+  // collection" is read off the source the same way `componentPaints` reads
+  // whether something paints — the branch's own JSX, hop-expanded one level
+  // through the SAME FILE's other top-level declarations (so `<AppTicketsTab
+  // appId={appId} .../>` resolves through `AppTicketsTab` → `AppTicketsPanel`
+  // → `PagedPanelBody`, all three in `work-panels.tsx`, to the literal
+  // `<PagedFind` two hops down) — never across a second file, the same
+  // under-reaching direction every walk in this file takes.
+  describe("R67, widened — a nested collection in a record-detail tab stands on its own card", () => {
+    /** Is this the `<TabsView className={STICKY_TABS} …>` mount a record
+     * detail wears (`record-chrome.tsx`)? Read positionally, the way R20
+     * reads a checked field: the `className` attribute's initializer is the
+     * bare identifier `STICKY_TABS`, not a string a `<TabsView
+     * className="…">` call could also write — so a screen that spells its
+     * own sticky class some other way is simply outside this narrower
+     * census, the same under-reach every walk here takes on purpose. */
+    function mountsStickyTabs(mount: ts.Node | undefined): boolean {
+      if (!mount || !(ts.isJsxElement(mount) || ts.isJsxSelfClosingElement(mount))) return false
+      const attrs = ts.isJsxElement(mount) ? mount.openingElement.attributes : mount.attributes
+      for (const a of attrs.properties) {
+        if (!ts.isJsxAttribute(a) || a.name.getText() !== "className") continue
+        const init = a.initializer
+        if (init && ts.isJsxExpression(init) && init.expression && ts.isIdentifier(init.expression))
+          return init.expression.text === "STICKY_TABS"
+      }
+      return false
+    }
+
+    /** One hop through the SAME FILE's other top-level declarations — the
+     * identical mechanism `componentPaints` (above) hop-expands through,
+     * reused here to ask a different question of the grown text: does it
+     * reference one of the seams a real collection is built from, rather
+     * than whether it paints. Deliberately narrow: `declText`/`fileTop` are
+     * this describe block's own outer closures, built once over `all`. */
+    const COLLECTION_SHAPE = /<(ToolbarRow|PagedFind|CollectionFrame|RecordTable|Table)\b/
+    const collectionShapeCache = new Map<string, boolean>()
+    function referencesCollectionSeam(name: string): boolean {
+      const cached = collectionShapeCache.get(name)
+      if (cached !== undefined) return cached
+      collectionShapeCache.set(name, false) // recursion guard
+      const d = declText.get(name)
+      if (!d) return false
+      const tops = fileTop.get(d.rel) ?? new Map<string, string>()
+      let text = d.text
+      const seen = new Set([name])
+      for (let hop = 0; hop < 4; hop++) {
+        let grew = false
+        for (const [k, v] of tops) {
+          if (seen.has(k)) continue
+          if (new RegExp(`\\b${k}\\b`).test(text)) {
+            seen.add(k)
+            text += `\n${v}`
+            grew = true
+          }
+        }
+        if (!grew) break
+      }
+      const hit = COLLECTION_SHAPE.test(text)
+      collectionShapeCache.set(name, hit)
+      return hit
+    }
+    /** Asked of a whole BODY (one `bodies()` entry — a JSX literal, or a
+     * `.map()`/ternary/`&&` arm) rather than of one tag: walks every element
+     * in it and asks the same question of each tag it meets, so
+     * `<AppTicketsTab appId={appId} host={host} … />` — a single
+     * self-closing element with no JSX children of its own — is still
+     * resolved through its OWN name. */
+    function looksLikeCollection(n: ts.Node): boolean {
+      let hit = false
+      const walk = (x: ts.Node) => {
+        if (hit) return
+        const t = tagName(x)
+        if (t) {
+          const base = t.split(".")[0]
+          if (COLLECTION_SHAPE.test(`<${base}`) || referencesCollectionSeam(base)) {
+            hit = true
+            return
+          }
+        }
+        ts.forEachChild(x, walk)
+      }
+      walk(n)
+      return hit
+    }
+
+    // ── A PRECISE, STRUCTURAL "does this collection stand on paper" check ──
+    //
+    // `paints`/`subtreePaints` (the machinery amendments 1–9 built, reused
+    // for `titled`/`panels` above) resolve a bare component reference
+    // through `componentPaints`'s TEXT-based hop expansion — which grows the
+    // scanned text through every same-file constant and same-file import the
+    // ACCUMULATED text so far happens to mention, recursively. That is the
+    // right direction for the QUESTION amendments 1–9 ask (a component's own
+    // classes, or a `cva` it calls), and the WRONG direction for this one:
+    // `work-panels.tsx` alone declares eleven panels, and once the hop walk
+    // has pulled in three or four of them the accumulated text is thousands
+    // of lines, and something in THAT blob almost always spells a container
+    // fill class that has nothing to do with the ONE panel being asked
+    // about. Measured, not assumed: with `paints`/`subtreePaints` in place
+    // of the resolver below, this census reported the app's Tickets tab —
+    // the literal screen the client's ruling names — as containED, because
+    // `AppTicketsTab`'s hop-accumulated text (through `AppTicketsPanel`,
+    // `PagedPanelBody`, `TicketsDashboard` and whatever THEY in turn
+    // mention) happens to contain a fill class several components away from
+    // the one actually on screen.
+    //
+    // So this narrower census asks the question the way R67's own amendment
+    // 5 (`rootPaints`) does — ONE edge, the component's own RETURN,
+    // followed transitively — with the ONE addition amendment 8 already
+    // proved necessary for a text scan and `rootElements` never carried: a
+    // GUARD return (an early `if (cond) return …`, no `else`, not the last
+    // statement — a loading skeleton, an error panel) is cut before roots
+    // are collected, exactly as `mainText`/`mainBody`/`isGuardReturn` do
+    // inside `createPaintWalk` above, reimplemented locally here rather than
+    // exported, since a guard branch this rejects is EXACTLY what R79's own
+    // `PagedPanelBody` writes twice (its error `<ShapeStateBody>` and its
+    // loading `<Skeleton>`) before its real, final `<PagedFind>` return —
+    // without cutting them, `rootElements`'s own "every root must pass"
+    // requirement would fail on the loading skeleton and never even reach
+    // the collection underneath it.
+    function isGuardReturnLocal(st: ts.Statement): boolean {
+      if (!ts.isIfStatement(st) || st.elseStatement) return false
+      const then = st.thenStatement
+      if (ts.isReturnStatement(then)) return true
+      return ts.isBlock(then) && then.statements.length > 0 && then.statements.every((s) => ts.isReturnStatement(s))
+    }
+    /** The declaration node for every top-level, capitalised name in `all` —
+     * the NODE counterpart to the outer `declText`/`fileTop` (which hold
+     * only text), built the same way `rootDecl` is inside `createPaintWalk`,
+     * needed here so `realRoots` below has an actual AST node to walk. */
+    const topLevelNode = new Map<string, ts.Node>()
+    for (const f of all)
+      for (const st of f.tree.statements) {
+        if (ts.isVariableStatement(st))
+          for (const d of st.declarationList.declarations)
+            if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !topLevelNode.has(d.name.text))
+              topLevelNode.set(d.name.text, d)
+        if (
+          ts.isFunctionDeclaration(st) &&
+          st.name &&
+          /^[A-Z]/.test(st.name.text) &&
+          !topLevelNode.has(st.name.text)
+        )
+          topLevelNode.set(st.name.text, st)
+      }
+    /** The JSX elements a declaration RETURNS, with every GUARD return cut
+     * first — `rootElements`'s own per-branch collection (a ternary's two
+     * arms included), asked only of the statements left once a loading/
+     * error guard is removed. Mirrors `rootElements`'s own handling of an
+     * expression-bodied arrow (no `return` at all) for the same reason. */
+    function realRoots(decl: ts.Node): ts.Node[] {
+      const body =
+        ts.isFunctionDeclaration(decl) && decl.body
+          ? decl.body
+          : ts.isVariableDeclaration(decl) &&
+              decl.initializer &&
+              (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) &&
+              ts.isBlock(decl.initializer.body)
+            ? decl.initializer.body
+            : undefined
+      if (!body) return rootElements(decl) // an expression-bodied arrow has no statements to guard-cut
+      const kept = body.statements.filter((_, i) => i === body.statements.length - 1 || !isGuardReturnLocal(body.statements[i]))
+      const out: ts.Node[] = []
+      const fromExpr = (e: ts.Expression) => {
+        if (ts.isParenthesizedExpression(e)) return fromExpr(e.expression)
+        if (ts.isConditionalExpression(e)) {
+          fromExpr(e.whenTrue)
+          fromExpr(e.whenFalse)
+          return
+        }
+        // A FRAGMENT IS ITS OWN ROOT HERE, unlike `rootElements` above (which
+        // deliberately hands back ZERO roots for one — "no ONE box to stand
+        // in", the right call for "does this component itself resolve to a
+        // single container"). This narrower census asks a different
+        // question — does ANYTHING inside what this panel returns paint —
+        // so the fragment node is pushed and `collectionSubtreePaints`
+        // (below) walks straight through it via `ts.forEachChild`, the same
+        // way it already walks into a `<div>` wrapper's children.
+        if (ts.isJsxFragment(e)) {
+          out.push(e)
+          return
+        }
+        if (ts.isJsxElement(e) || ts.isJsxSelfClosingElement(e)) out.push(e)
+      }
+      for (const st of kept) if (ts.isReturnStatement(st) && st.expression) fromExpr(st.expression)
+      return out
+    }
+    function hasJsxProp(node: ts.Node, propName: string): boolean {
+      const attrs = ts.isJsxElement(node)
+        ? node.openingElement.attributes
+        : ts.isJsxSelfClosingElement(node)
+          ? node.attributes
+          : null
+      if (!attrs) return false
+      return attrs.properties.some((p) => ts.isJsxAttribute(p) && p.name.getText() === propName)
+    }
+    const collectionPaintCache = new Map<string, boolean>()
+    /** The named seams this app already uses to say "this stands on its own
+     * paper" — read as a NAME rather than resolved through the kit's `cva`
+     * (which this narrower census does not carry a resolver for): the kit's
+     * `Card` defaults to `bg-surface-panel` (`shared/ui/components/card/
+     * card.tsx`'s own `cardVariants`, `defaultVariants: { variant:
+     * "default" }`), and `CollectionCard` (`screen-bits.tsx`) is a bare,
+     * variant-less `<Card>` — always that default, never `raised`. It is
+     * this whole census's OWN prescribed fix (`<PagedFind wrap={…}>`,
+     * `work-panels.tsx`'s `PagedPanelBody`), so naming it here is not a
+     * shortcut around the law, it is the law's own seam. */
+    const NAMED_PANEL_SEAM = new Set(["CollectionCard"])
+    /** Does THIS ONE element stand on paper directly — its own classes, one
+     * of the kit's own unconditional-panel escape hatches (`useKitPanel` on
+     * `CollectionFrame`/`RecordTable`, `CollectionCard`, a `<PagedFind
+     * wrap={…}>`) — or, failing those, does the NAMED component it calls
+     * resolve to painting (`collectionSeamPaints`, one edge, guard branches
+     * cut)? Never walks INTO the element itself — `collectionSubtreePaints`
+     * below is what walks, this is only ever asked of one node at a time. */
+    function elementPaintsDirectly(node: ts.Node): boolean {
+      if (!(ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node))) return false
+      if (FILL.test(classNameOf(node))) return true
+      const t = tagName(node)
+      if (!t) return false
+      const base = t.split(".")[0]
+      if (!/^[A-Z]/.test(base)) return false
+      if (hasJsxProp(node, "useKitPanel")) return true
+      if (base === "PagedFind" && hasJsxProp(node, "wrap")) return true
+      if (NAMED_PANEL_SEAM.has(base)) return true
+      return collectionSeamPaints(base)
+    }
+    /** Walks EVERY node in the subtree (`ts.forEachChild`, unconditionally —
+     * the same move `subtreePaints` above makes, which is what lets this
+     * reach a `.map()` row, a `&&`/ternary arm and a plain nested `<div>`
+     * alike without a separate clause for each shape) and asks
+     * `elementPaintsDirectly` of every JSX element it meets, stopping at the
+     * first hit. */
+    function collectionSubtreePaints(node: ts.Node): boolean {
+      let hit = false
+      const walk = (x: ts.Node) => {
+        if (hit) return
+        if (elementPaintsDirectly(x)) {
+          hit = true
+          return
+        }
+        ts.forEachChild(x, walk)
+      }
+      walk(node)
+      return hit
+    }
+    /** Does the named component structurally stand on paper — followed ONE
+     * edge at a time (its own real, guard-stripped return), every root
+     * required to paint, the same "every branch" direction `rootPaints`
+     * takes above. */
+    function collectionSeamPaints(name: string): boolean {
+      const cached = collectionPaintCache.get(name)
+      if (cached !== undefined) return cached
+      collectionPaintCache.set(name, false) // recursion guard
+      const decl = topLevelNode.get(name)
+      if (!decl) return false
+      const roots = realRoots(decl)
+      const hit = roots.length > 0 && roots.every((r) => collectionSubtreePaints(r))
+      collectionPaintCache.set(name, hit)
+      return hit
+    }
+
+    const stickyPanels: Finding[] = []
+    const stickyCensus = { hosts: 0, collections: 0 }
+    for (const f of app) {
+      const visit = (node: ts.Node) => {
+        if (
+          ts.isJsxAttribute(node) &&
+          node.name.getText() === "renderPanel" &&
+          node.initializer &&
+          ts.isJsxExpression(node.initializer) &&
+          node.initializer.expression &&
+          (ts.isArrowFunction(node.initializer.expression) || ts.isFunctionExpression(node.initializer.expression))
+        ) {
+          const fn = node.initializer.expression
+          let mount: ts.Node | undefined = node
+          while (mount && !ts.isJsxElement(mount) && !ts.isJsxSelfClosingElement(mount)) mount = mount.parent
+          if (mountsStickyTabs(mount)) {
+            stickyCensus.hosts++
+            const byPanel = new Map<string, string[]>()
+            const lineOf = new Map<string, number>()
+            for (const b of bodies(fn)) {
+              const t = tagName(b)
+              const value = panelValueOf(b, fn)
+              const line = f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1
+              if (!lineOf.has(value)) lineOf.set(value, line)
+              if (!looksLikeCollection(b)) continue // out of this narrower census's population
+              stickyCensus.collections++
+              if (!byPanel.has(value)) byPanel.set(value, [])
+              if (carriesHeading(b)) continue
+              if (t && PROSE.test(t)) continue
+              if (t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])) continue
+              if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
+              if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
+              // THE FIX: no ancestor shortcut here — a nested collection is
+              // asked to paint ITSELF, never excused by the record's own
+              // outer chrome card. `collectionSubtreePaints`, not
+              // `subtreePaints`/`paints` — see the block comment above.
+              if (collectionSubtreePaints(b)) continue
+              byPanel.get(value)!.push(`<${t}> at line ${line}`)
+            }
+            for (const [value, bare] of byPanel) stickyPanels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+          }
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(f.tree)
+    }
+
+    it("the census measures something (a blind scan reports all clear exactly like a passing one)", () => {
+      expect(
+        stickyCensus.hosts,
+        "no STICKY_TABS renderPanel host was found — the record-detail census has gone blind"
+      ).toBeGreaterThan(5)
+      expect(
+        stickyCensus.collections,
+        "no collection-shaped panel body was found under any STICKY_TABS host — either every record detail " +
+          "stopped nesting a real collection in a tab, or `looksLikeCollection` stopped resolving one"
+      ).toBeGreaterThan(5)
+    })
+
+    it("a nested collection in a record-detail tab is contained, or says why not", () => {
+      const offenders = stickyPanels.filter((s) => s.bare.length > 0)
+      const unexplained = offenders.filter((s) => !(s.where.split(":")[0] in RECORD_DETAIL_COLLECTION_OK))
+      expect(
+        unexplained.map((s) => `${s.where} — on the record's outer chrome, not its own card: ${s.bare.join(", ")}`),
+        "a record-detail tab panel that draws a collection stands on the same nested `CollectionCard`/" +
+          "`bg-surface-panel` the main collection screens use (`CollectionFrame useKitPanel`, `<PagedFind " +
+          "wrap={…}>`), never only on the record's own outer chrome card. Wrap it, or name " +
+          "`file#tabValue` in RECORD_DETAIL_COLLECTION_OK with the real reason:"
+      ).toEqual([])
+
+      const claimed = new Set(offenders.map((s) => s.where.split(":")[0]))
+      const stale = Object.keys(RECORD_DETAIL_COLLECTION_OK).filter((k) => !claimed.has(k))
+      expect(
+        stale,
+        "these RECORD_DETAIL_COLLECTION_OK entries match nothing any more — the panel is contained, so delete the entry:"
+      ).toEqual([])
+    })
   })
 })

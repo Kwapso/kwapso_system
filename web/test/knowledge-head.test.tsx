@@ -6,10 +6,19 @@
 // missing the toolbar. Why? Make it like the dashboard, so that it has its
 // own container background."
 //
-// FOUR PROOFS, off the real call site in collection-content.tsx — the same
-// "read source off disk" technique web/test/knowledge-search-restored.test.tsx
-// already uses for this exact screen, because the knowledge branch needs the
-// whole `ModuleContentCtx` (a dozen queries, permissions, callbacks) to
+// READS knowledge-screen.tsx, NOT collection-content.tsx — the knowledge
+// branch moved into its own component the same day (K2 by kind, the same
+// ruling this file's own sibling, knowledge-kind-tabs.test.tsx, proves): the
+// kind-tab strip's own R16 badges need a live sidecar read only a real
+// component can hold hooks for, the identical reason accounts/contacts/
+// tickets/tasks/processes/stories/waves already live in their own files
+// rather than as a branch of collection-content.tsx's deliberately pure
+// switch. collection-content.tsx now just calls <KnowledgeScreen ... /> —
+// nothing this file checks lives there any more.
+//
+// FOUR PROOFS, off the real call site — the same "read source off disk"
+// technique web/test/knowledge-search-restored.test.tsx already uses for
+// this exact screen, because the knowledge branch needs a dozen props to
 // render at all, and a render-level proof would spend most of its weight on
 // scaffolding rather than the four things she actually complained about:
 //
@@ -40,14 +49,12 @@ import { describe, expect, it } from "vitest"
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 
-function readCollectionContent(): string {
-  return readFileSync(join(ROOT, "web", "components", "deep-link", "collection-content.tsx"), "utf8")
+function readKnowledgeScreen(): string {
+  return readFileSync(join(ROOT, "web", "components", "knowledge", "knowledge-screen.tsx"), "utf8")
 }
 
 function knowledgeHeadBlock(src: string): string {
-  const moduleAt = src.indexOf('if (module === "knowledge")')
-  expect(moduleAt, "the knowledge module's own branch").toBeGreaterThan(-1)
-  const headingAt = src.indexOf("<CollectionHeading", moduleAt)
+  const headingAt = src.indexOf("<CollectionHeading")
   expect(headingAt, "the knowledge screen's own <CollectionHeading>").toBeGreaterThan(-1)
   // THE HEAD ENDS WHERE THE LIST'S OWN <PagedFind> BEGINS — the inline
   // AskTheAssistant box that used to mark this boundary is gone outright
@@ -58,15 +65,15 @@ function knowledgeHeadBlock(src: string): string {
   return src.slice(headingAt, listAt)
 }
 
-describe("the knowledge head (collection-content.tsx) — order", () => {
+describe("the knowledge head (knowledge-screen.tsx) — order", () => {
   it("is built on CollectionHeading, the one legal home for a mango button (R84)", () => {
-    const head = knowledgeHeadBlock(readCollectionContent())
+    const head = knowledgeHeadBlock(readKnowledgeScreen())
     expect(head.startsWith("<CollectionHeading")).toBe(true)
     expect(head, 'still names the section "knowledge"').toContain('sectionKey="knowledge"')
   })
 
   it('leads with the mango "Ask" button, then Sync, then the gear LAST', () => {
-    const head = knowledgeHeadBlock(readCollectionContent())
+    const head = knowledgeHeadBlock(readKnowledgeScreen())
     const askButtonAt = head.indexOf('variant="default"')
     const syncAt = head.indexOf("<GoogleSyncButton")
     const gearAt = head.indexOf("<ModuleSettingsGear")
@@ -85,7 +92,7 @@ describe("the knowledge head (collection-content.tsx) — order", () => {
   })
 
   it('the mango Ask button sits INSIDE CollectionHeading\'s own action prop, not beside it', () => {
-    const head = knowledgeHeadBlock(readCollectionContent())
+    const head = knowledgeHeadBlock(readKnowledgeScreen())
     const actionAt = head.indexOf("action={")
     const askButtonAt = head.indexOf('variant="default"')
     expect(actionAt, "CollectionHeading's action prop").toBeGreaterThan(-1)
@@ -95,7 +102,7 @@ describe("the knowledge head (collection-content.tsx) — order", () => {
 
 describe('the mango "Ask" button — calls the new-conversation door', () => {
   it("calls openNewAgentTab, preselects the knowledge scope, then opens the panel", () => {
-    const head = knowledgeHeadBlock(readCollectionContent())
+    const head = knowledgeHeadBlock(readKnowledgeScreen())
     const onClickAt = head.indexOf("onClick={() => {")
     expect(onClickAt, "the Ask button's own onClick").toBeGreaterThan(-1)
     const onClickEnd = head.indexOf("}}", onClickAt)
@@ -105,7 +112,7 @@ describe('the mango "Ask" button — calls the new-conversation door', () => {
     // newest unused draft or mints a fresh one, then activates it.
     expect(body, "opens (or reuses) a fresh conversation tab").toMatch(/openNewAgentTab\(\)/)
     // SCOPE, SKIPPING THE PICKER — her ask was answered directly rather than
-    // leaving the reader to press "Knowledge base" in the picker themselves.
+    // leaving the reader to press "Knowledge" in the picker themselves.
     expect(body, "preselects the knowledge scope").toMatch(/pickAgentTabScope\(\s*id\s*,\s*"knowledge"/)
     // OPENS AND FOCUSES — agent-panel.tsx's own open effect hands focus to
     // the composer the moment `open` flips true.
@@ -120,7 +127,7 @@ describe('the mango "Ask" button — calls the new-conversation door', () => {
   })
 
   it("imports the door from the two read-only files this lane may not edit", () => {
-    const src = readCollectionContent()
+    const src = readKnowledgeScreen()
     expect(src).toMatch(/import\s*\{\s*openNewAgentTab,\s*pickAgentTabScope\s*\}\s*from\s*"@\/lib\/agent-conversation-tabs"/)
     expect(src).toMatch(/import\s*\{\s*setAgentOpen\s*\}\s*from\s*"@\/lib\/agent-open"/)
   })
@@ -128,7 +135,7 @@ describe('the mango "Ask" button — calls the new-conversation door', () => {
 
 describe("the knowledge toolbar — present, search included again (17 Sep 2026, reverses K36)", () => {
   it("<PagedFind> carries facets, sort, view and a real placeholder together — never search={false}", () => {
-    const src = readCollectionContent()
+    const src = readKnowledgeScreen()
     const at = src.indexOf("<PagedFind<KnowledgeSource>")
     expect(at).toBeGreaterThan(-1)
     const tag = src.slice(at, at + 1800)
@@ -142,7 +149,7 @@ describe("the knowledge toolbar — present, search included again (17 Sep 2026,
 
 describe("the modal 'Ask a question' box is gone (client, 17 Sep 2026)", () => {
   it("does not mount AskTheAssistant on the knowledge screen any more", () => {
-    const src = readCollectionContent()
+    const src = readKnowledgeScreen()
     expect(src, "\"remove the whole modal 'Ask a question'\"").not.toMatch(/<AskTheAssistant\s*\/>/)
     expect(src).not.toMatch(/from "@\/components\/assistant\/ask-the-assistant"/)
   })
@@ -150,7 +157,7 @@ describe("the modal 'Ask a question' box is gone (client, 17 Sep 2026)", () => {
 
 describe("the knowledge container — one CollectionCard, like the dashboard (R67)", () => {
   it("<PagedFind> wraps its toolbar and body in CollectionCard, the same call every other collection makes", () => {
-    const src = readCollectionContent()
+    const src = readKnowledgeScreen()
     const at = src.indexOf("<PagedFind<KnowledgeSource>")
     const childrenAt = src.indexOf("{(found) => {", at)
     expect(at).toBeGreaterThan(-1)
@@ -162,15 +169,14 @@ describe("the knowledge container — one CollectionCard, like the dashboard (R6
   })
 
   it("imports CollectionCard, and no longer double-boxes through SectionWithCreate", () => {
-    const src = readCollectionContent()
+    const src = readKnowledgeScreen()
     expect(src).toMatch(/import\s*\{[^}]*CollectionCard[^}]*\}\s*from\s*"@\/components\/deep-link\/screen-bits"/)
-    // The knowledge branch's own render callback: SectionWithCreate would be
-    // a SECOND CollectionCard inside the one `wrap` now draws — the "broken
-    // combination" screen-bits.tsx's own CollectionCard doc warns about.
-    const moduleAt = src.indexOf('if (module === "knowledge")')
-    const nextModuleAt = src.indexOf('if (module === "tickets")', moduleAt)
-    const knowledgeBranch = src.slice(moduleAt, nextModuleAt)
-    expect(knowledgeBranch, "no inner CollectionCard left in the knowledge branch").not.toMatch(/<SectionWithCreate/)
+    // The whole file is the knowledge branch now, so one check covers what
+    // used to need a module-boundary slice: SectionWithCreate would be a
+    // SECOND CollectionCard inside the one `wrap` already draws — the
+    // "broken combination" screen-bits.tsx's own CollectionCard doc warns
+    // about.
+    expect(src, "no inner CollectionCard left in the knowledge screen").not.toMatch(/<SectionWithCreate/)
   })
 })
 

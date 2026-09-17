@@ -2,6 +2,509 @@
 
 ## Unreleased
 
+### Changed — `PermissionMatrix`: a locked capability takes a solid quiet-grey fill of its own; the row-level "Locked by policy" mark is retired in favour of a per-segment tooltip / `title`
+
+Client ruling, 17 Sep 2026, verbatim: *"In Permissions, the ones that are
+locked and cannot be changed, we need a different color, maybe a kind of
+solid grayed-out."* And, choosing among the drawings this put in front of
+her: *"For how a locked permission should look, I choose option A: solid
+gray field."*
+
+THIS OVERTURNS D4-B (2026-08-24) AND D6-B (2026-08-24), both ruled and built
+earlier in the same file. D4-B had a locked run draw exactly as a live one,
+with the lock stated only as a bare-words mark beside the collection's name
+(D6-B). That is reversed: a locked segment now carries a fill of its own, and
+the words move off the row onto the one segment they explain.
+
+TOKENS — no new hue, RULES §2.2's closed palette untouched:
+
+  - Fill, both registers — `--surface-quiet` (`bg-surface-quiet`), the kit's
+    own quiet surface and already `--btn-disabled-fill`'s value.
+  - Ink, HELD locked — `--ink-secondary` (`text-ink-secondary`), the mid-grey.
+  - Ink, RELEASED locked — `--ink-disabled` (`text-ink-disabled`), the light
+    grey. Both are the "ink-disabled family" `--btn-disabled-label` already
+    opens; no fifth ink tier was invented.
+
+MEASURED against `--surface-quiet`, transitions suppressed (script:
+`getComputedStyle` read off `verify/permission-locked/`, both palettes):
+
+  - `--ink-secondary` (held-locked): **6.656 light / 7.691 dark** against a
+    4.5:1 text floor — clears it in both palettes.
+  - `--ink-disabled` (released-locked): **1.817 light / 2.508 dark** —
+    deliberately quiet, the same shape this file already accepts for the live
+    not-held slot's own edge (1.526 / 2.185 against a 3:1 floor): a capability
+    that is both released and locked is the coldest fact on the grid, and
+    reading faint is the point.
+  - `--surface-quiet` vs `--surface-inverse` (locked fill vs a live held
+    fill): **rgb(226, 221, 212) vs rgb(26, 25, 24)** light, unmistakably
+    different computed backgrounds.
+
+BEHAVIOUR — a locked segment is not pressable: no hover (`enabled:hover:`
+never reaches a `<span>`), no focus ring (never a `<button>`, so tokens.css
+§8's global ring has nothing to attach to), `aria-disabled="true"`,
+`cursor: default` (not `cursor-not-allowed` — B's cursor argued a point the
+fill now makes on its own). The reason is the segment's own `title` and (where
+the run is interactive) its `Tooltip`: `"Locked by policy: <role>"`,
+`describeLock`'s own formatting, called once per locked segment instead of
+once per row.
+
+IT IS PER RIGHT. `PermissionModule.locked` grows a third shape —
+`Readonly<Record<string, boolean | readonly string[]>>`, keyed by role id,
+`true` for the whole row or a capability-id array for that role alone — so
+"one locked letter inside an otherwise editable cell takes the same fill" is
+now expressible: a cell can hold a locked capability beside three live,
+pressable ones. `PermissionRun` asks `isCapabilityLocked` once per slot
+rather than `locked` once per run. Both existing shapes (`boolean` and
+`readonly string[]`) are unchanged — RULES §9.1, nothing renamed or dropped.
+
+THE ROW-LEVEL MARK IS RETIRED FROM THE KIT.
+`data-slot="permission-matrix-locked"` no longer renders anywhere in this
+file — the consuming application was already hiding it. `lockedLabel` and
+`formatLockedLabel` are the same two props D4-B/D6-B shipped; only where they
+are called moved.
+
+THE LEGEND REGAINS A FOURTH REGISTER. D4-B had removed it because a locked
+run drew pixel-identical to "held" or "not held"; the new fill gives the
+legend something to translate again, drawn only when a shown cell actually
+holds a locked capability (the same restraint the "not offered" register
+already follows). New prop: `lockedRegisterLabel`, defaulted `"locked"`.
+
+FILES — `components/permission-matrix/permission-matrix.tsx` (the cell
+component and its locked state); `verify/permission-locked/` (new — an
+editable cell, a fully locked cell, and a mixed cell with one locked right
+beside three live ones, in one grid); `verify/permission-turn/page.tsx`
+(claim 6's probe rewritten: it asserted the now-retired row mark and now
+asserts its absence plus the per-segment `title` that replaced it).
+
+### Changed — `ScreenShell`'s outer gutters step down one rung: `--shell-gutter`, `--aside-inset`, the header band, the trail and the body all one `--space-*` size smaller
+
+Client ruling, 17 Sep 2026, verbatim: *"Because adding the breadcrumbs took
+up considerable screen space, let's reduce the margin that we have on the
+sides above and below both the main content and the assistant. Let's
+optimize the height. Let's not leave so much blank space there."* Every
+block-direction contributor to the outer gutter around the content column
+and the aside steps down exactly one rung on the scale already in
+`tokens.css` — not an invented pixel value, the same discipline every prior
+gutter change in this file follows.
+
+OLD -> NEW (comfortable; both are shown at the kit's own 15px root, ruling
+18, not ruling 28's 16px authoring reference):
+
+  - `--shell-gutter` (`DENSITY_GUTTER`, both densities) — `--space-5` ->
+    `--space-4`: 18.75px -> 15px. Moves at every one of this token's call
+    sites at once: the card's four sides, the content-to-assistant gap, the
+    assistant-to-window edge.
+  - `--aside-inset` (`DENSITY_ASIDE`, both densities) — `--space-5` ->
+    `--space-4`: 18.75px -> 15px, kept equal to `--shell-gutter` (the two
+    are documented as "the SAME token at every density").
+  - `DENSITY_HEADER` (the card's head band) — comfortable `px-7 pt-7 pb-6`
+    (30/30/22.5px) -> `px-6 pt-6 pb-5` (22.5/22.5/18.75px); calm `px-6 pt-6
+    pb-5` (22.5/22.5/18.75px) -> `px-5 pt-5 pb-4` (18.75/18.75/15px).
+  - `DENSITY_TRAIL` (the in-card trail's horizontal inset, which mirrors
+    `DENSITY_HEADER`'s `px` so the back/forward arrows keep landing under
+    the title) — comfortable `px-7` -> `px-6`; calm `px-6` -> `px-5`.
+  - `DENSITY_BODY` (the card's own content padding) — comfortable `p-6
+    lg:p-7` (22.5/30px) -> `p-5 lg:p-6` (18.75/22.5px); calm `p-5 lg:p-6`
+    (18.75/22.5px) -> `p-4 lg:p-5` (15/18.75px).
+  - `TRAIL_GAP` (the gap between the trail and the head) — `--space-5` ->
+    `--space-4`: 18.75px -> 15px.
+
+MEASURED in `verify/unsaved-changes-bar/`'s sibling harness,
+`verify/shell-gutter/`, at 1440x900, comfortable, with a rail, an open
+aside, a breadcrumb strip and a trail — the shapes that produced the
+client's own complaint:
+
+  - the card's own top edge: 47.33px -> 43.58px (-3.75, exactly the
+    `--shell-gutter` step; the old figure is the same 47.33 this file's own
+    `DENSITY_ASIDE` header already recorded before today).
+  - the card's own bottom edge (900px viewport): 881.25px -> 885px (+3.75).
+  - the aside's own body: top and bottom move identically to the card's,
+    confirming the "same token at every density" invariant held through the
+    edit.
+  - the card's own scrollable body gains height: comfortable 710.16px ->
+    732.67px (+22.51, the compounded `--shell-gutter` + `TRAIL_GAP` +
+    `DENSITY_HEADER` steps); calm gains to 743.92px (the smaller header band
+    leaves more of the card for content at that density).
+
+THE TAB STRIP'S OWN ATTACHMENT MECHANIC IS UNTOUCHED. `screen-shell-
+breadcrumb` (`BreadcrumbFolders`, `components/breadcrumbs/*`, a different
+lane's file) still takes no block-end padding of its own and its own
+`margin-block-end: calc(var(--folder-tab-overlap) * -1)` is not this edit's
+concern — none of the six records above lives inside that slot or changes
+how it joins the card.
+
+`--rail-inset` (`DENSITY_RAIL`) IS DELIBERATELY LEFT AT `--space-5`, AND
+THAT IS A FLAG, NOT AN OVERSIGHT. Today's ruling names "the main content and
+the assistant" — not the rail — and this lane's brief scopes the same way.
+Leaving the two apart reopens the 22.5-against-18.75 mismatch
+`DENSITY_RAIL`'s own header spent a full ruling closing on 2026-09-06 (now
+18.75-against-15 at the kit's 15px root). Whoever next touches the rail's
+own gutter should rule on it on purpose rather than let it drift further.
+
+ALSO FLAGGED: `TRAIL_GAP` now reads a different rung than `TABS_STRIP_GAP`
+(`components/tabs/tabs.tsx`) and `TOOLBAR_ROW_GAP`
+(`components/toolbar-row/toolbar-row.tsx`), which `TRAIL_GAP`'s own header
+explicitly reused `--space-5` from — "not a fourth opinion about air." Both
+files are outside this lane's ownership; their owner should decide whether
+to follow this step or hold the old rung on purpose.
+
+`check-screen-shell.mjs` gained a gutter-shrink check pinning all six
+records to their new values, run beside the existing resize-rot check.
+
+Files: `compositions/templates/screen-shell.tsx`,
+`compositions/templates/check-screen-shell.mjs`, `verify/shell-gutter/`
+(new), `.claude/launch.json`.
+
+### Changed — `UnsavedChangesBar` (`ground="bare"`) is sticky directly under the tab strip; its message steps up to `text-sm`
+
+Client ruling, 17 Sep 2026, verbatim: *"The 'You haven't saved changes'
+needs to be floating and visible at all times, directly under the tabs,
+even if I'm very down in the scroll. Also, I'm not sure of the size of this
+typography. Make sure that this is in the kit because it looks too small."*
+
+STICKY, `ground="bare"` ONLY. Until today `position: sticky` was explicitly
+the app's own decision (R63, `shared/web/pinned-chrome.ts`,
+`PINNED_TOOLBAR`) and this file drew only the row. That worked while the
+row's own container was already sticky at the viewport; it does not work
+for a row inside a SCROLLING panel — both real call sites (Settings ›
+Appearance, Settings › Team › Roles) — where a sticky ancestor does not
+make a static descendant sticky with it, so the bar scrolled out of view
+exactly as she described. `bare` — "the ground used under a tab strip", the
+one shape both call sites actually render — now carries `position: sticky`
+and `top: calc(var(--pinned-chrome-h, 0px) + var(--tab-strip-h, 0px))`
+itself; `page`/`panel` are unchanged and stay static, because neither
+stands under a tab strip inside a scrolling panel. `z-20` keeps it above
+its own scroll container's ordinary content. Both offsets are app-supplied
+CSS custom properties with a `0px` fallback each — this file still names no
+pixel of its own and still does not know the app's layout, only composes
+two numbers the app hands it.
+
+TYPE STEP, ONE RUNG: `text-caption` (`--text-caption`, 13px) ->
+`text-sm` (`--text-sm`, 14px) on the message. `Text`'s own ladder
+(`components/typography/typography.tsx`) is `caption` (13) -> `sm` (14) ->
+`base` (16); `sm` is the next rung, not `base`, which would be two rungs
+and more than "looks too small" asked for.
+
+MEASURED in `verify/unsaved-changes-bar/`, both without and with a
+stand-in for fixed chrome above the tab strip (`?chrome=1`, testing the
+two-offset composition): the bar's own top edge equals the tab strip's own
+bottom edge (`barTopMinusStripBottom: 0`) BEFORE scrolling its container
+and AFTER scrolling it 1500px — identical rect in both readings, in both
+cases (45px under the strip alone; 82.5px under the strip with a 37.5px
+chrome band above it, `--pinned-chrome-h` + `--tab-strip-h` composing
+exactly). The message's computed font-size reads 13.125px, matching
+`--text-sm`'s own resolved length at the kit's 15px root
+(`matchesTextSm: true`, `matchesTextCaption: false`) in both cases.
+
+`check-unsaved-changes-bar.mjs` gained checks for the sticky shape (present
+on `bare`, absent on `page`/`panel`) and the message's own `text-sm`, run
+beside the existing radius/colour checks — confirmed red against the
+pre-edit file before the fix landed, green after.
+
+Files: `components/unsaved-changes-bar/unsaved-changes-bar.tsx`,
+`components/unsaved-changes-bar/check-unsaved-changes-bar.mjs`,
+`verify/unsaved-changes-bar/` (new), `.claude/launch.json`.
+
+### Fixed — `BreadcrumbFolders` tabs NEST, Chrome's own model — the fourth report on this exact silhouette
+
+Client, 17 Sep 2026, verbatim: *"The inactives on the assistant are
+overlapping, so they're on top of the active tab, and that's incorrect.
+They should be behind."* Measured against two live-staging screenshots
+(`live-assistant-boundary-zoom.png`, `live-content-strip-1440.png`): every
+tab stood `--space-1` (4px) apart at rest, so two tabs never shared a
+pixel — nothing like a Chrome tab strip, where the NEXT tab's rounded
+corner sits UNDER the PREVIOUS tab's shoulder. A 4px seam could only ever
+produce a gap or, the moment anything tightened it, a square-cornered edge
+landing in front of a shoulder — "the inactive is on top" for either
+sibling, whichever direction the strip read.
+
+THE FIX IS A REAL, DELIBERATE OVERLAP, NOT A SMALLER GAP. `STRIP` drops
+`gap-1` (and now explicitly wins the merge against `BreadcrumbList`'s own
+base `gap-1.5` with `gap-0` — simply omitting the override left 6.75px of
+unwanted positive space standing, measured). Every tab after the first
+carries `TAB_OVERLAP_MARGIN` — `ms-[calc(var(--folder-shoulder)*-1)]` — so
+its box sits exactly `--folder-shoulder` under its predecessor's own
+shoulder: `overlap == shoulder`, not "roughly nested". The label doesn't
+lose room to it: the same tab adds `--folder-shoulder` BACK to its own
+leading padding (`TAB_OVERLAP_PS` / `TAB_ICON_ONLY_OVERLAP_PS`), so the box
+narrows by the overlap while the visible text stays exactly where it was.
+
+Z-INDEX, NOT DOM ORDER, DECIDES WHO PAINTS ON TOP. `restZIndex(position)` —
+`-position`, an INTEGER (CSS's own `z-index` grammar is `auto | <integer>`;
+a first draft used fractions in `(0,1)` and the browser silently refused
+every one past the leading tab, `getComputedStyle` reading `auto`,
+measured) — gives every rest tab its own, strictly DESCENDING number: the
+earlier (left) tab always outranks a later one. The live tab keeps its
+existing flat `1`, still strictly under the card's `z-[2]`. Written as an
+inline `style` on the `<li>` (Tailwind can't emit a class for a value that
+depends on render-time position), restored — not cleared to `""` — by
+`releaseTransforms` once a drag ends, or every rest tab would have
+flattened back to a DOM-order tie the instant a drag finished.
+
+`isolate` ON THE STRIP'S OWN `<ol>` — load-bearing, not decorative. A
+negative `z-index` flex item, measured, stops being clickable at all in
+real Chromium when its container is not itself a stacking context: CSS
+Flexbox's z-order rule paints items "behind the nearest ANCESTOR stacking
+context", which for an unpositioned `<ol>` is whatever established one
+several DOM levels up — `document.elementFromPoint` at a `z-index: -2`
+tab's own centre returned this file's page-level wrapper `<div>`, not the
+tab. `isolation: isolate` on the strip contains every child's z-index
+comparison locally, restoring ordinary hit-testing.
+
+Proved in `verify/tabstrip-parity/`, rebuilt for this: THREE hosts — content
+(rest · active · rest · rest), assistant A (active · iconOnly · iconOnly,
+her exact screenshot shape), assistant B (rest · active · iconOnly ·
+iconOnly, the active tab NOT first in DOM). `measureNesting` reads, for
+every consecutive pair on a REAL RESTING strip, no forcing: the pixel
+overlap equals `--folder-shoulder` (`overlapMatchesShoulder`), and
+`document.elementFromPoint` at the shared pixel returns the tab that ought
+to win — the active tab over either neighbour, and between two rest tabs
+the left one (`topElementWinsAsExpected`). All nine pairs across the three
+hosts pass. A screenshot (`tabs-nested.png`) shows the geometry with no
+notch anywhere the active or an earlier rest tab sits over its neighbour.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`,
+`verify/tabstrip-parity/page.tsx`.
+
+### Fixed — `BreadcrumbFolders` tabs are clickable again with `onReorder` wired up
+
+Client, 17 Sep 2026, verbatim: *"after you implemented the drag tabs, I can
+no longer click them to open them."* Real clicks on a tab, its ×, or a
+pinned tab did nothing — no navigation, no hash change, no console error,
+on both strips — measured with Playwright, not guessed: a genuine
+`pointerdown`/`pointerup` pair with zero movement, dispatched at a tab's own
+anchor, produced a `click` whose `event.target` was the `<li>`, never the
+anchor inside it.
+
+THE CAUSE: `setPointerCapture` (`onTabPointerDown`, taken on every
+`pointerdown` of a movable tab — drag or plain tap alike, since nothing
+distinguishes them until AFTER the gesture) retargets every later pointer
+event for that gesture, and the browser's own DERIVED `click`, to the
+capturing element — this `<li>` — never the anchor, button or × nested
+inside it. An event does not redispatch into descendants of its own
+target, so the anchor's native "follow this link" and the ×'s `onClick`
+never fired, for a motionless tap exactly as much as for a real drag.
+
+TWO FIXES, IN `onTabPointerEnd` AND `onTabPointerMove`:
+
+  · THE TAP FORWARD — a tap that never became a drag (`!drag.moved`)
+    replays its click at `drag.originTarget`, the actual element the
+    pointer went down on (captured at pick-up via
+    `event.target.closest("a, button")` — NOT `event.target` verbatim,
+    which is SVG for an icon glyph and has no native `.click()`).
+    `.click()`, called directly on that element, dispatches a fresh click
+    targeted exactly where it's called, unaffected by the capture above.
+  · `DRAG_MOVE_THRESHOLD_PX` (4) — `onTabPointerMove` used to flag ANY
+    nonzero pointer movement as a drag (`deltaX !== 0`), which a real mouse
+    or trackpad rarely avoids even on a plain click; below the threshold a
+    gesture still counts as a tap and gets the forward above.
+
+Proved in `verify/tabstrip-parity/`'s `measureTapForward`: a genuine
+`PointerEvent` pair (pointer id 1, no synthetic click) on a movable rest
+tab's own anchor, confirming the click reaches it (`clickTarget: "A"`).
+Regression-checked against real drag-to-reorder and the per-tab × with
+Playwright mouse events outside the verify harness: a real drag still
+reorders and swallows its own trailing click; the × still fires `onClose`.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`.
+
+### Removed — `BreadcrumbFolders`' close-all control, entirely
+
+Client, 17 Sep 2026, verbatim: *"I don't know what it is (this X button
+that you added in the tabs in the main content that closes everything),
+but no one asked you, so delete it."* `onCloseAll`, `closeAllLabel`,
+`CLOSE_ALL_WRAP`, `CLOSE_ALL` and the trailing `<li>` they drew (shipped
+v1.2.92, one day before this ruling) are gone, not deprecated — no dead
+body left for a later session to trip on. The app's own `closeAllTabs`
+wiring (`app-shell.tsx` / `workspace-tabs.ts`) is a different lane's; this
+change only ever owed it the prop, and removing the prop is what makes
+that call site fail to compile until that lane removes its own side —
+the correct, loud signal, not a bug here.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`,
+`verify/tabstrip-parity/page.tsx`.
+
+### Added — `BreadcrumbFolders` rest tabs get their own hover fill
+
+Client, 17 Sep 2026, verbatim: *"When I'm hovering over a tab and I'm
+talking, both in the main container and in the assistant, I want it to
+have a hover color apart from the changes in the text that are already
+there."* Until today a rest tab's hover moved only the label (ink + a
+weight preview); the paper under it never moved. `CrumbShape` now takes an
+optional `hoverFill`: a SECOND `FolderShape`, identical box, stacked on top
+of the first, `opacity-0` at rest and `group-hover:opacity-100` — not a
+straight swap of the base fill, because `--accent` (the SAME wash token
+`TAB_CLOSE`'s own hover already uses on this strip, "the kit's neutral
+item wash") is a 5%-alpha rgba designed to be COMPOSITED over an opaque
+layer, not to BE one; filling the whole tab with it directly reads as the
+tab nearly vanishing rather than gaining a tint. `--kw-crumb-hover` is a
+third custom property beside `--kw-crumb-rest`/`--kw-crumb-live`, declared
+on the same `<nav>` for TAB-C1's own reason. `group` on the `<li>` is now
+UNCONDITIONAL (was gated on `closable`) so the wash survives the pointer
+crossing onto the ×, same as the existing weight preview. Only on rest
+tabs, icon-only included (`item.iconOnly` never changes which fill a crumb
+draws) — never on the live tab: "the active tab does not change on hover"
+is the line her own words draw between the two, and `FILL_LIVE`'s two call
+sites never pass `hoverFill`.
+
+Verified with a real `page.hover()` (a synthetic event cannot fake a
+`:hover` pseudo-class): the hover shape's own computed `opacity` reads `0`
+at rest and `1` under a real hover, `color` the `--accent` wash; the live
+tab carries no hover shape at all.
+
+Files: `components/breadcrumbs/breadcrumb-folders.tsx`.
+
+### Added — `ScreenShell`'s `trail` slot moves INSIDE the content card; `TrailLine` reverts to paper ink (supersedes the v1.2.104 entry below)
+
+Client ruling, 17 Sep 2026 MORNING, verbatim: *"the breadcrumbs should sit in
+the background, outside the container, on top, and on the very far left,
+have a back and forward arrow."* Built exactly that way in v1.2.104. SAME
+DAY, AFTERNOON, verbatim: *"I love the direction that we are going, but put
+the breadcrumbs and the navigation inside the container."* This entry is
+that correction — it supersedes the "Added" entry immediately below it,
+which described the geometry this one replaces; that entry is left in place
+as the record of what shipped first and why, not deleted.
+
+`ScreenShell`'s `trail?: React.ReactNode` slot now renders as `<main>`'s
+(the CARD's) OWN FIRST CHILD, above whatever the card's body draws (the
+collection heading / record head), instead of as a sibling on the page
+ground between the tab strip and the card. Full width of the card's inner
+box, with the card's own inset on the left — `DENSITY_TRAIL`, a new record
+in `screen-shell.tsx` reading the identical `px-[var(--space-7)]` /
+`px-[var(--space-6)]` `DENSITY_HEADER` already spends, so the arrows land
+exactly under the title's own left edge, provably rather than by
+coincidence. No top padding of its own: `band`'s (or the body's) own `pt` is
+UNCHANGED, so the head simply moves down by the trail's own height plus a
+gap — still `TRAIL_GAP`, still `--space-5`, now spent between the trail and
+the head instead of between the trail and the card (the same constant, the
+same token, only where it is spent moved). Absent, nothing renders and
+NOTHING about the card's own position or the head's own top changes — proved
+in `verify/trail-line/`, updated for the new geometry: the card's top in the
+shell is now IDENTICAL across all four cases (with or without `trail`,
+`cardTopDeltaFromNone: 0`), because the slot no longer lives outside the
+card to push it down; only the head's top moves, and by exactly
+`trailSlotHeight + TRAIL_GAP`'s value (`deltaMatchesExactly: true`, delta
+`43.12`px, unchanged from the trail-less baseline's own head position).
+
+COLOUR REVERTS TO THE PAPER LADDER. `TrailLine` (`components/breadcrumbs/
+trail-line.tsx`) "lay flat on the ground" in v1.2.104 and rebound
+`--foreground` / `--ink-tertiary` to `--spine-ink` on its own root so the
+unedited `breadcrumb/breadcrumb.tsx` primitive would read on the spine. The
+afternoon ruling moves this component onto the card's own paper
+(`--surface-raised`, `text-foreground`), where that primitive already reads
+correctly with NO rebind at all — so the rebind is deleted, not merely
+unused. `--foreground` for the current step (`BreadcrumbPage`),
+`--ink-tertiary` for quiet earlier steps (`BreadcrumbList`'s inherited
+base), and the arrows now read `--foreground` at rest / `--ink-disabled`
+when there is nowhere to go (was `--spine-ink` / `--spine-ink-disabled`).
+THE "NEVER GREY NAV TEXT" RULE IS KEPT, NARROWED TO WHERE IT STILL APPLIES:
+the client's verbatim correction on `rail.tsx`'s own ground — "nav text
+should ALWAYS be either pure black or pure white — never gray — depending on
+what it sits on" — was always about text ON THE SPINE. This trail's text no
+longer sits there, so `--ink-tertiary` is now the correct quiet ink;
+"current bold, earlier quiet" is still carried by WEIGHT
+(`BreadcrumbPage`'s `font-[var(--font-weight-medium)]` against
+`BreadcrumbLink`'s inherited light body weight), never by colour, exactly as
+before.
+
+Verified in `verify/trail-line/`: trail inside the card at 1, 4 and 9 steps,
+arrows enabled/disabled across all three (`one`: both disabled; `four`: back
+only; `nine`: both, and the visible trail folds), the trail's own left edge
+(the back button) exactly aligned with the head's own left edge (the title
+text, `[data-slot=title-heading]`, not the padded wrapper around it —
+`trailLeftMinusHeadLeft: 0`), the trail spanning the card's own full width
+(`trailWidthMinusCardWidth: 0`), the card's own top unmoved by `trail`'s
+presence (`cardUnmoved: true` in all three cases), and the head's own top
+moving down by exactly the trail's height plus the gap, measured against the
+trail-less baseline rather than asserted (`deltaMatchesExactly: true`).
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system before either
+app can use the new geometry; no application code changes shape until then.
+
+### Added — `ScreenShell` gets a `trail` slot; new `TrailLine` composition (back/forward + the text trail) [SUPERSEDED, SAME DAY — see the entry above]
+
+Client ruling, 17 Sep 2026, verbatim: *"the breadcrumbs should sit in the
+background, outside the container, on top, and on the very far left, have a
+back and forward arrow."* and *"Yes to Chrome navigation, push the trail on a
+rail pick."* Two sentences, two files.
+
+`ScreenShell` gains an optional `trail?: React.ReactNode` slot, rendered
+BETWEEN the tab strip (the `breadcrumb` prop — note the name is now
+misleading; that prop has held `BreadcrumbFolders`, the folder-tab STRIP,
+since 2026-09-02) and the content CARD, on the page ground rather than inside
+`<main>`. `min-w-0 shrink-0` matches the strip wrapper's own sizing exactly
+(the column is `flex-col` with no `align-items` override, so the wrapper
+already spans the full inline size for free), and it declares no
+`z-index`/`isolate`/`transform`/`opacity`/`filter`, the same restraint the
+strip wrapper already writes. Absent, nothing renders and nothing about the
+card's position changes — proved side by side in `verify/trail-line/`,
+which measures the CARD's top with and without the slot and reports the
+delta to the pixel.
+
+THE GAP TO THE CARD IS `--space-5`, NOT A NEW `--trail-gap` CUSTOM PROPERTY.
+`TABS_STRIP_GAP` (`components/tabs/tabs.tsx`) and `TOOLBAR_ROW_GAP`
+(`components/toolbar-row/toolbar-row.tsx`) already spend `--space-5` on "the
+air under a strip of ground chrome", and `TOOLBAR_ROW_GAP`'s own comment says
+why the second of those reused the first's number rather than restating it:
+"not a fourth opinion about air." A `--trail-gap` token would have been a
+third name for the same number, so the shell instead exports a local
+`TRAIL_GAP = "mb-[var(--space-5)]"` constant, the same shape as its two
+siblings, applied to the trail's own wrapper (`breadcrumb`'s wrapper pays no
+gap at all — the folder strip is welded to the card by its own negative
+margin and owns that relationship itself; the trail welds to nothing, so the
+shell pays a real one).
+
+`TrailLine` (new, `components/breadcrumbs/trail-line.tsx`) is the node a
+screen hands that slot. Far left: Back and Forward, Phosphor `CaretLeft` /
+`CaretRight` at `--control-height-pill` (26), `aria-label`s `backLabel` /
+`forwardLabel` (props, defaulting "Back"/"Forward"), disabled when there is
+nowhere to go. Then the text trail, built on the SAME primitives
+`Breadcrumbs` already draws from (`components/breadcrumb/breadcrumb.tsx`)
+and the same fold rule (`collapse()`, imported from `./breadcrumbs` rather
+than re-derived) — reached one layer under the sealed one-prop `Breadcrumbs`
+because `onJump` needs every earlier step to be pressable whether or not it
+carries an `href`, which that sealed form has no way to express. Props:
+`steps: TrailStep[]` (the WHOLE history, "Chrome navigation" — a rail pick
+PUSHES: the call site appends after `cursor` and drops whatever followed,
+this component never mutates the array), `cursor` (the current step;
+everything after it is reachable by `onForward` but not drawn as a crumb),
+`onBack`, `onForward`, `onJump(index)`. The row never wraps
+(`flex-nowrap`, overriding `BreadcrumbList`'s own default) and folds the
+middle to `BreadcrumbEllipsis` past `maxItems` (default 4, matching
+`breadcrumb-folders.tsx`'s own `FOLD_AFTER`).
+
+COLOUR: caught and fixed mid-build by `verify/trail-line/` itself — the first
+version read `text-ink-tertiary`/`text-foreground` (the panel ladder) with no
+rebind, and the trail nearly disappeared on the mango spine. `TrailLine`
+"lies flat on the ground" the same way `rail.tsx` states its own rows do, so
+every ink here is a `--spine-*` token: the component rebinds `--foreground`
+and `--ink-tertiary` to `--spine-ink` on its own root (the two custom
+properties `breadcrumb/breadcrumb.tsx` actually reads), and reads
+`--spine-ink-disabled` directly on its own arrows. Deliberately NOT
+`--spine-ink-quiet` anywhere: `rail.tsx`'s `ROW_IDLE` carries the client's own
+verbatim correction on this exact ground — "nav text should ALWAYS be either
+pure black or pure white — never gray — depending on what it sits on" — so
+"last item current (bold ink), earlier items quiet" is carried by WEIGHT
+(`BreadcrumbPage`'s existing `font-[var(--font-weight-medium)]` against
+`BreadcrumbLink`'s inherited light body weight), never by a second ink
+shade. The arrows' disabled state follows `rail.tsx`'s `ROW_BLOCKED`
+precedent for the same reason — ink-only, no fill invented for a control
+that never had one.
+
+Verified in `verify/trail-line/` (new): strip + trail + card at 1, 4 and 9
+steps, arrows enabled/disabled across all three (`one`: both disabled;
+`four`: back only; `nine`: both, and the visible trail folds), the trail's
+own background transparent over the ground, its left edge exactly aligned
+with the strip's first tab (`trailLeftMinusLeadTabLeft: 0`), and the card's
+top moving down by exactly the trail's own height plus `TRAIL_GAP` — measured
+against a fourth, trail-less case, not asserted (`deltaMatchesExactly: true`
+in all three cases; the delta itself, `43.12`px, is identical regardless of
+step count, confirming the row's height does not depend on its content).
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system before either
+app can use `trail`/`TrailLine`; no application code changes shape until
+then.
+
 ### Fixed — `BreadcrumbFolders` icon-only tabs draw a rounded top-left corner again, tucked under the tab before them
 
 Client review, 17 Sep 2026, her THIRD report on this exact silhouette: *"the

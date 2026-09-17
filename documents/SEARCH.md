@@ -182,7 +182,7 @@ Layers 1–3 answer *"which rows match these words?"*. The knowledge base answer
 *"what do we know about this?"*, and because the answer is prose rather than a row,
 it is built and governed completely differently. It is **not** a fourth setting on a
 recipe and no collection opts into it; it is its own subsystem in the content
-worker, reached at `GET /api/content/knowledge/ask`, in the app's Knowledge base
+worker, reached at `GET /api/content/knowledge/ask`, in the app's Knowledge
 screen, and through `ask_knowledge` on the machine surface.
 
 Three things about it belong here, so that a reader who came to this file looking

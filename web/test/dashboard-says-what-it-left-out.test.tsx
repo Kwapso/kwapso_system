@@ -66,6 +66,7 @@ const EMPTY: TicketDashboard = {
   raisedAsNotRecorded: 0,
   openByApp: [],
   unopenedPastLine: 0,
+  raisedByContact: { rows: [], total: 0, people: 0 },
   // NOT ZERO. `EMPTY` is a backlog whose GROUPINGS came back empty, which is
   // what the panels' own subtractions are tested against; a zero here would
   // instead be "the question found no tickets at all", which is the separate
@@ -116,6 +117,14 @@ const FULL: TicketDashboard = {
     { appId: null, appName: null, helpType: "Issue", open: 2, total: 4 },
   ],
   unopenedPastLine: 7,
+  raisedByContact: {
+    rows: [
+      { contactId: "c1", contactName: "Marta Klein", contactLogoUrl: null, n: 14 },
+      { contactId: "c2", contactName: "Jonas Beck", contactLogoUrl: null, n: 9 },
+    ],
+    total: 23,
+    people: 2,
+  },
   matched: 245,
 }
 
@@ -132,22 +141,7 @@ function show(view: TicketDashboard | undefined, total: number | undefined = 62)
  * not a second one. */
 function showForApp(view: TicketDashboard | undefined, total: number | undefined = 62) {
   holder.view = view
-  return render(
-    <TicketsDashboard
-      teamId="T1"
-      appId="AP_1"
-      helpTypeOptions={TYPES}
-      ticketTotal={total}
-      viewSlot={{
-        views: [
-          { value: "list", label: "List" },
-          { value: "dashboard", label: "Dashboard" },
-        ],
-        value: "dashboard",
-        onValueChange: () => {},
-      }}
-    />
-  )
+  return render(<TicketsDashboard teamId="T1" appId="AP_1" helpTypeOptions={TYPES} ticketTotal={total} />)
 }
 
 describe("the tickets dashboard says what it left out", () => {
@@ -377,22 +371,16 @@ describe("the tickets dashboard says what it left out", () => {
     }
   })
 
-  it("a team with no tickets at all gets the empty state and NO toolbar (R50)", () => {
+  it("a team with no tickets at all gets the empty state (R50)", () => {
     show(EMPTY, 0)
     expect(screen.getByText(/Nothing is open right now/i)).toBeTruthy()
-    expect(
-      screen.queryByRole("button", { name: /filter/i }),
-      "R50 — a toolbar drew over a collection with no rows in it at all"
-    ).toBeNull()
   })
 
-  it("…but a FILTER that finds nothing keeps the toolbar, so the reader can get back out", () => {
-    // The difference this test exists for: an empty ANSWER is not an empty
-    // COLLECTION, and taking the filters away at the moment somebody filters
-    // themselves into a corner is the one thing that traps them there.
-    show(EMPTY, 62)
-    expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
-  })
+  // THE "FILTER that finds nothing keeps the toolbar" CASE THAT STOOD HERE IS
+  // GONE, 17 Sep 2026 — client ruling: "Remove the toolbar from the tickets
+  // dashboard." There is no search or filter left to narrow this screen to
+  // nothing with, so the distinction that test existed to prove (an empty
+  // ANSWER is not an empty COLLECTION) no longer has a control to hang on.
 })
 
 // ── THE SAME DASHBOARD, INSIDE ONE APP ──────────────────────────────────────
@@ -422,13 +410,16 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
     ).toBeNull()
   })
 
-  it("keeps the three that still answer a question about this system", () => {
+  it("keeps the four that still answer a question about this system", () => {
     showForApp(FULL)
     for (const heading of [
       // where this app's open work is stuck
       "The open work",
       // whether what arrives about it is what it turns out to be
       "Raised as, then triaged as",
+      // who has asked the most, ranked — arrived 17 Sep 2026, the third of
+      // three columns "The open work" and "Raised" now share a row with.
+      "Raised by",
       // how long we take to close things on it…
       "How long a ticket takes to close",
       // …and which way that is going. Two panels since 6 Sep 2026, and BOTH
@@ -454,32 +445,20 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
     ).toBeNull()
   })
 
-  // "Client" UNTIL 2026-09-09 — the facet's LABEL is now "Account" (her ruling:
-  // "the filter client is the company, so it's the account"). The word this
-  // asserts had to move with it or the assertion would pass by naming a string
-  // no screen says any more, which is a check measuring nothing.
-  it("offers no Account filter, because an app is built for one account", () => {
-    // The same subtraction the "Who has more" panel makes, made at the toolbar:
-    // a control whose only meaningful setting is the one already in force is a
-    // fact wearing a control's clothes. The Kind filter stays — a system's
-    // Issues and its Extras are a real question inside one app.
+  // THE FACET-FILTER AND VIEW-SWITCH CASES THAT STOOD HERE ARE GONE, 17 Sep
+  // 2026 — client ruling: "Remove the toolbar from the tickets dashboard."
+  // There is no toolbar left to carry a filter button or the List↔Dashboard
+  // `ViewSwitch` on EITHER host; the switch still reaches a reader through the
+  // List view's own toolbar (`web/components/work/work-panels.tsx`), which
+  // keeps its own coverage.
+  it("draws no toolbar at all — no filter button, no view switch", () => {
     showForApp(FULL)
-    expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
-    expect(screen.queryByText("Account"), "an Account facet drew inside one app").toBeNull()
-  })
-
-  it("draws the view switch, so the list is one press away", () => {
-    // R50 takes the WHOLE row away on an empty collection, this switch
-    // included — which is correct and is why the list leads: a reader only ever
-    // reaches this view from a tab that had rows.
-    showForApp(FULL)
-    // A `SelectTrigger` under the hood (the kit's `ViewSwitch`), so the role is
-    // a combobox and the accessible name is the `aria-label` the row passes —
-    // the pill draws no visible label, its own text is the current view.
+    expect(screen.queryByRole("button", { name: /filter/i }), "a filter button survived the toolbar").toBeNull()
     expect(
-      screen.getByRole("combobox", { name: "View" }),
-      "the dashboard view drew no way back to the list"
-    ).toBeTruthy()
+      screen.queryByRole("combobox", { name: "View" }),
+      "the List↔Dashboard view switch survived the toolbar"
+    ).toBeNull()
+    expect(screen.queryByPlaceholderText(/search/i), "a search box survived the toolbar").toBeNull()
   })
 })
 
@@ -999,30 +978,10 @@ describe("every month is drawn, however few closed in it", () => {
   })
 })
 
-describe("the toolbar carries the same create button every other ticket tab has", () => {
-  // CLIENT: "On the dashboard, I'm missing the full toolbar, so go ahead and
-  // implement that." The row passed `filters` and `view` and nothing else, so
-  // its right-hand end was empty while every sibling tab had a create button
-  // there. The node comes from the HOST — the identical one its list body draws
-  // — which is what makes "the same button" a fact rather than a claim.
-  it("draws the host's raise-ticket action in the row", () => {
-    showWith(TYPES, { actions: <button type="button">Raise ticket</button> })
-    expect(screen.getByRole("button", { name: "Raise ticket" })).toBeTruthy()
-  })
-
-  it("…and loses it with the rest of the row on a team with no tickets at all (R50)", () => {
-    holder.view = EMPTY
-    render(
-      <TicketsDashboard
-        teamId="T1"
-        helpTypeOptions={TYPES}
-        ticketTotal={0}
-        actions={<button type="button">Raise ticket</button>}
-      />
-    )
-    expect(
-      screen.queryByRole("button", { name: "Raise ticket" }),
-      "R50 — the create button outlived the row it sits in, again"
-    ).toBeNull()
-  })
-})
+// THE "toolbar carries the same create button" DESCRIBE BLOCK THAT STOOD HERE
+// IS GONE, 17 Sep 2026 — client ruling: "Remove the toolbar from the tickets
+// dashboard." `<TicketsDashboard>` no longer accepts `actions` (nothing left
+// to draw it into); the create button it used to test now lives only on the
+// List view's own toolbar (`web/components/work/work-panels.tsx`), which
+// keeps its own coverage. See `web/test/tickets-dashboard-no-toolbar.test.tsx`
+// for the replacement: no toolbar renders here at all any more.

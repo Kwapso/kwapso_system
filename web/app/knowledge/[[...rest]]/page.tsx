@@ -1,4 +1,4 @@
-// Top-level Knowledge base page — its own clean URL (/knowledge, /knowledge/<id>),
+// Top-level Knowledge page — its own clean URL (/knowledge, /knowledge/<id>),
 // resolving the active team from context like /home. Backed by the SAME deep-link
 // host as /t/* (one client-resolved shell); the gateway serves this shell for any
 // /knowledge/* depth (workers/gateway run_worker_first + the /knowledge/ rewrite).

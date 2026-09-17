@@ -82,21 +82,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@shared/ui/components/hover-card/hover-card"
-import { SearchInput } from "@shared/ui/components/search-input/search-input"
-// THE KIT'S OWN DEBOUNCE, the one the record picker already asks the door
-// through — see `askDoor` in the screen below for why a search box on THIS tab
-// needs one at all.
-import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
-import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
-import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useCached } from "@shared/web/store"
-import { cn } from "@shared/ui/lib/utils"
-import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 import { Sankey } from "@shared/ui/components/sankey/sankey"
-import { ToolbarRow, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 // THE ONLY LEGAL WAY TO WRITE A LINK INSIDE THE APP (R37). Read its own header
 // before writing one here — and read `shared/web/ticket-chips.tsx`'s app chip
@@ -109,11 +99,12 @@ import { InAppLink } from "@/components/shell/in-app-link"
 // THE URL SEAM, called where the anchor is written — see `RowName` below for
 // why it is called again there even though `InAppLink` also calls it.
 import { safeHref } from "@shared/web/rich-text"
-import { content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi } from "@/lib/api"
 import type { TicketDashboard } from "@/lib/api/content"
-import { accountsKey, helpDashboardKey } from "@/lib/live-resources"
-import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
-import type { Account, HelpStatus } from "@shared/types"
+import { helpDashboardKey } from "@/lib/live-resources"
+import { orderTicketTypes, ticketTypeColour, NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
+import { RecordMark } from "@shared/web/record-mark"
+import type { HelpStatus } from "@shared/types"
 import {
   CLOSURE_WINDOW_MONTHS,
   OPEN_HELP_STATUSES,
@@ -967,6 +958,108 @@ function RaisedAsFlow({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   7A · RAISED BY — who has asked the most, ranked, with faces.
+   ══════════════════════════════════════════════════════════════════════════
+   Client ruling, 17 Sep 2026, over the app's own Tickets › Dashboard: "I want
+   a rank list with bars in total, not the last 30 days, and yes, put the
+   faces." Third column of the row `TicketsDashboard`'s own return builds for
+   an app (below) — same height as its two neighbours, the same `Panel`/
+   `h-full`/grid-stretch shape every other panel on this screen already uses. */
+
+/** ONE ROW: the contact's own mark, their name, the count at the right, and a
+ * share bar underneath — the same `Bar` primitive `AppsStackedByType`/
+ * `WhoHasMore` already draw a segment of, reused here as a single bar rather
+ * than a stack, because a ranking has one number per row and not a kind split
+ * to show inside it.
+ *
+ * A PRESS OPENS THE APP'S OWN TICKETS — `RowName`'s own `InAppLink` pattern,
+ * one level up: the app record is `standsOn="card"`'s own address (this
+ * component only ever mounts with an `appId`, this panel's own guard below).
+ * NOT YET FILTERED TO THE RAISER: the ticket list has no raised-by facet on
+ * either front door today, and inventing one — a door parameter, a facet
+ * control, a validated field — is a door of its own rather than a line here;
+ * the row still lands on the right RECORD, which is most of the way there. */
+function RaisedByRow({
+  row,
+  scale,
+  teamId,
+  appId,
+  t,
+}: {
+  row: TicketDashboard["raisedByContact"]["rows"][number]
+  scale: number
+  teamId: string
+  appId: string
+  t: (s: string, vars?: Record<string, string | number>) => string
+}) {
+  const name = row.contactName ?? t("Somebody")
+  return (
+    <InAppLink
+      href={safeHref(`/t/${teamId}/apps/${appId}`) ?? "/home"}
+      className="flex min-w-0 items-center gap-2"
+    >
+      {/* A PERSON'S OWN FACE IS ROUND — the same shape every contact/member mark
+          in the app already draws (`accounts-screen.tsx`, `staff-panel.tsx`,
+          `member-screen.tsx`); `RecordMark`'s own default, `square`, is for a
+          record with no face of its own (an app, an account, a company). */}
+      <RecordMark picture={row.contactLogoUrl} name={name} shape="round" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="min-w-0 truncate text-xs" title={name}>
+            {name}
+          </span>
+          <span className="shrink-0 text-xs tabular-nums">{row.n}</span>
+        </div>
+        <Bar fraction={row.n / scale} colour={NEUTRAL_TYPE_COLOUR} title={name} />
+      </div>
+    </InAppLink>
+  )
+}
+
+/** THE PANEL ITSELF — top five rows, then the footer naming the WHOLE
+ * ranking (`total`/`people`, never derived from the five rows on screen: see
+ * the type's own comment on `TicketDashboard.raisedByContact`). */
+function RaisedByPanel({
+  data,
+  teamId,
+  appId,
+  t,
+}: {
+  data: TicketDashboard["raisedByContact"]
+  teamId: string
+  appId: string
+  t: (s: string, vars?: Record<string, string | number>) => string
+}) {
+  // SAME EMPTY SENTENCE AS ITS NEIGHBOURS (`AppsStackedByType`/`WhoHasMore`
+  // above) — a panel finding nothing to draw says the identical thing on this
+  // screen, whichever chart it is: a ticket with no `raised_by_contact_id` at
+  // all (our own housekeeping, never typed on a client's behalf) is real and
+  // simply outside this one ranking.
+  if (data.rows.length === 0) return <p className="text-muted-foreground text-xs">{t("Nothing is open right now.")}</p>
+
+  // RANKED HERE, NEVER ASSUMED OF THE DOOR — `readTicketDashboard`
+  // (workers/content/src/lib/help.ts) already orders `n DESC`, but "a rank
+  // list" is this component's own promise, not a property it may inherit
+  // silently from one caller's SQL: a fresh array (`.slice()` before
+  // `.sort()`, which mutates) so a re-render never reorders the prop the
+  // caller is still holding.
+  const ranked = data.rows.slice().sort((a, b) => b.n - a.n)
+  const scale = Math.max(1, ...ranked.map((r) => r.n))
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3">
+        {ranked.map((row) => (
+          <RaisedByRow key={row.contactId} row={row} scale={scale} teamId={teamId} appId={appId} t={t} />
+        ))}
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {t("of {total} · {people} people", { total: data.total, people: data.people })}
+      </p>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    3A · HOW LONG A TICKET TAKES TO CLOSE — the middle ticket and the middle half.
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -1572,9 +1665,6 @@ export function TicketsDashboard({
   helpTypeOptions,
   ticketTotal,
   appId,
-  standsOn = "card",
-  viewSlot,
-  actions,
 }: {
   teamId: string
   /** the team's live `Ticket type` values — the order the pipelines, the legend
@@ -1582,10 +1672,8 @@ export function TicketsDashboard({
    * vocabulary is obeyed here without a deploy */
   helpTypeOptions: string[]
   /** R50's own question, and it is the WHOLE collection's raw count rather than
-   * this tab's own answer: the toolbar must disappear on a team with no tickets
-   * at all, and must NOT disappear because somebody filtered to a client with
-   * none. `undefined` while the count is still in flight — which is not empty,
-   * for the reason the loading branch below gives. */
+   * this tab's own answer. `undefined` while the count is still in flight —
+   * which is not empty, for the reason the loading branch below gives. */
   ticketTotal: number | undefined
   /** ONE SYSTEM'S OWN DASHBOARD — the app record's Tickets tab, in its Dashboard
    * view (client, 6 Sep 2026: "make the dashboard a view inside the Tickets tab
@@ -1594,179 +1682,53 @@ export function TicketsDashboard({
    *
    * IT IS THE SAME SCREEN AND NEVER A SECOND ONE. Absent, this is the Tickets
    * screen's own Dashboard tab and every panel below draws. Present, it is a
-   * WHERE clause on all eight of the door's grouped reads (`appId` rides
-   * `content.helpDashboard` and the cache key, exactly as the two toolbar
-   * filters do), and TWO of the five panels stand down because the narrowing
-   * empties them of meaning rather than of rows — each says why at its own call
-   * site below.
+   * WHERE clause on the door's grouped reads (`appId` rides `content.helpDashboard`
+   * and the cache key), and TWO of the five panels stand down because the
+   * narrowing empties them of meaning rather than of rows — each says why at its
+   * own call site below, and the two that survive it now share one row (below).
    *
    * A FACT ABOUT WHERE THE READER IS STANDING, NOT A QUESTION. It never becomes
    * a facet: the app is the record whose page this is, and offering a control to
    * change it would be offering to navigate. */
   appId?: string
-  /** WHAT THIS DASHBOARD IS STANDING ON — and the ONE thing it decides is
-   * whether the toolbar draws a card of its own.
-   *
-   * THE CLIENT, 7 Sep 2026, on two screenshots side by side: "the toolbar in
-   * dashboard needs some kind of container 😕 think of sth — the most similar
-   * possible to the in-card toolbars!" Her Triage screenshot has the well she
-   * wants; her Dashboard screenshot has the identical `<ToolbarRow>` and no
-   * well at all. NOTHING WAS MISSING FROM THE ROW. `<ToolbarRow>` already
-   * draws the well — its own `toolbar-row-column` div, `bg-surface-raised`
-   * (= `--card`), `rounded-pill`, `py-1.5 pe-1.5 ps-4` — and the well is only
-   * VISIBLE because of what it stands on. Every other toolbar in this app is
-   * inside a `<Card>`, whose default variant paints `bg-surface-panel`, so the
-   * raised well reads against soft paper: measured 1.103:1 in light
-   * (#FFFEF9 on #F7F2EB) and 1.111:1 in dark (#26241F on #1C1B18).
-   *
-   * THIS SCREEN IS THE ONE THAT IS NOT. `ScreenShell`'s content card and body
-   * are `bg-[var(--surface-raised)]` (screen-shell.tsx), so the Tickets
-   * screen's Dashboard tab drew a raised well on a raised ground: **1.000:1
-   * in BOTH palettes** — the record footer's own defect, on a second screen.
-   * Not a light-mode accident either; the two tones are literally the same
-   * token, so no palette could ever separate them.
-   *
-   * SO THE FIX IS THE GROUND AND NEVER THE ROW, and it belongs to the HOST
-   * because the two hosts genuinely differ. `"card"` — the app record's
-   * Tickets tab (`AppTicketsTab`, work-panels.tsx) — is already inside
-   * `RecordChrome`'s soft-paper card, so its well already reads and a second
-   * card here would be the card-in-a-card CLAUDE.md's `useKitPanel` note calls
-   * the broken combination. `"screen"` — the Tickets screen's Dashboard tab,
-   * where the branch deliberately draws no `CollectionCard` (five panels, not
-   * one collection) — has no paper under it, so the toolbar brings its own.
-   * ONLY the toolbar: the panels stay where they are, outside it.
-   *
-   * `"card"` IS THE DEFAULT because it is the shape this component has always
-   * drawn — omitting it changes nothing on screen, so a host that says nothing
-   * gets exactly what it got before this prop existed. */
-  standsOn?: "card" | "screen"
-  /** THE OTHER BODY THIS COLLECTION HAS, when it has one (R53's `view` slot,
-   * passed straight through to `<ToolbarRow>`).
-   *
-   * The Tickets SCREEN has no such switch — its Dashboard is a folder tab beside
-   * Triage and the list, and a screen does not offer two ways to leave one tab.
-   * Inside an app RECORD there is no strip to add to (the client's own ruling:
-   * "there can never be 2 rows of tabs"), so the list and this dashboard are two
-   * VIEWS of one tab and the switch belongs in the toolbar — the same slot the
-   * list view's own `<PagedFind>` draws it in, from the same config, so one
-   * control appears in one place whichever body is on screen. */
-  viewSlot?: ToolbarViewSlot
-  /** THE ROW'S OWN ACTION BUTTONS — "Raise ticket", the same control every other
-   * ticket tab carries, handed down rather than built here.
-   *
-   * CLIENT, 6 Sep 2026: "On the dashboard, I'm missing the full toolbar, so go
-   * ahead and implement that." What was missing was this slot: the row passed
-   * `filters` and `view` and nothing else, so on the one tab of Tickets where
-   * the strip and the toolbar are the whole chrome, the right-hand end of the
-   * row was empty while every sibling tab had a create button there.
-   *
-   * A NODE FROM THE HOST, and never a `canCreate`/`onCreate` pair rebuilt into
-   * an `<AddButton>` here. Both hosts already hold that control for their OTHER
-   * body — `tickets-collection.tsx` hands the identical node to its own
-   * `<PagedFind actions>`, and the app record's Tickets tab draws it through
-   * `PagedPanelBody`'s `onNew` — so passing the node is what makes "the same
-   * button" a fact rather than a claim: one permission check, one label, one
-   * glyph, and no second copy to drift. It is the same shape `viewSlot` above
-   * already uses for the same reason.
-   *
-   * Absent is a legitimate answer (a role that cannot raise a ticket), and R50
-   * still outranks it: on a team with no tickets at all the whole row goes,
-   * this button included. */
-  actions?: React.ReactNode
 }) {
   const t = useT()
-  // THE TWO FILTERS, HELD HERE AND SPENT AT THE DOOR. They are not remembered
-  // across sessions on purpose: a dashboard silently narrowed to one client from
-  // a choice made last Tuesday is a screen whose every heading lies, and unlike a
-  // list there are no rows on it to make the narrowing visible.
-  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
-  const accountId = facetValues.accountId ?? ""
-  const helpType = facetValues.helpType ?? ""
 
-  // ── THE SEARCH BOX ────────────────────────────────────────────────────────
+  // ── THE TOOLBAR IS GONE — CLIENT RULING, 17 Sep 2026: "Remove the toolbar
+  //    from the tickets dashboard." ──────────────────────────────────────────
   //
-  // CLIENT, 7 SEP 2026, HAVING SAID IT TWICE: "on the dashboard, I'm missing the
-  // full toolbar", then "still missing full toolbar!". Sort is absent by her own
-  // earlier ruling on this exact row ("filter by client and type / no sort"), so
-  // the box was the only control a sibling ticket tab carried that this one did
-  // not — which is what she was looking at.
+  // The Dashboard tab draws no search, no filters, no sort and no "Raise
+  // ticket" any more, on EITHER host: the Tickets screen's own Dashboard tab
+  // and the app record's Tickets › Dashboard view both used to build one from
+  // this file's own `<ToolbarRow>` (the search box arrived 7 Sep 2026: "still
+  // missing full toolbar!"), and the whole row — search, the Account/Type
+  // facets it fed, and the search term it rode into the door's WHERE clause —
+  // goes with this ruling. R48 ("the toolbar, search included, is a default")
+  // still governs every OTHER collection tab; a dashboard of counted pictures
+  // rather than rows is the one, named, reasoned exception UI-RULEBOOK.md now
+  // carries for it (K37) — TOOLBAR_EXEMPT itself stays untouched, because none
+  // of R48's five censuses reach a bespoke component that draws no
+  // `<ToolbarRow>`, no `BASE_RECIPES` entry and no `CardGrid`/`List` wall, so a
+  // line here would match nothing any census ever marks "used" and would fail
+  // R48's own rot-check the moment it landed.
   //
-  // IT IS A THIRD DOOR PARAMETER AND NOT A DECORATION, which is the only shape
-  // that can work here: there are no rows on this tab for a browser to sieve, so
-  // a box that narrowed anything client-side would narrow nothing at all. The
-  // term rides `content.helpDashboard` beside `accountId` and `helpType`, lands
-  // in the WHERE clause of all nine of the door's grouped reads, and every panel
-  // below is then a tally over the tickets that mention it. "The dashboard for
-  // tickets mentioning invoice" is a real reading of the backlog.
-  //
-  // IT IS THE LIST'S OWN SEARCH, NOT A SECOND ONE. The door binds `q` into the
-  // same `searchClause` — description, reference, title — that
-  // `GET /api/content/help?q=` binds it into, so a term finds the same tickets
-  // on this tab as on the list tab beside it. Two answers to one question, typed
-  // into two boxes on one screen, was the failure worth designing against, and
-  // the defence is that neither box owns a matcher of its own.
-  //
-  // WHAT IS TYPED AND WHAT IS ASKED ARE TWO VALUES, exactly as `record-picker`
-  // holds them, and for a sharper reason here: this door takes nine grouped
-  // scans of the backlog, so a keystroke that fired one would be nine scans per
-  // letter, each landing in its own cache key. The box keeps up with the
-  // keyboard; the request runs up to 200ms behind it, through the kit's own
-  // `useDebouncedCallback` at the same delay the picker's door search uses.
-  //
-  // NOT REMEMBERED ACROSS SESSIONS, for the same reason the two facets above are
-  // not: a dashboard silently narrowed to a word somebody typed last Tuesday is
-  // a screen whose every panel is about a slice while every heading says
-  // backlog — and unlike a list there are no rows on it to make that visible.
-  // The box being on screen with the word still in it is the whole disclosure.
-  const [text, setText] = React.useState("")
-  const [term, setTerm] = React.useState("")
-  const askDoor = useDebouncedCallback(setTerm, 200)
+  // THE DOOR READ SIMPLIFIES WITH IT: `content.helpDashboard` still takes
+  // `appId` (a fact about which record this is, never a facet — see that
+  // prop's own doc above), but the two former facets and the search term are
+  // gone, so every panel below is now a tally over the WHOLE backlog (or the
+  // whole app, inside one), never a narrowed slice a reader could forget they
+  // set.
 
-  // ONE CACHE ENTRY PER QUESTION (`helpDashboardKey` carries every narrowing —
-  // both filters AND the system, when there is one), so switching client does
-  // not overwrite the unfiltered answer, one app's dashboard can never be served
-  // another's, and switching back paints instantly from the cache —
-  // CACHING.md's cache-first rule, applied to a picture instead of a list.
-  const dashQ = useCached<TicketDashboard>(
-    helpDashboardKey(teamId, accountId, helpType, appId ?? "", term),
-    () =>
-      contentApi.helpDashboard({
-        accountId: accountId || undefined,
-        helpType: helpType || undefined,
-        appId,
-        q: term || undefined,
-      })
-  )
-  // THE CLIENT FACET'S OPTIONS. `tenancy.accounts()` is page ONE of a growing
-  // list (R14) — the same known limitation the ticket list's own Client facet
-  // accepts and writes down (tickets-collection.tsx says why: a searched,
-  // door-backed facet option list is a capability no facet control in this app
-  // has yet). Filed here too rather than silently inherited.
-  //
-  // NOT READ AT ALL INSIDE AN APP, because there is no Client facet there to
-  // fill (see `facets` below) — a `null` key is `useCached`'s own way of saying
-  // "do not ask", so the app record's Tickets tab pays for no accounts page it
-  // would never draw.
-  const accountsQ = useCached<Account[]>(appId ? null : accountsKey(teamId), () =>
-    tenancy.accounts().then((r) => r.accounts)
+  // ONE CACHE ENTRY PER APP (`helpDashboardKey` still carries `appId`, so one
+  // app's dashboard can never be served another's, and switching back paints
+  // instantly from the cache — CACHING.md's cache-first rule, applied to a
+  // picture instead of a list).
+  const dashQ = useCached<TicketDashboard>(helpDashboardKey(teamId, "", "", appId ?? ""), () =>
+    contentApi.helpDashboard({ appId })
   )
 
   const data = dashQ.data
   const loading = data === undefined
-  // DID THE QUESTION FIND ANYTHING? Asked of the DOOR's own count of the rows
-  // every panel was grouped over (`matched`), never inferred from whether the
-  // panel arrays came back empty: a ticket with no kind and nothing closed sits
-  // in none of those groupings, so "all the arrays are empty" is a fact about
-  // which reads exclude nulls today rather than about whether anything matched.
-  //
-  // GATED ON SOMETHING HAVING BEEN ASKED. A zero with an untouched toolbar is
-  // the collection's own empty state, which the branch above already owns off
-  // `ticketTotal` — and that branch has to keep owning it, because it reads the
-  // WHOLE collection's count while this reads the narrowed one (R50: the
-  // toolbar disappears for a team with no tickets, and must not disappear
-  // because somebody typed a word).
-  const asked = Boolean(term) || Object.keys(facetValues).length > 0
-  const narrowedToNothing = asked && data !== undefined && data.matched === 0
   // WHICH KINDS TO DRAW, AND IN WHICH ORDER — one decision, made once, obeyed by
   // every panel below.
   //
@@ -1801,51 +1763,6 @@ export function TicketsDashboard({
     return orderTicketTypes(out)
   }, [data, helpTypeOptions])
 
-  const facets: FilterFacet[] = [
-    // THE CLIENT FACET IS ABSENT INSIDE AN APP, and this is the same subtraction
-    // the "Who has more" panel makes below, made at the toolbar. An app row
-    // carries ONE `accountId` — it is built for one client, or it is ours — so
-    // inside one system the choice is between that client's tickets and nothing.
-    // A control whose only meaningful setting is the one already in force is not
-    // a filter, it is a fact wearing a control's clothes.
-    ...(appId
-      ? []
-      : [
-          {
-            field: "accountId",
-            label: t("Account"),
-            control: "select" as const,
-            options: (accountsQ.data ?? [])
-              .filter((a) => a.active)
-              .map((a) => ({ value: a.id, label: a.name }))
-              .sort((a, b) => a.label.localeCompare(b.label)),
-          },
-        ]),
-    {
-      field: "helpType",
-      label: t("Type"),
-      control: "select",
-      options: helpTypeOptions.map((v) => ({ value: v, label: v })),
-    },
-  ]
-  // CALLED UNCONDITIONALLY — a hook cannot sit after an early return, the same
-  // discipline every other `useFilterBar` call site in this app keeps.
-  const { pill: filterPill, panel: filterPanel } = useFilterBar({
-    facets,
-    values: facetValues,
-    // The options are given above, so nothing is derived from rows — which is
-    // just as well, since this screen has none.
-    data: [],
-    onChange: (field, value) =>
-      setFacetValues((prev) => {
-        const next = { ...prev }
-        if (value === "") delete next[field]
-        else next[field] = value
-        return next
-      }),
-    onClearFacets: () => setFacetValues({}),
-  })
-
   if (dashQ.error)
     return (
       <Card>
@@ -1864,372 +1781,169 @@ export function TicketsDashboard({
       </Card>
     )
 
-  // R50'S OWN QUESTION, ASKED ONCE AND SPENT TWICE. The row takes it as
-  // `empty` and returns null; the CARD below is drawn for that row and has to
-  // agree with it, because a container around a row that drew nothing is an
-  // empty box of soft paper above the collection's own empty state — the same
-  // "lone floating furniture" R50 exists to stop, one level out. One
-  // expression, so the two answers cannot drift apart.
-  const noTickets = ticketTotal === 0
+  if (loading) return <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
 
-  // THE ROW ITSELF, NAMED SO THE CONTAINER DECISION BELOW CAN BE READ AS ONE
-  // LINE rather than as two copies of a fifty-line tag in a ternary.
-  const toolbar = (
-    /* THE TOOLBAR (client ruling, 2026-09-06: "dashboard should also have
-    toolbar / filter by client and type / no sort", and later the same day
-    "on the dashboard, I'm missing the full toolbar, so go ahead and
-    implement that" — which was this row's `actions` slot standing empty
-    while every sibling ticket tab drew a create button in it).
+  // R50'S OWN QUESTION. With no toolbar left to disappear, this is now the
+  // whole of it: a team with no tickets at all draws one welcoming sentence
+  // and nothing else.
+  if (ticketTotal === 0)
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <ShapeStateBody
+            shape="collectionScreen"
+            state="empty"
+            copy={{
+              emptyTitle: t("Nothing is open right now."),
+              emptyDescription: t("Every ticket a client raises shows here while it is being worked on."),
+            }}
+          />
+        </CardContent>
+      </Card>
+    )
 
-    THE SEARCH BOX IS HERE NOW (client, 7 Sep 2026: "still missing full
-    toolbar!"), and `TOOLBAR_EXEMPT`'s line for this file was DELETED
-    rather than reworded in the same change — an exemption that no longer
-    describes the code is worse than none, because it reads as a decision
-    somebody made about the screen in front of you.
-
-    NO SORT CONTROL, and that one is still recorded (`TOOLBAR_SORT_EXEMPT`)
-    rather than decided here: a dashboard has no row order to offer,
-    because it has no rows. That is not the same sentence as the search
-    box's, which is why only one of the two entries died — searching a
-    backlog and reordering a picture are different acts.
-
-    ALL THREE NARROWINGS ARE DOOR PARAMETERS — they land in the cache key
-    above and in the WHERE clause of every read behind it — which is the
-    only shape that can work when every number on screen is a COUNT(*)
-    somebody else took.
-
-    `empty` is the WHOLE collection's count and never this tab's own
-    answer (R50): the row must disappear for a team with no tickets, and
-    must not disappear because somebody filtered to a quiet client, or
-    typed a word nothing matches. */
-    <ToolbarRow
-      empty={noTickets}
-      // THE SAME PLACEHOLDER THE LIST TAB'S OWN BOX SAYS, deliberately the
-      // same words rather than a dashboard-flavoured variant: it is the same
-      // search, over the same tickets, through the same door-side clause, and
-      // a second wording would advertise a difference that does not exist.
-      search={
-        <SearchInput
-          value={text}
-          onChange={(e) => {
-            setText(e.currentTarget.value)
-            askDoor(e.currentTarget.value)
-          }}
-          // CLEARING IS IMMEDIATE ON BOTH VALUES, never debounced: "show me
-          // everything again" is one deliberate act, and making somebody
-          // watch a stale answer for a fifth of a second after it is the one
-          // moment a debounce is felt rather than unnoticed.
-          onClear={() => {
-            setText("")
-            setTerm("")
-          }}
-          placeholder={t("Search tickets…")}
-          className="w-full"
-        />
-      }
-      filters={filterPill}
-      toolbarPanel={filterPanel}
-      // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
-      // record's Tickets tab, which is this dashboard and a list. `undefined`
-      // on the Tickets screen's own Dashboard TAB, where the strip above it
-      // already is the way out. `undefined` DRAWS NOTHING and needs no
-      // exemption (R53 says so about this exact prop); note that since kit
-      // v1.2.60 passing a single view would draw a static label instead, so
-      // "omit it" and "pass one" are no longer the same thing on screen.
-      view={viewSlot}
-      // "RAISE TICKET", at the right of the row — the host's own node, the
-      // identical one its other body draws (see the `actions` prop above).
-      actions={actions}
-    />
-  )
+  const openWorkChip =
+    data && data.unopenedPastLine > 0 ? (
+      <span className="bg-warning text-warning-foreground rounded-pill px-3 py-1 text-xs tabular-nums">
+        {t("{count} past the three-day line", { count: data.unopenedPastLine })}
+      </span>
+    ) : null
 
   return (
-    <>
-      {/* THE TOOLBAR'S OWN CONTAINER, AND ONLY WHERE THERE IS NO PAPER UNDER
-          IT — client, 7 Sep 2026: "the toolbar in dashboard needs some kind of
-          container 😕 think of sth — the most similar possible to the in-card
-          toolbars!"
+    <div className="flex min-w-0 flex-col gap-4">
+      {/* ── THE ROW OF THREE, AND THE TWO THAT DO NOT SURVIVE ONE APP ──
+          The client asked for "whatever you think is relevant … like a mini
+          version, a filtered version", which is a judgement rather than a
+          shrink. A panel is DROPPED when the narrowing empties it of
+          MEANING, never when it merely has fewer rows — a chart with less in
+          it is still a chart, and a chart that can only ever draw one mark
+          is furniture.
 
-          THE IN-CARD TOOLBAR IS NOT A SECOND TREATMENT TO COPY. It is this
-          exact `<ToolbarRow>`, drawing its own `toolbar-row-column` well
-          (`bg-surface-raised`, `rounded-pill`, `py-1.5 pe-1.5 ps-4`, R53's
-          fixed slot order) inside a `<Card>` whose default variant paints
-          `bg-surface-panel`. So there is nothing here to re-tune: the SAME
-          component draws the well, and the same two kit parts — `Card` +
-          `CardContent` — put soft paper under it, which is `CollectionCard`'s
-          whole body (screen-bits.tsx) and this file's own `Panel` (above).
-          Reused, not agreed with: the radius, the fill, the inner padding, the
-          control sizes and the slot order are all still the row's, so they
-          cannot drift from Triage's by a hand-typed number.
+          6A · WHICH APP — dropped. It is one bar per system, ranked; inside
+          one system it is one bar at 100% of a scale it sets itself, under a
+          heading naming the record the reader is already standing on. The
+          kind SPLIT it carries is the only information left in it, and that
+          is the pipeline panel above, drawn properly against the lifecycle.
 
-          MEASURED, BOTH PALETTES, BECAUSE AN INVISIBLE CONTAINER IS NOT ONE.
-          The well against the paper it now sits on is 1.103:1 in light
-          (#FFFEF9 on #F7F2EB) and 1.111:1 in dark (#26241F on #1C1B18) —
-          byte-identical to Triage, because it is the identical token pair.
-          Against the shell it used to sit on it was 1.000:1 in BOTH:
-          `ScreenShell`'s card and its body both paint `--surface-raised`
-          (screen-shell.tsx, in the arbitrary form) and the row's own fill is
-          `--surface-raised` too — one token painted on itself, which no
-          palette could ever separate. That is the record footer's defect on a
-          second screen, and it is why "the container is missing" was the right
-          reading of a row that had been drawing one all along.
+          2B · WHO HAS MORE, BY CLIENT — dropped, and this one was checked
+          rather than assumed. `AppRow` carries a single `accountId` (an app
+          is built for one client, or it is ours), so "which client asks for
+          the most" inside one app is a ranking of one. It is NOT structurally
+          impossible for a second client to appear: `help.account_id` and
+          `help.app_id` are independent columns, and the raise dialog on this
+          very record deliberately leaves the client as a question ("a ticket
+          about one of our systems may be raised on behalf of a client or be
+          our own housekeeping"). So the honest sentence is that the panel
+          would draw one bar in the ordinary case and two in an odd one —
+          which is a comparison nobody came to this page to make, and it is
+          one screen away on the Tickets dashboard where it is the question.
 
-          ONE DELIBERATE DIFFERENCE FROM `CollectionCard`, AND IT IS A NUMBER
-          THIS ROW ALREADY PAYS. `CollectionCard` is `<CardContent
-          className="p-4">` — which keeps `CardContent`'s own `lg:` step
-          through `cn()`, so its inset is `--space-4` and `--space-7` above
-          `lg`, and this card takes the identical ladder. The BOTTOM inset is
-          zeroed at both steps (`pb-0 lg:pb-0`) because the row inside it
-          already pays `mb-[var(--toolbar-content-gap)]` on its own
-          root (R49 — that gap is the row's and no call site may spend it
-          twice). Without the zero the card would stack the two, 30 + 18.75 of
-          air under a pill with 30 above it; with it the card is the kit's
-          own inset on three sides and the row's own gap below. In Triage the
-          same number falls between the toolbar and the ROWS, which is the job
-          it was written for — here there are no rows in the card, so it
-          becomes the card's last inset instead of a second one.
-
-          `mb-4` IS A DIFFERENT NUMBER FOR A DIFFERENT JOB, and is not a
-          second hand on R49's: it is the gap from THIS card to the next
-          piece of furniture, the same `gap-4` every panel-to-panel gap on
-          this screen already spends.
-
-          NO SORT CONTROL COMES BACK WITH THE PAPER. The container decides
-          where the row stands and nothing about what is in it — the row is one
-          node, built once above, and `TOOLBAR_SORT_EXEMPT` still carries the
-          reason a dashboard offers no order (R53). */}
-      {standsOn === "screen" && !noTickets ? (
-        /* ── THE PIN GOES ON THE FURNITURE, NOT ON THE ROW INSIDE IT — R63,
-           and this is the one call site in the app where that distinction is
-           load-bearing. MEASURED, at 1440x900, before and after.
-
-           `<ToolbarRow>` pins itself (screen-bits.tsx), and a `position:
-           sticky` element is bounded by its own CONTAINING BLOCK — which here
-           is this `CardContent`, a box that holds the row and nothing else. Its
-           stuck range measured 32px: the row travelled with the scroll and
-           pinned nowhere, on the one screen the client actually screenshotted.
-           Everywhere else the row shares a card with the rows it narrows, so
-           the card is thousands of pixels tall and the range is the whole
-           collection (3,011px on Accounts, 1,049 on Apps, measured the same
-           run). The dashboard is the exception because its panels are SIBLINGS
-           of this card rather than its contents — the client's own "the toolbar
-           in dashboard needs some kind of container", which is why the card is
-           here at all.
-
-           So the pin moves out to a box whose containing block IS the dashboard
-           column. The row inside still carries its own pin and is simply inert
-           there (range zero), which costs nothing and keeps R63's sentence true
-           of the row wherever else it is used.
-
-           `pb-4` IS THIS CARD'S OWN `mb-4`, MOVED AND MADE PAINTED. A margin
-           between two siblings is never painted, so a pinned bar with one under
-           it lets the panels scroll through 16px of nothing — the bug
-           `STICKY_FOLDER_TABS` was fixed out of. Same number, same distance on
-           screen, now inside the box that paints. `bg-surface-raised` is the
-           shell pane's own ground, which is what this card stands on, so at
-           rest this box is invisible. */
-        <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4")}>
-          <Card>
-            <CardContent className="p-4 pb-0 lg:pb-0">{toolbar}</CardContent>
-          </Card>
-        </div>
-      ) : (
-        toolbar
-      )}
-      {loading ? (
-        <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
-      ) : noTickets ? (
-        <Card>
-          <CardContent className="p-4">
-            <ShapeStateBody
-              shape="collectionScreen"
-              state="empty"
-              copy={{
-                emptyTitle: t("Nothing is open right now."),
-                emptyDescription: t(
-                  "Every ticket a client raises shows here while it is being worked on."
-                ),
-              }}
-            />
-          </CardContent>
-        </Card>
-      ) : narrowedToNothing ? (
-        /* ── THE QUESTION FOUND NOTHING ──────────────────────────────────
-           ONE SENTENCE, AND THAT IS THE WHOLE POINT OF THIS BRANCH. Without
-           it a term nothing matches is six panels each drawing its own
-           private "Nothing is open right now." — six true statements that
-           together read as a broken screen rather than as an answer. A
-           reader who typed a word wants to be told about the WORD.
-
-           IT NAMES THE TERM when there is one, because "nothing matched" on
-           its own is the same sentence a screen would show for any reason at
-           all, and the reader's next move (retype it, clear it) depends on
-           seeing what was actually asked. With only the facets narrowing,
-           the app's existing sentence is the right one and is reused
-           verbatim — `PagedFind` says exactly this over a searched-and-
-           filtered collection, and one wording for one situation is the
-           whole reason it is not written again here.
-
-           IT IS NOT THE COLLECTION'S EMPTY STATE, and the branch above it is
-           why the two cannot be confused: `noTickets` is a team with
-           no tickets, which is a different fact and gets a different, and
-           welcoming, sentence. This one only ever appears once somebody has
-           asked something. */
-        <Card>
-          <CardContent className="p-4">
-            <ShapeStateBody
-              shape="collectionScreen"
-              state="empty"
-              copy={{
-                emptyTitle: term
-                  ? t("Nothing matched “{term}”.", { term })
-                  : t("Nothing matched. Try fewer words, or clear the filters."),
-              }}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex min-w-0 flex-col gap-4">
-          <Panel
-            title={t("The open work")}
-            chip={
-              data && data.unopenedPastLine > 0 ? (
-                <span className="bg-warning text-warning-foreground rounded-pill px-3 py-1 text-xs tabular-nums">
-                  {t("{count} past the three-day line", { count: data.unopenedPastLine })}
-                </span>
-              ) : null
-            }
-          >
+          WHAT IS KEPT ANSWERS A QUESTION SOMEBODY STANDING ON THIS APP ASKS:
+          where its open work is stuck (the pipeline), whether what arrives
+          about it is what it turns out to be (the matrix), and how long it
+          takes us to close things on it (the spread and the trend). */}
+      {appId ? (
+        /* ── "THE OPEN WORK", "RAISED" AND "RAISED BY" SHARE ONE ROW —
+            client ruling, 17 Sep 2026, over the app's own Tickets › Dashboard
+            view: "put the open work and raised at the same level. They take
+            up too much space." Both used to be full-width panels stacked one
+            above the other; now they are three columns in one
+            `lg:grid-cols-3` row, each panel the SAME `Panel` component (or,
+            for the third, the same grid-row/`h-full` shape) at a THIRD of the
+            width rather than the whole of it, which is what "smaller" means
+            here — nothing about the first two panels' own content shrank.
+            THE THIRD COLUMN WAS RESERVED EMPTY THE SAME DAY ("a separate
+            ruling is coming") and filled a few hours later, same day: "I want
+            a rank list with bars in total, not the last 30 days, and yes,
+            put the faces" — `RaisedByPanel`, above. */
+        <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+          <Panel title={t("The open work")} chip={openWorkChip}>
             <OpenWork rows={data?.openByTypeAndStatus ?? []} types={types} t={t} />
           </Panel>
-
-          {/* ── THE ROW OF THREE, AND THE TWO THAT DO NOT SURVIVE ONE APP ──
-              The client asked for "whatever you think is relevant … like a mini
-              version, a filtered version", which is a judgement rather than a
-              shrink. A panel is DROPPED when the narrowing empties it of
-              MEANING, never when it merely has fewer rows — a chart with less in
-              it is still a chart, and a chart that can only ever draw one mark
-              is furniture.
-
-              6A · WHICH APP — dropped. It is one bar per system, ranked; inside
-              one system it is one bar at 100% of a scale it sets itself, under a
-              heading naming the record the reader is already standing on. The
-              kind SPLIT it carries is the only information left in it, and that
-              is the pipeline panel above, drawn properly against the lifecycle.
-
-              2B · WHO HAS MORE, BY CLIENT — dropped, and this one was checked
-              rather than assumed. `AppRow` carries a single `accountId` (an app
-              is built for one client, or it is ours), so "which client asks for
-              the most" inside one app is a ranking of one — the same reason the
-              Client FACET is absent from this toolbar. It is NOT structurally
-              impossible for a second client to appear: `help.account_id` and
-              `help.app_id` are independent columns, and the raise dialog on this
-              very record deliberately leaves the client as a question ("a ticket
-              about one of our systems may be raised on behalf of a client or be
-              our own housekeeping"). So the honest sentence is that the panel
-              would draw one bar in the ordinary case and two in an odd one —
-              which is a comparison nobody came to this page to make, and it is
-              one screen away on the Tickets dashboard where it is the question.
-
-              WHAT IS KEPT ANSWERS A QUESTION SOMEBODY STANDING ON THIS APP ASKS:
-              where its open work is stuck (the pipeline), whether what arrives
-              about it is what it turns out to be (the matrix), and how long it
-              takes us to close things on it (the spread and the trend). */}
-          {appId ? (
-            <Panel title={t("Raised as, then triaged as")}>
-              <RaisedAsFlow
-                rows={data?.raisedVsCurrent ?? []}
-                        types={types}
-                t={t}
-              />
-            </Panel>
-          ) : (
-            <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-              {/* 6A — the reading the client picked. See `AppsStackedByType` for
-                  the two she did not, and for why swapping one in is a change at
-                  this line rather than a rewrite of the panel. */}
-              {/* THE TWO PANELS THAT LINK, AND THE ONE HOST THEY LINK FROM.
-                  Both take `teamId` because both now write an in-app address
-                  (R37's `InAppLink`) — and both are inside the `appId` branch's
-                  ELSE, which is the whole answer to "does this still make sense
-                  inside an app record?": inside one they do not draw at all,
-                  for the reasons written above, so neither ever offers a link
-                  to the record the reader is already standing on. */}
-              <Panel title={t("Which app")}>
-                <AppsStackedByType
-                  rows={data?.openByApp ?? []}
-                  types={types}
-                  teamId={teamId}
-                  t={t}
-                />
-              </Panel>
-              <Panel title={t("Who has more")}>
-                <WhoHasMore
-                  rows={data?.byAccountAndType ?? []}
-                  types={types}
-                  teamId={teamId}
-                  t={t}
-                />
-              </Panel>
-              <Panel title={t("Raised as, then triaged as")}>
-                <RaisedAsFlow
-                  rows={data?.raisedVsCurrent ?? []}
-                            types={types}
-                  t={t}
-                />
-              </Panel>
-            </div>
-          )}
-
-          {/* ── THE CLOSING TIME, IN TWO PANELS ON ONE ROW ─────────────────
-              CLIENT, 6 Sep 2026, three notes that are one layout: "same style
-              as How long a ticket takes to close put text above the mountain
-              graph 'Tendency'" · "the how long, split in 2 containers same
-              row" · "the how long 1/3, the graph 2/3".
-
-              THE TWO SUB-HEADINGS ARE GONE AND THE SPLIT IS WHY. "What it is
-              now" and "Which way it is going" were small grey labels inside one
-              card, doing the job a heading does — which is exactly what she
-              refused ("in the how logn ticket takes to close remove subtitle
-              'What it is now' and 'Which way it is going'"). Promoting the
-              trend to its own titled panel is the same instruction from the
-              other end: "Tendency" is now a heading at the same level as "How
-              long a ticket takes to close", in the same style, because it is
-              the title of a panel and not a label inside one. The distribution
-              keeps the original title, which is the question it answers.
-
-              A THIRD AND TWO THIRDS, WHICH IS THE SHAPE OF THE TWO PICTURES.
-              The distribution is a handful of short rows and reads at any
-              width; the trend is a time axis, and a time axis is the one thing
-              on this screen that genuinely needs room — squeeze twelve months
-              into a third of a row and the months stop being separable at all.
-
-              IT STILL STACKS. One column below `lg:`, in source order, so on a
-              narrow screen the distribution is read first and the trend gets
-              its own full width rather than a third of one — and inside the app
-              record's Tickets tab, which is a narrower column than the Tickets
-              screen, the same rule applies at the same breakpoint. Both panels
-              are grid siblings, so the row stretches them to one height and the
-              trend's plot measures itself from the distribution beside it (see
-              `ClosureTrend`); when it stacks there is no sibling to measure and
-              the plot falls back to its own floor.
-
-              NO "WORKING DAYS ONLY" CAPTION ON EITHER (client, earlier the same
-              day: "remove the subtitle 'working days only.' It's not needed. We
-              already know it."). ONLY THE SENTENCE WENT: every figure in both
-              panels is still counted Monday to Friday by the one shared seam
-              (`shared/business-days.ts`), which is where that promise actually
-              lives. */}
+          <Panel title={t("Raised as, then triaged as")}>
+            <RaisedAsFlow rows={data?.raisedVsCurrent ?? []} types={types} t={t} />
+          </Panel>
+          <Panel title={t("Raised by")}>
+            <RaisedByPanel
+              data={data?.raisedByContact ?? { rows: [], total: 0, people: 0 }}
+              teamId={teamId}
+              appId={appId}
+              t={t}
+            />
+          </Panel>
+        </div>
+      ) : (
+        <>
+          <Panel title={t("The open work")} chip={openWorkChip}>
+            <OpenWork rows={data?.openByTypeAndStatus ?? []} types={types} t={t} />
+          </Panel>
           <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-            <Panel title={t("How long a ticket takes to close")}>
-              <ClosureSpread rows={data?.closureDays ?? []} types={types} t={t} />
+            {/* 6A — the reading the client picked. See `AppsStackedByType` for
+                the two she did not, and for why swapping one in is a change at
+                this line rather than a rewrite of the panel. */}
+            {/* THE TWO PANELS THAT LINK, AND THE ONE HOST THEY LINK FROM.
+                Both take `teamId` because both now write an in-app address
+                (R37's `InAppLink`). */}
+            <Panel title={t("Which app")}>
+              <AppsStackedByType rows={data?.openByApp ?? []} types={types} teamId={teamId} t={t} />
             </Panel>
-            <Panel title={t("Tendency")} className="lg:col-span-2">
-              <ClosureTrend rows={data?.closureTrend ?? []} t={t} />
+            <Panel title={t("Who has more")}>
+              <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} teamId={teamId} t={t} />
+            </Panel>
+            <Panel title={t("Raised as, then triaged as")}>
+              <RaisedAsFlow rows={data?.raisedVsCurrent ?? []} types={types} t={t} />
             </Panel>
           </div>
-        </div>
+        </>
       )}
-    </>
+
+      {/* ── THE CLOSING TIME, IN TWO PANELS ON ONE ROW ─────────────────
+          CLIENT, 6 Sep 2026, three notes that are one layout: "same style
+          as How long a ticket takes to close put text above the mountain
+          graph 'Tendency'" · "the how long, split in 2 containers same
+          row" · "the how long 1/3, the graph 2/3".
+
+          THE TWO SUB-HEADINGS ARE GONE AND THE SPLIT IS WHY. "What it is
+          now" and "Which way it is going" were small grey labels inside one
+          card, doing the job a heading does — which is exactly what she
+          refused ("in the how logn ticket takes to close remove subtitle
+          'What it is now' and 'Which way it is going'"). Promoting the
+          trend to its own titled panel is the same instruction from the
+          other end: "Tendency" is now a heading at the same level as "How
+          long a ticket takes to close", in the same style, because it is
+          the title of a panel and not a label inside one. The distribution
+          keeps the original title, which is the question it answers.
+
+          A THIRD AND TWO THIRDS, WHICH IS THE SHAPE OF THE TWO PICTURES.
+          The distribution is a handful of short rows and reads at any
+          width; the trend is a time axis, and a time axis is the one thing
+          on this screen that genuinely needs room — squeeze twelve months
+          into a third of a row and the months stop being separable at all.
+
+          IT STILL STACKS. One column below `lg:`, in source order, so on a
+          narrow screen the distribution is read first and the trend gets
+          its own full width rather than a third of one — and inside the app
+          record's Tickets tab, which is a narrower column than the Tickets
+          screen, the same rule applies at the same breakpoint. Both panels
+          are grid siblings, so the row stretches them to one height and the
+          trend's plot measures itself from the distribution beside it (see
+          `ClosureTrend`); when it stacks there is no sibling to measure and
+          the plot falls back to its own floor.
+
+          NO "WORKING DAYS ONLY" CAPTION ON EITHER (client, earlier the same
+          day: "remove the subtitle 'working days only.' It's not needed. We
+          already know it."). ONLY THE SENTENCE WENT: every figure in both
+          panels is still counted Monday to Friday by the one shared seam
+          (`shared/business-days.ts`), which is where that promise actually
+          lives. */}
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+        <Panel title={t("How long a ticket takes to close")}>
+          <ClosureSpread rows={data?.closureDays ?? []} types={types} t={t} />
+        </Panel>
+        <Panel title={t("Tendency")} className="lg:col-span-2">
+          <ClosureTrend rows={data?.closureTrend ?? []} t={t} />
+        </Panel>
+      </div>
+    </div>
   )
 }

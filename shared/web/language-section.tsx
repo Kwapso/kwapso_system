@@ -31,24 +31,20 @@
 // "so a person choosing needs it" (below) was actually asking for than the
 // menu it used to hide behind.
 //
-// LANGUAGE STAYS INSTANT — RULED ON DIRECTLY, NOT AN OVERSIGHT. Size,
-// Appearance and Background all became PENDING this same day (see
-// `AppearancePanel`'s own header): a press only moves the preview, and
-// nothing outside this tab changes until Save. Language was asked to stage
-// the same way and the asymmetry was put to her plainly — the preview shows a
-// chip, a title and a lorem body, none of which read differently in another
-// language, so staging Language would show her nothing changing while she
-// waited to press Save. Her answer: "keep language instant." So this control
-// alone keeps its pre-existing contract — `choose()` below still applies the
-// instant the pill is pressed and persists right behind it, exactly as it did
-// before Size/Appearance/Background staged — and it is NOT part of
-// `AppearancePanel`'s dirty/Save/Discard state: picking a language never
-// arms Save, and Discard never touches it. THE NEXT READER'S OWN INSTINCT
-// WILL BE TO "FIX" THIS BY FOLDING LANGUAGE INTO THE PENDING STATE, because
-// four pill rows that look alike and behave differently is the one thing
-// about this panel that reads as unfinished. It is not: it is the client's
-// own ruling, asked for directly and answered directly, and folding it back
-// in would be reverting a decision rather than completing one.
+// LANGUAGE STAGES TOO NOW — REVERSED, 2026-09-17. "Keep language instant"
+// (above, kept as the historical record) held for three days. The client's
+// ruling, 2026-09-17, verbatim: "Delete these live preview updates as you
+// press a control, and also delete the language changes right away. Size,
+// Appearance, and Background: wait for Save. Actually, I want everything to
+// wait for the save. Nothing changes right away." So the one exception is
+// gone: this file no longer calls `setLang`, no longer calls `save`, no
+// longer shows its own toast, and no longer owns a `saving` state of its
+// own. It is now a plain, controlled pill row, the identical shape
+// `ScaleSection`/`ThemeSection`/`SpineSection` already take — `value` is the
+// PENDING language, `onChange` asks `AppearancePanel` to hold a different
+// one, and the panel is the one place that seeds the pending value from the
+// signed-in session, calls `saveLanguage` and `setLang` on Save, and shows
+// the result. See that file's own header for the fuller account.
 //
 // NO SUBTITLE, THE 2026-09-14 preview-led RULING. She quoted this section's
 // own two sentences back verbatim and asked for them gone: "remove subtitle
@@ -77,23 +73,32 @@
 // not become a pill row — it is a header control, not a Settings section, and
 // was never part of either ruling above.
 //
-// OPTIMISTIC, THEN PERSISTED — UNCHANGED, SEE "LANGUAGE STAYS INSTANT" ABOVE.
-// The choice re-renders the app instantly and the save follows. If the save
-// fails the language snaps back and says so, in the language they were
-// reading a moment ago rather than the one they asked for — because the one
-// they asked for is precisely what did not happen.
+// NATIVE NAME ONLY, NO SECOND RENDERING — CLIENT RULING, 2026-09-17,
+// VERBATIM: "In Settings > Appearance > Languages, only put the name of the
+// language in its original language. You don't need to also put it in
+// German." Each pill used to carry the language's OWN name plus its English
+// name beside it wherever the two differ (`Deutsch German`, `Español
+// Spanish`, `Català Catalan`) — a second rendering of the same word, in
+// whichever language the reader is NOT reading, on a row whose whole job is
+// showing four names a person scans for their own. That second `<span>` is
+// gone: a pill shows the flag, the language's own name for itself, and
+// nothing else but the completion figure where it is under 100.
 
 import * as React from "react"
 
-import { toast } from "@shared/ui/components/sonner/sonner"
-
 import { AppearancePillGroup, type AppearancePillOption } from "./appearance-pill-group"
-import { coverage, LANGUAGES, translate, type Language } from "../i18n"
+import { coverage, LANGUAGES, type Language } from "../i18n"
 import { useLanguage } from "./language"
 
 export function LanguageSection({
-  /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
-  save,
+  /** The PENDING language — `AppearancePanel`'s own state, not this
+   * component's. Never applied or persisted by this file any more. */
+  value,
+  /** A different pill was pressed. The panel decides what happens next —
+   * update the pending value, and nothing else, until Save. */
+  onChange,
+  /** True while `AppearancePanel`'s own Save is in flight. */
+  disabled = false,
   /* NO `className` OVERRIDE. It had one call site and that call site passed
    * nothing, so the "default" was what shipped — and the box is
    * `AppearancePanel`'s single `SettingsSection` now, same as its three
@@ -101,10 +106,11 @@ export function LanguageSection({
    * this file no longer owns is the door R67 has been shut through five
    * rulings. */
 }: {
-  save: (lang: Language) => Promise<unknown>
+  value: Language
+  onChange: (next: Language) => void
+  disabled?: boolean
 }) {
-  const { lang, setLang, t } = useLanguage()
-  const [saving, setSaving] = React.useState(false)
+  const { t } = useLanguage()
   const done = React.useMemo(() => coverage(), [])
 
   /** How much of the app this language can say, as a whole number — or null for
@@ -115,34 +121,10 @@ export function LanguageSection({
   const percent = (code: string): number | null =>
     code === "en" ? null : Math.round((done[code as keyof typeof done] ?? 0) * 100)
 
-  async function choose(next: Language) {
-    if (next === lang || saving) return
-    const previous = lang
-    setLang(next) // instant: the screen is already in the new language
-    setSaving(true)
-    try {
-      await save(next)
-      // In the language they JUST CHOSE, not the one `t` was bound to when this
-      // component rendered. `t` is captured before the optimistic switch, so
-      // using it here confirms a change to German in English — which is a small
-      // thing that says the feature is skin deep.
-      toast.success(translate("Language changed.", next))
-    } catch {
-      // Back to what they could read. The message is deliberately composed in
-      // `previous`, not through the `t` above — telling somebody in Catalan that
-      // Catalan failed to load is a joke at their expense.
-      setLang(previous)
-      toast.error(translate("That didn't save. Try again.", previous))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   // PILLS: flag in the swatch position (matching Background's own colour
-  // mark), the language's own name for itself, its English name beside it
-  // where the two differ, and the completion figure where it is under 100 —
-  // the same three facts the old trigger + dropdown carried, now all on one
-  // row instead of split between a closed control and an opened menu.
+  // mark), the language's own name for itself — its own, only, see the
+  // header's "NATIVE NAME ONLY" ruling — and the completion figure where it
+  // is under 100.
   const options: readonly AppearancePillOption[] = LANGUAGES.map((l) => {
     const pct = percent(l.code)
     return {
@@ -150,9 +132,6 @@ export function LanguageSection({
       label: (
         <span className="flex items-center gap-1.5">
           <span>{l.native}</span>
-          {l.english !== l.native && (
-            <span className="text-muted-foreground text-xs">{l.english}</span>
-          )}
           {pct !== null && pct < 100 && (
             <span className="text-muted-foreground text-xs tabular-nums">{pct}%</span>
           )}
@@ -174,9 +153,9 @@ export function LanguageSection({
       <h3 className="text-muted-foreground text-micro uppercase">{t("Language")}</h3>
       <AppearancePillGroup
         options={options}
-        value={lang}
-        disabled={saving}
-        onValueChange={(next) => void choose(next as Language)}
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => onChange(next as Language)}
         ariaLabel={t("Language")}
       />
     </div>

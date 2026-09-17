@@ -1,7 +1,8 @@
 # Where this art comes from
 
-The glyphs in this folder are **Phosphor** — 1,512 icons (the whole `fill`
-weight), MIT licensed, from
+The glyphs in this folder are **Phosphor** — 1,513 icons (the `fill` weight,
+plus two named regular-weight exceptions and one coexisting regular variant —
+see "Weight" below), MIT licensed, from
 [github.com/phosphor-icons/core](https://github.com/phosphor-icons/core)
 (© 2023 Phosphor Icons). The licence is beside this file as `LICENSE-phosphor`,
 and MIT permits redistribution inside this repository.
@@ -33,10 +34,15 @@ resolves here, with nothing translating it on the way in.
 
 **Fill is the default weight. The exceptions, drawn at regular (outline)
 weight instead, are `Plus`, `Power`, `Prohibit`, `X`, `DotsThree`,
-`DotsThreeVertical`, `MagnifyingGlass`, `Paperclip`, `Asterisk`, `Check`, and
-THE WHOLE `Arrow*` FAMILY — all 96 of them. 108 files in total; the other
-1,404 are fill, and both counts are now machine-checked — see "The audit"
-below.** Phosphor's fill weight renders a bare mark (a plus
+`DotsThreeVertical`, `MagnifyingGlass`, `Paperclip`, `Asterisk`, `Check`,
+`Waves` (2026-09-17, see below), and THE WHOLE `Arrow*` FAMILY — all 96 of
+them — plus `BatteryEmpty`/`BatteryVerticalEmpty`, which draw the same
+picture at either weight and are recorded as regular because that is what
+`--refresh` verified them against. 110 files drawn at regular weight; the
+other 1,403 are fill; and one more file, `ChecksRegular` (2026-09-17, see
+below), exists ONLY at regular weight beside its fill-weight sibling
+`Checks` — 1,513 files in total, and every count here is machine-checked —
+see "The audit" below.** Phosphor's fill weight renders a bare mark (a plus
 sign, a power glyph's slash-in-a-ring, a prohibit circle, a cross, three dots,
 a paperclip) as a solid disc, square or plate with the mark knocked out —
 there is no line to fill, so fill wraps it in a plate instead. That reads as a
@@ -138,6 +144,48 @@ Both weights ship the same `viewBox="0 0 256 256"` and `fill="currentColor"`
 on the root, so nothing needed normalising on the way in — see
 `icon-base.tsx` for how the wrapper paints that fill (no stroke, no
 `strokeWidth` prop: fill icons have nothing to weight).
+
+### 2026-09-17 — `Waves` to regular, and `Checks` gets a regular-weight sibling
+
+The client's ruling, verbatim, on the app's five most-alike rail glyphs:
+"Changing the icons because they all look too similar. For waves, use the
+regular, not solid. For tasks, use the checks in plural in regular, for
+knowledge, use bookmark simple in fill solid. For contacts, use the user
+circle in the field. For settings rules, use the shield check in Solid."
+
+Three of the five named glyphs — `BookmarkSimple`, `UserCircle`,
+`ShieldCheck` — already lived in this folder at fill weight, matching her
+ruling exactly (fill is the default weight here, so "in fill solid" and "in
+Solid" needed nothing). No file changed for those three; they are named here
+only so the next reader does not go looking for a change that was never
+needed.
+
+`Waves` moved from fill to regular, IN PLACE, the same way `Check` and
+`Asterisk` moved before it (see above): nothing else in either consuming app
+draws `Waves` for a different concept, so there was no reason to keep the
+fill picture around under a second name. `foundations/icons/Waves.svg` now
+holds Phosphor's `waves` REGULAR-weight path data; `--refresh` reclassified
+it and the manifest records `"weight": "regular"`.
+
+`Checks` could not move the same way: the app already draws the FILL glyph
+at two unrelated call sites (a sprint's own "Complete" action, a draft
+review's submit/"Keep all" buttons) that have nothing to do with the concept
+this ruling is about (the Tasks section). Moving `Checks.svg` in place would
+have silently replated both of those buttons. So `Checks` (fill) is
+UNCHANGED, and a second file, `ChecksRegular.svg`, was added beside it,
+holding Phosphor's `checks` REGULAR-weight path data — the first glyph in
+this folder where two weights of one Phosphor name coexist under two
+different export names. `ChecksRegular` is not a Phosphor spelling (Phosphor
+has no "regular" suffix — regular is the unsuffixed default upstream, and
+suffixes exist only for the OTHER five weights); it is this folder's own
+name for "the regular weight of `checks`, because `Checks` was already
+taken." The manifest records it honestly: `"upstream": "checks", "weight":
+"regular"`, same upstream name as `Checks`, different weight, different
+export.
+
+Both changes were made and verified by `--refresh` against the same pinned
+pack, `@phosphor-icons/core@2.1.1` — no version bump, no other glyph moved
+(`art changed 1 Waves`, `new glyphs 1 ChecksRegular`, `removed 0`).
 
 ## The folder is the contract
 

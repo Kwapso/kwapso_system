@@ -513,7 +513,7 @@ expect(terms.has(entry.term), `duplicate term "${entry.term}"`).toBe(false)
 The canonical terms include: **Team**, **Member**, **Role**, **Access right**
 (not "permission" in copy), **Invite**, **Revoke**, **Activate / deactivate** (not
 "delete"), **Archive**, **Account**, **Contact**, **Ticket**, **Conversation**,
-**Stakeholder**, **Story**, **Sprint**, **Task**, **Brand asset**, **Knowledge base**,
+**Stakeholder**, **Story**, **Sprint**, **Task**, **Brand asset**, **Knowledge**,
 **Source**, **Citation**, **Dropdown values**, **Import**, **Export**, **Assistant**,
 **Activity**, **Overview**, **Status**. That is a sample, not the list. Read
 `shared/glossary.ts`, and when writing UI copy reach for it first.

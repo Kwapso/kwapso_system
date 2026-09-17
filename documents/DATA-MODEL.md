@@ -2423,7 +2423,7 @@ fact, not a record anybody curates.
   0008/0009/0010); help, help_threads,
   data_import_sessions (dropped 2026-09-14, `0087`, superseded by
   data_import_batches below), agent_threads, agent_messages (per-team `0004_modules`).
-  **Knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)**:
+  **Knowledge (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)**:
   knowledge_sources, knowledge_chunks, knowledge_terms, knowledge_ingest
   (per-team `0012_knowledge` + `0020_knowledge_vectors`). The search itself lives
   in Vectorize. See R26 and BOOTSTRAP.md §3b.

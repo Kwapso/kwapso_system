@@ -6,10 +6,16 @@
 // gap against — so with no wrapper the space between the thread and the
 // app's own composer was exactly zero.
 //
-// THE FIX IS A COLUMN, NOT A MARGIN. One wrapper around both, using the same
-// panel spacing token (`gap-[var(--space-5)]`) the stages block above already
-// uses — no pixel literal, and the gap is paid once by the column rather than
-// by either child guessing at the other's edge.
+// AMENDED 17 Sep 2026 — V1's "no tabs" body put the whole conversation on
+// its own paper (`TicketConversationPanel`, ticket-detail-body.tsx): the
+// thread now scrolls INSIDE that card and the composer is pinned below it,
+// never scrolling out of view — the client's "she can carry on reading the
+// ticket while it counts" (reply-composer.tsx's own header), now read as a
+// chat panel that keeps its send row on screen. T3820's own concern — a real
+// gap between the latest message and the compose bar — still has to hold in
+// this shape: the two regions are direct children of ONE flex column
+// (`TicketConversationPanel`'s `CardContent`) carrying the same panel
+// spacing token as before, `gap-[var(--space-5)]`, no pixel literal.
 
 import { cleanup, render, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -42,6 +48,16 @@ const TICKET = {
 
 const perms = vi.hoisted(() => ({ can: vi.fn(() => true) }))
 vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: perms.can }) }))
+
+// V1 (17 Sep 2026) DRAWS EVERY PANEL AT ONCE — see ticket-close-moved-to-top.test.tsx's
+// own comment beside this same mock for the full account: `<WorkLogsPanel>`
+// (and its always-mounted `<TimeFormDialog>`s) is on the page unconditionally
+// now, and that dialog reads a router hook whether or not it is open.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
@@ -89,12 +105,11 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
 })
 
-describe("the conversation and the composer sit in one gapped column", () => {
-  it("shares a single flex column, spaced by the panel's own token", async () => {
+describe("the conversation and the composer sit in one gapped column, on their own paper", () => {
+  it("the thread scrolls inside its own region; the composer sits outside that scroller, pinned below it", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
 
-    // The default tab is Conversation (useRemembered's own fallback), so both
-    // are on screen with no click needed.
+    // V1 draws every panel at once — no tab click needed to reach either.
     await waitFor(() =>
       expect(document.querySelector('[data-slot="ticket-thread"]')).toBeTruthy()
     )
@@ -102,12 +117,29 @@ describe("the conversation and the composer sit in one gapped column", () => {
     const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
     expect(composerForm, "the app's own composer never rendered").toBeTruthy()
 
-    const composerRoot = composerForm.parentElement as HTMLElement
-    const column = thread.parentElement as HTMLElement
+    // THE THREAD'S OWN SCROLL REGION. It is the thread's direct parent — the
+    // fragment TicketThread sits in (alongside TranslateAction) carries no
+    // DOM node of its own, so the first real ancestor IS the scroller.
+    const scroller = thread.parentElement as HTMLElement
+    expect(scroller.className).toContain("overflow-y-auto")
+    expect(scroller.className).toContain("min-h-0")
 
-    // ONE COLUMN, holding both as DIRECT children — not two components each
-    // guessing at a margin of their own.
-    expect(column).toBe(composerRoot.parentElement)
+    // THE COMPOSER IS OUTSIDE IT — never scrolled away with the transcript,
+    // the client's own "she can keep reading while it counts" now read as a
+    // pinned send row.
+    expect(scroller.contains(composerForm)).toBe(false)
+
+    // ONE SHARED PARENT, PAYING THE GAP ONCE — the panel's own column
+    // (`TicketConversationPanel`'s `CardContent`). The scroller sits
+    // directly inside it; the composer sits one level deeper (its own
+    // `shrink-0` wrapper, then `ReplyComposer`'s own root `<div
+    // className="flex min-w-0 flex-col gap-4">`, then the form) — either
+    // way, one shared ancestor pays the gap, not two children guessing at
+    // each other's edge.
+    const composerShrinkWrapper = composerForm.parentElement!.parentElement as HTMLElement
+    expect(composerShrinkWrapper.className).toContain("shrink-0")
+    const column = scroller.parentElement as HTMLElement
+    expect(column).toBe(composerShrinkWrapper.parentElement)
     expect(column.className).toContain("flex-col")
     expect(column.className).toContain("gap-[var(--space-5)]")
 

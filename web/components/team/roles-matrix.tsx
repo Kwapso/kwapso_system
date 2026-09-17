@@ -239,10 +239,29 @@
 // deactivated role's sheet is still frozen and still 404s (unchanged), so
 // this list reads straight off `roles`, never off `sheets` — it needs no
 // permissions read to draw and is not gated behind the matrix's own load.
+//
+// ── AMENDED 17 SEP 2026 — "DEACTIVATED" MOVES AGAIN, INTO A REAL FACET ──────
+//
+// The client's screenshot of exactly this row, verbatim: "The toolbar in
+// roles is kind of broken. Go and fix it." Read against the row's own R53
+// contract, the fault was structural rather than cosmetic: `sort` was
+// omitted (named in `TOOLBAR_SORT_EXEMPT`, deleted this same change — see
+// the ruling beside `sortDir` above) and "Deactivated" was an `actions`
+// button carrying a facet's own job — narrowing WHICH ROLES' STATUS this
+// panel is showing — in the one slot `ToolbarRow` never treats as a facet.
+// It is `useFilterBar`'s own `statusPill`/`statusPanel` now (`roleStatusFacets`,
+// above), sitting in `filters`/`toolbarPanel` exactly where R53 puts them.
+// Nothing below THIS list changed: the disclosure is still the same `<List>`
+// of `inactiveRoles`, each row still carries its own one-step reactivate,
+// and it is still gated on nothing but `deactivatedOpen` — only WHAT SETS
+// that boolean moved, from a button's own `onClick` to the facet's `value`.
+// The "3" the old button's `Badge` carried is not lost: it rides
+// `FacetOption.count` on the "Deactivated" option itself
+// (`shared/web/screen-engine/config.ts`), the same documented field the
+// kit's own filter panel already knows how to draw a number beside.
 
 import * as React from "react"
 
-import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { Plus, Power } from "@shared/ui/foundations/icons"
@@ -253,7 +272,10 @@ import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/uns
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { cn } from "@shared/ui/lib/utils"
 import { List } from "@shared/web/list-compat"
-import { formatCount } from "@shared/web/format-count"
+import { Icon, type IconName } from "@shared/web/screen-engine/icon"
+import { CONCEPT_ICON } from "@/lib/pages"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
+import type { FilterFacet } from "@shared/web/screen-engine/config"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -300,6 +322,71 @@ const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
   create: "create",
   edit: "update",
   delete: "delete",
+}
+
+/** EVERY MODULE'S ROW WEARS THE SAME GLYPH THE RAIL DRAWS FOR IT — the
+ * client's ruling, 17 Sep 2026: "in Module Name, add the icon of the
+ * module." `CONCEPT_ICON` (`web/lib/pages.ts`) is the app's one icon
+ * vocabulary, keyed by CONCEPT rather than by permission module — "roles"
+ * for the Roles tab, "accounts" for the customer spine — so this is the one
+ * mapping from a `TEAM_MODULES` key (`shared/team-modules.ts`) to the concept
+ * that already wears a glyph everywhere else the module surfaces (the rail,
+ * `settings-screen.tsx`'s own Modules wall, a tab strip). It is not derived
+ * off `TEAM_SECTIONS`'s own `module` field, on purpose: several sections share
+ * one permission module (Stories/Sprints/Waves/Tasks/Time are all `work`) and
+ * several modules never reached the rail at all (`agent`, `commercials`,
+ * `google`, `google_mail`, every "everyone else's…" sight-switch) — a derived
+ * lookup would answer some rows and guess at the rest, and a guess is exactly
+ * what R36 exists to stop for a box on this same grid. Fixed here instead,
+ * reasoned per row, so a new module is a line added rather than a silent
+ * fallback nobody reviewed.
+ *
+ * A module absent from this map falls back to `CONCEPT_ICON.settings` (the
+ * gear) — the same fallback `settings-screen.tsx`'s own Modules wall reaches
+ * for when a segment the vocabulary has never heard of shows up, and it is
+ * the honest answer for the handful of rows with no glyph of their own: the
+ * AI agent's switch, the money door (`commercials` — its own rate-card icon
+ * was retired with the rate cards, 10 Sep 2026), and the two Google rows,
+ * none of which is a sidebar destination a reader has already learned a mark
+ * for. */
+const MODULE_ICON_CONCEPT: Partial<Record<string, keyof typeof CONCEPT_ICON>> = {
+  teams: "team",
+  team_members: "members",
+  member_roles: "roles",
+  accounts: "accounts",
+  contacts: "contacts",
+  portal_users: "portal",
+  help: "tickets",
+  knowledge: "knowledge",
+  selectable_data: "entries",
+  processes: "processes",
+  deliverables: "deliverables",
+  // THE WORK ENGINE'S OWN SWITCH — one module behind Stories, Sprints, Waves,
+  // Tasks and Work logs (`shared/team-modules.ts`'s own header: "one module
+  // covers stories, the sprints they sit in and the time logged against
+  // them, because they are one record from a reader's point of view: a piece
+  // of work"). Stories is that record's own noun, so its glyph stands for
+  // the module here too.
+  work: "stories",
+  all_tasks: "tasks",
+  all_stories: "stories",
+  inputs: "inputs",
+  all_inputs: "inputs",
+  meetings: "meetings",
+  brand_assets: "brand",
+  // "WHY WE MEET" — `delivery`'s own label is "Meeting types" and its rail
+  // row (`TEAM_SECTIONS`, `web/lib/pages.ts`) already wears `CONCEPT_ICON.
+  // purposes`, so the switch that governs it does too.
+  delivery: "purposes",
+  staff_profiles: "staff",
+}
+
+/** `MODULE_ICON_CONCEPT`, resolved all the way to the kit's own glyph name —
+ * `<Icon name>` wants the Phosphor spelling (`"buildings"`), never the
+ * concept key (`"accounts"`) that names it in `CONCEPT_ICON`; the fallback
+ * lives in exactly one place. */
+function moduleIconName(moduleKey: string): IconName {
+  return CONCEPT_ICON[MODULE_ICON_CONCEPT[moduleKey] ?? "settings"]
 }
 
 /** THE FOUR MARKS ARE FIXED — R · C · U · D — AND THE WORDS ARE TRANSLATED.
@@ -414,9 +501,28 @@ export function RolesMatrix({
   // THE TOOLBAR'S SEARCH BOX — narrows the matrix's ROWS, which are modules
   // (this file's own header explains why modules are rows since 2026-09-10).
   const [query, setQuery] = React.useState("")
-  // THE "DEACTIVATED" DISCLOSURE — closed by default, opened by the toolbar
-  // button, the same shape `invitesOpen` is in members-gallery.tsx.
-  const [deactivatedOpen, setDeactivatedOpen] = React.useState(false)
+  // A→Z OR Z→A ON MODULE NAME — the client's ruling, 17 Sep 2026: "in the
+  // toolbar, I want to be able to sort by Module Name." The rows already read
+  // top to bottom in `TEAM_MODULES`'s own fixed order (`TOOLBAR_SORT_EXEMPT`'s
+  // entry for this file argued there was no second order worth offering); her
+  // ask is that second order, so the exemption is deleted rather than kept
+  // beside a control that answers it. One field, the same shape
+  // `members-gallery.tsx`'s own name sort is (`SortControl` draws the
+  // direction button beside it unless a caller opts out, and `ToolbarRow`
+  // never does), because a module's NAME is the one axis this row can order.
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
+  // ROLES' STATUS, AS A REAL FILTER FACET — the client's diagnosis of the
+  // "kind of broken" toolbar, 17 Sep 2026: the "Deactivated 3" pill was an
+  // `actions`-slot button wired to a disclosure, standing in for a facet R53
+  // has its own dedicated slot for. `useFilterBar` below is the app's one
+  // seam for a facet (search → FILTERS → sort → view → actions); its `value`
+  // is this file's own `statusFilter.status`, empty string reading "Active"
+  // (the grid itself — deactivated roles have no column, per this file's own
+  // header) and `"deactivated"` reading the disclosure list below, the exact
+  // list this toggle already drew, now opened by the facet instead of a bare
+  // button.
+  const [statusFilter, setStatusFilter] = React.useState<Record<string, string>>({})
+  const deactivatedOpen = statusFilter.status === "deactivated"
 
   // ACTIVE ROLES ONLY. A deactivated role's permissions are frozen and the door
   // 404s them (the same rule the per-role screen kept) — and a row of dashes for
@@ -424,10 +530,41 @@ export function RolesMatrix({
   const activeRoles = React.useMemo(() => roles.filter((r) => r.active), [roles])
   const roleIds = activeRoles.map((r) => r.id).join(",")
   const inactiveRoles = React.useMemo(() => roles.filter((r) => !r.active), [roles])
-  // THE TOOLBAR'S "DEACTIVATED" BADGE — `formatCount` (R16), the same seam
-  // `invitesBadge` reads through in members-gallery.tsx, so a team with
-  // nothing switched off gets a plain button rather than a "0" nobody needs.
-  const deactivatedBadge = formatCount(inactiveRoles.length)
+
+  // THE STATUS FACET'S OWN OPTIONS — "Active"/"Deactivated", the roles'
+  // status. The count rides `FacetOption.count` (`shared/web/screen-engine/
+  // config.ts`) — a real, documented field the kit already draws a number
+  // beside (`filter-bar.tsx`), so the "3" the old button carried is not lost,
+  // only moved to the option it now describes rather than to a whole pill
+  // that used to name only one of the two states.
+  const roleStatusFacets: FilterFacet[] = [
+    {
+      field: "status",
+      label: t("Status"),
+      control: "select",
+      options: [
+        { value: "active", label: t("Active") },
+        { value: "deactivated", label: t("Deactivated"), count: inactiveRoles.length },
+      ],
+    },
+  ]
+  const { pill: statusPill, panel: statusPanel } = useFilterBar({
+    facets: roleStatusFacets,
+    values: statusFilter,
+    // No facet here declares its own `options`-free derivation, so `data` is
+    // never actually read for the distinct-values path — handed over anyway
+    // because the hook is generic over it, the same way every other call
+    // site in the app hands over its own collection.
+    data: roles,
+    onChange: (field, value) =>
+      setStatusFilter((prev) => {
+        const next = { ...prev }
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setStatusFilter({}),
+  })
 
   // ONE READ FOR THE WHOLE GRID. The door answers per role
   // (`tenancy.rolePermissions`), and roles are a BOUNDED collection (R14 — a
@@ -505,13 +642,44 @@ export function RolesMatrix({
   // shared TEAM_MODULES (shared/team-modules.ts). Taking it from a sheet rather
   // than importing the catalogue keeps the labels the door's own, which is where
   // the translated word lives — and now keeps `rights` the door's own too.
+  //
+  // A→Z BY DEFAULT, Z→A ON `sortDir` — the toolbar's own sort control, below.
+  // `sortedOptions` is always ascending (locale-aware — see its own header),
+  // so descending is that same order read backwards rather than a second
+  // comparator: stable, and the search filter still narrows the SAME list
+  // either way, applied after the order the same way every collection in the
+  // app searches first and orders the result (see the comment on `q` above).
+  const orderedModules = (() => {
+    const ascending = sortedOptions(sheets?.[0]?.perms.modules ?? [], lang, (m) => m.label)
+    return sortDir === "desc" ? [...ascending].reverse() : ascending
+  })()
   const moduleColumns =
     sheets && draft
-      ? sortedOptions(sheets[0]?.perms.modules ?? [], lang, (m) => m.label)
+      ? orderedModules
           .filter((m) => !q || m.label.toLowerCase().includes(q))
           .map((m) => ({
             id: m.key,
-            label: m.label,
+            // THE MODULE'S OWN ICON, BEFORE THE NAME — client, 17 Sep 2026:
+            // "in Module Name, add the icon of the module." `moduleIconName`
+            // (this file's header) resolves the module key through the same
+            // `CONCEPT_ICON` vocabulary the rail draws its own glyphs from,
+            // so a module wears the identical mark wherever it appears.
+            //
+            // A NODE COSTS THIS CELL ITS PLAIN-STRING NAME — the kit reads a
+            // label with `plain(label, id)` (a string is used as-is, anything
+            // else falls back to the id), which is exactly the trade the ROLE
+            // column already made turning itself into a button node
+            // (2026-09-10, this file's own header). `formatCellLabel` and
+            // `formatSlotLabel` below resolve the real word back out of the
+            // door's own module catalogue by the id this node now falls back
+            // to, the identical repair the role column's own lookup already
+            // makes for `roleId`.
+            label: (
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <Icon name={moduleIconName(m.key)} className="size-4 shrink-0 text-ink-tertiary" />
+                <span className="truncate">{m.label}</span>
+              </span>
+            ),
             // R36's fix, and the whole point of this release. `m.rights` is
             // MODULE_OFFERED_RIGHTS as the door sends it, in the app's own
             // vocabulary; the kit speaks in capability ids, so it goes through
@@ -577,21 +745,25 @@ export function RolesMatrix({
           // THE EYEBROW STYLE, UNIFIED WITH "MODULE" — client, 2026-09-14: "if
           // the column 1 header module is all cap, unify this for the role
           // names." The first column's head is a plain `<th>`, styled
-          // `text-micro uppercase font-[var(--font-weight-medium)]
-          // text-ink-tertiary` by the kit's own `TableHead` (table.tsx) — every
-          // OTHER column's head is this button node instead, and a `<button>`
-          // is where that styling breaks: browsers ship their own UA default
-          // of `text-transform: none` directly on the element, which beats an
-          // inherited `uppercase` regardless of the ancestor `<th>`'s own
-          // class. So the four classes are restated here, explicitly, rather
-          // than trusted to inherit through a control that will not carry
-          // them.
+          // `text-micro font-[var(--font-weight-medium)] text-ink-tertiary`
+          // by the kit's own `TableHead` (table.tsx) — every OTHER column's
+          // head is this button node instead, and a `<button>` is where that
+          // styling breaks: browsers ship their own UA default of
+          // `text-transform: none` directly on the element, which beats
+          // whatever the ancestor `<th>` sets. So the classes are restated
+          // here, explicitly, rather than trusted to inherit through a
+          // control that will not carry them. UNIFIED AGAIN, 2026-09-17: the
+          // client's ruling on the Choices table's Details header ("why all
+          // caps? 'Details' pls", generalised from her Roles/Contacts
+          // screenshots the same day) dropped `TableHead`'s own uppercase
+          // upstream in the kit — this restatement drops it too, for the
+          // same "unify with Module" reason it was added.
           label: (
             <button
               type="button"
               onClick={() => setOpenRole(role)}
               aria-label={`${role.title} — ${t("Overview")}`}
-              className="cursor-pointer text-start text-micro font-[var(--font-weight-medium)] text-ink-tertiary uppercase"
+              className="cursor-pointer text-start text-micro font-[var(--font-weight-medium)] text-ink-tertiary"
             >
               {/* THE HOVER IS THE KIT'S LINK HOVER AND NOTHING ELSE — `.kw-link`
                   "inherits its ink, underlines on hover, occupies no box"
@@ -675,6 +847,11 @@ export function RolesMatrix({
    * said in TWO places that must agree — the legend's third register and every
    * affected cell's accessible sentence — so it is translated once here. */
   const notOfferedWord = t("Not offered")
+  /** The legend's own two words, said a second time in `formatSlotLabel`'s
+   * own accessible sentence — one translation, read in both places rather
+   * than typed twice. */
+  const heldWord = t("Granted")
+  const notHeldWord = t("Not granted")
 
   return (
     /* THE CONTAINER — "nothing on top of white background, its a rule!"
@@ -742,7 +919,22 @@ export function RolesMatrix({
       {/* A REAL `<ToolbarRow>`, 2026-09-14 — client: "In Team Rules [Roles]
           at the toolbar with search and the add button." This file's header
           carries the full account of every slot; the short version is in
-          each prop's own comment below. */}
+          each prop's own comment below.
+
+          RESHAPED 17 SEP 2026 — the client's own screenshot of this exact
+          row, verbatim: "The toolbar in roles is kind of broken. Go and fix
+          it." Two real faults sat behind that one sentence, both diagnosed
+          off this file rather than guessed at: `sort` was OMITTED, named in
+          `TOOLBAR_SORT_EXEMPT` on the argument that a fixed module catalogue
+          has no second order worth offering — an argument her own next
+          sentence answers directly ("in the toolbar, I want to be able to
+          sort by Module Name"), so the exemption is deleted below rather
+          than kept beside a control that now answers it; and "Deactivated"
+          sat in `actions`, a secondary BUTTON standing in for what R53's own
+          slot set already has a dedicated place for — a FACET. Both are
+          fixed at the row's own slots (search → filters → sort → actions),
+          never a second wrapper: this is still the one `<ToolbarRow>` this
+          panel has ever drawn. */}
       <ToolbarRow
         // R50 — a REAL VALUE, and the honest one, not a dodge. What this row
         // narrows is the team's own MODULE CATALOGUE (`TEAM_MODULES`, read
@@ -760,27 +952,35 @@ export function RolesMatrix({
             className="w-full"
           />
         }
-        // R53 — NO `sort` HERE, and named in `TOOLBAR_SORT_EXEMPT`
-        // (`shared/rules/registry.ts`) rather than passed: the rows this grid
-        // draws are `TEAM_MODULES`'s own fixed order, which is the order a
-        // permission matrix is read in, top to bottom — there is no second,
-        // equally valid sequence for a control to offer over a fixed
-        // catalogue, the same shape TasksScreen's Calendar tab is already
-        // exempted for one slot along.
+        // THE ROLES' STATUS, AS A FACET — the pill `useFilterBar` builds
+        // (`statusPill`, above), between `search` and `sort` exactly where
+        // R53 puts it. This is the whole diagnosis of "kind of broken": the
+        // old "Deactivated 3" was an `actions`-slot button doing a facet's
+        // job in the wrong slot, invisible to this row's own contract the
+        // way R53's header describes eight other screens' sort controls
+        // sitting inside `search` for the identical reason — a slot a call
+        // site can put the wrong thing in is not a rule.
+        filters={statusPill}
+        toolbarPanel={statusPanel}
+        // A→Z / Z→A ON MODULE NAME — client, 17 Sep 2026: "in the toolbar, I
+        // want to be able to sort by Module Name." One field, `SortControl`'s
+        // own direction button doing the A↔Z half (`ToolbarRow` never passes
+        // `showDirection: false`), the identical shape
+        // `members-gallery.tsx`'s Name sort already is. The
+        // `TOOLBAR_SORT_EXEMPT` entry this file used to carry is deleted in
+        // the same change (`shared/rules/registry.ts`) — the reasoned
+        // argument it made ("no second, equally valid order over a fixed
+        // catalogue") is answered by this control rather than still true
+        // beside it.
+        sort={{
+          options: [{ value: "module", label: t("Module name") }],
+          value: "module",
+          onValueChange: () => undefined,
+          direction: sortDir,
+          onDirectionChange: setSortDir,
+        }}
         actions={
           <>
-            {/* "DEACTIVATED", THE SAME SHAPE AS MEMBERS' "INVITES" — client,
-                2026-09-14: "In Roles Permission, remove the whole
-                'Deactivated' from the bottom and make it a button in the
-                toolbar, same as we have Invites for Members." Secondary
-                variant, an icon, a `formatCount` badge (R16) that renders
-                nothing at zero — see `deactivatedBadge` below — mirroring
-                `members-gallery.tsx`'s Invites button control for control. */}
-            <Button variant="secondary" onClick={() => setDeactivatedOpen((v) => !v)}>
-              <Power className="size-3.5" />
-              {t("Deactivated")}
-              {deactivatedBadge !== "" && <Badge>{deactivatedBadge}</Badge>}
-            </Button>
             {/* THE BLACK `+`. Not mango, not labelled, and not `AddButton`;
                 this file's header has all three reasons and the client's two
                 messages that settle them. */}
@@ -893,6 +1093,20 @@ export function RolesMatrix({
       ) : (
         <div className="flex flex-col gap-4">
           <PermissionMatrix
+            // "— LOCKED BY POLICY: <ROLE>" IS GONE FROM THE MODULE NAME —
+            // client, 17 Sep 2026, verbatim: "I want you to delete the
+            // 'Locked by Policy' in Module Name." UPSTREAM SINCE (kit
+            // v1.2.108, same day): the row-level mark this app used to hide
+            // with a `[&_[data-slot=…]]:hidden` rule is now RETIRED FROM THE
+            // KIT ITSELF — `permission-matrix.tsx`'s own CHANGELOG entry says
+            // so in as many words ("the consuming application was already
+            // hiding it"), and a locked cell now carries a solid quiet-grey
+            // fill of its own instead, with the "Locked by policy: <role>"
+            // sentence moved onto that ONE segment's `title`/`Tooltip`
+            // (`formatCellLabel`/`formatSlotLabel` below), never restated
+            // beside the module name. Nothing left here to hide — a rule
+            // targeting a `data-slot` the kit no longer renders would be a
+            // no-op wearing the shape of a fix.
             // EACH PROP ITS OWN NOUN, and the DRAWING turned by `orientation`
             // rather than by the handover. See this file's header.
             modules={moduleColumns}
@@ -953,10 +1167,15 @@ export function RolesMatrix({
             // the key would have put the wrong German under this legend.
             // A NODE LABEL COSTS THE CELL ITS NAME UNLESS THE CALLER GIVES IT
             // BACK. The kit reads a name with `plain(label, id)` — a string
-            // label is used as-is and anything else falls back to the id, which
-            // here would announce a ULID. The MODULE's label is a plain string
-            // and arrives intact; the ROLE's is the button node above, so that
-            // half is rebuilt from the role's real title.
+            // label is used as-is and anything else falls back to the id.
+            // BOTH AXES ARE NODES NOW: the ROLE's has been a button since
+            // 2026-09-10 (this file's own header), and the MODULE's is the
+            // icon-plus-name span added 17 Sep 2026 (see `moduleColumns`
+            // above) — so `moduleLabel` below arrives as the module's KEY,
+            // not its translated word, the identical fallback `roleId`
+            // already stood in for. `moduleTitle` resolves it the same way
+            // `title` resolves the role: a lookup on the door's own sheet,
+            // never a second opinion about what the word is.
             //
             // THE PARAMETERS DO NOT ROTATE WITH THE DRAWING. The kit's own note
             // is explicit: the signature stays `(collection, role, held, locked,
@@ -971,10 +1190,26 @@ export function RolesMatrix({
             // says the role holds none of them, which is a different fact.
             formatCellLabel={(moduleLabel, roleId, held, locked, notOffered) => {
               const title = sheets?.find((sheet) => sheet.role.id === roleId)?.role.title ?? roleId
-              return `${title} · ${moduleLabel}: ${
+              const moduleTitle =
+                sheets?.[0]?.perms.modules.find((m) => m.key === moduleLabel)?.label ?? moduleLabel
+              return `${title} · ${moduleTitle}: ${
                 held.length === 0 ? t("nothing") : held.join(", ")
               }${locked ? `, ${t("Locked by policy")}` : ""}${
                 notOffered.length === 0 ? "" : ` · ${notOffered.join(", ")}: ${notOfferedWord}`
+              }`
+            }}
+            // ONE SLOT'S OWN ACCESSIBLE NAME — the kit's default builds this
+            // from the same two node labels `formatCellLabel` above corrects,
+            // so left alone every R/C/U/D checkbox would announce a role's
+            // ULID and a module's key instead of the words on screen. Same
+            // two lookups, and the same `heldLabel`/`notHeldLabel` words the
+            // legend already carries, read here rather than re-typed.
+            formatSlotLabel={(moduleLabel, roleId, capabilityLabel, held) => {
+              const title = sheets?.find((sheet) => sheet.role.id === roleId)?.role.title ?? roleId
+              const moduleTitle =
+                sheets?.[0]?.perms.modules.find((m) => m.key === moduleLabel)?.label ?? moduleLabel
+              return `${title} · ${moduleTitle} · ${capabilityLabel}: ${
+                held ? heldWord : notHeldWord
               }`
             }}
             // THE LOCK'S MARK NAMES THE OTHER AXIS, AND THE OTHER AXIS IS NOW
@@ -994,8 +1229,8 @@ export function RolesMatrix({
                 )
                 .join(", ")}`
             }
-            heldLabel={t("Granted")}
-            notHeldLabel={t("Not granted")}
+            heldLabel={heldWord}
+            notHeldLabel={notHeldWord}
             // THE LEGEND'S THIRD REGISTER, which only exists now that `rights`
             // is passed: the kit draws it only when a shown row actually
             // withholds something, and it teaches the em dash. Passed rather

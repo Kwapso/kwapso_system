@@ -34,7 +34,7 @@
 // reply. A key with no keyhole on the screen is the worst of the three states.
 //
 // WHAT IS STILL NOT HERE, deliberately: the APP the ticket sits on. The agency's
-// own four-chip line carries it (`shared/web/ticket-chips.tsx`) and this row does
+// own chip line carries it (`shared/web/ticket-chips.tsx`) and this row does
 // not, because which internal system a request was routed onto is exactly the
 // kind of fact ch.06 keeps on our side of the fence. The number travels; the
 // routing does not.
@@ -46,8 +46,10 @@ import { Clamp } from "@shared/ui/components/clamp/clamp"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
 import type { HelpTicket } from "@shared/types"
+import { ticketTypeIconName } from "@shared/ticket-types"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
+import { Icon } from "@shared/web/screen-engine/icon"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { richTextPlain } from "@shared/web/rich-text"
 
@@ -99,6 +101,15 @@ export const STATUS_WORDS: Record<
 export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   const { t, lang } = useLanguage()
   const status = STATUS_WORDS[ticket.status]
+  // THE TICKET'S KIND, AS AN ICON — client ruling, 17 Sep 2026: colour is the
+  // status's alone now, so a ticket's TYPE draws the same icon the agency's
+  // own list, board and chips draw (`ticketTypeIconName`, @shared/ticket-types).
+  // Decoration beside the row's own three facts (status, work count, date),
+  // never a fourth — the same "logo beside the name, not a subtitle fact"
+  // idiom UI-RULEBOOK K1 already states for a record's own mark. The word
+  // stays for a screen reader (`sr-only`), because a mark never carries the
+  // meaning alone (`type-colours.ts`'s own argument, read here for an icon).
+  const typeIconName = ticketTypeIconName(ticket.helpType)
   return (
     <Link
       href={`/tickets/${ticket.id}`}
@@ -115,6 +126,12 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
           <Clamp lines={2} collapsible={false}>{richTextPlain(ticket.description)}</Clamp>
         </span>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+          {typeIconName && (
+            <span className="inline-flex items-center">
+              <Icon name={typeIconName} className="size-3.5 shrink-0" />
+              <span className="sr-only">{ticket.helpType}</span>
+            </span>
+          )}
           <Badge variant={status.variant}>{t(status.label)}</Badge>
           {/* HOW MUCH WORK IS ON IT, and nothing else about that work
               (.plans/BUILD-1 §7: "stories as a COUNT only — never the titles").

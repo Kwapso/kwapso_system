@@ -275,6 +275,15 @@ const NOT_USER_TYPED: Record<string, string> = {
   "logotypeBlack.src": "a bundler-emitted URL for a file in the design kit",
   "logotypeWhite.src": "a bundler-emitted URL for a file in the design kit",
   "photo1440.src": "a bundler-emitted URL for a file in the design kit",
+  // THE NEW TAB SCREEN'S quick-search and Recently-opened rows
+  // (web/components/shell/new-tab-screen.tsx). Both are the same shape as
+  // `inAppRecordHref` above: `row.href` is built inline as `/<module>/${row.id}`
+  // from a fixed per-module route prefix and the record's own id (off this
+  // app's own search doors), and `row.path` is a step already stored in
+  // `openTabsSnapshot()` — a path THIS session itself navigated to and the
+  // workspace-tabs store wrote back, never typed by a person into a field.
+  "row.href": "an app-built /<module>/<id> path from a fixed route prefix",
+  "row.path": "a step already recorded by this app's own workspace-tabs store",
 }
 
 describe("no screen binds an unchecked URL to an attribute", () => {

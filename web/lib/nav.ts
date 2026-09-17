@@ -9,7 +9,7 @@
 // `softNavigate` — no prop-threading, no context provider. If the host isn't mounted yet
 // (a pre-auth screen, or the very first paint) it falls back to a real navigation.
 
-import { visitTrail } from "@/lib/workspace-tabs"
+import { openSoloTab } from "@/lib/workspace-tabs"
 import { anyDirty, clearAllDirty, requestDiscardConfirm } from "@/lib/unsaved-changes"
 
 let hostGo: ((path: string) => void) | null = null
@@ -84,19 +84,20 @@ export function softNavigate(path: string): void {
  * wizard, which reads exactly like a redirect — the collection she pressed it
  * from is gone from the strip until she clicks Back.
  *
- * A SOLO TAB IS A TRAIL OF ONE. `visitTrail` (`workspace-tabs.ts`) already
- * generalises to that shape on its own terms — no ancestors, one entry,
- * itself the only and active level — so this is not a second tab mechanism,
- * it is the model's own single mutator, called with a one-entry trail instead
- * of the crumb-derived one `deep-link-screen.tsx` builds for an ordinary
- * navigation. Calling it again on the SAME path fronts the tab already open
- * rather than opening a second one — `visitTrail`'s own rule for any
- * already-open path, unchanged here: this seam adds no duplicate-route logic
- * of its own.
+ * A SOLO TAB IS ITS OWN ONE-STEP TAB. `openSoloTab` (`workspace-tabs.ts`)
+ * fronts an already-open tab whose CURRENT step matches this path rather
+ * than opening a second one — the one dedupe this app still promises after
+ * 17 Sep 2026's ruling retired it everywhere else (`workspace-tabs.ts`'s own
+ * decision (C) has the whole account of why this door alone keeps it: the
+ * client's own words at the time were about the Import wizard specifically,
+ * "make sure that it opens as a new solo tab... because now it redirects",
+ * and repeat-pressing Import must still front the one wizard, never mint a
+ * second).
  *
- * THE VIEWPORT GATE IS DUPLICATED ON PURPOSE, NOT SHARED. `visitTrail` itself
- * takes no view on screen width (workspace-tabs.ts, decision 5: "this file
- * has no business reading one") — every other caller is a hook already living
+ * THE VIEWPORT GATE IS DUPLICATED ON PURPOSE, NOT SHARED. Neither
+ * `openSoloTab` nor `openBeside` takes a view on screen width
+ * (workspace-tabs.ts, decision 5 of the first design: "this file has no
+ * business reading one") — every other caller is a hook already living
  * inside `deep-link-screen.tsx`, which knows `roomForTabs` before it calls
  * in. This is the one caller with no host screen to ask, so it asks the same
  * question at the same breakpoint that hook does (48rem — the kit's own
@@ -115,7 +116,7 @@ export function softNavigate(path: string): void {
 export function openInNewTab(path: string, label: string): void {
   const roomForTabs =
     typeof window !== "undefined" && window.matchMedia("(min-width: 48rem)").matches
-  if (roomForTabs) visitTrail([{ path: path.split("?")[0] ?? path, label }])
+  if (roomForTabs) openSoloTab(path.split("?")[0] ?? path, label)
   // NEVER GUARDED — the one navigation this app has ruled must not ask.
   // Opening a new workspace tab does not leave the one you were on (R74: the
   // tab you pressed the door from stays in the strip, reachable, exactly as

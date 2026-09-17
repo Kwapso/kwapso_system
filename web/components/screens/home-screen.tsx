@@ -27,7 +27,7 @@ import {
 } from "@shared/ui/components/avatar/avatar"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, CheckSquare, Gear, Timer, UploadSimple, Users } from "@shared/ui/foundations/icons"
+import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, ChecksRegular, Gear, Timer, UploadSimple, Users } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 
 import { PulseBand, pulseIsQuiet, usePulse } from "@/components/screens/pulse"
@@ -165,7 +165,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
   const LINKS = [
     { need: "help", title: t("Tickets"), desc: t("What clients have asked us for"), icon: Tray, href: "/tickets" },
     { need: "work", title: t("Stories"), desc: t("The work in hand"), icon: PuzzlePiece, href: "/stories" },
-    { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: CheckSquare, href: "/tasks" },
+    { need: "work", title: t("Tasks"), desc: t("Our own admin"), icon: ChecksRegular, href: "/tasks" },
     { need: "work", title: t("Work logs"), desc: t("Time logged, and the timers running"), icon: Timer, href: "/time" },
     { need: "meetings", title: t("Meetings"), desc: t("The meetings list"), icon: Chat, href: "/meetings" },
     { need: "accounts", title: t("Accounts"), desc: t("The companies and contacts we work with"), icon: Briefcase, href: "/accounts" },

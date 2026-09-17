@@ -200,10 +200,14 @@ function EmptyRegister({ children }: { children: React.ReactNode }) {
 
    It wears `buttonVariants({ variant: "ghost", size: "sm" })` — the SAME skin
    `Button` draws, taken from the exported cva rather than re-written — plus
-   the header cell's own type (`text-micro uppercase`, tertiary ink), which
-   `TableHead` sets on the cell and a `<button>` inside it would otherwise
-   reset. `-mx-3 px-3` cancels the cell's own 12 inset so the 32 hover pill
-   reaches the cell's edges instead of floating inside them.
+   the header cell's own type (`text-micro`, tertiary ink), which `TableHead`
+   sets on the cell and a `<button>` inside it would otherwise reset.
+   `-mx-3 px-3` cancels the cell's own 12 inset so the 32 hover pill reaches
+   the cell's edges instead of floating inside them. NOT `uppercase` — client
+   ruling 2026-09-17 (`table.tsx`'s file header has the words); this button
+   used to restate it for the same reason it restates `text-micro` at all —
+   a `<button>` needs it stated, not inherited — and now restates nothing
+   because there is nothing left to restate.
 
    `aria-sort` goes on the `<th>`, not here: it is a property of the column,
    and a screen reader reads it from the header cell.
@@ -239,7 +243,8 @@ function HeaderSorter({
         buttonVariants({ variant: "ghost", size: "sm" }),
         "-mx-3 px-3",
         // The header's own type, restated because a `<button>` resets it.
-        "text-micro uppercase font-[var(--font-weight-medium)]",
+        // No `uppercase` here — see this function's own doc comment.
+        "text-micro font-[var(--font-weight-medium)]",
         active ? "text-foreground" : "text-ink-tertiary",
         align === "end" && "flex-row-reverse",
       )}

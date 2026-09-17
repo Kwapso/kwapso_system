@@ -134,9 +134,10 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
 import { tenancy } from "@/lib/api/tenancy"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
-import { RecordPicker, Swatch, type PickerOption } from "@/components/records/record-picker"
+import { RecordPicker, type PickerOption } from "@/components/records/record-picker"
 import { assignableMembers, staffedOn } from "@/lib/members"
-import { ticketTypeColour } from "@/lib/type-colours"
+import { ticketTypeIconName } from "@shared/ticket-types"
+import { Icon } from "@shared/web/screen-engine/icon"
 /* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
    still fills the swatch on each option of the Status facet below (`DOT_TONE_FILL`
    + `helpFacets`), which is a menu of STATUSES and is untouched by the 2026-09-09
@@ -510,18 +511,23 @@ export function TriageQueue({
     resultCount: matching.length,
   })
 
-  /** THE TEAM'S OWN TICKET TYPES, each with the colour the client ruled for it
-   * — one map, `lib/type-colours.ts`, read by this row and by anything that
-   * draws a type after it. A word that map does not know — "General" on an
-   * imported ticket, or one a team typed before the group was locked at four on
-   * 15 Sep 2026 — gets the neutral rather than being left off: these options are
-   * built from what the ROWS say, and a picker that offered only the four would
-   * be this screen quietly hiding a card it is showing. */
-  const typeOptions: PickerOption[] = helpTypeOptions.map((v) => ({
-    value: v,
-    label: v,
-    swatch: ticketTypeColour(v),
-  }))
+  /** THE TEAM'S OWN TICKET TYPES, each with the icon the client ruled for it —
+   * one map, `shared/ticket-types.ts`, read by this row and by anything that
+   * draws a type after it. Colour retired here 17 Sep 2026 ("the one that gets
+   * the chip with the color is always the status … for tickets, we need to
+   * find icons for the ticket type"). A word that map does not know —
+   * "General" on an imported ticket, or one a team typed before the group was
+   * locked at four on 15 Sep 2026 — draws no icon rather than being left off:
+   * these options are built from what the ROWS say, and a picker that offered
+   * only the four would be this screen quietly hiding a card it is showing. */
+  const typeOptions: PickerOption[] = helpTypeOptions.map((v) => {
+    const iconName = ticketTypeIconName(v)
+    return {
+      value: v,
+      label: v,
+      icon: iconName ? <Icon name={iconName} className="size-3.5" /> : undefined,
+    }
+  })
 
   /** WHO IS ON THE TICKET'S APP, falling back to everybody who can be given
    * work — `staffedOn`'s own fail-open, shared with the story form (see
@@ -1144,12 +1150,15 @@ export function TriageQueue({
             <div className="flex flex-col gap-3">
               {sittingTally.byType.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  {sittingTally.byType.map(([type, n]) => (
-                    <Badge key={type} variant="secondary" size="pill">
-                      <Swatch colour={ticketTypeColour(type)} />
-                      {t("{count} {type}", { count: n, type })}
-                    </Badge>
-                  ))}
+                  {sittingTally.byType.map(([type, n]) => {
+                    const iconName = ticketTypeIconName(type)
+                    return (
+                      <Badge key={type} variant="secondary" size="pill">
+                        {iconName && <Icon name={iconName} className="text-muted-foreground size-3.5 shrink-0" />}
+                        {t("{count} {type}", { count: n, type })}
+                      </Badge>
+                    )
+                  })}
                   {sittingTally.assignedCount > 0 && (
                     <Badge variant="secondary" size="pill">
                       {t("{count} given to somebody", { count: sittingTally.assignedCount })}

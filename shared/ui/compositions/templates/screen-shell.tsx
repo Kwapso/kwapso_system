@@ -1577,6 +1577,61 @@ export interface ScreenShellProps
   breadcrumbDepth?: number;
 
   /**
+   * THE TRAIL — back/forward arrows plus a line of navigation text, now
+   * INSIDE the CARD, its own first row, above whatever the card's body
+   * draws (the collection heading / record head). New 2026-09-17, MOVED
+   * the same day.
+   *
+   * DO NOT CONFUSE THIS WITH `breadcrumb`. That prop is named for what it
+   * used to hold and now holds `BreadcrumbFolders` — the tab STRIP, the
+   * folder-shaped silhouettes rendered on the ground, still this column's
+   * sibling above the card. This prop is the thing a reader would actually
+   * call "the breadcrumbs": Back, Forward, then the text trail. A screen
+   * may pass either, both, or neither.
+   *
+   * CLIENT RULING, 17 SEP 2026 MORNING, VERBATIM: "the breadcrumbs should
+   * sit in the background, outside the container, on top, and on the very
+   * far left, have a back and forward arrow." THAT GEOMETRY IS SUPERSEDED —
+   * SAME DAY, AFTERNOON, VERBATIM: "I love the direction that we are going,
+   * but put the breadcrumbs and the navigation inside the container." THIS
+   * PROP'S WHOLE GEOMETRY IS NOW THE AFTERNOON SENTENCE: "inside the
+   * container" is this node rendered as `<main>`'s (the CARD's) own first
+   * child rather than its sibling on the ground; "on the very far left" —
+   * unchanged by either ruling — is still the arrows leading the row, now at
+   * the card's own inline start, `DENSITY_TRAIL`'s inset, the SAME token
+   * `DENSITY_HEADER` spends so the arrows land exactly under the title's own
+   * left edge. Neither ruling touches "Yes to Chrome navigation, push the
+   * trail on a rail pick," which is `TrailLine`'s OWN CONTRACT
+   * (`components/breadcrumbs/trail-line.tsx`) — `steps`, `cursor`,
+   * `onBack`, `onForward`, `onJump` — and is argued there, not here; this
+   * file places the node and decides nothing about what is inside it.
+   *
+   * THE COLOUR CONSEQUENCE OF THE MOVE IS `TrailLine`'s, NOT THIS PROP'S —
+   * see that file's own header for the spine-ink rebind it reverts now that
+   * this slot's ground is the card's paper, not the spine. This file's own
+   * "never grey nav text" reasoning (`breadcrumb`'s prop doc, above) stays
+   * exactly where it was: it was always about the STRIP, which is still on
+   * the spine ground and unaffected by this move.
+   *
+   * A NODE, NOT A COMPONENT NAME, for the identical reason `breadcrumb` is:
+   * this file does not import `TrailLine` and does not inspect what is
+   * handed to it. A screen that wants the kit's own drawing passes
+   * `trail={<TrailLine ... />}`; nothing stops a caller from passing
+   * something else, and nothing here polices that they didn't.
+   *
+   * THE GAP TO WHAT FOLLOWS IS A TOKEN, NOT A GUESS — see `TRAIL_GAP` below.
+   * This slot pays no top padding of its own, so the head (`band`, or the
+   * body directly when there is no `band`) keeps its own existing `pt`
+   * unchanged and simply moves down by this slot's height plus `TRAIL_GAP` —
+   * proved, not asserted, in `verify/trail-line/`.
+   *
+   * ABSENT CHANGES NOTHING. No wrapper, no gap, no measurable difference in
+   * the card's own padding-top or the head's own top — proved side by side
+   * in `verify/trail-line/`.
+   */
+  trail?: React.ReactNode;
+
+  /**
    * THE HEADER BAND, AS A RAW NODE — THE PRE-COLLAPSE SPELLING, AND IT IS ON
    * ITS WAY OUT. Lies ON the CARD's off-beige and is NOT a container: it
    * paints no fill, takes no radius and carries no rule. CLIENT RULING,
@@ -1918,6 +1973,59 @@ const CARD = cn(
 const CARD_JOINED = "md:rounded-ss-none";
 
 /* ----------------------------------------------------------------------------
+   THE TRAIL'S OWN GAP TO WHAT FOLLOWS IT — since the 17 Sep AFTERNOON ruling
+   moved the trail INSIDE the card, "what follows" is the head (`band`, or
+   the body directly when there is no `band`), not the card itself. Still a
+   real, positive `margin-bottom` on the trail's own wrapper, for the same
+   reason as before: nothing below this node is welded to it the way the
+   card used to be welded to the folder strip.
+
+   STILL `--space-5` (20), STILL NOT A NEW `--trail-gap` CUSTOM PROPERTY, AND
+   STILL THE SAME CONSTANT — only where it is spent moved, not what it is
+   spent on. The kit does not own a dedicated CSS custom property for "the
+   air under a strip of chrome" — `TABS_STRIP_GAP` (`components/tabs/
+   tabs.tsx`) and `TOOLBAR_ROW_GAP` (`components/toolbar-row/toolbar-row.tsx`)
+   are JS string constants that already spend `--space-5` on exactly that
+   sentence, and `TOOLBAR_ROW_GAP`'s own comment states the reason to reuse
+   it rather than restate it: "not a fourth opinion about air." A
+   `--trail-gap` custom property would be a THIRD name for a number those two
+   already settled, so this reaches for their token instead. Kept as a named
+   constant, the same shape as its two siblings, so a reader can find all
+   three by grepping `_GAP` rather than by knowing this file also decided
+   one.
+
+   THE ONE NUMBER `verify/trail-line/` EXISTS TO PRINT: with `trail` present,
+   the head's own top must move down from its `trail`-absent position by
+   EXACTLY the trail slot's own height plus this margin — no more (a second
+   gap sneaking in from the trail's own top padding, which it deliberately
+   has none of — see `DENSITY_TRAIL`) and no less (this margin not landing at
+   all). `band`'s (or the body's) own `pt` is UNCHANGED by any of this; the
+   trail is inserted above it with zero top padding of its own, so the whole
+   delta is exactly `trailHeight + TRAIL_GAP`'s value, provable rather than
+   asserted.
+
+   STEPPED DOWN ONE RUNG, 2026-09-17. Client, on the live product: "Because
+   adding the breadcrumbs took up considerable screen space, let's reduce the
+   margin that we have on the sides above and below both the main content and
+   the assistant. Let's optimize the height. Let's not leave so much blank
+   space there." `--space-5` (20, 18.75 at the kit's own 15px root) ->
+   `--space-4` (16, 15 at the kit's own root) — one rung down the same scale,
+   same reasoning as every other step in this file: not a new number, not a
+   new `--trail-gap` custom property, only the existing token moving.
+
+   THIS NOW DIVERGES FROM `TABS_STRIP_GAP`/`TOOLBAR_ROW_GAP`, AND THAT IS
+   FLAGGED RATHER THAN FIXED. The paragraph above this one reused `--space-5`
+   specifically because two other files (`components/tabs/tabs.tsx`,
+   `components/toolbar-row/toolbar-row.tsx`) already spend it on "the air
+   under a strip of chrome" — "not a fourth opinion about air." Today's
+   ruling names only this shell's own content/assistant gutters, and neither
+   of those two files is this lane's to edit, so this rung and theirs now
+   read two different numbers for what used to be one shared idea. Logged in
+   the CHANGELOG as a follow-up for their owner, not silently reconciled
+   here. */
+const TRAIL_GAP = "mb-[var(--space-4)]";
+
+/* ----------------------------------------------------------------------------
    THE BODY — the card's tone, and NOT a container.
 
    In the artifact this is a bare padded div: 27.1 draws `padding: 22px 28px
@@ -2088,9 +2196,16 @@ const DENSITY_RAIL: Record<ScreenDensity, string> = {
   calm: "[--rail-inset:var(--space-5)]",
 };
 
+/* STEPPED DOWN ONE RUNG WITH `--shell-gutter`, 2026-09-17, TO KEEP THE
+   INVARIANT ABOVE TRUE. `--aside-inset` and `--shell-gutter` are documented
+   as "the SAME token at every density" (see the block above this one); the
+   17 Sep gutter-shrink ruling on "the main content and the assistant" moves
+   both to `--space-4` in the same edit so that sentence stays true rather
+   than becoming stale the moment one of the two moved and the other did
+   not. See `DENSITY_GUTTER`, directly below, for the ruling itself. */
 const DENSITY_ASIDE: Record<ScreenDensity, string> = {
-  comfortable: "[--aside-inset:var(--space-5)]",
-  calm: "[--aside-inset:var(--space-5)]",
+  comfortable: "[--aside-inset:var(--space-4)]",
+  calm: "[--aside-inset:var(--space-4)]",
 };
 
 /* THE GROUND'S OWN GUTTER — the air between the card and everything around
@@ -2123,20 +2238,90 @@ const DENSITY_ASIDE: Record<ScreenDensity, string> = {
    handle's target is a fixed 20px, so both densities now carry the 1.25
    overhang onto the outermost 1.25px of the card's own rounded corner
    region (no content there to intercept) that used to be calm-only — see
-   `verify/shell-chat/` for the measured before/after on both densities. */
+   `verify/shell-chat/` for the measured before/after on both densities.
+
+   STEPPED DOWN ONE RUNG AGAIN, 2026-09-17 — CLIENT, VERBATIM: "Because
+   adding the breadcrumbs took up considerable screen space, let's reduce
+   the margin that we have on the sides above and below both the main
+   content and the assistant. Let's optimize the height. Let's not leave so
+   much blank space there." The breadcrumb tab strip (the `breadcrumb` prop)
+   landed above the card in v1.2.104/105 and pushed the card's own top down
+   by its own height; this is the fix on the other side of that trade —
+   `--space-5` (18.75) -> `--space-4` (15 at the kit's own root), one more
+   rung on the same scale, moving at every one of this token's own call
+   sites at once (the card's four sides, the content-to-assistant gap, the
+   assistant-to-window edge) exactly as the 2026-09-03 step did. OLD -> NEW,
+   measured at the kit's own 15px root: 18.75px -> 15px (a 3.75px delta per
+   edge). See `verify/shell-gutter/` for the rendered before/after on the
+   card's and the aside's own rects at 1440x900.
+
+   `--rail-inset` (`DENSITY_RAIL`, above) IS DELIBERATELY LEFT AT
+   `--space-5`. Today's ruling names "the main content and the assistant",
+   not the rail, and this lane's brief scopes it the same way. Leaving the
+   two apart REOPENS the 22.5-against-18.75 mismatch `DENSITY_RAIL`'s own
+   header spent a full ruling closing on 2026-09-06 (now 18.75-against-15) —
+   noted, not fixed, in the CHANGELOG for whoever next touches the rail's own
+   gutter to decide on purpose rather than by drift. */
 const DENSITY_GUTTER: Record<ScreenDensity, string> = {
-  comfortable: "[--shell-gutter:var(--space-5)]",
-  calm: "[--shell-gutter:var(--space-5)]",
+  comfortable: "[--shell-gutter:var(--space-4)]",
+  calm: "[--shell-gutter:var(--space-4)]",
 };
 
+/* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` above:
+   the card's own head padding is one of the "strip/card ... paddings" the
+   brief names alongside `--shell-gutter` as a contributor to the blank space
+   above the main content. Comfortable: `--space-7`/`--space-7`/`--space-6`
+   (32/32/24, i.e. 30/30/22.5 at the kit's 15px root) -> `--space-6`/
+   `--space-6`/`--space-5` (24/24/20, 22.5/22.5/18.75 at 15px). Calm:
+   `--space-6`/`--space-6`/`--space-5` (24/24/20, 22.5/22.5/18.75) ->
+   `--space-5`/`--space-5`/`--space-4` (20/20/16, 18.75/18.75/15). `px` moves
+   in lockstep with `DENSITY_TRAIL`'s own `px`, directly below — see that
+   record's own comment for why the two may never drift apart. */
 const DENSITY_HEADER: Record<ScreenDensity, string> = {
-  comfortable: "px-[var(--space-7)] pt-[var(--space-7)] pb-[var(--space-6)]",
-  calm: "px-[var(--space-6)] pt-[var(--space-6)] pb-[var(--space-5)]",
+  comfortable: "px-[var(--space-6)] pt-[var(--space-6)] pb-[var(--space-5)]",
+  calm: "px-[var(--space-5)] pt-[var(--space-5)] pb-[var(--space-4)]",
 };
 
+/* THE TRAIL'S OWN INSET, NOW THAT IT LIVES INSIDE THE CARD — see the `trail`
+   prop's own doc for the 17 Sep AFTERNOON ruling that moved it here. "The
+   card's own inset on the left so the arrows align with the title's left
+   edge" is not a new number: it is `DENSITY_HEADER`'s OWN `px-*` value,
+   copied rather than derived, because the title the arrows must align with
+   is `band`'s content and `band` is padded by `DENSITY_HEADER`. Copied
+   rather than sliced out of `DENSITY_HEADER` itself (Tailwind's `px-`
+   shorthand in that record is not decomposable at runtime without a second
+   parse) — both records read the identical `--space-7` / `--space-6` custom
+   properties, so the two horizontal insets cannot drift independently; a
+   change to either token moves both. No `pt`/`pb` of its own: the trail
+   sits flush with the card's own top edge and `TRAIL_GAP` (below) supplies
+   the one gap between it and whatever follows — see that constant for why
+   the head must move down by EXACTLY the trail's height plus that gap, no
+   more.
+
+   STEPPED DOWN ONE RUNG WITH `DENSITY_HEADER`, 2026-09-17, FOR THE SAME
+   REASON THE COMMENT ABOVE GIVES: this record's own `px` is a COPY of
+   `DENSITY_HEADER`'s, not a slice of it, so the two must be edited together
+   or the trail's arrows stop landing under the title's own left edge. See
+   `DENSITY_HEADER` for the ruling and the old/new numbers. */
+const DENSITY_TRAIL: Record<ScreenDensity, string> = {
+  comfortable: "px-[var(--space-6)]",
+  calm: "px-[var(--space-5)]",
+};
+
+/* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` and
+   `DENSITY_HEADER` above: the body's own inset is the other "card ...
+   padding" contributor to the blank space below the main content (and,
+   through `DENSITY_STACK`'s shared pair, above the footer when one is
+   drawn). Comfortable: `--space-6`/`--space-7` (24/32, 22.5/30 at the kit's
+   15px root) -> `--space-5`/`--space-6` (20/24, 18.75/22.5). Calm:
+   `--space-5`/`--space-6` (20/24, 18.75/22.5) -> `--space-4`/`--space-5`
+   (16/20, 15/18.75). `DENSITY_STACK` (the gap BETWEEN the figures/content/
+   footer stacked inside this padding, not the padding itself) is
+   deliberately untouched — it is not one of the outer edges the ruling
+   named. */
 const DENSITY_BODY: Record<ScreenDensity, string> = {
-  comfortable: "p-[var(--space-6)] lg:p-[var(--space-7)]",
-  calm: "p-[var(--space-5)] lg:p-[var(--space-6)]",
+  comfortable: "p-[var(--space-5)] lg:p-[var(--space-6)]",
+  calm: "p-[var(--space-4)] lg:p-[var(--space-5)]",
 };
 
 /* The air between the three things the body can hold — the figure strip, the
@@ -3271,6 +3456,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       ambient,
       breadcrumb,
       breadcrumbDepth = ROOT_DEPTH,
+      trail,
       header,
       eyebrow,
       title,
@@ -4215,18 +4401,57 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               NOT DOUBLE UP: `web-portal/components/portal-shell.tsx` draws
               its own `<main>` directly and never imports `ScreenShell`, so
               this element and that one are never on the same page — checked
-              before this landed, not assumed. THE HEADER BAND AND THE BODY
-              ARE BOTH INSIDE IT, THE BREADCRUMB IS NOT: the trail above is
-              navigation chrome (and `BreadcrumbFolders` already carries its
-              own `<nav>`), but the title, the actions and everything the
-              route actually renders are the page's main content, which is
-              exactly what this element wraps. */}
+              before this landed, not assumed. THE HEADER BAND, THE TRAIL AND
+              THE BODY ARE ALL INSIDE IT NOW, THE BREADCRUMB [STRIP] IS NOT:
+              since the 17 Sep AFTERNOON ruling ("put the breadcrumbs and the
+              navigation inside the container") the trail is this element's
+              own first child, below — `BreadcrumbFolders` (the `breadcrumb`
+              prop) already carries its own `<nav>` and stays the one piece
+              of navigation chrome still rendered as this element's sibling,
+              not its child, but the title, the trail, the actions and
+              everything the route actually renders are now the page's main
+              content, which is exactly what this element wraps. */}
           <main
             data-slot="screen-shell-content"
             data-level="card"
             data-joined={breadcrumb ? "" : undefined}
             className={cn(CARD, breadcrumb ? CARD_JOINED : undefined)}
           >
+            {/* THE TRAIL — back/forward plus the text trail, now the card's
+                OWN first row. See the `trail` prop's own doc for the 17 Sep
+                AFTERNOON ruling ("put the breadcrumbs and the navigation
+                inside the container") this geometry answers, and
+                `DENSITY_TRAIL` for why the horizontal inset is
+                `DENSITY_HEADER`'s own value rather than a new number.
+
+                NO TOP PADDING OF ITS OWN — the trail sits flush with the
+                card's top edge; `band`'s (or the body's) own `pt` is
+                UNCHANGED, so the head moves down by exactly this slot's
+                height plus `TRAIL_GAP`, not that plus a second inset. See
+                `TRAIL_GAP` for the exact equation `verify/trail-line/`
+                proves.
+
+                `min-w-0 shrink-0` MATCHES EVERY OTHER ROW IN THIS COLUMN
+                (`band`'s wrapper, `screen-shell-body`), for the identical
+                reason: `<main>` is `flex-col` with no `align-items`
+                override, so `stretch` already gives this div the card's full
+                inline size — "full width of the card's inner box" costs no
+                utility of its own.
+
+                ABSENT, NOTHING RENDERS: `band` keeps its own `pt` exactly as
+                it was before this slot existed, so the card is byte-
+                identical to a screen with no `trail` — proved in
+                `verify/trail-line/`'s `none` case. */}
+            {trail ? (
+              <div
+                data-slot="screen-shell-trail"
+                data-level="card"
+                className={cn("min-w-0 shrink-0", DENSITY_TRAIL[density], TRAIL_GAP)}
+              >
+                {trail}
+              </div>
+            ) : null}
+
             {/* THE HEADER BAND — not a container, and now literally so.
                 ch24.6, verbatim: "The header band is transparent — it takes
                 the page tone." Inside the card that tone is the card's, and

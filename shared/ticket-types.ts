@@ -101,3 +101,64 @@ export function isValidationSprintType(value: string | null | undefined): boolea
   if (!value) return false
   return ticketTypeKey(value) === ticketTypeKey(VALIDATION_SPRINT_TYPE)
 }
+
+// ── THE ICON EACH TICKET TYPE CARRIES, COLOUR RETIRED ───────────────────────
+//
+// CLIENT RULING, 17 Sep 2026, verbatim: "I have changed my mind regarding
+// chips. In a database where there are different columns, the one that gets
+// the chip with the color is always the status. This means that for tickets,
+// we need to find icons for the ticket type and assign colors to the
+// status." Status already owns the colour on a ticket (`HELP_STATUS_DOT_TONE`,
+// shared/status-tones.ts, D17); what changes here is TYPE, which drew a
+// colour of its own (`web/lib/type-colours.ts`) since 2026-09-06. That map is
+// retired from every chip, row, board card and picker a ticket's type
+// reaches — the CHART series it also fed (the tickets dashboard's own bars
+// and legends, a different domain from a record's chip) is the one reader
+// left, because an aggregate chart's series colour is not the "chip with the
+// color" her ruling is about.
+//
+// THE SAME CLOSED-FOUR SHAPE `shared/story-types.ts` ALREADY ARGUES FOR ITS
+// OWN FIVE, so its header is not repeated here in full — a code map, not a
+// column (`selectable_data` has no icon column and TICKET_TYPES above is
+// already the LOCKED four, never a migration away from a fifth), kebab-case
+// names resolved through `iconComponent()` on the web side (this file is
+// read by every worker that touches a ticket, and no worker tsconfig allows
+// JSX), and a team that renames a row past recognition draws the word alone
+// — a missing icon is never a missing fact, the word beside it still says it.
+//
+// FOUR GLYPHS, HAND-CHOSEN AND VERIFIED AGAINST THE KIT'S OWN GENERATED
+// EXPORTS (shared/ui/foundations/icons/*.svg — Bug.svg, Question.svg,
+// PlusCircle.svg and ChatCircleText.svg all exist there): Issue reads as a
+// defect, `Bug`; Question is literally itself, `Question`; Extra is
+// something ADDED to the usual scope, `PlusCircle`; Feedback is a message
+// coming back from the client, `ChatCircleText` — distinct from `ChatCircle`
+// (no content mark) and `ChatCircleDots` (mid-typing), the two Phosphor
+// siblings closest in shape, because a chip this small needs a silhouette
+// that reads as "a note", not "a conversation in progress".
+const TICKET_TYPE_ICONS = {
+  issue: "bug",
+  question: "question",
+  extra: "plus-circle",
+  feedback: "chat-circle-text",
+} as const satisfies Record<string, string>
+
+export type TicketTypeIconKey = keyof typeof TICKET_TYPE_ICONS
+
+/** The four kebab-case glyph names themselves — the value side of the map,
+ * for a caller (the census bait beside `shape.tsx`'s `choiceDetailsCell`)
+ * that needs to name a glyph rather than a ticket type, the same shape
+ * `StoryTypeIconName` takes for its own five. */
+export type TicketTypeIconName = (typeof TICKET_TYPE_ICONS)[TicketTypeIconKey]
+
+/** The glyph NAME (kebab-case, resolved to a component through
+ * `iconComponent()` on the web side) for one ticket type's word, or null when
+ * the team has renamed the row to something this map has never heard of, or
+ * the ticket carries no type at all. Never throws, never guesses — the word
+ * beside it always carries the meaning on its own, the same contract
+ * `storyTypeIconName` (shared/story-types.ts) keeps for its own five. Keyed
+ * through `ticketTypeKey`, the one "is this word that word" test this file
+ * already uses for `isFeedbackTicketType`/`isValidationSprintType` above. */
+export function ticketTypeIconName(value: string | null | undefined): string | null {
+  const key = ticketTypeKey(value)
+  return Object.hasOwn(TICKET_TYPE_ICONS, key) ? TICKET_TYPE_ICONS[key as TicketTypeIconKey] : null
+}

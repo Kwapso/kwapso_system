@@ -85,6 +85,14 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// V1 (17 Sep 2026) DRAWS EVERY PANEL AT ONCE — see ticket-close-moved-to-top.test.tsx's
+// own comment beside this same mock for the full account.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: { success: () => {}, error: () => {}, info: () => {} },
   Toaster: () => null,

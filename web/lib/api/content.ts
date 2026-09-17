@@ -367,6 +367,19 @@ export type TicketDashboard = {
    * same function that queue uses, so the two can never disagree about what
    * "late" means. */
   unopenedPastLine: number
+  /** 7A — WHO ASKED, RANKED (client ruling, 17 Sep 2026: "a rank list with
+   * bars in total, not the last 30 days, and yes, put the faces"). One row
+   * per `raised_by_contact_id` — an `accounts` row of type `individual`, so
+   * `contactName`/`contactLogoUrl` are the same two fields every contact chip
+   * elsewhere in the app already reads — top five, ordered and capped by the
+   * door. `total`/`people` are WHOLE-POPULATION aggregates (every ticket with
+   * a contact attributed, every distinct contact), never derived from the
+   * five rows: the footer names the full ranking, not the five drawn. */
+  raisedByContact: {
+    rows: { contactId: string; contactName: string | null; contactLogoUrl: string | null; n: number }[]
+    total: number
+    people: number
+  }
   /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
    * above was taken over, counted once by the door through the bounded count
    * seam (R16).
@@ -968,7 +981,10 @@ export const content = {
       dir?: string
       cursor?: string | null
     } = {}
-  ) => api<PagedResponse<{ sources: KnowledgeSource[] }>>(`/api/content/knowledge${listQuery(find)}`),
+  ) =>
+    api<PagedResponse<{ sources: KnowledgeSource[]; byKind: Record<string, number> }>>(
+      `/api/content/knowledge${listQuery(find)}`
+    ),
   /** ONE RECORD'S NEIGHBOURHOOD, for the relationship map — the focus, what sits
    * one step away, the lines between them, and the EXACT number of neighbours
    * (which is not the length of a capped list). The door applies the caller's

@@ -234,9 +234,15 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
       "the tickets screen reads type marks again — see the ruling above"
     ).toBe(false)
     // …and what replaced it is on screen, so this is a SWAP rather than a loss:
-    // the kind is still drawn, by its colour.
+    // the kind is still drawn — by an ICON now, not a colour. AMENDED 17 Sep
+    // 2026: the client's own follow-up ruling ("the one that gets the chip
+    // with the color is always the status … for tickets, we need to find
+    // icons for the ticket type") retired `ticketTypeColour` from every CHIP
+    // a second time, in favour of `ticketTypeIconName` (R86,
+    // `status-owns-the-chip`) — colour is status's alone now (D17), and type
+    // draws the same icon the triage card and the type picker already do.
     expect(
-      /<Swatch colour=\{ticketTypeColour\(w\.helpType\)\} \/>/.test(strip),
+      /<Icon\s+name=\{ticketTypeIconName\(w\.helpType\)!?\}/.test(strip),
       "the ticket table's Type cell draws neither a glyph nor a colour — the kind has gone dark"
     ).toBe(true)
   })

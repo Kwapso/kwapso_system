@@ -141,13 +141,17 @@ export const TAB_ICONS: Record<string, IconName> = {
   // the record kinds, matching CONCEPT_ICON in web/lib/pages.ts word for word
   apps: "app-window",
   companies: "buildings",
-  contacts: "address-book",
+  // WAS "address-book" — client ruling, 17 Sep 2026, verbatim, over the whole
+  // rail: "For contacts, use the user circle in the field."
+  contacts: "user-circle",
   // Contacts' own By company / All pair (contacts-screen.tsx) — grouped is the
   // company arrangement, so it takes the same glyph `companies` above draws.
   grouped: "buildings",
   deliverables: "package",
   impact: "piggy-bank",
-  knowledge: "brain",
+  // WAS "brain" — same-day second correction, 17 Sep 2026: "for knowledge,
+  // use bookmark simple in fill solid."
+  knowledge: "bookmark-simple",
   meetings: "chat",
   sprints: "calendar-dots",
   stories: "puzzle-piece",
@@ -174,8 +178,18 @@ export const TAB_ICONS: Record<string, IconName> = {
   source: "file-text",
   files: "paperclip",
   notes: "note-pencil",
-  // the draft review's three lists of proposed records
-  roles: "user-gear",
+  // ONE CONCEPT, drawn by two tab strips that both use the value "roles": the
+  // draft review's own list of proposed member roles (draft-review.tsx) and
+  // Settings' own top-level Roles tab (settings-screen.tsx). WAS "user-gear",
+  // which disagreed with `CONCEPT_ICON.roles` ("shield-check", web/lib/pages.ts)
+  // for the same concept — a hand-copy that had drifted. Client ruling,
+  // 17 Sep 2026, verbatim, naming the Settings tab specifically ("settings
+  // rules"): "For settings rules, use the shield check in Solid." Brought in
+  // line here too, so the SAME concept draws the SAME glyph wherever a tab
+  // strip resolves the value "roles" — the divergence itself is flagged as a
+  // chip (two more hand-copies of this vocabulary exist, TAB_ICONS/CONCEPT_ICON/
+  // KNOWLEDGE_KIND_ICON, none deriving from another).
+  roles: "shield-check",
   tools: "wrench",
   // collection filters that appear as strips
   //

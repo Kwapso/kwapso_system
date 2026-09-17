@@ -5143,6 +5143,84 @@ describe("RULES — the laws of the base", () => {
       stoodDown,
       `R63 — a stood-down collection toolbar un-pins COMPLETELY, or its band paints over the rows (measured on Stories, staging, 2026-09-14):\n  ${stoodDown.join("\n  ")}`
     ).toEqual([])
+
+    // ── (vii) THE PINNED BOX IS AUTO WIDTH, NEVER A FIXED ONE ──────────────
+    // Client, 17 Sep 2026, over a screenshot of Waves: "the container or the
+    // toolbar container inside of Waves, it's broken… I told you this so many
+    // times. Go fix it." Measured on staging: the pinned band rendered 1069px
+    // inside a 1133px `<CollectionCard>`, left edges aligned, 64px short only
+    // on the right — exactly 2×`--pinned-inset-x` at `lg`.
+    //
+    // THE MECHANISM (iv) — R63 — ABOVE DEPENDS ON: `PINNED_TOOLBAR` reaches
+    // the card's own border box with `mx-[calc(var(--pinned-inset-x,0px)*-1)]
+    // px-[var(--pinned-inset-x,0px)]` on an AUTO-width box, so the browser
+    // SOLVES the width and the negative side margins genuinely expand it, both
+    // edges. Add an explicit width (`w-full` chief among them) and the box is
+    // OVER-CONSTRAINED — width and both margins all specified — so per the
+    // CSS2.1 §10.3.3 box-model rule the browser drops the specified
+    // `margin-right` and recomputes it while `margin-left` is honoured: the
+    // box stops short on the right only, the `::before` that paints the
+    // band's rounded top corners inherits that same short box, and the
+    // card's OWN corner shows through as a notch — left corner untouched,
+    // right corner cut, exactly what she is describing. `web/components/
+    // work/wave-finder.tsx` was the one `TOOLBAR_CONTROL_OWNERS` hand-copy
+    // that appended `"w-full"` to its `PINNED_TOOLBAR` element; the canonical
+    // `<ToolbarRow>` (screen-bits.tsx) carries no width utility there, which
+    // is why Tasks/Tickets/Accounts stayed clean while Waves broke.
+    //
+    // A FIXED-WIDTH UTILITY on the SAME element as `PINNED_TOOLBAR`/
+    // `PINNED_TOOLBAR_IN_KIT_PANEL`, read off the disk over every
+    // `TOOLBAR_CONTROL_OWNERS` file — by rule, not for Waves only, so the next
+    // hand-copy cannot reintroduce this the same way.
+    const FIXED_WIDTH_UTILITY = /\bw-(?:full|screen|dvw|svw|lvw|px|\d+(?:\/\d+)?|\[[^\]]*\])\b/
+    /** The `className` attribute's own raw text on a JSX opening/self-closing
+     * element — unevaluated, same read as toolbar-lead-gap.test.ts's own
+     * `classNameText`: every real call site here spells its class list as a
+     * plain string or a `cn(...)` call, both of which carry the utility name
+     * in the source text before any evaluation. */
+    const classNameText = (
+      node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+      sf: ts.SourceFile
+    ): string => {
+      for (const attr of node.attributes.properties) {
+        if (!ts.isJsxAttribute(attr)) continue
+        if (attr.name.getText(sf) !== "className") continue
+        return attr.initializer ? attr.initializer.getText(sf) : ""
+      }
+      return ""
+    }
+    const fixedWidthPins: string[] = []
+    for (const rel of Object.keys(TOOLBAR_CONTROL_OWNERS)) {
+      const abs = join(ROOT, rel)
+      if (!existsSync(abs)) continue
+      const src = stripComments(readFileSync(abs, "utf8"))
+      if (!/\bPINNED_TOOLBAR\b/.test(src)) continue
+      const sf = ts.createSourceFile(abs, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+      const visit = (node: ts.Node): void => {
+        if (
+          (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+          node.attributes.properties.some(
+            (a) => ts.isJsxAttribute(a) && a.name.getText(sf) === "data-slot" && a.initializer?.getText(sf).includes("toolbar-row-pin")
+          )
+        ) {
+          const cls = classNameText(node, sf)
+          if (/\bPINNED_TOOLBAR\b/.test(cls) && FIXED_WIDTH_UTILITY.test(cls)) {
+            fixedWidthPins.push(
+              `${rel}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1} — className="${cls}": ` +
+                "a fixed width alongside PINNED_TOOLBAR over-constrains the box (width + both margins specified), " +
+                "so the browser drops the specified margin-right and the band's rounded corner stops short of the " +
+                "card's real right edge — drop the width utility and let the box stay auto-width"
+            )
+          }
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(sf)
+    }
+    expect(
+      fixedWidthPins,
+      `R63 — the pinned toolbar box must stay auto-width (R63 part 4's corner arithmetic depends on it):\n  ${fixedWidthPins.join("\n  ")}`
+    ).toEqual([])
   })
 
   /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.
@@ -5402,6 +5480,8 @@ describe("RULES — the laws of the base", () => {
       "table-column-budget", // R82: the table-column-budget census below — every key+label-shaped array literal in web/ + web-portal/ + shared/web/, or named in TABLE_COLUMN_BUDGET_EXEMPT
       "toolbar-lead-gap", // R83: the toolbar-lead-gap census below — every renderFolderTabs( call's immediate JSX parent read for a gap-*/space-y-* it should not carry, or named in TOOLBAR_LEAD_GAP_EXEMPT
       "mango-in-title-only", // R84: web/test/mango-title-only.test.ts — every <Button variant="default"> (stated or omitted) in web/ + web-portal/ + shared/web/, walked for a CollectionHeading/RecordScreen/RecordDetail/RecordChrome ancestor (through JSX attribute initializers too), or named in MANGO_OUTSIDE_TITLE_OK
+      "rail-labels-one-word", // R85: web/test/rail-labels-one-word.test.ts — every NAV/TEAM_SECTIONS rail destination's title read off web/lib/pages.ts (the same source app-shell.tsx draws the rail from), or its group named in RAIL_LABEL_WORDS_OK
+      "status-owns-the-chip", // R86: web/test/status-owns-the-chip.test.ts — every <Badge variant="status" dot={…}>/<Swatch colour={…}> over shape.tsx + the ticket collection/detail components + tasks-screen.tsx, resolved through local const hops to what it names, or named in COLOURED_CHIP_OK
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

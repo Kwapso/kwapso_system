@@ -36,16 +36,16 @@ the concrete implementation, and its evidence.
 ## Contents
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
-- [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L16)
-- [3. Detail screens](#3-detail-screens) (D1 to D15)
-- [4. Collections](#4-collections) (K1 to K27)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B12)
-- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
-- [7. Typography](#7-typography) (T1 to T8)
+- [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L25)
+- [3. Detail screens](#3-detail-screens) (D1 to D20)
+- [4. Collections](#4-collections) (K1 to K40)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B19)
+- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F15)
+- [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S6)
 - [9. Mobile](#9-mobile) (M1 to M6)
-- [10. Copy](#10-copy) (W1 to W14)
+- [10. Copy](#10-copy) (W1 to W15)
 - [11. Record type glyphs](#11-record-type-glyphs) (G1 to G6)
 - [12. Density: the glance budget](#12-density-the-glance-budget-n1-to-n12) (N1 to N12)
 - [13. The kit, and what counts as using it](#13-the-kit-and-what-counts-as-using-it-u1-to-u4) (U1 to U4)
@@ -457,6 +457,21 @@ v1.2.98).
 (`shared/ui/components/unsaved-changes-bar/`), the same way B12's own colour note above it
 is enforced by the component and not by an app-side census.
 
+**AMENDED 17 Sep 2026 — sticky under the strip, and a size up.** The client's ruling,
+verbatim: *"The 'You haven't saved changes' needs to be floating and visible at all times,
+directly under the tabs, even if I'm very down in the scroll. Also, I'm not sure of the
+size of this typography. Make sure that this is in the kit because it looks too small."*
+Until this ruling `position: sticky` was the app's own decision (R63) and the bar itself
+only ever drew the row — which worked while the row's container was already sticky at the
+viewport, and did not work inside a scrolling panel (both real call sites, Settings ›
+Appearance and Settings › Team › Roles), where the bar scrolled out of view exactly as she
+described. The bar's own `bare` ground (the one shape both call sites render) now carries
+`position: sticky` itself, pinned directly under the tab strip through two app-supplied
+CSS custom properties with a `0px` fallback each (kit v1.2.106) — the component still
+names no pixel of its own and still does not know the app's layout. The message steps up
+one rung, `text-caption` (13px) to `text-sm` (14px) — the next rung on `Text`'s own ladder,
+not two.
+
 ---
 
 ## 2. Page layout and width
@@ -665,77 +680,113 @@ own model already gives every other tab, extended to this one door.
 
 **Law.** [R74](../RULES.md) (`import-opens-a-tab`).
 
-### L12: a new content tab opens beside the tab you were on, never at the far right; identical pages do not duplicate
+### L12: a tab is a trail — a plain click or a rail pick pushes a step onto it; only a deliberate gesture opens a new one
 
-**The rule.** *"When opening a new tab, do not open it on the very right, but immediately
-to the right of the tab where I was before. If I'm in the tab 'Tickets' and I click a
-ticket, open it next to the tab 'Tickets', not to the very right."* — client, 2026-09-16.
-Chrome does this too: a link opened from a tab lands beside it, not after every tab
-already open elsewhere in the window. **And:** *"make sure I cannot have the same tab 2
-times, for example I have already apps opened, if I click there again, reopen the opened
-tab."* — client, 2026-09-16. Duplicate paths (with or without trailing slashes, or
-different query parameters that do not affect identity) open the existing tab, never a
-second one.
+**The rule.** Two rulings, eleven days apart, and the second changes what a tab IS.
+**2026-09-06, verbatim:** *"regarding the breadcrumbs... would it be possible to
+replicate the tab behaviour of chrome? what i mean: i am in a detail app, but i click the
+first tab 'apps' see all the apps but the detail where i was stays open / then we'll need
+a x icon on the tabs to close them / but the idea is that all tabs i open stay open unless
+i close them / is this possible?"* — that built the TAB SET this file still holds.
+**17 Sep 2026, verbatim:** *"Unless I do it on purpose to open a new tab, everything
+happens on the same tab. This means that I would navigate in the app, and this would just
+keep making the breadcrumbs longer. Unless I press Command and click, this would open a
+new tab, and the same behavior in Windows, just replicating Google Chrome."* Same
+session: *"Yes to Chrome navigation, push the trail on a rail pick."*
 
-**The mechanism.** `visitTrail`'s own `put` (`web/lib/workspace-tabs.ts`) is the one place
-a tab is ever inserted. A record that is already open is untouched — it is only
-activated where it already sits, same as before this ruling. IDENTITY IS BY CANONICAL KEY,
-which normalizes paths: trailing slashes are stripped, and dialog-ephemeral query
-parameters (`?panel`, `?confirm`, `?id`) are removed, while screen-state parameters
-(`?tab=`) are kept. So `/apps`, `/apps/`, and `/apps?view=board` (if `view` is not
-identity-defining) all refer to the same tab; clicking them again when one is open
-activates it rather than opening a duplicate. A record that is genuinely new is spliced
-in immediately after whichever tab is active at that moment — read live off `activePath`,
-not captured once at the top of the function, which is what keeps a whole cold-opened
-trail (an ancestor plus the record under it) landing as an internally ordered block
-rather than the deepest level jumping ahead of its own parent. When nothing is active yet
-— the very first tab opened in a scope — there is nowhere to sit "beside," so this is a
-plain append, and the same is true whenever the active tab already happens to be the
-rightmost one, which is the ordinary case of opening things one after another. Eviction
-at the cap ([MAX_OPEN_TABS](#l11-pressing-import-opens-its-own-workspace-tab-fronted-and-never-redirects-the-one-you-were-in),
-`web/lib/workspace-tabs.ts`) is unchanged by this: it still takes the least-recently-ACTIVATED
-tab, by `recency` and never by position, so the tab just opened — always freshly touched — is
-never its own victim. On load, persisted tabs with duplicate canonical keys are collapsed,
-keeping the first.
+**The mechanism.** Until 17 Sep 2026 "opening a tab" and "navigating" were the same
+event — every crumb level on a cold address opened its own tab, and clicking deeper
+pushed nothing because the trail WAS the URL. A tab is no longer `{path, label}`; it is a
+PLACE WITH A PAST — `OpenTab` (`web/lib/workspace-tabs.ts`) now carries `steps:
+TrailStep[]` and a `cursor`, Chrome's own back-history model applied per tab instead of
+per window. A plain click on an `<InAppLink>` (`web/components/shell/in-app-link.tsx`)
+still calls `preventDefault` plus `softNavigate`, and `visitTrail` still owns the push —
+but it now reads only the LAST entry of the incoming crumb array (the page just navigated
+to) and pushes ONE step with it onto whichever tab is active, rather than minting a tab
+per level. A rail pick (`goToSection` in `web/components/shell/app-shell.tsx`) goes
+through the identical `navigate` → `softNavigate` → `visitTrail` seam, so it pushes too —
+"push the trail on a rail pick" is the same mechanism the ruling already gives every
+other click, not a special case. The one exception is the very first call in a freshly
+opened tab (no active tab yet, or a cold deep link into an empty scope): there `steps` is
+seeded from the whole incoming trail, so landing cold on a nested address still shows the
+ancestors above it, and Back still walks out through them — now via the cursor instead of
+via a second tab. Identity moved off the path and onto a minted `id`, because two tabs may
+now show the exact same path — cmd-clicking the same link twice is Chrome's own "open it
+again in a new tab," not "front the one already open" — so the old canonical-key dedupe
+(L12's own prior shape) is deleted outright rather than adapted. `MAX_TRAIL_STEPS` (30)
+caps one tab's own history, oldest dropped; `MAX_OPEN_TABS` (8, L11's own doc) and its
+recency-based eviction are unchanged.
 
-**What it does not touch.** A pinned or home tab, should one ever exist first on the strip,
-needs nothing extra here: insertion only ever happens AFTER the active tab's own position,
-so a pin sitting ahead of the active tab is never disturbed by this rule.
+**Only a deliberate gesture opens a second tab.** `openBeside` (`web/lib/workspace-
+tabs.ts`) is now the one door a NEW tab is minted through — never `visitTrail`'s default
+— and `<InAppLink>` calls it on cmd/ctrl-click (`onClick`) and on a real middle-click
+(`onAuxClick`, since a middle-click never reaches `onClick`), inserting the fresh,
+one-step tab immediately after the active one (this rule's own insertion order, unchanged)
+and fronting it. A plain Shift-click or Alt-click is left to the browser untouched —
+save-as, a real new window — because neither is the gesture the ruling names.
+`openSoloTab` (L11's own Import door) keeps its own narrower, hand-rolled dedupe,
+unaffected by any of this.
 
-**Law.** None registered — `web/test/workspace-tabs.test.ts` pins the behaviour (opening
-from the middle, opening from the rightmost tab, reopening an already-open tab, duplicate
-prevention, and cap eviction under the new insertion point) but nothing in
-`shared/rules/registry.ts` censuses it; a hand-rolled tab strip elsewhere in the app would
-not be caught the way `no-handrolled-toggles` catches a bespoke collection tab.
+**Law.** None registered — `web/test/workspace-tabs.test.ts` and `web/test/nav-memory.
+test.ts` pin the store; R37's own census (`web/test/shell-nav.test.ts`) is what makes
+`in-app-link.tsx` the only place this behaviour has to be taught.
 
-### L13: a multi-day record on a calendar draws as a span — a capped chip on the first and last day, a thin line between
+**AMENDED 17 Sep 2026 — the insertion point is unconditional, and a REUSED tab has to be
+repositioned too.** The client's ruling, verbatim: *"When I open a new tab from an
+existing tab, every time, it needs to be to the immediate right of the tab that is
+active."* A freshly minted tab already landed there (`openBeside`, above); the gap was the
+REUSE path — pressing the pinned "+" or cmd/ctrl-T a second time fronts the one already-
+open unused `/new` tab ([L24](#l24-a-new-tab-opens-on-a-search-page-never-a-blank-one-one-unused-new-tab-at-most))
+rather than opening a second, and until this fix the reused tab's own `touch()` fronted it
+wherever it already sat in the array — wherever it happened to land the one time it was
+minted — not necessarily beside whichever tab is active now: open "+", switch to a third
+tab, press "+" again, and the reused tab surfaced to the ACTIVE tab's left instead of its
+right. `moveAdjacentToActive(id)` (`web/lib/workspace-tabs.ts`) is the fix — read
+`activeId` before it moves anything, splice the reused tab out and back in immediately
+after the (still-correct) active position, then `touch()` fronts it — a no-op when the id
+asked for is already the active tab itself (pressing "+" twice in a row before navigating
+anywhere else). Every door lands here the same way now: cmd/ctrl-click, a real
+middle-click, the pinned "+", cmd/ctrl-T, and a reused unused tab alike.
 
-**The rule.** *"In the calendar, we should see sprints lasting multiple days, so maybe we
-need to redesign this component. If so, make an artifact with different variations."* —
-client, 16 Sep 2026, over the month grid's own one-chip-one-day shape, which showed a
-twelve-day sprint on a single date, indistinguishable from a one-day task. Four variations
-were mocked (`verify/decisions.html`'s sibling calendar-spans artifact); her ruling, choosing
-from them: *"for calendar, I choose S2, Start-and-end caps."*
+**Law.** None registered — `web/test/workspace-tabs.test.ts` covers `moveAdjacentToActive`
+directly; `web/test/workspace-tabs-are-wired.test.tsx` covers the reuse-and-reposition
+case end to end.
 
-**The mechanism.** The kit's `CalendarEvent` gained `span?: { id, position: "start" |
-"middle" | "end" | "only" }` (kit v1.2.90). A `start` or `end` day still draws a chip, capped
-on the record's own boundary edge and flat on the edge that runs into the next day; a
-`middle` day draws no chip at all, only a thin ghost line in the record's own colour, at low
-alpha, so a long span does not spend one chip per day of itself. `record-calendar.tsx`'s
-`expandEntry` is the one place a host walks `CalendarEntry.day`…`endDay` into these
-per-day placements — `RecordCalendar`'s own "ONE CALENDAR" door, so a span on the grid is
-never a picture built by a second file. Waves and sprints are the first callers
-(`waves-screen.tsx`'s `buildWaveCalendarEntries`): a wave's own `endsOn` and a sprint's own
-`endsOn` both ride along as `endDay`, so a sprint's span draws inside its wave's, and the
-two stack rather than one hiding the other. The "+N more" day dialog still lists a span once
-— it reads one day's own placements, and a record contributes exactly one placement to any
-single day. Below `sm:` the compact dots show only the start and end days; a `middle` day
-earns no dot, because a dot with no label has nothing to say about a day that is merely
-somewhere inside a span already marked by the line above `sm:`.
+### L13: the trail line lives inside the content card, above the head; the Chrome shortcuts are only partly replicated
 
-**Law.** None registered — the kit's own `calendar-view.tsx` carries the shape (see its
-header and `CalendarEvent.span`'s own doc); `web/test/rules.test.ts`'s `one-calendar` still
-censuses that only `record-calendar.tsx` may import the kit's `calendar-view` directly.
+**The rule.** Two rulings, the same day, the second correcting the first's geometry.
+**Morning, verbatim:** *"the breadcrumbs should sit in the background, outside the
+container, on top, and on the very far left, have a back and forward arrow."*
+**Afternoon, over the shipped result, verbatim:** *"I love the direction that we are
+going, but put the breadcrumbs and the navigation inside the container."*
+
+**The mechanism.** `ScreenShell`'s `trail?: React.ReactNode` slot (kit v1.2.104,
+corrected the same day in v1.2.105) renders as the card's own first child — above the
+collection heading or record head, inside the same paper the rest of the screen stands on
+— rather than as a sibling sitting on the bare page ground between the tab strip and the
+card. `TrailLine` (`shared/ui/components/breadcrumbs/trail-line.tsx`) reads
+`--foreground`/`--ink-tertiary` off the card's own paper (`--surface-raised`) now, not the
+spine ink the morning version borrowed — "current bold, earlier quiet" is carried by
+weight, never by colour, the same rule this book holds everywhere else. Back and forward
+call `back()`/`forward()` (`web/lib/workspace-tabs.ts`), each disabled at whichever end of
+the active tab's own `steps` it has reached; clicking an earlier step in the trail itself
+calls `jumpTo(index)` — Chrome's long-press-Back menu, without the long-press.
+
+**The Chrome shortcuts, and which ones actually exist.** Built: cmd/ctrl-click and a real
+middle-click open beside ([L12](#l12-a-tab-is-a-trail-a-plain-click-or-a-rail-pick-pushes-a-step-onto-it-only-a-deliberate-gesture-opens-a-new-one));
+a plain Shift-click or Alt-click is deliberately left to the browser, which is its own way
+of replicating them; cmd/ctrl-T opens a new tab, guarded against stealing the letter out
+of a focused input, textarea or the Notes editor's own contentEditable
+(`web/components/shell/app-shell.tsx`). **Not built, the same status as reopen-closed:**
+cmd-[ / cmd-] (Back/Forward from the keyboard), cmd-W (close the active tab) and cmd-1..8
+(jump to a tab by position) — as of this writing there is no keydown listener for any of
+the three anywhere in `web/` or the kit, so despite standing beside the built four in
+conversation they are not live yet.
+
+**Law.** None registered — `verify/trail-line/` (kit) measures the card's own top staying
+unmoved by `trail`'s presence and the head moving down by exactly the trail's height plus
+the gap; `web/test/workspace-tabs.test.ts` covers `back`/`forward`/`jumpTo` at the store
+level.
 
 ### L14: the assistant column's width is a drag, snapping to three sizes
 
@@ -774,6 +825,16 @@ drag/snap/keyboard mechanism; app-side persistence testing was deleted on 16 Sep
 **Law.** None registered — `web/test/workspace-tabs.test.ts` and `web/test/agent-conversation-tabs.test.ts` pin the store-level reorder; `shared/ui/components/breadcrumbs/breadcrumb-folders.tsx`'s own `onReorder` doc pins the drag/keyboard mechanism.
 
 ### L16: "Close all tabs" keeps the tab you are on and shuts every other one
+
+> **SUPERSEDED, 17 Sep 2026 — THE CONTROL ITSELF IS GONE.** The client's ruling, verbatim,
+> over a screenshot of the shipped control: *"I don't know what it is (this X button that
+> you added in the tabs in the main content that closes everything), but no one asked you,
+> so delete it."* `onCloseAll`, `closeAllLabel`, `CLOSE_ALL_WRAP`, `CLOSE_ALL` and the
+> trailing `<li>` they drew are gone from the kit outright (kit v1.2.106, shipped one day
+> after v1.2.92 below) — not deprecated, no dead body left for a later session to trip on
+> — and the app's own `closeAllTabs` wiring (`workspace-tabs.ts`, `app-shell.tsx`) went
+> with it the same day. Nothing below this line is live; kept as the record of what
+> shipped and why it was asked for in the first place.
 
 **The rule.** Chrome's "close other tabs", asked for under the app's own name for it:
 a trailing control on the workspace tab strip that closes every open tab except the one
@@ -854,6 +915,19 @@ and "+" on the assistant strip) never move and never open a slot.
 `web/test/agent-conversation-tabs.test.ts` pin the store-level reorder L15 already
 describes; the axis constraint and the live-slide are the kit's own drag mechanism.
 
+**AMENDED 17 Sep 2026 — a tap could no longer open a tab.** The client's ruling, verbatim:
+*"after you implemented the drag tabs, I can no longer click them to open them."* Real
+clicks on a tab, its ×, or a pinned tab did nothing, on either strip: `setPointerCapture`
+(taken on every `pointerdown` of a movable tab, drag or a motionless tap alike, since
+nothing tells the two apart until after the gesture) retargets every later pointer event —
+and the browser's own DERIVED `click` — to the `<li>` that captured it, never the anchor,
+button or × nested inside it. Fixed two ways (kit v1.2.106): a tap that never crosses
+`DRAG_MOVE_THRESHOLD_PX` (4px) replays its click directly on the element the pointer went
+down on (`drag.originTarget`, captured via `closest("a, button")` so an icon's own SVG,
+which has no native `.click()`, is never the target); a real drag is unaffected — it still
+reorders and still swallows its own trailing click, and the per-tab × still fires
+`onClose`.
+
 ### L19: the active tab is always the topmost layer, everywhere a tab strip draws
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"It's correct what you did, but
@@ -896,6 +970,22 @@ The client reported the same issue on 17 Sep 2026. The fix is in the kit's verif
 until measured against the live app on staging.
 
 **MEASURED 17 Sep 2026 — the icon-only tabs lost their top-left arc.** On the live page, the assistant strip's icon-only tabs are squashed below the silhouette's minimum width, losing the rounded top-left corner that marks the folder shape as a folder and not just a label strip. Kit v1.2.103 gives icon-only tabs the silhouette's minimum width (`--folder-radius-lip` + `--folder-shoulder`). The fix is verified on the page `verify/tabstrip-parity` in kwapso-design.
+
+**FIXED 17 Sep 2026, evening — tabs nest by the shoulder, Chrome's own model (the fourth
+report on this exact silhouette).** The client's ruling, verbatim: *"The inactives on the
+assistant are overlapping, so they're on top of the active tab, and that's incorrect. They
+should be behind."* Measured against live-staging screenshots: every tab stood 4px apart
+at rest, so two tabs never shared a pixel — nothing like Chrome, where the NEXT tab's
+rounded corner sits UNDER the PREVIOUS tab's shoulder, which is why a shift kept reading as
+"the wrong one is in front" no matter which z-index fix landed before this one. The real
+fix is a deliberate overlap, not a smaller gap: every tab after the first sits exactly
+`--folder-shoulder` under its predecessor (kit v1.2.106), and z-index is no longer flat —
+each rest tab gets its own strictly descending number by position (`restZIndex`), so the
+earlier (left) tab always outranks a later one, with `isolation: isolate` on the strip's
+own `<ol>` keeping the comparison local — a negative `z-index` flex item is unclickable
+without it, measured in real Chromium. Proved in `verify/tabstrip-parity/`: the pixel
+overlap equals the shoulder on every consecutive pair, across three strip shapes, and
+`elementFromPoint` at the shared pixel returns the tab that ought to win.
 
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
@@ -943,6 +1033,87 @@ in its own `overflow-x: auto` container. `web/test/rules.test.ts` asserts `scrol
 **Tests:** `web/test/agent-conversation-tabs.test.ts` and `web/test/agent-panel-tab-wiring.test.tsx` (the latter also guards: switching tabs while the assistant is busy is retried when it frees, and a tab's own thread is never overwritten).
 
 **Law.** None registered.
+
+### L23: a multi-day record on a calendar draws as a span — a capped chip on the first and last day, a thin line between
+
+> **Moved here from L13, 17 Sep 2026**, to make room for the rewritten navigation rules
+> above ([L12](#l12-a-tab-is-a-trail-a-plain-click-or-a-rail-pick-pushes-a-step-onto-it-only-a-deliberate-gesture-opens-a-new-one)/[L13](#l13-the-trail-line-lives-inside-the-content-card-above-the-head-the-chrome-shortcuts-are-only-partly-replicated)).
+> The content is unchanged.
+
+**The rule.** *"In the calendar, we should see sprints lasting multiple days, so maybe we
+need to redesign this component. If so, make an artifact with different variations."* —
+client, 16 Sep 2026, over the month grid's own one-chip-one-day shape, which showed a
+twelve-day sprint on a single date, indistinguishable from a one-day task. Four variations
+were mocked (`verify/decisions.html`'s sibling calendar-spans artifact); her ruling, choosing
+from them: *"for calendar, I choose S2, Start-and-end caps."*
+
+**The mechanism.** The kit's `CalendarEvent` gained `span?: { id, position: "start" |
+"middle" | "end" | "only" }` (kit v1.2.90). A `start` or `end` day still draws a chip, capped
+on the record's own boundary edge and flat on the edge that runs into the next day; a
+`middle` day draws no chip at all, only a thin ghost line in the record's own colour, at low
+alpha, so a long span does not spend one chip per day of itself. `record-calendar.tsx`'s
+`expandEntry` is the one place a host walks `CalendarEntry.day`…`endDay` into these
+per-day placements — `RecordCalendar`'s own "ONE CALENDAR" door, so a span on the grid is
+never a picture built by a second file. Waves and sprints are the first callers
+(`waves-screen.tsx`'s `buildWaveCalendarEntries`): a wave's own `endsOn` and a sprint's own
+`endsOn` both ride along as `endDay`, so a sprint's span draws inside its wave's, and the
+two stack rather than one hiding the other. The "+N more" day dialog still lists a span once
+— it reads one day's own placements, and a record contributes exactly one placement to any
+single day. Below `sm:` the compact dots show only the start and end days; a `middle` day
+earns no dot, because a dot with no label has nothing to say about a day that is merely
+somewhere inside a span already marked by the line above `sm:`.
+
+**Law.** None registered — the kit's own `calendar-view.tsx` carries the shape (see its
+header and `CalendarEvent.span`'s own doc); `web/test/rules.test.ts`'s `one-calendar` still
+censuses that only `record-calendar.tsx` may import the kit's `calendar-view` directly.
+
+### L24: a new tab opens on a search page, never a blank one — one unused new tab at most
+
+**The rule.** Superseded twice, same day. First, verbatim: *"For the new tab, when it
+opens a fresh tab, put here the text that says, 'Alaap, this space is for you.' He will
+take care of building this page. He will build a search bar."* Then, over her own
+proposal, verbatim: *"For the new tab page, implement 02 in your proposal. However, do
+not ask the assistant, just search anything, and instead of search, put an icon there
+that means search. Make sure you use elements in the kit."* And, the same day: *"Because
+now we have the concept of a new tab in the main content, then also add the plus tab,
+like in the assistant. And the same rules as there. You cannot have two new tabs."*
+
+**The mechanism.** `NewTabScreen` (`web/components/shell/new-tab-screen.tsx`) is a search
+bar (`SearchInput`), a module scope-chip row underneath it (Tickets/Accounts/Stories/Apps/
+Contacts/Knowledge — "People" corrected to "Contacts" to match the glossary, R34), and a
+"Recently opened" list read off every OTHER open tab's own trail (`openTabsSnapshot()`),
+newest-touched-tab first. Six doors, one question each, no new route: every module already
+answers `q` at its own list door (R14), capped at five results per module for display,
+never a claim about the collection's real size. The search trigger is an icon-only
+button, charcoal not mango — the page's own title carries no act of its own (R84) — and no
+hint sentence rides under the title (R81). A pinned "+" sits on the content tab strip,
+mirroring the assistant strip's own trailing "+" byte for byte (`iconOnly`,
+`closable: false`), and **you cannot have two**: pressing "+" a second time fronts the one
+unused new tab already open rather than minting another, the same "unused" reading
+`openNewTab` uses elsewhere ([L22](#l22-activating-selects-the-newest-unused-conversation)).
+Cmd/ctrl-T opens the same door from the keyboard ([L13](#l13-the-trail-line-lives-inside-the-content-card-above-the-head-the-chrome-shortcuts-are-only-partly-replicated)).
+
+**Law.** None registered — `web/test/new-tab-screen.test.tsx` covers the search/scope/
+recent behaviour; `web/test/workspace-tabs-are-wired.test.tsx` covers the one-unused-
+new-tab rule.
+
+### L25: a rest tab gets its own hover fill; the active tab never changes on hover
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"When I'm hovering over a tab
+and I'm talking, both in the main container and in the assistant, I want it to have a
+hover color apart from the changes in the text that are already there."*
+
+**The mechanism.** A rest tab's hover used to move only the label (ink plus a weight
+preview); the paper under it never moved. `CrumbShape` now takes an optional `hoverFill`
+(kit v1.2.106): a second folder shape, identical box, stacked on top of the first,
+`opacity-0` at rest and `group-hover:opacity-100` — not a straight swap of the base fill,
+because the kit's neutral item wash is a 5%-alpha colour meant to be composited over an
+opaque layer, not to be one. Only on rest tabs, icon-only included; never on the live tab
+— "the active tab does not change on hover" is the line her own words draw between the
+two.
+
+**Law.** None registered — kit v1.2.106's own header verifies the hover shape's computed
+opacity with a real `page.hover()`, never a synthetic event.
 
 ---
 
@@ -1347,6 +1518,56 @@ and composer in one flex column with the spacing constant; `web/test/ticket-thre
 asserts the gap renders and measures it at the expected scale.
 
 **Law.** None registered — a spacing decision on an existing component mount.
+
+### D19: "Raised on" is a fact under "Raised by," with the exact date and how many days ago in brackets — never its own chip
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"On tickets: Remove the 'Raised
+On' chip from the QE view, but also from the detail page in the QE view. Add it under
+'Raised By' as 'Raised On' and put the date and, in brackets, how many days ago."*
+
+**The mechanism.** The header's chip row (`TicketChips`, `shared/web/ticket-chips.tsx`)
+draws exactly three chips now — ref, type, app — never a fourth for the created date; the
+same component draws the list row and the board card, so both lose the date chip too. The
+Overview facts (`web/components/tickets/help-detail.tsx`) carry a "Raised on" fact
+immediately after "Raised by," reading `{date} ({count} days ago)` off `formatDate`/
+`daysSince` (`shared/web/format.ts`) — a real date and an exact day count, never a
+relative phrase alone.
+
+**Law.** None registered — `web/test/ticket-raised-on.test.tsx` proves the three-chip
+count over a real render and reads the source for "Raised on" sitting after "Raised by,"
+wired to `daysSince`/`formatDate`.
+
+### D20: a ticket's own detail is one page, no tabs — the stage ladder above a two-column body, conversation two thirds, stories/work logs/stakeholders stacked beside it
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"I want to see, on one single
+screen with no tabs, the content of tickets: the stages, the kind of conversation with the
+customer, related stories, work logs, stakeholders… We currently, in our legacy system,
+have it on one page, and it's very practical. We don't want to change that."* Shown a
+decision page with several implementations, her pick: *"For ticket 1 page, I choose to
+implement it v1."*
+
+**The mechanism.** The six-tab `TabsView` this screen used to draw (Conversation,
+Overview, Related stories, Work logs, Files and links, Stakeholders) is gone —
+`RECORD_TABS_SINGLE_PANEL` names `help-detail` as R2's own exemption for a bespoke detail
+with no strip — and nothing it drew was deleted, only re-homed: Conversation is
+`TicketConversationPanel` in the body; Overview's facts fold into the Stakeholders panel
+(she named five things, not six, and Overview was never one of them); Related stories is a
+capped preview with a "Show all" opening the same panel in a slide-in; Work logs and
+Stakeholders keep their own panels; Files and links moves to the ⋯ menu (B19's own
+pattern). `TicketDetailBody` (`web/components/tickets/ticket-detail-body.tsx`) draws the
+two-column layout under the stage ladder: the conversation at two thirds beside three
+stacked panels at one third, stacking to one column on a phone — her own "right column
+stacks under the conversation." The panel region is already paper (R67) — `RecordDetail`
+wraps whatever it is handed in one `Card` — so the three side panels are `variant="raised"`
+(`bg-card`) rather than the default paper tone, the same raised-on-soft-paper pairing this
+book uses everywhere else. The stage ladder itself is unmoved by this rule
+([K38](#k38-the-todays-tasks-progress-strip-and-the-ticket-stage-ladder-beside-it-stand-on-the-bare-page-no-container-behind-either)):
+it still rides `headerExtra`, above whatever the body draws — a tab strip yesterday, this
+body today.
+
+**Law.** None registered — `RECORD_TABS_SINGLE_PANEL` (`shared/rules/registry.ts`) is
+R2's own named exemption; `web/test/sections-stand-on-paper.test.ts` covers the panel
+tone.
 
 ---
 
@@ -2453,6 +2674,17 @@ real column:
 recorded here for the next reader rather than independently checked, the same
 footing amendment 1 and the entry above it stand on.
 
+**AMENDED A SECOND TIME, 17 Sep 2026 — the End date is back.** The client's ruling,
+verbatim: *"Please also add the end date."* `waveListColumns`
+(`web/components/work/waves-screen.tsx`) draws six columns, her exact order — Wave ·
+Status · Sprints · Start · End · Account — within R82's own six-column ceiling
+([K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end)):
+the App fact stays on the Account cell's own second line rather than claiming a column of
+its own, the same eighth-turned-seventh-column shape R82 exists to catch before it ships
+again.
+
+**Law.** [R82](../RULES.md) (`table-column-budget`).
+
 ### K25: Inputs — the third Accounts tab, three server views, no Mine tab
 
 **The rule.** What we are waiting on a client for gets its own sidebar page,
@@ -2919,7 +3151,7 @@ that says something like 'Ask' or 'Assistant', and this should open a new chat o
 assistant. it's missing the toolbar. Make it like the dashboard, so that it has its own
 container background."*
 
-**AMENDED 17 Sep 2026.** The client's follow-up ruling, verbatim: *"The ask button and the sync are correct. However, remove the whole modal 'Ask a question'. On the first screenshot also, can we change the icon of the knowledge base? I was thinking a brain. Also add the search to the toolbar. It's missing."* The Ask-a-question modal is gone (the head's mango Ask button is the one way to ask); the toolbar search is restored (PagedFind default, no longer in the exemption); the icon is **Brain** everywhere (app-shell SECTION_ICONS, pages CONCEPT_ICON, tabs-view TAB_ICONS).
+**AMENDED 17 Sep 2026.** The client's follow-up ruling, verbatim: *"The ask button and the sync are correct. However, remove the whole modal 'Ask a question'. On the first screenshot also, can we change the icon of the knowledge base? I was thinking a brain. Also add the search to the toolbar. It's missing."* The Ask-a-question modal is gone (the head's mango Ask button is the one way to ask); the toolbar search is restored (PagedFind default, no longer in the exemption); the icon went to **Brain** everywhere (app-shell SECTION_ICONS, pages CONCEPT_ICON, tabs-view TAB_ICONS) — **superseded a few hours later the same day**, see below.
 
 **The shape.** The knowledge collection draws NO search box in a separate field; searching happens through the assistant thread instead. Facets and the List/Shape view controls sit in a toolbar inside a `CollectionCard` with its own background, the same layout and container as the dashboard. Head actions above the toolbar: **Ask** (mango, `variant="default"`, opens a new assistant conversation scoped to the knowledge base) · **Sync** · **Settings** (gear, last). The search sits in the toolbar itself, not exempt.
 
@@ -2932,8 +3164,211 @@ stay on the toolbar to filter/shape the material the assistant cites. `web/test/
 asserts the Ask, Sync, and gear actions appear above the toolbar, the toolbar renders without
 search, and the list and view controls stay inside one `CollectionCard`.
 
+**AMENDED A SECOND TIME, 17 Sep 2026 — the icon moved again, K2 by kind, and the card
+shrinks.** A rail-wide correction, the same day, a few hours after the Brain pick above:
+*"for knowledge, use bookmark simple in fill solid."* The icon is **BookmarkSimple**, fill
+weight, everywhere Brain had just landed — see [N11](#n11-a-glyph-on-every-destination-and-every-collection-heading)
+for the other four rail glyphs corrected the same pass. From a consultation, verbatim:
+*"Knowledge page K2 by kind."* Tabs are now All, then one tab per source KIND the data
+actually has, each with its own exact count (R16); the Kind facet leaves the toolbar, the
+strip replaces it, and compartment/active, search, sort and Gallery · Shape all stay
+exactly where the first amendment left them. The same session, verbatim: *"On the
+knowledge base, I want the cards smaller, so I want to see at least four in one row. Also,
+the edit button is deleted from the card. It should just be on the detail page."*
+`KnowledgeSourceCard` draws four facts, not six — mark, title, kind, one meta line — small
+enough that four fit across a row; compartment, app, sharing, pieces and sightings are
+gone from the card and stay fully readable on the record's own Overview tab. The edit
+pencil is gone, not moved: it already existed on the record's own title (2026-08-31
+ruling, "edit, only the pencil icon"), so nothing it did is now unreachable, only
+reachable in one place instead of two.
+
+**Tests:** `web/test/knowledge-kind-tabs.test.tsx`, `web/test/knowledge-gallery-card.test.tsx`,
+`web/test/knowledge-source-card.test.tsx`.
+
 **Law.** [R48](../RULES.md) (`toolbar-shows-search`), as the exemption; [R84](../RULES.md)
 (`mango-in-title-only`), as the Ask button's styling.
+
+---
+
+### K37: the toolbar sits inside the content card and never in a container of its own; Tickets › Dashboard drops its toolbar; an app's Dashboard row gains a third card, "Raised by"
+
+**The rule, in three parts, all 17 Sep 2026.**
+
+1. **The uniform gap.** Over a screenshot of Tickets › Dashboard, verbatim: *"Look
+   at the second screenshot. It is a mess, the space between and after the
+   toolbar. Really, it's too much before, so go and uniform this
+   abso-freaking-everywhere, please."* The toolbar of any collection screen sits
+   as the first row inside the same card as its content — or, where a tab shows
+   several cards, inside the first one — with `--toolbar-lead-gap` above and
+   `--toolbar-content-gap` below (K33/R83); it never draws a second, separate
+   container of its own. Measured on Tickets › Dashboard before this pass: the
+   toolbar sat in its own `<Card>` with a `p-4 pb-0 lg:pb-0` inset (16/32px)
+   below the tab strip, a `pb-4` (16px) gap, then the first panel's own card —
+   three pieces of furniture where every other tab draws one.
+
+2. **No toolbar on Dashboard at all.** A same-day follow-up ruling, verbatim:
+   *"Remove the toolbar from the tickets dashboard."* Superseding part 1 for
+   this one tab specifically: the Dashboard tab (both the Tickets screen's own
+   and the app record's Tickets › Dashboard view) now draws no search, no
+   filters and no create button — the toolbar this rule's first part was about
+   uniforming is gone outright, on both hosts. Every other collection tab keeps
+   its own toolbar (R48); this is the one named exception.
+
+3. **"Raised by."** The same session, over the app's own Tickets › Dashboard
+   row: *"put the open work and raised at the same level. They take up too much
+   space."* — "The open work" and "Raised as, then triaged as" moved from two
+   stacked full-width panels into one `lg:grid-cols-3` row, each panel a third
+   of the width. Then, verbatim: *"I want a rank list with bars in total, not
+   the last 30 days, and yes, put the faces."* — the row's third column is
+   "Raised by": the app's top five ticket raisers (contacts, by
+   `raised_by_contact_id`), ranked highest-count-first, each row a face, a
+   name, the count, and a share bar; a footer names the whole population
+   ("of {total} · {people} people"), never just the five drawn.
+
+**The shape.** `web/components/tickets/tickets-dashboard.tsx` draws no
+`<ToolbarRow>` at all any more — the search/facet/create-button plumbing that
+used to feed one is gone with it, and `<TicketsDashboard>` no longer accepts
+`standsOn`/`viewSlot`/`actions`. The List↔Dashboard switch and "Raise a
+ticket" still reach a reader through the List view's own toolbar
+(`work-panels.tsx`). `readTicketDashboard` (workers/content/src/lib/help.ts)
+gained a tenth grouped read, `raisedByContact`: a top-five ranked list (SQL
+`ORDER BY n DESC LIMIT 5`) plus the whole-population `total`/`people`
+aggregate, never derived from the five rows on screen. The React component
+re-sorts its own rows rather than trusting the door's order silently.
+
+**Tests:** `web/test/tickets-dashboard-no-toolbar.test.tsx` (no `<ToolbarRow>`
+on disk; ranking order, the top-five cut, the whole-population footer, and a
+face on screen, over a real render); `web/test/toolbar-lead-gap-card.test.tsx`'s
+third census (a `CardContent`/`CollectionCard` whose only real content is a
+toolbar reference, derived off the disk — the shape this pass's own bug was);
+`web/test/dashboard-says-what-it-left-out.test.tsx`, updated for the toolbar's
+removal.
+
+**Where this reaches today.** No `TOOLBAR_EXEMPT` registry line was added for
+the Dashboard's own toolbar removal: none of R48's five censuses reach a
+component that draws no `<ToolbarRow>` at all, is not a `BASE_RECIPES` entry
+and draws no `CardGrid`/`List` wall, so an exemption entry here would match
+nothing and fail R48's own rot-check the moment it landed. This K-entry is
+the ruling's written record instead, the house convention for a UI ruling
+that needs no new machine-checked exemption.
+
+**Law.** [R83](../RULES.md) (`toolbar-lead-gap`), extended by the new census
+in `toolbar-lead-gap-card.test.tsx`; [R48](../RULES.md) (`toolbar-shows-search`),
+whose census cannot see the Dashboard's own removed toolbar, which is why this
+entry exists; [R50](../RULES.md) (`empty-toolbar`), unaffected — the
+Dashboard's own empty state (`ticketTotal === 0`) is unchanged.
+
+---
+
+### K38: the Today's-tasks progress strip, and the ticket stage ladder beside it, stand on the bare page — no container behind either
+
+**The rule.** The client's ruling, 16 Sep 2026, verbatim: *"In Tasks, the
+Today's Task Progress view should have no container behind it, and this is
+exactly the position for reference that I want the ticket progress to be."*
+Two labelled `<section>`s, one per record type, both bare: `tasks-screen.tsx`'s
+"Today's tasks" strip (between the heading and the tab strip, on every Tasks
+tab) and `ticket-stages.tsx`'s stage ladder (on `RecordScreen`'s
+`headerExtra`, above a ticket's own tab strip) — the second named as the
+position the first should match. Neither carries a heading of its own (R67's
+subject after its own 2026-09-11 amendment dropped the heading requirement);
+both are named by `aria-label` instead, and both used to carry
+`bg-surface-panel`/`bg-card` as R67's own default before this ruling
+overruled it for these two, specifically.
+
+**The shape.** `tasks-screen.tsx`'s `progressBar` lost `rounded-[var(--radius)]
+bg-surface-panel p-4` outright — `KpiProgress` and the caption beneath it are
+now the section's only content, no fill, no radius, no inset.
+
+**Tests:** `web/test/sections-stand-on-paper.test.ts` (R67's own census, proved
+red then green against this file — removing the registry line reintroduces
+the failure).
+
+**Where this reaches today.** `web/components/work/tasks-screen.tsx` is named
+in `UNCONTAINED_SECTION_OK` (`shared/rules/registry.ts`) with this ruling as
+the reason, immediately beside `web/components/tickets/ticket-stages.tsx`'s
+own entry for the same words — the two are cross-referenced in the registry's
+own comments as one ruling landing in two files.
+
+**Law.** [R67](../RULES.md) (`sections-stand-on-paper`), as the named
+exemption.
+
+**AMENDED 17 Sep 2026 — the tab strip it stood "above" is gone; the ladder's own position
+is not.** [D20](#d20-a-tickets-own-detail-is-one-page-no-tabs-the-stage-ladder-above-a-two-column-body-conversation-two-thirds-stories-work-logs-stakeholders-stacked-beside-it)
+retired the ticket detail's tab strip outright — the same `headerExtra` slot this rule
+names still carries the ladder, now above `TicketDetailBody`'s two-column layout rather
+than above a `TabsView`. Nothing about the rule above changes: still bare, still full
+width, still no heading of its own.
+
+---
+
+### K39: in any collection, the one coloured chip is the record's status
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"I have changed my mind
+regarding chips. In a database where there are different columns, the one that gets the
+chip with the color is always the status. This means that for tickets, we need to find
+icons for the ticket type and assign colors to the status."* A list row, a board card or a
+record's own head chip row may colour exactly ONE categorical field — its STATUS
+(`shared/status-tones.ts`, `shared/app-stages.ts`,
+[D17](#d17-a-status-colour-means-one-thing-everywhere-dots-are-always-solid-and-a-department-is-told-apart-by-an-icon-never-a-hue)) —
+and every other categorical field draws an ICON or plain text, never a colour. Priority on
+tasks is the one already-ruled exception
+([K19a](#k19a-priority-has-its-own-four-colours-never-app-stages)) and is named rather than
+silently allowed.
+
+**The shape.** Tickets are the worked example: `ticketTypeColour`
+(`web/lib/type-colours.ts`) drew a coloured dot for a ticket's TYPE on the list row, the
+board card, `TicketChips`, both type pickers and the portal's own row since 2026-09-06 —
+retired everywhere a CHIP reads it, replaced by `ticketTypeIconName`
+(`shared/ticket-types.ts`), the identical closed-map pattern `storyTypeIconName` already
+stands for story type
+([K26](#k26-story-type-is-five-words-not-three-and-a-story-now-says-where-it-came-from)):
+Issue → `Bug`, Question → `Question`, Extra → `PlusCircle`, Feedback → `ChatCircleText`.
+`ticketTypeColour` is NOT deleted — the tickets
+dashboard's own chart series is the one reader left, an aggregate view's series colour
+being a different domain from a record's own chip.
+
+**Tests:** `web/test/status-owns-the-chip.test.ts`, `web/test/ticket-type-icons.test.ts`,
+`web-portal/test/ticket-row-type-icon.test.tsx`.
+
+**Law.** [R86](../RULES.md) (`status-owns-the-chip`).
+
+---
+
+### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
+
+**The rule, three sessions, 14–17 Sep 2026, over Settings › Team › Roles.** *"The toolbar
+in roles is kind of broken. Go and fix it."* *"I want you to delete the 'Locked by Policy'
+in Module Name. Also, in Module Name, add the icon of the module, and in the toolbar, I
+want to be able to sort by Module Name."* *"For how a locked permission should look, I
+choose option A: solid gray field."*
+
+**The toolbar.** Search narrows the matrix's ROWS, which are modules, not roles — the
+roles are the columns, and a matrix does not hide its own axis. Sort is A→Z / Z→A on the
+module's own name, one field (`sortDir`), the `TOOLBAR_SORT_EXEMPT` line this file used to
+carry deleted along with it. "Deactivated" moved a second time: off an `actions`-slot
+button wired to a disclosure and onto `useFilterBar`'s own status facet
+(`roleStatusFacets`), the slot R53 has for exactly this job — its count still rides
+`FacetOption.count`, not lost in the move.
+
+**The module icon.** Every row wears the same glyph the rail draws for its module, off
+one map (`MODULE_ICON_CONCEPT` in `web/components/team/roles-matrix.tsx`, resolved
+through `CONCEPT_ICON`, `web/lib/pages.ts`) rather than derived from `TEAM_SECTIONS`,
+because several sections share one permission module (Stories/Sprints/Waves/Tasks/Time
+are all `work`) and several modules never reached the rail at all — a derived lookup
+would answer some rows and guess at the rest, which is exactly what R36 forbids for a box
+on this same grid. A module absent from the map falls back to the settings gear, the same
+fallback the Modules wall already uses.
+
+**The locked cell.** "Locked by policy: <role>" is gone from the Module Name column — the
+kit's own `lockMarkFor` drew it unconditionally and `aria-hidden`, so hiding it loses
+nothing a screen reader was reading anyway. In its place, option A: a locked capability
+takes a solid `--surface-quiet` fill of its own (kit v1.2.107, `PermissionMatrix`), not
+pressable (`aria-disabled`, no hover, no focus ring), the words moving onto the one
+segment they explain as a `title`/`Tooltip` rather than a row-level caption.
+
+**Law.** None registered — `shared/rules/registry.ts`'s `TOOLBAR_SORT_EXEMPT` no longer
+names this file; the kit's own `verify/permission-locked/` page (kwapso-design) is the
+proof for the locked fill.
 
 ---
 
@@ -3431,6 +3866,28 @@ which makes it not so visible."* The bar renders as `bg-warning/10` plus a warni
 (`UnsavedChangesBar`, kit v1.2.84), a distinct warning-tinted band in both light and dark
 palettes, never the container's own surface tone. This styling is enforced by the kit
 component itself — no app-side law required.
+
+**AMENDED 17 Sep 2026 — the language exception is retired; native names only; a taller,
+truer preview.** Three of the client's rulings, one session, all over this same tab.
+First, over the panel's own Languages row: *"In Settings > Appearance > Languages, only
+put the name of the language in its original language. You don't need to also put it in
+German."* Each pill used to carry its own name and its English name beside it wherever
+the two differ; the second name is gone. Second, reversing this rule's own documented
+exception above: *"Too many descriptions everywhere. Delete these live preview updates as
+you press a control, and also delete the language changes right away. ... Actually, I
+want everything to wait for the save. Nothing changes right away."* **"Keep language
+instant" held for three days and is retired**: `LanguageSection`
+(`shared/web/language-section.tsx`) no longer calls `setLang`, no longer calls `save`, no
+longer shows its own toast — it is a plain controlled pill row now, `value` the PENDING
+language, staged behind Save exactly like Size, Appearance and Background, folded into the
+same "Saved."/"That didn't save. Try again." toast the other three already share. Third,
+over the panel's own preview card: *"I want the preview ... to be slightly taller ...
+represent more of the real look of the app and include more elements inside, not just one
+kind of card."* `AppearanceTabPreview` now draws the rail, a two-tab strip, and one card —
+a title row, a toolbar bar, a three-row list with a status dot each and one count badge —
+inside one paper container, in place of the single kind of card it drew before.
+
+**Tests:** `web/test/settings-appearance.test.tsx`, `web/test/language-switcher.test.tsx`.
 
 ### B13: a protected value is always active — there is no such state as "active, protected"
 
@@ -4011,10 +4468,10 @@ decision, it is a font the library would have to ship.
 `text-[11px]` or `text-[10px]`. The two places that do today
 (`app-shell.tsx:388`, the mobile tab labels at `text-[11px]`) should move to `text-xs`.
 
-### T3: uppercase is only ever a label, never a title and never a sentence
+### T3: uppercase is only ever a label, never a title, never a table column head, and never a sentence
 
-`tracking-[0.5px] uppercase` at `text-xs font-medium` marks an eyebrow, a table column
-head or a field group. Nothing longer than three words.
+`tracking-[0.5px] uppercase` at `text-xs font-medium` marks an eyebrow or a field group.
+Nothing longer than three words.
 
 Evidence: `A-3.57.42`, `A-4.05.42`, `A-4.05.52`, `P-4.10.19`. The old app never
 uppercases a title. On the brand site `text-transform: uppercase` appears in exactly ten
@@ -4022,6 +4479,28 @@ rules and every one of them is a small label (`.nk-subheading`, `.contact-form__
 `.cs-header__back`, the language switcher); the 120px hero headline is sentence case.
 Letter-spacing of 0.5px is the house default there, applied in 43 rules and explicitly
 reset to `normal` on display sizes, which is why it belongs on labels and not on titles.
+
+**AMENDED 17 Sep 2026 — a table column head is off this list too.** The client's ruling,
+verbatim, over the Choices table's Details column: *"why all caps? 'Details' pls."* Her
+screenshots the same session showed every table header in the app drawn ALL CAPS — Roles'
+MODULE / ADMIN / CLIENT, Contacts' ACCOUNT / ROLE / PORTAL — so the ruling reads as general
+rather than one column: a column heading is sentence case, exactly as its call site wrote
+the word, never transformed to capitals. `shared/ui/components/table/table.tsx`'s
+`TableHead` (the primitive every column head in this app draws through — `RecordTable`,
+`screen-renderer.tsx`'s `DataTable` mount, `Matrix`, `PermissionMatrix`) drops `uppercase`
+from the `<th>` itself (kit v1.2.108); `data-table.tsx`'s own sortable-header button, which
+used to restate the transform because a `<button>` resets an inherited `text-transform`,
+drops it too. One app-side echo survived the kit fix and is fixed alongside it:
+`roles-matrix.tsx` drew the Roles screen's own ROLE column heads as its own `<button>` (the
+kit's `<th>` belongs to `PermissionMatrix`, in a different file, so this app can only hand
+it a label) and explicitly restated `uppercase` "to unify with Module" — the old ruling
+this one reverses.
+
+**Law.** None registered — `web/test/column-headers-are-sentence-case.test.ts` carries two
+censuses (every `<th>`/`<TableHead>` this app writes directly, and the one
+`React.ReactNode` column-head label an app file authors for a kit component that draws its
+own `<th>`, `roles-matrix.tsx`'s `roleRows[].label`) plus a CSS clause forbidding
+`text-transform: uppercase` on any selector under `web/`, `web-portal/` or `shared/web/`.
 
 ### T4: numbers and dates are `tabular-nums`
 
@@ -4172,6 +4651,19 @@ rhythm is 100px top. The portal already uses `gap-10` between sections
 
 One string, used by the shell and by the header band so they align to the same left edge.
 See [L1](#l1-one-page-container-one-cap).
+
+**AMENDED 17 Sep 2026 — the outer gutters step down one rung.** The client's ruling,
+verbatim: *"Because adding the breadcrumbs took up considerable screen space, let's reduce
+the margin that we have on the sides above and below both the main content and the
+assistant. Let's optimize the height. Let's not leave so much blank space there."* Every
+block-direction contributor to the gutter around the content column and the aside steps
+down exactly one `--space-*` rung (kit v1.2.106): `--shell-gutter` and `--aside-inset`
+(kept equal to each other) go from `--space-5` to `--space-4`; the card's own head band,
+its trail inset ([L13](#l13-the-trail-line-lives-inside-the-content-card-above-the-head-the-chrome-shortcuts-are-only-partly-replicated))
+and its body padding each drop one rung at both densities; the gap between the trail and
+the head drops with them. The rail's own gutter is deliberately untouched — the ruling
+names "the main content and the assistant," not the rail — so `--rail-inset` stays at
+`--space-5` on purpose, a flag for whoever next touches it rather than an oversight.
 
 ### S3: card padding is `p-4`, panel padding is `p-6`
 
@@ -4574,6 +5066,43 @@ a hand-list wearing a regex is not.
 
 ---
 
+### W15: every rail destination is named in one word
+
+**The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Make it a rule that in the
+navigation bar, we only have one-word names. For example, 'Knowledge Base': reduce it to
+'Knowledge'. We need an alternative for work logs. Propose me multiple."* A DESTINATION is
+a link a person can click to land somewhere — every `NAV` entry that carries a real `group`
+(not `"none"`) and is not `inRail: false`, and every `TEAM_SECTIONS` row with
+`placement: "sidebar"` (`web/lib/pages.ts`) — the same two lists `app-shell.tsx`'s own
+`universal`/`sidebarPages` read to draw the rail. Its title, in English, must be exactly
+one word: no space, no hyphen. The rail's three group headings (`NAV_GROUP_LABELS`: "My
+work", "Build", "Accounts") title a SECTION, never a place a click lands, so they sit in
+`RAIL_LABEL_WORDS_OK` with the reason "groups are headings, not destinations; awaiting her
+word", rather than being silently measured against a rule that was never asked about them.
+
+**The shape.** Red the day this law was written: "Knowledge base" (the `knowledge` sidebar
+entry) and "Work logs" (the `time` entry) both carried two words. "Knowledge base" →
+"Knowledge" everywhere it is a user-facing label ([R6](../RULES.md)/[R34](../RULES.md) —
+the glossary term, every `t("Knowledge base")` call site, the translations); the route
+(`/knowledge`) and every identifier are unchanged. "Work logs" had no client pick yet — she
+asked to be shown alternatives rather than have one chosen silently for her — so the `time`
+entry ships "Hours", the recommendation, live now, with a comment at that entry naming the
+rest for her pick: Hours · Time · Logs · Timesheet · Effort. "Work logs" itself is
+untouched everywhere else it is said (the glossary term, and every record's own tab),
+because only the RAIL destination is under this law.
+
+**The Accounts group's own order, same session.** The client's ruling, verbatim: *"Okay,
+put the tickets into Accounts after Contacts."* The group now reads Accounts · Contacts ·
+Tickets · Inputs, in that order (`TEAM_SECTIONS`, `web/lib/pages.ts`) — a destination's own
+order inside its group, not covered by the one-word count above, but ruled the same
+session and built the same day.
+
+**Tests:** `web/test/rail-labels-one-word.test.ts`.
+
+**Law.** [R85](../RULES.md) (`rail-labels-one-word`).
+
+---
+
 ## 11. Record type glyphs
 
 ### G1: a record type carries a glyph
@@ -4840,7 +5369,7 @@ something between the heading and the rows:
   (`web/components/work/sprints-screen.tsx:212`). V=5.
 - **Processes** puts the whole ImpactPanel, an accordion three levels deep, above the list
   (`web/components/process/processes-screen.tsx:67`). V=4.
-- **Knowledge base** puts the ask box above the list
+- **Knowledge** puts the ask box above the list
   (`web/components/deep-link/collection-content.tsx:461`). V=4.
 
 The rule is not "delete them". It is: **a block that is not the primary content, and not
@@ -5141,6 +5670,20 @@ the Sprints "All" tab. The only host-side workaround would be to put the glyph i
 title string, and a pictograph inside a sentence is the one shape §5 refuses. **So the mark
 is simply absent there and the word carries the meaning on its own**, until the library
 ships the one-line fix.
+
+**AMENDED 17 Sep 2026 — five destinations corrected, over a screenshot of the whole rail.**
+The client's ruling, verbatim, five in one pass because "they all look too similar":
+Waves → the regular weight, not solid (*"For waves, use the regular, not solid."*); Tasks
+→ `ChecksRegular`, Phosphor's plural checks at regular weight, coexisting with the
+fill-weight `Checks` two confirm buttons already use (*"For tasks, use the checks in
+plural in regular."*); Knowledge → `BookmarkSimple` at fill weight (*"for knowledge, use
+bookmark simple in fill solid"* — after a same-day, few-hours-earlier pick of a brain
+glyph, see [K36](#k36-the-knowledge-collection-centralizes-search-through-the-assistant-a-head-bar-carries-ask-sync-and-gear));
+Contacts → `UserCircle` at fill weight, off `AddressBook` (*"For contacts, use the user
+circle in the field."*); Settings' Roles row → `ShieldCheck` (*"For settings rules, use
+the shield check in Solid."*). Every one of the five is a single entry in `CONCEPT_ICON`
+(`web/lib/pages.ts`) or `SECTION_ICONS` (`web/components/shell/app-shell.tsx`) — one
+concept, one icon, whichever file draws it.
 
 ### N12: what to do when a screen is over budget, in order
 
@@ -5536,6 +6079,27 @@ app stage pills stay coloured the old way meanwhile. Status: ruled, not yet buil
 Accounts screen is retired. What replaces it is pending her pick from a follow-up artifact
 ("Accounts Tabs"). Status: ruled, not yet built.
 
+**Colour scheme, ruled 17 Sep 2026, awaiting the scheme decision.** The client's ruling,
+verbatim: *"Do not invent new colors. Just use the ones that exist in the kit only. For
+tickets, stories, everywhere, sprints running, and waves running, use the blue. Accounts:
+active green, inactive gray."* [R32](../RULES.md)'s closed palette (`closed-palette`) is
+the constraint this already has to fit inside — a token only, never a hex or a Tailwind
+ramp. Further rulings the same day covered ticket, story, sprint, audit-plan and
+validation-refinements colouring, not yet reconciled into one written rule here. Status:
+ruled, not yet built —
+[D17](#d17-a-status-colour-means-one-thing-everywhere-dots-are-always-solid-and-a-department-is-told-apart-by-an-icon-never-a-hue)
+is where the built palette lives once it lands.
+
+**Toolbar on small screens, decision pending.** Shown an artifact of the collection
+toolbar folding for a phone/tablet width, the client's ruling, verbatim: *"toolbar option
+B, expand the artifact to show me how it looks when I click the three-dot button and how
+it looks expanded, with everything: the sort, the filter, the views, everything. Possible
+to have the search bar, but also all the buttons there? Just asking."* Option B itself is
+chosen — search stays on the row, Filter/Sort/View fold into a ⋯ button on tablet and
+phone — but the expanded state's own drawing, and her closing question (search bar plus
+every button together, in the same row, on a small screen), are both still open. Status:
+**DECISION PENDING.**
+
 **Decisions awaiting further input (17 Sep 2026):**
 
 - **Meeting-type department inheritance.** The client's exact words: *"I would need more consulting to take a decision."* Pending follow-up conversation.
@@ -5545,20 +6109,20 @@ Accounts screen is retired. What replaces it is pending her pick from a follow-u
 
 ## Rule index
 
-**180 rules.**
+**190 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L22 (22) |
-| 3. Detail screens | D1 to D18 (18) |
-| 4. Collections | K1 to K36 (36) |
+| 2. Page layout and width | L1 to L25 (25) |
+| 3. Detail screens | D1 to D20 (20) |
+| 4. Collections | K1 to K40 (40) |
 | 5. Buttons and actions | B1 to B19 (19) |
 | 6. Forms and dialogs | F1 to F15 (15) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
-| 10. Copy | W1 to W14 (14) |
+| 10. Copy | W1 to W15 (15) |
 | 11. Record type glyphs | G1 to G6 (6) |
 | 12. Density: the glance budget | N1 to N12 (12) |
 | 13. The kit, and what counts as using it | U1 to U4 (4) |
@@ -5595,7 +6159,8 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R77 | [D3](#d3-the-header-and-tabs-stick) | R78 | [K20](#k20-calendar-views-carry-no-sort) |
 | R79 | [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected) | R80 | [K22](#k22-rows-are-a-list-never-a-banded-table) |
 | R82 | [K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end) | R83 | [K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column) |
-| R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | | |
+| R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | R85 | [W15](#w15-every-rail-destination-is-named-in-one-word) |
+| R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | | |
 
 ### The seven files that carry most of it
 

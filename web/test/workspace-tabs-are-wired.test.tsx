@@ -30,12 +30,23 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import * as React from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
-import { tabStripState } from "@/lib/workspace-tabs"
+import {
+  activateTab,
+  activeTabIdSnapshot,
+  activeTabPathSnapshot,
+  forgetOpenTabs,
+  MAX_OPEN_TABS,
+  NEW_TAB_PATH,
+  openBeside,
+  openTabsSnapshot,
+  setWorkspaceScope,
+  tabStripState,
+} from "@/lib/workspace-tabs"
 
 // The shell mounts the profile menu, which asks Next for a router. Mocked so
 // this suite is about the strip; nothing below reads the router.
@@ -73,7 +84,6 @@ describe("the workspace tab strip", () => {
           { label: "Gamma", href: "/t/t1/gamma", closeKey: "/t/t1/gamma" },
         ]}
         onCloseCrumb={() => {}}
-        onCloseAllTabs={() => {}}
         activeCrumbIndex={1}
       >
         <div>body</div>
@@ -84,20 +94,25 @@ describe("the workspace tab strip", () => {
       expect(screen.queryByText(label), `${label} must be drawn`).not.toBeNull()
     }
 
-    // THE COUNT, said as a count: one close button per tab, PLUS the trailing
-    // close-all control — four "close"-named buttons for three tabs. A strip
-    // that drew one tab, or none, or dropped the trailing control, fails here.
+    // THE COUNT, said as a count: one close button per
+    // three tabs. A strip
+    // tab is drawn, fails here.
     const closers = [...document.querySelectorAll("button[aria-label]")].filter((b) =>
       /close/i.test(b.getAttribute("aria-label") ?? "")
     )
-    expect(closers.length, "one close button per open tab, plus close-all").toBe(4)
-    expect(screen.queryByLabelText("Close all tabs"), "the trailing close-all control").not.toBeNull()
+    expect(closers.length, "one close button per open tab").toBe(3)
 
     // AND THE LINK RULE, which is what discriminates. The live tab is the page
     // in front of you and has nowhere to go; BOTH the others are real links,
     // Gamma included. If `activeIndex` stops reaching the kit, Gamma loses its
     // href instead of Beta and this list comes back as ["/t/t1/alpha", "/t/t1/beta"].
-    const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"))
+    // Filtered to REAL in-app hrefs (`/…`) — since 17 Sep 2026 the strip also
+    // draws a trailing pinned "+" (its own describe block, below), a real
+    // anchor too but carrying a fragment href, never a path; this fixture is
+    // about which CRUMB carries a link, not about that pinned item at all.
+    const hrefs = [...document.querySelectorAll("a")]
+      .map((a) => a.getAttribute("href"))
+      .filter((href): href is string => !!href && href.startsWith("/"))
     expect(hrefs).toEqual(["/t/t1/alpha", "/t/t1/gamma"])
   })
 
@@ -122,7 +137,7 @@ describe("the workspace tab strip", () => {
     // forgets is caught rather than averaged away.
     const shells = src.split("<AppShell").length - 1
     expect(shells, "expected the spine to render at least one AppShell").toBeGreaterThan(0)
-    for (const prop of ["breadcrumbs={", "onCloseCrumb={", "onCloseAllTabs={", "activeCrumbIndex={"]) {
+    for (const prop of ["breadcrumbs={", "onCloseCrumb={", "activeCrumbIndex={"]) {
       expect(
         src.split(prop).length - 1,
         `every <AppShell> in the spine must pass ${prop} — ${shells} shells, ` +
@@ -147,51 +162,198 @@ describe("the workspace tab strip", () => {
     expect(src, "the href must be gated on the active index").toContain("index === activeTabIndex")
   })
 
-  // ── CLOSE ALL, AND WHAT IT DOES NOT NEED TO ASK ───────────────────────────
-  it("draws no close-all control with a single tab open — nothing else to close", () => {
-    render(
-      <AppShell
-        active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
-        breadcrumbs={[{ label: "Beta", closeKey: "/t/t1/beta" }]}
-        onCloseCrumb={() => {}}
-        onCloseAllTabs={() => {}}
-        activeCrumbIndex={0}
-      >
-        <div>body</div>
-      </AppShell>
-    )
-    // The kit's own gate (`onCloseAll` + `items.length > 1`) hides the
-    // control rather than drawing one that would do nothing — see kit
-    // v1.2.92's `breadcrumb-folders.tsx`.
-    expect(screen.queryByLabelText("Close all tabs")).toBeNull()
+  // ── THE STRIP'S OWN PINNED "+", AND CMD/CTRL-T ────────────────────────────
+  //
+  // The client's ruling, 17 Sep 2026, on the content strip growing the
+  // assistant strip's own "+": "also add the plus tab, like in the
+  // assistant... the same rules as there." Both doors call the store's own
+  // `openNewTab`, so these render the REAL store (`setWorkspaceScope` /
+  // `forgetOpenTabs`, imported above) rather than a mock — `openNewTab` and
+  // `NEW_TAB_PATH` are read by `app-shell.tsx` straight off the module, not
+  // through a prop this file could substitute.
+  describe("the strip's own \"+\", and cmd/ctrl-T", () => {
+    it('the pinned "+" opens a fresh tab on /new, labelled "New tab", beside the active one', () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:new-tab-plus")
+      const onNavigate = vi.fn()
+      render(
+        <AppShell
+          active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
+          breadcrumbs={[{ label: "Alpha", href: "/t/t1/alpha", closeKey: "tab-alpha" }]}
+          onCloseCrumb={() => {}}
+          activeCrumbIndex={0}
+          onNavigate={onNavigate}
+        >
+          <div>body</div>
+        </AppShell>
+      )
+      fireEvent.click(screen.getByRole("link", { name: "New tab" }))
+      expect(onNavigate).toHaveBeenCalledWith(NEW_TAB_PATH)
+      expect(activeTabPathSnapshot()).toBe(NEW_TAB_PATH)
+      const opened = openTabsSnapshot().find((t) => t.steps[t.cursor]?.path === NEW_TAB_PATH)
+      expect(opened?.steps[opened.cursor]?.label).toBe("New tab")
+    })
+
+    it("cmd/ctrl-T opens the same /new tab when nothing editable has focus", () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:new-tab-cmdt")
+      const onNavigate = vi.fn()
+      render(
+        <AppShell
+          active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
+          breadcrumbs={[{ label: "Alpha", href: "/t/t1/alpha", closeKey: "tab-alpha" }]}
+          onCloseCrumb={() => {}}
+          activeCrumbIndex={0}
+          onNavigate={onNavigate}
+        >
+          <div>body</div>
+        </AppShell>
+      )
+      fireEvent.keyDown(document, { key: "t", metaKey: true })
+      expect(onNavigate).toHaveBeenCalledWith(NEW_TAB_PATH)
+      expect(activeTabPathSnapshot()).toBe(NEW_TAB_PATH)
+    })
+
+    it("cmd/ctrl-T does nothing while focus is sitting in a text field — the letter belongs to the field", () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:new-tab-cmdt-input")
+      const onNavigate = vi.fn()
+      render(
+        <>
+          <input aria-label="typing" />
+          <AppShell
+            active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
+            breadcrumbs={[{ label: "Alpha", href: "/t/t1/alpha", closeKey: "tab-alpha" }]}
+            onCloseCrumb={() => {}}
+            activeCrumbIndex={0}
+            onNavigate={onNavigate}
+          >
+            <div>body</div>
+          </AppShell>
+        </>
+      )
+      screen.getByLabelText("typing").focus()
+      fireEvent.keyDown(document, { key: "t", metaKey: true })
+      expect(onNavigate).not.toHaveBeenCalled()
+      expect(openTabsSnapshot()).toHaveLength(0)
+    })
   })
 
-  it("never asks about an unsaved draft — the kept tab is the only one that could hold one, and it is never closed", async () => {
-    const { markDirty, anyDirty } = await import("@/lib/unsaved-changes")
-    const { closeAllTabs, setWorkspaceScope, forgetOpenTabs, visitTrail } = await import("@/lib/workspace-tabs")
-    forgetOpenTabs()
-    setWorkspaceScope("wired-test-user:team1")
-    visitTrail([
-      { path: "/apps", label: "Apps" },
-      { path: "/apps/A1", label: "APP-1" },
-    ])
-    // The screen she is standing on ("APP-1", kept) stages a draft — the ONE
-    // key this app's dirty registry can ever hold, since only the mounted
-    // screen can call `markDirty` (R37: one shell, one route). Closing every
-    // other tab must not touch it, and nothing here calls the discard confirm
-    // to ask about it.
-    markDirty("apps:A1-draft", true)
-    closeAllTabs("/apps/A1")
-    expect(anyDirty()).toEqual(["apps:A1-draft"])
-    markDirty("apps:A1-draft", false) // leave the registry clean for the next test
+  // ── THE CLIENT'S RULING, 17 SEP 2026, VERBATIM ──────────────────────────
+  //
+  //   "When I open a new tab from an existing tab, every time, it needs to
+  //    be to the immediate right of the tab that is active."
+  //
+  // The store's own suite (`workspace-tabs.test.ts`) proves `openNewTab`
+  // against this exhaustively; this block's own job is the WIRING half —
+  // that pressing "+" or cmd/ctrl-T through the REAL, rendered shell reaches
+  // that same door with the real store underneath, in every position a
+  // person might have left the active tab, and survives eviction when the
+  // strip is already full. `openBeside` (imported above) seeds the fixture
+  // the same way a person accumulates tabs by cmd-clicking, before the "+"
+  // press each test is actually about.
+  describe("pressing \"+\" or cmd/ctrl-T lands the new tab at activeIndex + 1", () => {
+    function renderShellWith(onNavigate: (path: string) => void) {
+      render(
+        <AppShell
+          active={{ teamId: "t1", teamName: "Kwapso", rights: {}, role: "Owner" } as never}
+          breadcrumbs={[{ label: "Alpha", href: "/t/t1/alpha", closeKey: "tab-alpha" }]}
+          onCloseCrumb={() => {}}
+          activeCrumbIndex={0}
+          onNavigate={onNavigate}
+        >
+          <div>body</div>
+        </AppShell>
+      )
+    }
+
+    it('"+" lands at activeIndex + 1 with the active tab FIRST', () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:plus-pos-first")
+      openBeside("/a", "A")
+      openBeside("/b", "B")
+      openBeside("/c", "C")
+      const ids = openTabsSnapshot().map((t) => t.id)
+      activateTab(ids[0] ?? "")
+      const prevActiveIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      renderShellWith(vi.fn())
+      fireEvent.click(screen.getByRole("link", { name: "New tab" }))
+      const newIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      expect(newIndex).toBe(prevActiveIndex + 1)
+    })
+
+    it('"+" lands at activeIndex + 1 with the active tab in the MIDDLE', () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:plus-pos-middle")
+      openBeside("/a", "A")
+      openBeside("/b", "B")
+      openBeside("/c", "C")
+      const ids = openTabsSnapshot().map((t) => t.id)
+      activateTab(ids[1] ?? "")
+      const prevActiveIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      renderShellWith(vi.fn())
+      fireEvent.click(screen.getByRole("link", { name: "New tab" }))
+      const newIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      expect(newIndex).toBe(prevActiveIndex + 1)
+    })
+
+    it('"+" lands at activeIndex + 1 with the active tab LAST', () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:plus-pos-last")
+      openBeside("/a", "A")
+      openBeside("/b", "B")
+      openBeside("/c", "C")
+      const ids = openTabsSnapshot().map((t) => t.id)
+      activateTab(ids[2] ?? "") // already last/active
+      const prevActiveIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      renderShellWith(vi.fn())
+      fireEvent.click(screen.getByRole("link", { name: "New tab" }))
+      const newIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      expect(newIndex).toBe(prevActiveIndex + 1)
+    })
+
+    it("cmd/ctrl-T lands at activeIndex + 1 too, not just the pinned \"+\"", () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:cmdt-pos-middle")
+      openBeside("/a", "A")
+      openBeside("/b", "B")
+      openBeside("/c", "C")
+      const ids = openTabsSnapshot().map((t) => t.id)
+      activateTab(ids[1] ?? "")
+      const prevActiveIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      renderShellWith(vi.fn())
+      fireEvent.keyDown(document, { key: "t", metaKey: true })
+      const newIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      expect(newIndex).toBe(prevActiveIndex + 1)
+    })
+
+    it('with the strip already at MAX_OPEN_TABS, "+" eviction still leaves the new tab immediately right of the active one', () => {
+      forgetOpenTabs()
+      setWorkspaceScope("wired-test-user:plus-pos-full")
+      for (let i = 0; i < MAX_OPEN_TABS; i++) openBeside(`/s${String(i)}`, `S${String(i)}`)
+      const ids = openTabsSnapshot().map((t) => t.id)
+      expect(ids).toHaveLength(MAX_OPEN_TABS)
+      const anchor = ids[3] ?? ""
+      activateTab(anchor)
+      renderShellWith(vi.fn())
+      fireEvent.click(screen.getByRole("link", { name: "New tab" }))
+      expect(openTabsSnapshot()).toHaveLength(MAX_OPEN_TABS) // the ceiling held
+      const anchorIndex = openTabsSnapshot().findIndex((t) => t.id === anchor)
+      expect(anchorIndex, "the tab she opened FROM must survive its own eviction pass").toBeGreaterThanOrEqual(0)
+      const newIndex = openTabsSnapshot().findIndex((t) => t.id === activeTabIdSnapshot())
+      expect(newIndex).toBe(anchorIndex + 1)
+    })
   })
 
   // ── AND THE STORE'S OWN ANSWER, so the two halves cannot drift apart ──────
   it("tabStripState names the active tab, and stands the set down when it is absent", () => {
+    // ONE STEP EACH — a tab's own trail shape since 17 Sep 2026
+    // (`workspace-tabs.ts`'s `OpenTab.steps`/`cursor`); `tabStripState` reads
+    // a tab's CURRENT step, never a flat `.path`/`.label` a tab no longer has.
     const tabs = [
-      { path: "/t/t1/alpha", label: "Alpha" },
-      { path: "/t/t1/beta", label: "Beta" },
-      { path: "/t/t1/gamma", label: "Gamma" },
+      { id: "a", steps: [{ path: "/t/t1/alpha", label: "Alpha" }], cursor: 0 },
+      { id: "b", steps: [{ path: "/t/t1/beta", label: "Beta" }], cursor: 0 },
+      { id: "c", steps: [{ path: "/t/t1/gamma", label: "Gamma" }], cursor: 0 },
     ]
     // Standing on the MIDDLE tab: active is 1, and "last" would have been 2.
     expect(tabStripState(tabs, "/t/t1/beta", true)).toEqual({ showTabSet: true, activeIndex: 1 })

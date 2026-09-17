@@ -379,7 +379,31 @@ export function WaveFinder({
     // to be the tone the rows behind it stand on or it reads as a hole.
     // The pill's trailing `--toolbar-content-gap` (R49) sits INSIDE this flex
     // column and is therefore painted; nothing about R49 moved.
-    <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "w-full")}>
+    //
+    // NO `"w-full"` HERE — client, 17 Sep 2026, over a screenshot of Waves:
+    // "the container or the toolbar container inside of Waves, it's broken…
+    // go fix it." The card's top-right corner showed a diagonal notch (left
+    // corner fine, right corner cut) while Tasks/Tickets/Accounts — all drawn
+    // through the canonical `<ToolbarRow>` (screen-bits.tsx), which carries no
+    // width utility on this element — stayed clean. R63 part 4's whole trick
+    // is a box with AUTO width and a `mx-[calc(...*-1)] px-[...]` pair: an
+    // auto-width box lets the browser SOLVE its width so the negative side
+    // margins genuinely expand it out to the card's border box on both edges.
+    // `w-full` (`width: 100%`) turns that into an OVER-CONSTRAINED box — width
+    // and both margins are all specified, so per the CSS2.1 §10.3.3 box-model
+    // rule the browser drops the specified `margin-right` and recomputes it,
+    // while `margin-left` is honoured (measured on staging: the pin rendered
+    // 1069px inside a 1133px card, left edges aligned, 64px — exactly
+    // 2×`--pinned-inset-x` at `lg` — missing only on the right). The `::before`
+    // that paints the band's rounded top corners (`PINNED_TOOLBAR`,
+    // shared/web/pinned-chrome.ts) inherits that same short box, so its
+    // right corner rounds 64px short of the card's real one, and the card's
+    // OWN corner shows through as the notch. This file was the one
+    // `TOOLBAR_CONTROL_OWNERS` hand-copy that added the extra class; the
+    // fix is simply not adding it, matching `<ToolbarRow>`'s own shape.
+    // Guarded everywhere by `pinned-toolbar-no-fixed-width` in
+    // web/test/rules.test.ts (R63's own census, clause vii).
+    <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
       <div
         data-slot="toolbar-row-column"
         className={cn(

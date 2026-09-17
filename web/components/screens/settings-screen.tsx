@@ -615,12 +615,17 @@ export function SettingsScreen({
       // Members and Roles." They take the "team" VALUE's old position —
       // `?tab=team` still opens the screen (`resolveTeamAlias` above lands it
       // on "members") but is no longer a value this table itself declares.
-      // `icon: "users-three"` / `icon: "user-gear"` are spelled out even
+      // `icon: "users-three"` / `icon: "shield-check"` are spelled out even
       // though `TAB_ICONS["members"]` / `TAB_ICONS["roles"]`
       // (shared/web/screen-engine/tabs-view.tsx) already resolve to the same
       // two glyphs — that table wins over anything a call site passes, so
       // this is the same "spelled out anyway so the two agree on the page
       // rather than by accident" the Modules tab's own `cube` keeps below.
+      // ROLES WAS "user-gear" — client ruling, 17 Sep 2026, verbatim, naming
+      // this tab ("settings rules"): "For settings rules, use the shield
+      // check in Solid." Now matches TAB_ICONS["roles"] and
+      // CONCEPT_ICON.roles (web/lib/pages.ts), which already drew
+      // "shield-check" for this same concept.
       {
         value: "members",
         label: t("Members"),
@@ -631,7 +636,7 @@ export function SettingsScreen({
       {
         value: "roles",
         label: t("Roles"),
-        icon: "user-gear",
+        icon: "shield-check",
         badge: formatCount(rolesCount),
         badgeVariant: "" as const,
       },
@@ -751,17 +756,18 @@ export function SettingsScreen({
             // redundant "Appearance" heading one screen-height below the
             // first. See `settings-section.tsx`'s own header for the prop.
             //
-            // SIZE, APPEARANCE AND BACKGROUND NOW STAGE BEHIND A SAVE BUTTON
-            // — a second ruling the same day: "we need … some kind of save
-            // button so that I can first preview it and, once I'm happy with
-            // what I see, implement it across the app." `scaleValue`/
-            // `saveScale` and `spineValue`/`saveSpine` below are unchanged —
-            // still the same two doors, still read off `active.user` — but
-            // `AppearancePanel` now calls them once, from its own Save,
-            // rather than on every press. Language (`saveLanguage` below) is
-            // the one exception: it keeps applying and persisting the moment
-            // it is picked, her own explicit "keep language instant" —
-            // `appearance-panel.tsx`'s header has the full account.
+            // EVERY CONTROL STAGES BEHIND A SAVE BUTTON — "we need … some
+            // kind of save button so that I can first preview it and, once
+            // I'm happy with what I see, implement it across the app."
+            // (2026-09-14), widened 2026-09-17 to cover Language too: "I
+            // want everything to wait for the save. Nothing changes right
+            // away." `scaleValue`/`saveScale`, `spineValue`/`saveSpine` and
+            // `saveLanguage` below are unchanged — still the same three
+            // doors, Size and Background still read off `active.user` — but
+            // `AppearancePanel` now calls all three once, from its own Save,
+            // rather than on every press. `appearance-panel.tsx`'s own
+            // header has the full account, including why Language was the
+            // one exception for three days and is not any more.
             return (
               <AppearancePanel
                 saveLanguage={(lang) => auth.setLanguage(lang)}

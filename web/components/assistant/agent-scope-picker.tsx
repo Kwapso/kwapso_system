@@ -79,7 +79,7 @@ export function AgentScopePicker({
         )}
         <PickerRow
           icon={<BookBookmark className="size-[18px]" />}
-          label={t("Knowledge base")}
+          label={t("Knowledge")}
           sub={t("Articles and indexed files")}
           onClick={() => onPick("knowledge")}
         />

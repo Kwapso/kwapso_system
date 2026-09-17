@@ -129,7 +129,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // `delete` is "take a source away from it". A person who cannot delete a
   // source cannot ask the assistant to delete one either, because the assistant
   // acts through this same sheet.
-  knowledge: "Knowledge base",
+  knowledge: "Knowledge",
   selectable_data: "Dropdown data",
   agent: "AI agent",
   // THE MAP AND THE MONEY, kept apart on purpose — one is the client's own world

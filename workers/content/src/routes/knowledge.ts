@@ -37,6 +37,7 @@ import {
 } from "@shared/workers/limits"
 import {
   countSources,
+  countSourceKinds,
   createFileSource,
   createSource,
   getSource,
@@ -75,7 +76,8 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     const one = await getSource(cfg, guard, id)
     return pagedJson(
       "sources",
-      { rows: one ? [one] : [], total: await countSources(cfg, guard), hasMore: false, nextCursor: null }
+      { rows: one ? [one] : [], total: await countSources(cfg, guard), hasMore: false, nextCursor: null },
+      { byKind: await countSourceKinds(cfg, guard) }
     )
   }
   const kind = queryText(url.searchParams.get("kind"), "Type")
@@ -94,7 +96,7 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     q: queryText(url.searchParams.get("q"), "Search"),
     active: active === "yes" || active === "no" ? active : undefined,
   }
-  const [page, total] = await Promise.all([
+  const [page, total, byKind] = await Promise.all([
     listSources(
       cfg,
       guard,
@@ -113,10 +115,17 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     // …over the SAME question the rows answered. Counting the whole base beside a
     // searched page badges a number the list cannot reach.
     countSources(cfg, guard, filter),
+    // …AND THE KIND-TAB STRIP'S OWN BADGES (client ruling, 17 Sep 2026, "Knowledge
+    // page K2 by kind"), the identical "one grouped read rides every page" shape
+    // `countTicketFacets` gives the ticket sub-tab strip. `countSourceKinds`
+    // drops the `kind` filter itself so every tab's badge answers "how many of
+    // this kind, under whatever else is narrowed" rather than "how many once
+    // already narrowed to this kind" (R16).
+    countSourceKinds(cfg, guard, filter),
   ])
   // R16: the exact server total rides every list response (badges never use
   // rows.length — on a paged list that is just "50" forever).
-  return pagedJson("sources", { ...page, total })
+  return pagedJson("sources", { ...page, total }, { byKind })
 }
 
 /** SPEND ONE AI UNIT AND WRITE THE ANSWER OUT — the only act on this module that

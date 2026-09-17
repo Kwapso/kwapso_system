@@ -130,6 +130,10 @@ export const listFetch = {
     contentApi.knowledge().then((r) => {
       primeCache(totalKey("knowledge", teamId), r.total)
       primeCache(cursorKey(knowledgeKey(teamId)), r.nextCursor)
+      // The kind-tab strip's own badges (K2 by kind, 17 Sep 2026) — rides this
+      // same read, the identical "one grouped read primes a sidecar" shape
+      // `help`'s own `byType`/`byStatus` take just below.
+      primeCache(knowledgeByKindKey(teamId), r.byKind)
       return r.sources
     }),
   help: (teamId: string) =>
@@ -962,6 +966,17 @@ export function accountKey(accountId: string): string {
 /** The knowledge-source list's cache key. */
 export function knowledgeKey(teamId: string): string {
   return `knowledge:${teamId}`
+}
+
+/** THE KIND-TAB STRIP'S OWN BADGES (client ruling, 17 Sep 2026, "Knowledge
+ * page K2 by kind") — one grouped read (`countSourceKinds`, workers/content/
+ * src/lib/knowledge.ts) rides every knowledge list read, the identical shape
+ * `helpByAccountKey` just above gives the ticket sub-tab strip's own tally. A
+ * key rather than a string literal for the same reason that one is: this file
+ * primes it (below, and every `<PagedFind>` narrowing on the knowledge screen
+ * re-primes it on its own `fetchPage`) and the tab strip reads it back. */
+export function knowledgeByKindKey(teamId: string): string {
+  return `knowledge-by-kind:${teamId}`
 }
 
 /** THE SHAPE'S cache key — the same collection drawn as a picture rather than a

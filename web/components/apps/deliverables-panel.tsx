@@ -44,7 +44,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { Eye, EyeSlash, PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
@@ -245,7 +245,19 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
 
   return (
-    <div className="flex flex-col">
+    <>
+      {/* THE NESTED CARD — client, 17 Sep 2026, over the app's Tickets tab,
+          the same "wall of cards on the page" shape this file draws: "there
+          is still the space between the point and the type missing, and
+          also they are missing the background card." The record's own outer
+          chrome already stands on one shared card (see `work-panels.tsx`'s
+          `PagedPanelBody`, fixed the same session, for the full citation);
+          a collection nested in a tab needs its OWN, the way
+          `SprintsPanel`/`AppsPanel` already draw theirs. The dialogs below
+          stay OUTSIDE this card — an overlay portals off the page ground
+          rather than standing on any card (R67's own ACT/overlay
+          reasoning). */}
+      <CollectionCard>
       {/* ONE ROW, ALWAYS (client ruling, 2026-09-01 — the toolbar spec Aurora
           approved that night). `filters` used to be a `<FilterBar>` rendered
           as this row's own sibling below it — the same shape her Apps
@@ -448,6 +460,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           })}
         </ul>
       )}
+      </CollectionCard>
 
       {/* THE APP IS NOT ON THE FORM — you are standing on it, so it rides the
           call as a fact. The same rule the ticket and meeting forms follow when
@@ -525,6 +538,6 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
           )
         }
       />
-    </div>
+    </>
   )
 }

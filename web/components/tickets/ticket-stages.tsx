@@ -28,6 +28,21 @@
 // correction is to draw the progression ON the record. `help-detail.tsx`
 // carries the argument for the exact spot it landed in.
 //
+// ── AND THEN OUT OF THE CONVERSATION TAB, 2026-09-17 ────────────────────────
+//
+// The 2026-09-09 fix above landed this on the Conversation tab panel, on the
+// reasoning that the kit's own `hero` region (reached through `RecordScreen`'s
+// `headerExtra`) was closed by an earlier ruling ("chips is the last component
+// of headers"). That reasoning held for eight days and then the client ruled
+// again, verbatim: "In ticket detail, put the status progress checkpoints on
+// top of the tabs. I already told you this." Above the tabs, on every tab, is
+// `headerExtra` — the region the earlier reading had ruled out — and her own
+// "I already told you this" is the record that the 2026-09-06 commission
+// ("visibility of all the steps") always meant this spot, not a tab a reader
+// has to be standing on. `help-detail.tsx`'s `headerExtra` comment carries the
+// ruling and what it reverses; this file only draws the ladder now, wherever
+// it is mounted.
+//
 // AND IT IS NOT A DUPLICATE OF ANYTHING. Checked before moving, because "one
 // thing in two places" is how screens drift: as of the 2026-09-06 chip ruling
 // this screen shows the ticket's stage NOWHERE. The status pill left the header
@@ -383,7 +398,20 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
   }))
 
   return (
-    <div className="flex flex-col gap-[var(--space-3)]">
+    // BARE, ON PURPOSE — CLIENT REFINEMENT, 17 Sep 2026, verbatim: "In Tasks,
+    // the Today's Task Progress view should have no container behind it, and
+    // this is exactly the position for reference that I want the ticket
+    // progress to be." So no `bg-card` here: the ladder stands directly on the
+    // head band's own ambient field, the same way `tasks-screen.tsx`'s
+    // "Today's tasks" progress line does at the position she pointed at.
+    //
+    // THIS IS AN R67 EXEMPTION, NOT AN OVERSIGHT — `sections-stand-on-paper`
+    // forbids a titled section on the bare page ground by default, and this
+    // one is bare by her own explicit reference rather than by a container
+    // nobody got round to adding. `UNCONTAINED_SECTION_OK`
+    // (shared/rules/registry.ts) carries the entry and her words, the same
+    // shape the Tasks progress line's own entry uses.
+    <section className="flex flex-col gap-[var(--space-3)]" aria-labelledby={headingId}>
       <span id={headingId} className="text-muted-foreground text-caption">
         {t("Stages")}
       </span>
@@ -441,6 +469,6 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
           {t("We can't show this right now")} {t("Try again in a moment.")}
         </p>
       ) : null}
-    </div>
+    </section>
   )
 }

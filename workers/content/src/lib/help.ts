@@ -1125,6 +1125,37 @@ export type TicketDashboard = {
    * since it shipped, read from the same constant, so the dashboard and the
    * queue cannot come to disagree about what "late" means. */
   unopenedPastLine: number
+  /** 7A — WHO ASKED, RANKED. The client's ruling, 17 Sep 2026, over the app's
+   * own Tickets › Dashboard: "I want a rank list with bars in total, not the
+   * last 30 days, and yes, put the faces." One row per `raised_by_contact_id`
+   * — "WHO ASKED (5.9), which is not who typed it" (team migration 0028's own
+   * words: 220 of 221 seeded requests were typed by staff on a client's
+   * behalf) — an `accounts` row of type `individual`, so its `name`/`logo_url`
+   * are the same two fields every contact chip in the app already reads. NO
+   * PERIOD: unlike `closureDays`'s six-month window, this is every ticket the
+   * fence ever matched, because "who has asked the most, ever" is the
+   * question a rank list answers — a 30-day window would re-crown the list
+   * every time a quiet contact went a month without writing.
+   *
+   * TOP FIVE IN THE ROW ITSELF (`rows`, capped in SQL, never sliced after a
+   * bigger read) — `total`/`people` are separate, WHOLE-POPULATION aggregates
+   * (every ticket with a contact attributed, every distinct contact), because
+   * the footer's "of {total} · {people} people" answers for the FULL
+   * ranking, not for the five names actually drawn. A ticket with no
+   * `raised_by_contact_id` (our own housekeeping, typed by nobody on a
+   * client's behalf) is in neither — the same subtraction `byAccountAndType`
+   * already makes for a null account. */
+  raisedByContact: {
+    rows: { contactId: string; contactName: string | null; contactLogoUrl: string | null; n: number }[]
+    /** every ticket the fence matched with a `raised_by_contact_id` set — the
+     * denominator the footer's "of {total}" names, never just the sum of the
+     * five rows above. */
+    total: number
+    /** how many DISTINCT contacts the fence found asking at all — the
+     * footer's "{people} people", which can be larger than `rows.length`
+     * once a team has more than five people asking. */
+    people: number
+  }
   /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
    * above was taken over, counted once, through the one bounded seam (R16).
    *
@@ -1213,10 +1244,23 @@ export async function readTicketDashboard(
   // ways of asking it would eventually be two answers.
   const unopenedCutoff = workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS).toISOString()
 
-  // NINE STATEMENTS NOW, and the ninth is the population the other eight were
-  // grouped over — see `matched` on the type above for why it is counted rather
-  // than inferred from whether the eight came back empty.
-  const [openByType, byAccountType, closure, trend, matrix, notRecorded, byApp, unopened, matched] = await Promise.all([
+  // ELEVEN STATEMENTS NOW (7A added two, 17 Sep 2026), and the last is the
+  // population every grouping was taken over — see `matched` on the type
+  // above for why it is counted rather than inferred from whether the rest
+  // came back empty.
+  const [
+    openByType,
+    byAccountType,
+    closure,
+    trend,
+    matrix,
+    notRecorded,
+    byApp,
+    unopened,
+    raisedByRanked,
+    raisedByTotals,
+    matched,
+  ] = await Promise.all([
     // 1B. Bounded by GROUPING: at most (kinds × stages) rows, and both sets are
     // collections that cannot run away.
     d1Query<{ help_type: string; status: string; n: number }>(
@@ -1485,6 +1529,36 @@ export async function readTicketDashboard(
         WHERE ${fenced} AND status = 'new' AND created_at < ? LIMIT 1`,
       [...where.params, unopenedCutoff]
     ),
+    // 7A. THE TOP FIVE RAISERS, RANKED — see the type's own note for why
+    // `raised_by_contact_id` (never `creator_id`) is "who asked". Ordered and
+    // capped IN SQL (never sliced after a bigger read, the same discipline
+    // `byAccountType`/`byApp` above already keep): `LIMIT 5` here is the row
+    // the client asked for, not `TICKET_DASHBOARD_GROUP_CAP` — a sixth name
+    // would never be drawn, so asking for a hundred of them would be a
+    // hundred-row answer to a five-row question.
+    d1Query<{ contact_id: string; contact_name: string | null; contact_logo_url: string | null; n: number }>(
+      cfg,
+      guard.databaseId,
+      `WITH scoped AS (SELECT raised_by_contact_id FROM help WHERE ${fenced} AND raised_by_contact_id IS NOT NULL)
+       SELECT s.raised_by_contact_id AS contact_id, a.name AS contact_name, a.logo_url AS contact_logo_url,
+              COUNT(*) AS n
+         FROM scoped s LEFT JOIN accounts a ON a.id = s.raised_by_contact_id
+        GROUP BY s.raised_by_contact_id, a.name, a.logo_url
+        ORDER BY n DESC
+        LIMIT 5`,
+      where.params
+    ),
+    // …AND THE TWO NUMBERS THE FOOTER NAMES, over the WHOLE population the
+    // ranking above was taken from rather than just its own five rows —
+    // "of {total} · {people} people" would otherwise undercount the moment a
+    // team has a sixth person asking. One aggregate row, R14.
+    d1Query<{ total_n: number; people_n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT COUNT(*) AS total_n, COUNT(DISTINCT raised_by_contact_id) AS people_n
+         FROM help WHERE ${fenced} AND raised_by_contact_id IS NOT NULL LIMIT 1`,
+      where.params
+    ),
     // …AND HOW MANY TICKETS THE QUESTION FOUND AT ALL — the denominator under
     // every picture above, over the identical `fenced` clause and the identical
     // parameters, so it can never describe a different population from the one
@@ -1543,6 +1617,16 @@ export async function readTicketDashboard(
       total: num(r.total_n),
     })),
     unopenedPastLine: num(unopened[0]?.n),
+    raisedByContact: {
+      rows: raisedByRanked.map((r) => ({
+        contactId: r.contact_id,
+        contactName: r.contact_name,
+        contactLogoUrl: r.contact_logo_url,
+        n: num(r.n),
+      })),
+      total: num(raisedByTotals[0]?.total_n),
+      people: num(raisedByTotals[0]?.people_n),
+    },
     // Already a clamped number off the seam, so no `num(...)` — every other
     // field here is unwrapping a JSON value the REST door handed back, and this
     // one is not.

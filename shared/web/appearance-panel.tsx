@@ -201,10 +201,56 @@
 // `bg-surface-panel` — a second fill on the row itself would be the exact
 // "arbitrary form silently freezes every ground-aware token beneath it" trap
 // `ToolbarRow`'s own header warns about.
+//
+// ── THREE MORE RULINGS, 2026-09-17 ──────────────────────────────────────────
+//
+// (a) LANGUAGE PILLS SHOW THEIR OWN NAME ONLY — answered in
+//     `language-section.tsx`, not here; see that file's own header.
+//
+// (b) NO EXPLANATORY SENTENCE ANYWHERE ON THIS TAB, AND EVERYTHING WAITS FOR
+//     SAVE — including Language, reversing "keep language instant" above
+//     (kept as the historical record of a ruling that held for three days).
+//     Verbatim: "Settings, Appearance. Again, I told you: too many
+//     descriptions everywhere. Delete these live preview updates as you
+//     press a control, and also delete the language changes right away.
+//     Size, Appearance, and Background: wait for Save. Actually, I want
+//     everything to wait for the save. Nothing changes right away." Two
+//     changes: the two `<p>` captions below this section (the live-preview
+//     caption and the "Language changes right away…" sentence) are DELETED
+//     outright — R81 (`form-carries-no-hints`) is a form-file census keyed on
+//     a `FormShell`/`FormShellDialog` import, and this file imports neither
+//     (a Settings tab staged behind Save is a form in every way that matters
+//     but that one import), so `web/test/form-hints.test.ts`'s own
+//     `importsFormShell` marker now ALSO recognises a file importing the
+//     kit's `UnsavedChangesBar` — the same "stages a draft behind Save/
+//     Discard" signature R81's own law is about, read off the file rather
+//     than restated by hand. And Language joins `pendingScale`/
+//     `pendingSpine`/`pendingTheme` as a fourth staged value: `pendingLanguage`/
+//     `savedLanguage` below, `dirty` grows a fourth clause, `discard()` resets
+//     a fourth value, and `handleSave` calls `saveLanguage` AND `setLang`
+//     (the context's own instant re-render, moved from every press to this
+//     one commit — the identical move Background's `saveSpine` already made
+//     for `active.refresh()`) only when the pending language actually
+//     changed. `LanguageSection` no longer takes a `save` prop at all — see
+//     that file's own header for its side of this change.
+//
+// (c) THE PREVIEW ITSELF STANDS ON PAPER, TALLER, MORE POPULATED. Verbatim:
+//     "I want the preview on Settings > Appearance to be slightly taller.
+//     Currently, it's a container inside a container, so that's not
+//     accurate. Try to represent more of the real look of the app and
+//     include more elements inside, not just one kind of card." The kit's
+//     `AppearancePreview` (`shared/ui/compositions/screens/settings.tsx`) is
+//     replaced below by `AppearanceTabPreview`
+//     (`shared/web/appearance-tab-preview.tsx`) — that file's own header has
+//     the full account of the height token it names, why it is not a card
+//     inside a card, and why it reaches for real kit parts (`Card`, `Badge`,
+//     `List`) rather than hand-drawn boxes. `previewScaleStep` and the
+//     `previewTheme` wiring below are unchanged; only which component reads
+//     them moved.
 
 import * as React from "react"
 
-import { AppearancePreview } from "@shared/ui/compositions/screens/settings"
+import { AppearanceTabPreview } from "./appearance-tab-preview"
 import { UnsavedChangesBar } from "@shared/ui/components/unsaved-changes-bar/unsaved-changes-bar"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
@@ -222,8 +268,10 @@ import { SettingsSection } from "./settings-section"
 
 export function AppearancePanel({
   /** Persist the language choice. Both apps pass their own `auth.setLanguage`.
-   * Called the instant a pill is pressed — see this file's own header,
-   * "LANGUAGE IS THE FOURTH SECTION AND STAYS INSTANT". */
+   * Called once, from Save, only when Language actually changed — see the
+   * header, "(b) NO EXPLANATORY SENTENCE ANYWHERE ON THIS TAB, AND EVERYTHING
+   * WAITS FOR SAVE" (2026-09-17, reversing the "stays instant" ruling this
+   * file's older prose still describes). */
   saveLanguage,
   /** what the person currently reads at, from their own session row —
    * `AppearancePanel`'s own SAVED baseline for Size. */
@@ -255,13 +303,15 @@ export function AppearancePanel({
   saveSpine: (spine: Spine) => Promise<unknown>
   onDirtyChange?: (dirty: boolean) => void
 }) {
-  const { t } = useLanguage()
+  const { t, lang, setLang } = useLanguage()
 
   // ── SAVED — what is actually live in the app right now, one per staged
   // control. Size and Background arrive as props (the person's own session
   // row); Appearance has none — it is device-local — so it is read out of
   // `localStorage` once, after mount, the same SSR-guarded way
-  // `ThemeSection` itself used to read it.
+  // `ThemeSection` itself used to read it. Language is already authoritative
+  // in the language context (`SessionUser.language`, R33's own provider), so
+  // there is nothing to seed from storage — `lang` IS the saved baseline.
   const [savedScale, setSavedScale] = React.useState(() => scaleValue ?? SCALE_STEPS[1].value)
   const [savedSpine, setSavedSpine] = React.useState<Spine>(() => toSpine(spineValue))
   const [savedTheme, setSavedTheme] = React.useState<ThemeMode>("system")
@@ -283,11 +333,17 @@ export function AppearancePanel({
   const [pendingScale, setPendingScale] = React.useState(savedScale)
   const [pendingSpine, setPendingSpine] = React.useState<Spine>(savedSpine)
   const [pendingTheme, setPendingTheme] = React.useState<ThemeMode>(savedTheme)
+  const [pendingLanguage, setPendingLanguage] = React.useState<Language>(lang)
   React.useEffect(() => setPendingScale(savedScale), [savedScale])
   React.useEffect(() => setPendingSpine(savedSpine), [savedSpine])
   React.useEffect(() => setPendingTheme(savedTheme), [savedTheme])
+  React.useEffect(() => setPendingLanguage(lang), [lang])
 
-  const dirty = pendingScale !== savedScale || pendingSpine !== savedSpine || pendingTheme !== savedTheme
+  const dirty =
+    pendingScale !== savedScale ||
+    pendingSpine !== savedSpine ||
+    pendingTheme !== savedTheme ||
+    pendingLanguage !== lang
   const [saving, setSaving] = React.useState(false)
 
   // REPORT UPWARD, AND `false` ON THE WAY OUT — see the prop's own doc. The
@@ -311,6 +367,7 @@ export function AppearancePanel({
     setPendingScale(savedScale)
     setPendingSpine(savedSpine)
     setPendingTheme(savedTheme)
+    setPendingLanguage(lang)
   }
 
   async function handleSave() {
@@ -346,6 +403,22 @@ export function AppearancePanel({
       // `ThemeSection`'s own old `choose()` stated about itself.
       applyThemeMode(pendingTheme)
       setSavedTheme(pendingTheme)
+    }
+
+    if (pendingLanguage !== lang) {
+      // Persist first, apply second — `setLang` is the instant, optimistic
+      // re-render `language-section.tsx`'s own retired `choose()` used to
+      // fire on every press; it now fires once, on a successful Save, the
+      // identical move Background's `saveSpine` already made for
+      // `active.refresh()` above. A failed persist leaves the app reading
+      // in whatever `lang` already was — the pill stays pressed and Save
+      // stays enabled, so trying again is one more press.
+      try {
+        await saveLanguage(pendingLanguage)
+        setLang(pendingLanguage)
+      } catch {
+        failed = true
+      }
     }
 
     setSaving(false)
@@ -388,26 +461,21 @@ export function AppearancePanel({
       )}
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
         <div className="flex flex-col gap-2 lg:sticky lg:top-4">
-          <AppearancePreview
-            theme={previewTheme}
-            spine={pendingSpine}
-            scale={previewScaleStep(pendingScale)}
-          />
-          {/* THE CAPTION — the artifact's own option 3 (`appearance-layouts.html`,
-              "Preview-led"), centred beneath the frame: nothing here reacts to
-              a control on its own, so the sentence says what the picture is
-              for before somebody presses one. */}
-          <p className="text-muted-foreground text-center text-xs">
-            {t("Live preview — updates as you press a control")}
-          </p>
+          {/* NO CAPTION BELOW THE FRAME ANY MORE — R81/2026-09-17: "too many
+              descriptions everywhere ... delete these live preview updates
+              as you press a control." The picture is `AppearanceTabPreview`
+              now (`shared/web/appearance-tab-preview.tsx`), taller and more
+              populated — see that file's own header and the block above,
+              "THE PREVIEW ITSELF STANDS ON PAPER, TALLER, MORE POPULATED". */}
+          <AppearanceTabPreview theme={previewTheme} spine={pendingSpine} scale={previewScaleStep(pendingScale)} />
         </div>
         <div className="flex flex-col gap-5">
           {/* LANGUAGE, FIRST — her correction, verbatim in the header above:
               "Language · Size · Appearance · Background", inside this one
-              column, not a full-width band over the grid. Applies and
-              persists the instant a pill is pressed — see the header,
-              "LANGUAGE IS THE FOURTH SECTION AND STAYS INSTANT". */}
-          <LanguageSection save={saveLanguage} />
+              column, not a full-width band over the grid. Staged now, like
+              its three neighbours — see the header, "NO EXPLANATORY
+              SENTENCE ANYWHERE ON THIS TAB, AND EVERYTHING WAITS FOR SAVE". */}
+          <LanguageSection value={pendingLanguage} onChange={setPendingLanguage} disabled={saving} />
           <ScaleSection value={pendingScale} onChange={setPendingScale} disabled={saving} />
           <ThemeSection
             value={pendingTheme}
@@ -416,16 +484,6 @@ export function AppearancePanel({
             disabled={saving}
           />
           <SpineSection value={pendingSpine} onChange={setPendingSpine} disabled={saving} />
-
-          {/* THE CAPTION — Save/Discard moved to the pinned bar above (14
-              Sep 2026); this sentence stays exactly where it was and says
-              exactly what it always said, because it is still true: the
-              row above it (Language) looks identical to the three it sits
-              beside and behaves nothing like them — see the header, "THE
-              ROW THAT LOOKS THE SAME BUT ACTS DIFFERENTLY". */}
-          <p className="text-muted-foreground pt-2 text-xs">
-            {t("Language changes right away. Size, appearance and background wait for Save.")}
-          </p>
         </div>
       </div>
     </SettingsSection>

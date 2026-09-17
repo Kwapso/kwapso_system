@@ -222,6 +222,63 @@ export function AgentTabStrip({
       }}
       closeLabel={t("Close tab")}
       onReorder={onReorder}
+      // THE LIVE-PAGE REGRESSION, 17 Sep 2026 — "I still cannot switch or
+      // close tabs." The kit's own drag-pickup handler (`onTabPointerDown`,
+      // `breadcrumb-folders.tsx`) takes `setPointerCapture` on a tab's `<li>`
+      // for ANY primary-button pointerdown anywhere inside a `movable` tab
+      // (every real, closable conversation tab, once `onReorder` is given —
+      // which `agent-panel.tsx` always does), with no check on WHERE inside
+      // the tab the gesture started. Per the Pointer Events spec, once the
+      // `<li>` holds capture the browser's synthesized `click` for that
+      // gesture is retargeted to the CAPTURING element rather than to
+      // whatever is visually under the cursor — here, the close `<button>`,
+      // a sibling of the tab's own link, laid over the tab's own box. The
+      // `<li>` carries no `onClick`, so the click is silently swallowed
+      // before it ever reaches the close button: `onClose` never fires.
+      // Measured on staging (main 1a1a86c3) with real mouse clicks in
+      // headless Chromium (scratchpad/assistant-clicks.mjs): a plain,
+      // no-movement pointerdown+pointerup on the × calls
+      // `Element.setPointerCapture` on the tab's `<li>` and the tab count
+      // never changes.
+      //
+      // FIXED HERE, NOT IN THE KIT. `shared/ui/` is vendored and pinned (a
+      // hand-edit turns the build red, `web/test/vendored-kit.test.ts`), and
+      // `breadcrumb-folders.tsx` is owned by a different lane at the moment
+      // this was diagnosed — the durable fix belongs upstream (defer
+      // `setPointerCapture` to the first `pointermove` that actually crosses
+      // a movement threshold, inside `onTabPointerMove`, rather than taking
+      // it unconditionally on `pointerdown`; see that file's own
+      // `onTabPointerDown`/`onTabPointerMove`). This is the narrowest
+      // possible app-side stand-in: a CAPTURE-phase `pointerdown` handler on
+      // the `<nav>` — an ANCESTOR of the `<li>` in both the DOM and the fiber
+      // tree — fires strictly before the kit's own BUBBLE-phase
+      // `onPointerDown` on the `<li>` (capture runs top-down before bubble
+      // runs bottom-up, for the very same dispatch). When the pointerdown's
+      // target sits inside `[data-slot="breadcrumb-folders-close"]` — the
+      // kit's own stable data-slot for the close control, not a class this
+      // file would otherwise reach for (R39) — `stopPropagation` here means
+      // the kit's handler never runs for that gesture at all: no capture, no
+      // retargeting, and the click reaches the button exactly as it would on
+      // an ordinary, non-draggable tab. A pointerdown anywhere ELSE inside
+      // the tab (its label, its shape) is untouched, so dragging the tab
+      // itself to reorder it keeps working unchanged. See
+      // `agent-tab-strip.test.tsx`'s own regression test for the DOM-level
+      // proof (pointerdown on the × must never reach
+      // `Element.setPointerCapture`).
+      //
+      // THE SAME KIT DEFECT ALSO BREAKS A PLAIN CLICK ON A BACKGROUND TAB'S
+      // OWN LINK — confirmed live on the content/workspace strip
+      // (`app-shell.tsx`, the identical `BreadcrumbFolders` with its own
+      // `onReorder`): a real, no-movement pointerdown+pointerup on a
+      // background tab's link also takes capture and the tab never
+      // activates. That strip belongs to a different lane; this guard only
+      // covers the assistant's own close control, which is the one control
+      // this file owns.
+      onPointerDownCapture={(e: React.PointerEvent) => {
+        if ((e.target as HTMLElement).closest('[data-slot="breadcrumb-folders-close"]')) {
+          e.stopPropagation()
+        }
+      }}
       onClickCapture={(e: React.MouseEvent) => {
         const a = (e.target as HTMLElement).closest("a")
         if (!a) return

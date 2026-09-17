@@ -74,6 +74,7 @@ import ts from "typescript"
 import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionHeading } from "@/components/records/collection-heading"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(import.meta.dirname, "..", "..")
@@ -480,5 +481,518 @@ describe("R83 amendment -- the census of renderFolderTabs( call sites the card r
     expect(coveredRels, "tickets-collection.tsx covers through a direct <CollectionCard> tag").toContain(
       "web/components/tickets/tickets-collection.tsx"
     )
+  })
+})
+
+describe("R83 generalised, 17 Sep 2026 -- a card led by a HEADING pays the whole --toolbar-lead-gap", () => {
+  it("DOM: a CollectionHeading with an action wraps the headline in a row div, and that row is the card's own preceding sibling", () => {
+    // THE EXACT KNOWLEDGE SHAPE -- a heading WITH an `action` (Ask/Sync/gear),
+    // so `CollectionHeading` wraps its `<Headline data-slot="headline">` in a
+    // plain `justify-between` row rather than returning it bare
+    // (collection-heading.tsx's own branch) -- immediately followed, in a
+    // GAPLESS column, by the same `<CollectionCard>` fixture the strip proof
+    // above uses.
+    render(
+      <div className="flex flex-col">
+        <CollectionHeading sectionKey="knowledge" total={5} action={<button>Ask</button>} />
+        <CollectionCard>
+          <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+            <div data-slot="toolbar-row-column">the toolbar</div>
+          </div>
+          <div data-testid="rows">the rows</div>
+        </CollectionCard>
+      </div>
+    )
+
+    const headline = document.querySelector('[data-slot="headline"]')
+    expect(headline, "CollectionHeading must render the kit's Headline, data-slot=\"headline\"").toBeTruthy()
+
+    const card = document.querySelector('[data-slot="card"]')
+    expect(card, 'CollectionCard must render the kit\'s Card, data-slot="card"').toBeTruthy()
+
+    // THE HEADLINE ITSELF IS NOT THE CARD'S PRECEDING SIBLING -- `action`
+    // wraps it in a row div, which IS the sibling. `:has(> […])` in
+    // globals.css exists precisely to still reach it.
+    expect(headline!.nextElementSibling, "the headline sits inside a row, not beside the card directly").not.toBe(card)
+    expect(
+      headline!.parentElement?.nextElementSibling,
+      "the headline's own wrapping row must be the card's preceding sibling, or the generalised selector in globals.css matches nothing"
+    ).toBe(card)
+
+    const content = card!.querySelector(':scope > [data-slot="card-content"]')
+    expect(content, "CollectionCard must wrap its children in the kit's CardContent, one level in").toBeTruthy()
+    expect(
+      content!.firstElementChild?.getAttribute("data-slot"),
+      "the pinned toolbar must still be the card content's first child"
+    ).toBe("toolbar-row-pin")
+  })
+
+  it("DOM: a CollectionHeading with NO action returns the bare headline, which is then the card's own preceding sibling directly", () => {
+    render(
+      <div className="flex flex-col">
+        <CollectionHeading sectionKey="knowledge" total={5} />
+        <CollectionCard>
+          <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+            <div data-slot="toolbar-row-column">the toolbar</div>
+          </div>
+        </CollectionCard>
+      </div>
+    )
+    const headline = document.querySelector('[data-slot="headline"]')
+    const card = document.querySelector('[data-slot="card"]')
+    expect(headline!.nextElementSibling, "no action, no wrapping row -- the headline is the sibling itself").toBe(card)
+  })
+
+  it("CSS: globals.css reaches a card led by a headline (bare, or wrapped for an action) off data-slot alone, and pays the WHOLE --toolbar-lead-gap, never the strip's remainder", () => {
+    const css = readFileSync(join(ROOT, "web", "app", "globals.css"), "utf8")
+
+    const selector = String.raw`:is\(\[data-slot="headline"\],\s*:has\(>\s*\[data-slot="headline"\]\)\)\s*\+\s*\[data-slot="card"\]`
+
+    const leadRule = new RegExp(selector + String.raw`\s*\{\s*--pinned-lead:\s*var\(--toolbar-lead-gap\)\s*;\s*\}`)
+    expect(
+      css,
+      'web/app/globals.css must set --pinned-lead to the WHOLE var(--toolbar-lead-gap) (never a calc() remainder -- a heading pays no --tab-content-gap of its own to subtract) when the card follows a bare or action-wrapped headline'
+    ).toMatch(leadRule)
+
+    const paddingRule = new RegExp(
+      selector + String.raw`\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*var\(--toolbar-lead-gap\)\s*;\s*\}`
+    )
+    expect(
+      css,
+      "web/app/globals.css must set the same sibling's CardContent padding-top to the whole var(--toolbar-lead-gap)"
+    ).toMatch(paddingRule)
+  })
+
+  it("RED PROOF: a stylesheet with only the strip's remainder rule (no headline generalisation at all) does not satisfy today's rule", () => {
+    const stripOnly = `
+      .pinned-strip + [data-slot="card"] {
+        --pinned-lead: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
+      }
+      .pinned-strip + [data-slot="card"] > [data-slot="card-content"] {
+        padding-top: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
+      }
+    `
+    const selector = String.raw`:is\(\[data-slot="headline"\],\s*:has\(>\s*\[data-slot="headline"\]\)\)\s*\+\s*\[data-slot="card"\]`
+    const leadRule = new RegExp(selector + String.raw`\s*\{\s*--pinned-lead:\s*var\(--toolbar-lead-gap\)\s*;\s*\}`)
+    expect(stripOnly, "the strip-only stylesheet (pre-generalisation) must not read as today's heading rule").not.toMatch(
+      leadRule
+    )
+  })
+})
+
+// THE OLD GAPLESS-COLUMN PROOF ABOVE THIS COMMENT IS RETIRED, 17 Sep 2026 (K2
+// by kind). It proved collection-content.tsx's own knowledge branch paid no
+// SECOND gap on top of the heading-only CSS rule below (`:is([data-slot=
+// "headline"], …) + [data-slot="card"]`) — the special case that rule exists
+// for, because the knowledge collection drew no tab strip at all. Now it
+// does: the branch moved into its own component (knowledge-screen.tsx) and
+// gained a kind-tab strip (`tabs` on `<PagedFind>`), so it is STRIP-LED like
+// accounts-screen.tsx one collection over — the FIRST census below already
+// covers it (`.pinned-strip + [data-slot="card"]`, through `paged-find.tsx`'s
+// own `wrap` delegation), and the heading-only rule this block proved no
+// longer reaches it at all (the second census, further down, says so
+// explicitly). The heading-to-strip gap it used to police is no longer
+// regulated by anything — `.pinned-strip + [data-slot="card"]` only cares
+// about the strip's OWN preceding sibling, never what sits above it — so
+// knowledge-screen.tsx spends the ordinary `gap-4` accounts-screen.tsx does
+// between its own heading and its own `<PagedFind>`.
+
+// ============================================================================
+// THE SECOND CENSUS -- R83, GENERALISED 17 SEP 2026. A card can also be led by
+// a HEADING instead of a strip (the knowledge collection: K36 gives it no
+// tabs, so it never draws `renderFolderTabs(...)` at all). globals.css now
+// reaches that shape too, off the identical DOM-adjacency idea, keyed on
+// `Headline`'s own `data-slot="headline"` rather than `.pinned-strip`:
+// `:is([data-slot="headline"], :has(> [data-slot="headline"])) +
+// [data-slot="card"]`. This census derives, off the disk, every
+// `<CollectionHeading` call whose IMMEDIATE next JSX sibling really is a
+// `<CollectionCard>`/`<Card>` -- directly, or through a `wrap` a caller fills,
+// the same two shapes the first census resolves -- so a future refactor that
+// slides another element between the heading and the card (exactly the fault
+// this file's own first census guards against for a strip) fails this one
+// instead of shipping unproved.
+//
+// STRIP-LED SCREENS ARE DELIBERATELY *NOT* "COVERED" HERE, even where a
+// `<CollectionHeading>` sits above a `<PagedFind wrap={...} tabs={...}>`
+// (accounts-screen.tsx, contacts-screen.tsx, inputs-screen.tsx,
+// meetings-screen.tsx): passing `tabs` makes `PagedFind` draw its own
+// `renderFolderTabs(...)` strip BEFORE the card, so the card's true DOM
+// PRECEDING SIBLING is the strip, not the heading -- the shape the FIRST
+// census already proves, off `.pinned-strip`. Counting it twice here would
+// assert something the CSS selector above does not actually do (a heading
+// selector cannot also match through an intervening strip), so the "wrap
+// without tabs" guard below is load-bearing, not a simplification.
+// ============================================================================
+
+const HEADING_TAG = "CollectionHeading"
+
+/** The nearest enclosing JSX container (`<div>…</div>` or a fragment) around
+ * `node`, and which of that container's own `children` entries `node` sits
+ * inside -- climbing through wrapping expressions the same way `enclosingBox`
+ * does, but returning the SLOT rather than just the box, so the census below
+ * can ask "what comes right after this one." */
+function siblingSlot(
+  node: ts.Node
+): { parent: ts.JsxElement | ts.JsxFragment; child: ts.Node } | undefined {
+  let child: ts.Node = node
+  let parent: ts.Node | undefined = node.parent
+  while (parent) {
+    if (ts.isJsxElement(parent) || ts.isJsxFragment(parent)) {
+      if ((parent.children as readonly ts.Node[]).includes(child)) return { parent, child }
+    }
+    child = parent
+    parent = parent.parent
+  }
+  return undefined
+}
+
+/** The next MEANING-BEARING child after `child` in `parent.children` --
+ * whitespace-only JSX text and a comment blanked to an empty `{}` (this
+ * file's own `stripComments(..., { keepLength: true })` leaves exactly that
+ * shape) are skipped, the same way a browser skips them when it resolves
+ * `element.nextElementSibling`. */
+function nextRealSibling(
+  parent: ts.JsxElement | ts.JsxFragment,
+  child: ts.Node,
+  sf: ts.SourceFile
+): ts.JsxChild | undefined {
+  const kids = parent.children
+  const idx = kids.findIndex((k) => k === child)
+  if (idx === -1) return undefined
+  for (let i = idx + 1; i < kids.length; i++) {
+    const k = kids[i]!
+    if (ts.isJsxText(k) && k.getText(sf).trim() === "") continue
+    if (ts.isJsxExpression(k) && !k.expression) continue
+    return k
+  }
+  return undefined
+}
+
+function tagNameOf(el: ts.JsxSelfClosingElement | ts.JsxElement, sf: ts.SourceFile): string {
+  return (ts.isJsxSelfClosingElement(el) ? el.tagName : el.openingElement.tagName).getText(sf)
+}
+
+function attributesOf(el: ts.JsxSelfClosingElement | ts.JsxElement): readonly ts.JsxAttributeLike[] {
+  return ts.isJsxSelfClosingElement(el) ? el.attributes.properties : el.openingElement.attributes.properties
+}
+
+function findAttr(el: ts.JsxSelfClosingElement | ts.JsxElement, name: string, sf: ts.SourceFile): ts.JsxAttribute | undefined {
+  for (const a of attributesOf(el)) {
+    if (ts.isJsxAttribute(a) && a.name.getText(sf) === name) return a
+  }
+  return undefined
+}
+
+/** Is `sib` a card the heading rule actually reaches -- directly, or through
+ * a `wrap` prop a caller filled with one, PROVIDED nothing else on that same
+ * element (a `tabs` prop) draws a strip first. */
+function siblingIsCard(sib: ts.JsxChild, sf: ts.SourceFile): boolean {
+  if (!ts.isJsxSelfClosingElement(sib) && !ts.isJsxElement(sib)) return false
+  const tag = tagNameOf(sib, sf)
+  if (tag === "CollectionCard" || tag === "Card") return true
+
+  // DELEGATED -- the element itself draws no card, but hands `wrap` to one
+  // that does, e.g. `<PagedFind wrap={(inner) => <CollectionCard>...}>`.
+  const wrapAttr = findAttr(sib, "wrap", sf)
+  if (!wrapAttr?.initializer) return false
+  if (!CARD_TAG.test(wrapAttr.initializer.getText(sf))) return false
+
+  // …BUT ONLY IF NOTHING ON THIS SAME ELEMENT ALSO DRAWS A STRIP FIRST. A
+  // `tabs` prop makes `PagedFind` render `renderFolderTabs(...)` ahead of the
+  // card it wraps, so the card's real preceding sibling is the STRIP, not
+  // this heading -- the shape the FIRST census (`.pinned-strip`) already
+  // proves. Counting it here too would claim the heading selector reaches a
+  // card it structurally cannot.
+  if (findAttr(sib, "tabs", sf)) return false
+
+  return true
+}
+
+type HeadingSite = { rel: string; line: number }
+
+function censusHeadingCallSites(roots: string[]): { covered: HeadingSite[]; uncovered: HeadingSite[] } {
+  const covered: HeadingSite[] = []
+  const uncovered: HeadingSite[] = []
+  for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+    const src = stripComments(f.source, { keepLength: true })
+    if (!src.includes(`<${HEADING_TAG}`)) continue
+    const sf = ts.createSourceFile(f.path, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const visit = (node: ts.Node): void => {
+      const isHeading =
+        (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) && tagNameOf(node, sf) === HEADING_TAG
+      if (isHeading) {
+        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+        const site: HeadingSite = { rel: f.rel, line }
+        const slot = siblingSlot(node)
+        const sib = slot ? nextRealSibling(slot.parent, slot.child, sf) : undefined
+        const isCovered = sib ? siblingIsCard(sib, sf) : false
+        if (isCovered) covered.push(site)
+        else uncovered.push(site)
+        // Do not descend into a JsxSelfClosingElement's own attribute
+        // initializers looking for a nested `<CollectionHeading` -- there
+        // isn't one, `action` holds buttons -- but JsxElement forms (none
+        // today) could, so this still walks children normally below.
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sf)
+  }
+  return { covered, uncovered }
+}
+
+describe("R83 generalised -- the census of <CollectionHeading> call sites the heading rule reaches", () => {
+  it("finds no <CollectionHeading> covered by the heading rule today -- knowledge (the last one) gained a strip 17 Sep 2026", () => {
+    const { covered, uncovered } = censusHeadingCallSites(ROOTS)
+
+    const coveredRels = [...new Set(covered.map((s) => s.rel))].sort()
+    const uncoveredRels = [...new Set(uncovered.map((s) => s.rel))].sort()
+
+    for (const site of covered) {
+      const alsoUncovered = uncovered.some((u) => u.rel === site.rel && u.line === site.line)
+      expect(alsoUncovered, `${site.rel}:${site.line} was classified both covered and uncovered`).toBe(false)
+    }
+
+    // THE KNOWLEDGE COLLECTION LEFT THIS LIST, 17 Sep 2026 (K2 by kind) --
+    // it used to be the one call site this rule reached (a heading with no
+    // strip above its card, K36's "this collection has no tabs to switch").
+    // It gained a kind-tab strip the same day and moved into its own
+    // component (knowledge-screen.tsx); its `<CollectionHeading>` is now
+    // immediately followed by `<PagedFind wrap={...} tabs={...}>`, the exact
+    // "wrap without tabs" exception `siblingIsCard` below carves out -- so it
+    // is asserted UNCOVERED here instead, alongside accounts-screen.tsx,
+    // which already stood for the identical shape.
+    expect(coveredRels, `covered call sites: ${coveredRels.join(", ")}`).not.toContain(
+      "web/components/deep-link/collection-content.tsx"
+    )
+    expect(coveredRels, `covered call sites: ${coveredRels.join(", ")}`).not.toContain(
+      "web/components/knowledge/knowledge-screen.tsx"
+    )
+
+    // THE OTHER <CollectionHeading> CALL SITES THIS LANE CHECKED AND FOUND
+    // NOT TO MATCH THE SAME SHAPE -- present regardless of unrelated work
+    // landing elsewhere the same day (this repo runs more than one lane on
+    // one shared tree), so membership rather than exact equality, exactly
+    // like the first census above.
+    //
+    //   · stories-screen.tsx -- the heading is followed by
+    //     `<SectionWithCreate folderTabs={...}>`, which draws its OWN strip
+    //     ahead of its own card; the heading's real next sibling is that
+    //     strip+card column, never the card alone.
+    //   · time-screen.tsx -- followed by `<HoursByWeekCard>`, a bare
+    //     `<section>` (pulse.tsx), never the kit's `Card` at all.
+    //   · processes-screen.tsx -- followed by `<PagedFind>` with no `wrap`
+    //     prop; this screen draws no `CollectionCard` around its toolbar yet,
+    //     so there is no card here for any rule to reach.
+    //   · accounts-screen.tsx, knowledge-screen.tsx -- both followed by
+    //     `<PagedFind wrap={...} tabs={...}>`: `wrap` fills a card, but
+    //     `tabs` means the strip drawn inside `PagedFind` sits between the
+    //     heading and that card, so this is the FIRST census's shape
+    //     (`.pinned-strip`), not this one.
+    expect(uncoveredRels, `uncovered call sites: ${uncoveredRels.join(", ")}`).toEqual(
+      expect.arrayContaining([
+        "web/components/work/stories-screen.tsx",
+        "web/components/work/time-screen.tsx",
+        "web/components/process/processes-screen.tsx",
+        "web/components/accounts/accounts-screen.tsx",
+        "web/components/knowledge/knowledge-screen.tsx",
+      ])
+    )
+  })
+})
+
+// ============================================================================
+// THE THIRD CENSUS -- A TOOLBAR NEVER GETS ITS OWN CONTAINER (R83, 17 Sep
+// 2026). Client ruling, over Tickets › Dashboard: "Look at the second
+// screenshot. It is a mess, the space between and after the toolbar. Really,
+// it's too much before, so go and uniform this abso-freaking-everywhere,
+// please."
+//
+// THE SHAPE SHE NAMED, PRECISELY: the Dashboard tab used to build a SECOND
+// `<Card>` around nothing but its own toolbar (`tickets-dashboard.tsx`, fixed
+// the same session) -- a `toolbar-row-*` element whose only sibling, inside
+// the card that held it, was itself. That is not "the content card"; it is a
+// card whose entire reason to exist is the toolbar. This census derives the
+// shape off the disk: a `<ToolbarRow>` reference (a literal tag, or a bare
+// `{identifier}` resolved the same by-name way the FIRST census resolves a
+// `<CollectionCard>` reference above) whose immediate enclosing JSX box is a
+// `CardContent`/`CollectionCard` carrying no OTHER real content.
+//
+// UNDER-REACHES ON PURPOSE, the same direction every census in this file
+// already takes: a toolbar embedded through ANOTHER component (`TriageQueue`,
+// which returns a bare fragment and lets ITS OWN caller supply the card one
+// file over, in tickets-collection.tsx) is invisible to a same-file walk --
+// there is no card in triage-queue.tsx for this census to judge, so that call
+// site is UNCOVERED rather than asserted clean. Proving THAT shape needs the
+// cross-file resolution the render-based DOM proofs above already do for a
+// fixed fixture; this census's job is the fault a single file can commit by
+// itself, which is exactly the bug that shipped.
+// ============================================================================
+
+const TOOLBAR_TAG = "ToolbarRow"
+
+function isCardHoldingBox(tag: string): boolean {
+  return tag === "CardContent" || tag === "CollectionCard"
+}
+
+/** True when `child` is a JSX reference to the toolbar row -- a literal
+ * `<ToolbarRow .../>`/`<ToolbarRow>...</ToolbarRow>` tag, or a bare
+ * `{identifier}` resolved (in `fn`, the nearest enclosing function) to a
+ * `const` whose own initializer carries one -- the identical BY-NAME
+ * resolution `censusCallSites`'s own Shape 2 already uses for
+ * `<CollectionCard>`, re-pointed at `<ToolbarRow>` instead. */
+function isToolbarReference(child: ts.JsxChild, fn: ts.Node | undefined, sf: ts.SourceFile): boolean {
+  if ((ts.isJsxSelfClosingElement(child) || ts.isJsxElement(child)) && tagNameOf(child, sf) === TOOLBAR_TAG)
+    return true
+  if (ts.isJsxExpression(child) && child.expression && ts.isIdentifier(child.expression) && fn) {
+    const init = resolveConstInitializer(fn, child.expression.text, sf)
+    if (init && new RegExp(`<${TOOLBAR_TAG}(?=[\\s/>])`).test(init)) return true
+  }
+  return false
+}
+
+type OwnContainerSite = { rel: string; line: number }
+
+/** Judges every `CardContent`/`CollectionCard` box in one already-parsed
+ * source file: OFFENDING when a toolbar reference is among its real children
+ * and is the ONLY one; CLEAN when a toolbar reference sits there ALONGSIDE
+ * other real content (the fixed shape -- `Panel`'s own `leadToolbar` slot, or
+ * a loading/empty body beside it). A box with no toolbar reference at all
+ * says nothing here either way. Pulled out of the file-walking census below
+ * so the red proof can call it directly, against a source string this file
+ * owns, without writing to disk. */
+function judgeCardBoxes(sf: ts.SourceFile, rel: string): { offenders: OwnContainerSite[]; clean: OwnContainerSite[] } {
+  const offenders: OwnContainerSite[] = []
+  const clean: OwnContainerSite[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxElement(node) && isCardHoldingBox(tagNameOf(node, sf))) {
+      const fn = enclosingFunction(node)
+      const kids = node.children as readonly ts.JsxChild[]
+      const real = kids.filter((k) => {
+        if (ts.isJsxText(k)) return k.getText(sf).trim() !== ""
+        if (ts.isJsxExpression(k)) return !!k.expression
+        return true
+      })
+      const toolbarKids = real.filter((k) => isToolbarReference(k, fn, sf))
+      if (toolbarKids.length > 0) {
+        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+        const site: OwnContainerSite = { rel, line }
+        if (real.length === toolbarKids.length) offenders.push(site)
+        else clean.push(site)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sf)
+  return { offenders, clean }
+}
+
+function censusOwnContainer(roots: string[]): { offenders: OwnContainerSite[]; clean: OwnContainerSite[] } {
+  const offenders: OwnContainerSite[] = []
+  const clean: OwnContainerSite[] = []
+  for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+    // `screen-bits.tsx` DECLARES `<ToolbarRow>` (and `CollectionCard`) -- it
+    // is not a call site of either, the same exclusion the FIRST census in
+    // this file already makes for `renderFolderTabs(`.
+    if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue
+    const src = stripComments(f.source, { keepLength: true })
+    if (!src.includes(`<${TOOLBAR_TAG}`)) continue
+    const sf = ts.createSourceFile(f.path, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const { offenders: o, clean: c } = judgeCardBoxes(sf, f.rel)
+    offenders.push(...o)
+    clean.push(...c)
+  }
+  return { offenders, clean }
+}
+
+describe("R83 -- a toolbar never gets its own container, only the content card's own first row", () => {
+  it("finds no CardContent/CollectionCard whose only real content is the toolbar, off the disk", () => {
+    const { offenders } = censusOwnContainer(ROOTS)
+    expect(
+      offenders.map((s) => `${s.rel}:${s.line}`),
+      "R83 -- a toolbar sits inside a Card/CollectionCard/CardContent that holds nothing else, which is a " +
+        "container built for the toolbar alone rather than the first row of the card that also holds the " +
+        "collection's content -- the client's 17 Sep 2026 ruling over Tickets › Dashboard (\"too much " +
+        "[space] before ... uniform this abso-freaking-everywhere\"). Merge it into the content card instead " +
+        "(`Panel`'s own `leadToolbar` slot, or the toolbar as CardContent's first child alongside real content):"
+    ).toEqual([])
+  })
+
+  // THE TRIPWIRE, both halves -- the same discipline every census in this
+  // file is held to: a scan that finds nothing (`clean` always empty) passes
+  // an "everything is fine" assertion exactly as well as one that works.
+  it("the census really reaches CardContent/CollectionCard boxes that hold a toolbar alongside other content", () => {
+    const { clean } = censusOwnContainer(ROOTS)
+    expect(
+      clean.length,
+      "no CardContent/CollectionCard box in the whole app was found holding a toolbar reference PLUS other " +
+        "real content -- the predicate that tells a correctly-merged toolbar from an offending one has gone " +
+        "blind, and the empty offenders list above would now pass for the wrong reason"
+    ).toBeGreaterThan(0)
+  })
+
+  it("RED PROOF: a Card built only to hold the toolbar -- the exact shape tickets-dashboard.tsx shipped -- fails this census", () => {
+    const fixture = `
+      function Old() {
+        return (
+          <div data-slot="toolbar-row-pin">
+            <Card>
+              <CardContent className="p-4 pb-0 lg:pb-0">
+                <ToolbarRow empty={false} />
+              </CardContent>
+            </Card>
+          </div>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture.tsx", fixture, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const { offenders, clean } = judgeCardBoxes(sf, "fixture.tsx")
+    expect(offenders, "a CardContent holding only <ToolbarRow/> must be flagged").toEqual([
+      { rel: "fixture.tsx", line: 6 },
+    ])
+    expect(clean, "a box with nothing else in it is not the clean shape").toEqual([])
+  })
+
+  it("GREEN PROOF: the fixed shape -- the toolbar merged into the same card as real content -- passes", () => {
+    const fixture = `
+      function Fixed() {
+        return (
+          <Card>
+            <CardContent className="flex min-w-0 flex-col p-4">
+              <ToolbarRow empty={false} />
+              <Skeleton />
+            </CardContent>
+          </Card>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture.tsx", fixture, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const { offenders, clean } = judgeCardBoxes(sf, "fixture.tsx")
+    expect(offenders, "a toolbar sharing its card with real content must not be flagged").toEqual([])
+    expect(clean, "the shared card must register as the clean shape").toEqual([{ rel: "fixture.tsx", line: 5 }])
+  })
+
+  it("GREEN PROOF: Panel's own leadToolbar slot -- a toolbar reference resolved by name, not spelled inline -- passes", () => {
+    // THE BY-NAME SHAPE, the second half of `isToolbarReference` -- Panel's
+    // own `leadToolbar` prop is filled with a `const toolbar = (<ToolbarRow
+    // .../>)` declared above the return, never the literal tag inline
+    // (`tickets-dashboard.tsx`'s own shape, this fixture's whole reason to
+    // exist beside the literal-tag proof above).
+    const fixture = `
+      function Fixed() {
+        const toolbar = (<ToolbarRow empty={false} />)
+        return (
+          <Card>
+            <CardContent className="flex min-w-0 flex-col p-4">
+              {toolbar}
+              <div>the title row and the content</div>
+            </CardContent>
+          </Card>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture.tsx", fixture, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const { offenders, clean } = judgeCardBoxes(sf, "fixture.tsx")
+    expect(offenders, "a by-name toolbar reference sharing its card with real content must not be flagged").toEqual([])
+    expect(clean.length, "the by-name resolution must still find the card clean").toBeGreaterThan(0)
   })
 })

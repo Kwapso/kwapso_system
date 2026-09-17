@@ -20,7 +20,7 @@ describe("AgentScopePicker", () => {
     expect(screen.getByText("What should this conversation read?")).toBeTruthy()
     expect(screen.getByText("This record")).toBeTruthy()
     expect(screen.getByText("Picks up the record you're viewing")).toBeTruthy()
-    expect(screen.getByText("Knowledge base")).toBeTruthy()
+    expect(screen.getByText("Knowledge")).toBeTruthy()
     expect(screen.getByText("Articles and indexed files")).toBeTruthy()
     expect(screen.getByText("Everything (today's default)")).toBeTruthy()
     expect(screen.getByText("All six sources, untick later")).toBeTruthy()
@@ -30,7 +30,7 @@ describe("AgentScopePicker", () => {
     render(<AgentScopePicker hasRecord={false} onPick={vi.fn()} />)
     expect(screen.queryByText("This record")).toBeNull()
     // The other two still draw — the task's rule is narrow, about ONE row.
-    expect(screen.getByText("Knowledge base")).toBeTruthy()
+    expect(screen.getByText("Knowledge")).toBeTruthy()
     expect(screen.getByText("Everything (today's default)")).toBeTruthy()
   })
 
@@ -38,7 +38,7 @@ describe("AgentScopePicker", () => {
     const picks: AgentTabScope[] = []
     render(<AgentScopePicker hasRecord onPick={(s) => picks.push(s)} />)
     fireEvent.click(screen.getByText("This record"))
-    fireEvent.click(screen.getByText("Knowledge base"))
+    fireEvent.click(screen.getByText("Knowledge"))
     fireEvent.click(screen.getByText("Everything (today's default)"))
     expect(picks).toEqual(["record", "knowledge", "everything"])
   })

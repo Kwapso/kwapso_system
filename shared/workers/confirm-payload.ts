@@ -185,7 +185,7 @@ const PERMISSION_GRID_FIELDS = new Set([
   // `setRolePermissions` through the same door, writing every module, so the
   // panel owes the reader the same module-by-module sheet. (R21 put this field
   // on the tool; the panel had to learn it in the same breath, or an admin would
-  // have approved "Permissions — Knowledge base — Read: Yes" and never been shown the
+  // have approved "Permissions — Knowledge — Read: Yes" and never been shown the
   // nine modules the same call sets to no access.)
   "create_role.permissions",
 ])

@@ -1622,6 +1622,35 @@ describe("the personal fence — material that came through one person's own sig
   })
 })
 
+describe("the kind-tab strip's own badges (R16 — K2 by kind, client ruling 17 Sep 2026)", () => {
+  it("answers byKind as one grouped count beside the page, for the kind the door actually wrote", async () => {
+    await addSource(IDS.staffUser, { title: "Renewal notes" })
+    await addSource(IDS.staffUser, { title: "Another note" })
+    const list = await call(IDS.staffUser, "GET /api/content/knowledge")
+    const { byKind } = (await list.json()) as { byKind: Record<string, number> }
+    // `POST /api/content/knowledge` always writes a typed note (kind "note"),
+    // so both sources above land in the same bucket.
+    expect(byKind.note).toBeGreaterThanOrEqual(2)
+  })
+
+  it("drops the kind filter itself, so a tab's own badge is never narrowed by its own tab (countTicketFacets' own shape)", async () => {
+    await addSource(IDS.staffUser, { title: "Unfiltered note" })
+    const all = await call(IDS.staffUser, "GET /api/content/knowledge")
+    const { byKind: unnarrowed } = (await all.json()) as { byKind: Record<string, number> }
+    const narrowed = await call(IDS.staffUser, "GET /api/content/knowledge", undefined, "?kind=note")
+    const { sources, byKind } = (await narrowed.json()) as {
+      sources: KnowledgeSource[]
+      byKind: Record<string, number>
+    }
+    // Every ROW really is narrowed to the tab's own kind…
+    expect(sources.every((s) => s.kind === "note")).toBe(true)
+    // …but the BADGE answers the same question whichever tab is open — a
+    // strip whose "Note" badge read differently once that tab was pressed
+    // would be the exact R16 failure `countTicketFacets`'s own header names.
+    expect(byKind.note).toBe(unnarrowed.note)
+  })
+})
+
 describe("the app fence — material kept to the people on one app (12.3)", () => {
   /** The shared fixture already has an app (`IDS.victimApp`). Staffing is what
    * decides who may open it (8.11), so it is staffing — not a role — that this

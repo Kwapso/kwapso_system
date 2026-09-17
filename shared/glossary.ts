@@ -244,7 +244,13 @@ export const GLOSSARY = {
   // second term somebody has to keep apart. The usage view is the one screen that
   // splits them, because that is the screen whose whole job is the split.
   assistantCredit: { term: "Credit", def: "One request to the assistant. Your team gets a batch free each day, and an admin can add more to the balance." },
-  knowledgeBase: { term: "Knowledge base", def: "Everything the assistant is allowed to read, in one place, you can add to it, correct it, and take things out." },
+  // RENAMED FROM "Knowledge base" TO "Knowledge" — the client's ruling,
+  // 17 Sep 2026, over the rail's one-word law (R85): "Make it a rule that in
+  // the navigation bar, we only have one-word names. For example, 'Knowledge
+  // Base': reduce it to 'Knowledge'." The identifier stays `knowledgeBase`
+  // (R6/R34 read the `term` field, never the key), and the route stays
+  // `/knowledge`.
+  knowledgeBase: { term: "Knowledge", def: "Everything the assistant is allowed to read, in one place, you can add to it, correct it, and take things out." },
   source: { term: "Source", def: "One piece of material in the knowledge base: a note you wrote, or something the app keeps in step for you." },
   compartment: { term: "Compartment", def: "The slice of the knowledge base a question is answered from, one account's world, or the agency's own." },
   citation: { term: "Citation", def: "The source an answer came from. Every answer names its own; an answer with no source isn't one." },

@@ -18,20 +18,32 @@
 // draws the library DropdownMenu, unrelated to either ruling and unaffected
 // by this change.
 //
-// THE SENTENCE, which is the one that was a real bug and is untouched by any
-// of this. A switch is OPTIMISTIC: `setLang(next)` re-renders the app before
-// the save comes back — LANGUAGE ALONE KEPT THIS CONTRACT, deliberately, when
-// Size/Appearance/Background staged behind Save the same day (her own answer,
-// put to her directly: "keep language instant" — see
-// `appearance-panel.tsx`'s own header for the fuller account). But `t` was
-// bound when the component rendered, so a confirmation written through it
-// says "Language changed." in the language they just LEFT — a small thing
-// that tells somebody the feature is a veneer. And the FAILURE has to go the
-// other way: a switch to Catalan that did not happen must be reported in the
-// language they can still read, because telling somebody in Catalan that
-// Catalan failed to load is a joke at their expense. So the success is
-// composed in `next` and the refusal in `previous`, and both are asserted
-// here rather than left as a comment that was true once.
+// THE SENTENCE — TRUE OF THE PORTAL'S MENU, NO LONGER OF SETTINGS.
+// `language-menu.tsx` (the portal's compact header switcher) is still
+// OPTIMISTIC: `setLang(next)` re-renders before the save comes back, `t` was
+// bound when the component rendered so the confirmation is composed in
+// `next` (the language they just picked) and the refusal in `previous` (the
+// one they can still read) — untouched, and still asserted below.
+//
+// `language-section.tsx` (Settings) LOST THIS CONTRACT, 2026-09-17. "Keep
+// language instant" (the client's own answer, 2026-09-14, when Size/
+// Appearance/Background first staged behind Save) held for three days and
+// was reversed, verbatim: "Delete these live preview updates as you press a
+// control, and also delete the language changes right away. ... Actually, I
+// want everything to wait for the save. Nothing changes right away." The
+// Settings pill row is now a plain controlled component — `value`/
+// `onChange`, no `save` prop, no `setLang`, no toast of its own — and
+// `AppearancePanel`'s `handleSave` is where a language change is persisted
+// and applied now, folded into the same "Saved."/"That didn't save. Try
+// again." toast Size/Appearance/Background already share, not a dedicated
+// "Language changed." sentence any more.
+//
+// THE SAME DAY, A SECOND RULING: "In Settings > Appearance > Languages, only
+// put the name of the language in its original language. You don't need to
+// also put it in German." Each pill used to carry its own name AND its
+// English name beside it wherever the two differ; the second rendering is
+// gone from `language-section.tsx` — asserted below as "in its own words
+// ONLY". `language-menu.tsx` is unaffected; it never drew a second name.
 //
 // Read off disk, this repo's house style for a rule about how a file is
 // written.
@@ -42,7 +54,7 @@ import { join } from "node:path"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { LANGUAGES } from "@shared/i18n"
+import { LANGUAGES, type Language } from "@shared/i18n"
 import { LanguageProvider } from "@shared/web/language"
 import { LanguageSection } from "@shared/web/language-section"
 
@@ -116,20 +128,29 @@ describe("the switcher is a pill row in Settings, and a menu in the portal heade
   }
 })
 
-describe("the confirmation speaks the language that was just chosen", () => {
-  for (const path of [SECTION, MENU]) {
-    it(`${path} confirms in the NEW language and refuses in the old one`, () => {
-      const src = read(path)
-      // `t(...)` here would be the bug: `t` is bound to the language the render
-      // started in, which is the one they are leaving.
-      expect(src, "the success toast must be composed in `next`").toContain(
-        'toast.success(translate("Language changed.", next))'
-      )
-      expect(src, "the failure toast must be composed in `previous`").toContain(
-        'toast.error(translate("That didn\'t save. Try again.", previous))'
-      )
-    })
-  }
+describe("the portal menu confirms in the language that was just chosen", () => {
+  it(`${MENU} confirms in the NEW language and refuses in the old one`, () => {
+    const src = read(MENU)
+    // `t(...)` here would be the bug: `t` is bound to the language the render
+    // started in, which is the one they are leaving.
+    expect(src, "the success toast must be composed in `next`").toContain(
+      'toast.success(translate("Language changed.", next))'
+    )
+    expect(src, "the failure toast must be composed in `previous`").toContain(
+      'toast.error(translate("That didn\'t save. Try again.", previous))'
+    )
+  })
+
+  it(`${SECTION} composes no toast of its own any more — AppearancePanel's Save does`, () => {
+    // 2026-09-17: Settings' own pill row lost `save`/`setLang`/its own toast
+    // when Language joined the panel's staged draft. A dedicated "Language
+    // changed." sentence composed HERE would be dead code (nothing calls
+    // `save` any more) and a live one would be a second, competing toast
+    // beside the panel's own "Saved." — so neither may grow back.
+    const src = read(SECTION)
+    expect(src, "no toast import").not.toContain("sonner")
+    expect(src, "no translate() call").not.toContain("translate(")
+  })
 
   it("both sentences are in the catalogue, in the agency's own languages", async () => {
     // These two live in shared/web/, which the extractor does not walk (it reads
@@ -151,10 +172,10 @@ describe("the confirmation speaks the language that was just chosen", () => {
 describe("what Settings actually paints", () => {
   afterEach(cleanup)
 
-  const paint = (lang: string) =>
+  const paint = (lang: Language) =>
     render(
       <LanguageProvider value={lang}>
-        <LanguageSection save={async () => {}} />
+        <LanguageSection value={lang} onChange={() => {}} />
       </LanguageProvider>
     )
 
@@ -174,13 +195,23 @@ describe("what Settings actually paints", () => {
     ).toHaveLength(LANGUAGES.length)
   })
 
-  it("names the language in its own words AND in English", () => {
+  it("names each language in its own words ONLY — no second rendering, client ruling 2026-09-17", () => {
+    // Verbatim: "In Settings > Appearance > Languages, only put the name of
+    // the language in its original language. You don't need to also put it
+    // in German." Each pill used to carry the language's own name PLUS its
+    // English name beside it wherever the two differ; the second span is
+    // gone.
     paint("de")
     const pills = screen.getAllByRole("radio")
     const german = pills.find((p) => p.textContent?.includes("Deutsch"))
     expect(german, "the endonym, for somebody scanning for their own language").toBeTruthy()
-    expect(german?.textContent, "and the English name, for somebody who cannot read the script")
-      .toContain("German")
+    expect(german?.textContent, "no second name beside it").not.toContain("German")
+
+    const spanish = pills.find((p) => p.textContent?.includes("Español"))
+    expect(spanish?.textContent, "no second name beside Español either").not.toContain("Spanish")
+
+    const catalan = pills.find((p) => p.textContent?.includes("Català"))
+    expect(catalan?.textContent, "no second name beside Català either").not.toContain("Catalan")
   })
 
   it("says how complete a part-written language is, and stays quiet about English", () => {

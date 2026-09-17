@@ -147,7 +147,9 @@ import { content as contentApi } from "@/lib/api"
 import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
 import { AppMark } from "@/components/apps/app-tiles"
 import { Swatch } from "@/components/records/record-picker"
-import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
+import { orderTicketTypes } from "@/lib/type-colours"
+import { ticketTypeIconName } from "@shared/ticket-types"
+import { Icon } from "@shared/web/screen-engine/icon"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
 /* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
@@ -420,9 +422,11 @@ export function ticketFacets({
     // TYPE — the TEAM'S OWN `Ticket type` words, in the client's fixed reading
     // order (`orderTicketTypes`: issue, question, request, extra, then anything
     // this order has never heard of, in the order it arrived). Each wears the
-    // colour ruled for it, through the same `Swatch` + `ticketTypeColour` pair
-    // the rows, the chips and the triage picker draw — so the dot a person
-    // filters by and the dot they read back are one object.
+    // ICON ruled for it (client, 17 Sep 2026: colour is the status's alone now,
+    // ticket type gets an icon), through the same `ticketTypeIconName` +
+    // `iconComponent()` pair the rows, the chips and the triage picker draw —
+    // so the glyph a person filters by and the glyph they read back are one
+    // object.
     //
     // THE WORDS ARE NOT TRANSLATED and the field's label is: `helpType` is a
     // dropdown value a team typed itself, so it is DATA rather than copy, and
@@ -439,11 +443,14 @@ export function ticketFacets({
     // with the kind (`shared/ticket-types.ts`): every word the team's vocabulary
     // now holds is a word the door will answer about.
     helpType: tabFacets.helpType
-      ? orderTicketTypes(helpTypeOptions).map((v) => ({
-          value: v,
-          label: v,
-          mark: <Swatch colour={ticketTypeColour(v)} />,
-        }))
+      ? orderTicketTypes(helpTypeOptions).map((v) => {
+          const iconName = ticketTypeIconName(v)
+          return {
+            value: v,
+            label: v,
+            mark: iconName ? <Icon name={iconName} className="text-muted-foreground size-3.5 shrink-0" /> : undefined,
+          }
+        })
       : [],
     // STATUS — the CLOSED, server-owned vocabulary, sliced to exactly what this
     // tab can contain, and never taken off the page. `helpTabFacets` hands back
@@ -572,12 +579,16 @@ export const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", d
  * counts it toward the pill's number all the same. */
 /* THE FACETS WEAR THE SAME MARKS THE RECORDS DO — client, 2026-09-06: "in
    filter type i want to see the colored dot / on filter app i wanna see the
-   icon of the app."
+   icon of the app." SUPERSEDED FOR TYPE, 17 Sep 2026: "the one that gets the
+   chip with the color is always the status … for tickets, we need to find
+   icons for the ticket type" — so the Type facet's mark is `ticketTypeIconName`
+   now, not a dot; the App facet's own icon mark is untouched, it was never a
+   colour to begin with.
 
    `FacetOption.mark` is a NODE the caller draws, not a colour or an icon name,
    for the same reason `ticket-chips.tsx` takes its dot and its link as props:
    the facet machinery lives in `shared/web/`, which both front doors read, and
-   `ticketTypeColour` / `AppMark` are `web/`-only. The kit needed no change —
+   `ticketTypeIconName` / `AppMark` are `web/`-only. The kit needed no change —
    its own facet control already types a label as a node.
 
    THE MARK NEVER CARRIES THE MEANING. It rides beside the word and is hidden
@@ -595,8 +606,8 @@ export function triageFacets(
 ): FilterFacet[] {
   /* THE KINDS IN THE PILE, IN THE CLIENT'S OWN FIXED ORDER — issue, question,
      request, extra, then any word that order has never heard of, in the order
-     it arrived (`orderTicketTypes`, web/lib/type-colours.ts, where the ruling
-     lives beside the colours it is keyed the same way as). It sorted
+     it arrived (`orderTicketTypes`, web/lib/type-colours.ts, where the order
+     still lives even though the colours beside it no longer draw here). It sorted
      alphabetically until 2026-09-07, which put Extra first and was invisible
      while this was the only Type menu on the screen; the list tabs' toolbar has
      one now, and two Type menus in two different orders on one screen is the
@@ -610,7 +621,10 @@ export function triageFacets(
      order has never heard of. */
   const types = orderTicketTypes([
     ...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v))),
-  ]).map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
+  ]).map((v) => {
+    const iconName = ticketTypeIconName(v)
+    return { value: v, label: v, mark: iconName ? <Icon name={iconName} className="text-muted-foreground size-3.5 shrink-0" /> : undefined }
+  })
   // BY ID, LABELLED BY NAME. A Map rather than a Set of ids plus a second
   // lookup: one pass, and an app whose rows disagree about its name (they
   // cannot — the name comes from one subselect) would still produce one option.
@@ -927,11 +941,17 @@ export function TicketsCollection({
      than a habit: there is no longer a group name a future screen could look a
      ticket's glyph up under, so the ruling cannot be undone by somebody
      re-adding one call.
-     WHAT CARRIES THE KIND NOW is the colour, and it always did — `Swatch` +
+     WHAT CARRIED THE KIND FROM 2026-09-07 WAS THE COLOUR — `Swatch` +
      `ticketTypeColour` (web/lib/type-colours.ts) on the row's pill, the chip
      line, the picker option and the Type facet, one map so a kind's colour
-     cannot be decided twice. Her own earlier sentence for the same cell: "Type
-     with the colors, same as we have with the chips."
+     could not be decided twice. Her own sentence for that cell then: "Type
+     with the colors, same as we have with the chips." SUPERSEDED, 17 Sep
+     2026: "the one that gets the chip with the color is always the status …
+     for tickets, we need to find icons for the ticket type." What carries the
+     kind now is an ICON, through the identical single-map shape —
+     `ticketTypeIconName` (shared/ticket-types.ts) resolved via
+     `iconComponent()` — on the same four surfaces, so a kind's glyph still
+     cannot be decided twice.
      THE WHOLE `selectable:` READ WENT WITH IT rather than being left standing:
      the vocabulary was fetched on this screen for the glyphs and for nothing
      else, so keeping it would be a door call per visit feeding nothing. The
@@ -1364,53 +1384,33 @@ export function TicketsCollection({
                (`help-by-account` off the ticket list, the pulse off Home) and
                between them answering two of the questions the approved design
                asks. Everything on the tab is now one door read of its own
-               (`content.helpDashboard`) — which is what makes the toolbar's two
-               filters possible at all: a facet has to reach a WHERE clause,
-               and two cards reading two other screens' caches have no WHERE to
-               reach. The two cards still exist and are still drawn where they
-               belong: `TicketStagesCard` on Home's band, beside the hours.
+               (`content.helpDashboard`). The two cards still exist and are
+               still drawn where they belong: `TicketStagesCard` on Home's
+               band, beside the hours.
 
-               STILL NOT INSIDE A `CollectionCard`, AND NOW ITS TOOLBAR SAYS SO
-               OUT LOUD (`standsOn`, below). Every other branch here is one card
-               holding one collection; this branch is five panels and its own
-               toolbar, and wrapping THEM in a sixth card would put a card
+               STILL NOT INSIDE A `CollectionCard`. Every other branch here is
+               one card holding one collection; this branch is five panels of
+               its own, and wrapping THEM in a sixth card would put a card
                inside a card — CLAUDE.md's own `useKitPanel` note calls that
-               the broken combination. That reasoning is untouched: the panels
-               are still bare on the shell's own pane and always will be.
+               the broken combination. The panels are bare on the shell's own
+               pane and always will be.
 
-               WHAT CHANGED, 7 Sep 2026 ("the toolbar in dashboard needs some
-               kind of container 😕 … the most similar possible to the in-card
-               toolbars!"): the argument above was read as covering the TOOLBAR
-               too, and it never did. A toolbar is not a collection, so a card
-               around one holds no rows and nests nothing. What the missing card
-               cost was not decoration — `<ToolbarRow>` paints its own well in
-               `--surface-raised` and `ScreenShell`'s pane is `--surface-raised`,
-               so on THIS branch alone the well measured 1.000:1 against its
-               ground in both palettes while the Triage branch above, inside a
-               `CollectionCard`, measured 1.103:1 light / 1.111:1 dark. Same
-               component, same fill, two different grounds. The dashboard draws
-               its own furniture, and one piece of it is now a card around its
-               toolbar — never around its panels. */
+               NO TOOLBAR AT ALL ANY MORE — client ruling, 17 Sep 2026:
+               "Remove the toolbar from the tickets dashboard." It carried a
+               search box (7 Sep 2026: "still missing full toolbar!"), two
+               facets and a create button; the whole row is gone with this
+               ruling, `<TicketsDashboard>` no longer accepts `standsOn`,
+               `viewSlot` or `actions` (nothing left to draw them into), and
+               every OTHER tab on this strip keeps its own toolbar — this is
+               a named, reasoned exception (UI-RULEBOOK.md K37), not a rule
+               change. */
             <TicketsDashboard
               teamId={teamId}
               helpTypeOptions={helpTypeOptions}
-              // THE ONE FACT ONLY THIS HOST KNOWS: there is no card under the
-              // dashboard here, so its toolbar has to bring one. The app
-              // record's Tickets tab says nothing and gets the default,
-              // because `RecordChrome` already puts soft paper under it — see
-              // `standsOn`'s own doc for the measurements on both hosts.
-              standsOn="screen"
               // R50's own question, asked of the WHOLE collection: `totals.help`
-              // is the door's exact COUNT(*) of the everyday list, before this
-              // tab's own two filters narrow anything. A dashboard filtered to a
-              // client with no tickets is an empty ANSWER, not an empty
-              // collection, and its toolbar must stay put so the reader can
-              // filter their way back out.
+              // is the door's exact COUNT(*) of the everyday list. A team with
+              // no tickets at all draws one welcoming sentence and nothing else.
               ticketTotal={totals.help}
-              // THE SAME BUTTON THE LIST TAB DRAWS, in the same slot of the same
-              // row shape — see `raiseTicket` above for why it is one node
-              // rather than two call sites that happen to agree today.
-              actions={raiseTicket}
             />
           ) : scopedQ.error ? (
             <CollectionCard>
@@ -1724,8 +1724,10 @@ export type TicketFace = {
  * they were rulings about a TICKET ROW and not about triage: the four columns in
  * her order (Title · Type · App · Raised), the black `variant="inverse"` chip
  * leading the title ("put the ID before the title to the left, with the usual
- * black chip design"), the coloured dot from `ticketTypeColour` ("Type with the
- * colors, same as we have with the chips"), plain non-sorting headers, no hover
+ * black chip design"), the type's own glyph from `ticketTypeIconName` (the
+ * colour her 2026-09-07 "Type with the colors" ruling drew here was retired
+ * 17 Sep 2026, superseded by "for tickets, we need to find icons for the
+ * ticket type" — see the cell below for both quotes in full), plain non-sorting headers, no hover
  * on the header row ("when I hover over the title row, there should be no
  * action"), and "Raised" rather than "Date" for the last column ("i choose
  * raised"). Their full arguments are on the individual cells below.
@@ -1928,20 +1930,28 @@ export function TicketRowsTable<T extends TicketFace>({
                         coloured pill was two marks for one fact, and the ruling
                         picks the one the rest of the app already uses.
 
-                        THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
-                        the triage card's chips and the type picker draw — client:
-                        "Type with the colors, same as we have with the chips."
-                        `Swatch` + `ticketTypeColour` rather than a second lozenge
-                        that agrees with them today: the whole reason
-                        `lib/type-colours.ts` is one file is that a type's colour
-                        cannot be decided twice.
+                        THE SAME GLYPH, FROM THE SAME MAP as the triage card's
+                        chips and the type picker draw — client, 17 Sep 2026,
+                        superseding the sentence above: "the one that gets the
+                        chip with the color is always the status … for tickets,
+                        we need to find icons for the ticket type." `Icon` +
+                        `ticketTypeIconName` (shared/ticket-types.ts) rather than
+                        a second resolution that agrees with it today: the whole
+                        reason that map is one file is that a type's icon cannot
+                        be decided twice. Status, not type, keeps the dot
+                        (`shared/status-tones.ts`, D17).
 
                         A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
                         so with an em dash: a column with a pill on four rows and a
                         hole on the fifth reads as the broken row rather than the
                         untyped one. */}
                     <Badge variant="secondary" size="pill">
-                      <Swatch colour={ticketTypeColour(w.helpType)} />
+                      {ticketTypeIconName(w.helpType) && (
+                        <Icon
+                          name={ticketTypeIconName(w.helpType)!}
+                          className="text-muted-foreground size-3.5 shrink-0"
+                        />
+                      )}
                       {w.helpType ?? "—"}
                     </Badge>
                   </span>
@@ -2115,17 +2125,18 @@ export function TicketRowsTable<T extends TicketFace>({
  * THE CARDS CARRY THE SHARED CHIPS, `TicketChips` through this screen's own
  * `TriageChips` wrapper, which is the client's standing ruling about every
  * ticket surface in the app: "replicate the pills that we have on the view
- * outside. These are: ID, type, app, date … and everywhere else where tickets
- * have pills, reuse this." A fifth way of drawing a ticket's four facts is
- * precisely what that ruling exists to prevent.
+ * outside … and everywhere else where tickets have pills, reuse this." A
+ * fifth way of drawing a ticket's own facts is precisely what that ruling
+ * exists to prevent.
  *
- * WITH ONE FACT MOVED, NOT DROPPED (2026-09-07, "lets put the date below title
- * as simole tex"): the board asks that line to leave its date chip out and
- * draws the date under the title instead, in the kit card's own quiet caption
- * slot. All four facts are still on the card and all four are still drawn by
- * the shared component's rules — see `boardCard` below for the whole argument,
- * and `shared/web/ticket-chips.tsx` for why it is one boolean rather than a
- * board-flavoured copy of the chip line. */
+ * THE DATE MOVED, TWICE. First out of the chip row and under the title
+ * (2026-09-07, "lets put the date below title as simole tex"): the chip line
+ * left its date chip out and the board drew the date itself, in the kit
+ * card's own quiet caption slot. Then, 17 Sep 2026, the CHIP half of that
+ * split retired everywhere ("Remove the 'Raised On' chip from the QE view"),
+ * so today there is nothing left for a board card to omit — the caption
+ * below the title is simply the one place this card still says when the
+ * ticket was raised; see `boardCard` below. */
 function OpenBoard({
   teamId,
   rows,
@@ -2244,12 +2255,14 @@ function OpenBoard({
    * column you happened to find it in, and a waiting ticket is drawn in BOTH.
    *
    * THE DATE MOVES OUT OF THE CHIPS AND UNDER THE TITLE — client, 2026-09-07:
-   * *"lets put the date below title as simole tex"*. So `TriageChips` is asked
-   * to leave its fourth chip out (`omitDate`, and `shared/web/ticket-chips.tsx`
-   * carries the argument for why that is a subtraction rather than a fork), and
-   * the kit's own `description` slot takes the date instead — a `text-micro`
-   * line in `--ink-tertiary` under the title, which IS this app's quiet caption
-   * treatment and is drawn by the kit rather than styled here.
+   * *"lets put the date below title as simole tex"*. `TriageChips` used to be
+   * asked to leave its fourth chip out (`omitDate`) for exactly this reason;
+   * the chip itself is retired everywhere now (client, 17 Sep 2026: "Remove
+   * the 'Raised On' chip from the QE view"), so `omitDate` is gone with it
+   * and this caption is simply the one place a ticket's date still shows on
+   * the board — a `text-micro` line in `--ink-tertiary` under the title,
+   * which IS this app's quiet caption treatment and is drawn by the kit
+   * rather than styled here.
    *
    * THE WORDS ARE "raised {date}", WHICH IS HER OWN PHRASING FOR THIS EXACT
    * POSITION rather than a new sentence. The chip that is being retired here
@@ -2269,7 +2282,7 @@ function OpenBoard({
   const boardCard = (r: HelpTicket) => ({
     id: r.id,
     title: ticketTitle(r),
-    badges: <TriageChips teamId={teamId} ticket={r} omitDate />,
+    badges: <TriageChips teamId={teamId} ticket={r} />,
     description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
   })
   return (

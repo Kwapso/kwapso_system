@@ -102,6 +102,19 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// V1 (17 Sep 2026) DRAWS EVERY PANEL AT ONCE — no tab strip left to keep
+// `<WorkLogsPanel>` (and the `<TimeFormDialog>`s it always mounts, open or
+// not) off the tree until somebody clicked into it. `TimeFormDialog` reads
+// `useActiveTeam()` unconditionally (time-form-dialog.tsx:99), which needs a
+// mounted app router — this harness gives it none, so every ticket-detail
+// render needs this mock now, the same one `stories-sort.test.tsx` already
+// uses for the same reason.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 vi.mock("@shared/ui/components/sonner/sonner", () => ({
   toast: { success: () => {}, error: () => {}, info: () => {} },
   Toaster: () => null,

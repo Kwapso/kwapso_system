@@ -28,7 +28,7 @@
        through it; it has to paint the right thing, or it reads as a hole
        punched in the card — measured, dark, 2026-09-10: a row inside a
        `<CollectionCard>` stands on `--surface-panel` #1C1B18 while its own pill
-       is `--surface-raised` #26241F, and the same row on the Knowledge base
+       is `--surface-raised` #26241F, and the same row on the Knowledge screen
        stands directly on the shell's body pane, which IS `--surface-raised`.
        One hardcoded fill cannot be right in both, and a PROP would put the
        answer back at the call site.

@@ -73,14 +73,15 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/choices/manage-dropdowns-link"
 import { RecordPicker } from "@/components/records/record-picker"
-// `NEUTRAL_TYPE_COLOUR` USED TO BE IMPORTED HERE, for the dot on the "No type"
-// chip. The chip is gone (see `typeField` below) and it was that row's only
-// reader in the app, so the import goes with it — the constant itself stays
-// exactly where it was, because `ticketTypeColour` still answers with it for a
-// word its map has never heard of, which is that constant's real job.
-import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
+// `NEUTRAL_TYPE_COLOUR`/`ticketTypeColour` USED TO BE IMPORTED HERE, for the
+// dot on the "No type" chip and then for the type row's own swatch. Both
+// readers are gone from this file now — the "No type" chip first (see
+// `typeField` below), then the type row's colour itself, retired 17 Sep 2026
+// in favour of `ticketTypeIconName` (@shared/ticket-types, imported below).
+import { orderTicketTypes } from "@/lib/type-colours"
+import { Icon } from "@shared/web/screen-engine/icon"
 import { appStageMark } from "@shared/app-stages"
-import { isFeedbackTicketType, isValidationSprintType } from "@shared/ticket-types"
+import { isFeedbackTicketType, isValidationSprintType, ticketTypeIconName } from "@shared/ticket-types"
 import { sprintIsRunning } from "@shared/sprint-state"
 import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
@@ -494,12 +495,15 @@ export function HelpFormDialog({
          type is one line there rather than a decision on five screens. "Issue
          first" is that function's first element and this call site does not
          restate it.
-       · THE COLOUR is `ticketTypeColour`, which resolves through the CHART
-         SERIES rather than the raw palette (R32; the same file argues it out).
-         It is drawn as `swatch` — a small dot before the word — and never as a
+       · THE GLYPH is `ticketTypeIconName` (@shared/ticket-types) — colour
+         RETIRED 17 Sep 2026 ("the one that gets the chip with the color is
+         always the status … for tickets, we need to find icons for the
+         ticket type"), replaced by the identical icon-per-type map
+         `storyTypeIconName` already stands for stories. It is drawn as
+         `icon` — a real glyph before the word — and never as a bare
          `mark`: a 24px filled box with no content reads as a picture that
-         failed to load, and the word beside the dot is what actually carries
-         the meaning for a reader who cannot tell poppy from forest.
+         failed to load, and the word beside the glyph is what actually
+         carries the meaning either way.
 
      FEEDBACK IS WITHHELD UNTIL ITS CONDITION HOLDS — the owner's ruling, 15 Sep
      2026: it may only be raised while a Validation sprint is running on the
@@ -554,13 +558,16 @@ export function HelpFormDialog({
    * control with no way to mean "empty" and a form that still accepts empty
    * would be the two halves disagreeing.
    *
-   * The words, their order and their colours are all decided above; nothing
+   * The words, their order and their icons are all decided above; nothing
    * about the vocabulary is decided on this line. */
-  const typeOptions = typeChoices.map((v) => ({
-    value: v,
-    label: v,
-    swatch: ticketTypeColour(v),
-  }))
+  const typeOptions = typeChoices.map((v) => {
+    const iconName = ticketTypeIconName(v)
+    return {
+      value: v,
+      label: v,
+      icon: iconName ? <Icon name={iconName} className="size-3.5" /> : undefined,
+    }
+  })
   /** THE TICKET THAT ARRIVED WITH NO TYPE, and there are about sixty of them.
    *
    * Type is required from here on, and that is a rule about the tickets this
