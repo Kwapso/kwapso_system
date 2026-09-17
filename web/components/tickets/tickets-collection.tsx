@@ -126,7 +126,7 @@ import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { RecordRef } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
-import { rowOpenHandlers } from "@/lib/row-open"
+import { applyClickGesture, clickGesture, rowOpenHandlers } from "@/lib/row-open"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
@@ -2429,6 +2429,48 @@ function OpenBoard({
    * function's four-entry `COLUMN` moved to the shared six — see that
    * function's own header. */
   const boardCard = ticketBoardCard(teamId, t, lang)
+  /* ONE GRAMMAR NOW, THROUGH THE KIT'S OWN THIRD ARGUMENT — the identical fix
+     `AppTicketsBoard` (work-panels.tsx) already carried: `onCardSelect={(card)
+     => onOpen(card.id)}` reads only the card and never the click, so a
+     cmd/ctrl-click, a middle-click or a cmd/ctrl+shift-click on THIS BOARD's
+     own card opened the ticket IN PLACE every time, whatever modifier was
+     held — diagnosed live, 18 Sep 2026, on the Open tab's own board (this
+     component), through a capture-phase event log + a React-fiber read of the
+     card's bound `onCardSelect` (confirmed `e=>i(e.id)` in the deployed
+     bundle) + a `history.pushState`/localStorage trace showing the "beside"
+     branch of `applyClickGesture` never ran. `Kanban` forwards the real event
+     as a third argument on every one of a card's three triggers (a left
+     click, a middle/`auxclick`, and Enter/Space — kanban.tsx, v1.2.113,
+     `KanbanCardSelectEvent`), so the same seam every other row in the app
+     already reads (`clickGesture`/`applyClickGesture`, web/lib/row-open.ts)
+     is read straight off it here too. The path is built exactly as
+     `TicketRowsTable`'s own row does two functions up in this file —
+     `/t/<teamId>/tickets/<id>`, unconditionally, never the clean top-level
+     form: `openBeside` only ever needs an address to open BESIDE the tab
+     already open, and the team-scoped form is always valid wherever this
+     screen is reached from. */
+  const handleCardSelect = (
+    card: { id: string },
+    _column: unknown,
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    // A KEYBOARD ACTIVATION (Enter/Space) CARRIES NO `button` AT ALL — see
+    // `AppTicketsBoard`'s own identical guard for the full argument.
+    if (!("button" in event)) {
+      onOpen(card.id)
+      return
+    }
+    const gesture = clickGesture(event)
+    if (gesture === null) return
+    if (gesture !== "same") event.preventDefault()
+    const row = rows.find((r) => r.id === card.id)
+    applyClickGesture(
+      gesture,
+      `/t/${teamId}/tickets/${card.id}`,
+      row ? ticketTitle(row) : card.id,
+      () => onOpen(card.id)
+    )
+  }
   return (
     <Kanban
       /* USE ALL THE WIDTH THERE IS — client, 2026-09-07: "with this 5 columns,
@@ -2558,8 +2600,9 @@ function OpenBoard({
       ]}
       // A CARD OPENS THE TICKET, and that is the board's only act. The kit makes
       // a card a target only when this is passed, so the affordance and the
-      // behaviour are one decision.
-      onCardSelect={(card) => onOpen(card.id)}
+      // behaviour are one decision. `handleCardSelect`, not a bare
+      // `(card) => onOpen(card.id)` — see its own note above.
+      onCardSelect={handleCardSelect}
       // THE LINE UNDER THE BOARD. The kit draws "Dragging a card moves the
       // record…" there by default and says in its own doc that the words are the
       // caller's, "because 'writes a log line' is an application promise this
@@ -2657,6 +2700,28 @@ function AllBoard({
   const { t, lang } = useLanguage()
   const COLUMN = ticketStatusColumnTitles(t)
   const boardCard = ticketBoardCard(teamId, t, lang)
+  // ONE GRAMMAR NOW — the identical fix `OpenBoard` carries above, for the
+  // identical reason: see that component's own note for the full account.
+  const handleCardSelect = (
+    card: { id: string },
+    _column: unknown,
+    event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    if (!("button" in event)) {
+      onOpen(card.id)
+      return
+    }
+    const gesture = clickGesture(event)
+    if (gesture === null) return
+    if (gesture !== "same") event.preventDefault()
+    const row = rows.find((r) => r.id === card.id)
+    applyClickGesture(
+      gesture,
+      `/t/${teamId}/tickets/${card.id}`,
+      row ? ticketTitle(row) : card.id,
+      () => onOpen(card.id)
+    )
+  }
   return (
     <Kanban
       // SIX COLUMNS SHARE THE ROW, the same fluid formula `OpenBoard` uses for
@@ -2678,7 +2743,7 @@ function AllBoard({
         cards: rows.filter((r) => r.status === stage).map(boardCard),
         emptyLabel: t("Nothing at this stage."),
       }))}
-      onCardSelect={(card) => onOpen(card.id)}
+      onCardSelect={handleCardSelect}
       footnote={
         narrowed
           ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")

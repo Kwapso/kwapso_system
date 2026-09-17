@@ -7595,3 +7595,99 @@ describe("row-opens-beside — a table row's click goes through rowOpenHandlers"
     expect(offenders, offenders.join("\n")).toEqual([])
   })
 })
+
+// KANBAN'S OWN THIRD ARGUMENT — the identical class of bug, on a board card
+// instead of a table row. Diagnosed live, 18 Sep 2026: a cmd/ctrl-click, a
+// middle-click and a cmd/ctrl+shift-click on a ticket board card ALL opened
+// the ticket IN PLACE, every time, because `OpenBoard` and `AllBoard`
+// (tickets-collection.tsx) wired `onCardSelect={(card) => onOpen(card.id)}`
+// — a handler that reads only the card and never the click, so
+// `clickGesture`/`applyClickGesture` (web/lib/row-open.ts) never ran no
+// matter which modifier was held. `Kanban` forwards the real event as a
+// THIRD argument on every one of a card's three triggers (a left click, a
+// middle/`auxclick`, and Enter/Space — `shared/ui/components/kanban/
+// kanban.tsx`, v1.2.113, `KanbanCardSelectEvent`) precisely so a caller can
+// read it; a caller that declares only one parameter cannot, and nothing
+// short of reading the source told anybody so — the affordance (a card that
+// looks like every other open-beside target in the app) and the behaviour
+// disagreed, silently, under a green build. Both read-only ticket boards are
+// fixed onto the seam now (`OpenBoard`, `AllBoard`, and `AppTicketsBoard` in
+// work-panels.tsx, which already carried the fix the same day the kit grew
+// the third argument) — this reads every `<Kanban onCardSelect>` off disk so
+// a fourth hand-rolled copy cannot ship the same way.
+//
+// A DRAGGABLE BOARD (`onMove` passed) IS A DIFFERENT PROBLEM, DELIBERATELY
+// NOT ANSWERED HERE. Splitting "the user is starting a drag" from "the user
+// cmd/ctrl/middle-clicked to open beside" on the SAME pointer-down needs its
+// own design (native HTML5 drag already claims the plain press), and
+// bolting the read-only boards' three-line fix onto a draggable one without
+// proving the drag still works is how THIS class of bug gets a sibling. The
+// three draggable boards below are named, reasoned and rot-checked in
+// `KANBAN_DRAGGABLE_ONCARDSELECT_EXEMPT` rather than silently skipped —
+// filed as a real follow-up, not forgotten.
+const KANBAN_DRAGGABLE_ONCARDSELECT_EXEMPT = [
+  // Sprint/status board, `onMove={moveStatus}` — dragging a card between
+  // sprints or statuses is this board's whole point.
+  "components/work/stories-screen.tsx",
+  // Status board, draggable the identical way.
+  "components/work/tasks-screen.tsx",
+  // Stage board, draggable the identical way.
+  "components/apps/apps-screen.tsx",
+]
+
+describe("row-opens-beside — a Kanban card's click also goes through the gesture seam", () => {
+  it("no <Kanban onCardSelect> reads only the card, discarding the click", () => {
+    const offenders: string[] = []
+    const files = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+    // Proof the census is reading something real — the same "must not be
+    // vacuous" shape every census in this file is held to: every known
+    // read-only board (OpenBoard, AllBoard, AppTicketsBoard) reads the event
+    // today.
+    let sawTheSeam = 0
+    for (const { path: file, source } of files) {
+      const src = stripComments(source)
+      for (const m of src.matchAll(/<Kanban\b/g)) {
+        const after = src.slice(m.index ?? 0, (m.index ?? 0) + 3000)
+        // The prop's own VALUE — a bare identifier (`handleCardSelect`) or an
+        // inline arrow, balanced one level of nested braces deep (an inline
+        // object literal argument), whichever the call site wrote.
+        const propMatch = after.match(/onCardSelect=\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/)
+        if (!propMatch) continue // a read-only board with no onCardSelect at all, or a shape past the window
+        const prop = propMatch[1] ?? ""
+        // A BARE IDENTIFIER IS TRUSTED — `handleCardSelect`'s own definition
+        // is checked by hand at every call site this shape exists at today
+        // (three, all reading the event); a fourth would need the same
+        // review, which is exactly what a code review already does for a
+        // renamed variable. The regex below is what catches a FRESH inline
+        // arrow written straight into the JSX, which is how this bug shipped
+        // twice.
+        if (/^[A-Za-z_$][\w$]*$/.test(prop.trim())) {
+          sawTheSeam++
+          continue
+        }
+        const arrowParams = prop.match(/^\(?\s*([^)=]*?)\s*\)?\s*=>/)
+        const paramCount = arrowParams
+          ? arrowParams[1].split(",").map((p) => p.trim()).filter(Boolean).length
+          : 0
+        if (paramCount >= 3) {
+          sawTheSeam++
+          continue
+        }
+        if (
+          KANBAN_DRAGGABLE_ONCARDSELECT_EXEMPT.some((rel) => file.replace(/\\/g, "/").endsWith(rel))
+        )
+          continue
+        offenders.push(
+          `${file} — a <Kanban onCardSelect> reads only ${paramCount} argument(s) and discards the click; ` +
+            "forward the event through clickGesture/applyClickGesture (web/lib/row-open.ts), the way " +
+            "OpenBoard/AllBoard (tickets-collection.tsx) and AppTicketsBoard (work-panels.tsx) do"
+        )
+      }
+    }
+    expect(
+      sawTheSeam,
+      "no <Kanban onCardSelect> was found reading the click — the census is reading nothing"
+    ).toBeGreaterThan(0)
+    expect(offenders, offenders.join("\n")).toEqual([])
+  })
+})
