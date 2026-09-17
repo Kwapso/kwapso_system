@@ -1308,7 +1308,7 @@ is very close to the latest comment, we should give some gap there."* The activi
 COLUMN with a guaranteed gap, `gap-[var(--space-5)]`, so that the newest message is never
 crowding the input bar.
 
-**Where this reaches today.** `shared/web/ticket-thread-composer.tsx` mounts the thread
+**Where this reaches today.** `web/components/tickets/help-detail.tsx` mounts the thread
 and composer in one flex column with the spacing constant; `web/test/ticket-thread-composer-gap.test.tsx`
 asserts the gap renders and measures it at the expected scale.
 
@@ -3571,7 +3571,7 @@ reply and keeps the ticket open; a 5-second undo is available after send. This s
 moves the resolved/stays-open decision to the title bar (where it belongs with the record's
 own state) and the composition action to where the person is typing.
 
-**Where this reaches today.** `shared/web/ticket-thread-composer.tsx` mounts one Send
+**Where this reaches today.** `web/components/tickets/help-detail.tsx` mounts one Send
 button in the footer and zero close actions; `RecordChrome`'s title actions mount the
 "Answer and close" when the ticket is open, removing it once resolved. The move itself
 is held by R84's title-only rule. `web/test/ticket-close-moved-to-top.test.tsx` asserts
