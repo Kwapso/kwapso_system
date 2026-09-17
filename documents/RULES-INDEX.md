@@ -78,7 +78,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R64 | enforced | `sections-have-a-door` | `web/test/rules.test.ts` |
 | R65 | enforced | `chip-above-title` | `web/test/rules.test.ts` |
 | R66 | enforced | `no-emoji-in-copy` | `web/test/rules.test.ts` |
-| R67 | enforced | `sections-stand-on-paper` | `web/test/sections-stand-on-paper.test.ts` |
+| R67 | enforced | `sections-stand-on-paper` | `web/test/knowledge-head.test.tsx`<br>`web/test/sections-stand-on-paper.test.ts` |
 | R72 | enforced | `no-default-subtitles` | `web/test/no-default-subtitles.test.ts` |
 | R74 | enforced | `import-opens-a-tab` | `web/test/import-opens-a-tab.test.ts` |
 | R75 | enforced | `alphabetical-options` | `web/test/alphabetical-options.test.ts` |
