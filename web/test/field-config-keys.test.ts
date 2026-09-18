@@ -239,12 +239,8 @@ describe("a field config carries no key it does not declare", () => {
     const src = `
       import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
-      // RED — "hint" is not a key FieldConfig declares (it is "helpText").
       const bogusField = { ...defaultFieldConfig, hint: "nope" }
 
-      // GREEN — the R87 title-length shape: a top-level spread with a
-      // declared key (label), plus a nested validation spread setting
-      // maxLength, which FieldValidation DOES declare.
       const titleField = {
         ...defaultFieldConfig,
         label: "Title",
