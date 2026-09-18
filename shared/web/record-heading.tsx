@@ -184,6 +184,43 @@ export const TITLE_ACTIONS_SPLIT =
   "[&_[data-slot=title]>div:not([data-slot=title-actions])]:flex-1 " +
   "[&_[data-slot=title-actions]]:shrink-0"
 
+/** THE HEAD BAND AS A QUERY CONTAINER — Aurora's ruling, 18 Sep 2026, on the
+ * narrow ticket head: the Close / Start timer / pen / "…" row floated over a
+ * wrapped title below a certain width. Her pick off a side-by-side options
+ * page, verbatim: "h3, and aign the menu to the chips" — at a narrow width
+ * only the "…" trigger stays, at the chip row's own right edge, and every
+ * other action folds inside it; above the breakpoint, today's layout.
+ *
+ * A CONTAINER QUERY, NOT A VIEWPORT ONE — so a narrow PANE inside a wide
+ * window still folds, the same reasoning the kit's own `ToolbarRow` states
+ * for its own fold (shared/ui/components/toolbar-row/toolbar-row.tsx, "A
+ * CONTAINER QUERY, NOT A VIEWPORT ONE"). `[data-slot=title]` — the kit's own
+ * `Title` row (components/title/title.tsx) — is the ONE element that already
+ * holds both halves of the fold as descendants: the chip row rides inside
+ * `title` (`RecordScreen`'s own `identityChips`, folded into the node this
+ * file's `title` prop carries), and the buttons ride inside `actions`
+ * (`[data-slot=title-actions]`, `Title`'s own sibling slot) — so making THAT
+ * element the query container, rather than something narrower, is what lets
+ * one width answer for both halves of the fold at once.
+ *
+ * REACHED FROM OUTSIDE, LIKE EVERY OTHER RULE IN THIS FILE. `shared/ui/` is
+ * vendored and pinned (CLAUDE.md, R39): neither `Title` nor `RecordDetail`
+ * can be handed a `container-type` prop, so this reaches the kit's own
+ * rendered row with the same descendant-selector trick `TITLE_ACTIONS_SPLIT`
+ * above already uses on the identical element — `record-chrome.tsx`'s own
+ * `[&>[role=tablist]]:[border-bottom:…]` is the same "arbitrary variant +
+ * arbitrary CSS property" shape, so this is not a new technique, only a new
+ * property. `container-type: inline-size` only — no `container-name`, so
+ * `shared/web/head-actions.tsx`'s `@min-[…]` variants query the nearest
+ * container rather than a name that would have to travel with them.
+ *
+ * FOLDED INTO `RECORD_TITLE_TREATMENT` BELOW rather than kept separate, so
+ * every record head that already wears R52's one constant gets a query
+ * container for free — the fold ITSELF is opt-in (a screen has to route its
+ * own actions through `shared/web/head-actions.tsx`), but the width it folds
+ * against is not something each screen has to remember to wire up. */
+export const RECORD_HEAD_CONTAINER = "[&_[data-slot=title]]:[container-type:inline-size]"
+
 /** EVERY DETAIL PATH WEARS EXACTLY THIS — R52.
  *
  * The two rules above are one decision about one row: how big a record's own
@@ -210,5 +247,12 @@ export const TITLE_ACTIONS_SPLIT =
  * in the right place a whole strip-height further down. Same reason the other
  * way round: the gap between strip and panel is `--tab-content-gap` in both,
  * which is why the client's tab-strip GAP was already uniform and only the
- * title above it was not. */
-export const RECORD_TITLE_TREATMENT = `${RECORD_TITLE_SIZE} ${TITLE_ACTIONS_SPLIT}`
+ * title above it was not.
+ *
+ * CARRIES `RECORD_HEAD_CONTAINER` TOO, SINCE 18 SEP 2026 — see that
+ * constant's own comment. It changes nothing visually on its own (a query
+ * container with no `@min-[…]` reader anywhere below it draws exactly as
+ * before); it only makes every record head's own `[data-slot=title]` row
+ * ABLE to host a `shared/web/head-actions.tsx` fold, the day a screen wires
+ * one up. */
+export const RECORD_TITLE_TREATMENT = `${RECORD_TITLE_SIZE} ${TITLE_ACTIONS_SPLIT} ${RECORD_HEAD_CONTAINER}`

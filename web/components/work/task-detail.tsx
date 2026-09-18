@@ -28,14 +28,15 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Check, ArrowUUpLeft } from "@shared/ui/foundations/icons"
+import { Check, ArrowUUpLeft, PencilSimple } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { OverviewList } from "@/components/records/overview-list"
 import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
-import { RecordTimerButton } from "@/components/shell/timer-bar"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
+import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { content } from "@/lib/api"
@@ -82,6 +83,27 @@ export function TaskDetailScreen({
   const canEdit = can("work", "update")
   // The clock asks for the right its own door asks for (`work:create`).
   const canLogTime = can("work", "create")
+  /* THE TIMER, NORMALIZED — Aurora's ruling, 18 Sep 2026 ("h3, and aign the
+   * menu to the chips"): at a narrow width, Start/Stop timer moves off its
+   * own button and into the "…" menu beside Edit/Tick it off. `RecordTimerButton`
+   * (below, in `actions`) still draws the wide button unchanged; this second,
+   * independent read of the SAME running-timers cache (`useRecordTimerAction`,
+   * `@/components/shell/timer-bar`) is what the fold's menu item is built
+   * from when the row is narrow — see `shared/web/head-actions.tsx`'s own
+   * header, "TWO RENDERS OF THE SAME ACTIONS, NOT ONE NODE PHYSICALLY MOVED".
+   *
+   * CALLED HERE, AHEAD OF THE TWO EARLY RETURNS BELOW — a hook cannot sit
+   * after a conditional return the way `RecordTimerButton` itself, an
+   * ordinary child component, safely can — so this reads `task?.status`,
+   * the same `done` gate `RecordTimerButton` reads below, computed one
+   * optional-chain earlier than the guard that proves `task` non-null. */
+  const timerAction = useRecordTimerAction({
+    teamId,
+    targetTable: "tasks",
+    targetId: taskId,
+    canLog: canLogTime,
+    disabled: task?.status === "done",
+  })
   const canSeeTime = can("work", "read")
   const activity = useRecordActivity("tasks", taskId)
   // The Time badge, counted when the TASK opens rather than when its tab is
@@ -117,6 +139,37 @@ export function TaskDetailScreen({
 
   const done = task.status === "done"
   const FileGlyph = fileTypeIcon(task.fileName)
+
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * Edit, Tick it off/Put it back and the timer all leave their standalone
+   * controls and join the ONE "…" trigger that moves into the chip row.
+   * Same order the wide row already draws them in — edit, the tick, then
+   * the timer. This head had no overflow menu at all before this fold: the
+   * "…" trigger only exists below the breakpoint. */
+  const foldedActions: HeadActionItem[] = [
+    ...(canEdit && !done
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditing(true),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            key: "toggleDone",
+            label: done ? t("Put it back") : t("Tick it off"),
+            icon: done ? <ArrowUUpLeft className="size-3.5" /> : <Check className="size-3.5" />,
+            onSelect: onToggleDone,
+          },
+        ]
+      : []),
+    ...(timerAction ? [timerAction] : []),
+  ]
   const overviewItems = [
     { label: t("Status"), value: done ? t("Done") : t("Open") },
     // R54: a task is assigned to one of ours.
@@ -226,9 +279,14 @@ export function TaskDetailScreen({
       // "Not started" tier every other lifecycle in the app reads this way),
       // `shipped` once ticked (closed, successfully).
       chips={
-        <Badge variant="status" dot={done ? "shipped" : "archived"}>
-          {done ? t("Done") : t("Open")}
-        </Badge>
+        <>
+          <Badge variant="status" dot={done ? "shipped" : "archived"}>
+            {done ? t("Done") : t("Open")}
+          </Badge>
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
+        </>
       }
       title={task.title}
       // THE ASSIGNEE LINE IS GONE — CLIENT RULING, 2026-08-31, VERBATIM:
@@ -238,7 +296,7 @@ export function TaskDetailScreen({
       // row (`data-record-region="header"`). Not lost: it's already a row
       // in the Overview tab (`overviewItems`: "Who has it").
       actions={
-        <>
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           {/* THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — a
               finished task must not offer to be finished again. No confirm:
               nothing is lost either way, and a confirm on a tick is the kind of
@@ -269,7 +327,7 @@ export function TaskDetailScreen({
             canLog={canLogTime}
             disabled={done}
           />
-        </>
+        </div>
       }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column.

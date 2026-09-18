@@ -116,6 +116,7 @@ import type { SessionUser, TeamMember, TeamRole } from "@shared/types"
 
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import { RecordActionsMenu, RecordScreen, type RecordAction } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { AccountActivityPanel } from "@/components/team/account-activity-panel"
 import { MemberHead } from "@/components/team/member-head"
 import { ProfileDialog } from "@/components/team/profile-dialog"
@@ -361,6 +362,42 @@ export function MemberScreen({
       ]
     : []
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * every standalone control on this row — `buttonActions` (empty today,
+   * the recipe's own two acts both already excluded above), the edit pencil,
+   * and everything already in the three-dot menu — joins the ONE "…"
+   * trigger that moves into the chip row, in the same order the wide row
+   * already draws them: recipe buttons, edit, then the menu's own items. */
+  const foldedButtonActions: HeadActionItem[] = buttonActions
+    .map((a): HeadActionItem | null => {
+      const gs = gateState(rights, a.gate)
+      if (gs === "hidden") return null
+      return {
+        key: a.id,
+        label: a.label,
+        onSelect: () => onAction(a.action),
+        disabled: gs === "disabled",
+      }
+    })
+    .filter((a): a is HeadActionItem => a !== null)
+  const foldedActions: HeadActionItem[] = [
+    ...foldedButtonActions,
+    ...(canEditProfile
+      ? [
+          {
+            key: "editProfile",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditProfile(true),
+          },
+        ]
+      : []),
+    ...accountMenuActions,
+    ...changeRoleMenuActions,
+    ...removeMenuActions,
+  ]
+
   return (
     <>
       <RecordScreen
@@ -387,10 +424,17 @@ export function MemberScreen({
         // (`members-gallery.tsx`'s own `<Badge>{m.roleTitle}</Badge>`),
         // through the host every bespoke record detail uses for its own
         // identity row.
-        chips={<Badge>{member.roleTitle}</Badge>}
+        chips={
+          <>
+            <Badge>{member.roleTitle}</Badge>
+            {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring
+                as `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+            <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
+          </>
+        }
         title={name}
         actions={
-          <>
+          <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
             {buttonActions.map((a) => {
               const gs = gateState(rights, a.gate)
               if (gs === "hidden") return null
@@ -413,7 +457,7 @@ export function MemberScreen({
             <RecordActionsMenu
               actions={[...accountMenuActions, ...changeRoleMenuActions, ...removeMenuActions]}
             />
-          </>
+          </div>
         }
         // THE RECORD COLUMN — client ruling, 2026-09-15: "the footer … is
         // missing the two sections' design." A MEMBERSHIP has no editor the

@@ -252,6 +252,7 @@ export function WorkLogsPanel({
   onActivityChanged,
   showAddButton = true,
   addTrigger,
+  onEmptyChange,
 }: {
   targetTable: "stories" | "help" | "tasks" | "meetings"
   targetId: string
@@ -287,6 +288,24 @@ export function WorkLogsPanel({
    * reason. `null` while `canLog` is false.
    */
   addTrigger?: React.RefObject<(() => void) | null>
+  /**
+   * R88 — THE ONE SOURCE OF TRUTH FOR "IS THIS PANEL EMPTY", handed to
+   * whoever draws the title row ABOVE this panel (`EmptyGatedPanel`, the
+   * ticket page). Fired from the SAME resting-list read `<ToolbarRow>`'s own
+   * `empty` prop already reads below (`logsQ.data.length === 0`) — never a
+   * second door (a sidecar total cache key) computed on the side, which
+   * would let the header's own "confirmed empty" and this panel's own
+   * "confirmed empty" answer two different questions on two different
+   * clocks. That exact race is what shipped first: the header read a totals
+   * SIDECAR (`workLogsTotalKey`) while the body read `logsQ.data` directly,
+   * and the two settled a render apart, drawing the header's "+" AND the
+   * body's own "Add the first" together for one frame — precisely the
+   * double-door bug R88 exists to end. Not called until `logsQ.data`
+   * resolves — a caller that treats "not yet called" as "not empty" (the
+   * safe default) never flashes a header away and back while the read
+   * settles.
+   */
+  onEmptyChange?: (empty: boolean) => void
 }) {
   const { t, lang } = useLanguage()
   const filter = React.useMemo(() => ({ targetTable, targetId }), [targetTable, targetId])
@@ -326,6 +345,14 @@ export function WorkLogsPanel({
     })
   )
   const summaryQ = useCached<WorkLogSummary>(summaryKey, () => contentApi.workLogSummary(filter))
+
+  // R88 — THE ONE EMPTINESS SIGNAL, published to `onEmptyChange`'s own doc
+  // comment. `logsQ.data`, the SAME resting read `<ToolbarRow empty={…}>`
+  // reads below — never `workLogsTotalKey`'s sidecar, which this effect used
+  // to read and which settled on a different tick.
+  React.useEffect(() => {
+    if (logsQ.data !== undefined) onEmptyChange?.(logsQ.data.length === 0)
+  }, [logsQ.data, onEmptyChange])
 
   const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
   const [adding, setAdding] = React.useState(false)

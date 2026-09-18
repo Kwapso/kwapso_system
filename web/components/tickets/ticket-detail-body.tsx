@@ -75,49 +75,82 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * this component's one job is the two-column split and the anchors a deep
  * link scrolls to.
  *
- * THE LEFT COLUMN SPANS THE RIGHT COLUMN'S THREE ROWS — client ruling,
- * 18 Sep 2026, verbatim: "the ticket detail conversation should have more
- * height, depending on the height of the right column components. they
- * should be, the addition of the three of the right, same as conversation."
+ * R89 "footer-on-the-edge", 18 Sep 2026, VERBATIM, SUPERSEDING THE SAME
+ * DAY'S EARLIER "sum of three" CONSTRUCTION BELOW: "On ticket detail, the
+ * footer should be at the very bottom. The position is still fucking wrong.
+ * Fix it once and for all." Measured live on staging (T0001, headless
+ * Playwright, `${SCRATCH}/footer-measure.json`) BEFORE this fix: the screen
+ * body (`[data-slot="screen-shell-body"]`) closed at y=884 at 1440×900, and
+ * the conversation card's own footer closed at y=1298 — 414px past the
+ * visible screen, because the earlier construction (below) sized the
+ * conversation card to the SUM of the three side panels' own content
+ * height, never to the screen's actual available height. A footer at the
+ * bottom of a card that is itself floating in the middle of a scrolled page
+ * is not a footer "at the very bottom" in the sense she means it — the
+ * screen's own bottom edge.
  *
- * CORRECTED THE SAME DAY, MEASURED LIVE ON STAGING (T0001): the first cut
- * used `lg:grid-rows-3`, Tailwind's `grid-template-rows: repeat(3, minmax(0,
- * 1fr))` — three EQUAL, flexible tracks. An `fr` track in an auto-height
- * grid still sizes to the tallest CONTENT it is asked to hold before
- * dividing the space evenly, so the spanning conversation cell (whose own
- * intrinsic height dwarfs any single right-column card) dragged all three
- * tracks up to a third of ITS height each — the right column's three cards
- * stayed their own short height, and the "gap" between their stack and the
- * conversation's own bottom edge was blank leftover track space, not a
- * uniform 24px gap. Measured: conversation 1015.78px against the three
- * right cards' own 136.3 + 322.59 + 208.3 plus two 24px gaps = 901.49px —
- * 114px of exactly this kind of dead space.
+ * THE FIX IS BY CONSTRUCTION, THE SAME STANDARD EVERY OTHER LAW IN THIS
+ * BASE HOLDS TO: no magic pixel offset, no viewport-relative guess. This
+ * component's own root is now a FLEX ITEM of `app-shell.tsx`'s own R29 page
+ * container (`className="mx-auto flex w-full max-w-none min-w-0 min-h-full
+ * flex-col …"`, the ONE thing that div wraps besides `<LiveStatus/>`) — a
+ * `flex-col` box already sitting on a `min-h-full` floor equal to the
+ * screen body's own visible height (`[data-slot="screen-shell-body"]`,
+ * `min-h-0 flex-1 overflow-y-auto`, ScreenShell's own scroller). A
+ * `min-height` flex container distributes ANY leftover space (floor minus
+ * the flex items' own content height) to whichever item carries
+ * `flex-grow` — `lg:flex-1 lg:min-h-0` here — so this grid grows to fill
+ * exactly what `<RecordScreen>`'s head leaves behind, no taller and no
+ * shorter, at every viewport height, with NO EDIT TO `app-shell.tsx`
+ * NEEDED: that file was already the flex column this law needs: see the
+ * measurement proof in the report for why `min-h-full` (not `h-full`) is
+ * already the right property here — it is a FLOOR the flex algorithm fills
+ * from below, not a cap that would clip a taller screen's overflow.
  *
- * THE FIX IS THE ROWS' OWN SIZE, NOT A SPAN. `lg:grid-rows-[auto_auto_auto]`
- * sizes each of the right column's three tracks to ITS OWN cell's content —
- * Related stories/Work logs/Stakeholders auto-placed into them exactly as
- * before — so the conversation's `row-span-3` height becomes the SUM of
- * three tracks the right column alone decided, which is the client's own
- * arithmetic ("the addition of the three of the right, same as
- * conversation") drawn structurally rather than approximated. The
- * conversation cell also carries `lg:min-h-0` beside `lg:h-full`: a grid
- * item's default min-height is `auto` (its own content's min-content size),
- * which — spanning three auto tracks — would otherwise feed the
- * conversation's OWN tall intrinsic height back into the very rows it is
- * trying to measure FROM, inflating them again by the back door
- * `grid-rows-3` used the front one for. `min-h-0` floors that contribution
- * to zero, so only the right column's three cells set the tracks.
- * `items-stretch` (the grid default, stated here rather than left implicit)
- * then stretches the conversation cell to the FULL sum of those tracks, and
- * `TicketConversationPanel`'s own `lg:h-full` fills whatever height that
- * cell resolves to — a grid item's used size is definite for a descendant's
- * percentage height the same way a flex item's is, so `h-full` there
- * resolves against a real number rather than `auto`. The thread scrolls
- * inside (`overflow-y-auto`, `min-h-0`, already on `TicketConversationPanel`
- * below) so a long conversation never forces the card — and therefore the
- * tracks — taller than the right column's own three cards decided. Below
- * `lg` there is no second column to measure against and the grid collapses
- * to one, exactly as before. */
+ * ONE ROW NOW, NOT THREE — the grid's own tracks have to be able to
+ * STRETCH to fill that definite height, and CSS Grid's default
+ * `align-content: normal` behaves as `stretch` for a SINGLE track but
+ * would split the leftover space three ways across three separate `auto`
+ * tracks, which is not "the side cards scroll independently" this law also
+ * asks for. So the right column collapsed from three grid cells (Related
+ * stories / Work logs / Stakeholders each auto-placed into its own row) to
+ * ONE cell holding a `flex flex-col gap-6 overflow-y-auto` wrapper around
+ * the same three panels — the identical `gap-6` the grid's own column-gap
+ * already spent between the two columns, not a new number. `items-stretch`
+ * (the grid default, stated rather than left implicit) then stretches BOTH
+ * column cells to the row's own full height: the conversation cell
+ * (`lg:h-full lg:min-h-0`, unchanged) and the side wrapper
+ * (`lg:h-full lg:min-h-0 lg:overflow-y-auto`) end up the SAME height,
+ * exactly matching the ground `screen-shell-body` sits on — and the side
+ * wrapper scrolls its own three cards independently the moment they are
+ * TALLER than that height, rather than pushing the conversation card's
+ * footer down with them the way the old row-span-3 sum did.
+ *
+ * `data-slot="ticket-detail-body"` is this file's own marker — read by
+ * `web/test/rules.test.ts` (R89) and by nothing else; it draws no CSS of
+ * its own and is not a new global selector to keep in step with anything.
+ *
+ * BELOW `lg` NOTHING HERE CHANGED: the grid collapses to one column, the
+ * flex-fill classes are all `lg:`-gated, and the page scrolls as a whole
+ * exactly as it did before this law, because there is no second column's
+ * height to match on a phone.
+ *
+ * THE EARLIER "SUM OF THREE" CONSTRUCTION, KEPT FOR THE RECORD (superseded,
+ * not deleted, because a later reader asking "why isn't this `grid-rows-3`"
+ * deserves the same measured answer the first ruling got): the client's
+ * ruling that morning, verbatim, "the ticket detail conversation should
+ * have more height, depending on the height of the right column
+ * components. they should be, the addition of the three of the right, same
+ * as conversation" — first tried as `lg:grid-rows-3` (three EQUAL `1fr`
+ * tracks), which measured wrong (the spanning conversation cell dragged all
+ * three tracks up to a third of ITS OWN height each, 114px of dead space
+ * between the right column's real bottom and the conversation's), then
+ * fixed with `lg:grid-rows-[auto_auto_auto]` + `row-span-3` so the
+ * conversation's height became the right column's own sum. That
+ * construction was correct FOR THE RULING IT ANSWERED — it never claimed to
+ * reach the screen's own bottom edge, only to match the two columns to each
+ * other — and R89 is a different, later ruling entirely: "at the very
+ * bottom" names the SCREEN, not the sidebar. */
 export function TicketDetailBody({
   conversation,
   stories,
@@ -130,22 +163,24 @@ export function TicketDetailBody({
   stakeholders: React.ReactNode
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto_auto]">
-      <div
-        id={TICKET_PANEL_ANCHOR.conversation}
-        className="min-w-0 lg:row-span-3 lg:h-full lg:min-h-0"
-      >
+    <div
+      data-slot="ticket-detail-body"
+      className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr] lg:flex-1 lg:min-h-0"
+    >
+      <div id={TICKET_PANEL_ANCHOR.conversation} className="min-w-0 lg:h-full lg:min-h-0">
         {conversation}
       </div>
-      {/* NO WRAPPING COLUMN HERE ANY MORE — the three panels below are direct
-          grid children now (auto-placed into column 2's three rows), which
-          is what lets the conversation cell's own row-span measure THEM
-          rather than a `flex-col` box with a height of its own. Below `lg`
-          the grid collapses to one column and these three simply stack under
-          the conversation in DOM order, same as before. */}
-      <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
-      <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
-      <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
+      {/* ONE GRID CELL, HOLDING ITS OWN SCROLLER — see the header above for
+          why three separate auto-placed rows cannot stretch to the grid's
+          own full height the way a single cell can. The three anchors stay
+          exactly where a deep link (`help-detail.tsx`'s own scroll effect)
+          already expects them, nested inside the scroller rather than
+          removed. */}
+      <div className="flex min-w-0 flex-col gap-6 lg:h-full lg:min-h-0 lg:overflow-y-auto">
+        <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
+        <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
+        <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
+      </div>
     </div>
   )
 }

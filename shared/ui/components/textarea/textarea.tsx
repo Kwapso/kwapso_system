@@ -283,11 +283,38 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
      *
      * `props.value` is in the dependency list because a controlled field is
      * the shape both composers use; an uncontrolled one still re-measures on
-     * every input through the handler below. */
+     * every input through the handler below.
+     *
+     * AN EMPTY FIELD IS NEVER MEASURED — it is reset to one line outright.
+     * The client, 18 Sep 2026, on the assistant composer at ~410px: "Now it
+     * makes it two rows, and it kind of breaks… it doesn't break into rows."
+     * Root cause was `scrollHeight` counting the PLACEHOLDER's own rendered
+     * box: `el.value` is `""`, but the browser still lays out and wraps the
+     * placeholder text inside the field to compute layout, and at a narrow
+     * width "Ask about your work" wraps to two lines — `scrollHeight` then
+     * reports two line-heights before a single character has been typed, so
+     * `grown` flips true off ghost text alone (the pill steps to the box
+     * radius, the field opens two rows tall, and the caret on focus lands at
+     * the top of what reads as a broken, already-multiline control — the
+     * same fault, not a second one). Content the field does not hold must
+     * not size it, so `el.value.length === 0` short-circuits the measurement
+     * entirely and pins the height to the CSS resting state (`min-height`,
+     * one line) rather than whatever the placeholder happened to wrap to. */
     const wasGrown = React.useRef(false);
     useIsomorphicLayoutEffect(() => {
       const el = own.current;
       if (!autoGrow || !el) return;
+
+      if (el.value.length === 0) {
+        el.style.height = "auto";
+        el.style.overflowY = "hidden";
+        if (wasGrown.current) {
+          wasGrown.current = false;
+          onGrownChange?.(false);
+        }
+        return;
+      }
+
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight}px`;
       el.style.overflowY = el.scrollHeight > el.clientHeight ? "auto" : "hidden";

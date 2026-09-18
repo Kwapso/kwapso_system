@@ -1,50 +1,28 @@
 #!/usr/bin/env node
 /* ============================================================================
    THE 18 SEP 2026 ONE-STRIP-ONE-GAP CHECK — run by `npm run check` beside
-   the other component checks.
+   the other component checks. EXTENDED THE SAME DAY, THIRD REPORT ON THE
+   SAME SCREENSHOT: "the assistant tabs overlap / the issue's still there."
 
-   CLIENT RULING, VERBATIM: "on the assistant, the inctove tabds shape is
-   still overlapping with the active one. tahts worng. shoudl 100% replicate
-   what hapens with main content tabs."
+   THE FIRST HALF OF THIS FILE (below) answered her SECOND report — a
+   divergence that turned out not to exist, because `BreadcrumbFolders` is
+   the ONLY folder-tab strip in the kit and both real call sites (the app's
+   content trail, the assistant dock) call it directly with no wrapper. That
+   check still stands and still matters: it is what proves a future "dock
+   variant" can never quietly re-fork the gap.
 
-   THE DIVERGENCE SHE SAW WAS NEVER A SECOND COMPONENT — `BreadcrumbFolders`
-   (this file) is the ONLY drawing of a folder-tab strip in the kit, and it
-   is called DIRECTLY, with no wrapper, by both real call sites: the app's
-   content trail (`app-shell.tsx`) and the assistant dock
-   (`web/components/assistant/agent-tab-strip.tsx`, `@shared/ui`-vendored,
-   unreachable from here — see that file's own header, "DRAWN WITH THE
-   KIT'S OWN BreadcrumbFolders — the identical component the main content
-   trail uses"). There is exactly ONE `<BreadcrumbList>` render site in this
-   file (checked below) and it spends exactly one class string, `STRIP`, so
-   every caller of the exported component gets the same gap by
-   CONSTRUCTION — proved live, not just by inspection: `verify/tabstrip-
-   parity/page.tsx` renders the content shape and two assistant shapes
-   (A: active·iconOnly·iconOnly, B: rest·active·iconOnly·iconOnly, the
-   drag-reordered shape) side by side from the SAME real call-site props,
-   and `measureNesting` there reads the SAME 9px gap (`--space-2`, the tab
-   strip's own row token) for every consecutive pair in all three, with the
-   two assistant strips' own `<ol>` className read BYTE-IDENTICAL to the
-   content strip's (confirmed 18 Sep 2026 against the harness's dev build:
-   `text-caption text-ink-tertiary flex flex-nowrap items-end isolate
-   gap-[var(--space-2)] max-w-full overflow-x-auto overflow-y-hidden
-   scroll-p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-   [&::-webkit-scrollbar]:h-0 pt-1 mt-[calc(var(--space-1)*-1)]
-   mb-[calc(var(--folder-tab-overlap)*-1)]`, for the content host and both
-   assistant hosts alike).
-
-   WHAT SHE SAW WAS THE PRE-GAP BUILD. `STRIP`'s own comment ("THE OVERLAP
-   IS GONE, 18 SEP 2026") already narrates the mechanism this replaced —
-   `TAB_OVERLAP_MARGIN`, a negative per-`<li>` margin that nested every tab
-   under its predecessor's shoulder — and the retirement is a same-file, ONE
-   -PLACE change: because both strips share this one component, the day the
-   gap landed it landed for both at once. What this check pins is that it
-   STAYS that way: a caller-supplied `listClassName` (the one prop this file
-   offers a caller to change the `<ol>`'s own class list, documented "for a
-   call site that needs to change the strip") never grows an internal
-   default that touches the gap, and no second `<BreadcrumbList>` render
-   site — a per-caller "dock variant" — is ever added, because either one
-   would let exactly the divergence she is describing return without a
-   second component ever existing to blame. */
+   THE THIRD REPORT WAS A DIFFERENT DEFECT WEARING THE SAME WORDS. Every
+   rect sweep that answered the first two measured TAB-TO-TAB GAPS (correct,
+   8px, every time) and never asked whether the STRIP ITSELF fit its
+   container — at the assistant pane's fixed 380px it did not, and the "+"
+   (the one tab that must always be reachable) scrolled off with everything
+   else. `fit="shrink"` (`BreadcrumbFoldersProps`) is the fix: a second
+   mode, still ONE component, that pulls the trailing pinned run (History,
+   "+") OUTSIDE the shrinking list into its own, always-visible box. This
+   check's SECOND half pins THAT class contract, the same way the first
+   half pins the natural mode's: one scroll list, one pinned list, one set
+   of shrink constants, spent by exactly the render sites that should spend
+   them. */
 
 import fs from "node:fs";
 import path from "node:path";
@@ -58,24 +36,45 @@ const rel = path.relative(process.cwd(), FILE);
 
 const findings = [];
 
-// EXACTLY ONE RENDER SITE. Two would mean two class strings that could
-// drift — the structural half of "one implementation with one gap".
+// THREE RENDER SITES, EXACTLY — ONE PER SHAPE, NEVER A FOURTH. The natural-
+// mode strip, the shrink mode's scroll list and the shrink mode's pinned
+// list. A fourth would mean a second implementation of one of the three
+// shapes, which is the same class of drift the original one-render-site
+// rule refused.
 const listRenderSites = src.match(/<BreadcrumbList\b/g) ?? [];
-if (listRenderSites.length !== 1) {
+if (listRenderSites.length !== 3) {
   findings.push(
-    `${rel} renders <BreadcrumbList> ${listRenderSites.length} times — exactly one keeps every caller (content ` +
-      "trail, assistant dock, any future one) on the same class string by construction; a second render site " +
-      "is a second implementation for the gap to disagree with.",
+    `${rel} renders <BreadcrumbList> ${listRenderSites.length} times — exactly three (natural, shrink-scroll, ` +
+      "shrink-pinned) keeps every caller on one implementation per shape; any other count is a second " +
+      "implementation of one of them.",
   );
 }
 
-// THE ONE RENDER SITE SPENDS STRIP, MERGED ONLY WITH THE CALLER'S OWN
-// listClassName — not a second, hand-picked class list a future "dock"
-// branch could substitute.
+// THE NATURAL-MODE RENDER SITE SPENDS STRIP, MERGED ONLY WITH THE CALLER'S
+// OWN listClassName — byte-identical to the strip before `fit` existed.
 if (!/<BreadcrumbList ref=\{listRef\} className=\{cn\(STRIP, listClassName\)\}>/.test(src)) {
   findings.push(
-    `${rel}'s <BreadcrumbList> does not read className={cn(STRIP, listClassName)} — every consumer's gap comes ` +
-      "from this one merge; a literal or a second constant here could diverge per call site.",
+    `${rel}'s natural-mode <BreadcrumbList> does not read className={cn(STRIP, listClassName)} — every ` +
+      "fit=\"natural\" consumer's gap comes from this one merge.",
+  );
+}
+
+// THE SHRINK MODE'S SCROLL LIST SPENDS STRIP_SHRINK_SCROLL, SAME MERGE
+// SHAPE, SAME listClassName ESCAPE HATCH.
+if (!/<BreadcrumbList ref=\{listRef\} className=\{cn\(STRIP_SHRINK_SCROLL, listClassName\)\}>/.test(src)) {
+  findings.push(
+    `${rel}'s shrink-mode scroll <BreadcrumbList> does not read className={cn(STRIP_SHRINK_SCROLL, ` +
+      "listClassName)} — the shrinking half of fit=\"shrink\" must merge the same way the natural strip does.",
+  );
+}
+
+// THE SHRINK MODE'S PINNED LIST SPENDS STRIP_SHRINK_PINNED — no listClassName
+// here on purpose: a caller's own class hook targets the strip the reader
+// scrolls, not the pinned tail, which never grows or shrinks per caller.
+if (!/<BreadcrumbList className=\{STRIP_SHRINK_PINNED\}>/.test(src)) {
+  findings.push(
+    `${rel}'s shrink-mode pinned <BreadcrumbList> does not read className={STRIP_SHRINK_PINNED} — the pinned ` +
+      "History/\"+\" run must render through this one constant.",
   );
 }
 
@@ -83,11 +82,15 @@ if (!/<BreadcrumbList ref=\{listRef\} className=\{cn\(STRIP, listClassName\)\}>/
 // OVERLAP. Working code shape (the class Tailwind actually emits), not a
 // bare mention — this file's own prose is free to keep narrating
 // TAB_OVERLAP_MARGIN's retirement at length while explaining why it is gone.
-const stripBlockMatch = src.match(/^const STRIP = cn\(([\s\S]*?)\);/m);
-if (!stripBlockMatch) {
+const constBlock = (name) => {
+  const match = src.match(new RegExp(`^const ${name} = cn\\(([\\s\\S]*?)\\);`, "m"));
+  return match ? match[1] : null;
+};
+
+const stripBody = constBlock("STRIP");
+if (!stripBody) {
   findings.push(`${rel} has no const STRIP = cn(...) declaration to check.`);
 } else {
-  const stripBody = stripBlockMatch[1];
   if (!/gap-\[var\(--space-2\)\]/.test(stripBody)) {
     findings.push(
       `${rel}'s STRIP does not read gap-[var(--space-2)] — the 18 Sep "need space betwwen tehm" ruling's own ` +
@@ -103,15 +106,104 @@ if (!stripBlockMatch) {
   }
 }
 
-// NO SECOND STRIP-SHAPED CONSTANT. A future `STRIP_ASIDE`/`STRIP_DOCK` is
-// exactly the "second implementation" this check exists to refuse, however
-// it merges its own gap.
-const stripLikeNames = Array.from(src.matchAll(/^const (STRIP\w*) = cn\(/gm)).map((m) => m[1]);
-if (stripLikeNames.length !== 1) {
+// THE SHRINK ROW'S GAP MATCHES STRIP'S OWN, AT ALL THREE LEVELS — the outer
+// row (between the two lists) and each list (between the tabs inside it).
+// A drifted gap on any one of the three would read as a wider or narrower
+// seam exactly where the scroll list meets the pinned one, which is the
+// single pixel row most likely to be looked at closely.
+for (const name of ["STRIP_SHRINK_ROW", "STRIP_SHRINK_SCROLL", "STRIP_SHRINK_PINNED"]) {
+  const bodyOrLiteral = constBlock(name) ?? (src.match(new RegExp(`^const ${name} = "([^"]*)";`, "m")) ?? [])[1];
+  if (bodyOrLiteral === null || bodyOrLiteral === undefined) {
+    findings.push(`${rel} has no const ${name} declaration to check.`);
+  } else if (!/gap-\[var\(--space-2\)\]/.test(bodyOrLiteral)) {
+    findings.push(
+      `${rel}'s ${name} does not read gap-[var(--space-2)] — every gap in the strip, natural mode or shrink, ` +
+        "is the same token; a different one here would read as a mismatched seam at the pinned boundary.",
+    );
+  }
+}
+
+// fit="shrink" IS AN OPT-IN, NOT A NEW DEFAULT — a caller that never
+// mentions `fit` must render exactly what it always has. Matched as a real
+// destructuring line (leading whitespace, a bare `=`, a trailing comma), not
+// a bare substring search — this file's own prose mentions `fit="natural"`
+// (with an `=`, no spaces, inside backticks) more than once, and a search
+// that could not tell prose from code would pass on the strength of a
+// comment alone.
+if (!/^\s+fit = "natural",\s*$/m.test(src)) {
   findings.push(
-    `${rel} declares ${stripLikeNames.length} STRIP-shaped constant(s) (${stripLikeNames.join(", ") || "none"}) ` +
-      "— exactly one (STRIP) keeps the content trail and the assistant dock reading the identical class list; a " +
-      "second one is a second implementation, whatever its own gap reads today.",
+    `${rel} does not default fit to "natural" in the component's own destructuring — a missing default would ` +
+      "change every existing caller's DOM the day this shipped.",
+  );
+}
+
+// THE SHRINKING TAB'S OWN THREE-PART CONTRACT: the <li> grows from zero and
+// caps at its own content width, a floor below which it stops shrinking,
+// and the inner control's fixed 128px floor is cancelled so it can actually
+// reach that floor.
+if (!/const TAB_SHRINK_ITEM = "flex-1 basis-0 max-w-max";/.test(src)) {
+  findings.push(
+    `${rel}'s TAB_SHRINK_ITEM is not "flex-1 basis-0 max-w-max" — a shrinking tab must grow from zero and cap ` +
+      "at its own natural (max-content) width, never stretch past it.",
+  );
+}
+if (!/const TAB_SHRINK_MIN_WIDTH =\s*\n?\s*"min-w-\[calc\(4ch_\+_var\(--space-5\)_\+_var\(--folder-shoulder\)_\+_var\(--control-height-pill\)_\+_var\(--space-2\)\)\]";/.test(
+    src,
+  )
+) {
+  findings.push(
+    `${rel}'s TAB_SHRINK_MIN_WIDTH does not read the pinned four-character-plus-close-button calc — the floor ` +
+      "a shrinking tab may never cross must stay a real, derived minimum rather than an arbitrary number.",
+  );
+}
+if (!/const TAB_SHRINK_TAB = "shrink min-w-0";/.test(src)) {
+  findings.push(
+    `${rel}'s TAB_SHRINK_TAB does not read "shrink min-w-0" — MEASURED regression (see that constant's own ` +
+      "comment): TAB's base class opens with shrink-0, and with only min-w-0 overridden the <li> shrinks to its " +
+      "floor while the anchor inside it keeps its own full content width and silently overflows the box, with " +
+      "no ellipsis ever drawn. Both overrides are required, not one.",
+  );
+}
+if (!/const LABEL_SHRINK = "min-w-0 truncate";/.test(src)) {
+  findings.push(
+    `${rel}'s LABEL_SHRINK does not read "min-w-0 truncate" — a label needs both to actually ellipsis once its ` +
+      "tab is narrower than the text.",
+  );
+}
+
+// EVERY SHRINK CONSTANT IS ACTUALLY READ IN THE RENDER, NOT JUST DECLARED.
+// A constant that exists but is never spent is the same silent drift the
+// one-STRIP rule below refuses for the natural-mode shape.
+for (const name of ["TAB_SHRINK_ITEM", "TAB_SHRINK_MIN_WIDTH", "TAB_SHRINK_TAB", "LABEL_SHRINK"]) {
+  const uses = (src.match(new RegExp(name, "g")) ?? []).length;
+  // 1 for the declaration itself (`const NAME =`); anything beyond that is a
+  // real read.
+  if (uses < 2) {
+    findings.push(`${rel} declares ${name} but never reads it outside its own declaration.`);
+  }
+}
+
+// NO SECOND STRIP-SHAPED CONSTANT BEYOND THE FOUR THIS FILE NOW OWNS. A
+// future STRIP_ASIDE/STRIP_DOCK is exactly the "second implementation" this
+// check exists to refuse, however it merges its own gap.
+const KNOWN_STRIP_NAMES = new Set([
+  "STRIP",
+  "STRIP_SHRINK_ROW",
+  "STRIP_SHRINK_SCROLL",
+  "STRIP_SHRINK_PINNED",
+  // Pre-existing, unrelated to the gap/fit contract: the `max-md:hidden`
+  // gate that hides the whole strip below `md` in favour of the phone's
+  // text trail. Named STRIP* because it gates the strip, not because it is
+  // a second drawing of one.
+  "STRIP_ONLY",
+]);
+const stripLikeNames = Array.from(src.matchAll(/^const (STRIP\w*) = /gm)).map((m) => m[1]);
+const unknownStripNames = stripLikeNames.filter((name) => !KNOWN_STRIP_NAMES.has(name));
+if (unknownStripNames.length > 0 || stripLikeNames.length !== KNOWN_STRIP_NAMES.size) {
+  findings.push(
+    `${rel} declares STRIP-shaped constant(s) ${JSON.stringify(stripLikeNames)} — expected exactly ` +
+      `${JSON.stringify([...KNOWN_STRIP_NAMES])}; a name outside that set is a second implementation, whatever ` +
+      "its own gap reads today.",
   );
 }
 
@@ -121,10 +213,9 @@ if (findings.length > 0) {
 }
 
 console.log(
-  "OK breadcrumb-folders one-strip-one-gap check: exactly one <BreadcrumbList> render site, spending exactly " +
-    "one STRIP constant (gap-[var(--space-2)], the retired negative-margin overlap gone) merged only with the " +
-    "caller's own listClassName — so the content trail and the assistant dock (and any future caller) render " +
-    "through one implementation and cannot diverge without a second one being added first. Live proof of the " +
-    "outcome: verify/tabstrip-parity/page.tsx's measureNesting reads the identical 9px gap and byte-identical " +
-    "<ol> class string for the content strip and both assistant-strip configurations.",
+  "OK breadcrumb-folders one-strip-one-gap check: three <BreadcrumbList> render sites (natural, shrink-scroll, " +
+    "shrink-pinned), each spending exactly its own named constant, all reading the identical gap-[var(--space-2)] " +
+    "token, fit defaulting to \"natural\", and every fit=\"shrink\" tab-sizing constant declared AND read. Live " +
+    "proof of the natural-mode outcome: verify/tabstrip-parity/page.tsx's measureNesting; live proof of the " +
+    "shrink-mode outcome: verify/agent-tab-strip-fit/page.tsx's own measurements at 1, 3, 5 and 8 tabs.",
 );

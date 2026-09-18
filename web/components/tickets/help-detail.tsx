@@ -72,7 +72,7 @@ import { TicketThread, type ThreadAttachment } from "@shared/ui/components/ticke
 import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 import { RecordRef } from "@shared/web/record-ref"
 import { EditPenButton } from "@shared/web/edit-pen-button"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, EmptyGatedPanel } from "@/components/deep-link/screen-bits"
 import { nameInitials } from "@/lib/identity"
 // EACH MESSAGE'S OWN FILES (team migration 0105) — the same three pieces this
 // file's own header already named as the day-one answer: `AttachmentPreview`/
@@ -92,6 +92,7 @@ import {
   Archive,
   Translate,
   CheckCircle,
+  PencilSimple,
 } from "@shared/ui/foundations/icons"
 
 /** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
@@ -144,6 +145,7 @@ import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { ResolveDialog, type ResolveFormValues } from "@/components/tickets/resolve-dialog"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
@@ -151,7 +153,8 @@ import { sliceKey, STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { TicketStages } from "@/components/tickets/ticket-stages"
 import { WorkLogsPanel } from "@/components/work/work-logs-panel"
-import { RecordTimerButton } from "@/components/shell/timer-bar"
+import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { totalKey } from "@/lib/live-resources"
@@ -371,6 +374,38 @@ export function HelpDetailScreen({
   // right and not the ticket's: answering a request and putting hours on the
   // team's timesheet are two different things a role may grant separately.
   const canLogTime = can("work", "create")
+  /* THE TIMER, NORMALIZED — Aurora's ruling, 18 Sep 2026 ("h3, and aign the
+   * menu to the chips"): at a narrow width, Start/Stop timer moves off its
+   * own button and into the "…" menu beside Close and Edit. `RecordTimerButton`
+   * (below, in `actions`) still draws the wide button unchanged; this second,
+   * independent read of the SAME running-timers cache (`useRecordTimerAction`,
+   * `@/components/shell/timer-bar`) is what the fold's menu item is built
+   * from when the row is narrow — see `shared/web/head-actions.tsx`'s own
+   * header, "TWO RENDERS OF THE SAME ACTIONS, NOT ONE NODE PHYSICALLY MOVED",
+   * for why a stateful control is read twice rather than moved once.
+   *
+   * CALLED HERE, AHEAD OF BOTH LOADING/EMPTY RETURNS BELOW (`!inPage &&
+   * oneQ.data === undefined`, `!ticket`) — a hook cannot sit after a
+   * conditional return the way `RecordTimerButton` itself, an ordinary child
+   * component, safely can — so this reads `ticket?.status`, the same
+   * `ticket.status === "resolved"` gate `RecordTimerButton` reads below, one
+   * optional-chain earlier than the guard that proves `ticket` non-null.
+   *
+   * `enabled: !!ticket` IS THE COLD-PATH FIX (R... cold-screen-hops): called
+   * this early, the hook's own running-timers read would otherwise leave
+   * before the ticket itself is on screen — a sixth request in front of the
+   * five-request budget. Gated on the record being in hand, it leaves no
+   * earlier than `RecordTimerButton` below ever did; the folded menu item
+   * still renders meanwhile (as plain "Start timer", the same as a timer
+   * nobody has started yet) and updates once the read lands. */
+  const timerAction = useRecordTimerAction({
+    teamId,
+    targetTable: "help",
+    targetId: helpId,
+    canLog: canLogTime,
+    disabled: ticket?.status === "resolved",
+    enabled: !!ticket,
+  })
   // WRITING WORK DOWN IS THE WORK MODULE'S RIGHT, NOT THE TICKET'S. A person who
   // may read and answer requests is not necessarily a person who may put things
   // on the team's backlog, so the button on the Related stories tab asks the
@@ -395,6 +430,14 @@ export function HelpDetailScreen({
   // showing, once the small figure it fed was removed. `workLogAddRef`,
   // below, is what the title row's new "+" reaches for instead.
   const workLogAddRef = React.useRef<(() => void) | null>(null)
+  // R88 — WHETHER THIS PANEL IS CONFIRMED EMPTY, read from `<WorkLogsPanel>`'s
+  // own `onEmptyChange` (work-logs-panel.tsx) rather than a second, sidecar
+  // door: that panel's doc comment carries the full account of the race a
+  // separate totals cache key opened (the header settling "empty" a render
+  // apart from the body, both doors briefly drawing their own "+"). `false`
+  // until the panel's own resting-list read resolves, so the header never
+  // pops away and back while that read settles.
+  const [workLogsEmpty, setWorkLogsEmpty] = React.useState(false)
   // `attachRef`/the composer's Paperclip button STOOD HERE — wired to
   // `HelpAttachmentsPanel`'s own `openRef` (record-attachments.tsx). Gone
   // with the tray it opened: see this file's own header for the 18 Sep 2026
@@ -1068,8 +1111,42 @@ export function HelpDetailScreen({
       : []),
   ]
 
+  /* THE FOLD — Aurora's ruling, 18 Sep 2026, "h3, and aign the menu to the
+   * chips": below `shared/web/head-actions.tsx`'s own breakpoint, Close,
+   * Start/Stop timer and Edit leave their standalone buttons and join
+   * `overflow` (above) inside the ONE "…" trigger that moves into the chip
+   * row. Same order the wide row already draws them in — primary, timer,
+   * edit — then whatever already lived in the menu, so reading down the
+   * folded list and reading across the wide row name the same acts in the
+   * same order. */
+  const foldedActions: HeadActionItem[] = [
+    ...(canClose
+      ? [
+          {
+            key: "close",
+            label: t("Close"),
+            icon: <CheckCircle className="size-3.5" />,
+            onSelect: () => setResolving(true),
+            disabled: statusBusy || !latestIsOurs,
+          },
+        ]
+      : []),
+    ...(timerAction ? [timerAction] : []),
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditing(true),
+          },
+        ]
+      : []),
+    ...overflow,
+  ]
+
   const actions = (
-    <>
+    <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
       {/* "THEY'VE CONFIRMED IT" WAS HERE (CHECKLIST 5.13, retired 7 Sep 2026).
           Staff pressed it for the answer that arrived by phone; the client
           pressed the same door in their own portal. It went with the
@@ -1147,7 +1224,7 @@ export function HelpDetailScreen({
           pen (R84's amendment, RULES.md). */}
       {canEdit && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
       <RecordActionsMenu actions={overflow} />
-    </>
+    </div>
   )
 
   return (
@@ -1203,33 +1280,44 @@ export function HelpDetailScreen({
       // status is on the header band's own line"; that line is now this one,
       // narrowed to what she asked for).
       chips={
-        <TicketChips
-          ticket={ticket}
-          // THE STATUS CHIP, AFTER THE ID — client ruling, 17 Sep 2026:
-          // "Add the status chip with the color after the ID on the title."
-          // `Badge variant="status" dot={helpStatusDotTone(ticket.status)}`
-          // is the app's one status-chip shape (R86, `status-owns-the-chip`)
-          // — the colour lives in the dot, never the fill, and this is the
-          // only categorical field on this row that may be coloured at all.
-          statusDot={
-            <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
-              {helpStatusLabel(ticket.status, t)}
-            </Badge>
-          }
-          // THE SAME ICON THE TYPE PICKER DRAWS, from the same map — see
-          // `shared/web/ticket-chips.tsx`'s header for why this is a prop
-          // rather than an import.
-          typeDot={
-            ticketTypeIconName(ticket.helpType) ? (
-              <Icon
-                name={ticketTypeIconName(ticket.helpType)!}
-                className="text-muted-foreground size-3.5 shrink-0"
-              />
-            ) : undefined
-          }
-          appHref={ticket.appId ? `${host.base}/apps/${ticket.appId}` : undefined}
-          AppLink={InAppLink}
-        />
+        <>
+          <TicketChips
+            ticket={ticket}
+            // THE STATUS CHIP, AFTER THE ID — client ruling, 17 Sep 2026:
+            // "Add the status chip with the color after the ID on the title."
+            // `Badge variant="status" dot={helpStatusDotTone(ticket.status)}`
+            // is the app's one status-chip shape (R86, `status-owns-the-chip`)
+            // — the colour lives in the dot, never the fill, and this is the
+            // only categorical field on this row that may be coloured at all.
+            statusDot={
+              <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
+                {helpStatusLabel(ticket.status, t)}
+              </Badge>
+            }
+            // THE SAME ICON THE TYPE PICKER DRAWS, from the same map — see
+            // `shared/web/ticket-chips.tsx`'s header for why this is a prop
+            // rather than an import.
+            typeDot={
+              ticketTypeIconName(ticket.helpType) ? (
+                <Icon
+                  name={ticketTypeIconName(ticket.helpType)!}
+                  className="text-muted-foreground size-3.5 shrink-0"
+                />
+              ) : undefined
+            }
+            appHref={ticket.appId ? `${host.base}/apps/${ticket.appId}` : undefined}
+            AppLink={InAppLink}
+          />
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — Aurora's ruling,
+              "aign the menu to the chips." Always in the tree, like the wide
+              `actions` row above it (`shared/web/head-actions.tsx`'s own "TWO
+              RENDERS OF THE SAME ACTIONS"): CSS is what decides which one a
+              reader sees, never a condition here. `ml-auto` (built into
+              `HeadActionsFoldMenu` itself) pushes it to the chip row's own
+              right edge, and the menu's own `align="end"` lines the popover up
+              with that same edge — "aign the menu to the chips" made literal. */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
+        </>
       }
       // B0302/T3661 — THE SAME TITLE SEAM THE COLLECTION ROW USES
       // (`ticketTitle`, shared/web/ticket-chips.tsx, fixed there 6 Sep 2026):
@@ -1484,28 +1572,51 @@ export function HelpDetailScreen({
           // R84 — reused rather than a fourth hand-rolled "+" button; its own
           // `label` doubles as the accessible name AND the tooltip, so
           // "New story" survives the swap from words to a glyph.
-          <TicketSidePanel
+          //
+          // R88 — EMPTY-STATE SINGLE DOOR (client ruling, 18 Sep 2026,
+          // reading the deployed Work logs card back — full quote on
+          // `EmptyGatedPanel`, deep-link/screen-bits.tsx): "we only have the
+          // first, not the top-right plus button ... reinforce it
+          // everywhere ... remove the [...] header when it's empty." The
+          // title-row "+" above used to carry a hardcoded `empty={false}`
+          // (an `EMPTY_TOOLBAR_EXEMPT` line arguing it should stay reachable
+          // at zero rows) — that reasoning is exactly what this ruling
+          // retires. `<EmptyGatedPanel>` replaces `<TicketSidePanel>` here:
+          // at zero related stories it drops the WHOLE header (title and
+          // button together), and the body's own `CollectionEmptyState` —
+          // wired to the identical `setStoryOpen` the header button opened —
+          // becomes the one door, exactly as a resting collection's toolbar
+          // create button already stands down for R50.
+          //
+          // `empty` READS `storiesPreviewQ.data` — the SAME read that decides
+          // the body's own `CollectionEmptyState` branch below — never
+          // `storiesTotal`, a separate exact-count cache key primed by the
+          // same fetch but settled on its own clock. Two doors reading two
+          // caches is exactly the race `<WorkLogsPanel>`'s own `onEmptyChange`
+          // doc comment names: the header could read "not yet 0" for a render
+          // after the body already knows it is, drawing both doors at once.
+          <EmptyGatedPanel
             title={t("Related stories")}
             count={formatCount(storiesTotal)}
+            empty={storiesPreviewQ.data !== undefined && storiesPreviewQ.data.length === 0}
             action={
-              // R50 — `empty={false}`, deliberately: this "+" sits on the
-              // panel's own TITLE ROW, not a `<ToolbarRow>`, and it is
-              // reachable at zero related stories exactly as it was when it
-              // was a plain text button — a ticket with none yet is the
-              // ordinary case a person presses this to fix. Named in
-              // EMPTY_TOOLBAR_EXEMPT (shared/rules/registry.ts) with this
-              // same reason.
               canWriteWork ? (
-                <AddButton label={t("New story")} onClick={() => setStoryOpen(true)} empty={false} />
+                <AddButton
+                  label={t("New story")}
+                  onClick={() => setStoryOpen(true)}
+                  empty={storiesPreviewQ.data !== undefined && storiesPreviewQ.data.length === 0}
+                />
               ) : undefined
             }
           >
             {storiesPreviewQ.data === undefined ? (
               <Skeleton variant="list" lines={2} />
             ) : storiesPreviewQ.data.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {t("No work written down against this ticket yet.")}
-              </p>
+              <CollectionEmptyState
+                title={t("No work written down against this ticket yet.")}
+                createLabel={t("New story")}
+                onCreate={canWriteWork ? () => setStoryOpen(true) : undefined}
+              />
             ) : (
               <ul className="flex min-w-0 flex-col gap-2">
                 {storiesPreviewQ.data.map((s) => {
@@ -1542,7 +1653,7 @@ export function HelpDetailScreen({
                 })}
               </ul>
             )}
-          </TicketSidePanel>
+          </EmptyGatedPanel>
         }
         time={
           // WORK LOGS, wherever time can be tracked (CHECKLIST 6.8) — gated on
@@ -1561,16 +1672,28 @@ export function HelpDetailScreen({
           // into itself. Every OTHER caller of `WorkLogsPanel` (a story, a
           // task, a meeting) is untouched: both props default to the old
           // behaviour.
+          //
+          // R88 — EMPTY-STATE SINGLE DOOR. Her screenshot, verbatim on
+          // `EmptyGatedPanel` (deep-link/screen-bits.tsx): THIS card, empty,
+          // drew "Work logs" with the black "+" beside it AND, in the body,
+          // "No time logged against this yet. [...] Add the first" — two
+          // doors on one zero-row collection. `<EmptyGatedPanel>` replaces
+          // `<TicketSidePanel>` here for the same reason it does on Related
+          // stories, above: at zero logged entries it drops the header
+          // outright (title and "+" together) and `<WorkLogsPanel>`'s own
+          // `CollectionEmptyState` — unchanged, already wired to the same
+          // `workLogAddRef` opener — is the one door.
           canSeeTime ? (
-            <TicketSidePanel
+            <EmptyGatedPanel
               title={t("Work logs")}
+              empty={workLogsEmpty}
               action={
-                // R50 — `empty={false}`, the same deliberate reason as
-                // Related stories' own "+" above: a title-row button, always
-                // reachable, not a toolbar's own create action over rows
-                // that might be zero.
                 canLogTime ? (
-                  <AddButton label={t("Log time")} onClick={() => workLogAddRef.current?.()} empty={false} />
+                  <AddButton
+                    label={t("Log time")}
+                    onClick={() => workLogAddRef.current?.()}
+                    empty={workLogsEmpty}
+                  />
                 ) : undefined
               }
             >
@@ -1583,8 +1706,9 @@ export function HelpDetailScreen({
                 onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
                 showAddButton={false}
                 addTrigger={workLogAddRef}
+                onEmptyChange={setWorkLogsEmpty}
               />
-            </TicketSidePanel>
+            </EmptyGatedPanel>
           ) : null
         }
         stakeholders={
@@ -1597,7 +1721,24 @@ export function HelpDetailScreen({
           // re-homed — see that comment's own header for which of its facts
           // now render nowhere else on this page.
           <TicketSidePanel title={t("Stakeholders")} count={stakeholderBadge}>
-            <HelpStakeholders stakeholders={stakeholdersQ.data ?? []} />
+            {/* RAISED BY → EDITABLE, THROUGH THE EXISTING PATCH DOOR — client
+                ruling, 18 Sep 2026 ("raised by, there should be a dropdown").
+                `raisedByContactId`/`raisedByContactName` and the save callback
+                are the single-line addition `help-stakeholders.tsx`'s own
+                header calls for: `onChangeRaisedBy` reuses `editTicket` (this
+                file's existing `content.updateHelp` courier, just above),
+                carrying the ticket's own `description` along because that
+                door requires it — no new route. */}
+            <HelpStakeholders
+              stakeholders={stakeholdersQ.data ?? []}
+              accountId={ticket.accountId}
+              raisedByContactId={ticket.raisedByContactId}
+              raisedByContactName={ticket.raisedByContactName}
+              canEditRaisedBy={canEdit}
+              onChangeRaisedBy={(raisedByContactId) =>
+                editTicket({ description: ticket.description, raisedByContactId })
+              }
+            />
           </TicketSidePanel>
         }
       />

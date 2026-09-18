@@ -1177,6 +1177,21 @@ again, which is the only property that matters here.
   pre-existing longer one with an ellipsis through the shared
   `clampRecordHeading` (`shared/web/record-heading.tsx`) rather than a
   bespoke clamp of its own.
+- **R88 `empty-state-single-door`** — if your module draws a collection that
+  can be empty (zero rows, no filter), and you show an empty state, the empty
+  state's "Add the first" button is the ONLY door to add a record — never a
+  header row with a separate add button beside it. Use `<EmptyGatedPanel
+  empty={isEmpty}>` to drop the header entirely when empty, leaving only the
+  empty state's own `CollectionEmptyState`. Every `<AddButton>` outside a
+  `<ToolbarRow>`'s gated slot must sit inside `<EmptyGatedPanel>` or be named
+  in `EMPTY_STATE_SINGLE_DOOR_EXEMPT`.
+- **R89 `footer-on-the-edge`** — if your module's detail screen holds a
+  conversation or reply composer at the bottom, the composer's footer (the card
+  footer or the input container) sits flush against the screen's own bottom edge
+  at every viewport height, and the reply composer draws a distinguishing
+  background at the full width of its own container. Built on `app-shell.tsx`'s
+  existing floor (`flex-col` + `min-h-full`) and your detail body's own `flex-grow`
+  item, so no extra bottom margin.
 
 **The words** (the ones that catch every new module, every time)
 

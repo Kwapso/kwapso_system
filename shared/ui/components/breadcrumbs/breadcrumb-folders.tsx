@@ -184,7 +184,7 @@ import {
 import { FolderShape } from "../folder/folder";
 import { X } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
-import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
+import { Breadcrumbs, collapse, type BreadcrumbsItem, type Rendered } from "./breadcrumbs";
 
 /* ----------------------------------------------------------------------------
    The strip.
@@ -330,6 +330,146 @@ const STRIP = cn(
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",
 );
+
+/* ----------------------------------------------------------------------------
+   `fit="shrink"` — THE STRIP FITS ITS CONTAINER INSTEAD OF OVERFLOWING IT,
+   18 SEP 2026, HER THIRD REPORT ON THE SAME SCREENSHOT: "the assistant tabs
+   overlap / the issue's still there", and by her own account "very tired of
+   this topic". Every rect sweep that answered the first two reports measured
+   TAB-TO-TAB GAPS (8px, `--space-2`, correct every time) and never asked
+   whether the STRIP ITSELF fit the 380px assistant pane it was drawn in. It
+   never did: `STRIP` above is every tab `shrink-0` at its own natural width,
+   with "too wide" answered by scrolling the whole row — and the pinned
+   trailing items, History and "+", are ordinary `<li>`s INSIDE that same
+   scrolling `<ol>`, so on a narrow pane they scroll off with everything
+   else. Reported over a screenshot of the assistant pane at its fixed
+   380px, three open conversations: "Conversation ×", "Everything ×", a
+   third tab cut off mid-label by the pane's own right edge, and both
+   History and "+" pushed out of view entirely — not overlapping,
+   OVERFLOWING, which is a different defect than the one three fixes
+   already answered.
+
+   `fit="natural"` (the default) is BYTE-IDENTICAL to the strip before this
+   prop existed: one `<ol>`, every tab `shrink-0`, the whole row scrolls, and
+   `STRIP` above is untouched. Nothing changes for a caller that never passes
+   `fit`.
+
+   `fit="shrink"` SPLITS THE STRIP'S DRAWING IN TWO, AND ONLY WHEN `onClose`
+   IS ALSO GIVEN — a fold trail has no trailing pinned run to protect, and
+   `onClose`'s own doc already establishes that a tab set never folds. The
+   TRAILING RUN of `closable: false` items (History, "+" — the exact shape
+   both `AgentTabStrip` and the workspace content strip already build, see
+   `app-shell.tsx`'s own `WORKSPACE_NEW_TAB_HREF` item) renders in a SECOND
+   `<ol>`, a plain sibling flex row, `shrink-0` and always visible; every
+   item BEFORE that run renders in the FIRST `<ol>`, which is what actually
+   shrinks: `flex min-w-0` on the list, `flex-1 min-w-0 basis-0 max-w-max` on
+   every tab in it, so a short trail's tabs sit at their own natural
+   (`max-content`) width and a long one shares the room evenly, shrinking
+   together down to `TAB_SHRINK_MIN_WIDTH` — roughly four characters plus
+   the close × — the floor below which a label stops being readable at all.
+   Below that floor the FIRST `<ol>` scrolls, exactly as the single-list
+   strip always has, while the second `<ol>` — outside the scrolling box
+   entirely — never moves and is never clipped.
+
+   ONE TWO-LIST STRIP, NOT A SPLIT `<ol>`. An `<ol>`'s only valid children
+   are `<li>` (plus script-supporting elements) — wrapping the trailing run
+   in a `<div>` inside the SAME list is invalid markup no `data-slot` fixes.
+   Two `<ol>`s, both the kit's own `BreadcrumbList`, both inside the one
+   `<nav>` this file already renders, keep the landmark singular (one
+   `aria-label`, read once) while giving the trailing run its own,
+   unshrinking box — the same shape a real browser tab strip already uses:
+   the "+" is chrome, not a list member.
+
+   THE GAP IS SPENT THREE TIMES ON PURPOSE, NOT DRIFTED INTO. `--space-2`
+   sits on the outer row (between the two lists), and again on each list
+   (between the tabs inside it) — the same token everywhere, so the seam
+   between the last shrinking tab and the first pinned one reads no
+   differently than any other gap in the strip. */
+const STRIP_SHRINK_ROW = cn(
+  "flex min-w-0 items-end isolate gap-[var(--space-2)]",
+  "mb-[calc(var(--folder-tab-overlap)*-1)]",
+);
+
+/* The shrinking half. `min-w-0` is the whole mechanism: without it a flex
+   item's default min-width is its own content size, and a row of tabs would
+   never shrink below their combined natural widths no matter how little
+   room the outer row hands it — exactly the bug this prop exists to fix,
+   reintroduced one level down. `pt-1`/the matching negative `mt-` and the
+   scrollbar-hiding rules move here from `STRIP` rather than the outer row,
+   because they exist for the element that actually carries `overflow-x-
+   auto` — the ring-clipping fix and the hidden scrollbar both only mean
+   anything on the box that can scroll. */
+const STRIP_SHRINK_SCROLL = cn(
+  "flex min-w-0 flex-nowrap items-end gap-[var(--space-2)]",
+  "overflow-x-auto overflow-y-hidden scroll-p-2 [scrollbar-width:none]",
+  "[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0",
+  "pt-1 mt-[calc(var(--space-1)*-1)]",
+);
+
+/* The pinned half — History, "+". Never shrinks, never scrolls, always the
+   strip's own trailing edge. */
+const STRIP_SHRINK_PINNED = "flex flex-nowrap items-end shrink-0 gap-[var(--space-2)]";
+
+/* ONE TAB, IN THE SHRINKING LIST. `basis-0` + `flex-1` is "every tab starts
+   from nothing and shares the room equally" — the opposite of `shrink-0`'s
+   "take your content's width no matter what" — and `max-w-max`
+   (`max-width: max-content`) is the ceiling that stops a short trail's tabs
+   from stretching past their own label width to fill empty space: three
+   short tabs in a wide pane still read as three tabs sized to their words,
+   not three tabs stretched to fill it. `TAB_SHRINK_MIN_WIDTH` is the floor
+   on the other end. */
+const TAB_SHRINK_ITEM = "flex-1 basis-0 max-w-max";
+
+/**
+ * The floor a shrinking tab may never cross: roughly four characters of
+ * label, plus the tab's own leading inset (`ps-5`, `--space-5`) and the room
+ * the close × already reserves (`--folder-shoulder` + `--control-height-
+ * pill` + `--space-2` — `TAB_CLOSABLE`'s own calc, read here rather than
+ * re-derived). Below this a label has nothing left to say and the tab
+ * should scroll rather than keep shrinking. `4ch` is a CSS length unit (the
+ * advance width of the glyph "0" in the element's own font), not a guess
+ * dressed as a number.
+ */
+const TAB_SHRINK_MIN_WIDTH =
+  "min-w-[calc(4ch_+_var(--space-5)_+_var(--folder-shoulder)_+_var(--control-height-pill)_+_var(--space-2))]";
+
+/* The anchor/button/page INSIDE a shrinking tab — TWO overrides, and the
+   MEASURED reason both are needed, not one.
+
+   `TAB`'s own base class list opens with `shrink-0` (`flex-shrink: 0`),
+   which is exactly right for the NATURAL strip — every `<li>` there is
+   ALSO `shrink-0`, so nothing downstream of it ever needs to give up room —
+   and exactly wrong here: the `<li>` this element lives in is now the thing
+   that shrinks (`TAB_SHRINK_ITEM`), but `shrink-0` on the CHILD refuses to
+   follow it. Verified live in `verify/agent-tab-strip-fit/`: with only
+   `min-w-0` overridden and `shrink-0` left standing, every `<li>` shrank to
+   `TAB_SHRINK_MIN_WIDTH` exactly as designed while the anchor INSIDE it
+   stayed at its own full content width and silently overflowed the now-
+   narrower box — no ellipsis, because nothing ever asked the label to be
+   narrower than its text. `shrink` (`flex-shrink: 1`) is the fix: once the
+   anchor can shrink, flexbox's own shrink phase — its hypothetical size is
+   `auto` here (content-based), not zero, so the shrink weighting the
+   `<li>`'s `basis-0` sidesteps for ITSELF still applies normally one level
+   down — brings it down to whatever room the `<li>` actually has.
+
+   `min-w-0` is still needed beside it: `TAB`'s own
+   `min-w-[var(--folder-tab-min-width)]` (128px) is the natural-width floor
+   every OTHER tab still wants, and it would otherwise floor the shrink
+   right where `shrink-0` used to. The TRUE floor for a shrinking tab is
+   `TAB_SHRINK_MIN_WIDTH`, spent one level up on the `<li>` — this element
+   has none of its own, and shrinks to match whatever the `<li>` allows.
+
+   Both merge in AFTER `TAB` so tailwind-merge drops `TAB`'s own
+   `shrink-0`/128px values rather than stacking two declarations of the
+   same property. */
+const TAB_SHRINK_TAB = "shrink min-w-0";
+
+/* The label itself. `truncate` (`overflow-hidden text-ellipsis whitespace-
+   nowrap`) only draws an ellipsis on a box that can actually overflow, which
+   needs `min-w-0` here too — the label is itself a flex child of `TAB`'s own
+   `inline-flex` row, and without this it inherits the same content-based
+   minimum every other flex child starts with. */
+const LABEL_SHRINK = "min-w-0 truncate";
 
 /* ----------------------------------------------------------------------------
    THE TWO DRAWINGS AND THE ONE GATE BETWEEN THEM.
@@ -1235,6 +1375,25 @@ export interface BreadcrumbFoldersProps
    * byte-identical to the strip before this feature existed.
    */
   onReorder?: (fromIndex: number, toIndex: number) => void;
+  /**
+   * `"natural"` (the default) is the strip's original answer to running out
+   * of room: every tab holds its own content width and the whole row
+   * scrolls once the trail (or tab set) is wider than its slot. Byte-
+   * identical to this component before the prop existed.
+   *
+   * `"shrink"` makes the tabs FIT the container instead: named for what it
+   * does, not for the width it happens to be built against, because the
+   * next narrow slot this strip is asked to fill will not be 380px either.
+   * Every tab still open shares the available room and shrinks together —
+   * flex-basis 0, a `max-content` ceiling so a short trail is never
+   * stretched past its own label width, a `~4ch + close ×` floor below
+   * which the row scrolls instead — while any trailing `closable: false`
+   * run (History, "+") is pulled OUTSIDE the shrinking list into its own,
+   * never-shrinking, always-visible box at the strip's end. Requires
+   * `onClose`: see `STRIP_SHRINK_ROW`'s own comment for the whole
+   * mechanism and the defect it answers.
+   */
+  fit?: "natural" | "shrink";
   onCurrentActivate?: () => void;
   /**
    * The accessible name for the button `onCurrentActivate` turns the live
@@ -1350,6 +1509,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       currentActivateLabel,
       currentActivateExpanded,
       onReorder,
+      fit = "natural",
       ...props
     },
     ref,
@@ -1964,6 +2124,29 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
         !rendered.some((entry) => entry.kind === "item" && entry.index === index),
     );
 
+    /* `fit="shrink"`'s OWN SPLIT, COMPUTED ONCE. The trailing run of
+       `closable: false` entries — History, "+", walked from the END of
+       `rendered` so it stops at the first entry that is either closable or a
+       fold gap — is what `STRIP_SHRINK_ROW`'s own comment calls "pulled
+       OUTSIDE the shrinking list". `pinned` is that run; `scrollable` is
+       everything before it, the part that actually shrinks. In `fit=
+       "natural"` mode `pinned` is always empty and `scrollable` is `rendered`
+       unchanged, so nothing below this line does anything different from
+       before the prop existed. */
+    let shrinkSplit = rendered.length;
+    if (fit === "shrink") {
+      for (let index = rendered.length - 1; index >= 0; index -= 1) {
+        const entry = rendered[index];
+        if (entry.kind === "item" && items[entry.index].closable === false) {
+          shrinkSplit = index;
+        } else {
+          break;
+        }
+      }
+    }
+    const scrollable = rendered.slice(0, shrinkSplit);
+    const pinned = rendered.slice(shrinkSplit);
+
     /**
      * One close control's accessible name.
      *
@@ -1982,6 +2165,257 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       const asText = typeof item.label === "string" ? item.label : "";
       if (formatCloseLabel) return formatCloseLabel(asText, closeLabel);
       return asText ? `${closeLabel}: ${asText}` : closeLabel;
+    };
+
+    /**
+     * One tile of the strip — a fold gap or a real crumb — pulled out of the
+     * `<ol>.map()` it used to live inside so `fit="shrink"` can call it
+     * twice, once per list, rather than forking the whole render. `shrinkTab`
+     * is the ONLY thing that changes between the two calls: `false` renders
+     * byte-identical output to this component before `fit` existed (which is
+     * what every `fit="natural"` caller still gets, and what the PINNED half
+     * of a `fit="shrink"` strip gets too — History and "+" never shrink).
+     * `i` stays the strip's own visual-position argument `restZIndex` has
+     * always taken; callers pass the tile's position across the WHOLE
+     * strip, pinned tiles included, so the stacking order is continuous
+     * across both lists exactly as it was across the one.
+     */
+    const renderCrumb = (entry: Rendered, i: number, shrinkTab: boolean) => {
+      if (entry.kind === "gap") {
+        return (
+          <BreadcrumbItem
+            key="breadcrumb-folders-gap"
+            className="shrink-0"
+            style={{ zIndex: restZIndex(i) }}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                data-slot="breadcrumb-folders-fold"
+                style={{ zIndex: restZIndex(i) }}
+                // `group` HERE, NOT ON AN ANCESTOR — this tile has no
+                // close button and no sibling to hover independently
+                // of; the trigger IS the whole hoverable box, so it
+                // is its own group for `FILL_REST_HOVER`'s
+                // `group-hover:`.
+                className={cn(TAB, TAB_REST, "group")}
+              >
+                <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
+                {/* The kit's own elision, reused whole: the glyph is
+                    `aria-hidden` and the announced label sits OUTSIDE
+                    that wrapper, which is the half of this component
+                    everybody gets wrong. A second drawing of "the middle
+                    is missing" is exactly what this file must not
+                    invent. */}
+                <BreadcrumbEllipsis label={ellipsisLabel} />
+              </DropdownMenuTrigger>
+              {/* …and it OPENS what it hides. `breadcrumb.tsx`'s own
+                  note on `BreadcrumbEllipsis` says where this belongs:
+                  "Where a call site makes the elision expandable it
+                  wraps this in a `DropdownMenuTrigger`, and that control
+                  owns every state including its ring." */}
+              <DropdownMenuContent align="start" aria-label={ellipsisLabel}>
+                {hidden.map((item, index) => (
+                  <DropdownMenuItem
+                    key={item.key ?? `breadcrumb-folders-hidden-${String(index)}`}
+                    asChild={item.href !== undefined}
+                    disabled={item.href === undefined}
+                  >
+                    {item.href === undefined ? (
+                      <span>{item.label}</span>
+                    ) : (
+                      <a href={item.href}>{item.label}</a>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </BreadcrumbItem>
+        );
+      }
+
+      const live = entry.index === activeCrumb;
+      const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
+
+      /* READ THE CLOSE FIELDS OFF `items`, NOT OFF `entry.item`.
+         `collapse()` is the TRAIL's fold rule and it hands back
+         `BreadcrumbsItem` — the shared shape, which deliberately does
+         not carry `closable` or a per-item `closeLabel` (see
+         `BreadcrumbFoldersItem` for why those two live only on this
+         drawing's item). `entry.index` is the index into the array
+         the caller passed, so this is the same object with its own
+         type intact, not a second lookup. */
+      const item = items[entry.index];
+      const closable = onClose !== undefined && (item.closable ?? true);
+      const movable = isMovable(entry.index);
+
+      /* THIS TAB'S OWN STACK NUMBER — `1`, flat, for the live tab
+         (unchanged since 2026-09-03); `restZIndex(i)` for every other
+         one, strictly descending by strip position. Written into
+         `zIndexRef` HERE, during render, so `releaseTransforms` can
+         restore exactly this number once a drag that touched this tab
+         ends — see that function's own comment. */
+      const stackZ = live ? 1 : restZIndex(i);
+      zIndexRef.current.set(entry.index, stackZ);
+
+      /* `fit="shrink"`'s OWN LABEL WRAP — ONLY on a tab this call marked
+         shrinkable. `LABEL_SHRINK`'s own comment has the truncation
+         mechanism; a pinned or natural-mode tab renders the label exactly
+         as it always has, an unwrapped node. */
+      const label = shrinkTab ? <span className={LABEL_SHRINK}>{entry.item.label}</span> : entry.item.label;
+
+      return (
+        <BreadcrumbItem
+          key={key}
+          /* THE `<li>` IS THE POSITIONING PARENT, AND ONLY WHEN THERE
+             IS SOMETHING TO POSITION. `relative` is what lets the
+             close button be laid over the tab while remaining the
+             link's SIBLING rather than its child. THE REF GOES ON THE
+             LIVE ITEM ONLY, and ALSO registers this `<li>` into
+             `itemRefs` for every entry — see those refs' own comments
+             above. */
+          ref={(node: HTMLLIElement | null) => {
+            if (node) itemRefs.current.set(entry.index, node);
+            else itemRefs.current.delete(entry.index);
+            if (live) liveRef.current = node;
+          }}
+          data-dragging={carryingIndex === entry.index ? "true" : undefined}
+          // NO HANDLER AT ALL ON A PINNED TAB (`movable` false) — the
+          // refusal IS the rule, same as the native-drag build's own
+          // "never a drop target".
+          onPointerDown={movable ? onTabPointerDown(entry.index) : undefined}
+          onPointerMove={movable ? onTabPointerMove : undefined}
+          onPointerUp={movable ? onTabPointerEnd : undefined}
+          onPointerCancel={movable ? onTabPointerEnd : undefined}
+          onKeyDown={
+            movable
+              ? (event) => {
+                  if (!event.altKey) return;
+                  if (event.key === "ArrowLeft") {
+                    event.preventDefault();
+                    moveByKeyboard(entry.index, -1);
+                  } else if (event.key === "ArrowRight") {
+                    event.preventDefault();
+                    moveByKeyboard(entry.index, 1);
+                  }
+                }
+              : undefined
+          }
+          // THE SILHOUETTE'S OWN STACKING AUTHORITY LIVES HERE, ON THE
+          // `<li>`, AS AN INLINE STYLE — see `stackZ`'s own comment and
+          // `restZIndex`'s for the whole reasoning; unchanged by
+          // `fit="shrink"`, which never touches z-order.
+          style={{ zIndex: stackZ }}
+          className={cn(
+            // `fit="shrink"`'s OWN SIZING, ONLY ON A SHRINKABLE TAB —
+            // `TAB_SHRINK_ITEM`/`TAB_SHRINK_MIN_WIDTH`'s own comments
+            // have the mechanism. Every other tile (natural mode, or a
+            // pinned tile in shrink mode) keeps the original `shrink-0`.
+            shrinkTab ? TAB_SHRINK_ITEM : "shrink-0",
+            shrinkTab && TAB_SHRINK_MIN_WIDTH,
+            "group",
+            closable && "relative",
+            movable && "motion-drag cursor-grab touch-none select-none",
+          )}
+        >
+          {live ? (
+            onCurrentActivate ? (
+              /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. See
+                 `onCurrentActivate`'s own prop doc. */
+              <button
+                type="button"
+                data-slot="breadcrumb-folders-current-control"
+                aria-expanded={currentActivateExpanded}
+                aria-label={currentActivateLabel}
+                onClick={onCurrentActivate}
+                style={{ zIndex: stackZ }}
+                className={cn(
+                  TAB,
+                  shrinkTab && TAB_SHRINK_TAB,
+                  TAB_LIVE,
+                  "cursor-pointer",
+                  closable && TAB_CLOSABLE,
+                  item.iconOnly && TAB_ICON_ONLY,
+                )}
+              >
+                <CrumbShape fill={FILL_LIVE} />
+                {label}
+              </button>
+            ) : (
+              <BreadcrumbPage
+                style={{ zIndex: stackZ }}
+                className={cn(
+                  TAB,
+                  shrinkTab && TAB_SHRINK_TAB,
+                  TAB_LIVE,
+                  closable && TAB_CLOSABLE,
+                  item.iconOnly && TAB_ICON_ONLY,
+                )}
+              >
+                <CrumbShape fill={FILL_LIVE} />
+                {label}
+              </BreadcrumbPage>
+            )
+          ) : entry.item.href === undefined ? (
+            /* An ancestor with no route — see the original comment on
+               this branch, unchanged, above the file's `render` history. */
+            <BreadcrumbPage
+              aria-current={undefined}
+              style={{ zIndex: stackZ }}
+              className={cn(
+                TAB,
+                shrinkTab && TAB_SHRINK_TAB,
+                TAB_REST,
+                "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary",
+                closable && TAB_CLOSABLE,
+                item.iconOnly && TAB_ICON_ONLY,
+              )}
+            >
+              <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
+              {label}
+            </BreadcrumbPage>
+          ) : (
+            <BreadcrumbLink
+              href={entry.item.href}
+              // Browsers make an `<a>` draggable by default; suppressed
+              // only when this tab actually is one — see the original
+              // comment on this prop for the pointer-gesture reasoning.
+              draggable={movable ? false : undefined}
+              style={{ zIndex: stackZ }}
+              className={cn(
+                TAB,
+                shrinkTab && TAB_SHRINK_TAB,
+                TAB_REST,
+                closable && TAB_CLOSABLE,
+                item.iconOnly && TAB_ICON_ONLY,
+                closable && "group-hover:font-[var(--font-weight-medium)]",
+              )}
+            >
+              <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
+              {label}
+            </BreadcrumbLink>
+          )}
+
+          {/* ── THE CLOSE CONTROL. A SIBLING OF THE CRUMB, NEVER A CHILD
+              OF IT — see the file's own header for why. Unaffected by
+              `fit`: a shrinking tab still reserves the identical room for
+              it (`TAB_CLOSABLE`, read by `TAB_SHRINK_MIN_WIDTH`'s own
+              floor too), so the × never gets closer to the label than it
+              does in natural mode. */}
+          {closable ? (
+            <button
+              type="button"
+              data-slot="breadcrumb-folders-close"
+              aria-label={joinCloseLabel(item)}
+              onClick={() => { onClose?.(item, entry.index); }}
+              className={cn(TAB_CLOSE)}
+            >
+              {/* Phosphor's `X`, by Phosphor's own name, at the kit's
+                  own icon-in-a-button size. */}
+              <X size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </BreadcrumbItem>
+      );
     };
 
     return (
@@ -2158,384 +2592,32 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
           )}
           {...props}
         >
-          <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
-            {rendered.map((entry, i) => {
-              /* `i` IS THE STRIP'S OWN VISUAL POSITION, LEFT TO RIGHT —
-                 EVERY RENDERED TILE, THE ELISION INCLUDED, NOT `entry.index`
-                 (which skips whatever the fold hid). `restZIndex(i)` is this
-                 tile's own stacking number, which must be assigned by where
-                 it actually sits, not by its index into the caller's
-                 original array — unchanged by the 18 Sep gap ruling (see
-                 `STRIP`'s own comment): the lift and the z-order stay, only
-                 the retired overlap's own per-`<li>` margin and padding are
-                 gone. */
-              if (entry.kind === "gap") {
-                return (
-                  <BreadcrumbItem
-                    key="breadcrumb-folders-gap"
-                    className="shrink-0"
-                    style={{ zIndex: restZIndex(i) }}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        data-slot="breadcrumb-folders-fold"
-                        style={{ zIndex: restZIndex(i) }}
-                        // `group` HERE, NOT ON AN ANCESTOR — this tile has no
-                        // close button and no sibling to hover independently
-                        // of; the trigger IS the whole hoverable box, so it
-                        // is its own group for `FILL_REST_HOVER`'s
-                        // `group-hover:`.
-                        className={cn(TAB, TAB_REST, "group")}
-                      >
-                        <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
-                        {/* The kit's own elision, reused whole: the glyph is
-                            `aria-hidden` and the announced label sits OUTSIDE
-                            that wrapper, which is the half of this component
-                            everybody gets wrong. A second drawing of "the middle
-                            is missing" is exactly what this file must not
-                            invent. */}
-                        <BreadcrumbEllipsis label={ellipsisLabel} />
-                      </DropdownMenuTrigger>
-                      {/* …and it OPENS what it hides. `breadcrumb.tsx`'s own
-                          note on `BreadcrumbEllipsis` says where this belongs:
-                          "Where a call site makes the elision expandable it
-                          wraps this in a `DropdownMenuTrigger`, and that control
-                          owns every state including its ring." */}
-                      <DropdownMenuContent align="start" aria-label={ellipsisLabel}>
-                        {hidden.map((item, index) => (
-                          <DropdownMenuItem
-                            key={item.key ?? `breadcrumb-folders-hidden-${String(index)}`}
-                            asChild={item.href !== undefined}
-                            disabled={item.href === undefined}
-                          >
-                            {item.href === undefined ? (
-                              <span>{item.label}</span>
-                            ) : (
-                              <a href={item.href}>{item.label}</a>
-                            )}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </BreadcrumbItem>
-                );
-              }
-
-              const live = entry.index === activeCrumb;
-              const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
-
-              /* READ THE CLOSE FIELDS OFF `items`, NOT OFF `entry.item`.
-                 `collapse()` is the TRAIL's fold rule and it hands back
-                 `BreadcrumbsItem` — the shared shape, which deliberately does
-                 not carry `closable` or a per-item `closeLabel` (see
-                 `BreadcrumbFoldersItem` for why those two live only on this
-                 drawing's item). `entry.index` is the index into the array
-                 the caller passed, so this is the same object with its own
-                 type intact, not a second lookup. */
-              const item = items[entry.index];
-              const closable = onClose !== undefined && (item.closable ?? true);
-              const movable = isMovable(entry.index);
-
-              /* THIS TAB'S OWN STACK NUMBER — `1`, flat, for the live tab
-                 (unchanged since 2026-09-03); `restZIndex(i)`
-                 for every other one, strictly descending by strip position so
-                 the earlier tab always outranks a later one it now overlaps
-                 on purpose (`TAB_OVERLAP_MARGIN`'s own note, on `STRIP`).
-                 Written into `zIndexRef` HERE, during render, so
-                 `releaseTransforms` can restore exactly this number once a
-                 drag that touched this tab ends — see that function's own
-                 comment for why reading it back matters more than it used
-                 to. */
-              const stackZ = live ? 1 : restZIndex(i);
-              zIndexRef.current.set(entry.index, stackZ);
-
-              return (
-                <BreadcrumbItem
-                  key={key}
-                  /* THE `<li>` IS THE POSITIONING PARENT, AND ONLY WHEN THERE
-                     IS SOMETHING TO POSITION. `relative` is what lets the
-                     close button be laid over the tab while remaining the
-                     link's SIBLING rather than its child; a trail adds no
-                     class it did not have yesterday.
-
-                     THE REF GOES ON THE LIVE ITEM ONLY — one of them, or none
-                     when `activeIndex` points outside the array — and it is
-                     what the scroll effect above brings into view. */
-                  /* THE REF ALSO REGISTERS THIS `<li>` INTO `itemRefs`, FOR
-                     EVERY ENTRY — the pointer handlers need to read and move
-                     ANY tab in the strip, not only the live one, which is
-                     the one case `liveRef` already covered. Both live in one
-                     callback because `ref` takes exactly one function. */
-                  ref={(node: HTMLLIElement | null) => {
-                    if (node) itemRefs.current.set(entry.index, node);
-                    else itemRefs.current.delete(entry.index);
-                    if (live) liveRef.current = node;
-                  }}
-                  data-dragging={carryingIndex === entry.index ? "true" : undefined}
-                  /* NO HANDLER AT ALL ON A PINNED TAB (`movable` false) — the
-                     refusal IS the rule, same as the native-drag build's own
-                     "never a drop target": nothing here can pick one up, so
-                     nothing has to separately check that one was not
-                     dropped on. */
-                  onPointerDown={movable ? onTabPointerDown(entry.index) : undefined}
-                  onPointerMove={movable ? onTabPointerMove : undefined}
-                  onPointerUp={movable ? onTabPointerEnd : undefined}
-                  onPointerCancel={movable ? onTabPointerEnd : undefined}
-                  onKeyDown={
-                    movable
-                      ? (event) => {
-                          if (!event.altKey) return;
-                          if (event.key === "ArrowLeft") {
-                            event.preventDefault();
-                            moveByKeyboard(entry.index, -1);
-                          } else if (event.key === "ArrowRight") {
-                            event.preventDefault();
-                            moveByKeyboard(entry.index, 1);
-                          }
-                        }
-                      : undefined
-                  }
-                  /* THE SILHOUETTE'S OWN STACKING AUTHORITY LIVES HERE, ON
-                     THE `<li>`, AS AN INLINE STYLE — NOT A CLASS, AND NOT
-                     ONLY ON THE INNER LINK/BUTTON. Client, 16 Sep 2026, over
-                     a screenshot of the compact assistant strip: "the
-                     inactive tabs' shape appears in front of the active one.
-                     That's wrong. It should be behind." — and again, 17 Sep
-                     2026, once the strip's tabs began overlapping ON PURPOSE
-                     (`TAB_OVERLAP_MARGIN`): "The inactives on the assistant
-                     are overlapping, so they're on top of the active tab…
-                     They should be behind." `stackZ`, computed above, is a
-                     real per-tab number now (a flat pair could not rank two
-                     rest tabs against each other; see `restZIndex`'s own
-                     comment), so it cannot be a class — Tailwind only emits
-                     CSS for a class string it can see verbatim in source,
-                     and this value depends on `i` and `rendered.length`,
-                     neither of which exists until render. `style={{ zIndex:
-                     stackZ }}` compares directly against every other tab's
-                     OWN inline zIndex in the strip's own stacking context,
-                     no matter how deep the DOM nesting, PROVIDED nothing
-                     between this `<li>` and that shared context ever becomes
-                     a stacking context itself. Something does:
-                     `onTabPointerMove` writes a bare `style.transform` onto
-                     every tab a drag carries PAST — the active tab included,
-                     whether or not it is the one being dragged — and a
-                     transformed element is a NEW stacking context by itself,
-                     `z-index: auto` or not. That would trap a shifted tab's
-                     own number inside a box the outer context now sees as
-                     one opaque unit tied on DOM order alone against a later
-                     sibling — which is exactly the "inactive in front of
-                     active" defect, reproduced by a drag that never touches
-                     the active tab directly. A `<li>` is a flex item of
-                     `BreadcrumbList`'s own `<ol>` (`STRIP`'s `flex`), so
-                     `z-index` applies to it exactly as if it were `position:
-                     relative` — CSS Flexbox §z-index — with no `position`
-                     needed on this element for that alone. Because the
-                     number lives on THIS element rather than a descendant,
-                     `transform` (a different property) never touches it, so
-                     it stays explicit and numeric on every tab, transformed
-                     or not, dragged or shifted or neither — and because
-                     `releaseTransforms` RESTORES it (rather than clearing
-                     it) once a gesture ends, it survives a drag too. See
-                     that function's own comment, and `onTabPointerDown`'s
-                     inline `style.zIndex = "2"` (the tab actually held,
-                     which still wins over every resting number here — every
-                     one is `<= 1`). */
-                  style={{ zIndex: stackZ }}
-                  className={cn(
-                    "shrink-0",
-                    // UNCONDITIONAL SINCE 17 Sep 2026, WAS `closable &&`
-                    // ALONGSIDE `relative` — the silhouette's own hover
-                    // (`FILL_REST_HOVER`, that constant's own comment) needs
-                    // `group-hover:` on every rest tab, closable or not, so
-                    // the marker moved out from behind that gate. `relative`
-                    // stays gated: it exists only to give the close button a
-                    // positioning parent, and a tab with no close button has
-                    // nothing to position.
-                    "group",
-                    closable && "relative",
-                    // `touch-action: none` ONLY on a movable tab, and only
-                    // because it is one: without it a touch drag along the
-                    // strip's own axis is also a scroll gesture the browser
-                    // is free to start instead of ever calling `pointermove`
-                    // here. A read-only crumb keeps the platform's ordinary
-                    // touch scrolling.
-                    movable && "motion-drag cursor-grab touch-none select-none",
-                  )}
-                >
-                  {live ? (
-                    onCurrentActivate ? (
-                      /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. A
-                         real `<button>`, not `BreadcrumbPage` — that element
-                         is `role="link" aria-disabled="true"` BY DESIGN (see
-                         `breadcrumb.tsx`), which is correct for "you are here"
-                         and wrong for "press to act": a control a reader can
-                         activate must never also announce itself disabled.
-                         Same `TAB`/`TAB_LIVE` classes as the read-only path —
-                         one shape, two elements — with `cursor-pointer` put
-                         back over `TAB_LIVE`'s own `cursor-default`. */
-                      <button
-                        type="button"
-                        data-slot="breadcrumb-folders-current-control"
-                        aria-expanded={currentActivateExpanded}
-                        /* NO FALLBACK TO `entry.item.label`, and the type is the
-                           reason rather than an inconvenience: a crumb's label is
-                           a `ReactNode`, and `aria-label` takes a string. A node
-                           cannot be flattened to an accessible name here without
-                           guessing at what its markup reads as. Left undefined
-                           when no explicit label is given, React omits the
-                           attribute entirely, and the button's accessible name
-                           falls back to its own text content — which IS the
-                           crumb's label, rendered. So the un-labelled case is
-                           still named, by the browser, from the thing a sighted
-                           reader sees; `currentActivateLabel` exists to say
-                           something BETTER than that ("Close the assistant"
-                           rather than "Assistant"), not to rescue it. */
-                        aria-label={currentActivateLabel}
-                        onClick={onCurrentActivate}
-                        style={{ zIndex: stackZ }}
-                        className={cn(
-                          TAB,
-                          TAB_LIVE,
-                          "cursor-pointer",
-                          closable && TAB_CLOSABLE,
-                          item.iconOnly && TAB_ICON_ONLY,
-                        )}
-                      >
-                        <CrumbShape fill={FILL_LIVE} />
-                        {entry.item.label}
-                      </button>
-                    ) : (
-                      <BreadcrumbPage
-                        style={{ zIndex: stackZ }}
-                        className={cn(
-                          TAB,
-                          TAB_LIVE,
-                          closable && TAB_CLOSABLE,
-                          item.iconOnly && TAB_ICON_ONLY,
-                        )}
-                      >
-                        <CrumbShape fill={FILL_LIVE} />
-                        {entry.item.label}
-                      </BreadcrumbPage>
-                    )
-                  ) : entry.item.href === undefined ? (
-                    /* An ancestor with no route. `breadcrumbs.tsx` draws this as
-                       `BreadcrumbPage` too — a step you can see and not visit —
-                       but it must NOT take the live paper here, because the
-                       paper is what says "you are here". So it takes the page
-                       element for its semantics and the REST fill for its
-                       drawing, and `aria-current` is dropped: there is exactly
-                       one current location and it is the live tab. */
-                    <BreadcrumbPage
-                      aria-current={undefined}
-                      style={{ zIndex: stackZ }}
-                      className={cn(
-                        TAB,
-                        TAB_REST,
-                        "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary",
-                        closable && TAB_CLOSABLE,
-                        item.iconOnly && TAB_ICON_ONLY,
-                      )}
-                    >
-                      <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
-                      {entry.item.label}
-                    </BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink
-                      href={entry.item.href}
-                      /* Browsers make an `<a>` draggable by default (drag to
-                         bookmark / open in a new tab); left alone that fires
-                         a native `dragstart` the instant the pointer moves,
-                         which cancels the pointer gesture `onTabPointerMove`
-                         is tracking before it ever sees a second event —
-                         hijacking `onReorder`'s own drag, not merely a
-                         leftover from the retired HTML5-drag build.
-                         Suppressed only when this tab actually is one, so a
-                         read-only trail's links keep their ordinary browser
-                         behaviour. */
-                      draggable={movable ? false : undefined}
-                      style={{ zIndex: stackZ }}
-                      className={cn(
-                        TAB,
-                        TAB_REST,
-                        closable && TAB_CLOSABLE,
-                        item.iconOnly && TAB_ICON_ONLY,
-                        /* THE WEIGHT PREVIEW SURVIVES REACHING FOR THE ×.
-                           `TAB_REST`'s hover is written on the link, and the
-                           close button is laid OVER the link rather than
-                           inside it — so the moment the pointer crosses onto
-                           the ×, the link stops being the hovered element and
-                           the tab drops back to light mid-gesture. The `group`
-                           is the `<li>`, which contains both, so the tab reads
-                           as hovered for the whole of it. Added only on a
-                           closable tab: with no button there is nothing to
-                           cross onto and nothing to fix. */
-                        closable && "group-hover:font-[var(--font-weight-medium)]",
-                      )}
-                    >
-                      <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
-                      {entry.item.label}
-                    </BreadcrumbLink>
-                  )}
-
-                  {/* ── THE CLOSE CONTROL. A SIBLING OF THE CRUMB, NEVER A
-                      CHILD OF IT, and that is the entire reason this exists:
-                      `BreadcrumbLink` renders an `<a>`, interactive content
-                      inside an `<a>` is invalid HTML, and the app's own
-                      stopgap therefore had to be an `aria-hidden` `<span>`
-                      caught by a capture-phase handler — a close affordance a
-                      keyboard could not reach and a screen reader was not told
-                      about. As a sibling it is a real `<button>`: it has an
-                      accessible name that says WHICH tab it closes, it takes
-                      focus, `Enter` and `Space` fire it natively, and
-                      tokens.css §8 rings it like every other control.
-
-                      IN THE TAB ORDER, IMMEDIATELY AFTER ITS OWN TAB, WHICH IS
-                      A DECISION AND NOT A DEFAULT. The alternative was to keep
-                      it out of the sequence and reach it some other way — a
-                      roving `tabindex`, a `Delete` key on the focused crumb —
-                      and both were rejected. This strip is an `<ol>` of links
-                      and not a `role="tablist"`, so it has no keyboard model
-                      to hang a roving index on and inventing one would make
-                      the arrow keys mean something here that they mean nowhere
-                      else in the kit; a bare key binding is undiscoverable,
-                      which for the one user this whole change is FOR is the
-                      same as not existing. `filter-bar.tsx` settled the
-                      identical shape — a label and a remove control inside one
-                      chip — in the same words: "A REMOVABLE CHIP HAS TWO FOCUS
-                      TARGETS… and both are in the tab order."
-
-                      THE COST IS BOUNDED AND WORTH NAMING: it doubles the
-                      stops in the strip. `TAB`'s own `min-w` (128) is what
-                      bounds it in practice — a strip wide enough to be worth
-                      tabbing through is a strip the reader can see — and the
-                      alternative is a set of tabs that can only be closed with
-                      a mouse. */}
-                  {closable ? (
-                    <button
-                      type="button"
-                      data-slot="breadcrumb-folders-close"
-                      aria-label={joinCloseLabel(item)}
-                      /* Optional call, though `closable` above already proved
-                         the handler is there: `onClose` is a parameter and
-                         TypeScript does not carry a narrowing on one into a
-                         closure, so the alternative is an assertion — a claim
-                         the compiler is wrong — for a call this guard has
-                         already made safe. */
-                      onClick={() => { onClose?.(item, entry.index); }}
-                      className={cn(TAB_CLOSE)}
-                    >
-                      {/* Phosphor's `X`, by Phosphor's own name, at the kit's
-                          own icon-in-a-button size. `aria-hidden` because the
-                          button is named above: an icon that announced itself
-                          too would be read twice. */}
-                      <X size={16} aria-hidden="true" />
-                    </button>
-                  ) : null}
-                </BreadcrumbItem>
-              );
-            })}
-          </BreadcrumbList>
+          {fit === "shrink" ? (
+            /* THE TWO-LIST STRIP — `STRIP_SHRINK_ROW`'s own comment has the
+               whole mechanism. `scrollable` (computed above, beside
+               `pinned`) is everything BEFORE the trailing `closable: false`
+               run; it renders in the FIRST `<ol>`, the one that actually
+               shrinks. `pinned` is that trailing run — History, "+" — in a
+               SECOND `<ol>`, `shrink-0`, never inside the first list's own
+               `overflow-x-auto`. `renderCrumb`'s own `i` argument keeps
+               counting across BOTH lists (pinned tiles start at
+               `scrollable.length`), so the stacking order this strip has
+               always drawn is unbroken by the split. */
+            <div data-slot="breadcrumb-folders-shrink-row" className={STRIP_SHRINK_ROW}>
+              <BreadcrumbList ref={listRef} className={cn(STRIP_SHRINK_SCROLL, listClassName)}>
+                {scrollable.map((entry, i) => renderCrumb(entry, i, true))}
+              </BreadcrumbList>
+              {pinned.length > 0 ? (
+                <BreadcrumbList className={STRIP_SHRINK_PINNED}>
+                  {pinned.map((entry, i) => renderCrumb(entry, scrollable.length + i, false))}
+                </BreadcrumbList>
+              ) : null}
+            </div>
+          ) : (
+            <BreadcrumbList ref={listRef} className={cn(STRIP, listClassName)}>
+              {rendered.map((entry, i) => renderCrumb(entry, i, false))}
+            </BreadcrumbList>
+          )}
         </Breadcrumb>
       </>
     );

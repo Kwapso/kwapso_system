@@ -185,3 +185,74 @@ describe("the picker fires the same add-only door the page used to call", () => 
     expect(onAdd).toHaveBeenCalledWith("u-4")
   })
 })
+
+describe("18 Sep 2026 — 'who to keep in the loop should be horizontal'", () => {
+  // Client ruling, verbatim, same batch as the raised-by dropdown. The row
+  // was already horizontal (`StaffPillPicker`'s own `flex flex-wrap`); what
+  // changed is that it now shows the FULL roster, with whoever is already on
+  // the loop pressed and locked rather than filtered out of the list.
+  const ALREADY_ON = { id: "u-2", name: "Aurora", photo: null }
+
+  it("shows an already-on-the-loop teammate as a pressed, disabled chip beside the addable ones — one wrapping row, not a vertical list", async () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={vi.fn(async () => {})}
+        helpTypeOptions={["Bug"]}
+        teamId="team-1"
+        initial={EDIT_INITIAL}
+        helpId="help-1"
+        stakeholders={[STAKEHOLDER]}
+        loopMembers={[ALREADY_ON, ADDABLE]}
+        canAddToLoop
+        onAddStakeholder={vi.fn(async () => {})}
+      />
+    )
+    // Aurora (STAKEHOLDER.userId === ALREADY_ON.id) is drawn — not hidden —
+    // and cannot be clicked off: `aria-pressed`, `disabled`, same shape
+    // `StaffPillPicker`'s own `lockedIds` contract draws everywhere else.
+    const aurora = await screen.findByText("Aurora")
+    const auroraPill = aurora.closest("button") as HTMLButtonElement
+    expect(auroraPill.getAttribute("aria-pressed")).toBe("true")
+    expect(auroraPill.disabled).toBe(true)
+
+    // Blackbox is still the live add control — clicking it still fires the
+    // same add-only door, unchanged by the roster widening.
+    const blackbox = screen.getByText("Blackbox")
+    const blackboxPill = blackbox.closest("button") as HTMLButtonElement
+    expect(blackboxPill.disabled).toBe(false)
+
+    // ONE ROW, WRAPPING — `role="group"` is `StaffPillPicker`'s own
+    // `flex flex-wrap` container; both pills share it, never a vertical stack.
+    const row = auroraPill.closest('[role="group"]') as HTMLElement
+    expect(row).toBeTruthy()
+    expect(row).toBe(blackboxPill.closest('[role="group"]'))
+    expect(row.className).toContain("flex-wrap")
+  })
+
+  it("still fires onAddStakeholder only for an unlocked pill, never for one already on the loop", async () => {
+    const onAdd = vi.fn(async () => {})
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={vi.fn(async () => {})}
+        helpTypeOptions={["Bug"]}
+        teamId="team-1"
+        initial={EDIT_INITIAL}
+        helpId="help-1"
+        stakeholders={[STAKEHOLDER]}
+        loopMembers={[ALREADY_ON, ADDABLE]}
+        canAddToLoop
+        onAddStakeholder={onAdd}
+      />
+    )
+    const aurora = await screen.findByText("Aurora")
+    fireEvent.click(aurora.closest("button") as HTMLElement)
+    expect(onAdd).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText("Blackbox").closest("button") as HTMLElement)
+    expect(onAdd).toHaveBeenCalledWith("u-4")
+  })
+})

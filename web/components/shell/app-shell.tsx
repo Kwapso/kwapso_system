@@ -1749,6 +1749,21 @@ export function AppShell({
                  own "last item" default and byte-for-byte what this strip drew
                  before this prop existed. */
               activeIndex={activeCrumbIndex}
+              /* FIT THE TABS TO THE STRIP — kit v1.2.125, `fit="shrink"` —
+                 ONLY WHEN THIS IS A TAB SET, never on an ordinary trail.
+                 `onCloseCrumb` is the same guard every other tab-set-only
+                 prop on this call already uses: a plain breadcrumb (no
+                 `onCloseCrumb`) still folds its middle into a `···` menu
+                 (`fold()`, unaffected by `fit`) and must stay ONE `<ol>`,
+                 which is what `fit="natural"` (the default, left implicit
+                 here) still draws byte-for-byte. Given, this strip shrinks
+                 its own conversation-tab-shaped peers exactly the way
+                 `agent-tab-strip.tsx` shrinks its — "should 100% replicate
+                 what happens with main content tabs," her own words, read
+                 the OTHER direction: the two mounts of one component must
+                 not diverge on which fit either one gets, so this file
+                 opts in the moment the assistant strip's own file did. */
+              fit={onCloseCrumb ? "shrink" : undefined}
               /* THE CLOSE BUTTON, THE KIT'S OWN NOW. `undefined` when
                  `onCloseCrumb` is absent — an ordinary trail — so nothing
                  grows a × and `closable` on `crumbItems` is never even

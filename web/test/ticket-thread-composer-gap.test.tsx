@@ -193,25 +193,37 @@ describe("the composer is the conversation card's own footer, not a third padded
   })
 })
 
-// LIVE PROOF ON STAGING (T0001): the composer pill's `background-color`
-// measured `rgb(255,254,249)` (#FFFEF9), which is `--card` — and, in light,
-// `--card` and `--background` are byte-identical (ticket-detail-body.tsx's
-// own R67 header), so the "container" read as no container at all, standing
-// on the exact tone of the page behind it. Every other composer/input
-// container in the app grounds on the soft-paper tone instead
-// (`--surface-panel` #F7F2EB) — `agent-panel.tsx` repoints `--card` to reach
-// it for the kit's own vendored composer pill it cannot hand-edit; this
-// composer is APP-drawn, so the fix is the plain class, no token override
-// needed.
-describe("the composer pill stands on the panel tone, not the page's own ground", () => {
-  it("the composer root carries bg-surface-panel, never bg-card", async () => {
+// CORRECTED, R89 "footer-on-the-edge", 18 Sep 2026 — the describe block this
+// replaces was true when it was written and stale within the same session:
+// `ticket-detail-body.tsx` moved `TicketConversationPanel`'s own `Card` to
+// `variant="default"` (R67, "remove the 'overall' container") the SAME day,
+// which repainted the conversation card's own ground from `--card`/
+// `--background` (#FFFEF9) to `--surface-panel` (#F7F2EB) — and this file's
+// old assertion (`bg-surface-panel`, "never bg-card") was never revisited
+// against the new ground it was standing on. Live proof on staging (T0001,
+// BEFORE this fix): the composer's own `background-color` and the
+// conversation card's were the identical `rgb(247,242,235)` — no contrast at
+// all, exactly the client's own screenshot-4 complaint ("on the same beige
+// as the card"). `bg-card` is correct now, for two reasons together: it
+// DIFFERS from the card's own `--surface-panel` ground, so the pill reads as
+// its own field again; and it is the SAME class the kit's own `Input`
+// (`shared/ui/components/input/input.tsx`'s `inputVariants`) paints every
+// ordinary text field with, read straight off that file rather than
+// hand-typed, so this composer matches every input in the app by
+// construction.
+describe("the composer pill stands on a distinct ground from the card, matching the kit's own Input", () => {
+  it("the composer root carries bg-card (the kit Input's own fill) and w-full, never the card's own bg-surface-panel", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
     const composerForm = await waitFor(() => {
       const el = document.querySelector('[data-slot="reply-composer"]') as HTMLElement | null
       if (!el) throw new Error("composer not rendered yet")
       return el
     })
-    expect(composerForm.className).toContain("bg-surface-panel")
-    expect(composerForm.className).not.toMatch(/\bbg-card\b/)
+    expect(composerForm.className).toContain("bg-card")
+    expect(composerForm.className).not.toMatch(/\bbg-surface-panel\b/)
+    // FULL WIDTH OF ITS OWN CONTAINER — Aurora's screenshot 4, verbatim:
+    // "it should be full width of its own container." Measured on staging
+    // before this fix: the pill rendered 271px wide inside a 769px footer.
+    expect(composerForm.className).toContain("w-full")
   })
 })

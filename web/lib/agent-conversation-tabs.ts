@@ -296,18 +296,33 @@ export function activateAgentTab(id: string): void {
   announce()
 }
 
-/** A picker row was pressed: the scope is set once, and the label becomes the
- * pick itself — the design artifact's own reading: "the tab's own label is the
- * pick, not a fourth control... a record's name if she'd picked 'This
- * record'." */
+/** A picker row was pressed: the scope is set once. `recordLabel`/`scopeId`
+ * ride along for `agent-panel.tsx`'s own first-message prefix (`handleSend`)
+ * and, for "app" scope, the retrieval door's `appId` — neither is shown to
+ * the reader.
+ *
+ * THE TAB'S OWN LABEL IS NO LONGER THE PICK — REVERSED, 18 SEP 2026, HER
+ * THIRD REPORT ON THE ASSISTANT TABS. The design artifact's original reading
+ * ("the tab's own label is the pick... a record's name if she'd picked 'This
+ * record'") is what put the scope's OWN name — "Everything", "Knowledge" —
+ * into a real, user-facing tab title, permanently: nothing downstream ever
+ * replaced it, so a picked-but-not-yet-sent tab, and any tab whose first
+ * message never got a title update, sat there reading "Everything" forever.
+ * Two of them doing exactly that is what she reported. A tab's title is the
+ * CONVERSATION's own subject, never the CATEGORY it was filed under — the
+ * same distinction a browser's own tab strip draws (a new tab reads "New
+ * Tab", never the search engine you are about to use). So this function no
+ * longer takes or writes a `label` at all: the tab's `label` stays whatever
+ * it already was (empty, for a fresh "+" — `agent-tab-strip.tsx`'s own `||
+ * t("New")` fallback is what a reader actually sees) until `renameAgentTab`
+ * below gives it a real one, off the conversation's own first message. */
 export function pickAgentTabScope(
   id: string,
   scope: AgentTabScope,
-  label: string,
   recordLabel?: string,
   scopeId?: string
 ): void {
-  tabs = tabs.map((t) => (t.id === id ? { ...t, scope, label, recordLabel, scopeId } : t))
+  tabs = tabs.map((t) => (t.id === id ? { ...t, scope, recordLabel, scopeId } : t))
   announce()
 }
 
@@ -315,6 +330,29 @@ export function pickAgentTabScope(
  * landed, or a resume finished after the tab was already seeded. */
 export function setAgentTabThread(id: string, threadId: string): void {
   tabs = tabs.map((t) => (t.id === id && t.threadId !== threadId ? { ...t, threadId } : t))
+  announce()
+}
+
+/** GIVE A TAB ITS REAL TITLE — the conversation's own first user message,
+ * called once, the instant that message is actually sent
+ * (`agent-panel.tsx`'s own `handleSend`, `!tab.threadId` is "nothing sent in
+ * THIS tab yet," the identical signal `setAgentTabThread` above clears).
+ *
+ * THE RAW TEXT, UNTRUNCATED — never sliced here. `breadcrumb-folders.tsx`'s
+ * `fit="shrink"` (kit v1.2.125) truncates the RENDERED tab with a real
+ * ellipsis once the label is wider than the strip can spare; slicing the
+ * string a second time here would just be a second, hand-rolled, character-
+ * counted truncation disagreeing with the one the strip already draws.
+ *
+ * NEVER OVERWRITES A TAB THAT ALREADY HAS A TITLE — a history-resumed tab
+ * arrives with the server's own topic already in `label`
+ * (`openAgentTabForThread`), and this function is only ever called from a
+ * tab's own first-message send, which a resumed tab has already had, by
+ * definition, before it was ever resumable. The guard is here anyway,
+ * belt-and-suspenders, rather than trusted to every call site's own logic:
+ * a title, once real, is never demoted back to a guess. */
+export function renameAgentTab(id: string, label: string): void {
+  tabs = tabs.map((t) => (t.id === id && !t.label ? { ...t, label } : t))
   announce()
 }
 

@@ -167,7 +167,13 @@ async function markChangesNoProcess() {
  * same gate (`canWriteWork`). Nothing left to open first any more. */
 async function relatedStoriesTab() {
   openTicket()
-  await screen.findByText("Related stories")
+  // R88 — this fixture carries NO related stories on purpose (every case
+  // below is about the create flow FROM that empty state), and a genuinely
+  // empty Related stories panel draws no "Related stories" title at all any
+  // more (`EmptyGatedPanel`, deep-link/screen-bits.tsx) — the empty state's
+  // own sentence is the one thing on screen regardless of whether this
+  // reader may create a story, so it is the wait target both cases share.
+  await screen.findByText("No work written down against this ticket yet.")
 }
 
 describe("writing a story on the ticket that asked for it", () => {

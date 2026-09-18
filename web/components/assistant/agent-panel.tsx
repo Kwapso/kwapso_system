@@ -58,6 +58,7 @@ import {
   openNewAgentTab,
   pickAgentTabScope,
   pruneUnusedAgentTabsOnBoot,
+  renameAgentTab,
   reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
@@ -701,19 +702,15 @@ export function AgentPanel({
   // `ask-the-assistant.tsx` already uses for a record-scoped question
   // ("About {context}: …") — the chat door itself has no structured
   // record-id field to hand it instead.
+  //
+  // NO TAB TITLE COMPUTED HERE ANY MORE — `pickAgentTabScope`'s own header
+  // has the reversal: the scope's name ("Everything", "Knowledge") is not a
+  // conversation's title, and writing it into `label` here is exactly what
+  // let two tabs sit stuck reading "Everything" forever. `handleSend` below
+  // is what titles the tab now, off the message actually sent.
   function handlePickScope(scope: AgentTabScope) {
     if (!activeAgentTabId) return
-    const label =
-      scope === "record"
-        ? (currentRecordLabel ?? t("This record"))
-        : scope === "knowledge"
-          ? t("Knowledge")
-          // "today's default" is gone (client ruling: "kill this 'today's
-          // default' for setting scope of assistant") — agent-scope-picker.tsx
-          // already dropped it from the picker ROW; this is the same tab
-          // TITLE that row's own comment names as the other call site.
-          : t("Everything")
-    pickAgentTabScope(activeAgentTabId, scope, label, scope === "record" ? currentRecordLabel : undefined)
+    pickAgentTabScope(activeAgentTabId, scope, scope === "record" ? currentRecordLabel : undefined)
     const target = scope === "record" ? ["records"] : scope === "knowledge" ? ["articles"] : [...SOURCE_CHIP_KEYS]
     for (const key of SOURCE_CHIP_KEYS) {
       const has = chat.sources.includes(key)
@@ -731,10 +728,18 @@ export function AgentPanel({
   // pass `appId` straight to `ask_knowledge` instead of matching the app by
   // name alone, exactly the way naming a client's own words lets it resolve
   // `accountId` from an ordinary "record"-scoped question today.
+  //
+  // THE TAB'S TITLE, TOO — `!tab.threadId` names the identical "first
+  // message in this tab" moment `renameAgentTab`'s own header reads it as.
+  // The RAW text the reader typed, never the prefixed one sent to the door —
+  // "About Halloway: what's the status" reads as a record-scoped QUESTION
+  // to the model, and as a strip full of tabs all starting "About …" to the
+  // reader; her own words is the title, not the app's own framing of it.
   function handleSend(text: string) {
     const tab = activeAgentTab
-    const firstMessage = tab && !tab.threadId && tab.recordLabel
-    const prefixed = !firstMessage
+    const firstMessage = tab && !tab.threadId
+    if (firstMessage && activeAgentTabId) renameAgentTab(activeAgentTabId, text)
+    const prefixed = !firstMessage || !tab.recordLabel
       ? text
       : tab.scope === "app"
         ? `About the app "${tab.recordLabel}"${tab.scopeId ? ` (app id ${tab.scopeId})` : ""}: ${text}`

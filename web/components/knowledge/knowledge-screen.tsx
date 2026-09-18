@@ -227,8 +227,14 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
 
   function openAskConversation() {
     const id = openNewAgentTab()
-    if (isApp) pickAgentTabScope(id, "app", scope.appName, scope.appName, scope.appId)
-    else pickAgentTabScope(id, "knowledge", t("Knowledge"))
+    // NO TAB LABEL PASSED ANY MORE — `pickAgentTabScope`'s own header
+    // (web/lib/agent-conversation-tabs.ts) has the reversal: the scope's
+    // name is not the conversation's title, so this only ever hands over
+    // what the FIRST-MESSAGE PREFIX needs (`recordLabel`/`scopeId`); the tab
+    // reads "New" until `agent-panel.tsx`'s `handleSend` titles it off the
+    // question actually asked.
+    if (isApp) pickAgentTabScope(id, "app", scope.appName, scope.appId)
+    else pickAgentTabScope(id, "knowledge")
     setAgentOpen(true)
   }
 

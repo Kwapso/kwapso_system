@@ -217,6 +217,22 @@ export function AgentTabStrip({
       items={items}
       label={t("Open conversations")}
       activeIndex={activeIndex}
+      // THE ASSISTANT PANE FITS ITS TABS RATHER THAN OVERFLOWING THEM — kit
+      // v1.2.125, `fit="shrink"`. Aurora reported the assistant tabs
+      // overlapping/overflowing three times; the third report was this
+      // exact pane at its fixed 380px width, "+" and History pushed
+      // entirely off the right edge by three (then five, then eight) open
+      // conversations. `fit="shrink"` pulls both of those OUTSIDE the
+      // scrolling tab list into their own always-visible box, and shrinks
+      // the conversation tabs themselves — down to a real minimum, labels
+      // truncated with an ellipsis — before the list ever has to scroll.
+      // See that prop's own doc (breadcrumb-folders.tsx) for the whole
+      // mechanism, and app-shell.tsx's `breadcrumb` for why the content
+      // strip takes the identical prop: "should 100% replicate what
+      // happens with main content tabs," her own words, and the two mounts
+      // already share this one component byte-for-byte
+      // (agent-tab-strip.test.tsx's "parity" describe block).
+      fit="shrink"
       onClose={(item) => {
         if (typeof item.key === "string" && item.key !== "new" && item.key !== "history") onClose(item.key)
       }}

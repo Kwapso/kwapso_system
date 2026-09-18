@@ -132,7 +132,7 @@ describe('the "app" agent scope opens a NEW conversation, never "knowledge"', ()
     const fnEnd = src.indexOf("\n  }", fnAt)
     const body = src.slice(fnAt, fnEnd)
     expect(body, "scopes to this app, by id and by name").toMatch(
-      /pickAgentTabScope\(id,\s*"app",\s*scope\.appName,\s*scope\.appName,\s*scope\.appId\)/
+      /pickAgentTabScope\(id,\s*"app",\s*scope\.appName,\s*scope\.appId\)/
     )
     const openAt = body.indexOf("openNewAgentTab()")
     const scopeAt = body.indexOf('pickAgentTabScope(id, "app"')

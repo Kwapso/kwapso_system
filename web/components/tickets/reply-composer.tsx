@@ -558,22 +558,32 @@ export function ReplyComposer({
           it. Nothing here suppresses a ring and nothing here defines a second
           one, which is what `focus-ring.test.ts` reads this file for.
 
-          THE PILL'S OWN GROUND — live proof on the deployed ticket screen
-          (T0001) measured this pill's `background-color` as
-          `rgb(255,254,249)` (#FFFEF9), which is `--card` AND `--background`
-          in light — the SAME tone as the page behind the whole record (see
-          `ticket-detail-body.tsx`'s own header, the R67 note that the two
-          are byte-identical in light). A composer drawn `bg-card` therefore
-          stood on its own ground exactly the way R67 forbids everywhere
-          else: no contrast at all between the "container" and the page it
-          sits on. Every other composer/input container in the app answers
-          this the same way — `agent-panel.tsx` repoints `--card` to
-          `--surface-panel` for the kit's own `AgentChat` composer pill it
-          cannot hand-edit ("the color of the text write field #F7F2EB, like
-          everywhere else"). This composer is APP-DRAWN, not the kit's, so
-          there is no vendored class to work around: `bg-surface-panel`
-          directly, the soft-paper tone (`--surface-panel` #F7F2EB light)
-          every other container in the app already grounds on. */}
+          THE PILL'S OWN GROUND — CORRECTED, R89 "footer-on-the-edge",
+          18 Sep 2026. The paragraph this replaces was true when it was
+          written and stale by the time `ticket-detail-body.tsx` moved
+          `TicketConversationPanel`'s own `Card` to `variant="default"`
+          (R67, the SAME session, "remove the 'overall' container, make
+          each thing its own container") — that change repainted the
+          conversation card's ground from `--card`/`--background`
+          (#FFFEF9) to `--surface-panel` (#F7F2EB), and this composer's own
+          `bg-surface-panel` was never revisited against the new ground it
+          was standing on. Live proof on staging (T0001, before this fix,
+          `${SCRATCH}/footer-measure.json`): the composer's
+          `background-color` and the conversation card's were the SAME
+          `rgb(247,242,235)` — no contrast at all, exactly the client's own
+          complaint ("on the same beige as the card"), and exactly the class
+          of bug R67 exists to catch, just arrived at from the OTHER
+          direction — the container's ground moved out from under a control
+          that used to answer it correctly.
+          `bg-card` now (`rgb(255,254,249)` / #FFFEF9 in light), for two
+          reasons together: it is DIFFERENT from the card's own
+          `--surface-panel` ground, so the pill reads as its own field
+          again; and it is the SAME class `shared/ui/components/input/
+          input.tsx`'s own `inputVariants` paints every ordinary text field
+          with (`"bg-card text-foreground"`) — this composer matches every
+          other input in the app BY CONSTRUCTION, reaching for the one class
+          the kit's own field already uses, rather than a new colour picked
+          to look right once. */}
       <form
         data-slot="reply-composer"
         data-focus-shell=""
@@ -581,7 +591,7 @@ export function ReplyComposer({
           event.preventDefault()
           start()
         }}
-        className="flex min-w-0 items-center gap-2 rounded-pill bg-surface-panel py-2 ps-4 pe-2"
+        className="flex w-full min-w-0 items-center gap-2 rounded-pill bg-card py-2 ps-4 pe-2"
       >
         {/* ATTACH — a Paperclip beside the field, back for real (team migration
             0105, the client's ruling of 18 Sep 2026 restated at the top of

@@ -4395,4 +4395,18 @@ export const SEED: Catalogue = {
     es: "«{name}» es demasiado grande. Adjunta un archivo de hasta {size} MB.",
     ca: "«{name}» és massa gran. Adjunta un fitxer de fins a {size} MB.",
   },
+
+  /* 18 Sep 2026 — one more string `npm run lang` found with no seed entry for
+     de/es/ca: help-stakeholders.tsx's `SelectValue` placeholder for the
+     Raised by row, now a kit Select rather than a RecordPicker. It reuses the
+     exact root already settled twice over for this same relationship —
+     "Raised by" (Gemeldet von/Solicitado por/Sol·licitat per) and the hole
+     fragment "who raised it" (wer es gemeldet hat/quién lo planteó/qui ho va
+     plantejar) — so the placeholder reads as the same sentence the rest of
+     the form already says, not a fresh coinage. */
+  "Choose who raised it": {
+    de: "Wählen Sie, wer es gemeldet hat",
+    es: "Elige quién lo planteó",
+    ca: "Tria qui ho va plantejar",
+  },
 }

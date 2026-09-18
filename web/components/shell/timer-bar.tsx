@@ -34,6 +34,7 @@ import type { RunningTimer } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useAfterPaint } from "@shared/web/after-paint"
 import { useT } from "@shared/web/language"
+import type { HeadActionItem } from "@shared/web/head-actions"
 
 /** Whole seconds as a clock a person reads at a glance: 1:04:09, or 4:09 under an
  * hour. Never "3849s", and never a decimal — a timer is read, not calculated. */
@@ -215,47 +216,51 @@ function refreshTimers(teamId: string, targetTable: string, targetId: string): v
   invalidatePrefix(TIME_SLICE_PREFIX)
 }
 
-/** THE CLOCK ON ONE RECORD — start it, and stop the one you started.
+/** THE CLOCK ON ONE RECORD, NORMALIZED FOR A FOLDED MENU — extracted from
+ * `RecordTimerButton` below, 18 Sep 2026, so `shared/web/head-actions.tsx`'s
+ * record-head fold can offer "Start timer"/"Stop timer" as an ordinary menu
+ * item at a narrow width without re-deriving the running-timer state or
+ * duplicating the toggle's own error handling. `RecordTimerButton` is now a
+ * thin `Button` wrapper around this hook's own return value — same running-
+ * timers cache, same toggle, same copy, same errors, unchanged for every
+ * existing caller (`help-detail.tsx`, `task-detail.tsx`, `story-detail.tsx`).
  *
- * A record's own screen is where a person decides to begin working on it, so it
- * is where the control belongs, and it exists here rather than three times over
- * because it was written once and then not repeated: the ticket and the task had
- * NO way to start a timer at all, while the server has accepted all three targets
- * since work logs shipped (WORK_LOG_TARGETS: stories, help, tasks).
+ * `null` exactly where `RecordTimerButton` would have rendered nothing
+ * (`!canLog`) — a caller folding this into a menu drops it the same way
+ * `HeadActionsFoldMenu` already drops any other falsy item.
  *
- * IT SAYS WHICH WAY IT GOES. The story's button was a permanent "Start timer"
- * that did not know a timer was already running on that very story, so the second
- * press answered "You already have a timer running on this" — the door refusing
- * correctly, and the screen having asked the wrong question. It reads the same
- * running-timers cache the header bar reads, so the two can never disagree.
- *
- * The variant is CONSTANT on purpose: the label and the glyph carry the state,
- * and a `variant={running ? … : …}` is the shape R3's check hunts for. */
-export function RecordTimerButton({
+ * `enabled` (default `true`) IS THE DETERMINISTIC GATE `shared/web/
+ * after-paint.ts` asks a caller to prefer over its own scheduler — a `null`
+ * cache key fetches nothing. A caller forced to call this hook AHEAD OF its
+ * own record (a head-fold reader, hooks can't sit after a conditional
+ * return) passes `enabled: !!record` so the running-timers read leaves only
+ * once the record itself is in hand, the same moment `RecordTimerButton`
+ * below — an ordinary child mounted after that guard — has always read it.
+ * Left `true`, unchanged, for every caller that already only mounts this
+ * once its own record is on screen. */
+export function useRecordTimerAction({
   teamId,
   targetTable,
   targetId,
-  /** `work:update` at the call site — the same right the door gates on. */
   canLog,
-  /** A finished piece of work has nothing left to time. */
   disabled,
+  enabled = true,
 }: {
   teamId: string
   targetTable: "stories" | "help" | "tasks"
   targetId: string
   canLog: boolean
   disabled?: boolean
-}) {
+  enabled?: boolean
+}): HeadActionItem | null {
   const t = useT()
   const [busy, setBusy] = React.useState(false)
-  const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
+  const timersQ = useCached<RunningTimer[]>(enabled ? runningTimersKey(teamId) : null, () =>
     contentApi.runningTimers().then((r) => r.timers)
   )
   const mine = (timersQ.data ?? []).find(
     (x) => x.targetTable === targetTable && x.targetId === targetId
   )
-
-  if (!canLog) return null
 
   async function toggle() {
     setBusy(true)
@@ -278,15 +283,57 @@ export function RecordTimerButton({
     }
   }
 
+  if (!canLog) return null
+
+  return {
+    key: "timer",
+    label: mine ? t("Stop timer") : t("Start timer"),
+    icon: mine ? <StopCircle className="size-3.5" /> : <Play className="size-3.5" />,
+    onSelect: () => void toggle(),
+    disabled: busy || disabled,
+  }
+}
+
+/** THE CLOCK ON ONE RECORD — start it, and stop the one you started.
+ *
+ * A record's own screen is where a person decides to begin working on it, so it
+ * is where the control belongs, and it exists here rather than three times over
+ * because it was written once and then not repeated: the ticket and the task had
+ * NO way to start a timer at all, while the server has accepted all three targets
+ * since work logs shipped (WORK_LOG_TARGETS: stories, help, tasks).
+ *
+ * IT SAYS WHICH WAY IT GOES. The story's button was a permanent "Start timer"
+ * that did not know a timer was already running on that very story, so the second
+ * press answered "You already have a timer running on this" — the door refusing
+ * correctly, and the screen having asked the wrong question. It reads the same
+ * running-timers cache the header bar reads, so the two can never disagree.
+ *
+ * The variant is CONSTANT on purpose: the label and the glyph carry the state,
+ * and a `variant={running ? … : …}` is the shape R3's check hunts for.
+ *
+ * NOW A THIN WRAPPER around `useRecordTimerAction`, above — same output,
+ * unchanged, for every existing caller. */
+export function RecordTimerButton({
+  teamId,
+  targetTable,
+  targetId,
+  /** `work:update` at the call site — the same right the door gates on. */
+  canLog,
+  /** A finished piece of work has nothing left to time. */
+  disabled,
+}: {
+  teamId: string
+  targetTable: "stories" | "help" | "tasks"
+  targetId: string
+  canLog: boolean
+  disabled?: boolean
+}) {
+  const action = useRecordTimerAction({ teamId, targetTable, targetId, canLog, disabled })
+  if (!action) return null
   return (
-    <Button
-      variant="secondary"
-      className="gap-1"
-      disabled={busy || disabled}
-      onClick={() => void toggle()}
-    >
-      {mine ? <StopCircle className="size-3.5" /> : <Play className="size-3.5" />}
-      {mine ? t("Stop timer") : t("Start timer")}
+    <Button variant="secondary" className="gap-1" disabled={action.disabled} onClick={action.onSelect}>
+      {action.icon}
+      {action.label}
     </Button>
   )
 }

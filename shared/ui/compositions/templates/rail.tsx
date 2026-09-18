@@ -390,6 +390,27 @@
    the expanded lockup keep taking the identical token, unchanged from
    "IT TAKES `MARK_STEP` TOO" above).
 
+   ONE RUNG MORE, 18 SEP 2026 — "A BIT BIGGER." Aurora, on the same live rail,
+   the same day: "I want the logo to be bigger and maybe even a bit lower. I
+   don't know. You tell me, you're the designer, but I would say it needs to
+   be a bit bigger, just a bit." A DESIGNER'S CALL, not a measured reference —
+   so it is answered the same way every step on this mark has been: one more
+   rung of the SAME ladder, `--icon-24` to `--icon-28`, not an invented
+   number and not a free-form nudge. `MARK_STEP` now reads `--icon-28`.
+
+   THE "BIT LOWER" IS NOT A SEPARATE CHANGE, AND NOTHING ELSE MOVES. "THE
+   LOGO'S OWN VERTICAL CENTRE MATCHES THE WORKSPACE TAB STRIP'S LABEL" law
+   (v1.2.122, rewritten again in v1.2.123 for the CSS-strut fix) stands
+   completely untouched here: the band (`h-[var(--strip-row)]`,
+   `items-center`) centres the mark by construction and reads neither
+   `MARK_STEP` nor any icon-ladder rung to do it — see "UNCONDITIONAL — BOTH
+   RAIL STATES, EVERY MARK" below. A taller mark inside a band whose height
+   and top offset do not move keeps its CENTRE exactly where it was and grows
+   in both directions from it — so the mark's bottom edge drops (and its top
+   edge rises) by exactly half the size delta, which is what reads as "a bit
+   lower" without moving the alignment law an inch. One number changed;
+   nothing here was told to sit lower on purpose, and nothing needed to be.
+
    ─────────────────────────────────────────────────────────────────────────
    THE APPLICATION OWNS THE ROUTE
    ─────────────────────────────────────────────────────────────────────────
@@ -565,10 +586,21 @@ const ROW_COLLAPSED = cn(
  * override has nothing left to say. See the file header, "STEPPED BACK UP TO
  * `--icon-24`".
  *
+ * STEPPED UP AGAIN TO `--icon-28`, 18 SEP 2026, SAME DAY — Aurora, the
+ * designer's own call rather than a client-measured reference: "I want the
+ * logo to be bigger and maybe even a bit lower... it needs to be a bit
+ * bigger, just a bit." One more rung of the SAME ladder (28 x 4.9986 =
+ * 139.96 in a 208 column, 67.29%). The "bit lower" is not a second change —
+ * the vertical-centre law (file header, "THE LOGO'S OWN VERTICAL CENTRE
+ * MATCHES THE WORKSPACE TAB STRIP'S LABEL") centres the mark in a band whose
+ * own height and offset do not read this token at all, so a taller mark
+ * grows from a fixed centre and its bottom edge drops on its own. See the
+ * file header, "ONE RUNG MORE, 18 SEP 2026".
+ *
  * The COLLAPSED isotype takes the same step, so the two states of the same
  * mark stand at the same height. See the file header.
  */
-const MARK_STEP = "[--brand-step:var(--icon-24)]";
+const MARK_STEP = "[--brand-step:var(--icon-28)]";
 
 /* ----------------------------------------------------------------------------
    AN IDLE ENTRY, AND D5 = C's COLOUR HALF IS OVERRULED ON THIS ROW, 2026-09-02.

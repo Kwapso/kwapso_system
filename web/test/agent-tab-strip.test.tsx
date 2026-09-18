@@ -250,12 +250,26 @@ describe("parity with the main content tab strip — client ruling, 17 Sep 2026,
     // `app-shell.tsx` only ever leaves `onClose` `undefined` on a trail with
     // nothing closable at all, never on the open-tab-set shape this test (and
     // the client's own report) is about.
+    // `fit="shrink"` HERE TOO, kit v1.2.125 — `app-shell.tsx`'s own tab-set
+    // call (`onCloseCrumb` given) now passes it, the identical opt-in
+    // `agent-tab-strip.tsx` gives `BreadcrumbFolders` a few lines below this
+    // test. Leaving it off this side of the comparison would compare the
+    // assistant's real SHRINK shape against a NATURAL one that no real
+    // tab-set caller renders any more — a parity test that could pass while
+    // the two mounts had already diverged, exactly the class of gap this
+    // describe block exists to close.
     const contentItems: BreadcrumbFoldersItem[] = [
       { key: "tasks", label: "Tasks", href: "#tasks" },
       { key: "tickets", label: "Tickets", href: "#tickets" },
     ]
     const { container: contentContainer } = render(
-      <BreadcrumbFolders items={contentItems} activeIndex={0} onClose={() => {}} closeLabel="Close tab" />
+      <BreadcrumbFolders
+        items={contentItems}
+        activeIndex={0}
+        onClose={() => {}}
+        closeLabel="Close tab"
+        fit="shrink"
+      />
     )
     const contentNav = contentContainer.querySelector('nav[data-slot="breadcrumb-folders"]')
     expect(contentNav, "the bare content-strip-shaped call must mount the same component").toBeTruthy()
@@ -264,6 +278,28 @@ describe("parity with the main content tab strip — client ruling, 17 Sep 2026,
       agentNav!.className,
       "the assistant dock strip's <nav> class string must match the content strip's exactly — neither file may add its own overlap/spacing class"
     ).toBe(contentNav!.className)
+  })
+
+  // THE FIT ITSELF — kit v1.2.125, `fit="shrink"`. Her THIRD report on this
+  // strip was not the gap or the z-order (both already proven above and in
+  // the "stacking" describe block) but OVERFLOW: at the assistant pane's
+  // fixed 380px, three open conversations pushed History and "+" off the
+  // right edge entirely. `fit="shrink"` splits the strip into a shrinking
+  // scroll list and a pinned, never-shrinking one for exactly that trailing
+  // run — see breadcrumb-folders.tsx's own `STRIP_SHRINK_ROW` comment for
+  // the whole mechanism; this proves only that `AgentTabStrip` actually asks
+  // for it, and that History/"+" land in the PINNED half, never the
+  // scrolling one.
+  it("AgentTabStrip renders through fit=\"shrink\" — two breadcrumb lists, History and \"+\" in the pinned (second) one", () => {
+    render(<AgentTabStrip {...baseProps()} />)
+    const lists = document.querySelectorAll('[data-slot="breadcrumb-list"]')
+    expect(lists, "fit=\"shrink\" draws a scrolling list and a pinned one").toHaveLength(2)
+
+    const plusLink = screen.getByRole("link", { name: "New conversation" })
+    const historyLink = screen.getByRole("link", { name: "History" })
+    expect(lists[1].contains(plusLink), "\"+\" sits in the pinned (second) list, never the scrolling one").toBe(true)
+    expect(lists[0].contains(plusLink), "\"+\" is never a descendant of the scrolling list").toBe(false)
+    expect(lists[1].contains(historyLink), "History sits in the pinned (second) list too").toBe(true)
   })
 })
 

@@ -1,13 +1,14 @@
-// HELP-STAKEHOLDERS — FACES + NAMES ONLY. Client ruling, 17 Sep 2026, reading
-// the deployed V1 ticket page back, verbatim: "Remove all of this from
-// stakeholders 'Pick someone to keep in the loop … B Blackbox C Chilavert …
-// You can add members, but no one is ever removed.'" And, read together with
-// the fact-list removal in the same review: "Everyone kept in the loop on this
-// ticket, the person who raised it, your admins, and anyone mentioned." also
-// goes. What remains, on the page itself: the stakeholder's face and name,
-// nothing else. The picker moved into the ticket edit sheet
-// (help-form-dialog-loop-field.test.tsx proves its new home); this file
-// proves the component the page renders now takes no picker props at all.
+// HELP-STAKEHOLDERS — FACES + NAMES, RAISED BY AS ONE TILE, THE LOOP
+// HORIZONTAL. Client ruling, 17 Sep 2026, reading the deployed V1 page back,
+// verbatim: "Remove all of this from stakeholders 'Pick someone to keep in
+// the loop … B Blackbox C Chilavert … You can add members, but no one is
+// ever removed.'" And, read together with the fact-list removal in the same
+// review: "Everyone kept in the loop on this ticket, the person who raised
+// it, your admins, and anyone mentioned." also goes. What remains, on the
+// page itself: the stakeholder's face and name, nothing else. The picker
+// moved into the ticket edit sheet (help-form-dialog-loop-field.test.tsx
+// proves its new home); this file proves the component the page renders now
+// takes no LOOP-picker props at all.
 //
 // AMENDED 18 Sep 2026 — client ruling, verbatim: "show them like cards (like
 // settings members) and show what was before, who raised it and on the
@@ -16,17 +17,64 @@
 // loop" for everyone else — never a THIRD fact beyond the face, the name and
 // that one label.
 //
-// AMENDED AGAIN, SAME DAY — client ruling, verbatim: "inside ticket detail,
-// for stakeholders, i want square tiels (lik in members, with text under the
-// image). 3 should fit in one row." The card became the SAME tile the
-// members gallery draws (`PersonCard`'s default `vertical` orientation and
-// `band` size, not the `horizontal`/`tile` pair the first pass reached for)
-// in a `grid-cols-3` panel.
+// AMENDED AGAIN, SAME DAY, THEN SUPERSEDED THE SAME DAY: "square tiles, three
+// to a row" (grid-cols-3) was the shape for a few hours; her next ruling —
+// "On ticket raised by, there should be a dropdown, and who to keep in the
+// loop should be horizontal" — split the panel in two: Raised by keeps ONE
+// tile (the same `PersonCard` vertical/band shape, now also EDITABLE through
+// the ticket's own `raised_by_contact_id`, the field that field already
+// supports via the existing PATCH door); the loop is no longer a grid, it is
+// one card holding a single horizontal, wrapping row of `PersonCard`
+// `orientation="horizontal"` chips. See help-stakeholders.tsx's own header
+// for the full account, including why the loop row is still READ-ONLY (no
+// "×" — `help_stakeholders` has no delete route).
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { cleanup, render, screen, within } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+
+/** Radix measures itself and captures the pointer; jsdom does neither. Without
+ * these the "Raised by" edit `Select` never mounts — the same polyfill
+ * `toolbar-search-floor.test.tsx` uses for the identical reason. */
+beforeAll(() => {
+  Object.assign(window.HTMLElement.prototype, {
+    scrollIntoView: () => {},
+    hasPointerCapture: () => false,
+    releasePointerCapture: () => {},
+    setPointerCapture: () => {},
+  })
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+})
+
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...actual,
+    tenancy: {
+      ...actual.tenancy,
+      accountDetail: async () => ({
+        account: { id: "account-1", name: "Bergman & co" },
+        links: [
+          {
+            id: "link-1",
+            accountId: "account-1",
+            personAccountId: "contact-1",
+            personName: "Max Mustermann",
+            personLogoUrl: null,
+            relationship: null,
+            isMainStakeholder: true,
+            active: true,
+          },
+        ],
+      }),
+    },
+  }
+})
 
 import type { HelpStakeholder } from "@shared/types"
 import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
@@ -62,118 +110,97 @@ describe("HelpStakeholders — the empty state", () => {
   })
 })
 
-describe("HelpStakeholders — the people list", () => {
-  it("renders a face and a name for every stakeholder, and nothing else", () => {
+describe("HelpStakeholders — Raised by, one tile", () => {
+  it("renders the raiser's face and name, labelled 'Raised by', with no email and no raw origin word", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    expect(screen.getByText("Aurora")).toBeTruthy()
-    // R54 — a client contact (origin: "raiser") keeps their name WHOLE; a
-    // colleague (origin: anything else) is named by their first name alone.
-    // `staffNameFromSnapshot` is what does that, so Max — the raiser — reads
-    // in full, and this proves the component still calls it.
-    expect(screen.getByText("Max Mustermann")).toBeTruthy()
-
-    // NO EMAIL LINE, NO ORIGIN BADGE BY ITS RAW NAME — "the stakeholder
-    // faces + names", read narrowly: a face, a name, and now the ONE
-    // relation label the 18 Sep 2026 ruling added — never an email, never
-    // the origin word itself ("admin"/"raiser").
-    expect(screen.queryByText("aurora@kwapso.com")).toBeNull()
-    expect(screen.queryByText("Admin")).toBeNull()
+    // R54 — a client contact (origin: "raiser") keeps their name WHOLE.
+    const card = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    expect(card).toBeTruthy()
+    expect(within(card).getByText("Raised by")).toBeTruthy()
+    expect(screen.queryByText("max@bergman.example")).toBeNull()
     expect(screen.queryByText("Raiser")).toBeNull()
-
-    // AND NO PICKER OR ITS SENTENCES — moved to the edit sheet.
-    expect(screen.queryByText("Pick someone to keep in the loop")).toBeNull()
-    expect(screen.queryByText("You can add members, but no one is ever removed.")).toBeNull()
   })
 
-  it("labels the raiser 'Raised by' and everyone else 'On the loop' (18 Sep 2026 ruling)", () => {
+  it("draws exactly one Raised-by tile, never one per admitted/mentioned/added stakeholder", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    const auroraCard = screen.getByText("Aurora").closest('[data-slot="stakeholder-card"]') as HTMLElement
-    const maxCard = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
-    // AURORA's `origin` is "admin" — on the loop, not the raiser.
-    expect(within(auroraCard).getByText("On the loop")).toBeTruthy()
-    // MAX's `origin` is "raiser".
-    expect(within(maxCard).getByText("Raised by")).toBeTruthy()
+    expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(1)
   })
 
-  it("draws one card, and one face (an initial fallback, with no photo), per stakeholder", () => {
+  it("is a plain fact, not an editor, when the caller has not gated editing on", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(2)
+    expect(screen.queryByLabelText("Edit")).toBeNull()
   })
 
-  it("lays the cards three per row (18 Sep 2026 ruling), with each face above its name", () => {
-    const { container } = render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    // THREE PER ROW, AT THE PANEL'S OWN WIDTH — a class census, the same
-    // shape R31/R32's own checks read a value off a className string.
-    const grid = container.firstElementChild as HTMLElement
-    expect(grid.className).toContain("grid-cols-3")
-
-    // THE FACE ABOVE THE NAME — `PersonCard`'s `vertical` orientation (the
-    // kit default, never overridden here any more) draws the mark
-    // (`RecordMark`, `aria-hidden`) before the title in DOM order; a
-    // `horizontal` tile would draw them side by side instead.
-    for (const name of ["Aurora", "Max Mustermann"]) {
-      const card = screen.getByText(name).closest('[data-slot="stakeholder-card"]') as HTMLElement
-      expect(card).toBeTruthy()
-      const face = card.querySelector("[aria-hidden]") as HTMLElement
-      expect(face).toBeTruthy()
-      const nameNode = screen.getByText(name)
-      // eslint-disable-next-line no-bitwise
-      expect(face.compareDocumentPosition(nameNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    }
+  it("opens an editable dropdown from the edit pen when the caller gates it on, sourced from the ticket's own account contacts, and saves through the caller's callback", async () => {
+    const onChange = vi.fn(async () => {})
+    render(
+      <HelpStakeholders
+        stakeholders={[AURORA, MAX]}
+        accountId="account-1"
+        raisedByContactId={null}
+        raisedByContactName={null}
+        canEditRaisedBy
+        onChangeRaisedBy={onChange}
+      />
+    )
+    fireEvent.click(await screen.findByLabelText("Edit"))
+    const option = await screen.findByText((t) => t.includes("Max Mustermann"))
+    fireEvent.click(option)
+    expect(onChange).toHaveBeenCalledWith("contact-1")
   })
 
-  it("draws the SQUARE band, never a circle — client ruling, 18 Sep 2026, same-day follow-up: \"for stakeholders, i want square tiels (lik in members, with text under the image)\" (class census + a live-style jsdom render)", () => {
-    // THE CLASS CENSUS — `PersonCard` (shared/web/person-card.tsx) is the ONE
-    // `RecordMark` call this tile and the members-gallery tile both share; a
-    // regression here proves both walls at once, straight off the source
-    // rather than trusting the render alone (the render can only prove HOW
-    // React interpreted the source today, not that the source itself still
-    // says what the file's header claims).
+  it("takes no LOOP-picker props — StaffPillPicker/onAdd/canAdd/members are gone from its signature", () => {
+    // The component's own contract for the LOOP half stayed shrunk (17 Sep
+    // 2026 ruling); reading the SOURCE'S own export signature narrowly so a
+    // regression fails here even if a call site kept passing `stakeholders`
+    // alone. `raisedByContactId`/`raisedByContactName`/`accountId`/
+    // `canEditRaisedBy`/`onChangeRaisedBy` are a NEW, narrower capability —
+    // editing the one field the door already supports — not a return of the
+    // old loop picker, so they are deliberately not in this deny-list.
     const src = readFileSync(
-      join(import.meta.dirname, "..", "..", "shared", "web", "person-card.tsx"),
+      join(import.meta.dirname, "..", "components", "tickets", "help-stakeholders.tsx"),
       "utf8"
     )
-    expect(src, "PersonCard must hand RecordMark shape=\"square\" — the members-gallery tile, not a circular avatar").toMatch(
-      /<RecordMark[^>]*\bshape="square"/
-    )
-    expect(src, "and it must never go back to the round person mark").not.toMatch(/<RecordMark[^>]*\bshape="round"/)
-
-    // THE LIVE RENDER — `RecordMark` (shared/web/record-mark.tsx) resolves
-    // `shape="square"` to `rounded-[var(--radius)]` (R31's box radius) and
-    // `shape="round"` to `rounded-pill`; reading the FACE's own className off
-    // a real jsdom render is the proof a source census alone cannot give —
-    // that the prop actually reaches the box React paints, not just that the
-    // call site spells the right word.
-    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    for (const name of ["Aurora", "Max Mustermann"]) {
-      const card = screen.getByText(name).closest('[data-slot="stakeholder-card"]') as HTMLElement
-      const face = card.querySelector("[aria-hidden]") as HTMLElement
-      expect(face, `${name}'s card must draw a face`).toBeTruthy()
-      expect(face.className, `${name}'s face must be the rounded-square band`).toContain(
-        "rounded-[var(--radius)]"
-      )
-      expect(face.className, `${name}'s face must not be the round person mark any more`).not.toContain(
-        "rounded-pill"
-      )
-    }
-  })
-
-  it("takes no picker-related props at all — the component's own contract shrank with the ruling", () => {
-    // `HelpStakeholders` used to require `members`, `canAdd` and `onAdd`
-    // alongside `stakeholders`; rendering it above with `stakeholders` alone
-    // already proves the signature no longer demands them (a required prop
-    // missing would fail to compile). This reads the SOURCE'S own export
-    // signature too — narrowly, the one line that declares the component's
-    // props — so a regression that re-widened the contract still fails here
-    // even if a call site kept passing `stakeholders` alone. Comments
-    // elsewhere in the file naming `StaffPillPicker`/`onAdd` in PROSE (the
-    // history of where they moved) are deliberately out of scope for this
-    // narrower read.
-    const src = readFileSync(join(import.meta.dirname, "..", "components", "tickets", "help-stakeholders.tsx"), "utf8")
     const signature = src.slice(src.indexOf("export function HelpStakeholders"), src.indexOf("{\n  const"))
     expect(signature).not.toContain("StaffPillPicker")
-    expect(signature).not.toContain("canAdd")
-    expect(signature).not.toContain("onAdd")
-    expect(signature).not.toContain("members")
+    expect(signature).not.toContain("canAddToLoop")
+    expect(signature).not.toContain("onAddStakeholder")
+    expect(signature).not.toContain("loopMembers")
+  })
+})
+
+describe("HelpStakeholders — On the loop, one horizontal row", () => {
+  it("labels the loop card 'On the loop' once, not per person", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    expect(screen.getAllByText("On the loop").length).toBe(1)
+  })
+
+  it("draws the loop members in ONE card, side by side, wrapping — not a grid of tiles", () => {
+    const { container } = render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const loopCard = container.querySelector('[data-slot="loop-card"]') as HTMLElement
+    expect(loopCard).toBeTruthy()
+    expect(screen.getByText("Aurora").closest('[data-slot="loop-card"]')).toBe(loopCard)
+    // No grid-cols-3 census any more — the row is a flex-wrap, not a grid.
+    expect(loopCard.innerHTML).not.toContain("grid-cols-3")
+    const row = loopCard.querySelector(".flex-wrap") as HTMLElement
+    expect(row).toBeTruthy()
+  })
+
+  it("names a colleague by their first name (staffNameFromSnapshot), never their raw origin word", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    expect(screen.getByText("Aurora")).toBeTruthy()
+    expect(screen.queryByText("aurora@kwapso.com")).toBeNull()
+    expect(screen.queryByText("Admin")).toBeNull()
+  })
+
+  it("carries no remove control — the loop stays add-only (help_stakeholders has no delete route)", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    expect(screen.queryByText("×")).toBeNull()
+    expect(screen.queryByLabelText(/remove/i)).toBeNull()
+  })
+
+  it("does not render the loop card at all when nobody but the raiser is on the ticket", () => {
+    const { container } = render(<HelpStakeholders stakeholders={[MAX]} />)
+    expect(container.querySelector('[data-slot="loop-card"]')).toBeNull()
   })
 })

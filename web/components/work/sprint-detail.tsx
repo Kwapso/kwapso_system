@@ -57,6 +57,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { listFetch, sprintsKey, totalKey } from "@/lib/live-resources"
@@ -281,6 +282,28 @@ export function SprintDetailScreen({
       ]
     : []
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * Complete/Reopen leaves its standalone button and joins `overflow`
+   * (Edit) inside the ONE "…" trigger that moves into the chip row. Same
+   * order the wide row already draws them in — complete, then edit. */
+  const foldedActions: HeadActionItem[] = canEdit
+    ? [
+        {
+          key: "complete",
+          label: sprint.completedAt ? t("Reopen") : t("Complete"),
+          icon: sprint.completedAt ? (
+            <ArrowCounterClockwise className="size-3.5" />
+          ) : (
+            <Checks className="size-3.5" />
+          ),
+          disabled: busy,
+          onSelect: () => void setComplete(!sprint.completedAt),
+        },
+        ...overflow,
+      ]
+    : []
+
   return (
     <RecordScreen
       mark={kindMark}
@@ -336,6 +359,9 @@ export function SprintDetailScreen({
               {sprint.accountName}
             </RecordChipLink>
           ) : null}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={sprint.name}
@@ -345,7 +371,7 @@ export function SprintDetailScreen({
       // third, and the app in the Overview tab's own "App" row.
       actions={
         canEdit ? (
-          <>
+          <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
             <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1">
               {busy ? (
                 <Spinner />
@@ -357,7 +383,7 @@ export function SprintDetailScreen({
               {sprint.completedAt ? t("Reopen") : t("Complete")}
             </Button>
             <RecordActionsMenu actions={overflow} />
-          </>
+          </div>
         ) : undefined
       }
       // NO headerExtra — client ruling 2026-08-31, read a second time: "only

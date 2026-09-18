@@ -34,7 +34,7 @@ import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { StoryAttachmentsPanel } from "@/components/work/story-attachments"
-import { RecordTimerButton } from "@/components/shell/timer-bar"
+import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { ApiFailure, content as contentApi } from "@/lib/api"
@@ -46,6 +46,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -101,6 +102,28 @@ export function StoryDetailScreen({
   // one that governs editing the story — a person who may log time but not
   // rewrite the work was being offered neither.
   const canLogTime = can("work", "create")
+  /* THE TIMER, NORMALIZED — Aurora's ruling, 18 Sep 2026 ("h3, and aign the
+   * menu to the chips"): at a narrow width, Start/Stop timer moves off its
+   * own button and into the "…" menu beside Ready for review/Done/Edit.
+   * `RecordTimerButton` (below, in `actions`) still draws the wide button
+   * unchanged; this second, independent read of the SAME running-timers
+   * cache (`useRecordTimerAction`, `@/components/shell/timer-bar`) is what
+   * the fold's menu item is built from when the row is narrow — see
+   * `shared/web/head-actions.tsx`'s own header, "TWO RENDERS OF THE SAME
+   * ACTIONS, NOT ONE NODE PHYSICALLY MOVED".
+   *
+   * CALLED HERE, AHEAD OF THE THREE EARLY RETURNS BELOW — a hook cannot sit
+   * after a conditional return the way `RecordTimerButton` itself, an
+   * ordinary child component, safely can — so this reads `storyQ.data?.status`,
+   * the same `story.status === "done"` gate `RecordTimerButton` reads below,
+   * one optional-chain earlier than the guard that proves `story` non-null. */
+  const timerAction = useRecordTimerAction({
+    teamId,
+    targetTable: "stories",
+    targetId: storyId,
+    canLog: canLogTime,
+    disabled: storyQ.data?.status === "done",
+  })
   // Precomputed with the outer `t`: `renderPanel` below names its own tab-item
   // parameter `t`, which would otherwise shadow the translation function right
   // where the footer's own note field needs it.
@@ -322,6 +345,44 @@ export function StoryDetailScreen({
       ]
     : []
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * the timer, Ready for review/Done and Edit all leave their standalone
+   * controls and join the ONE "…" trigger that moves into the chip row.
+   * Same order the wide row already draws them in — timer, the stage
+   * button, then edit. */
+  const foldedActions: HeadActionItem[] = [
+    ...(timerAction ? [timerAction] : []),
+    ...(canEdit && (story.status === "open" || story.status === "in_progress")
+      ? [
+          {
+            key: "readyForReview",
+            label: t("Ready for review"),
+            icon: <CheckSquare className="size-3.5" />,
+            disabled: busy,
+            onSelect: () => setReviewOpen(true),
+          },
+        ]
+      : []),
+    ...(canEdit && story.status === "in_review"
+      ? [
+          {
+            key: "done",
+            label: t("Done"),
+            icon: <Check className="size-3.5" />,
+            disabled: busy,
+            onSelect: () =>
+              void run(
+                () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
+                "Done.",
+                "Couldn't close that story."
+              ),
+          },
+        ]
+      : []),
+    ...overflow,
+  ]
+
   return (
     <RecordScreen
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
@@ -357,6 +418,9 @@ export function StoryDetailScreen({
               {story.sprintName}
             </RecordChipLink>
           ) : null}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={translation.of(story.title)}
@@ -369,7 +433,7 @@ export function StoryDetailScreen({
       // under the chips row (`data-record-region="header"`) — exactly the
       // region the ruling forbids.
       actions={
-        <>
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           {/* START, AND STOP. It used to be a permanent "Start timer" that could
               not see the timer already running on this very story, so pressing it
               again asked the door a question it had to refuse. The shared control
@@ -411,7 +475,7 @@ export function StoryDetailScreen({
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
-        </>
+        </div>
       }
       // THE STAGE STEPPER AND THE APP/TICKET CROSS-LINKS ARE GONE — CLIENT
       // RULING, 2026-08-31, VERBATIM: "what is this 3rd component in the

@@ -27,7 +27,7 @@
 import * as React from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { clearCache } from "@shared/web/store"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 /** What the accounts door was asked, captured. Hoisted so `vi.mock`'s factory —
  * which runs before the module body — can close over it. */
@@ -99,6 +99,25 @@ vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: () => false }) }))
 
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { searchAccounts } from "@/lib/picker-sources"
+
+// RADIX MEASURES ITSELF AND CAPTURES THE POINTER; JSDOM DOES NEITHER — the same
+// polyfill `help-form-dialog-raised-by.test.tsx` and `help-stakeholders.test.tsx`
+// carry for the identical reason. Needed here since 18 Sep 2026: "Raised by"
+// (the `describe("who raised it")` block below) is now the kit's own `Select`,
+// not the hand-rolled chip row the rest of this file's helpers still assume.
+beforeAll(() => {
+  Object.assign(window.HTMLElement.prototype, {
+    scrollIntoView: () => {},
+    hasPointerCapture: () => false,
+    releasePointerCapture: () => {},
+    setPointerCapture: () => {},
+  })
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+})
 
 afterEach(cleanup)
 beforeEach(() => {
@@ -777,15 +796,40 @@ describe("a ticket has a title", () => {
 })
 
 /* ══════════════════════════════════════════════════════════════════════════
-   "IN RAIDES BY TICKET ADD SCREEN: ADD AVATAR IN ROUND" — the client, 2026-09-09.
+   "ON TICKET RAISED BY, THERE SHOULD BE A DROPDOWN" — the client, 18 Sep 2026,
+   superseding her 2026-09-07 "no dropdown but visible all chips" ruling for
+   this ONE field (see `help-form-dialog.tsx`'s own comment at the field's
+   call site for the full account). This describe used to drive a
+   `RecordPicker layout="row"` chip line — `role="button"`, `aria-pressed`,
+   a round `RecordMark` avatar per chip — none of which the field draws any
+   more. THE CASES BELOW ARE THE SAME FIVE CLAIMS, re-driven through the real
+   control: the kit's own `Select` (`shared/ui/components/select/select.tsx`),
+   opened by its trigger (`#help-contact`) and read as `role="option"` rows.
 
-   READ OFF THE MARK BOX, not off the chip's text, for the reason the app row's
-   own case gives one describe up: the label already contains every letter of the
-   name, so a textContent assertion would pass with no mark drawn at all.
-   `RecordMark` is `aria-hidden` by design, so its class is the handle.
-   ══════════════════════════════════════════════════════════════════════════ */
+   WHAT DID NOT MOVE, because the comment at the call site says so and this
+   file proves it rather than trusting the comment: `contactOptions`, the
+   main-contact default (`raisedByValue`), the grandfathering
+   (`contactGrandfathered`) and the fence (only this account's own contacts)
+   are all read off the exact same state as before — only the control
+   painting them changed. `help-form-dialog-raised-by.test.tsx` already
+   proves the control swap itself (combobox role, no leftover chip role); the
+   cases here stay because they are the ones that also prove SUBMIT — what a
+   default nobody touched, or a grandfathered empty field, actually sends. */
 describe("who raised it", () => {
-  it("draws each contact with a round mark carrying their initial", async () => {
+  /** The trigger — `SelectTrigger id="help-contact"`, present from first
+   * render (disabled until the account's contacts arrive), which is why this
+   * reads it directly rather than through a `waitFor`. */
+  const raisedByTrigger = () => document.getElementById("help-contact") as HTMLButtonElement
+
+  /** Opens the list and returns once the door's own contacts have rendered as
+   * real, clickable rows — `role="option"`, Radix's own shape for a Select
+   * item, not the retired chip's `role="button"`. */
+  const openRaisedBy = async () => {
+    fireEvent.click(raisedByTrigger())
+    await waitFor(() => expect(raisedByTrigger().getAttribute("aria-expanded")).toBe("true"))
+  }
+
+  it("lists every contact as a real option, and the escape hatch is still gone", async () => {
     door.links = [
       { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Marta Nilsson", relationship: null, isMainStakeholder: true, active: true },
       { id: "l2", accountId: "acct-bergman", personAccountId: "p2", personName: "Otto Berg", relationship: null, isMainStakeholder: false, active: true },
@@ -800,33 +844,18 @@ describe("who raised it", () => {
         initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
       />
     )
-    const row = await waitFor(() => {
-      const r = chipRow("Raised by")
-      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
-      return r
-    })
-    const marta = within(row).getByRole("button", { name: /Marta Nilsson/ })
-    const mark = marta.querySelector(".bg-muted")
-    // THE MARK EXISTS AT ALL — this is the half `shape: "round"` alone never
-    // bought. `RowChip` draws its `RecordMark` only when a picture, a glyph or
-    // `face` says to, and neither of these two contacts has a photograph.
-    expect(mark).toBeTruthy()
-    // ROUND, which is R35's box for a person in their own right…
-    expect(mark?.className).toContain("rounded-pill")
-    // …and the honest content: no `personLogoUrl` on the row, so the initial.
-    // This is now the FALLBACK case rather than the only case — see below.
-    expect(mark?.textContent).toBe("M")
-
+    // WAIT FOR THE ACCOUNT'S OWN CONTACTS: the trigger stays disabled
+    // (`contactOptions.length === 0`) until `accountDetail` resolves.
+    await waitFor(() => expect(raisedByTrigger().disabled).toBe(false))
+    await openRaisedBy()
+    expect(await screen.findByRole("option", { name: /Marta Nilsson/ })).toBeTruthy()
+    expect(screen.getByRole("option", { name: /Otto Berg/ })).toBeTruthy()
     // AND THE ROW IS ALL PEOPLE — client, 2026-09-10: "raised by not said
-    // should not exist." The escape hatch used to sit at the end of this row
-    // wearing `shape: "round"` and deliberately no face; it is gone, and this
-    // line is what keeps it gone. Read as an ABSENCE off the row rather than off
-    // the options array, because the option object is not what she was looking
-    // at.
-    expect(within(row).queryByRole("button", { name: "Not said" })).toBeNull()
-    // TWO CHIPS, NOT THREE. A count, so a rename of the escape hatch could not
-    // slip past the assertion above by calling itself something else.
-    expect(within(row).getAllByRole("button")).toHaveLength(2)
+    // should not exist." The escape hatch that used to close this chip row
+    // is still gone under the new control: no option reads "Not said", and
+    // the count is exactly the door's own two contacts, not a third row.
+    expect(screen.queryByRole("option", { name: "Not said" })).toBeNull()
+    expect(screen.getAllByRole("option")).toHaveLength(2)
   })
 
   /* ── "ALWAYS DEFAULT MAIN CONTACT PERSON" — the client, 2026-09-10 ─────────
@@ -862,20 +891,14 @@ describe("who raised it", () => {
         draftKey="t"
       />
     )
-    const row = await waitFor(() => {
-      const r = chipRow("Raised by")
-      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
-      return r
-    })
-    // THE MAIN CONTACT IS THE ONE LIT, and Otto — first in the list here on
-    // purpose — is not. "Take the first row" would have passed a weaker version
-    // of this case, because the door sorts the main contact first.
-    expect(
-      within(row).getByRole("button", { name: /Marta Nilsson/ }).getAttribute("aria-pressed")
-    ).toBe("true")
-    expect(
-      within(row).getByRole("button", { name: /Otto Berg/ }).getAttribute("aria-pressed")
-    ).toBe("false")
+    // THE MAIN CONTACT IS THE ONE SHOWN, before anybody opens the list —
+    // Otto, first in `door.links` on purpose, is not. "Take the first row"
+    // would have passed a weaker version of this case, because the door
+    // sorts the main contact first and this reads the CLOSED trigger, which
+    // can only be showing `raisedByValue`'s own default.
+    await waitFor(() => expect(raisedByTrigger().disabled).toBe(false))
+    await waitFor(() => expect(raisedByTrigger().textContent).toContain("Marta Nilsson"))
+    expect(raisedByTrigger().textContent).not.toContain("Otto Berg")
     // …AND IT IS WHAT GETS SENT. A default nobody touched still has to reach the
     // door, or it is a highlight rather than an answer.
     write("<p>The export is empty</p>")
@@ -889,8 +912,8 @@ describe("who raised it", () => {
     // NO INVENTED FALLBACK. The door sorts the main contact first, so "take the
     // first row" looks like a default and is an arbitrary person the moment no
     // flag is set — a ticket naming a human who never asked is worse than one
-    // naming nobody. So the row stays empty and the form ASKS, which is the one
-    // case the new requirement actually bites in.
+    // naming nobody. So the field stays unanswered and the form ASKS, which is
+    // the one case the new requirement actually bites in.
     door.links = [
       { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Otto Berg", relationship: null, isMainStakeholder: false, active: true },
     ]
@@ -905,16 +928,16 @@ describe("who raised it", () => {
         draftKey="t"
       />
     )
-    const row = await waitFor(() => {
-      const r = chipRow("Raised by")
-      expect(within(r).getByRole("button", { name: /Otto Berg/ })).toBeTruthy()
-      return r
-    })
-    expect(within(row).getByRole("button", { name: /Otto Berg/ }).getAttribute("aria-pressed")).toBe("false")
+    await waitFor(() => expect(raisedByTrigger().disabled).toBe(false))
+    // NOBODY IS SHOWN — the trigger still carries its placeholder, not Otto's
+    // name, because the door has no main contact flagged for it to fall back
+    // to.
+    expect(raisedByTrigger().textContent).not.toContain("Otto Berg")
     write("<p>The export is empty</p>")
     name("Tuesday export is empty")
     expect(submitButton().disabled).toBe(true)
-    fireEvent.click(within(row).getByRole("button", { name: /Otto Berg/ }))
+    await openRaisedBy()
+    fireEvent.click(await screen.findByRole("option", { name: /Otto Berg/ }))
     expect(submitButton().disabled).toBe(false)
   })
 
@@ -938,14 +961,11 @@ describe("who raised it", () => {
         initial={{ description: "<p>x</p>", titleEn: "Old thing", accountId: "acct-bergman" }}
       />
     )
-    const row = await waitFor(() => {
-      const r = chipRow("Raised by")
-      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
-      return r
-    })
-    expect(
-      within(row).getByRole("button", { name: /Marta Nilsson/ }).getAttribute("aria-pressed")
-    ).toBe("false")
+    await waitFor(() => expect(raisedByTrigger().disabled).toBe(false))
+    // MARTA IS THE ACCOUNT'S MAIN CONTACT AND IS NOT SHOWN — the exact
+    // negative case the previous test's positive proves the mirror of: an
+    // edit of a ticket that predates the rule must not silently attach her.
+    expect(raisedByTrigger().textContent).not.toContain("Marta Nilsson")
     expect(submitButton().disabled).toBe(false)
     fireEvent.click(submitButton())
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
@@ -954,16 +974,21 @@ describe("who raised it", () => {
     expect(onSubmit.mock.calls[0][0].raisedByContactId).toBeUndefined()
   })
 
-  /* ── "ADD AVATAR IN ROUND" (client, 2026-09-09), THE OTHER HALF ────────────
-     The round box shipped the day she asked and every contact drew a grey
-     letter in it, because the query behind the row selected `p.name` off the
-     joined person row and nothing else — so the photographs that
-     `scripts/glide-visuals.mjs` put in R2 reached nobody. The door now carries
-     `personLogoUrl` and this is the case that says a real face is drawn where
-     there is one, and the letter kept where there is not. Both halves in one
-     render, because "it draws the picture" and "it still draws the initial" are
-     two claims and shipping only the first would be the regression. */
-  it("draws a contact's real face where they have one, and the initial where they don't", async () => {
+  /* ── "ADD AVATAR IN ROUND" (client, 2026-09-09) — RETIRED BY THE DROPDOWN
+     RULING, and said here rather than silently dropped. The chip row drew a
+     round `RecordMark` per contact — a real photograph where the door had
+     one (`personLogoUrl`), the letter tile where it did not — because a row
+     of otherwise-identical pills needs a face to tell them apart at a
+     glance. The kit's own `Select` (never edited here — R39/R46, and the
+     vendored-kit rule this repo does not relitigate) draws no such fallback:
+     `SelectItem`'s own `image` prop is EITHER a real `<img>` or nothing, on
+     purpose (`shared/ui/components/select/select.tsx`: "image ? <img …> :
+     null" — one mark, never an invented one for a row with none). So R40's
+     claim — a stored photograph reaches a person through a real `src` — still
+     holds and is still proved below; the LETTER-TILE half of the old case is
+     not a regression this form can fix without a kit change, because the
+     kit's own dropdown genuinely has no fallback avatar to draw. */
+  it("draws a contact's real face where they have one, in the open list", async () => {
     door.links = [
       {
         id: "l1",
@@ -998,28 +1023,17 @@ describe("who raised it", () => {
         initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
       />
     )
-    const row = await waitFor(() => {
-      const r = chipRow("Raised by")
-      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
-      return r
-    })
-    // R40's own oracle, read the way that law reads it: the bytes reach a person
-    // through a real `src`, not through a value parked in the form. Asserting on
-    // the `<img>` rather than on the option object is the whole point — the
-    // field was on the row and rendered by nothing for two days.
-    const marta = within(row).getByRole("button", { name: /Marta Nilsson/ })
-    const photo = marta.querySelector("img")
+    await waitFor(() => expect(raisedByTrigger().disabled).toBe(false))
+    await openRaisedBy()
+    // R40's own oracle, read the way that law reads it: the bytes reach a
+    // person through a real `src`, not through a value parked in the form.
+    const martaOption = await screen.findByRole("option", { name: /Marta Nilsson/ })
+    const photo = martaOption.querySelector("img")
     expect(photo, "the contact's photograph never reached the screen").toBeTruthy()
     expect(photo?.getAttribute("src")).toContain("/media/accounts/p1/logo.jpg")
-    // AND THE BOX IS STILL THE PERSON'S — a picture must not quietly become a
-    // square the way a client's mark is.
-    expect(marta.querySelector(".rounded-pill")).toBeTruthy()
-
-    // …AND THE UNPHOTOGRAPHED COLLEAGUE BESIDE HER KEEPS THE LETTER TILE, which
-    // is the half `face` buys and the half a "just pass the picture" change
-    // would have dropped.
-    const otto = within(row).getByRole("button", { name: /Otto Berg/ })
-    expect(otto.querySelector("img"), "an invented picture for a contact who has none").toBeNull()
-    expect(otto.querySelector(".bg-muted")?.textContent).toBe("O")
+    // …AND THE UNPHOTOGRAPHED COLLEAGUE DRAWS NO INVENTED ONE — the kit's own
+    // Select has no fallback mark to draw one with (see the comment above).
+    const ottoOption = screen.getByRole("option", { name: /Otto Berg/ })
+    expect(ottoOption.querySelector("img"), "an invented picture for a contact who has none").toBeNull()
   })
 })

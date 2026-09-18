@@ -129,8 +129,47 @@ vi.mock("@/lib/api", async (importOriginal) => {
       helpStages: async () => EMPTY_STAGE_HISTORY,
       stories: async () => ({ stories: RELATED_STORIES, total: RELATED_STORIES.length, nextCursor: null, hasMore: false }),
       sprints: async () => ({ sprints: [], total: 0 }),
-      workLogs: async () => ({ logs: [], total: 0, totalSeconds: 0, nextCursor: null, hasMore: false }),
-      workLogSummary: async () => ({ total: 0, totalSeconds: 0, people: [], kinds: [], weeks: [] }),
+      // ONE ROW, NOT ZERO (R88) — this file's own panels are proved
+      // POPULATED (the grid/card/paper structure every `it` below asserts),
+      // and a genuinely empty Work logs panel now draws no title row at all
+      // (`EmptyGatedPanel`, deep-link/screen-bits.tsx) — the shape
+      // `empty-state-single-door.test.ts` proves on its own. A zero-row
+      // fixture here would be testing that law by accident, on a title this
+      // file needs present to find the panel by.
+      workLogs: async () => ({
+        logs: [
+          {
+            id: "log-1",
+            targetTable: "help",
+            targetId: "help-1",
+            targetLabel: "BERG-T0412",
+            targetRef: "BERG-T0412",
+            userId: "user-1",
+            userName: "Aurora",
+            kind: null,
+            note: null,
+            startedAt: "2026-08-18T09:00:00.000Z",
+            endedAt: "2026-08-18T09:30:00.000Z",
+            seconds: 1800,
+            billable: true,
+            discarded: false,
+            accountId: "acct-bergman",
+          },
+        ],
+        total: 1,
+        totalSeconds: 1800,
+        nextCursor: null,
+        hasMore: false,
+      }),
+      workLogSummary: async () => ({
+        total: 1,
+        totalCapped: false,
+        totalSeconds: 1800,
+        peopleTotal: 1,
+        people: [{ userId: "user-1", userName: "Aurora", seconds: 1800 }],
+        kinds: [],
+        weeks: [],
+      }),
       helpAttachments: async () => ({ attachments: [], total: 0 }),
       runningTimers: async () => ({ timers: [] }),
     },
@@ -331,7 +370,17 @@ describe("files are neither behind the ⋯ menu nor in a tray inside the convers
   it("draws no 'Files and links' item in the ⋯ menu", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const trigger = screen.getByRole("button", { name: "More actions" })
+    // Scoped to the WIDE actions row (`shared/web/head-actions.tsx`'s own
+    // `HEAD_ACTIONS_ROW_CLASS`, 18 Sep 2026's narrow-width fold) — the chip
+    // row now carries a SECOND "More actions" trigger for the folded width
+    // (`HeadActionsFoldMenu`), same accessible name by design (both are the
+    // record's one overflow menu; only jsdom, which loads no CSS and so
+    // never resolves either `@min-[24rem]` half of the fold, would find both
+    // at once). `web/test/head-actions-fold.test.tsx` owns the fold's own
+    // contract; this test still only means the row it always meant.
+    const trigger = within(
+      document.querySelector('[data-slot="head-actions-row"]') as HTMLElement
+    ).getByRole("button", { name: "More actions" })
     fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
     fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
     fireEvent.click(trigger)
@@ -395,60 +444,72 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
   })
 })
 
-// CLIENT RULING, 18 Sep 2026, VERBATIM: "the ticket detail conversation
-// should have more height, depending on the height of the right column
-// components. they should be, the addition of the three of the right, same
-// as conversation." Proved structurally (jsdom has no layout engine to
-// measure a real height against): the grid carries the two-column,
-// three-AUTO-row template and `items-stretch`, the conversation cell spans
-// all three rows with `min-h-0`/`h-full` so it never feeds its own height
-// back into them, and the three right-column panels are direct grid
-// children — no wrapping `flex-col` box left to give them a height of their
-// own for the span to measure.
+// SUPERSEDED, R89 "footer-on-the-edge", 18 Sep 2026 — the CLIENT RULING this
+// describe block originally proved ("the addition of the three of the
+// right, same as conversation") was answered, that same afternoon, by a
+// LATER and different ruling read against the deployed page: "On ticket
+// detail, the footer should be at the very bottom. The position is still
+// fucking wrong. Fix it once and for all." A conversation card sized to the
+// right column's own content sum is not "at the very bottom" of the SCREEN
+// — measured live on staging (T0001) it closed 414px past the visible
+// screen body at 1440×900, because nothing tied its height to the screen's
+// own available space. `ticket-detail-body.tsx`'s own header carries the
+// full account of both rulings and why the second replaces the first's
+// CONSTRUCTION (not its right-column ANCHORS, which are unchanged below).
 //
-// AMENDED 18 Sep 2026, SAME DAY — live proof on staging (T0001) measured the
-// FIRST cut of this fix (`lg:grid-rows-3`, three EQUAL `fr` tracks) still
-// short: conversation 1015.78px against the three right cards' own
-// 136.3 + 322.59 + 208.3 plus two 24px gaps = 901.49px. An `fr` track in an
-// auto-height grid sizes to the tallest CONTENT before dividing space
-// evenly, so the spanning conversation cell dragged all three equal tracks
-// up to a third of ITS OWN height each, and the "gap" under the right
-// column's three short cards was leftover track space, not a uniform 24px
-// gap. `lg:grid-rows-[auto_auto_auto]` sizes each track to its OWN cell
-// instead, so the span's height becomes the sum the right column alone
-// decided — see ticket-detail-body.tsx's own header for the full account.
-describe("the conversation cell spans the right column's three rows (R16 sibling ruling)", () => {
-  it("the grid is two columns × three auto rows, stretched, with the conversation cell spanning all three", async () => {
+// THE NEW SHAPE, proved structurally (jsdom has no layout engine to measure
+// a real height against): the grid is now a `lg:flex-1 lg:min-h-0` flex
+// item of `app-shell.tsx`'s own flex-column page container, ONE row
+// (`lg:grid-cols-[2fr_1fr]`, no `grid-rows` override), `items-stretch`
+// stretching both cells to that row's full, real height. The conversation
+// cell keeps its `lg:min-h-0 lg:h-full` from the earlier construction
+// unchanged; the three right-column panels moved from three separate
+// auto-placed grid cells into ONE cell — a `flex flex-col gap-6
+// lg:overflow-y-auto` wrapper around the same three anchors — because a
+// single grid track can stretch to fill leftover space where three separate
+// `auto` tracks would only ever split it, and "the side cards scroll
+// independently if they are taller" (this law's own text) needs a real
+// scroller, not a track.
+describe("the conversation cell and the side-panel column fill the grid's own full, real height (R89)", () => {
+  it("the grid is one row, a flex-1 min-h-0 item of the page's own flex column, both cells stretched", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
+    expect(grid.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(grid.className).toContain("lg:grid-cols-[2fr_1fr]")
-    // THREE AUTO ROWS, NOT THREE EQUAL `fr` ONES — `grid-rows-3` (Tailwind's
-    // `repeat(3, minmax(0, 1fr))`) is exactly the shape that dragged all
-    // three tracks up to the spanning conversation cell's own height; this
-    // must never come back.
-    expect(grid.className).toContain("lg:grid-rows-[auto_auto_auto]")
-    expect(grid.className).not.toMatch(/lg:grid-rows-3\b/)
+    // NO ROW TEMPLATE ANY MORE — ONE row, stretched to the grid's own real
+    // height by the flex-fill below, never split three ways again.
+    expect(grid.className).not.toMatch(/lg:grid-rows-/)
     expect(grid.className).toContain("items-stretch")
-    expect(conversationAnchor.className).toContain("lg:row-span-3")
-    // THE SPAN MUST NOT FEED ITS OWN HEIGHT BACK INTO THE TRACKS IT SPANS —
-    // a grid item's default min-height is its own content's min-content
-    // size, which `min-h-0` floors to zero so only the right column's three
-    // cells set the auto tracks; `h-full` then fills whatever height the
-    // grid hands back.
+    // THE GRID ITSELF IS THE FLEX-GROW ITEM NOW — app-shell.tsx's own
+    // min-h-full flex column hands it whatever space RecordScreen's head
+    // leaves behind.
+    expect(grid.className).toContain("lg:flex-1")
+    expect(grid.className).toContain("lg:min-h-0")
+
+    expect(conversationAnchor.className).not.toMatch(/lg:row-span-/)
     expect(conversationAnchor.className).toContain("lg:min-h-0")
     expect(conversationAnchor.className).toContain("lg:h-full")
 
-    // THE THREE RIGHT-COLUMN PANELS ARE DIRECT GRID CHILDREN, not nested in
-    // a `flex-col` box of their own — that box is exactly what USED to give
-    // them (and therefore the span) a height independent of the grid.
+    // THE THREE RIGHT-COLUMN PANELS SHARE ONE SCROLLABLE CELL NOW — not
+    // direct grid children any more, which is exactly what lets that cell
+    // stretch to the row's OWN height instead of the panels' own sum.
     const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
     const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
-    expect(storiesAnchor.parentElement).toBe(grid)
-    expect(timeAnchor.parentElement).toBe(grid)
-    expect(stakeholdersAnchor.parentElement).toBe(grid)
+    const sideColumn = storiesAnchor.parentElement as HTMLElement
+    expect(sideColumn.parentElement).toBe(grid)
+    expect(timeAnchor.parentElement).toBe(sideColumn)
+    expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
+    expect(sideColumn.className).toContain("flex-col")
+    expect(sideColumn.className).toContain("lg:h-full")
+    expect(sideColumn.className).toContain("lg:min-h-0")
+    // INDEPENDENT SCROLL — "the side cards scroll independently if they are
+    // taller" (R89's own text), so a long Related stories/Work logs/
+    // Stakeholders stack never pushes the conversation card's footer down
+    // with it.
+    expect(sideColumn.className).toContain("lg:overflow-y-auto")
   })
 
   it("the conversation card fills its grid cell (lg:h-full) rather than a fixed viewport height", async () => {

@@ -20,6 +20,7 @@ import {
   openNewAgentTab,
   pickAgentTabScope,
   pruneUnusedAgentTabsOnBoot,
+  renameAgentTab,
   reorderAgentTab,
   seedAgentTabs,
   setAgentTabThread,
@@ -104,7 +105,7 @@ describe("isUnusedAgentTab — zero turns, read off the thread model", () => {
 
   it("a draft with a scope picked but nothing sent is STILL unused", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "everything", "Everything")
+    pickAgentTabScope(id, "everything")
     const tab = agentTabsSnapshot().find((t) => t.id === id)!
     expect(tab.scope).not.toBeNull() // sanity: the pick did land
     expect(isUnusedAgentTab(tab)).toBe(true)
@@ -152,7 +153,7 @@ describe("openNewAgentTab reuses an existing unused tab instead of doubling it",
 
   it("a draft with a scope already picked still counts as unused and is reused, not replaced", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "knowledge", "Knowledge")
+    pickAgentTabScope(id, "knowledge")
     const reused = openNewAgentTab()
     expect(reused).toBe(id)
     expect(agentTabsSnapshot().find((t) => t.id === id)?.scope).toBe("knowledge") // untouched
@@ -206,20 +207,51 @@ describe("pruneUnusedAgentTabsOnBoot", () => {
   })
 })
 
-describe("pickAgentTabScope", () => {
-  it("names the tab after the pick — the record's own name for \"record\"", () => {
+// REVERSED, 18 SEP 2026, HER THIRD REPORT ON THE ASSISTANT TABS — see
+// `pickAgentTabScope`'s own header (web/lib/agent-conversation-tabs.ts) for
+// the full argument: a picked SCOPE is a category, not a conversation's
+// title, and writing it into `label` is what let two tabs sit stuck reading
+// "Everything" forever. `renameAgentTab`, below, is what titles a tab now.
+describe("pickAgentTabScope — never writes the tab's visible label", () => {
+  it("sets scope, recordLabel and scopeId — and leaves label untouched", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "record", "Beringer", "Beringer")
+    pickAgentTabScope(id, "record", "Beringer")
     const tab = agentTabsSnapshot().find((t) => t.id === id)
     expect(tab?.scope).toBe("record")
-    expect(tab?.label).toBe("Beringer")
     expect(tab?.recordLabel).toBe("Beringer")
+    expect(tab?.label).toBe("") // still the empty draft label — never "Beringer"
   })
 
-  it("names it \"Knowledge\" / \"Everything…\" for the other two picks", () => {
+  it("a picked-but-unsent tab reads no scope name at all — \"Knowledge\", \"Everything\" included", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "knowledge", "Knowledge")
-    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("Knowledge")
+    pickAgentTabScope(id, "knowledge")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("")
+  })
+})
+
+// THE TAB'S REAL TITLE — the conversation's own first message, given once,
+// the instant it is actually sent (`agent-panel.tsx`'s `handleSend`). This
+// is the pure-state half; that file's own wiring of "which text, which
+// moment" is proven where the send lives.
+describe("renameAgentTab", () => {
+  it("gives an untitled tab its first real label", () => {
+    const id = openNewAgentTab()
+    renameAgentTab(id, "What's the status on Halloway?")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("What's the status on Halloway?")
+  })
+
+  it("never overwrites a tab that already has a title — a history-resumed tab's topic stays put", () => {
+    const id = openAgentTabForThread("srv-thread-rename", "Beringer tickets")
+    renameAgentTab(id, "a different message, should never land")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("Beringer tickets")
+  })
+
+  it("replaces a picked-but-unsent scope's empty label — never the scope's own name first", () => {
+    const id = openNewAgentTab()
+    pickAgentTabScope(id, "everything")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("")
+    renameAgentTab(id, "how many tickets are open right now")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("how many tickets are open right now")
   })
 })
 

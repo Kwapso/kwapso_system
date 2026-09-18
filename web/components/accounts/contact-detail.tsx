@@ -76,6 +76,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { formatCount } from "@shared/web/format-count"
 import { accountKey, accountsKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -416,6 +417,25 @@ export function ContactDetailScreen({
       ]
     : []
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * Edit leaves its standalone pen and joins `overflow` inside the ONE "…"
+   * trigger that moves into the chip row. Same order the wide row already
+   * draws them in — edit, then whatever already lived in the menu. */
+  const foldedActions: HeadActionItem[] = [
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditOpen(true),
+          },
+        ]
+      : []),
+    ...overflow,
+  ]
+
   return (
     <RecordScreen
       // THE SAME SQUARE THE ACCOUNTS LIST DRAWS. It is the same `logo_url`
@@ -463,6 +483,9 @@ export function ContactDetailScreen({
             {account.active ? t("Live") : t("Archived")}
           </Badge>
           {liveLogin ? <Badge>{t("Can sign in")}</Badge> : null}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={account.name}
@@ -478,11 +501,11 @@ export function ContactDetailScreen({
       // the email is already a row in the Overview tab (`overviewItems`),
       // and the companies are already the Companies tab.
       actions={
-        <>
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
           {canEdit && <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
-        </>
+        </div>
       }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column.

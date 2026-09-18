@@ -46,6 +46,23 @@
 // `MANGO_OUTSIDE_TITLE_OK` (`shared/rules/registry.ts`) with her words rather
 // than widening `TITLE_TAGS` to treat this row as a fifth title component.
 //
+// THE FIFTH, 18 Sep 2026, verbatim: "now there is the search icon on the
+// right and on the left. Remove the one on the left inside the text bar,
+// the white one." The mango Go button (above) is the "one on the right";
+// `SearchInput`'s OWN leading glyph — a `MagnifyingGlass` in `--ink-tertiary`
+// (the light/muted ink her "white" names) — was the one on the left, drawn
+// UNCONDITIONALLY by the kit component (`shared/ui/components/search-input/
+// search-input.tsx`, chapter 9's own "the glyph leads"), with no prop to
+// withhold it. FIXED IN THE KIT, kit v1.2.125: `SearchInput` gained
+// `leadingIcon?: boolean` (default `true`, every other caller unchanged) —
+// omits BOTH the resting glyph and the `loading` spinner, since the two
+// occupy the same leading slot. This is that prop, `leadingIcon={false}`,
+// replacing the interim `[&>svg:first-child]:hidden` class override this
+// paragraph used to defend: a class reaching past the kit's own root to its
+// first CHILD is silently wrong the moment that child stops being the
+// glyph — exactly what `loading` does, swapping it for `CircleNotch` — where
+// the prop asks for the removal directly and covers both.
+//
 // SIX DOORS, ONE QUESTION EACH, NO NEW ROUTE. Every module already answers
 // `q` at its own list door (R14 — paged, so this is a DISPLAY cap on a
 // quick-search box, never a claim about the collection's own size): tickets
@@ -303,6 +320,10 @@ export function NewTabScreen() {
               onClear={() => setQ("")}
               loading={searching}
               label={t("Where to?")}
+              // The kit's own leading glyph, withheld — see this file's
+              // fifth ruling, above: kit v1.2.125's own prop now, not a
+              // class reaching into the kit's rendered output.
+              leadingIcon={false}
               className="flex-1"
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return

@@ -24,15 +24,20 @@
 // rows a person picks from, never an auto-inferred entry standing apart from
 // the real choices — the ruling's own words draw that line ("the scope is
 // what the user picks... with no 'default' pseudo-entry"), and "Everything"
-// already was, and remains, an ordinary pick. `agent-panel.tsx`'s own
-// `handlePickScope` (this file's only caller) independently rebuilds the
-// SAME string for the resulting tab's title — that file is owned by a
-// different lane and is UNCHANGED here; its own `t("Everything (today's
-// default)")` at its own line still needs the identical edit, to
-// `t("Everything")`, so a conversation's tab title stops saying "today's
-// default" too (the tab strip renders `tab.label` verbatim,
-// `agent-tab-strip.tsx:139`). Reported rather than fixed here — see this
-// lane's own report for the exact line number.
+// already was, and remains, an ordinary pick.
+//
+// THIS ROW'S OWN LABEL NO LONGER BECOMES THE TAB'S TITLE, AS OF kit v1.2.125
+// / the SAME-DAY reversal in `web/lib/agent-conversation-tabs.ts`. Until
+// today `agent-panel.tsx`'s `handlePickScope` rebuilt this exact string
+// ("Everything", "Knowledge", the record's name) and wrote it straight into
+// the tab's own `label` — which is what let a tab sit there reading
+// "Everything" forever, her third report on this strip. A picker ROW's own
+// words are a category; a tab's title is the CONVERSATION's own subject, and
+// the two are now genuinely two things: `pickAgentTabScope` no longer takes
+// or writes a label at all, and `agent-panel.tsx`'s `handleSend` titles the
+// tab off the first message actually sent, the instant it is sent. This
+// file's own copy is unaffected either way — the rows still read exactly
+// these three words.
 
 import * as React from "react"
 

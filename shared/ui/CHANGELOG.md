@@ -2,6 +2,186 @@
 
 ## Unreleased
 
+### Fixed — the assistant tab strip fits its 380px pane instead of overflowing it; a shrinking tab's inner control now actually shrinks; `SearchInput` can drop its leading glyph — v1.2.125
+
+**THE DEFECT, FINALLY SEEN.** Aurora reported "the assistant tabs overlap /
+the issue's still there" three times and was, her own words, "very tired of
+this topic." The first two reports were real and were fixed — `STRIP`'s own
+gap (v1.2.116→119) and the per-tab z-index (v1.2.120) — but every rect sweep
+that answered them measured TAB-TO-TAB GAPS and never asked whether the
+STRIP ITSELF fit its container. It never did: `components/breadcrumbs/
+breadcrumb-folders.tsx`'s `STRIP` sizes every tab `shrink-0` at its own
+natural width and answers "too wide" by scrolling the whole row — and the
+pinned trailing items (History, "+") are ordinary `<li>`s INSIDE that same
+scrolling `<ol>`, so on the assistant pane's fixed 380px they scroll off
+with everything else. Reported over a screenshot of that pane with three
+open conversations: "Conversation ×", "Everything ×", a third tab cut off
+mid-label by the pane's own right edge, and both History and "+" pushed out
+of view entirely — a different defect (overflow) wearing the same words as
+the first two (overlap).
+
+**THE FIX, BY CONSTRUCTION.** `BreadcrumbFoldersProps` gains `fit?: "natural"
+| "shrink"`, named for what it does rather than for the one width it happens
+to answer for today. `"natural"` (the default) is BYTE-IDENTICAL to the
+strip before the prop existed — nothing changes for a caller that never
+passes it. `"shrink"` splits the strip's drawing into TWO `<ol>`s (an
+`<ol>`'s only valid children are `<li>`, so a `<div>` wrapper inside one is
+invalid markup no `data-slot` fixes), both still the kit's own
+`BreadcrumbList`, both inside the ONE `<nav>` this file already renders (one
+landmark, one `aria-label`, unchanged): the SCROLLING half (every item
+before the trailing `closable: false` run) is `flex min-w-0`, each tab in it
+`flex-1 basis-0 max-w-max` with a `min-w` of roughly four characters plus
+the close × (`TAB_SHRINK_MIN_WIDTH`, a real calc off `--folder-shoulder` /
+`--control-height-pill` / `--space-2` / `--space-5`, not an invented
+number) — so a short trail sits at its own natural width and a long one
+shares the room evenly, shrinking together down to that floor before the
+list scrolls inside itself; the PINNED half (History, "+") is `shrink-0` in
+its own, never-shrinking, always-visible `<ol>`, outside the scrolling box
+entirely. `onClose` is required for `"shrink"` — a fold trail has no
+trailing pinned run to protect, and a tab set never folds already.
+
+**ONE MEASURED BUG CAUGHT BUILDING THE HARNESS, NOT GUESSED AT.** The first
+draft shrank the `<li>` correctly to its floor and the label still never
+truncated — the third tab's full, un-clipped 38-character label rendered at
+206px inside a 110px box. `TAB`'s own base class opens with `shrink-0`: the
+`<li>` shrinks by construction, but the ANCHOR/BUTTON inside it, carrying
+`shrink-0` of its OWN, refused to follow and simply overflowed the now-
+narrower box — no ellipsis, because nothing had asked the label to be
+narrower than its text. `TAB_SHRINK_TAB` (merged in after `TAB` so
+tailwind-merge drops the conflicting declarations) is `"shrink min-w-0"`,
+not `"min-w-0"` alone: `shrink` re-enables `flex-shrink` so the browser's own
+shrink phase — the anchor's hypothetical size is content-based here, not the
+`<li>`'s `basis-0`, so the shrink weighting actually applies — brings it down
+to whatever room the `<li>` has, and `min-w-0` cancels `TAB`'s 128px floor so
+there is room to give up in the first place.
+
+**MEASURED**, `verify/agent-tab-strip-fit/` (`window.__agentTabStripFitProbe(n)`),
+mounting `BreadcrumbFolders` exactly as `AgentTabStrip` builds it — real
+conversation-length labels, History + "+" pinned trailing, `fit="shrink"` —
+at 380px with 1, 3, 5 and 8 open tabs: every case reads no pane overflow, "+"
+genuinely visible and never a descendant of the scrolling list, zero tabs
+narrower than their own CSS minimum, every gap (intra-list and the seam
+between the two lists) equal to the browser's own resolved `column-gap`
+(7.5px at this harness's 15px root), and — first at three tabs, holding
+through five and eight — labels truncating with a real ellipsis. Pinned
+against regression in `components/breadcrumbs/check-breadcrumb-folders.mjs`,
+extended (still one file, still `npm run check`): three `<BreadcrumbList>`
+render sites, exactly (natural, shrink-scroll, shrink-pinned), each reading
+its own named constant, every `fit="shrink"` sizing constant declared AND
+read, `fit` defaulting to `"natural"` in the component's own destructuring
+(matched as a real code line, not a substring — this file's own prose
+mentions `fit="natural"` too), and no stray `STRIP*`-named constant beyond
+the five this file now owns. Proved by breaking each property in turn (the
+label-truncation regression above among them) on a `cp` backup and
+confirming the check fails red with the exact finding, then restoring and
+re-verifying green.
+
+**THE WORKSPACE CONTENT STRIP GETS `fit="shrink"` TOO**, not only the
+assistant. `web/components/shell/app-shell.tsx`'s content trail already
+builds the identical shape — `onClose`, a trailing `closable: false` "+"
+item (v1.2.… "also add the plus tab, like in the assistant. And the same
+rules as there") — through this exact same component, with no wrapper, the
+fact v1.2.120's own check already pins. Aurora's own law on this strip,
+quoted in that check's header, is "should 100% replicate what happens with
+main content tabs" — read the other way, replicating means the two never
+diverge in EITHER direction: the content column is usually wide enough that
+this overflow reads as unlikely rather than impossible (many open tabs, or a
+narrow viewport with the assistant pane open at the same time), and leaving
+it on `"natural"` while the assistant moves to `"shrink"` is exactly the
+kind of quiet fork three prior sessions on this one strip already spent
+effort proving does NOT exist. Both call sites pass `fit="shrink"`; see the
+app-side commit for the wiring.
+
+### Added — `SearchInput` can drop its own leading glyph, for a caller that already draws one beside it
+
+**CLIENT RULING**, on the new-tab page: "there is the search icon on the
+right and on the left. Remove the one on the left inside the text bar, the
+white one." `components/search-input/search-input.tsx` gains `leadingIcon?:
+boolean`, defaulting to `true` — every existing caller keeps its glass (or,
+`loading`, its spinner) exactly as before. `false` omits BOTH: not only the
+resting magnifying glass but the loading spinner too, because the two occupy
+the same leading slot and a `[&>svg:first-child]:hidden` class override
+(`kwapso_system`'s own interim workaround before this prop existed) hides
+whichever one happens to render first — silently wrong the moment `loading`
+swaps the first child from glass to spinner. Nothing else about the field
+moves: the shell's own inline padding and gap are unconditional, so the
+input simply starts where the glyph would have stood.
+
+### Fixed — the assistant composer holds one row at rest at every pane width; an empty field is never sized off its own wrapped placeholder — v1.2.124
+
+**THE REPORT, VERBATIM**, on the assistant pane at ~410px: "Now it makes it
+two rows, and it kind of breaks. Make sure that it's only one row. Ask about
+your work. It doesn't break into rows, and also, as you see in the
+screenshot, when it's selected, it's not working properly. Something's off."
+
+**TWO CAUSES, BOTH IN `textarea.tsx`/`agent-chat.tsx`, ONE SYMPTOM.**
+`autoGrow` measured `el.scrollHeight` unconditionally, empty field or not —
+and a browser still lays out and wraps the PLACEHOLDER to compute that
+number when there is no value. At 410px "Ask about your work" wrapped to two
+lines, so `scrollHeight` reported two line-heights before a single character
+existed, and `grown` (hence the pill's own radius and the field's rendered
+height) flipped true off ghost text alone. Separately, the composer's flex
+row gave the `<Textarea>` `flex-1` but not `min-w-0`, so the field's floor
+was its own min-CONTENT width rather than whatever the row had left once the
+paperclip, the gaps and the send button took their share — which is what
+narrowed the box enough to wrap the placeholder in the first place.
+
+**"SELECTED... SOMETHING'S OFF" IS NOT A THIRD BUG.** The composer was
+already two rows tall from the placeholder wrap before focus ever entered
+the picture, so a click that focused it landed the caret in the
+already-broken box. tokens.css §8's focus-shell rule draws only an outline
+on `:focus-visible` — no height, no radius — and is unchanged here; fixing
+the rest-state height removes the only thing that was actually moving.
+
+**THE FIX, BY CONSTRUCTION, NOT A MEDIA QUERY.** `textarea.tsx`'s `autoGrow`
+effect now short-circuits on `el.value.length === 0`: an empty field is
+pinned to the CSS resting height (`min-height`, one line) and is never
+measured against `scrollHeight` at all, so the placeholder's own layout can
+no longer size the box regardless of how it wraps. `agent-chat.tsx`'s
+composer `<Textarea>` now also carries `min-w-0` alongside `flex-1`, and,
+belt-and-suspenders, `placeholder:whitespace-nowrap placeholder:overflow-
+hidden placeholder:text-ellipsis` so the ghost text itself never wraps at
+any width. Real typed content is untouched — `autoGrow` still measures and
+grows it exactly as before; only the EMPTY measurement changed.
+
+**MEASURED**, `verify/composer-one-row/` (`window.__composerProbe()`), at
+280/320/410/600px: the pill holds 45px (one line) at rest and after a real
+DOM focus at every width, the placeholder never wraps, and typing a long
+sentence still grows the field normally and returns to 45px the instant the
+value empties. Pinned against regression in `components/agent-chat/check-
+composer.mjs` (new file, wired into `npm run check`).
+
+### Added — the rail brand mark steps up one more rung, "a bit bigger" — v1.2.124
+
+**AURORA, ON THE LIVE RAIL, VERBATIM:** "I want the logo to be bigger and
+maybe even a bit lower. I don't know. You tell me, you're the designer, but
+I would say it needs to be a bit bigger, just a bit."
+
+**A DESIGNER'S CALL, ANSWERED THE SAME WAY EVERY STEP ON THIS MARK HAS
+BEEN** — one more rung of the icon ladder, not an invented number:
+`MARK_STEP` moves from `--icon-24` to `--icon-28` (28 x 4.9986 = 139.96 in a
+208 column, 67.29% — up from 24's 57.68%). `--icon-28` already existed on
+the ladder ("the sixth size, admitted rather than snapped away," tokens.css)
+so nothing was added there.
+
+**THE "BIT LOWER" IS NOT A SEPARATE CHANGE.** "THE LOGO'S OWN VERTICAL
+CENTRE MATCHES THE WORKSPACE TAB STRIP'S LABEL" law (v1.2.122, rewritten in
+v1.2.123 for the CSS-strut fix) stands untouched: the band (`h-[var(
+--strip-row)]`, `items-center`) centres the mark by construction and reads
+neither `MARK_STEP` nor any icon-ladder rung to do it. A taller mark inside a
+band whose own height and top offset do not move keeps its centre exactly
+where it was and grows in both directions from it — so the bottom edge drops
+(and the top edge rises) by half the size delta, which reads as "a bit
+lower" without moving the alignment law at all.
+
+Both `MARK_STEP` call sites (the collapsed isotype and the expanded lockup)
+take the identical token, so the two rail states still stand at the same
+height. `compositions/templates/rail.tsx`'s own comments, at both the file
+header and immediately above `MARK_STEP`, narrate this ruling beside the
+24 Aug and 18 Sep (`--icon-24`) rulings it follows. `check-screen-shell.mjs`
+pins the band's own construction, not the mark's literal size, so it needed
+no change.
+
 ### Fixed — the rail brand mark stops drifting off the strip-row band inside a `<button>` wrapper; the size ruling the app had been overriding is now the kit's own default — v1.2.123
 
 **STILL 2.9px OFF, LIVE, AFTER v1.2.122.** That rewrite (below) made

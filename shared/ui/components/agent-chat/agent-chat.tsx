@@ -1079,7 +1079,25 @@ const AgentChat = React.forwardRef<HTMLDivElement, AgentChatProps>(
               autoGrow
               onGrownChange={setGrown}
               className={cn(
-                "min-h-[var(--control-height-dense)] flex-1 resize-none",
+                // `min-w-0` MATTERS ON A FLEX CHILD. `flex-1` alone (`flex: 1
+                // 1 0%`) still leaves the item's floor at its min-CONTENT
+                // width, which for a `<textarea>` is the browser's own
+                // `cols`-derived intrinsic size — wider than the row had left
+                // once the paperclip, the gaps and the send button took their
+                // share at 410px. The field refused to shrink past that
+                // floor, so the row it sat in overflowed instead, and the
+                // narrowed box it was actually painted into is exactly what
+                // made "Ask about your work" wrap — one row 18 Sep 2026.
+                "min-h-[var(--control-height-dense)] min-w-0 flex-1 resize-none",
+                // THE PLACEHOLDER NEVER WRAPS. A pill measured by `autoGrow`
+                // (see `textarea.tsx`) no longer sizes itself off ghost text
+                // once the field is empty, but the ghost text itself still
+                // has to read as one line at every width down to 280 — two
+                // fixes for the one report, not one standing in for the
+                // other. `::placeholder` only, so a real multi-line ANSWER a
+                // person has typed keeps wrapping and growing exactly as
+                // `autoGrow` still drives it.
+                "placeholder:overflow-hidden placeholder:text-ellipsis placeholder:whitespace-nowrap",
                 /* THE CAP, and it is `chat.tsx`'s — nine rem is where that
                    composer stops growing and starts scrolling, and two
                    composers in one kit do not get two answers. `autoGrow`

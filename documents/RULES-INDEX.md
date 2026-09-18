@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-87 laws, 85 resolved to at least one check file, 2 unresolved.
+89 laws, 87 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (27)
 
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (51)
+## UI (53)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -48,7 +48,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R6 | enforced | `glossary-wellformed` | `web/test/rules.test.ts` |
 | R7 | enforced | `forms-persist-drafts` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts` |
 | R8 | enforced | `tab-counts-derived` | `web/test/rules.test.ts` |
-| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx`<br>`workers/content/test/count-seam.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
+| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/count-seam.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
 | R25 | enforced | `savings-caption` | `web/test/rules.test.ts` |
 | R28 | enforced | `catalogued-strings` | `web/test/catalogued-strings.test.ts` |
 | R29 | enforced | `one-page-width` | `web/test/linked-emails.test.ts`<br>`web/test/rules.test.ts` |
@@ -93,6 +93,8 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
 | R87 | enforced | `title-length` | `web/test/title-length.test.ts` |
+| R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts` |
+| R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx` |
 
 ## Workflow (2)
 

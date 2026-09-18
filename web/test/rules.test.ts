@@ -5311,9 +5311,22 @@ describe("RULES — the laws of the base", () => {
       /export const RECORD_TITLE_SIZE\s*=\s*"\[&_\[data-slot=title-heading\]\]:text-4xl"/.test(heading),
       "R52 — `RECORD_TITLE_SIZE` must stay the h1/44 step reached through the kit's OWN `data-slot=title-heading` hook: `[&_[data-slot=title-heading]]:text-4xl`. The kit's `Title` has no h1 rung (h2/32, h3/24, h4/20 only), so this descendant selector is the only way to the step the design kit names \"Record heading\" without hand-editing the vendored file (R39)"
     ).toBe(true)
+    // AMENDED 18 Sep 2026 — Aurora's ruling, "h3, and aign the menu to the
+    // chips": `RECORD_HEAD_CONTAINER` joined the string as a THIRD piece,
+    // never a substitute for the two above. It changes nothing about the two
+    // this law already pins (the h1 step, the 80% split) — it only turns the
+    // kit's own `[data-slot=title]` row into a `@container`, so every screen
+    // already wearing `RECORD_TITLE_TREATMENT` (this law's own guarantee)
+    // gets a query container for free the day it wires a
+    // `shared/web/head-actions.tsx` fold onto it. Still ONE string, still
+    // built from the SAME two pieces plus this one — a call site cannot pick
+    // any subset of the three any more than it could pick one of the
+    // original two.
     expect(
-      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{RECORD_TITLE_SIZE\}\s\$\{TITLE_ACTIONS_SPLIT\}`/.test(heading),
-      "R52 — `RECORD_TITLE_TREATMENT` must still be built from `RECORD_TITLE_SIZE` and `TITLE_ACTIONS_SPLIT`. The two travel as ONE string on purpose: they are one decision about one row (how big the record's name is set, and how much of its row it may claim before the buttons wrap under it), and a call site that could apply one without the other is a call site that will"
+      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{RECORD_TITLE_SIZE\}\s\$\{TITLE_ACTIONS_SPLIT\}\s\$\{RECORD_HEAD_CONTAINER\}`/.test(
+        heading
+      ),
+      "R52 — `RECORD_TITLE_TREATMENT` must still be built from `RECORD_TITLE_SIZE`, `TITLE_ACTIONS_SPLIT` and `RECORD_HEAD_CONTAINER`, in that order. All three travel as ONE string on purpose: they are one decision about one row (how big the record's name is set, how much of its row it may claim before the buttons wrap under it, and whether the row can host a `shared/web/head-actions.tsx` fold), and a call site that could apply a subset is a call site that will"
     ).toBe(true)
   })
 
@@ -5483,6 +5496,8 @@ describe("RULES — the laws of the base", () => {
       "rail-labels-one-word", // R85: web/test/rail-labels-one-word.test.ts — every NAV/TEAM_SECTIONS rail destination's title read off web/lib/pages.ts (the same source app-shell.tsx draws the rail from), or its group named in RAIL_LABEL_WORDS_OK
       "status-owns-the-chip", // R86: web/test/status-owns-the-chip.test.ts — every <Badge variant="status" dot={…}>/<Swatch colour={…}> over shape.tsx + the ticket collection/detail components + tasks-screen.tsx, resolved through local const hops to what it names, or named in COLOURED_CHIP_OK
       "title-length", // R87: web/test/title-length.test.ts — the ten title-field-config + write-door censuses, plus the clampRecordHeading/CollectionHeading/RecordTable render assertions
+      "empty-state-single-door", // R88: web/test/empty-state-single-door.test.ts — EmptyGatedPanel's own central guard, plus the title-row <AddButton> census over web/ + web-portal/, or named in EMPTY_STATE_SINGLE_DOOR_EXEMPT
+      "footer-on-the-edge", // R89: web/test/footer-on-the-edge.test.ts — app-shell.tsx's own flex-col page container, ticket-detail-body.tsx's flex-1 min-h-0 root + single-cell scrollable side column, TicketConversationPanel's Card/CardFooter shape, and the composer's w-full + kit-Input-matched background class
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

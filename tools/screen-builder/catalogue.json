@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.123",
-  "sha": "124f81f28edee3f5333791c53b67e92a22ee58d8",
+  "tag": "v1.2.125",
+  "sha": "a5ff64c033b1da1d645589744033bf4a488e3e48",
   "syncedAt": "2026-09-18"
  },
- "generatedAt": "2026-09-18T13:08:55.742Z",
+ "generatedAt": "2026-09-18T18:14:32.547Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -14,8 +14,8 @@
   "cvaSites": 54,
   "variantGroups": 81,
   "variantOptions": 269,
-  "typedEnumProps": 43,
-  "typedBooleanProps": 318,
+  "typedEnumProps": 44,
+  "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
   "tokens": 368,
@@ -1286,6 +1286,16 @@
      "type": "BreadcrumbFoldersProps",
      "variantsFrom": [],
      "props": [
+      {
+       "name": "fit",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "natural",
+        "shrink"
+       ],
+       "note": "`\"natural\"` (the default) is the strip's original answer to running out of room: every tab holds its own content width and the whole row scrolls once the trail (or tab set) is wider than its slot. Byte- identical to this component before the prop existed. `\"shrink\"` makes the tabs FIT the container instead: named for what it does, not for the width it happens to be built against, because the next narrow slot this strip is asked to fill will not be 380px either. Every tab still open shares the available room and shrinks together — flex-basis 0, a `max-content` ceiling so a short trail is never stretched past its own label width, a `~4ch + close ×` floor below which the row scrolls instead — while any trailing `closable: false` run (History, \"+\") is pulled OUTSIDE the shrinking list into its own, never-shrinking, always-visible box at the strip's end. Requires `onClose`: see `STRIP_SHRINK_ROW`'s own comment for the whole mechanism and the defect it answers."
+      },
       {
        "name": "currentActivateExpanded",
        "optional": true,
@@ -6260,6 +6270,12 @@
        "optional": true,
        "kind": "boolean",
        "note": "A query is in flight. The glyph becomes a spinner and `aria-busy` is announced; the field STAYS editable — see the header note."
+      },
+      {
+       "name": "leadingIcon",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Draw the leading glyph — the magnifying glass at rest, the spinner while `loading`. Defaults to `true`, which is this field's original, only drawing: every existing caller keeps it. `false` FOR THE ONE CALLER WITH A SECOND SEARCH GLYPH ALREADY BESIDE IT. Client ruling, on the new-tab page: \"there is the search icon on the right and on the left. Remove the one on the left inside the text bar, the white one.\" A page that draws its OWN leading mark next to this field (a hero search with a button-side glyph, say) ends up with two — this field's own tertiary-ink glass, always drawn, and the caller's. Named for what it removes, not for the one call site that needs it: `kwapso_system`'s new-tab screen used a blunt `[&>svg:first-child]: hidden` class override before this prop existed, which hides whichever child happens to render first — silently wrong the day `loading` makes that first child the spinner instead of the glass. This prop asks for the removal directly, and covers both glyphs by construction: with `false`, NEITHER the glass nor the spinner renders, ever, so a loading search with no leading icon reads as a search with no leading icon — not as a hidden spinner still telling `aria-busy` it is there. Nothing else about the field changes: the shell's own `px-[var(--space-4h)]` padding and the gap before the input are unconditional, so the input simply starts where the glyph would have stood."
       }
      ]
     }

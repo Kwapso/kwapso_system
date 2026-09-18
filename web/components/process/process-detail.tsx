@@ -88,6 +88,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import {
@@ -483,6 +484,25 @@ export function ProcessDetailScreen({
       : []),
   ]
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * Edit leaves its standalone button and joins `overflow` inside the ONE
+   * "…" trigger that moves into the chip row. Same order the wide row
+   * already draws them in — edit, then whatever already lived in the menu. */
+  const foldedActions: HeadActionItem[] = [
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditOpen(true),
+          },
+        ]
+      : []),
+    ...overflow,
+  ]
+
   return (
     <RecordScreen
       // A DELIBERATE MARK, NEVER AN EMPTY SLOT. This record has no picture and
@@ -508,11 +528,16 @@ export function ProcessDetailScreen({
       // two states are live and archived, the account/wave pattern exactly:
       // `archived` while put away, wordless while live.
       chips={
-        !process.active ? (
-          <Badge variant="status" dot="archived">
-            {t("Archived")}
-          </Badge>
-        ) : null
+        <>
+          {!process.active && (
+            <Badge variant="status" dot="archived">
+              {t("Archived")}
+            </Badge>
+          )}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
+        </>
       }
       title={process.name}
       // THE APP/VERSION LINE IS GONE — CLIENT RULING, 2026-08-31, VERBATIM:
@@ -523,7 +548,7 @@ export function ProcessDetailScreen({
       // already rows in the Overview tab (`overviewItems`: "App", "Current
       // version").
       actions={
-        <>
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           {canEdit && (
             <Button variant="secondary" onClick={() => setEditOpen(true)} className="gap-1">
               <PencilSimple className="size-3.5" />
@@ -531,7 +556,7 @@ export function ProcessDetailScreen({
             </Button>
           )}
           <RecordActionsMenu actions={overflow} />
-        </>
+        </div>
       }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column. The summary row carries the creation date and

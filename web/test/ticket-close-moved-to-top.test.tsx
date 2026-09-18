@@ -228,8 +228,18 @@ describe("the top close action, at every status the bottom composer used to cove
     const region = titleRegion()
     await within(region).findByRole("button", { name: "Close" })
     const buttons = within(region).getAllByRole("button")
-    const overflow = buttons.filter((b) => b.getAttribute("aria-label") === "More actions")
-    const visible = buttons.filter((b) => b.getAttribute("aria-label") !== "More actions")
+    // SCOPED PAST THE FOLD, 18 Sep 2026 ("h3, and aign the menu to the
+    // chips") — the chip row now carries its OWN "More actions" trigger too
+    // (`shared/web/head-actions.tsx`'s `HeadActionsFoldMenu`, folded into
+    // `chips` below `RecordScreen`), same accessible name as the wide row's
+    // `RecordActionsMenu` by design (one overflow menu, two widths). This
+    // ceiling is about the WIDE row B1 actually named, so only a button
+    // inside `[data-slot="head-actions-row"]` counts toward either bucket —
+    // `web/test/head-actions-fold.test.tsx` owns the fold's own trigger.
+    const wideRow = document.querySelector('[data-slot="head-actions-row"]') as HTMLElement
+    const wideButtons = buttons.filter((b) => wideRow.contains(b))
+    const overflow = wideButtons.filter((b) => b.getAttribute("aria-label") === "More actions")
+    const visible = wideButtons.filter((b) => b.getAttribute("aria-label") !== "More actions")
     expect(overflow.length).toBe(1)
     // "Close" (primary) + the timer (secondary) + the standalone Edit pen —
     // B1's ceiling for THIS screen, amended 17 Sep 2026.

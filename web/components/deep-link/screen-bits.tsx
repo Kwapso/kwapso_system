@@ -310,6 +310,89 @@ export function AddButton({
   )
 }
 
+/** R88 — EMPTY-STATE SINGLE DOOR. THE ONE SHAPE A TITLE ROW OUTSIDE A
+ * `<ToolbarRow>` MAY PAIR WITH A COLLECTION THAT CAN BE EMPTY.
+ *
+ * The client's ruling, 18 Sep 2026, reading the deployed Work logs card back
+ * over her own earlier one: "we already said on empty state, we only have
+ * the first, not the top-right plus button. This is a law. Reinforce it
+ * everywhere. And then also remove the work log header when it's empty."
+ * Her screenshot: the ticket page's Work logs card, empty, drew a "Work
+ * logs" TITLE with a black top-right `+` (`AddButton`) *and*, in the body,
+ * `CollectionEmptyState`'s own "No time logged against this yet. […] Add
+ * the first" — two doors for one act, on a collection holding zero rows.
+ *
+ * R50/R84 ALREADY CLOSE THE BUTTON — `AddButton`'s own `empty` prop, right
+ * above — but a title-row header sits OUTSIDE a `<ToolbarRow>` by
+ * construction (that is the whole reason `AddButton` grew the `empty` prop
+ * in the first place, R50's `i(a2)`), so nothing stopped a call site from
+ * gating the BUTTON while leaving the HEADING drawn regardless — which is
+ * exactly what `help-detail.tsx` did, on the exemption "this button should
+ * stay reachable at zero rows exactly as the text button it replaced always
+ * was." That reasoning is what this ruling retires: on an empty section the
+ * empty state's own heading IS the heading, and a second one above it, even
+ * with a suppressed button beside it, is still a second door standing open.
+ *
+ * `TicketSidePanel` (ticket-detail-body.tsx) draws the shape this fixes —
+ * `Card` › a title row (`h3` + a trailing `action`) › the panel's rows —
+ * and could not take an `empty` prop of its own this session (that file was
+ * a locked, in-flight lane the day this law was written). So the shell is
+ * built ONCE here, the one new place the law lives, with the gate
+ * `TicketSidePanel` is missing: `empty` true skips the ENTIRE header row —
+ * title, count and action together — and draws only `children`, which is
+ * expected to be the panel's own `CollectionEmptyState` (or equivalent),
+ * exactly the body a populated panel would draw its rows into. `children`'s
+ * OWN position in the returned tree never moves, header present or not, so
+ * toggling `empty` never remounts whatever the caller nested inside — a
+ * child that owns a dialog (an "add" sheet, its own open/closed state) keeps
+ * it. */
+export function EmptyGatedPanel({
+  title,
+  count,
+  action,
+  empty,
+  children,
+}: {
+  title: string
+  /** Already formatted (R16's `formatCount`, or a hand-built duration) — "" draws
+   * nothing. Read only when `!empty`, same as `action`. */
+  count?: string
+  action?: React.ReactNode
+  /** True once the collection is CONFIRMED to hold zero rows — never merely
+   * "still loading": a header popping away and back while a read settles is
+   * its own small bug, so a caller passes this only once it actually knows. */
+  empty: boolean
+  children: React.ReactNode
+}) {
+  const headingId = React.useId()
+  return (
+    <Card variant="default">
+      <CardContent className="flex flex-col gap-3 p-4">
+        {!empty && (
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5 text-sm font-medium">
+              <span className="truncate">{title}</span>
+              {count ? (
+                <span className="text-muted-foreground shrink-0 font-[var(--font-weight-normal)]">
+                  {count}
+                </span>
+              ) : null}
+            </h3>
+            {action}
+          </div>
+        )}
+        <div
+          role="group"
+          aria-labelledby={empty ? undefined : headingId}
+          className="flex min-w-0 flex-col gap-3"
+        >
+          {children}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 /** THE GROWING SLOT'S OWN CLASS STRING — AND THE FLOOR IS ON THE FIELD, NOT ON
  * THE BOX AROUND IT.
  *

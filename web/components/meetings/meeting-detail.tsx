@@ -46,7 +46,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { ArrowSquareOut, FileText, Power, Video } from "@shared/ui/foundations/icons"
+import { ArrowSquareOut, FileText, PencilSimple, Power, Video } from "@shared/ui/foundations/icons"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
@@ -66,6 +66,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
+import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey, recordMapKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -511,6 +512,25 @@ export function MeetingDetailScreen({
       : []),
   ]
 
+  /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
+   * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
+   * Edit leaves its standalone pen and joins `overflow` inside the ONE "…"
+   * trigger that moves into the chip row. Same order the wide row already
+   * draws them in — edit, then whatever already lived in the menu. */
+  const foldedActions: HeadActionItem[] = [
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => setEditing(true),
+          },
+        ]
+      : []),
+    ...overflow,
+  ]
+
   return (
     <RecordScreen
       // A DELIBERATE MARK, NEVER AN EMPTY SLOT. This record has no picture and
@@ -570,6 +590,9 @@ export function MeetingDetailScreen({
               {item.accountName}
             </RecordChipLink>
           )}
+          {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
+              `help-detail.tsx`'s own ("aign the menu to the chips"). */}
+          <HeadActionsFoldMenu items={foldedActions} label={t("More actions")} />
         </>
       }
       title={cleanTitle}
@@ -583,7 +606,7 @@ export function MeetingDetailScreen({
       // than staying where a trim pass had left it.
       subtitle={formatDateTime(item.startsAt, lang)}
       actions={
-        <>
+        <div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>
           {/* NEVER BLACK OR MANGO (client ruling, 18 Sep 2026: "edit button
               is never black (even when it's only one)") — this button had
               carried NO `variant` at all, which is `Button`'s own default,
@@ -591,7 +614,7 @@ export function MeetingDetailScreen({
               is the one shared, always-quiet answer now. */}
           {canEdit && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
-        </>
+        </div>
       }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column.

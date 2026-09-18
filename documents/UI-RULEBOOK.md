@@ -37,10 +37,10 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L30)
-- [3. Detail screens](#3-detail-screens) (D1 to D21)
-- [4. Collections](#4-collections) (K1 to K47)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B20)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L31)
+- [3. Detail screens](#3-detail-screens) (D1 to D23)
+- [4. Collections](#4-collections) (K1 to K51)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B21)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1494,6 +1494,36 @@ against A1 going in.
 **Law.** None registered — `web/test/agent-chat-attachments.test.tsx` and
 `workers/data-ops/test/agent-attachments.test.ts` cover the mechanism.
 
+### L31: a ticket's footer sits on the screen's own bottom edge, and the composer wears its own colour, full width
+
+**The rule.** The client's ruling, 18 Sep 2026 evening, said twice the same round. First, over
+the shipped ticket page: *"On ticket detail, the footer should be at the very bottom. The
+position is still fucking wrong. Fix it once and for all."* Then, over a fourth screenshot of
+the same page: *"Look at the fourth screenshot. This composer should have a background color
+that makes it easy to identify, and also it should be full width of its own container."*
+[D21](#d21-a-footer-is-at-the-bottom) already proved a footer is the LAST child of its own
+card — DOM order only, nothing about where that card sits on the screen. It was not enough:
+the conversation card's own footer was closing hundreds of pixels past the visible screen
+body, because the ticket body was sized to the SUM of its own three side panels rather than to
+the screen's actual available height.
+
+**The shape.** The ticket detail screen now fills the screen's own height by construction: the
+page container's existing `flex-col`/`min-h-full` floor did not need to change, and the ticket
+body became that column's own `flex-grow` item, its side column collapsed from three
+auto-placed rows into one scrollable cell. The conversation cell's own height now resolves
+against a real, definite remainder rather than the side column's content sum, so the
+`CardFooter`/composer sits flush with the screen body's true bottom edge at every viewport
+height, the side column scrolling independently once it runs taller than the row. The composer
+(`ReplyComposer`) now draws a background distinct from the card ground around it — the same
+fill the kit's own `Input` paints every ordinary text field with — and spans the full width of
+the surface it sits on, never narrower than its own container.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** [R89](../RULES.md) (`footer-on-the-edge`), extending D21's DOM-order proof with the
+height-fill/full-bleed shape a card's own position on the screen still needed.
+`web/test/footer-on-the-edge.test.ts`.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order
@@ -2188,6 +2218,59 @@ the day this law was written.
 **Law.** None registered in `RULES.md`'s numbered list — a structural UI census on an
 existing component seam, the same weight this book gives R83's own toolbar-gap census
 before it graduated to R83. `web/test/footer-is-last.test.ts`.
+
+### D22: an empty section draws exactly one door in — no header, no second "+"
+
+**The rule.** The client's ruling, 18 Sep 2026, reading a deployed panel back over her own
+earlier one: *"Look at the third screenshot. We already said on empty state, we only have the
+first, not the top-right plus button. This is a law. Reinforce it everywhere. And then also
+remove the work log header when it's empty."* Her screenshot: the ticket page's Work logs
+card, empty, drew a "Work logs" title with a black top-right "+" AND, in the body, the
+standing empty state's own "Add the first" — two doors on one zero-row collection.
+[R50](../RULES.md)/[R84](../RULES.md) already close the button half everywhere a title row
+sits inside a `<ToolbarRow>`; the gap this rule closes is the title row that sits OUTSIDE
+one — a panel's own header, drawn by hand rather than by the toolbar. When a section is
+confirmed empty, its header — title, count and action together — draws nothing at all, and
+the section's own empty state is the one way in.
+
+**The shape.** `EmptyGatedPanel` (`web/components/deep-link/screen-bits.tsx`) is the one
+shared shell the law lives in: `empty` true drops the whole header and draws only `children`,
+expected to be the panel's own `CollectionEmptyState` — `children`'s position in the returned
+tree never moves as `empty` flips, so a child that owns its own "add" dialog is never
+remounted by the header appearing or disappearing. The ticket page's Related stories and Work
+logs panels, the two this ruling was written over, both moved off a hardcoded `empty={false}`
+(the escape hatch that used to argue the "+" should stay reachable at zero rows) onto this
+shell.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** [R88](../RULES.md) (`empty-state-single-door`). `web/test/empty-state-single-door.test.ts`.
+
+### D23: below its own breakpoint, a ticket head's buttons fold into the "…" menu, aligned to the chip row
+
+**The rule.** Shown an artifact of the narrow ticket head, the client's ruling, verbatim, over
+the first screenshot: *"Look at the first screenshot. It looks completely broken. Create an
+artifact with different versions of how we can do it for smaller screens, because like this,
+it cannot be. It looks so broken."* Her pick off the side-by-side, verbatim: *"h3, and aign
+the menu to the chips."* H3 — "actions fold into the menu": below the breakpoint, Close,
+Start/Stop timer and Edit leave their own standalone buttons and join the overflow menu
+already there, so only the "…" trigger survives beside the title; above the breakpoint
+nothing changes, the wide row draws exactly what it always has. The "…" trigger itself sits
+on the chip row's own line, at its right end, and the menu opens aligned to that same edge —
+"align the menu to the chips" made literal.
+
+**The shape.** A container query against the record head's own title row, not the viewport —
+the kit's own convention. Two renders of the same action list are always in the tree (the wide
+row of buttons, and a flat, normalized item list feeding the folded menu); CSS alone decides
+which one a reader sees. `shared/web/head-actions.tsx` (`HeadActionsFoldMenu`,
+`HEAD_ACTIONS_ROW_CLASS`) is the shared seam — ticket detail is the first screen wired to it;
+task and story detail, which draw the identical inline row of a primary button, a timer button
+and the edit pen, are named as the next screens onto it, not rebuilt in this round.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered — a structural fold over an existing action row, the same weight this
+book gives R83's own toolbar-gap census before it graduated to a law.
 
 ---
 
@@ -4329,6 +4412,73 @@ and the face fits inside that, never the other way round.
 
 **Law.** None registered.
 
+### K48: the assistant composer holds one row at rest, at every pane width
+
+**The rule.** The client's ruling, 18 Sep 2026, over a screenshot of the assistant pane at a
+narrow width: *"Look at the second screenshot. Now it makes it two rows, and it kind of
+breaks. Make sure that it's only one row. Ask about your work. It doesn't break into rows,
+and also, as you see in the screenshot, when it's selected, it's not working properly.
+Something's off."* An empty composer field was measuring its own placeholder's wrapped
+height — "Ask about your work" wraps to two lines at a narrow pane width, and the field grew
+to match before a single character existed — and the field carried no floor narrower than its
+own min-content width, which is what let the pane narrow enough to wrap the placeholder in the
+first place. The "selected... something's off" report was the same bug wearing a different
+name: a click focused an already two-row field, nothing about focus itself was broken. Fixed
+by construction: an empty field never measures against its own placeholder and is pinned to
+the resting one-line height, and the placeholder itself is set never to wrap, at any width.
+
+**Status: ruled, in build, kit v1.2.124.**
+
+**Law.** None registered — a kit-only fix. `components/agent-chat/check-composer.mjs`, wired
+into the kit's own `npm run check`.
+
+### K49: the rail's brand mark steps up one more rung, still centred on the strip row
+
+**The rule.** The client's ruling, 18 Sep 2026, over the live rail: *"I want the logo to be
+bigger and maybe even a bit lower. I don't know. You tell me, you're the designer, but I
+would say it needs to be a bit bigger, just a bit."* One more rung of the icon ladder — the
+mark's size steps from the 24px rung to the 28px rung, the next size already admitted on the
+ladder, not an invented number. The strip row's own band still centres the mark by
+construction — its height and top offset are unchanged — so a taller mark grows from that
+same centre in both directions: the bottom edge drops (and the top rises) by half the size
+difference, reading as "a bit lower" without touching the law that centres it.
+
+**Status: ruled, in build, kit v1.2.124.**
+
+**Law.** None registered — a kit token step (`compositions/templates/rail.tsx`); the band's
+own construction that centres the mark was untouched and needed no re-proof.
+
+### K50: the assistant tab strip fits its own pane — no clipped tab, "+" never pushed out of view
+
+**The rule.** The client's ruling, 18 Sep 2026, the fourth time she reported the same shape:
+*"Nope, the issue's still there. Please tell me what we need to do to fix this once and for
+all, because I'm getting very tired of this topic."* — over the assistant's tab strip with
+three or more conversations open. Found: at three-plus conversations the strip overflowed the
+pane's own width, so the third tab clipped mid-word and the pinned "+" was pushed past the
+visible edge — the strip was drawing every tab at its natural width rather than sharing the
+pane's own room between them.
+
+**The fix.** The strip fits the pane it is drawn in rather than growing past it: tabs share
+the available width and shrink together before any one of them clips, and "+" stays pinned,
+always visible, at the strip's own trailing edge. A tab's own title stays the conversation's
+own — never truncated to a generic placeholder to make room.
+
+**Status: ruled, not yet built — kit v1.2.125.**
+
+**Law.** None registered — a kit-only fix.
+
+### K51: the new-tab search field carries one icon, not two
+
+**The rule.** The client's ruling, 18 Sep 2026, validating this round's search fix on the
+new-tab page: *"Validated, but now there is the search icon on the right and on the left.
+Remove the one on the left inside the text bar, the white one."* `SearchInput`'s own leading
+icon is switched off on the new-tab page's search field — the trailing icon, the kit's
+standing search glyph, is the only one, matching every other search box in the app.
+
+**Status: ruled, not yet built — kit v1.2.125.**
+
+**Law.** None registered — a kit-only fix.
+
 ---
 
 ## 5. Buttons and actions
@@ -5108,6 +5258,32 @@ build decision for whoever implements it.
 else case this rule carves an exception out of; the exception itself is not yet separately
 registered.
 
+### B21: raised by is a dropdown; who to keep in the loop is one horizontal row, the full roster
+
+**The rule.** The client's ruling, 18 Sep 2026, verbatim: *"On ticket raised by, there should
+be a dropdown, and who to keep in the loop should be horizonta[l]."* Two fields on the ticket
+form, two separate changes.
+
+**Raised by.** Supersedes her own 7 Sep 2026 ruling on the same field ("the raise by, no
+dropdown but visible all chips") — said here rather than left to be discovered as a silent
+contradiction. The data and the default are unchanged: the same contact options, the same
+default (the picked contact, else the account's main one), the same door fence refusing any id
+that is not a live contact of this client. Only the control changed, from a row of chip pills
+to the kit's own `Select`. Team members are not offered here — a colleague is a different
+table from a contact, and offering one would need a real schema decision, not a control swap.
+
+**On the loop.** Already a horizontal, wrapping row of pills (`StaffPillPicker`); what changes
+is who it draws. Before, a person already on the loop was filtered OUT of the row while
+somebody else was being added, so mid-add nobody could see who was already on it. Now the row
+always shows the FULL roster, with everyone already on the loop drawn pressed and locked
+rather than dropped from the row — the same "row of chips, current members shown, more
+addable at the end" shape, and the already-add-only rule (nothing on a ticket is ever removed)
+stays: a locked pill carries no "×".
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered.
+
 ---
 
 ## 6. Forms and dialogs
@@ -5540,6 +5716,21 @@ R20's own discipline); a render assertion that every one-line title renderer —
 `clampRecordHeading` (`shared/web/record-heading.tsx`), `CollectionHeading`, and
 `RecordTable`'s own first column — truncates with an ellipsis and keeps the full title
 reachable through its `title` attribute.
+
+**AMENDED 18 Sep 2026 — an imported title is kept whole.** Shown the choice between clamping
+an imported title on the way in, leaving it uncapped, or refusing it outright, the client's
+ruling, verbatim: *"l1."* **I1**: the fifty-character cap binds what a person TYPES — every
+title field's `maxLength` and its matching write door stay exactly as ruled above — but a
+title that arrives already written somewhere else, from a FILE NAME (a knowledge upload with
+no typed title of its own) or from a Google import (Drive, Gmail, Calendar, Chat), is kept
+WHOLE on write, uncapped, and is only ever shortened where a one-line renderer already
+truncates any other title — never rejected, never clipped at the door.
+`postUploadKnowledgeFile` (`workers/content/src/routes/knowledge.ts`) already reads this way:
+a caller who posts no `title` falls back to the file's own (uncapped) `fileName` rather than
+to a value `TITLE_MAX_CHARS` would have refused — this amendment writes that shape down as the
+rule rather than leaving it an accident of the fallback's own order.
+
+**Law.** R87's own amendment (`title-length`), no new rule number.
 
 ---
 
@@ -7396,19 +7587,53 @@ positionally (R20/R87). F18's own status line already reads "ruled, in build, 18
 this row is closed rather than restated. **Artifact:**
 <https://claude.ai/artifact/TYmJqr1byzjS9oiLosyFaL>.
 
+**CLOSED, 18 Sep 2026 (Round 21) — an imported title's length.** Was: "DECISION PENDING —
+imported knowledge titles over 50 (clamp on import / leave / refuse)," open since round 18.
+Shown the three options, the client's pick, verbatim, *"l1,"* is now
+[F18](#f18-a-title-fits-one-line-on-a-macbook-air)'s own 18 Sep 2026 amendment (I1): the cap
+binds what a person types, and a title arriving from a file name or a Google import is kept
+whole.
+
+**CLOSED, 18 Sep 2026 (Round 21) — ticket facts shown nowhere.** Was: "DECISION PENDING —
+ticket facts now shown nowhere (Raised by/on/from, another language's title, the screen
+recording link)," open since round 13 (17 Sep 2026). Asked to confirm whether these facts are
+reachable anywhere on the page, the client's ruling, verbatim: *"yes, they do. It shows on the
+footer, so do nothing as it is right now."* No change: the record's own audit footer
+([D1](#d1-a-detail-screen-has-exactly-four-regions-in-this-order)'s own fourth region) already
+carries them.
+
+**STILL OPEN, 18 Sep 2026 (Round 21) — the emails artifact's accuracy.** Shown the "Every
+Email Kwapso Sends" artifact, the client's ruling, verbatim: *"not sure they are accurate.
+Make sure that you reproduce 100% accuracy."* The page is regenerated straight from the real
+templates the app actually sends, rather than hand-summarised copy, so nothing on it can drift
+from what a person receives. Not yet re-shown for her sign-off — the row stays open until she
+sees the regenerated page.
+
+**STILL PARKED, 18 Sep 2026 (Round 21) — Main Page Views.** Open, unchanged, since at least
+round five (16 Sep 2026). Asked again this round, the client's ruling, verbatim: *"continue
+parked."* No artifact shown, no pick made; carried forward exactly as it was.
+
+**ANSWERED, WRITE PENDING HER SIGN-OFF, 18 Sep 2026 (Round 21) — the five untyped Smoke-team
+stories.** Was: "DECISION PENDING — five untyped stories," open since round eight (16 Sep
+2026). Asked what to do about the stories that carry no type, the client's ruling, verbatim:
+*"explain this better. I still don't get what you mean and what I have to do here — if you
+are referring to the fact that some stories don't have a type, read the content and assign it
+yourself."* Five proposals, one per story, read off its own content and handed back for her
+sign-off; the write itself waits on her permission and is not built against this ruling alone.
+
 ---
 
 ## Rule index
 
-**208 rules.**
+**216 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L30 (30) |
-| 3. Detail screens | D1 to D21 (21) |
-| 4. Collections | K1 to K47 (47) |
-| 5. Buttons and actions | B1 to B20 (20) |
+| 2. Page layout and width | L1 to L31 (31) |
+| 3. Detail screens | D1 to D23 (23) |
+| 4. Collections | K1 to K51 (51) |
+| 5. Buttons and actions | B1 to B21 (21) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |
@@ -7452,6 +7677,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R82 | [K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end) | R83 | [K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column) |
 | R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | R85 | [W15](#w15-every-rail-destination-is-named-in-one-word) |
 | R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | R87 | [F18](#f18-a-title-fits-one-line-on-a-macbook-air) |
+| R88 | [D22](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-) | R89 | [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) |
 
 ### The seven files that carry most of it
 

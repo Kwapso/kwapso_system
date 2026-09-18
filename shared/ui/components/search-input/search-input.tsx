@@ -131,6 +131,31 @@ export interface SearchInputProps
    * announced; the field STAYS editable — see the header note.
    */
   loading?: boolean;
+  /**
+   * Draw the leading glyph — the magnifying glass at rest, the spinner while
+   * `loading`. Defaults to `true`, which is this field's original, only
+   * drawing: every existing caller keeps it.
+   *
+   * `false` FOR THE ONE CALLER WITH A SECOND SEARCH GLYPH ALREADY BESIDE IT.
+   * Client ruling, on the new-tab page: "there is the search icon on the
+   * right and on the left. Remove the one on the left inside the text bar,
+   * the white one." A page that draws its OWN leading mark next to this
+   * field (a hero search with a button-side glyph, say) ends up with two —
+   * this field's own tertiary-ink glass, always drawn, and the caller's.
+   * Named for what it removes, not for the one call site that needs it:
+   * `kwapso_system`'s new-tab screen used a blunt `[&>svg:first-child]:
+   * hidden` class override before this prop existed, which hides whichever
+   * child happens to render first — silently wrong the day `loading` makes
+   * that first child the spinner instead of the glass. This prop asks for
+   * the removal directly, and covers both glyphs by construction: with
+   * `false`, NEITHER the glass nor the spinner renders, ever, so a loading
+   * search with no leading icon reads as a search with no leading icon —
+   * not as a hidden spinner still telling `aria-busy` it is there. Nothing
+   * else about the field changes: the shell's own `px-[var(--space-4h)]`
+   * padding and the gap before the input are unconditional, so the input
+   * simply starts where the glyph would have stood.
+   */
+  leadingIcon?: boolean;
 }
 
 /**
@@ -184,6 +209,7 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       onClear,
       clearLabel = "Clear",
       loading = false,
+      leadingIcon = true,
       disabled = false,
       readOnly = false,
       value,
@@ -240,19 +266,21 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         data-readonly={readOnly ? "true" : undefined}
         className={cn(searchShellVariants({ state }), className)}
       >
-        {loading ? (
-          // `.motion-spinner` is motion.css's one rotation: the kit-stated
-          // 700ms turn on the linear curve, kept running under reduced motion
-          // because a frozen spinner is the absence of the only signal that
-          // work is still open.
-          <CircleNotch
-            size={16}
-            aria-hidden="true"
-            className="motion-spinner text-ink-tertiary"
-          />
-        ) : (
-          <MagnifyingGlass size={16} aria-hidden="true" className="text-ink-tertiary" />
-        )}
+        {leadingIcon ? (
+          loading ? (
+            // `.motion-spinner` is motion.css's one rotation: the kit-stated
+            // 700ms turn on the linear curve, kept running under reduced
+            // motion because a frozen spinner is the absence of the only
+            // signal that work is still open.
+            <CircleNotch
+              size={16}
+              aria-hidden="true"
+              className="motion-spinner text-ink-tertiary"
+            />
+          ) : (
+            <MagnifyingGlass size={16} aria-hidden="true" className="text-ink-tertiary" />
+          )
+        ) : null}
 
         <input
           ref={setRefs}

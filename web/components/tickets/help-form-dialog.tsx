@@ -56,6 +56,7 @@ import {
 } from "@shared/ui/components/dialog/dialog"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -982,6 +983,11 @@ export function HelpFormDialog({
         // while the escape hatch was appended to the end of it; with "Not said"
         // gone there is one term left, and `[...xs.map(…)]` is a second array
         // built for nothing — oxlint's `no-useless-spread`, and it is right.
+        //
+        // UNSORTED HERE ON PURPOSE — the A→Z order (R75) is applied at the
+        // <SelectItem> render below (`sortedOptions(contactOptions, lang, …)`),
+        // which is also the one `.map()` the law's own census reads; sorting
+        // twice would be wasted work for the same result.
         contactChoices.map((l) => ({
           value: l.personAccountId,
           label: l.personName,
@@ -1529,24 +1535,88 @@ export function HelpFormDialog({
           the server refuses. Removing the search box removes a convenience, never
           a limit. The options themselves, the no-cap decision and the two empty
           states are worked out above. */}
+      {/* A DROPDOWN, NOT A CHIP ROW — client ruling, 18 Sep 2026, verbatim:
+          "On ticket raised by, there should be a dropdown." This SUPERSEDES
+          her own 2026-09-07 ruling ("the raise by, no dropdown but visible
+          all chips") for this one field, so it is said here rather than left
+          to be discovered as a silent contradiction of the paragraph above.
+          The DATA and the DEFAULT are unchanged — same `contactOptions`, same
+          `raisedByValue` (picked, else the account's main contact), same
+          fence (the door refuses any id that is not a live contact of this
+          client) — only the CONTROL changed, from `RecordPicker layout="row"`
+          to the kit's own `Select`.
+
+          TEAM MEMBERS ARE NOT IN THIS LIST, and that is a flagged gap rather
+          than a quiet omission. `raisedByContactId` is a foreign key onto
+          THIS TEAM's `accounts` table (`account_type IN ('entity',
+          'individual')` — contacts, not staff); a colleague is a row in the
+          separate GLOBAL `users`/`team_members` tables, and the door
+          (`contactForTicket`, workers/content/src/lib/help.ts) refuses any id
+          that is not a live account row linked to this ticket's client.
+          Offering a colleague here would either silently fail to save or
+          require a real schema decision (a second nullable column, or a
+          polymorphic id) — not a control swap, and not made in this pass. */}
+      {/* `key` FORCES A FRESH MOUNT THE MOMENT THIS ACCOUNT'S CONTACTS FIRST
+          ARRIVE — a fix for a real regression the control swap introduced,
+          found by driving this exact default through the real Select rather
+          than trusting the comment above that "only the control changed".
+
+          RADIX'S OWN HIDDEN NATIVE `<select>` (`SelectBubbleInput`, for HTML
+          form/autofill integration) mirrors this Select's controlled `value`
+          by calling the native value setter and dispatching a `change` event
+          — which this component's `onChange` turns straight back into
+          `onValueChange`. That mirror only works if the native `<option>` for
+          the target value has already registered, and registration happens
+          in a `SelectItem`'s OWN effect, one commit behind the render that
+          first added it. So the one render where `raisedByValue` and the
+          contact options BOTH first appear together — exactly what happens
+          the instant `mainContactId` resolves out of an async `accountDetail`
+          read — finds no matching native option, the browser leaves the
+          hidden select at "", and the dispatched event fires `onValueChange
+          ("")`, overwriting the very default this field exists to set. Proved
+          by `web/test/ticket-names-its-client.test.tsx`'s "lights the
+          account's main contact" case, which timed out on exactly that empty
+          string reaching `onSubmit`.
+
+          A FRESH MOUNT SIDESTEPS IT RATHER THAN RACING IT: Radix's own
+          `usePrevious` reports NO change on a component's first render
+          (`previous` seeds to the initial `value`), so a Select that mounts
+          ALREADY holding its default never asks the native mirror to change
+          anything — there is nothing for the race to corrupt. `chosenAccountId`
+          is folded into the key too, so switching accounts (which resets
+          `raisedByContactId` to `NONE` two fields up) gets the same fresh
+          start as the first load rather than reusing an instance whose native
+          mirror still remembers the OLD account's options.
+
+          NOTHING A PERSON COULD HAVE TOUCHED IS EVER LOST: the trigger stays
+          `disabled` for exactly as long as `contactOptions.length === 0`, so
+          the remount always lands on the SAME transition — disabled-with-
+          nothing-chosen to enabled-with-a-default — that a person could not
+          have clicked into in between. */}
       <Field config={contactConfig} htmlFor="help-contact" className={fieldSpacing}>
-        <RecordPicker
-          id="help-contact"
-          layout="row"
-          // Same wall, same answer as the type row above: a group of chips is
-          // not a labelable control, so the name a screen reader reads comes
-          // from the field's own config rather than from the `<label for>`.
-          ariaLabel={t(contactConfig.label)}
-          // THE DEFAULT IS VISIBLE, WHICH IS THE POINT OF IT. `raisedByValue`
-          // resolves the main contact for the row as well as for `submit`, so
-          // the chip somebody would be agreeing to is the one already lit.
-          value={raisedByValue}
-          onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
-          options={contactOptions}
-          searchPlaceholder={t("Search contacts…")}
-          emptyText={chosenAccountId ? t("No contacts yet.") : t("Choose an account first.")}
-          disabled={busy}
-        />
+        <Select
+          key={`${chosenAccountId ?? "none"}:${contactOptions.length > 0 ? "loaded" : "loading"}`}
+          value={raisedByValue === NONE ? "" : raisedByValue}
+          onValueChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
+          disabled={busy || !chosenAccountId || contactOptions.length === 0}
+        >
+          <SelectTrigger id="help-contact">
+            <SelectValue
+              placeholder={chosenAccountId ? t("No contacts yet.") : t("Choose an account first.")}
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {/* A→Z BY LABEL (R75) — `raisedByValue`/`mainContactId` above read
+                `contactChoices` directly, never this rendered order, so
+                sorting the row's own options can never move the
+                preselection. */}
+            {sortedOptions(contactOptions, lang, (c) => c.label).map((c) => (
+              <SelectItem key={c.value} value={c.value} image={c.picture ?? undefined} imageAlt="">
+                {c.hint ? `${c.label} — ${c.hint}` : c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
       {/* WHO TO KEEP IN THE LOOP — moved here from the page's own Stakeholders
           panel (client ruling, 17 Sep 2026; see `loopField`'s own comment
@@ -1555,19 +1625,43 @@ export function HelpFormDialog({
           attach a stakeholder to, and a picker with nothing in it is the
           same "row that failed to load" shape the type/app/contact rows
           above already avoid by hiding rather than drawing empty. */}
+      {/* A HORIZONTAL ROW, THE FULL ROSTER — client ruling, 18 Sep 2026
+          ("who to keep in the loop should be horizontal"). `StaffPillPicker`
+          already wraps its pills on one line (`flex flex-wrap`, never a
+          vertical list); what changed is WHO it draws. Before, `people` was
+          `addableLoopMembers` — the roster with everyone already on the loop
+          filtered OUT, so a person mid-add could not see who was already in
+          it. Now it is the FULL roster (`loopMembers`), with everyone
+          already on the loop passed as `lockedIds`: `StaffPillPicker`'s own
+          multi-mode contract (see its header) draws a locked id PRESSED and
+          DISABLED rather than leaving it out — "the full roster stays
+          visible and the row never reorders under a click" — which is
+          exactly the "row of chips, current members shown, more addable at
+          the end" shape asked for, with no separate "add control" invented:
+          every un-locked pill IS the add control, clicking it fires
+          `addToLoop` exactly as before.
+
+          NO "×", ON PURPOSE. A removable chip would draw a control this app
+          cannot honour: `help_stakeholders` has no delete route, and the
+          derived origins (raiser/admin/mentioned) were never a row to begin
+          with — "nothing on a ticket is ever removed" is stakeholders.ts's
+          own locked law. `StaffPillPicker`'s locked pills already say this
+          honestly (pressed, but not clickable off) rather than offering a ×
+          that could only fail. */}
       {isEdit && canAddToLoop && onAddStakeholder && addableLoopMembers.length > 0 ? (
         <Field config={loopField} htmlFor="help-loop" className={fieldSpacing}>
           <StaffPillPicker
             id="help-loop"
             mode="multi"
             ariaLabel={t(loopField.label)}
-            people={addableLoopMembers.map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
+            people={(loopMembers ?? []).map((m) => ({ id: m.id, name: m.name, photo: m.photo }))}
             lang={lang}
             // ADD-ONLY (help-stakeholders.tsx's own rule, unchanged by the
             // move): nothing in this row is ever "selected" state, only
-            // clicked — the chip a click adds is gone from this list on the
-            // next render, folded into the page's own people list instead.
+            // clicked — a click adds, and the person moves into `lockedIds`
+            // on the next render rather than leaving the row.
             value={[]}
+            lockedIds={[...loopExisting]}
             onValueChange={(ids) => {
               const picked = ids[0]
               if (picked) void addToLoop(picked)
