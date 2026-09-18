@@ -4,22 +4,53 @@ Run this after the test is over. It archives the two BLACKBOX records the
 tester created (tasks 8/9) and shuts the sandbox down. Nothing here is a
 delete — the deactivate-not-delete rule holds, so this is reversible.
 
-**Step 3 (revoke) is already DONE, by the scorer.** Token
-`01M2N1JV4Y23M64E6W7SRG6662` is revoked and the Keychain item
-`mcp-blackbox-token-kwapso` has been deleted — confirmed again 2026-09-16
-(nothing live remains under it). Steps 1/2 (archive the BLACKBOX ticket,
-cancel the BLACKBOX to-do) are still open if they weren't done separately.
+**RUN 4 — the real narrow-role run — is complete and DONE end to end.**
+The tester ran 13:12–13:19 IST inside the `kwapso_cpaa` checkout, calling
+the staging `/mcp` door directly over HTTP with the sandbox token (48
+`mcp_call_log` rows under it, including the setup session's own earlier
+live probes of tasks 13-20). Answers: `~/Desktop/kwapso-mcp-blackbox/answers.md`
+(the tester's own working folder, outside this repo — not in this
+worktree or the primary checkout).
 
-**Why the tester's run didn't test the narrow role at all**: the scorer
-found (`mcp_call_log`) that the tester's 16 calls ran under
-`alaap@kwapso.com`'s own standing Admin token, not this sandbox token —
-whichever MCP connector the tester session had configured pointed at the
-owner's personal token, not the one this sandbox minted. **A real
-narrow-role run needs a fresh tester session whose only MCP connector
-carries a freshly-minted sandbox token** — `setup.mjs` can mint that
-token again any time, but only the owner can point a tester session's
-connector at it (this session doesn't configure the desktop app's MCP
-connectors, and cannot mint the connection on the tester's behalf).
+**Token revoked 2026-09-18T07:52:04Z UTC (~13:22 IST)**, through the
+app's own revoke door (`POST /api/mcp/tokens/revoke`, signed in as the
+token's owner, the same test-login flow `setup.mjs` uses) — token id
+`01M2S9B44A9Y1VRFRX74YMVBJ5`. **The Keychain item
+`mcp-blackbox-token-kwapso` was deliberately LEFT IN PLACE** this time
+(unlike the run-1 cleanup below) so nothing else that reads it breaks;
+it now holds a secret for a revoked token, which is inert but not
+misleading — `security find-generic-password -s mcp-blackbox-token-kwapso -w`
+still returns a value, it just no longer authenticates anywhere.
+
+**The worktree `.worktrees/mcp-blackbox` has been removed from disk**
+(`git worktree remove`, no branch deleted) — this branch is edited from
+a freshly re-added worktree at the same path when needed, and removed
+again afterward, so a stray `answers.md`/`tasks.md` copy never sits
+where a tester session inside the primary checkout could read it.
+
+**Dead local MCP connector.** The owner's `~/.claude.json` holds a
+LOCAL-SCOPE entry named `machine-tester`, scoped to
+`~/Desktop/kwapso-mcp-blackbox` (the tester's working folder), pointing
+at the now-revoked token. It is dead and can be removed by running, from
+that folder:
+
+```bash
+claude mcp remove machine-tester
+```
+
+Only the owner can do this (this session doesn't reach his `~/.claude.json`
+or his desktop app's connector list). Leaving it is harmless — a revoked
+token just gets `401`s — but it is the thing to strip before pointing
+that same folder at a NEXT sandbox token, so a fresh run doesn't
+accidentally inherit a stale connector under the same name.
+
+**The wrong-token finding from the FIRST tester run (run 3, 16 tool
+calls) is now resolved**: that run's calls landed on
+`alaap@kwapso.com`'s own standing Admin token because more than one MCP
+connector was apparently reachable and nothing forced a check. Run 4
+fixed this by having the tester call the staging `/mcp` door directly
+over HTTP with the narrow token, inside this checkout, rather than
+through a desktop-app connector that could point at the wrong thing.
 
 Fill in `<ticket-id>` and `<todo-id>` from the tester's `answers.md` (or
 look them up: `list_help_tickets({"q":"BLACKBOX-1"})` /
@@ -31,9 +62,19 @@ Fixed ids from setup, for reference:
 - role: `01M2N1JJNPDF7KB7XA1T6KH9BF` ("Machine tester")
 - machine-tester member (token owner): `01M2N0N8GFQ042H68AQFWAVR88`
   (`delivered+mcp-blackbox@resend.dev`)
-- token id: `01M2N1JV4Y23M64E6W7SRG6662` (or list the owner's tokens —
-  `GET /api/mcp/tokens` as that user — if this id was lost)
+- token id (run 4, revoked 2026-09-18T07:52:04Z): `01M2S9B44A9Y1VRFRX74YMVBJ5`
+  (or list the owner's tokens — `GET /api/mcp/tokens` as that user — for
+  the current one; every id this sandbox has ever minted is revoked as
+  of this writing)
 - test account used for the writes: "PLATINUM" (`01KZXBTAJXJXE3J1GYX7MFYYXB`)
+
+**Steps 1/2 below need a LIVE token** — the run-4 token is revoked, so
+mint a fresh one first (`node scripts/mcp-blackbox/setup.mjs`) if you
+want to actually archive/cancel the BLACKBOX-1/BLACKBOX-2 records from
+this run. Not done as part of this cleanup pass — the planner asked
+specifically not to touch the "Machine tester" role or its rights right
+now (a scorer may still want to read them as-is), and step 2's technique
+below temporarily widens `inputs:delete` on that exact role.
 
 The earlier dry-run sandbox on the Smoke team (see `dry-run/README.md`) is
 already torn down: both of its tokens
@@ -73,17 +114,20 @@ always resets the matrix to the narrow one.
 
 ## 3. Revoke the token
 
-**Already done for this run** (see the note at the top). Kept below for
-the next run. Revoking is scoped to the token's OWNER, not the admin — sign the machine-
-tester account in the same way `setup.mjs` does (the staging test-login
-door) and call:
+**Already done for run 4** (`01M2S9B44A9Y1VRFRX74YMVBJ5`, revoked
+2026-09-18T07:52:04Z — see the note at the top). Kept below as the
+general recipe for the NEXT run. Revoking is scoped to the token's
+OWNER, not the admin — sign the machine-tester account in the same way
+`setup.mjs` does (the staging test-login door) and call:
 
 ```
 POST /api/mcp/tokens/revoke
-  { "id": "01M2N1JV4Y23M64E6W7SRG6662" }
+  { "id": "<current live token id>" }
 ```
 
-Then drop it from the Keychain:
+Then drop it from the Keychain — **skipped this time on the planner's
+instruction** (keep the item so nothing else that reads it breaks; it's
+inert once the token behind it is revoked):
 
 ```bash
 security delete-generic-password -s mcp-blackbox-token-kwapso
