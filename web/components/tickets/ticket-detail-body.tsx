@@ -91,21 +91,40 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  *
  * THE FIX IS BY CONSTRUCTION, THE SAME STANDARD EVERY OTHER LAW IN THIS
  * BASE HOLDS TO: no magic pixel offset, no viewport-relative guess. This
- * component's own root is now a FLEX ITEM of `app-shell.tsx`'s own R29 page
- * container (`className="mx-auto flex w-full max-w-none min-w-0 min-h-full
+ * component's own root is a FLEX ITEM of `app-shell.tsx`'s own R29 page
+ * container (`className="mx-auto flex w-full max-w-none min-w-0 h-full
  * flex-col …"`, the ONE thing that div wraps besides `<LiveStatus/>`) — a
- * `flex-col` box already sitting on a `min-h-full` floor equal to the
- * screen body's own visible height (`[data-slot="screen-shell-body"]`,
- * `min-h-0 flex-1 overflow-y-auto`, ScreenShell's own scroller). A
- * `min-height` flex container distributes ANY leftover space (floor minus
- * the flex items' own content height) to whichever item carries
- * `flex-grow` — `lg:flex-1 lg:min-h-0` here — so this grid grows to fill
- * exactly what `<RecordScreen>`'s head leaves behind, no taller and no
- * shorter, at every viewport height, with NO EDIT TO `app-shell.tsx`
- * NEEDED: that file was already the flex column this law needs: see the
- * measurement proof in the report for why `min-h-full` (not `h-full`) is
- * already the right property here — it is a FLOOR the flex algorithm fills
- * from below, not a cap that would clip a taller screen's overflow.
+ * `flex-col` box sitting on the screen body's own visible height
+ * (`[data-slot="screen-shell-body"]`, `min-h-0 flex-1 overflow-y-auto`,
+ * ScreenShell's own scroller).
+ *
+ * RE-PROVEN LIVE, 18 SEP 2026 EVENING, AND CORRECTED IN TWO PLACES THIS
+ * PARAGRAPH USED TO GET WRONG. The FIRST landing of this law claimed
+ * `min-h-full` on `app-shell.tsx`'s page container was already enough and
+ * needed no edit — false: `min-height` is only ever a FLOOR a `height:auto`
+ * block can grow PAST, and the instant real content (a ticket with an
+ * actual conversation, not an empty fixture) is taller than that floor,
+ * there is no leftover space left for any descendant's `flex-grow` to
+ * consume — every `flex-1 min-h-0` box downstream, this grid included, just
+ * rendered at its own natural content size, because nothing above them was
+ * ever DEFINITE. Measured before this correction: the page container stood
+ * 1312px tall against a 785px pane. `app-shell.tsx` now uses `h-full`
+ * (`height: 100%`, a real, definite number, not a floor) — see that file's
+ * own note for why this is safe for every OTHER screen (nothing here sets
+ * `overflow`, so taller content still paints past the box and
+ * `screen-shell-body` still scrolls all of it, proved against the tickets
+ * dashboard and an account detail page, pixel-identical before/after).
+ *
+ * SECOND: with the column finally definite, `RecordScreen`'s own head
+ * (`RecordChrome`, rendered above this grid as a SIBLING because
+ * `help-detail.tsx` passes `panelVisible={false}`) was ALSO carrying
+ * `flex-1 min-h-0` — so the column's real height split 50/50 between the
+ * head and this grid, never "everything the head doesn't need". Fixed in
+ * `web/components/records/record-chrome.tsx` (`HEAD_ONLY`, read off
+ * `panelVisible` directly): the head now takes exactly its own content
+ * height, and this grid's `lg:flex-1` claims everything left over — which
+ * is what "fills exactly what `<RecordScreen>`'s head leaves behind" always
+ * meant, just not what the first landing's CSS actually did.
  *
  * ONE ROW NOW, NOT THREE — the grid's own tracks have to be able to
  * STRETCH to fill that definite height, and CSS Grid's default
@@ -241,6 +260,20 @@ export function TicketSidePanel({
  * rather than express it. Below `lg` there is no second column to stretch
  * against, so the old viewport-relative height stays exactly as it was.
  *
+ * `lg:min-h-0` RELEASES `min-h-[420px]` AT `lg` TOO — R89 RE-PROOF, 18 Sep
+ * 2026 evening. `min-h-[420px]` is a BELOW-`lg` floor (so a short viewport
+ * never crushes the card thinner than a usable chat panel while it is
+ * stacked full-width above the side column) — measured live once the grid
+ * actually had a real height to give this card (`${SCRATCH}/
+ * check-sel2.json`): with a heavy head + audit footer above it, the grid's
+ * own real budget can measure LESS than 420px, and `min-height` always
+ * wins over a smaller `height` regardless of which utility the cascade
+ * would otherwise prefer — so the card sat pinned at exactly 420px, 48px
+ * past the grid's own row, the same "min-height floor outlives the
+ * breakpoint it was written for" shape `tickets-dashboard.tsx` already
+ * names and releases with `lg:min-h-0` on its own stacked panels. Same
+ * fix, same reason, here.
+ *
  * THE COMPOSER IS THE CARD'S `CardFooter` NOW, NOT A THIRD FLEX CHILD OF A
  * PADDED `CardContent` — client ruling, 18 Sep 2026, verbatim: "the footer
  * is not on the footer position!! fix that!" The earlier shape put
@@ -286,7 +319,7 @@ export function TicketConversationPanel({
   composer: React.ReactNode
 }) {
   return (
-    <Card variant="default" className="flex h-[min(78vh,760px)] min-h-[420px] flex-col lg:h-full">
+    <Card variant="default" className="flex h-[min(78vh,760px)] min-h-[420px] flex-col lg:h-full lg:min-h-0">
       <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
       <CardFooter className="shrink-0 p-4">{composer}</CardFooter>
     </Card>

@@ -642,6 +642,39 @@ const FOOTER_TO_BOTTOM =
   "[&_[data-slot=record-detail]]:flex-1 [&_[data-slot=record-detail]]:min-h-0 " +
   "[&_[data-record-region=footer]]:mt-auto"
 
+/** THE HEAD-ONLY CASE — R89 RE-PROOF, 18 Sep 2026. `FOOTER_TO_BOTTOM` above
+ * is right for every caller that hands `RecordScreen` its own `children` as
+ * the panel (`panelVisible` true, the default): `RecordChrome` is the ONLY
+ * real child of that caller's own `flex flex-col gap-6` wrapper, so growing
+ * to fill it is exactly "the column's job is this component's job".
+ *
+ * `help-detail.tsx` is different, and is (so far) the ONLY caller that is
+ * different: `panelVisible={false}` turns the panel card off, and
+ * `TicketDetailBody` renders as a SIBLING of `<RecordScreen>` in that same
+ * flex column instead — a column now holding TWO flex items, not one. Live
+ * on staging, with BOTH this component's own root and `TicketDetailBody`'s
+ * own root carrying `flex-1 min-h-0`, the column's real height split 50/50
+ * between them (`${SCRATCH}/check-sel2.json`: the grid measured 347px
+ * against a 761px column, exactly half of what was left after the header's
+ * own ~370px, not "everything the header didn't need") — two flex-basis-0,
+ * flex-grow-1 items in one row ALWAYS share free space by their grow
+ * factor, never by which one asked first.
+ *
+ * The head is not the thing that should grow here — `TicketDetailBody` is,
+ * all the way to the screen's own bottom edge, which is the whole of R89.
+ * So when there is no panel, the head takes exactly its own content height
+ * (`flex-none`: grow 0, shrink 0, basis auto) and every pixel of the
+ * column's real budget goes to whatever the caller renders after it. This
+ * reads off `panelVisible` directly — no new prop, because `panelVisible`
+ * is already the caller's own declaration that something else now owns the
+ * column's growth; a second boolean saying the same thing twice is exactly
+ * the kind of duplicate seam CLAUDE.md's "too much code is a defect"
+ * exists to catch. A future second caller of `panelVisible={false}` that
+ * does NOT render a growing sibling gets a shorter head and an ordinary
+ * page scroll below it — never a stretched, empty head, which is what
+ * `FOOTER_TO_BOTTOM` would have drawn instead. */
+const HEAD_ONLY = "flex-none"
+
 /* THE RECORD'S OWN TITLE STEP (h1/44) AND THE TITLE/ACTIONS SPLIT (80%) BOTH
    MOVED OUT OF THIS FILE, 2026-09-06 — they are `RECORD_TITLE_TREATMENT` in
    `shared/web/record-heading.tsx` now, which carries the whole reasoning for
@@ -1270,7 +1303,7 @@ export function RecordScreen({
           rendered; the file that drew it is deleted, and the tab strip below
           is now the only thing a scrolled record screen pins. */}
       <RecordChrome
-        className={`${FOOTER_TO_BOTTOM} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
+        className={`${panelVisible ? FOOTER_TO_BOTTOM : HEAD_ONLY} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
         /* NO `banner` HANDED TO THE KIT — THE COVER BAND IS REMOVED, 16 Sep
            2026 ("I changed my mind. Let's remove this completely."). `cover`
            is no longer a prop on this component at all — see the removal

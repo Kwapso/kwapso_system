@@ -253,6 +253,33 @@ describe("renameAgentTab", () => {
     renameAgentTab(id, "how many tickets are open right now")
     expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("how many tickets are open right now")
   })
+
+  // THE 18 SEP 2026 BUG, REPRODUCED DIRECTLY. `seedAgentTabs` hands the
+  // panel's very first tab a NON-EMPTY placeholder (`t("Conversation")`,
+  // `agent-panel.tsx`'s own effect) — the old guard here read `!t.label`, so
+  // that placeholder, being non-empty, permanently blocked this function
+  // from ever titling the seeded tab off its first real message. `titled`
+  // (`AgentTab.titled`) is the fix: the seed's own default counts as "no
+  // title" regardless of whether the string itself is empty.
+  //
+  // `seedAgentTabs` ITSELF IS A ONE-SHOT FOR THE WHOLE SESSION (its own
+  // describe block above already spends it), so this reproduces the exact
+  // shape it hands out — a non-empty placeholder label, no `titled` flag —
+  // through the same test-only door `pruneUnusedAgentTabsOnBoot`'s own tests
+  // use for the identical reason, rather than a second real seed call.
+  it("titles a tab holding the seed's own non-empty placeholder label — a non-empty label is not by itself a title", () => {
+    const id = __unsafeAppendUnusedAgentTabForTest("Conversation")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("Conversation")
+    renameAgentTab(id, "What's the status on Halloway?")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("What's the status on Halloway?")
+  })
+
+  it("a second rename attempt on an already-titled tab is a no-op", () => {
+    const id = openNewAgentTab()
+    renameAgentTab(id, "first real title")
+    renameAgentTab(id, "a second message should never retitle it")
+    expect(agentTabsSnapshot().find((t) => t.id === id)?.label).toBe("first real title")
+  })
 })
 
 describe("setAgentTabThread", () => {

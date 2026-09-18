@@ -106,6 +106,34 @@ if (!stripBody) {
   }
 }
 
+// THE 18 SEP 2026 POINTER FIX — `isolate` ON EACH `<ol>`, NOT ONLY ON THE
+// OUTER ROW. Live proof (kwapso_system's `plus-click-check.mjs` against
+// v1.2.125): a real pointer click centred on the "+" tab's own anchor rect
+// hit-tested to `document.elementFromPoint` returning the PINNED `<ol>`
+// itself, never the anchor — `STRIP_SHRINK_ROW`'s own `isolate` stops a
+// negative-z `<li>` from escaping past the ROW, but does nothing for a
+// child whose nearest ancestor stacking context is still the `<ol>` it
+// lives in, two levels closer, which had no `isolation` of its own. Every
+// tab's `<li>` carries a negative inline `z-index` (`restZIndex`, read at
+// render), so BOTH split lists need this — a regression here is exactly
+// the defect `verify/agent-tab-strip-fit/check-pointer.mjs` reproduces with
+// a real `page.mouse.click`, not just a class-string check, but this check
+// pins the construction so the class can never quietly drop the word again
+// without a human noticing in a diff.
+for (const name of ["STRIP_SHRINK_SCROLL", "STRIP_SHRINK_PINNED"]) {
+  const bodyOrLiteral = constBlock(name) ?? (src.match(new RegExp(`^const ${name} = "([^"]*)";`, "m")) ?? [])[1];
+  if (bodyOrLiteral === null || bodyOrLiteral === undefined) {
+    findings.push(`${rel} has no const ${name} declaration to check.`);
+  } else if (!/(^|\s)isolate(\s|$)/.test(bodyOrLiteral)) {
+    findings.push(
+      `${rel}'s ${name} does not read isolate — without isolation on the SAME <ol> whose flex children carry ` +
+        "the negative restZIndex, a real pointer click on a tab hit-tests to the <ol> itself instead of the " +
+        "anchor (measured on v1.2.125's staging build, see check-pointer.mjs). STRIP_SHRINK_ROW's own isolate " +
+        "is one level too high to fix this.",
+    );
+  }
+}
+
 // THE SHRINK ROW'S GAP MATCHES STRIP'S OWN, AT ALL THREE LEVELS — the outer
 // row (between the two lists) and each list (between the tabs inside it).
 // A drifted gap on any one of the three would read as a wider or narrower

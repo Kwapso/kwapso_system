@@ -2106,10 +2106,38 @@ export function AppShell({
          * a few lines up already answers (`hasTrail`): the app pays the
          * pane's leading gap ONLY when there is no trail to pay it instead.
          * `pb-24 md:pb-0` is untouched — the phone bar it pays for has
-         * nothing to do with the trail. */}
+         * nothing to do with the trail.
+         *
+         * `h-full`, NOT `min-h-full` — R89 RE-PROOF, 18 Sep 2026 evening.
+         * The paragraph above (and R89's own first landing) claimed
+         * `min-h-full` was already enough: "a min-height flex container
+         * hands any leftover space ... to whichever item carries
+         * flex-grow". Measured live on staging against a real ticket with a
+         * real conversation (`${SCRATCH}/footer-fix-dump.json`,
+         * `footer-fix-proof.json`), that sentence is false the moment a
+         * screen's OWN content is taller than the floor: `min-height` is
+         * only ever a floor a block box's `height:auto` can grow past, and
+         * once content exceeds it there is no leftover space left to hand
+         * anyone — this div measured 1312px tall against a 785px pane, and
+         * every `flex-1 min-h-0` item downstream of it (`TicketDetailBody`
+         * included) just rendered at its own natural content size, because
+         * nothing above them was ever DEFINITE. `height: 100%` is: the
+         * resolved size is a real number regardless of content, so a
+         * `flex-1 min-h-0` descendant chain gets an actual budget to
+         * distribute instead of infinite room to grow into. Content taller
+         * than that budget is UNCHANGED for every other screen — nothing
+         * here sets `overflow`, so it still paints past this box's own
+         * (now fixed) bottom edge exactly as it always did, and
+         * `screen-shell-body`'s own `overflow-y-auto` still scrolls every
+         * pixel of it (proved on the tickets dashboard and an account
+         * detail page, both pixel-identical before/after). Only a screen
+         * that ALSO deliberately fills this budget with its own
+         * `flex-1 min-h-0` chain — today, only the ticket page — changes
+         * behaviour at all: for the first time that chain has a real
+         * number to divide instead of a floor it never has to respect. */}
         <div
           className={cn(
-            "mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pb-24 md:pb-0",
+            "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip pb-24 md:pb-0",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >

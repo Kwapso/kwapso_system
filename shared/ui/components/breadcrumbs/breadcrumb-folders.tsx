@@ -399,16 +399,53 @@ const STRIP_SHRINK_ROW = cn(
    because they exist for the element that actually carries `overflow-x-
    auto` — the ring-clipping fix and the hidden scrollbar both only mean
    anything on the box that can scroll. */
+/* `isolate` — 18 SEP 2026, SAME MECHANISM AS `STRIP`'s OWN (see that class's
+   comment above for the full CSS reasoning), CARRIED DOWN ONTO THIS `<ol>`
+   RATHER THAN LEFT ON THE OUTER ROW. `fit="shrink"`'s split moved the tab
+   tiles' negative inline `z-index` (`restZIndex`, unchanged by the split)
+   onto `<li>`s living TWO stacking-context levels below `STRIP_SHRINK_ROW`
+   — this `<ol>` sits between them — and `STRIP_SHRINK_ROW`'s own `isolate`
+   only stops a negative-z child from escaping THAT far; it does nothing for
+   a child whose nearest ancestor stacking context is still this `<ol>`, and
+   this `<ol>` had no `position`, no `z-index` and no `isolation` of its
+   own. MEASURED, live on staging (kwapso_system's `plus-click-check.mjs`,
+   run against v1.2.125): a real pointer click centred on a scrolling tab's
+   own anchor rect hit-tested to `document.elementFromPoint` returning THIS
+   `<ol>` (`data-slot="breadcrumb-list"`), never the tab — the same defect
+   `STRIP`'s own `isolate` comment already proved for the one-list strip,
+   reproduced here because the split dropped it one level too high. Adding
+   `isolate` here (matching `STRIP`'s own placement: directly on the element
+   whose flex children carry the negative z-index, not on some ancestor of
+   it) makes every negative-z tab in THIS list paint inside its own,
+   self-contained stacking context again — above the `<ol>`'s own box,
+   exactly where a click lands. */
 const STRIP_SHRINK_SCROLL = cn(
-  "flex min-w-0 flex-nowrap items-end gap-[var(--space-2)]",
+  "flex min-w-0 flex-nowrap items-end isolate gap-[var(--space-2)]",
   "overflow-x-auto overflow-y-hidden scroll-p-2 [scrollbar-width:none]",
   "[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0",
   "pt-1 mt-[calc(var(--space-1)*-1)]",
 );
 
 /* The pinned half — History, "+". Never shrinks, never scrolls, always the
-   strip's own trailing edge. */
-const STRIP_SHRINK_PINNED = "flex flex-nowrap items-end shrink-0 gap-[var(--space-2)]";
+   strip's own trailing edge.
+
+   `isolate` — 18 SEP 2026, THE SAME FIX AS `STRIP_SHRINK_SCROLL`'s OWN,
+   ABOVE, AND THE MORE VISIBLE HALF OF IT: History and "+" are the two tiles
+   `restZIndex` always assigns the MOST negative numbers to (they sit last
+   in strip position), so of the two split lists this is the one where a
+   real click was actually reported swallowed — Aurora's staging proof
+   (`plus-click-check.mjs`) measured the "+" anchor's own rect and got this
+   `<ol>` back from `elementFromPoint` at its centre, tabs-before/after
+   staying 2 → 2 through a real `page.mouse.click`. Without `isolate` here,
+   History's and "+"'s negative-z `<li>`s had no ancestor stacking context
+   closer than `STRIP_SHRINK_ROW` — two levels up, past this `<ol>`'s own
+   box — so this `<ol>`'s own in-flow, non-positioned box painted OVER them
+   at that shared level, and a browser's hit-test picks the topmost paint,
+   not the topmost DOM depth. Same fix, same reasoning, same placement rule
+   as `STRIP`'s own comment: put `isolation: isolate` on the element whose
+   children actually carry the negative z-index, not on some ancestor of
+   it. */
+const STRIP_SHRINK_PINNED = "flex flex-nowrap items-end isolate shrink-0 gap-[var(--space-2)]";
 
 /* ONE TAB, IN THE SHRINKING LIST. `basis-0` + `flex-1` is "every tab starts
    from nothing and shares the room equally" — the opposite of `shrink-0`'s

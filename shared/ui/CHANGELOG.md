@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Fixed — a real click on the "+" (and on any non-active tab) never reached it — v1.2.126
+
+**THE DEFECT, IN PLAIN WORDS.** A real click on the workspace trail's "New
+tab" link, and on the assistant strip's "+" and History tabs, never reached
+them — the click landed on nothing, and the tab strip stayed exactly as it
+was. `fit="shrink"`'s split of the strip into two `<ol>`s (v1.2.125) is what
+introduced it: every non-active tab's `<li>` carries a negative `z-index`
+(`restZIndex`), and while the OUTER row (`STRIP_SHRINK_ROW`) had `isolate`,
+neither of the two `<ol>`s it wraps did. A negative `z-index` flex item with
+no stacking context of its own is painted BEHIND the nearest ANCESTOR
+stacking context — which was two levels up, past the `<ol>` the tab actually
+lives in — so that `<ol>`'s own (invisible) box painted OVER its own
+children at the shared level, and a real pointer's hit-test picked the box,
+not the tab. A synthetic `dispatchEvent` never showed this because it does
+not hit-test at all — only a real `page.mouse.click` (or a real finger)
+does. `components/breadcrumbs/breadcrumb-folders.tsx`'s own comment on
+`STRIP` had already solved this identical problem for the one-list strip by
+putting `isolate` directly on the `<ol>` whose children carry the negative
+number; the split simply left it one level too high on the new pinned and
+scrolling halves.
+
+**THE FIX, BY CONSTRUCTION, NO MAGIC PIXELS.** `isolate` moves onto
+`STRIP_SHRINK_SCROLL` and `STRIP_SHRINK_PINNED` themselves — the exact same
+mechanism `STRIP` already uses, in the exact same relative position (on the
+element whose flex children carry the number, not an ancestor of it).
+Nothing else changes: no z-index values, no positions, no new pixels.
+`verify/agent-tab-strip-fit/check-pointer.mjs` is the proof, a REAL
+Playwright `page.mouse.click` (not a dispatched event) at every tab's own
+visible centre, in every case this harness ships (1, 3, 5, 8 open
+conversations) — it reproduces the exact defect against v1.2.125's classes
+(`elementFromPoint` naming the ancestor `<ol>`, matching Aurora's own
+staging proof) and passes clean with the fix. `components/breadcrumbs/
+check-breadcrumb-folders.mjs` pins the class contract itself (`isolate`
+present on both split lists) so `npm run check` catches a future regression
+without needing a browser. Natural mode (`fit="natural"`) is untouched —
+`STRIP` already carried `isolate` and this change does not touch it —
+confirmed against `verify/tabstrip-parity/` with the same real-click proof.
+
 ### Fixed — the assistant tab strip fits its 380px pane instead of overflowing it; a shrinking tab's inner control now actually shrinks; `SearchInput` can drop its leading glyph — v1.2.125
 
 **THE DEFECT, FINALLY SEEN.** Aurora reported "the assistant tabs overlap /

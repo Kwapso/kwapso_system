@@ -544,12 +544,21 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   position is still fucking wrong. Fix it once and for all," and, over a screenshot: "This
   composer should have a background color that makes it easy to identify, and also it should be
   full width of its own container." D21 (`footer-is-last`) proved a footer is the LAST child of
-  its own card, DOM order only — this makes the POSITION the screen's own too: the ticket body
-  fills the screen's own height by construction (`app-shell.tsx`'s existing `flex-col`/
-  `min-h-full` floor, `TicketDetailBody`'s own root as its `flex-grow` item), so the
-  conversation card's footer sits flush with the screen body's true bottom edge at every
-  viewport height, and the reply composer draws a distinguishing background at the full width
-  of its own container. (`footer-on-the-edge`)
+  its own card, DOM order only — this makes the POSITION the screen's own too. AMENDED 18 Sep
+  2026 evening: the first landing's own construction did not hold — re-proven live against a
+  real ticket, `min-h-full` on `app-shell.tsx`'s page container is a FLOOR a `height:auto` block
+  grows past once content exceeds it, not a cap a `flex-1 min-h-0` chain can distribute against,
+  so the page container measured 1312px against a 785px pane and the whole chain below it just
+  rendered at natural content size. Fixed three places: `app-shell.tsx`'s page container is
+  `h-full` now (a DEFINITE height, safe for every other screen — nothing sets `overflow`, so
+  taller content still paints past it and `screen-shell-body` still scrolls all of it);
+  `record-chrome.tsx`'s `RecordScreen` no longer lets its own head (`RecordChrome`) compete with
+  a sibling body for the column's growth when `panelVisible={false}` (`HEAD_ONLY`, `flex-none`,
+  read off `panelVisible`) — it was splitting the real column 50/50 with `TicketDetailBody`
+  instead of taking its own content height; and the conversation card's `min-h-[420px]` floor is
+  released at `lg` (`lg:min-h-0`). The composer's own `<form>` always carried `w-full` — the bug
+  was its PARENT div (shrink-to-fit inside `CardFooter`'s own flex row), fixed with `w-full`
+  there too. (`footer-on-the-edge`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 

@@ -483,7 +483,18 @@ export function ReplyComposer({
   })
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
+    // `w-full` — R89 RE-PROOF, 18 Sep 2026 evening. This div is the sole
+    // child `<CardFooter>` (card.tsx) renders as `composer` — CardFooter is
+    // a `flex flex-wrap items-center` ROW, and a row's own child sizes to
+    // its OWN content (shrink-to-fit) unless it claims width itself. The
+    // `<form>` below already carried `w-full` from the day it shipped, but
+    // `w-full` is only ever 100% of ITS OWN containing block — this div —
+    // so without this line the form's 100% was 100% of a box that had
+    // already shrunk to the form's own min-content width. Measured live on
+    // staging before this fix: the form rendered 271px wide inside a
+    // 769px-wide footer. `w-full` here is what gives the form's own
+    // `w-full` something real to be 100% of.
+    <div className="flex w-full min-w-0 flex-col gap-4">
       {held ? (
         /* THE PENDING BUBBLE. Her own side, quiet fill instead of the solid one,
            and a counting receipt where the timestamp goes. Not absent (she would

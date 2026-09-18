@@ -86,6 +86,20 @@ export type AgentTab = {
    * through to the first message rather than making the model guess an app
    * from its name alone. */
   scopeId?: string
+  /** WHETHER `label` IS A REAL, EARNED TITLE — the conversation's own first
+   * message, or a history-resumed thread's own server topic — rather than a
+   * PLACEHOLDER nobody chose. `renameAgentTab`'s own bug, 18 Sep 2026: that
+   * function used to gate on `!label` (a bare truthiness check), which reads
+   * "empty string" as the only untitled state. `seedAgentTabs` hands the
+   * panel's very first tab a NON-empty placeholder — `t("Conversation")` —
+   * so a seeded tab already read as "titled" the instant it existed, and
+   * `renameAgentTab` refused to ever replace it with the conversation's own
+   * first message. `titled` is the real signal instead: unset (falsy) for a
+   * placeholder label a caller chose FOR the reader (the seed's default, or
+   * "" while the picker is open), `true` the moment a title actually came
+   * FROM the reader or from the server's own record of a past conversation
+   * (`openAgentTabForThread`). `renameAgentTab` reads this, not `label`. */
+  titled?: boolean
 }
 
 /** How many conversation tabs may sit open at once, the "+" not counted — the
@@ -148,6 +162,11 @@ export function seedAgentTabs(threadId: string | undefined, label: string): void
   if (hasEverSeeded || tabs.length > 0) return
   hasEverSeeded = true
   const id = newTabId()
+  // `titled` IS DELIBERATELY LEFT UNSET — `label` here is the caller's own
+  // placeholder (`t("Conversation")`, `agent-panel.tsx`'s effect), never a
+  // title the reader or the server gave this tab, so `renameAgentTab` must
+  // still be free to replace it the instant a real first message is sent.
+  // See `AgentTab.titled`'s own comment for the bug this fixes.
   tabs = [{ id, threadId, scope: SEED_SCOPE, label }]
   activeId = id
   announce()
@@ -352,7 +371,16 @@ export function setAgentTabThread(id: string, threadId: string): void {
  * belt-and-suspenders, rather than trusted to every call site's own logic:
  * a title, once real, is never demoted back to a guess. */
 export function renameAgentTab(id: string, label: string): void {
-  tabs = tabs.map((t) => (t.id === id && !t.label ? { ...t, label } : t))
+  // `!t.titled`, NOT `!t.label` — 18 SEP 2026 FIX. The old guard read an
+  // EMPTY STRING as the only untitled state, so `seedAgentTabs`'s own
+  // placeholder (`t("Conversation")`, non-empty) permanently blocked this
+  // function from ever giving the panel's first tab its real title. `titled`
+  // is the earned signal now: set here, the one place a tab's label becomes
+  // real rather than a placeholder, and by `openAgentTabForThread` for a
+  // history-resumed thread's own server topic (see `AgentTab.titled`'s own
+  // comment for the whole argument, and this file's header for why a
+  // resumed tab must never be touched again once it carries one).
+  tabs = tabs.map((t) => (t.id === id && !t.titled ? { ...t, label, titled: true } : t))
   announce()
 }
 
@@ -399,7 +427,10 @@ export function openAgentTabForThread(threadId: string, label: string): string {
   if (existing) {
     activeId = existing.id
   } else {
-    pushTab({ id: newTabId(), threadId, scope: SEED_SCOPE, label })
+    // `titled: true` — this `label` is the SERVER's own topic for a real,
+    // already-sent conversation, never a placeholder, so `renameAgentTab`
+    // must never be allowed to replace it (`AgentTab.titled`'s own comment).
+    pushTab({ id: newTabId(), threadId, scope: SEED_SCOPE, label, titled: true })
   }
   historyOpen = false
   announce()
