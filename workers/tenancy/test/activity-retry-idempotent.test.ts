@@ -28,7 +28,25 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import { logActivity, writeActivity } from "@shared/workers/activity"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import * as idModule from "@shared/workers/id"
+import { ulid } from "@shared/workers/id"
 import { buildSpineDb, IDS } from "./spine-harness"
+
+// THE MINT ITSELF, DIRECTLY — the fact the diagnosis above rests on, not just
+// argued: two calls at the exact same millisecond draw independent randomness
+// (crypto.getRandomValues) and do not collide. `now` is pinned so the
+// timestamp half of both ids is identical too — the only way to genuinely
+// test "same ms", since two real calls a microtask apart usually are not.
+describe("ulid() itself — two mints at the same millisecond still differ", () => {
+  it("100 ids minted at one pinned timestamp are all distinct", () => {
+    const now = Date.parse("2026-09-18T00:00:00.000Z")
+    const minted = Array.from({ length: 100 }, () => ulid(now))
+    // SAME TIME HALF, PROVING THE TEST ITSELF PINNED WHAT IT CLAIMS TO: every
+    // id's first 10 characters (the timestamp) are identical, so any
+    // difference below is entirely the random suffix's own doing.
+    expect(new Set(minted.map((id) => id.slice(0, 10))).size).toBe(1)
+    expect(new Set(minted).size, "every id minted at the same ms must still be its own").toBe(100)
+  })
+})
 
 /** THE SAME ID BOTH TIMES — exactly what a retried, already-minted script
  * carries. A fresh ulid() per call would prove nothing about a retry; it
