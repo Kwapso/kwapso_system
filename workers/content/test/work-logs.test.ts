@@ -433,6 +433,57 @@ describe("auto-stop is the caller's own choice, and off by default", () => {
   })
 })
 
+describe("a write answers with the touched row, not the team's whole timesheet", () => {
+  // mcp-write-replies-2: postLogTime/postUpdateWorkLog used to answer with
+  // `logPage` — every OTHER log on the team, unfiltered — to confirm one row.
+  // `logTime` never even surfaced the new row's own id.
+  it("logging time by hand answers with just that one row, id included", async () => {
+    const story = await addStory("Logged by hand")
+    const other = await addStory("Somebody else's hour")
+    await call(IDS.staffUser, "POST /api/content/work-logs", {
+      targetTable: "stories",
+      targetId: other,
+      startedAt: "2026-08-11T09:00:00.000Z",
+      endedAt: "2026-08-11T10:00:00.000Z",
+    })
+    const res = await call(IDS.staffUser, "POST /api/content/work-logs", {
+      targetTable: "stories",
+      targetId: story,
+      startedAt: "2026-08-12T09:00:00.000Z",
+      endedAt: "2026-08-12T09:30:00.000Z",
+      note: "Wrote the tests",
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { logs: { id: string; note: string | null }[]; id?: string }
+    expect(body.logs, "the reply carries exactly the row this call just made").toHaveLength(1)
+    expect(body.logs[0].note).toBe("Wrote the tests")
+    expect(body.id, "the id this call answers with matches the row it made").toBe(body.logs[0].id)
+    // The OTHER staff member's earlier hour must not ride along.
+    expect(body.logs.some((l) => l.note === null)).toBe(false)
+  })
+
+  it("correcting a row answers with just that one row", async () => {
+    const story = await addStory("Corrected, and answered leanly")
+    await call(IDS.staffUser, "POST /api/content/work-logs", {
+      targetTable: "stories",
+      targetId: story,
+      startedAt: "2026-08-11T09:00:00.000Z",
+      endedAt: "2026-08-11T10:00:00.000Z",
+    })
+    const id = logRows()[0].id as string
+    const res = await call(IDS.staffUser, "POST /api/content/work-logs/update", {
+      id,
+      endedAt: "2026-08-11T11:00:00.000Z",
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { logs: { id: string; seconds: number }[]; id?: string }
+    expect(body.logs).toHaveLength(1)
+    expect(body.logs[0].id).toBe(id)
+    expect(body.logs[0].seconds).toBe(7200)
+    expect(body.id).toBe(id)
+  })
+})
+
 describe("the list pages and totals what it is showing (R14 + R16)", () => {
   it("answers with both exact totals over the same filter", async () => {
     const story = await addStory("Counted")

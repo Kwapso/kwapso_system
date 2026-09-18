@@ -408,6 +408,25 @@ export function mergePage(
   notify(key)
 }
 
+/** Remove ONE ROW from a cached PAGED collection by id — `mergePage`'s sibling
+ * for the write reply that just moved the row OUT of the view the door answers
+ * for: a task ticked done leaving the "open" list, a to-do withdrawn leaving
+ * it, a ticket archived leaving the everyday list. `mergePage` cannot express
+ * this — merging a row back in is exactly wrong when the row no longer belongs
+ * — so a caller that knows the touched row left its own view calls this
+ * instead, splicing the cache directly rather than invalidating it into a
+ * refetch. No-op on a cold key (nothing loaded to remove from) and a no-op
+ * notify when the id was never in the cache, for the same reason `mergePage`
+ * only notifies on a real change. */
+export function removeFromPage(key: string, idField: string, id: string): void {
+  const prev = fresh(key)?.value as Record<string, unknown>[] | undefined
+  if (prev === undefined) return
+  const next = prev.filter((r) => r[idField] !== id)
+  if (next.length === prev.length) return
+  store(key, next)
+  notify(key)
+}
+
 /** ONE KEY, ONE REQUEST IN THE AIR.
  *
  * Measured on staging, 24 Aug 2026: a story detail made 27 requests on a cold

@@ -146,6 +146,22 @@ function toLog(r: LogRow): WorkLog {
   }
 }
 
+/** One work log by id (or null) — the by-id reader this file never needed
+ * until `postLogTime`/`postUpdateWorkLog` stopped answering with the whole
+ * team's list, the same shape `help.ts`'s `getTicket` and `tasks.ts`'s
+ * `getTask` already have. No caller-scope to carry: work logs are refused to
+ * a client login outright (R21, SCOPE ch.06 — a log names the staff member
+ * and how long they took), so the team's own database is the whole fence. */
+export async function getWorkLog(cfg: D1Rest, guard: MemberGuard, id: string): Promise<WorkLog | null> {
+  const rows = await d1Query<LogRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${LOG_COLS} FROM work_logs w WHERE w.id = ? AND w.discarded_at IS NULL LIMIT 1`,
+    [id]
+  )
+  return rows[0] ? toLog(rows[0]) : null
+}
+
 /** Whole seconds between two moments, never negative and never fractional. The
  * caller does not get to say how long something took: an end before a start is a
  * clock skew or a typo, and zero is the honest answer to both. */

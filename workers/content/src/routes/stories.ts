@@ -335,7 +335,7 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     if (flip.moved)
       await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
   }
-  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
+  return storyMutationReply(cfg, guard, storyFilterFrom(new URL(request.url)), id)
 }
 
 /* ---------------------------------- sprints --------------------------------- */

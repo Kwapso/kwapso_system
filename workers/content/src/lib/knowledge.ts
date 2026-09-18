@@ -465,6 +465,25 @@ const RRF_K = 60
  * which is a short list or it is not an answer. */
 const ROUTER_TOP_RECORDS = 3
 
+/** BUILD-5 §J (18 Sep 2026) — HOW MANY THE ROUTER ACTUALLY ASKS VECTORIZE
+ * FOR, so three real candidates survive rather than three requested ones.
+ * Vectorize's own nearest-neighbour list can carry a DEAD id — one whose row
+ * was replaced or removed since the vector was upserted, R26's own survivable
+ * shape ("a ghost id reads back as no row, never as somebody else's
+ * paragraph") — and `sourceTitles` below drops exactly those silently, the
+ * same way a re-indexed base routinely hands a six-passage answer four real
+ * rows (see `widenNeighbours`'s own header for the measured version of this
+ * on the chunk side). Asking for `ROUTER_TOP_RECORDS` and getting back two
+ * live rows because the third was a ghost is indistinguishable, from here,
+ * from the base genuinely having only two things to say — so this asks for a
+ * cushion, drops the dead ones when the real read comes back, and trims to
+ * `ROUTER_TOP_RECORDS` after that. NOT available on the chunk-level search
+ * beside it: `VECTOR_TOP_K` (below) already sits at the topK Vectorize's own
+ * platform ceiling allows for a values/metadata-free query, so there is no
+ * room left to over-fetch there even if it were wanted — this cushion is
+ * only possible because three is so far under that ceiling. */
+const ROUTER_RECORD_OVERFETCH = ROUTER_TOP_RECORDS + 5
+
 /** HOW MANY OF THE ROUTER'S RECORDS THE LAST-RESORT READ OPENS.
  *
  * Fewer than the router names, deliberately. `ROUTER_TOP_RECORDS` decides what a
@@ -2987,7 +3006,7 @@ async function deriveRoute(
     guard,
     input.asked,
     { level: "record", ...compartmentFilter(choice.compartments) },
-    ROUTER_TOP_RECORDS
+    ROUTER_RECORD_OVERFETCH
   )
   // THE REASONING IS HELD TO THE SAME FLOOR AS THE ANSWER. A vector search always
   // returns a nearest neighbour, and this one had no floor at all — so the
@@ -3002,12 +3021,20 @@ async function deriveRoute(
   // In the order the SEARCH put them, best first. Reading them back off the Map
   // handed them over in whatever order the database returned, so "best first" —
   // which is what the sentence claims — was a coincidence of row order.
+  // BEST FIRST, THEN THE REAL COUNT. `near` is the whole overfetched, floor-passing
+  // pool; `ids` carries all of it into the real read so a dead id further up the
+  // list does not shrink the pool before it has even lost anything — the trim to
+  // ROUTER_TOP_RECORDS happens ONLY after dead ids are gone, on `records`, over the
+  // SAME best-first order `ids.flatMap` preserves regardless of the row order the
+  // database happens to return.
   const ids = near.map((h) => h.id.replace(/:summary$/, ""))
   const found = await sourceTitles(cfg, guard, ids)
-  const records = ids.flatMap((sourceId) => {
-    const row = found.get(sourceId)
-    return row ? [{ sourceId, title: row.title, recordPath: row.recordPath }] : []
-  })
+  const records = ids
+    .flatMap((sourceId) => {
+      const row = found.get(sourceId)
+      return row ? [{ sourceId, title: row.title, recordPath: row.recordPath }] : []
+    })
+    .slice(0, ROUTER_TOP_RECORDS)
   return {
     ...choice,
     records,
@@ -3073,10 +3100,14 @@ async function sourceTitles(
   }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: `ids` is at most ROUTER_TOP_RECORDS, and the LIMIT says so
-    // at the statement. The ids are ULIDs this worker wrote and read back, never
-    // anything off a request, so they are interpolated like every other
-    // server-owned value (CONVENTIONS) and the statement binds one parameter.
+    // R14 hard cap: `ids` is at most ROUTER_RECORD_OVERFETCH (BUILD-5 §J — the
+    // caller overfetches so a dead id costs nothing, then trims to
+    // ROUTER_TOP_RECORDS itself, on the real rows, in best-first order; a LIMIT
+    // pinned to ROUTER_TOP_RECORDS here would cap the read BEFORE the dead ones
+    // are known, on a row order SQLite owes nobody, defeating the whole point).
+    // The ids are ULIDs this worker wrote and read back, never anything off a
+    // request, so they are interpolated like every other server-owned value
+    // (CONVENTIONS) and the statement binds one parameter.
     //
     // `origin_table`/`origin_row_id`/`compartment` ride this read for the same
     // reason they ride `toPassage`'s (§ above `recordPath`): a `records` row
@@ -3084,7 +3115,7 @@ async function sourceTitles(
     // without these three columns the caller has no way to tell the two apart.
     `SELECT id, title, origin_table, origin_row_id, compartment FROM knowledge_sources
       WHERE id IN (${ids.map((id) => sqlString(id)).join(", ")}) AND ${owner.sql} AND deactivated_at IS NULL
-      LIMIT ${ROUTER_TOP_RECORDS}`,
+      LIMIT ${ROUTER_RECORD_OVERFETCH}`,
     owner.params
   )
   return new Map(

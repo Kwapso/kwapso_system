@@ -1128,7 +1128,14 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // body — the certificate module was killed whole and the query that fed it
   // is gone from knowledge-ingest.ts. A row already indexed with a colleague's
   // certificates in its text would keep saying them forever without this bump.
-  person: { version: 4, digest: "476f23cdf5899b67" },
+  // Digest re-pinned (not the version), BUILD-5 §J, 18 Sep 2026:
+  // `generatedOnly` widened to also treat a genuine name-spelling variant
+  // (`nameSpellings(...).length > 1`) as real content, alongside the existing
+  // profile fields — metadata about the row, same as the 10 Sep 2026 note
+  // below explains for `generated_only` generally, not one word of what any
+  // kind's body SAYS (the `nameSpellings` call in `body` itself is unchanged,
+  // just read from a hoisted local instead of called twice).
+  person: { version: 4, digest: "bbd989ec3cbf4311" },
   // v2 (10 Sep 2026): THE READER WAS SAYING SOMETHING FALSE, and this is the
   // bump that reaches the rows already filed. It used to take
   // `MAX(CASE WHEN is_default = 1 … THEN value END)` and write "<X> is picked
@@ -1452,5 +1459,61 @@ describe("a meeting nobody has held and nobody has written on is not material", 
     expect(answer.found, "the transcript is right there").toBe(true)
     const bodies = answer.passages.map((p) => p.text).join(" ")
     expect(bodies, "the answer must reach the transcript, not the diary entries").toMatch(/horsepower/i)
+  })
+})
+
+// OPEN ITEM 1 (BUILD-5 §J, 18 Sep 2026): the owner's own question —
+// "What is Alex's full name?" — found no answer live on staging even though the
+// colleague's full name was sitting right there in `team_members`/`users`. Not
+// because the corpus lacked the row (R47 already mirrors every colleague), but
+// because a colleague with no `staff_profiles` row was filed as a pure CARD
+// (`generated_only=1`, zero chunks — "findable, never quoted") and a name with
+// no free-text description anywhere ELSE in the row looked, by the old test,
+// exactly like a colleague with nothing to say. It is not: `name, email, role,
+// team` is a real, quotable fact on its own, and a person with a genuine
+// nickname/short-form spelling (the "Alex" a real person is called, next to the
+// "Alexander Stadlmair" their record holds) is precisely the shape a bare
+// identity question needs answered from a passage, not just found by title.
+describe("a colleague with no staff profile still holds a real, quotable fact — their own name", () => {
+  it("is not a card when their name has a spelling worth disambiguating, even with an empty profile", async () => {
+    db().exec(
+      `INSERT INTO users (id, email, first_name, last_name, current_team_id)
+         VALUES ('U_NAMED', 'alexandra@kwapso.com', 'Alexandra', 'Novak', '${IDS.team}');
+       INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
+         VALUES ('M_NAMED', '${IDS.team}', 'U_NAMED', '${IDS.adminRole}', '2026-01-01');`
+    )
+    await sweepUntilCaughtUp()
+    const row = db()
+      .prepare(
+        `SELECT generated_only, chunk_count FROM knowledge_sources
+           WHERE kind = 'person' AND origin_row_id = 'U_NAMED'`
+      )
+      .get() as { generated_only: number; chunk_count: number } | undefined
+    expect(row, "the sweep must have filed this colleague").toBeDefined()
+    expect(row!.generated_only, "a real, distinguishing name is not nothing to say").toBe(0)
+    expect(row!.chunk_count, "a card has zero chunks by design; this must not be one").toBeGreaterThan(0)
+
+    const answer = await ask("What is Alexandra's full name?")
+    expect(answer.found, "the name itself is the passage — a card could never answer this").toBe(true)
+    const bodies = answer.passages.map((p) => p.text).join(" ")
+    expect(bodies, "the full name must actually be IN a quoted passage, not just the title").toMatch(/Novak/)
+  })
+
+  it("stays a card when the profile is empty AND the name has no spelling worth disambiguating", async () => {
+    // `Staff` has no last name and no email-derived variant distinct from the
+    // first name — nameSpellings collapses to one entry, exactly the case this
+    // fix must NOT widen (the original "what has this colleague been working
+    // on" stub-quoting risk the file's own header warns about).
+    await sweepUntilCaughtUp()
+    const row = db()
+      .prepare(
+        `SELECT generated_only, chunk_count FROM knowledge_sources
+           WHERE kind = 'person' AND origin_row_id = '${IDS.staffUser}'`
+      )
+      .get() as { generated_only: number; chunk_count: number } | undefined
+    if (row) {
+      expect(row.generated_only, "no profile, no name variant worth noting — still a card").toBe(1)
+      expect(row.chunk_count).toBe(0)
+    }
   })
 })
