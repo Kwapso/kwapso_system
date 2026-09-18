@@ -301,8 +301,14 @@ describe("nothing rewrites history", () => {
 
   it("there is exactly one way into the table from outside a migration", () => {
     const inserts: string[] = []
+    // `(?:OR\s+\w+\s+)?` — BUILD-5 §J (18 Sep 2026): `insertActivity` moved to
+    // `INSERT OR IGNORE INTO activity` (a retried, already-successful write is
+    // now a no-op instead of a UNIQUE-constraint error), the same one door,
+    // still the only spelling of it. Widened to keep recognising it, not to
+    // recognise a SECOND one — a real second `INSERT INTO activity` elsewhere
+    // still fails this the same way it always did.
     for (const { rel, source } of writerSources())
-      for (const m of stripComments(source).matchAll(/\bINSERT\s+INTO\s+activity\b/gi))
+      for (const m of stripComments(source).matchAll(/\bINSERT\s+(?:OR\s+\w+\s+)?INTO\s+activity\b/gi))
         inserts.push(`${rel} @${m.index}`)
     expect(
       inserts.map((s) => s.split(" @")[0]),
