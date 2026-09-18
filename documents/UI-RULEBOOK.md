@@ -876,6 +876,24 @@ rendered as a search-bar-like field, carrying a ⌘K hint), shipped in kit v1.2.
 
 **Status: ruled, in build, 17 Sep 2026 (kit v1.2.111).**
 
+**AMENDED 18 Sep 2026 — a second pass over the same trail line, her pick is T1: symmetric
+10px, no hairline, arrows inside the field.** Reviewing the S3+D2 shape above, the client's
+ruling, verbatim: *"for the breadrcumbs / search - half of the margin that now is on top,
+and exactly same under. no line divider under. inckude the nav. arrows in the colored
+background."* Read against S3's own numbers (20px above the trail line, 8px below it down
+to the chip row): **half of the margin that now is on top** is 10px, and **exactly same
+under** makes the space below it 10px too — the two are no longer different values, the
+20/8 split S3 shipped is gone. **No line divider under** retires D2's hairline under the
+trail entirely (the search-bar-like field shell itself stays, only its baseline rule is
+removed). **Include the nav arrows in the colored background** moves back()/forward() inside
+the trail's own tinted field, rather than sitting outside it as a separate pair. Named
+**T1** for this pick, shipped in kit v1.2.114
+(`shared/ui/components/breadcrumbs/trail-line.tsx`).
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.114). Supersedes S3/D2's spacing and
+divider above; the trail-inside-the-card placement and the back/forward mechanism from the
+morning/afternoon rulings are untouched.**
+
 ### L14: the assistant column's width is a drag, snapping to three sizes
 
 **The rule.** *"Is it possible that we can, while using the app, adjust the width of the
@@ -1583,6 +1601,17 @@ mocks all land on it.
 sibling inside the title's own row, never a row of its own; the box is read off source as
 derived from `--text-4xl`/`--text-4xl--line-height`, never a literal pixel value; a string
 `mark` stays inert).
+
+**AMENDED 18 Sep 2026 — the chip row above the title moves in, her pick is C2 (8px).** The
+client's ruling, verbatim: *"reduc the space between chips and title."* The identity chips
+row that sits above the title (D13's role chip, and every other record's plain identity
+pills) had been carrying `mb-[var(--space-4)]` (16px) under it since the 2026-09-01 ruling
+that first gave the pill row its own gap from the title. A side-by-side artifact was built
+per this book's own working agreement, and her pick, verbatim, was *"t1 and c2"* — **C2**
+named as half of the gap that was live that day, i.e. half of 16px. The chip row now spends
+`mb-[var(--space-2)]` (8px), not `--space-4`, above the title — `record-chrome.tsx`'s own
+header comment carries the ruling in full. Enforced by
+`web/test/record-head-chip-gap.test.ts`.
 
 ### D15: a calendar span within a detail screen uses S2's horizontal gutters
 

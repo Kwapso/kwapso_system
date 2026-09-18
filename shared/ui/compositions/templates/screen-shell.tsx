@@ -933,7 +933,6 @@ import { Button } from "../../components/button/button";
 // (17 Sep 2026 evening, Ruling 2) for why.
 import { CARD_CONTENT_INSET_X } from "../../components/card/card";
 import { CursorGlow } from "../../components/cursor-glow/cursor-glow";
-import { Separator } from "../../components/separator/separator";
 import {
   Sheet,
   SheetContent,
@@ -2033,27 +2032,29 @@ const CARD_JOINED = "md:rounded-ss-none";
    STEPPED DOWN AGAIN, ONE RUNG FURTHER, 2026-09-17 EVENING — S3, THE OTHER
    HALF OF `DENSITY_TRAIL`'s OWN `pt` ABOVE. Client, verbatim: "Reduce the
    space between the breadcrumbs and the chips." Her pick: "s3", whose own
-   figure for this gap is 8 (`--space-2`) — `--space-4` (16) one more rung
-   down the scale. FLAT, LIKE `DENSITY_TRAIL`'s NEW `pt`: the ruling named
-   one number, not a density pair, so both densities read `--space-2` now;
-   `TRAIL_GAP` stops being a `Record<ScreenDensity, string>` in spirit (it
-   was already a single string, not a record — this only states plainly that
-   the single string no longer varies BY INTENT, not by oversight).
+   figure for this gap was 8 (`--space-2`) — SUPERSEDED THE NEXT DAY, see
+   below.
 
-   THE DIVIDER RIDES THIS SAME GAP. S3's third sentence — "Maybe we could add
-   a divider line" — is drawn as `<Separator />` (`components/separator/
-   separator.tsx`), the kit's own hairline rule, immediately after the trail
-   in `screen-shell-trail`'s own markup below, so it lays out INSIDE that
-   div's padding (`DENSITY_TRAIL`'s `px`) rather than at the card's bare
-   edge — `w-full` on a padded parent is 100% of the CONTENT box, which is
-   exactly "spanning the card's inner width," the same width `band`'s own
-   title row reads, with no new inset of its own. `TRAIL_GAP`, still the
-   wrapper's `mb`, is what puts air BETWEEN the divider and whatever follows
-   (`band`, or the body) — the divider itself sits flush under the crumbs,
-   no separate top margin invented for it. Not a new colour: `Separator`'s
-   default variant is `bg-border`, the same 8% hairline every same-tone card
-   separation in this kit already spends. */
-const TRAIL_GAP = "mb-[var(--space-2)]";
+   MADE EQUAL TO THE GAP ABOVE, 2026-09-18 — CLIENT RULING, VERBATIM: "for
+   the breadrcumbs / search - half of the margin that now is on top, and
+   exactly same under. no line divider under." "Exactly same" reads as
+   "exactly the same TOKEN," not a second number that happens to match
+   today's — so this reads `--space-2h` (10), the identical custom property
+   `DENSITY_TRAIL`'s own `pt` now spends, rather than a `--space-2` (8) left
+   to drift independently of it. FLAT, LIKE `DENSITY_TRAIL`'s `pt`: the
+   ruling named one number, not a density pair, so both densities still read
+   the one string (`TRAIL_GAP` was already a single string, not a record —
+   this only restates that it does not vary by density, on purpose).
+
+   THE DIVIDER IS GONE, NOT MOVED. S3's own third sentence had asked for one
+   ("Maybe we could add a divider line"), drawn as `<Separator />`
+   (`components/separator/separator.tsx`) immediately after the trail in
+   `screen-shell-trail`'s own markup below. The 2026-09-18 ruling's own last
+   sentence retires it outright — "no line divider under" — so the trail
+   slot renders only `{trail}` now; `TRAIL_GAP`'s `mb` is the one gap
+   between the trail and whatever follows (`band`, or the body), with
+   nothing drawn between them any more. */
+const TRAIL_GAP = "mb-[var(--space-2h)]";
 
 /* ----------------------------------------------------------------------------
    THE BODY — the card's tone, and NOT a container.
@@ -2351,18 +2352,26 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
    `pt` ADDED, 2026-09-17 EVENING — S3. Client, verbatim: "Make a bit more
    space above the breadcrumbs. Reduce the space between the breadcrumbs and
    the chips. Maybe we could add a divider line." Her pick from the design
-   page: "for the spacing, do s3." S3's own figure for "above the trail" is
-   20 (`--space-5`), ONE FLAT NUMBER, not a density pair — the ruling never
-   named a second, calmer figure the way `DENSITY_HEADER`'s own pt/pb do, so
-   this reads `--space-5` at BOTH densities rather than inventing a calm
-   figure nobody asked for. The trail was flush with the card's own top edge
-   before this (see the `trail` prop's own doc, and the paragraph below —
-   "no `pt`/`pb` of its own" is no longer true of `pt` and is corrected
-   there too). See `TRAIL_GAP`, further down, for the other half of S3 (the
-   gap AFTER the trail, now 8, and the divider). */
+   page: "for the spacing, do s3." S3's own figure for "above the trail" was
+   20 (`--space-5`), ONE FLAT NUMBER, not a density pair — SUPERSEDED THE
+   NEXT DAY, see the paragraph below.
+
+   HALVED, 2026-09-18 — CLIENT RULING, VERBATIM: "for the breadrcumbs /
+   search - half of the margin that now is on top, and exactly same under.
+   no line divider under." Half of S3's 20 is 10, a number the eleven-step
+   integer `--space-*` scale does not carry — `tokens.css`'s own Spacing
+   section (kit ruling 28) already mints exactly this rung on its four-
+   member half-step sub-scale, `--space-2h: 0.625rem` (10, "dense row gap"),
+   so this reaches for the existing half-step rather than inventing a new
+   token or a `calc()`. Still flat, both densities, same reasoning as the
+   ruling it replaces: the client named one number, not a density pair.
+   "Exactly same under" is `TRAIL_GAP`, further down — it reads the
+   identical `--space-2h`, not a fourth opinion about the same air. "No line
+   divider under" retires the `<Separator />` that S3's own third sentence
+   asked for; see `TRAIL_GAP`'s own comment for where it used to sit. */
 const DENSITY_TRAIL: Record<ScreenDensity, string> = {
-  comfortable: "px-[var(--space-6)] pt-[var(--space-5)]",
-  calm: "px-[var(--space-5)] pt-[var(--space-5)]",
+  comfortable: "px-[var(--space-6)] pt-[var(--space-2h)]",
+  calm: "px-[var(--space-5)] pt-[var(--space-2h)]",
 };
 
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` and
@@ -4531,10 +4540,16 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 see that record's own comment for the number. `band`'s (or
                 the body's) own WRAPPER TOP is STILL UNCHANGED — its
                 `getBoundingClientRect()` moves down by exactly this slot's
-                own height (pt, content and divider all included) plus
-                `TRAIL_GAP`, which is the equation `verify/trail-line/`
-                proves, unchanged in SHAPE, only in the numbers it reads live
-                off `DENSITY_TRAIL`/`TRAIL_GAP`.
+                own height (pt and content included) plus `TRAIL_GAP`, which
+                is the equation `verify/trail-line/` proves, unchanged in
+                SHAPE, only in the numbers it reads live off
+                `DENSITY_TRAIL`/`TRAIL_GAP`. NO DIVIDER IN THAT HEIGHT ANY
+                MORE — the 2026-09-18 ruling on `TRAIL_GAP` retired the
+                `<Separator />` this slot used to render as its own last
+                child; "the hairline" in the two paragraphs below is this
+                bug's OWN HISTORICAL LANGUAGE, from the night that divider
+                still existed, and is left as written rather than edited
+                into a claim about a line that is no longer drawn.
 
                 THAT PROOF HAS A BLIND SPOT, FOUND 2026-09-17 NIGHT MEASURING
                 LIVE: `getBoundingClientRect().top` is the WRAPPER's box, and
@@ -4585,17 +4600,14 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 data-level="card"
                 className={cn("min-w-0 shrink-0", DENSITY_TRAIL[density], TRAIL_GAP)}
               >
+                {/* NO SEPARATOR ELEMENT ANY MORE — 2026-09-18, CLIENT
+                    VERBATIM: "no line divider under." S3 (2026-09-17
+                    evening) had drawn one here; that same-day-later ruling
+                    retired it outright, so this slot renders only `{trail}`
+                    and `TRAIL_GAP`'s `mb` is the one thing left putting air
+                    between it and whatever follows. See `TRAIL_GAP`'s own
+                    comment for the fuller history. */}
                 {trail}
-                {/* THE DIVIDER — S3's third sentence, "maybe we could add a
-                    divider line." A child of THIS padded div, not a sibling
-                    of it, so `w-full` below reads 100% of the CONTENT box
-                    (this div's own `px` already subtracted) — "spanning the
-                    card's inner width," not the card's bare edge-to-edge
-                    width. See `TRAIL_GAP`'s own comment for why it carries
-                    no margin of its own above the line. Default variant and
-                    orientation — `bg-border`, `h-px w-full` — nothing here
-                    overrides either. */}
-                <Separator />
               </div>
             ) : null}
 

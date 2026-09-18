@@ -188,22 +188,30 @@ console.log(
 );
 
 /* ============================================================================
-   THE 17 SEP 2026 EVENING TRAIL-SPACING CHECK — S3/D2. Client, verbatim:
-   "Make a bit more space above the breadcrumbs. Reduce the space between the
-   breadcrumbs and the chips. Maybe we could add a divider line." Then, picking
-   from the design page: "for the spacing, do s3. and d2." S3: 20px above the
-   trail (was 12), 8px between the trail and the title/chip row (was 20), plus
-   a hairline divider under the trail spanning the card's inner width.
+   THE 17 SEP 2026 EVENING TRAIL-SPACING CHECK — S3/D2, HALVED AND
+   DE-DIVIDERED 18 SEP 2026. Client, 17 Sep, verbatim: "Make a bit more space
+   above the breadcrumbs. Reduce the space between the breadcrumbs and the
+   chips. Maybe we could add a divider line." Then, picking from the design
+   page: "for the spacing, do s3. and d2." S3: 20px above the trail (was 12),
+   8px between the trail and the title/chip row (was 20), plus a hairline
+   divider under the trail spanning the card's inner width.
+
+   SUPERSEDED THE NEXT DAY — client, 18 Sep, verbatim: "for the breadrcumbs /
+   search - half of the margin that now is on top, and exactly same under.
+   no line divider under." Half of S3's 20 is 10 — `--space-2h`, the tokens
+   scale's own existing half-step, not a new token — and "exactly same
+   under" reads that identical custom property into `TRAIL_GAP` too, rather
+   than leaving it at S3's unrelated 8. The divider is retired outright.
 
    Asserted as working code shapes, the same style every check in this file
-   uses: `DENSITY_TRAIL` carries a flat `pt-[var(--space-5)]` at BOTH
+   uses: `DENSITY_TRAIL` carries a flat `pt-[var(--space-2h)]` at BOTH
    densities (the ruling named one number, not a density pair), `TRAIL_GAP`
-   is `mb-[var(--space-2)]`, and the trail slot renders a `<Separator />`
-   AFTER `{trail}` and BEFORE the slot's own closing tag — inside the padded
-   div, so it spans the content box, not the card's bare edge. A regression
-   that reverts any one of the three — a bad merge, a "let's put it back to
-   flush" edit that forgets the other two moved with it — fails here instead
-   of waiting for the next client screenshot.
+   is `mb-[var(--space-2h)]` — the SAME token, not a second one that merely
+   agrees today — and the trail slot renders `{trail}` with NO `<Separator
+   />` anywhere inside it. A regression that reverts any one of the three —
+   a bad merge, a "let's put it back to S3" edit that forgets the other two
+   moved with it, or a divider that creeps back in — fails here instead of
+   waiting for the next client screenshot.
 
    EXTENDED 2026-09-17 NIGHT — THE TITLE SLOT'S OWN LEADING PADDING, PINNED
    TO ZERO WHEN A TRAIL RENDERS. `DENSITY_TRAIL`'s `pt` and `TRAIL_GAP` were
@@ -228,33 +236,41 @@ console.log(
 const trailSpacingFindings = [];
 
 const DENSITY_TRAIL_PATTERN =
-  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[var\(--space-6\)\] pt-\[var\(--space-5\)\]",\s*calm: "px-\[var\(--space-5\)\] pt-\[var\(--space-5\)\]",\s*\};/;
+  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[var\(--space-6\)\] pt-\[var\(--space-2h\)\]",\s*calm: "px-\[var\(--space-5\)\] pt-\[var\(--space-2h\)\]",\s*\};/;
 if (!DENSITY_TRAIL_PATTERN.test(src)) {
   trailSpacingFindings.push(
-    `DENSITY_TRAIL in ${rel} does not read S3's flat pt-[var(--space-5)] (20px above the trail) at both densities.`,
+    `DENSITY_TRAIL in ${rel} does not read the 18 Sep ruling's flat pt-[var(--space-2h)] (10px above the trail, half of S3's 20) at both densities.`,
   );
 }
 
-const TRAIL_GAP_PATTERN = /const TRAIL_GAP = "mb-\[var\(--space-2\)\]";/;
+const TRAIL_GAP_PATTERN = /const TRAIL_GAP = "mb-\[var\(--space-2h\)\]";/;
 if (!TRAIL_GAP_PATTERN.test(src)) {
   trailSpacingFindings.push(
-    `TRAIL_GAP in ${rel} does not read S3's mb-[var(--space-2)] (8px between the trail and the title/chip row).`,
+    `TRAIL_GAP in ${rel} does not read mb-[var(--space-2h)] — the 18 Sep ruling ("exactly same under") reads the ` +
+      "SAME token DENSITY_TRAIL's own pt does, not S3's separate --space-2.",
   );
 }
 
-// THE DIVIDER — a working render shape (Separator called inside the `trail`
-// slot's own JSX block), not a bare mention of the word "Separator" anywhere
-// in the file (the import line alone would satisfy a bare substring search
-// without proving anything is actually drawn).
+// THE DIVIDER IS GONE — the 18 Sep ruling's own last sentence, "no line
+// divider under," retired it outright. Checked as the ABSENCE of a working
+// render shape (Separator called inside the `trail` slot's own JSX block),
+// not a bare mention of the word "Separator" anywhere in the file — this
+// file's own historical comments are free to keep naming it while
+// explaining why it is gone, exactly the standard the resize-rot check
+// above states for its own removed feature.
 const TRAIL_SLOT_BLOCK = /data-slot="screen-shell-trail"[\s\S]{0,1600}?<\/div>/;
 const trailSlotMatch = src.match(TRAIL_SLOT_BLOCK);
-if (!trailSlotMatch || !/<Separator\s*\/>/.test(trailSlotMatch[0])) {
+if (trailSlotMatch && /<Separator\s*\/>/.test(trailSlotMatch[0])) {
   trailSpacingFindings.push(
-    `The screen-shell-trail slot in ${rel} does not render <Separator /> — S3's divider line is missing.`,
+    `The screen-shell-trail slot in ${rel} still renders <Separator /> — the 18 Sep 2026 ruling ("no line divider ` +
+      'under") retired it and it must stay gone.',
   );
 }
-if (!/^import \{ Separator \} from "\.\.\/\.\.\/components\/separator\/separator";$/m.test(src)) {
-  trailSpacingFindings.push(`${rel} does not import Separator from components/separator/separator.`);
+if (/^import \{ Separator \} from "\.\.\/\.\.\/components\/separator\/separator";$/m.test(src)) {
+  trailSpacingFindings.push(
+    `${rel} still imports Separator from components/separator/separator — dead weight now that the trail slot's ` +
+      "own divider is retired and nothing else in this file renders one.",
+  );
 }
 
 // THE TITLE SLOT'S OWN LEADING PADDING, ZEROED AT THE HEADER'S RENDER SITE
@@ -286,14 +302,16 @@ if (!bodySlotMatch || !/trail\s*&&\s*!band\s*\?\s*"pt-0 lg:pt-0"\s*:\s*undefined
 
 if (trailSpacingFindings.length > 0) {
   console.error(
-    "FAIL screen-shell trail-spacing check (S3/D2):\n" + trailSpacingFindings.map((f) => `  - ${f}`).join("\n"),
+    "FAIL screen-shell trail-spacing check (S3/D2, superseded 18 Sep):\n" +
+      trailSpacingFindings.map((f) => `  - ${f}`).join("\n"),
   );
   process.exit(1);
 }
 
 console.log(
-  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt, TRAIL_GAP, the trail's own <Separator />, and the " +
-    "title slot's leading pt pinned to zero (header and body) whenever a trail renders all read S3's values.",
+  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt and TRAIL_GAP both read the SAME --space-2h (10px, half " +
+    "of S3's 20), no <Separator /> renders in the trail slot (and none is imported), and the title slot's leading " +
+    "pt stays pinned to zero (header and body) whenever a trail renders.",
 );
 
 /* ============================================================================

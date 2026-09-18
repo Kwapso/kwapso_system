@@ -2,6 +2,80 @@
 
 ## Unreleased
 
+### Fixed — the trail's spacing halved and de-dividered, arrows moved into the field — v1.2.114
+
+**CLIENT RULINGS, 18 SEP 2026, VERBATIM.** "for the breadrcumbs / search -
+half of the margin that now is on top, and exactly same under. no line
+divider under. inckude the nav. arrows in the colored background." Picked
+from a side-by-side page built per the working agreement ("decisions need a
+visual"): "t1 and c2" — this entry is T1. (C2, the identity-chips-to-title
+gap, was investigated and found to be APP-SIDE ONLY; see the note at the
+end of this entry.)
+
+**THE SPACING, HALVED.** S3 (17 Sep evening) had put 20px
+(`--space-5`) above the trail field and 8px (`--space-2`) below it, plus a
+`<Separator />` hairline. Half of 20 is 10 — a number the eleven-step
+integer `--space-*` scale does not carry. `tokens.css` already mints
+exactly this rung on its own four-member half-step sub-scale
+(`--space-1h`…`--space-4h`, kit ruling 28): `--space-2h: 0.625rem` (10px,
+"dense row gap"). Used as-is rather than minting a new token or a
+`calc(var(--space-5) / 2)` — the tokens file already had the half-step, so
+there was nothing to add. `DENSITY_TRAIL`'s own `pt` and `TRAIL_GAP`'s own
+`mb` (`compositions/templates/screen-shell.tsx`) both now read
+`var(--space-2h)` — the SAME custom property, not two literals that happen
+to agree today, which is what "exactly same under" asks for.
+
+**THE DIVIDER IS GONE.** The `<Separator />` S3 had added as the trail
+slot's own last child is removed outright, along with the now-dead
+`Separator` import. The trail slot renders `{trail}` alone; `TRAIL_GAP`'s
+`mb` is the one gap between it and whatever follows.
+
+**THE ARROWS MOVED INSIDE THE PANEL FIELD.** `components/breadcrumbs/
+trail-line.tsx`: the back/forward buttons were siblings of the pill field,
+outside its panel tone; they now render as the field's own first children,
+inside `TRAIL_PILL`, still leading, still before the magnifier. Same
+`ARROW` class, same `--control-height-pill` hit target, same disabled/hover
+states, same keyboard order (back, forward, then the crumbs) — only the
+parent changed. The outer `trail-line` row is left with one child, so its
+own `gap-[var(--space-2)]` (there to separate the old two siblings) is
+dropped rather than kept as a no-op.
+
+**CHECKS.** `compositions/templates/check-screen-shell.mjs`'s trail-spacing
+check now asserts `DENSITY_TRAIL`'s `pt` and `TRAIL_GAP`'s `mb` both read
+`var(--space-2h)`, and that no `<Separator />` renders in the trail slot
+(and that the file imports none). `verify/trail-line/page.tsx`'s probe
+drops the old hairline-relative reading (`gapHairlineToTitlePx`/
+`gapHairlineToTitleIs8`) for a field-relative one
+(`gapBelowTrailPx`/`gapBelowTrailIs10`, plus a new `gapAboveEqualsBelow`),
+adds `noHairline` (a positive DOM read: no `[data-slot=separator]`
+descendant of the trail slot), and adds `arrowsInsideField` (the back/
+forward buttons' own bounding boxes lie inside `[data-slot=trail-line-
+field]`'s box, on all four edges, 0.5px tolerance for sub-pixel rounding).
+All five readings hold across `one`/`four`/`nine`/`record`.
+
+**C2 — INVESTIGATED, APP-SIDE ONLY, NO KIT CHANGE.** The client's second
+pick names the gap between the identity chip row and the title, ruled from
+16px (`--space-4`) to half, 8px (`--space-2`). That 16px figure is the
+APP's own (`kwapso_system/web/components/records/record-chrome.tsx`,
+`mb-[var(--space-4)]` on `identityChips`, rendered ABOVE the title — the
+pre-override-73 arrangement). Checked against this kit's own record head —
+`RecordChrome`/`RecordDetail` (`compositions/templates/record-chrome.tsx`,
+`components/record-detail/record-detail.tsx`) and `Title`
+(`components/title/title.tsx`) — and none of the three own an equivalent
+16px gap to fix. Override 73 (2026-08-26) already moved the kit's own
+identity row BELOW the title, into `RecordDetail`'s `meta` slot, and the
+gap between `Title` and that slot is `gap-1` (4px,
+`record-detail.tsx:891`) — a different, already-tight, already-shipped
+value, unrelated to 16/8 and not touched by this ruling. The kit's
+identity-row/title relationship diverged from the app's the day override
+73 shipped; this ruling's 16px→8px arithmetic describes a defect that only
+exists in the app's own (older) arrangement. No kit file changed for C2.
+
+Files: `compositions/templates/screen-shell.tsx`,
+`compositions/templates/check-screen-shell.mjs`,
+`components/breadcrumbs/trail-line.tsx`, `verify/trail-line/page.tsx`.
+`npm run check` green. Not tagged.
+
 ### Fixed — the record shape's hairline-to-title gap, and the kanban card's mouse gesture — v1.2.113
 
 **ITEM 1 — THE LIVE 40 WAS NEVER THIS REPO'S BUG, AND THE PROOF NOW SAYS SO

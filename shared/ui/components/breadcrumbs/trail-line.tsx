@@ -185,6 +185,20 @@ import { cn } from "../../lib/utils";
    scale). `--control-height-pill` (26) is reused rather than restated so the
    pill lines up with the arrows leading it — the same token `ARROW` below
    already spends.
+
+   THE ARROWS MOVED INSIDE THIS FIELD, 18 SEP 2026 — CLIENT RULING,
+   VERBATIM: "include the nav. arrows in the colored background." D2 had
+   drawn them as the field's own leading siblings, outside the panel-tone
+   pill; this ruling pulls them INSIDE it, still first, still before the
+   magnifier — "on the very far left" (the file header's own unchanged
+   half of the original ruling) now means the far left of the FIELD's own
+   content box, not the row that used to contain both. Nothing about the
+   arrows themselves moves: same `ARROW` class, same `--control-height-pill`
+   hit target, same disabled/hover states, same keyboard order (back,
+   forward, then the crumbs) — only their PARENT changed, from the outer
+   `trail-line` row to `TRAIL_PILL` itself. The outer row is left with one
+   child now, so its own `gap-[var(--space-2)]` (there to separate the old
+   two siblings) is dropped as dead weight rather than kept as a no-op.
    -------------------------------------------------------------------------- */
 const TRAIL_PILL = cn(
   "flex min-w-0 flex-1 items-center gap-[var(--space-2)]",
@@ -367,7 +381,7 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
         ref={ref}
         data-slot="trail-line"
         className={cn(
-          "flex min-w-0 items-center gap-[var(--space-2)]",
+          "flex min-w-0 items-center",
           // NO REBIND HERE ANY MORE — see the file header. This component now
           // stands on the card's own paper, where `breadcrumb/breadcrumb.tsx`
           // already reads `--foreground` / `--ink-tertiary` correctly on its
@@ -377,39 +391,42 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
         )}
         {...props}
       >
-        <div className="flex shrink-0 items-center gap-[var(--space-1)]">
-          <button
-            type="button"
-            data-slot="trail-line-back"
-            className={ARROW}
-            onClick={onBack}
-            disabled={!canGoBack}
-            aria-label={backLabel}
-          >
-            <CaretLeft size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            data-slot="trail-line-forward"
-            className={ARROW}
-            onClick={onForward}
-            disabled={!canGoForward}
-            aria-label={forwardLabel}
-          >
-            <CaretRight size={16} aria-hidden="true" />
-          </button>
-        </div>
-
-        {/* THE PILL — D2's whole shape. The magnifier and the "⌘K" hint are
-            chrome around the SAME `Breadcrumb` this file always drew; see
-            the header above `TRAIL_PILL` for why neither wires to anything
-            yet. Rendered even when `visible.length === 0`, unlike the bare
-            `Breadcrumb` it used to be: an empty search-shaped field still
-            draws its own shell (`search-input.tsx`'s own resting state
-            does the same), it just has no landmark inside it — the "no
-            `Breadcrumb` landmark when `steps: []`" rule (state 7, above)
-            is unchanged, it now governs only the landmark, not the pill. */}
+        {/* THE PILL — D2's whole shape, now carrying the arrows too. See the
+            header above `TRAIL_PILL` for the 18 Sep ruling that moved them
+            INSIDE this field, still leading, still before the magnifier.
+            The magnifier and the "⌘K" hint are chrome around the SAME
+            `Breadcrumb` this file always drew; see the header above
+            `TRAIL_PILL` for why neither wires to anything yet. Rendered
+            even when `visible.length === 0`, unlike the bare `Breadcrumb`
+            it used to be: an empty search-shaped field still draws its own
+            shell (`search-input.tsx`'s own resting state does the same),
+            it just has no landmark inside it — the "no `Breadcrumb`
+            landmark when `steps: []`" rule (state 7, above) is unchanged,
+            it now governs only the landmark, not the pill. */}
         <div data-slot="trail-line-field" className={TRAIL_PILL}>
+          <div className="flex shrink-0 items-center gap-[var(--space-1)]">
+            <button
+              type="button"
+              data-slot="trail-line-back"
+              className={ARROW}
+              onClick={onBack}
+              disabled={!canGoBack}
+              aria-label={backLabel}
+            >
+              <CaretLeft size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              data-slot="trail-line-forward"
+              className={ARROW}
+              onClick={onForward}
+              disabled={!canGoForward}
+              aria-label={forwardLabel}
+            >
+              <CaretRight size={16} aria-hidden="true" />
+            </button>
+          </div>
+
           <MagnifyingGlass
             size={14}
             aria-hidden="true"

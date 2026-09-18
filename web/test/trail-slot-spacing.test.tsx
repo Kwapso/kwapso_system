@@ -25,18 +25,26 @@ import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+import { TrailLine } from "@shared/ui/components/breadcrumbs/trail-line"
 
 afterEach(cleanup)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
 
-describe("the kit's own trail slot — screen-shell.tsx, v1.2.112", () => {
-  // SABOTAGE: delete `TRAIL_GAP`/`DENSITY_TRAIL` from the trail slot's
-  // className (or drop the `<Separator />` inside it) →
-  //   × wraps a trail in one padded box, S3's own two tokens, with a hairline
-  //     AssertionError: expected null not to be null (or the separator query fails)
-  it("wraps a trail in one padded box, S3's own two tokens, with a hairline", () => {
+describe("the kit's own trail slot — screen-shell.tsx, v1.2.114", () => {
+  // CLIENT RULING, 18 SEP 2026, VERBATIM: "for the breadrcumbs / search -
+  // half of the margin that now is on top, and exactly same under. no line
+  // divider under. inckude the nav. arrows in the colored background."
+  // Her pick: t1 and c2.
+  //
+  // SABOTAGE: change pt to `pt-[var(--space-5)]` (the old value) or mb to
+  // `mb-[var(--space-2)]` (the old value), or add back a `<Separator />`
+  // inside the slot →
+  //   × wraps a trail with the new spacing and no separator
+  //     AssertionError: expected 'pt-[var(--space-2h)]' to contain ... (or
+  //     expected null not to be null)
+  it("wraps a trail with the new spacing and no separator", () => {
     const { container } = render(
       <ScreenShell trail={<div data-testid="trail-stub">trail</div>} title="Tasks">
         <div>content</div>
@@ -44,21 +52,54 @@ describe("the kit's own trail slot — screen-shell.tsx, v1.2.112", () => {
     )
     const slot = container.querySelector('[data-slot="screen-shell-trail"]')
     expect(slot, "a trail must render through the kit's own screen-shell-trail slot").toBeTruthy()
-    // ABOVE THE TRAIL — DENSITY_TRAIL's own `pt`, S3's 20, at the shell's
-    // default (comfortable) density.
-    expect(slot!.className, "20 above, DENSITY_TRAIL's pt, not an app-owned class").toContain(
-      "pt-[var(--space-5)]"
+    // ABOVE THE TRAIL — DENSITY_TRAIL's own `pt`, 10px (var(--space-2h)),
+    // half the margin that was above before, at the shell's default
+    // (comfortable) density.
+    expect(slot!.className, "10px above, DENSITY_TRAIL's pt, not an app-owned class").toContain(
+      "pt-[var(--space-2h)]"
     )
-    // AFTER THE TRAIL — TRAIL_GAP's own `mb`, S3's 8.
-    expect(slot!.className, "8 after, TRAIL_GAP's mb, not an app-owned class").toContain(
-      "mb-[var(--space-2)]"
+    // AFTER THE TRAIL — TRAIL_GAP's own `mb`, 10px (var(--space-2h)),
+    // exactly same under as above.
+    expect(slot!.className, "10px after, TRAIL_GAP's mb, not an app-owned class").toContain(
+      "mb-[var(--space-2h)]"
     )
     // IT IS THE WRAPPER, not a sibling — the node this file hands the `trail`
     // prop renders INSIDE the slot.
     expect(slot!.querySelector('[data-testid="trail-stub"]'), "the slot must wrap the trail node, not sit beside it").toBeTruthy()
-    // THE HAIRLINE — S3's third sentence, "maybe we could add a divider
-    // line," is the kit's own `<Separator />` inside the same padded box.
-    expect(slot!.querySelector('[data-slot="separator"]'), "the hairline lives inside the trail slot's own box").toBeTruthy()
+    // NO SEPARATOR — the 18 Sep ruling retired the hairline: "no line
+    // divider under." The trail slot renders only `{trail}` now.
+    expect(slot!.querySelector('[data-slot="separator"]'), "no separator lives inside the trail slot").toBeNull()
+  })
+
+  // SABOTAGE: move the arrow buttons (data-slot="trail-line-back" and
+  // data-slot="trail-line-forward") outside the pill field
+  // (data-slot="trail-line-field") →
+  //   × when TrailLine renders inside the slot, arrows render inside the field
+  //     AssertionError: expected null to be truthy
+  it("when TrailLine renders inside the slot, arrows render inside the field", () => {
+    const { container } = render(
+      <ScreenShell
+        trail={<TrailLine steps={[{ label: "Root" }, { label: "Current" }]} cursor={1} />}
+        title="Tasks"
+      >
+        <div>content</div>
+      </ScreenShell>
+    )
+    const slot = container.querySelector('[data-slot="screen-shell-trail"]')
+    expect(slot, "a trail must render through the kit's own screen-shell-trail slot").toBeTruthy()
+    // When the actual TrailLine renders inside the slot, verify the arrows
+    // are inside the field element, per the 18 Sep ruling: "include the nav.
+    // arrows in the colored background."
+    const field = slot!.querySelector('[data-slot="trail-line-field"]')
+    expect(field, "the field element must exist in the trail slot").toBeTruthy()
+    expect(
+      field!.querySelector('[data-slot="trail-line-back"]'),
+      "the back arrow must be a descendant of the field"
+    ).toBeTruthy()
+    expect(
+      field!.querySelector('[data-slot="trail-line-forward"]'),
+      "the forward arrow must be a descendant of the field"
+    ).toBeTruthy()
   })
 
   // SABOTAGE: drop the `trail ? "pt-0" : undefined` clause from the header
