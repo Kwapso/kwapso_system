@@ -2,6 +2,60 @@
 
 ## Unreleased
 
+### Fixed — the rail brand mark stops drifting off the strip-row band inside a `<button>` wrapper; the size ruling the app had been overriding is now the kit's own default — v1.2.123
+
+**STILL 2.9px OFF, LIVE, AFTER v1.2.122.** That rewrite (below) made
+`rail-brand` a BAND — `h-[var(--strip-row)]` plus its own `items-center` —
+so the mark's centre coincides with the tab strip's by construction, whatever
+the mark's own rendered height. Measured on `agency-staging`, 1440×900, 16px
+root, after the app started handing its logotype to `Rail`'s own `mark` prop:
+the logo's centre at 27.74px against the active tab label's 30.64px (itself
+0.59px off this row's true centre — the sub-pixel residual
+`check-screen-shell.mjs` already measures and accepts) — a 2.9px gap the
+band construction was supposed to have closed to sub-pixel.
+
+**`verify/shell-chrome/` never caught it because it never exercises the
+shape every consumer actually uses.** That harness passes the DEFAULT mark —
+a bare `Isotype`/`Logotype`, whose own root is `inline-flex` — and every
+application wraps `mark` in something with a reason this file's own header
+names as legitimate (`kwapso_system`'s click-to-home `<button>`, so the
+brand mark can navigate home now that Welcome has no rail row of its own).
+
+**THE CAUSE IS A CSS STRUT, NOT A TOKEN.** `items-center` correctly centres
+whatever BOX the direct child occupies — the v1.2.122 construction still
+holds. But a `<button>` is not itself a flex/grid container, so it lays out
+its one child (the artwork's span) through normal inline flow, and a
+baseline-aligned replaced element (the `<img>`, `vertical-align: baseline`
+by default) keeps the ambient line's "strut" — an invisible box sized off
+the inherited font's ascent/descent — as extra room entirely on one side:
+the image has no descent of its own, so the strut's descent becomes empty
+space UNDER the artwork alone. `items-center` then correctly centres that
+taller, asymmetric box, and the artwork inside it ends up above the box's
+own middle by half the strut. Reproduced in isolation: a bare `<button>`
+around a fixed-height `<img>` measured 3px taller than the image, with the
+image's own centre 1.5px above the button's — same mechanism, same
+direction, same order of magnitude as the measured 2.9px.
+
+**THE FIX ASKS NOTHING OF THE CALLER.** `rail.tsx` cannot see what `mark` is
+made of, so `rail-brand` now makes EVERY direct child its own flex
+container (`[&>*]:flex [&>*]:items-center`) — the one formatting context a
+strut cannot form inside, because a flex child is sized to its own content
+directly, with no line box. Proved in the same isolation test: the
+identical button, unchanged, gained only this rule on its PARENT and its
+own rendered height dropped to exactly the image's, landing the image's
+centre exactly on the row's. Costs nothing on the kit's own default mark
+(already `inline-flex`) or the wordmark block beside it (already
+`flex flex-col`).
+
+**THE SIZE RULING IS ALSO CARRIED BACK IN.** `MARK_STEP` was `--icon-20`
+(the 24 Aug 2026 reference-screenshot ruling); the client asked for the
+opposite a week later, live on staging — "make the logo bigger" — one rung
+up the ladder, `--icon-24`. Every consuming app had been carrying that rung
+as its own override on the same `mark` escape hatch (`kwapso_system`'s
+`railBrandMark`, both call sites) since the ruling landed, because the kit's
+own default never moved. `MARK_STEP` now reads `--icon-24` directly, so the
+app-side override has nothing left to say.
+
 ### Fixed — the rail brand row aligns to the workspace tab strip by construction, not by a computed centre — v1.2.122
 
 v1.2.120/121 aligned the rail's brand row to the active folder tab's label

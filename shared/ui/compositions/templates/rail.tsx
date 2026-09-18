@@ -374,6 +374,22 @@
    artwork is the only thing naming the product in this rail, so it keeps its
    accessible name and `label` carries it.
 
+   STEPPED BACK UP TO `--icon-24`, 18 SEP 2026 — THE SIZE RULING ABOVE WAS
+   SUPERSEDED A WEEK LATER, live on staging, client verbatim: "make the logo
+   bigger". One rung up the ladder from the 20 the 24 Aug reference set, and
+   the next one on the same scale (`brand.tsx`'s own `sm` step) rather than an
+   invented number. Every application vendoring this kit had been carrying
+   that rung as an app-side override on the SAME `mark` prop escape hatch this
+   file's own header documents for exactly this ("a call site with a reason")
+   since the ruling landed, because the kit's own default never moved — so
+   every consumer using the DEFAULT mark was still drawing the retired 20,
+   and the override existed only to undo a kit default the kit itself should
+   carry. `MARK_STEP` now reads `--icon-24` directly, so the override has
+   nothing left to say and can go: same artwork, same ratio-driven width,
+   one rung larger, at both `MARK_STEP` call sites (the collapsed isotype and
+   the expanded lockup keep taking the identical token, unchanged from
+   "IT TAKES `MARK_STEP` TOO" above).
+
    ─────────────────────────────────────────────────────────────────────────
    THE APPLICATION OWNS THE ROUTE
    ─────────────────────────────────────────────────────────────────────────
@@ -536,15 +552,23 @@ const ROW_COLLAPSED = cn(
  *
  * Client, 2026-08-24, with a reference screenshot: "the logo on top of sidebar
  * smaller, check screenshot for reference." The reference puts the lockup at
- * ~48% of the rail's width. `--icon-20` is the ladder rung that lands there:
- * `brand.tsx` computes the width as `--brand-step * --brand-ratio`, so 20 x
- * 4.9986 = 99.97 in a 208 column — 48.06%. Nothing here is a literal, and the
- * artwork's aspect still owns the width.
+ * ~48% of the rail's width. `--icon-20` was the ladder rung that landed
+ * there: `brand.tsx` computes the width as `--brand-step * --brand-ratio`, so
+ * 20 x 4.9986 = 99.97 in a 208 column — 48.06%. Nothing here is a literal,
+ * and the artwork's aspect still owns the width.
+ *
+ * STEPPED UP TO `--icon-24`, 18 SEP 2026 — client, live on staging, a week
+ * later: "make the logo bigger". One rung up the same ladder (24 x 4.9986 =
+ * 119.97 in a 208 column, 57.68%), not a new number. Every consuming app had
+ * been carrying this exact step as an override on `Rail`'s own `mark` prop
+ * since the ruling landed; the kit's default now reads it directly, so the
+ * override has nothing left to say. See the file header, "STEPPED BACK UP TO
+ * `--icon-24`".
  *
  * The COLLAPSED isotype takes the same step, so the two states of the same
  * mark stand at the same height. See the file header.
  */
-const MARK_STEP = "[--brand-step:var(--icon-20)]";
+const MARK_STEP = "[--brand-step:var(--icon-24)]";
 
 /* ----------------------------------------------------------------------------
    AN IDLE ENTRY, AND D5 = C's COLOUR HALF IS OVERRULED ON THIS ROW, 2026-09-02.
@@ -1357,6 +1381,60 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
                  cannot re-open this seam the way the first fix's `--icon-20`
                  term could. */
               "mt-[calc(var(--shell-gutter)_-_var(--rail-inset))] h-[var(--strip-row)]",
+              /* THE BAND WAS STILL 2.9px OFF ON THE LIVE APP, 18 SEP 2026,
+                 AFTER THE REWRITE ABOVE — measured at 1440x900, 16px root:
+                 the logo's own centre at 27.74px against the tab label's
+                 30.64px (which itself sits 0.59px off this row's true centre,
+                 the sub-pixel residual `check-screen-shell.mjs` already
+                 measures and accepts). `verify/shell-chrome/` never caught it
+                 because that harness passes the DEFAULT mark — a bare
+                 `Isotype`/`Logotype`, whose own root is already
+                 `inline-flex` — and every consuming app wraps `mark` in
+                 something with a reason `rail.tsx`'s own docs invite (the
+                 click-to-home `<button>` this file's header names as "a call
+                 site with a reason").
+
+                 THE CAUSE IS A CSS STRUT, NOT A TOKEN. `items-center`
+                 centres whatever BOX the direct child occupies — that part
+                 of the rewrite still holds "by construction" — but a
+                 `<button>` (or any element that is not itself a flex/grid
+                 container) lays out ITS OWN single child through normal
+                 inline flow, and a baseline-aligned replaced element (the
+                 artwork's `<img>`, `vertical-align: baseline` by default)
+                 inside that flow keeps the ambient line's "strut" — an
+                 invisible box sized off the inherited font's ascent/descent
+                 — as extra room. The image has no descent of its own (its
+                 bottom edge SITS on the baseline), so the strut's descent
+                 becomes pure empty space UNDER the artwork and nowhere
+                 else, inflating the button's rendered height by a few
+                 pixels with all of the slack on one side. `items-center`
+                 then centres that TALLER, asymmetric box correctly — the
+                 artwork inside it is what ends up off-centre, sitting
+                 above the box's own middle by half the strut. Reproduced
+                 in isolation (a bare `<button>` around a fixed-height
+                 `<img>`, 16px ambient font): the button measured 3px taller
+                 than the image and the image's centre sat 1.5px above the
+                 button's own — the same mechanism, the same direction, and
+                 the same order of magnitude as the 2.9px measured live.
+
+                 THE FIX ASKS NOTHING OF THE CALLER. `rail.tsx` cannot see
+                 what `mark` is made of — a `<button>`, an `<a>`, the kit's
+                 own artwork span — so the row makes EVERY direct child its
+                 own flex container instead, which is the one property a
+                 strut cannot form inside: a flex formatting context sizes a
+                 child to its own content directly, with no line box and
+                 therefore no font-metric strut to speak of. Proved in the
+                 same isolation test: the identical button, unchanged, wrapped
+                 by nothing but this one rule on its PARENT, measured its own
+                 height at exactly the image's own and the image's centre
+                 landed exactly on the row's. It costs nothing on the kit's
+                 own default mark (`Isotype`/`Logotype`'s root is already
+                 `inline-flex`, so this only restates what is already true)
+                 or on the wordmark block beside it (already `flex flex-col`
+                 for the same reason), and it is `*`, not `button`, because
+                 the next call site's reason for overriding `mark` is not
+                 this one's to predict. */
+              "[&>*]:flex [&>*]:items-center",
               /* ONE LEADING EDGE DOWN THE WHOLE COLUMN. The client's
                  reference aligns the lockup with the leading edge of the
                  destinations below it, not with the column's padding — and

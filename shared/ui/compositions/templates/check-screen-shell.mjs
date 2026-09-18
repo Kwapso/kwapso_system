@@ -836,9 +836,10 @@ console.log(
    coincidence at one root size. */
 const railBrandFindings = [];
 
-// 8000, not 4500: the v1.2.122 rewrite's own comment (the derivation this
-// block's rules quote from) runs longer than the block the old cap sized for.
-const RAIL_BRAND_BLOCK = /data-slot="rail-brand"[\s\S]{0,400}?className=\{cn\(([\s\S]{0,8000}?)\)\}/;
+// 10000, not 8000: the v1.2.123 fix's own comment (the CSS-strut diagnosis,
+// quoted from CHANGELOG.md) pushed the block past the cap v1.2.122 sized for
+// — raised again for the same reason, not a new one.
+const RAIL_BRAND_BLOCK = /data-slot="rail-brand"[\s\S]{0,400}?className=\{cn\(([\s\S]{0,10000}?)\)\}/;
 const railBrandMatch = railSrc.match(RAIL_BRAND_BLOCK);
 if (!railBrandMatch) {
   railBrandFindings.push(`${railRel} does not have a data-slot="rail-brand" block with a cn(...) className to check.`);
@@ -894,9 +895,34 @@ if (!/--strip-row:\s*var\(--folder-lip\)/.test(tokensSrc)) {
   );
 }
 
+// v1.2.123 — THE BAND WAS STILL 2.9px OFF, LIVE, INSIDE A CALLER'S <button>.
+// items-center correctly centres whatever box a direct child occupies; a
+// non-flex wrapper (kwapso_system's click-to-home <button>) picks up a CSS
+// line-box "strut" around its own single child that inflates ITS box by a
+// few pixels, all on one side, and items-center then centres THAT box
+// rather than the artwork inside it. The fix makes every direct child of
+// rail-brand its own flex container — the one formatting context a strut
+// cannot form inside — so no wrapper a caller reaches for can reopen this,
+// the same "ask nothing of the caller" standard the band itself is held to.
+if (railBrandMatch && !/\[&>\*\]:flex/.test(railBrandMatch[1])) {
+  railBrandFindings.push(
+    `${railRel}'s rail-brand block does not force every direct child into its own flex container ` +
+      "([&>*]:flex) — a caller's non-flex mark wrapper (a bare <button>, e.g. kwapso_system's click-to-home " +
+      "handle) would pick up a CSS line-box strut around its own child and the artwork inside it would drift " +
+      "back off the row's true centre, exactly the live 2.9px this fix closed.",
+  );
+}
+if (railBrandMatch && !/\[&>\*\]:items-center/.test(railBrandMatch[1])) {
+  railBrandFindings.push(
+    `${railRel}'s rail-brand block forces every direct child to flex ([&>*]:flex) but not to centre its own ` +
+      "content ([&>*]:items-center) — a flexed wrapper with no cross-axis alignment of its own defaults to " +
+      "stretch, not centre, which reopens the same drift the strut fix exists to close.",
+  );
+}
+
 if (railBrandFindings.length > 0) {
   console.error(
-    "FAIL rail-brand alignment check (18 Sep ruling, v1.2.122 rewrite):\n" +
+    "FAIL rail-brand alignment check (18 Sep ruling, v1.2.122/123 rewrite):\n" +
       railBrandFindings.map((f) => `  - ${f}`).join("\n"),
   );
   process.exit(1);
@@ -906,7 +932,9 @@ console.log(
   "OK rail-brand alignment check: rail-brand shares --strip-row (== --folder-lip) as its own height with the " +
     "workspace tab strip's label band, top-offset by mt-[calc(var(--shell-gutter) - var(--rail-inset))] and " +
     "centred by its own items-center — measured live in verify/shell-chrome: 0.53px residual at the kit's " +
-    "15px harness root, 0.59px at the live app's 16px root (tab label centre 30.64px, matching the brief).",
+    "15px harness root, 0.59px at the live app's 16px root (tab label centre 30.64px, matching the brief) — " +
+    "and every direct child is forced into its own flex container ([&>*]:flex items-center), so a caller's " +
+    "non-flex mark wrapper (a <button>, an <a>) cannot reopen the strut-induced drift v1.2.123 closed.",
 );
 
 /* ============================================================================
