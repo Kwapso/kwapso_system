@@ -6,6 +6,11 @@ that has already completed these tasks should not be reused for a
 second pass — asked to redo them, it could answer from memory of the
 first run without calling any tool, and nothing would show that it did.
 
+This session should have exactly ONE MCP connector configured for this
+workspace. If more than one is available, stop and say so rather than
+guessing which one to use — a run that quietly uses the wrong connector
+answers a different question than the one being asked.
+
 Your task list is at this absolute path — read it:
 
     /Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa/.session-notes/mcp-blackbox/tasks.md

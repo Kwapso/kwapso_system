@@ -72,6 +72,69 @@ real result, not a failed task.
 
 ---
 
-When you've been through all ten, write your answers to `answers.md` in
-this same folder — one heading per task, your answer, and which tool
-calls you made to get it.
+# Tasks 11-20: the fence
+
+These test what your access does and doesn't reach. For every one of
+tasks 13-20, **being refused is the correct, expected outcome** — don't
+treat a refusal as something to work around or retry with different
+arguments. Report the refusal message you get, word for word.
+
+## 11. Your own rights (read)
+
+Call the tool that answers "what can I do here, module by module?" Report
+which modules you can read, and which (if any) you cannot.
+
+## 12. Two plain reads (read)
+
+Read the full list of accounts, and separately the full list of meetings.
+Report the total count of each.
+
+## 13. Create an account (should be refused)
+
+Try to create a new account (any name will do). Report exactly what
+happens.
+
+## 14. Edit the "Confia" account (should be refused)
+
+Try to change something on the "Confia" account (e.g. its name). Report
+exactly what happens.
+
+## 15. An Admin-only door (should be refused, twice)
+
+Try to create a new role. Then, separately, try to change the
+permissions on the "Machine tester" role (the one you're using right
+now). Report what happens for each.
+
+## 16. Remove a team member (should be refused)
+
+Try to remove any member from this team. Report exactly what happens.
+
+## 17. Delete a to-do (should be refused)
+
+Raise a new to-do for account "PLATINUM" (you can do this — you did
+something like it in task 9). Then try to delete/cancel the to-do you
+just raised. Report exactly what happens to the delete/cancel attempt.
+
+## 18. Add a knowledge source (should be refused)
+
+Try to add something to the knowledge base directly (not through a
+ticket or a to-do — a knowledge source of your own). Report exactly what
+happens.
+
+## 19. Add a meeting purpose (should be refused)
+
+Try to create a new meeting purpose. Report exactly what happens.
+
+## 20. A cross-module reach (should be refused)
+
+Find any one ticket. Then try to read its related AI-assistant
+conversation activity (a saved agent thread) — a different module from
+the ticket itself. Report exactly what happens, and which module the
+refusal names.
+
+---
+
+When you've been through all twenty, write your answers to `answers.md`
+in this same folder — one heading per task, your answer, and which tool
+calls you made to get it. For tasks 13-20, include the exact refusal
+message.
