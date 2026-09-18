@@ -1535,9 +1535,40 @@ document has been the one to conflate them before.
   person seeing the same source from a DIFFERENT place is a second real
   sighting worth keeping (a shared Drive folder and a direct email share of
   the same file are different provenance), not a duplicate — which is why
-  `seen_where` sits inside the key rather than beside it. As of 10 Sep 2026
-  this table is empty on every team; nothing writes to it yet — it is the
-  one piece of the rebuild's schema still ahead of its own wiring.
+  `seen_where` sits inside the key rather than beside it. **STALE, corrected
+  18 Sep 2026**: the line above said "as of 10 Sep 2026 this table is empty
+  on every team; nothing writes to it yet" — `writeSightings`
+  (`workers/content/src/lib/knowledge-google.ts`) has been live since, and
+  by 18 Sep it held real rows (e.g. a `private` sighting for an individual
+  colleague's own Gmail thread). Left uncorrected for over a week; caught
+  while writing the ruling below.
+
+  **THE DEFAULT SHELF PER READER, AND THE ONE RULING AGAINST IT.** Every
+  item `readGoogleMaterial` (`workers/content/src/lib/google-read.ts`)
+  reads carries a `shelf` decided AT THE READ, before it ever reaches this
+  table — a gmail thread and a personal calendar entry are hard-coded
+  `private` ("a mailbox is nobody's team material"), the owner's own
+  20 Aug 2026 ruling that opened the net (removed the known-contact fence)
+  without moving the shelf. **Owner's ruling, 18 Sep 2026, verbatim:**
+  *"whatever gets shared through Google Calendar or email regarding call
+  transcripts should be synced to the knowledge base, and by default, the
+  right is that the team owns it. That can, of course, be changed later."*
+  One narrow exception now exists inside the gmail path:
+  `isCallNotesEmail` (same file) recognises Google Meet's own
+  auto-generated "Notes from…" email — subject `Notes: "<title>" …`
+  (Gemini's template, never a human's) AND a snippet naming what it is
+  ("sent to invited guests in your organization" / "auto-generated on…"),
+  both required — and files it `shelf: "team"` instead. `team_visible`
+  (`knowledge_sources`, above) follows automatically:
+  `teamVisibleRecomputeSql` (`workers/content/src/lib/knowledge.ts`) reads
+  `EXISTS (a live sighting with shelf = 'team')`, so ONE such sighting is
+  already sufficient — this is not a multiple-attendee vote. The
+  "changed later" the owner names is not built: a per-team override would
+  add a `defaultTeamOwns` parameter to `isCallNotesEmail`'s caller, read
+  from a team setting; `google-read.ts`'s own comment on the function marks
+  where. Every OTHER personal Google item — an ordinary mail thread, a
+  personal calendar entry, a Drive file nobody named — is unaffected and
+  stays `private` by the same default it always had.
 - **`knowledge_names`** (0073). The account/app/contact/colleague ALIAS
   INDEX, **LIVE as of 10 Sep 2026**, replacing `accountNamedIn`'s
   single-token account-name matching (KB-AUDIT.md §4.2 — "VU Solutions"

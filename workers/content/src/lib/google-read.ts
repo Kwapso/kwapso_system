@@ -603,6 +603,60 @@ export function chatThreadItem(space: GoogleSource, message: ChatMessage, userId
   }
 }
 
+/** IS THIS THE ONE SHAPE OF MAIL THAT IS NOT NOBODY'S TEAM MATERIAL?
+ *
+ * The owner's ruling, 18 Sep 2026, verbatim: "whatever gets shared through
+ * Google Calendar or email regarding call transcripts should be synced to
+ * the knowledge base, and by default, the right is that the team owns it.
+ * That can, of course, be changed later." A mailbox stays `shelf: "private"`
+ * by default (the header essay above, and the owner's own 20 Aug 2026
+ * ruling that opened the net without moving the shelf) — this is the one
+ * narrow class that flips, because it did not arrive as somebody's own
+ * correspondence. Google Meet writes it, automatically, to whoever the
+ * organiser was, and addresses it "to invited guests in your organization"
+ * — it is minutes of a meeting that happened to land in one inbox, not a
+ * letter written to that person.
+ *
+ * THE SHAPE, MEASURED AGAINST A REAL ONE (Ishita's own "🧡 Team Assembly"
+ * notes, found live in Q18 of kb-bench.mjs, read directly off staging D1
+ * before this classifier was written):
+ *
+ *   Subject: Notes: "🧡 Team Assembly" Aug 19, 2026
+ *   Snippet: Notes from "🧡 Team Assembly" ... These notes have been sent
+ *            to invited guests in your organization. Open meeting notes ...
+ *            The content was auto-generated on August 19, 2026 ...
+ *
+ * Two independent signals, both required, so an ordinary mail that merely
+ * contains the word "notes" (a huge false-positive risk alone) cannot
+ * match: the SUBJECT starts `Notes: "<title>"` — Gemini's own template, a
+ * shape no human types by hand — AND the SNIPPET carries the sentence that
+ * names what this is, "sent to invited guests in your organization" or
+ * "auto-generated". Checked on `snippet`, not the full body: `shelf` is
+ * decided before `hydrateText` runs (see the field's own comment two
+ * screens up), so the full text is not read yet, and Gmail's own snippet is
+ * long enough to carry both sentences on the one real example measured.
+ *
+ * NOT CHECKED: the sender address. `google-transcript.ts`'s own
+ * `GOOGLE_NOTICE_SENDERS` names four Google robots for the SEPARATE
+ * "a document now exists" notice — this is a different Google feature (the
+ * notes are IN the mail, not a pointer to a Doc) and its own sender was not
+ * independently confirmed against a live message before this shipped (the
+ * decrypt key that would prove it lives outside what a script run from this
+ * checkout can reach). If a false positive is ever found, add the sender as
+ * a THIRD required signal here rather than loosening either of these two.
+ *
+ * WHERE A PER-TEAM OVERRIDE WOULD HOOK IN, per the owner's own "can be
+ * changed later": this function would gain a `defaultTeamOwns: boolean`
+ * parameter, read from a team setting `readGoogleMaterial`'s caller already
+ * has the guard to look up, and the call site below would pass it instead
+ * of assuming true. Not built now, on instruction — this comment is the
+ * marker. */
+export function isCallNotesEmail(subject: string, snippet: string): boolean {
+  if (!/^Notes:\s*["“]/i.test(subject.trim())) return false
+  const body = snippet.toLowerCase()
+  return body.includes("invited guests in your organization") || body.includes("auto-generated on")
+}
+
 export async function readGoogleMaterial(
   env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
@@ -791,8 +845,13 @@ export async function readGoogleMaterial(
           // AS RECENT AS ITS LAST REPLY, matching chatThreads' own reasoning:
           // a conversation is as recent as the last thing said in it.
           updatedAt: last.date,
-          // A mailbox is nobody's team material. See the doc comment above.
-          shelf: "private",
+          // A mailbox is nobody's team material — EXCEPT the one shape that
+          // is not somebody's own correspondence at all: Google Meet's own
+          // auto-generated notes, addressed to "invited guests in your
+          // organization" rather than written by the person whose inbox it
+          // landed in. Owner's ruling, 18 Sep 2026 — see `isCallNotesEmail`'s
+          // own header for the shape and the two-signal reasoning.
+          shelf: isCallNotesEmail(first.subject, first.snippet) ? "team" : "private",
           ownerUserId: guard.userId,
           accountId,
           accounts,
