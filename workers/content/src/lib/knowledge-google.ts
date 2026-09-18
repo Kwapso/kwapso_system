@@ -1582,7 +1582,23 @@ export function googleIngestKinds(
       // nothing while reporting itself caught up — chat measured exactly
       // this on 20 Aug 2026 (`read: 1, indexed: 1, caughtUp: true` against
       // five spaces holding fifty messages each) when it made the same move.
-      textVersion: 2,
+      //
+      // 3 SINCE 18 SEP 2026 — SAME REASONING, A DIFFERENT MOVE. The owner's
+      // ruling that day (`isCallNotesEmail`, google-read.ts) flips `shelf`
+      // for a Google Meet notes email from `private` to `team` by default —
+      // but `shelf` is decided at the READ, and an already-caught-up cursor
+      // (a `null`/empty cursor means "see everything Google holds,
+      // unbounded", per this kind's own `read()` comment on `liveSince`)
+      // never revisits mail it has already walked past. Without the bump,
+      // every Meet-notes email filed before today keeps the OLD
+      // `private` sighting the old default wrote, for ever — the ruling
+      // would only ever reach new mail from today onward, silently leaving
+      // every existing one behind exactly the way the 10 Sep move's own
+      // comment describes. `writeSightings`'s upsert (knowledge-google.ts,
+      // `ON CONFLICT (source_id, seen_where, seen_by_user_id)`) is what
+      // actually flips an existing row's `shelf` once the cursor walks it
+      // again — the bump's only job is making sure that walk happens.
+      textVersion: 3,
       read: async (_cfg, _guard, cursor, limit) => {
         const toRows = (items: GoogleItem[]) =>
           items.map((item) => ({
