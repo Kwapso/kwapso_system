@@ -198,7 +198,7 @@ describe("app-shell.tsx hands the trail to that slot as a bare node", () => {
     // carries (`mx-auto` + `flex` + `w-full` + `max-w-none` + `min-h-full` +
     // `overflow-x-clip`), never by a line number, which rots the moment a
     // comment above it grows or shrinks.
-    const marker = "mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip"
+    const marker = "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip" // R89 footer-on-the-edge, 18 Sep 2026
     const markerAt = src.indexOf(marker)
     expect(markerAt, "app-shell.tsx must still carry the screen-shell body's own content wrapper").toBeGreaterThan(-1)
     // Bound the search at the div's own opening tag, from the `<div` before
