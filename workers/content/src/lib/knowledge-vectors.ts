@@ -256,6 +256,48 @@ async function twice<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** BUILD-5 §J (18 Sep 2026), report open item 4. `RATE_LIMITED` NAMES THE ONE
+ * FAILURE `twice()`'s IMMEDIATE RETRY CANNOT FIX, BY CONSTRUCTION: retrying a
+ * request that failed because the last few hundred milliseconds already sent
+ * too many, with no gap between the two attempts, lands inside the SAME
+ * window and is close to certain to fail again for the identical reason —
+ * observed live, `VECTOR_DELETE_ERROR` (code 40041, "Too Many Requests") on
+ * deactivated, zero-chunk sources during a heavy concurrent rebuild.
+ * `clearIndex` always includes the record's own cover vector in the delete
+ * batch, even at `chunk_count = 0`, so the call is never truly empty — "skip
+ * a delete with nothing in it" does not apply here; the fix is giving the
+ * SAME retry a chance to land outside the window that just rejected it. */
+const RATE_LIMITED = /too many requests|\b429\b|\b40041\b/i
+
+/** ONE IMMEDIATE RETRY, THEN — ONLY IF THAT SECOND FAILURE STILL READS AS A
+ * RATE LIMIT — ONE MORE AFTER A SHORT PAUSE. Bounded on purpose, the same
+ * reasoning `twice`'s own header gives against a backoff ladder: the caller
+ * is a bounded slice of a resumable job, so a delete that is rate-limited
+ * three times running is not a blip worth a worker's lifetime — the next
+ * sweep, or the next retire, will ask again. A pause is spent ONLY when the
+ * failure actually looks like the one thing a pause can fix; any other
+ * error surfaces immediately, exactly as `twice` already does. */
+async function thriceIfRateLimited<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (first) {
+    try {
+      return await run()
+    } catch (second) {
+      if (!RATE_LIMITED.test(String(second instanceof Error ? second.message : second))) throw second
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_BACKOFF_MS))
+      return await run()
+    }
+  }
+}
+
+/** Long enough that the SAME short rate-limit window the second attempt just
+ * hit has passed; short enough that a source stuck in `clearIndex` for this
+ * is still faster than waiting for the next 15-minute sweep. Not measured
+ * against Vectorize's own published window (undocumented) — a round, safe
+ * guess, and the bound above is what keeps a wrong guess cheap either way. */
+const RATE_LIMIT_BACKOFF_MS = 500
+
 /** Put vectors in. Batched, and each batch retried once — a partial upsert is
  * survivable (the source's content hash is only stamped when the whole index
  * succeeded, so the next sweep redoes it) but a lost batch that nobody retries
@@ -293,7 +335,7 @@ export async function deleteVectors(env: Env, ids: string[]): Promise<void> {
     // longer holds, and R26's guarantee is that the index only ever NARROWS —
     // a stale id costs a lookup that finds nothing, which is a wasted slot in
     // an answer rather than a leak, but it does not heal on its own.
-    await twice(() => env.KNOWLEDGE_INDEX.deleteByIds(batch))
+    await thriceIfRateLimited(() => env.KNOWLEDGE_INDEX.deleteByIds(batch))
   }
 }
 
