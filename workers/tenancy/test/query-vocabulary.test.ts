@@ -80,6 +80,14 @@ async function ask(qs: string): Promise<{ status: number; body: Record<string, u
   return { status: res.status, body: JSON.parse(await res.text()) as Record<string, unknown> }
 }
 
+async function askDescribe(module: string): Promise<{ status: number; body: Record<string, unknown> }> {
+  const request = new Request(`https://tenancy/api/tenancy/query/describe?module=${module}`, {
+    headers: { Cookie: "session=x" },
+  })
+  const res = await worker.fetch(request, makeEnv(() => holder.db as DatabaseSync, IDS.staffUser))
+  return { status: res.status, body: JSON.parse(await res.text()) as Record<string, unknown> }
+}
+
 describe("query-vocabulary: the rows come back in the names the grammar published", () => {
   it("no row carries a key that is not a declared field name", async () => {
     const offenders: string[] = []
@@ -114,6 +122,45 @@ describe("query-vocabulary: the rows come back in the names the grammar publishe
     const rows = (r.body.records ?? []) as Record<string, unknown>[]
     expect(rows.length, "the accounts fixture must really have rows").toBeGreaterThan(0)
     expect(Object.keys(rows[0]).sort()).toEqual(["accountType", "id", "name"])
+  })
+})
+
+describe("query-vocabulary: a RETIRED vocabulary value a real row still holds is not a disagreement", () => {
+  // Reproduced live on staging, 2026-09-18: `describe_module` for `apps` and
+  // `query_records`'s own where-filter both reported a stale `stage` enum
+  // missing "Maintenance"/"Completed", while 18 of 28 real apps (64%) carried
+  // exactly those two words — both deactivated on the "App stage" dropdown
+  // (deactivate-never-delete: shared/app-stages.ts's own header says a
+  // retired name keeps living on the row it was already set on). `stage` was
+  // declared a fixed `values:` enum instead of the `vocabulary:` seam
+  // `helpType`/`sprintType`/`country` already use, and the describe door's
+  // own vocabulary read filtered `deactivated_at IS NULL`, which hid the
+  // retired words from BOTH tools the same way.
+  it("a deactivated App stage value that an app still carries is in describe_module's list and matches a filter", async () => {
+    db().exec(`
+      INSERT INTO selectable_data (id, type, value, is_default, created_at, deactivated_at)
+        VALUES ('SD_RETIRED_STAGE', 'App stage', 'Maintenance', 0, '2026-01-01', '2026-06-01');
+      INSERT INTO apps (id, name, stage, created_at)
+        VALUES ('APP_RETIRED_STAGE', 'Legacy portal', 'Maintenance', '2026-01-01');
+    `)
+
+    const described = await askDescribe("apps")
+    expect(described.status).toBe(200)
+    const stageField = (described.body.fields as { name: string; values?: string[] }[]).find(
+      (f) => f.name === "stage"
+    )
+    expect(
+      stageField?.values,
+      `describe_module must report every word a real app can hold, retired or not: ${JSON.stringify(stageField)}`
+    ).toContain("Maintenance")
+
+    const filtered = await ask(
+      `?module=apps&where=${encodeURIComponent(JSON.stringify([{ field: "stage", op: "eq", value: "Maintenance" }]))}`
+    )
+    expect(filtered.status, "a real, if retired, value must never be refused as invalid").toBe(200)
+    const rows = (filtered.body.records ?? []) as { id: string }[]
+    expect(rows.map((r) => r.id)).toContain("APP_RETIRED_STAGE")
+    expect(filtered.body.unmatched, "a value the vocabulary still knows is not a misspelling").toBeUndefined()
   })
 })
 

@@ -42,7 +42,6 @@
 // comes back empty every time. Delete the allow-list check and that suite goes
 // red — which is the only kind of check worth having.
 
-import { APP_STAGES } from "../app-stages"
 import { MODULE_ICON_NAMES } from "../module-icons"
 import { DELIVERABLE_KINDS } from "../selectable-groups"
 import { HELP_STATUSES, RETIRED_HELP_STATUSES, STORY_STATUSES } from "../types"
@@ -367,8 +366,6 @@ const ACCOUNT: QueryField = {
   note: "the client this belongs to",
 }
 const APP: QueryField = { name: "appId", column: "app_id", type: "id", ref: "apps" }
-
-const APP_STAGE_NAMES = APP_STAGES.map((s) => s.name)
 
 /* -------------------------------- the modules -------------------------------- */
 
@@ -836,7 +833,23 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "name", column: "name", type: "text" },
       { name: "url", column: "url", type: "text" },
-      { name: "stage", column: "stage", type: "enum", values: APP_STAGE_NAMES },
+      // A TEAM-EDITABLE VOCABULARY, not a fixed enum — `shared/app-stages.ts`'s
+      // own header says so: the eight names there are the CURRENT picker
+      // choices, seeded into the "App stage" dropdown group, and a retired
+      // name (Documentation, Iteration, Maintenance, Completed) is deactivated
+      // there rather than deleted, because deactivate-never-delete means an
+      // app already sitting in one keeps that exact word. `values:
+      // APP_STAGE_NAMES` reported only the eight current names and refused
+      // every retired one outright — reproduced live on staging 2026-09-18,
+      // 18 of 28 apps (64%) sitting in "Maintenance" or "Completed": both
+      // `describe_module` and this field's own where-filter disagreed with
+      // the team's real data the exact way R9/R19 exist to prevent. The
+      // `vocabulary` seam already reads BOTH active and deactivated rows for
+      // exactly this reason (getQueryDescribe in workers/tenancy/src/routes/
+      // query.ts) and skips static-enum refusal for a vocabulary field
+      // (query-engine.ts), the same shape `helpType`/`sprintType`/`country`
+      // already use below.
+      { name: "stage", column: "stage", type: "enum", vocabulary: "App stage" },
       { name: "about", column: "about", type: "text", bulky: true },
       ACCOUNT,
       CREATED,
