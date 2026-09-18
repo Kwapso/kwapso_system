@@ -174,6 +174,17 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
   // The team's own words for the fields that have them. ONE bounded read for all
   // of them (R14: LIST_HARD_CAP), not one per field — a module declares at most a
   // handful of vocabularies and this door is called once per question.
+  //
+  // ACTIVE AND DEACTIVATED ALIKE — deliberately, and it is the fix for a real
+  // disagreement: a vocabulary is DEACTIVATE-NEVER-DELETE, same as every other
+  // door in this app, so a retired word is still a word a live row can hold
+  // (`shared/app-stages.ts`'s own header: an app already sitting in a retired
+  // stage keeps that exact word). This question is "what could a row hold",
+  // never "what could a NEW row be set to" — that second, narrower question is
+  // the create form's own picker, a different door with a different filter.
+  // Reproduced live on staging 2026-09-18: filtering `deactivated_at IS NULL`
+  // hid "Maintenance"/"Completed" from `describe_module` even though 18 of 28
+  // real apps (64%) carry exactly those two words.
   const groups = [...new Set(mod.fields.map((f) => f.vocabulary).filter((v): v is string => !!v))]
   const vocab = new Map<string, string[]>()
   if (groups.length) {
@@ -181,7 +192,7 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
       cfg,
       guard.databaseId,
       `SELECT type, value FROM selectable_data
-        WHERE deactivated_at IS NULL AND type IN (${groups.map(() => "?").join(", ")})
+        WHERE type IN (${groups.map(() => "?").join(", ")})
         ORDER BY value LIMIT ${LIST_HARD_CAP}`,
       groups
     )
