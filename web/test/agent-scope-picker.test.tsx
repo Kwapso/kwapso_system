@@ -22,7 +22,7 @@ describe("AgentScopePicker", () => {
     expect(screen.getByText("Picks up the record you're viewing")).toBeTruthy()
     expect(screen.getByText("Knowledge")).toBeTruthy()
     expect(screen.getByText("Articles and indexed files")).toBeTruthy()
-    expect(screen.getByText("Everything (today's default)")).toBeTruthy()
+    expect(screen.getByText("Everything")).toBeTruthy()
     expect(screen.getByText("All six sources, untick later")).toBeTruthy()
   })
 
@@ -31,7 +31,7 @@ describe("AgentScopePicker", () => {
     expect(screen.queryByText("This record")).toBeNull()
     // The other two still draw — the task's rule is narrow, about ONE row.
     expect(screen.getByText("Knowledge")).toBeTruthy()
-    expect(screen.getByText("Everything (today's default)")).toBeTruthy()
+    expect(screen.getByText("Everything")).toBeTruthy()
   })
 
   it("each row hands back its own scope, exactly once", () => {
@@ -39,7 +39,7 @@ describe("AgentScopePicker", () => {
     render(<AgentScopePicker hasRecord onPick={(s) => picks.push(s)} />)
     fireEvent.click(screen.getByText("This record"))
     fireEvent.click(screen.getByText("Knowledge"))
-    fireEvent.click(screen.getByText("Everything (today's default)"))
+    fireEvent.click(screen.getByText("Everything"))
     expect(picks).toEqual(["record", "knowledge", "everything"])
   })
 })

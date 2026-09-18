@@ -33,6 +33,7 @@ import { IconPicker } from "@/components/records/icon-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 import { DEFAULT_MODULE_ICON, MODULE_ICON_NAMES } from "@shared/module-icons"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 /** One field on the form. `kind` decides the control; `options` turns a text
  * input into a pick-or-create one (a datalist, so typing past the list is
@@ -51,6 +52,15 @@ export type InternalField = {
   placeholder?: string
   options?: string[]
   required?: boolean
+  /** THIS FIELD IS A TITLE (R87, RULES.md) — caps at `TITLE_MAX_CHARS`
+   * (shared/types.ts) with a live "N / 50" counter, the same shape every
+   * dedicated `*-form-dialog.tsx` gives its own title/name field
+   * (`web/test/title-length.test.ts`). Named per-field rather than assumed
+   * from `kind: "text"`, because this one form's other `name` fields
+   * (`brandAssetFields`, `deliverableFields`'s "Title", `clientDepartmentFields`,
+   * `clientRoleFields`, `clientToolFields`) sit outside R87's own worked
+   * examples and stay uncapped — only `moduleFields()`'s "Name" sets it. */
+  titleCap?: boolean
   /** `kind: "file"` and `kind: "link"` only — post the bytes and answer with the
    * URL to store. It lives on the FIELD rather than on the dialog because each
    * upload door is gated on the module that owns the thing being uploaded, and
@@ -128,9 +138,19 @@ export function InternalRecordDialog({
         return (
           <Field
             key={f.key}
-            config={{ ...defaultFieldConfig, label: f.label, required: !!f.required }}
+            config={{
+              ...defaultFieldConfig,
+              label: f.label,
+              required: !!f.required,
+              // R87 (title-length, RULES.md) — the same shape every dedicated
+              // `*-form-dialog.tsx` gives its own title field.
+              ...(f.titleCap
+                ? { validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS } }
+                : null),
+            }}
             htmlFor={id}
             className={fieldSpacing}
+            {...(f.titleCap ? { count: (values[f.key] ?? "").length, countMax: TITLE_MAX_CHARS } : null)}
           >
             {f.kind === "file" && f.upload ? (
               <FilePicker
@@ -192,6 +212,7 @@ export function InternalRecordDialog({
                   placeholder={f.placeholder ? t(f.placeholder) : undefined}
                   disabled={busy}
                   autoFocus={i === 0}
+                  {...(f.titleCap ? { maxLength: TITLE_MAX_CHARS } : null)}
                 />
                 {listId && (
                   <datalist id={listId}>
@@ -290,7 +311,13 @@ export const deliverableFields = (kinds: string[]): InternalField[] => [
  * labels are translated on the way to the screen by shared/web/field.tsx, which
  * is why they are bare here. */
 export const moduleFields = (): InternalField[] => [
-  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Settings" },
+  // R87 (title-length, RULES.md): a module's name is a title-shaped field —
+  // it draws in the same one-line gallery card title every other title on
+  // the app clamps (`GalleryCard`, R87's own render seam) — so it carries the
+  // same `TITLE_MAX_CHARS` ceiling and live counter the dedicated
+  // `*-form-dialog.tsx` title fields do, and the door refuses the same 50
+  // positionally (`workers/tenancy/src/routes/processes.ts`).
+  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Settings", titleCap: true },
   // THE GALLERY CARD'S OWN ICON — client's ruling, 17 Sep 2026: "when I add a
   // module, I should be able to select an icon for it." A grid, not a text
   // field: `IconPicker` (web/components/records/icon-picker.tsx) offers the

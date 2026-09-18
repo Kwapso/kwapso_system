@@ -36,6 +36,7 @@ import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { GuardError, type MemberGuard } from "../lib/permissions"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import {
@@ -122,7 +123,7 @@ export async function postCreateWave(request: Request, env: Env): Promise<Respon
   }>(request, env, "work", "create")
   const scope = await agencyScope(cfg, guard)
   const accountId = requireText(body.accountId, "Client", TEXT_LIMITS.short)
-  const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(body.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(body.goal, "What it's for", TEXT_LIMITS.long) ?? null
   const appId = optionalText(body.appId, "App", TEXT_LIMITS.short) ?? null
   const { id } = await createWave(cfg, guard, scope, actor, { accountId, name, goal, appId })
@@ -145,7 +146,7 @@ export async function postUpdateWave(request: Request, env: Env): Promise<Respon
   }>(request, env, "work", "update")
   const scope = await agencyScope(cfg, guard)
   const id = requireText(body.id, "Id", TEXT_LIMITS.short)
-  const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(body.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(body.goal, "What it's for", TEXT_LIMITS.long) ?? null
   // TRI-STATE, the same shape `updateAccount`'s own `accountManagerUserId`
   // takes (workers/tenancy/src/routes/accounts.ts): absent key = leave the

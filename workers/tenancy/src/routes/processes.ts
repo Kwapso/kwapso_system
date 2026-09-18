@@ -23,6 +23,7 @@
 
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { imageFieldLimit, optionalMark, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { MODULE_ICON_NAMES } from "@shared/module-icons"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -153,7 +154,7 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "processes", "create")
   const scope = await refusePortalCaller(cfg, guard)
   const id = await createApp(cfg, guard, scope, actor, {
-    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    name: requireText(body.name, "Name", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     accountId: optionalText(body.accountId, "Account", TEXT_LIMITS.short),
     url: optionalText(body.url, "Address", TEXT_LIMITS.link),
     stage: optionalText(body.stage, "Stage", TEXT_LIMITS.short),
@@ -253,7 +254,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "App", TEXT_LIMITS.short)
   const { supersededUrls } = await updateApp(cfg, guard, scope, actor, id, {
-    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    name: requireText(body.name, "Name", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     // Absent means "say nothing"; sent-and-empty means "clear it" — the patch
     // rule the accounts door learned the hard way (an edit that erased what it
     // was not asked about).
@@ -365,7 +366,7 @@ export async function postCreateAppModule(request: Request, env: Env): Promise<R
     return fail(400, "invalid_input", "Icon isn't one of the ones on offer.")
   const id = await createAppModule(cfg, guard, scope, actor, {
     appId: requireText(body.appId, "App", TEXT_LIMITS.short),
-    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    name: requireText(body.name, "Name", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     // R20: "Mark", not "Emoji" — the field's own UI label dropped the word on
     // 2026-08-31 (internal-record-dialog.tsx's moduleFields), and optionalMark
     // is what actually enforces "no emoji" now, the same guard selectable.ts
@@ -398,7 +399,7 @@ export async function postUpdateAppModule(request: Request, env: Env): Promise<R
   )
     return fail(400, "invalid_input", "Icon isn't one of the ones on offer.")
   await updateAppModule(cfg, guard, scope, actor, id, {
-    name: requireText(body.name, "Name", TEXT_LIMITS.short),
+    name: requireText(body.name, "Name", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     // R20: "Mark", not "Emoji" — the field's own UI label dropped the word on
     // 2026-08-31 (internal-record-dialog.tsx's moduleFields), and optionalMark
     // is what actually enforces "no emoji" now, the same guard selectable.ts

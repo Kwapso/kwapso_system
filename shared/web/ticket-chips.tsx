@@ -66,25 +66,30 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * STILL A LINK, because navigating to the app was the whole reason she asked
  * for these to be clickable in the first place, and it is UNDERLINED now too
  * — client ruling, 18 Sep 2026, verbatim, naming this exact chip: "when its a
- * link make it underlined (for exmaple the app name)." `Badge` DID take no
- * `asChild` until the kit's v1.2.118 — that pin is stale, see
- * `shared/ui/VERSION.json` — and this component's own anchor-wraps-badge
- * shape was written for exactly that gap: `AppLink` wraps a plain `<Badge>`
- * rather than the badge becoming the link.
+ * link make it underlined (for exmaple the app name)." THE BADGE IS THE LINK:
+ * `<Badge asChild><AppLink>…</AppLink></Badge>`, the shape `badge.tsx`'s own
+ * docs name, so the kit's own `LINK_UNDERLINE` draws the underline and this
+ * file names no decoration at all. Radix `Slot` merges the badge's classes,
+ * `data-slot="badge"` and ref onto `AppLink`'s real anchor — which is why
+ * `AppLink` has to spread the props it does not name (see its prop doc,
+ * below): a link component that only forwarded `className` would drop the
+ * `data-slot` every chip census in `web/test/` counts by.
  *
- * IT STILL DOES, and that is a FILED KIT DEFECT rather than a choice — see
- * the render's own comment, one screen down, for the reproduction. `asChild`
- * (the shape the ruling names, `<Badge asChild><AppLink>…</AppLink></Badge>`)
- * throws inside Radix `Slot` on every Badge that does not also pass `icon`
- * and `dot`, because `Badge`'s own render always spends three JSX child
- * SLOTS on its root element regardless of whether `icon`/`dot` are given, and
- * `Slot` demands exactly one. `shared/ui/` is never hand-edited from this
- * repo (CLAUDE.md: "kit changes live in the kit repo only"), so the
- * underline is drawn by hand here instead, copying `badge.tsx`'s own
- * `LINK_UNDERLINE` constant character for character rather than reinventing
- * it — the day `asChild` is fixed upstream and the kit is re-pulled,
- * swapping back changes zero pixels. The black `#ref` chip stays the only
- * `variant="inverse"` lozenge in the row either way.
+ * IT WAS NOT ALWAYS THIS SHAPE. `Badge` took no `asChild` until kit v1.2.116,
+ * and when this file first tried it (v1.2.118) it THREW — "Slot failed to
+ * slot onto its children" — because `Badge`'s render always spent three JSX
+ * child slots (icon, dot, label) and `React.Children.count` counts a `null`
+ * placeholder like an element, so `Slot` never saw the one child it demands.
+ * Nobody in the app had called `<Badge asChild>` before, so the kit shipped
+ * the path untested. `shared/ui/` is never hand-edited from this repo
+ * (CLAUDE.md: "kit changes live in the kit repo only"), so for one tag this
+ * file drew the underline by hand (`AppLink` wrapping a plain `<Badge>` with
+ * `badge.tsx`'s own `LINK_UNDERLINE` string copied in) and filed the defect.
+ * Kit v1.2.121 fixed it — the label sits in Radix's `Slottable` under
+ * `asChild`, and `check-badge.mjs` now MOUNTS that shape rather than grepping
+ * for it — and this file swapped back the same day. Zero pixels changed.
+ * The black `#ref` chip stays the only `variant="inverse"` lozenge in the
+ * row either way.
  *
  * ── THE DATE CHIP IS RETIRED, 17 SEP 2026 ───────────────────────────────────
  *
@@ -270,9 +275,15 @@ export function TicketChips({
    * routing on either front door. No app chip renders without both this and
    * `ticket.appId`/`ticket.appName`. */
   appHref,
-  /** The in-app link component to wrap the app chip's badge in — `InAppLink`
+  /** The in-app link component the app chip's badge renders AS — `InAppLink`
    * on the agency side today. See the header comment for why this is a prop
-   * and not an import. */
+   * and not an import. It sits inside `<Badge asChild>`, so at runtime Radix
+   * `Slot` hands it MORE than this type names — the badge's own `className`,
+   * `data-slot="badge"`, `data-dot` and ref, merged in — and the component
+   * must spread those onto its real anchor (Radix's own `asChild` contract,
+   * stated in `badge.tsx`'s `asChild` prop doc). `InAppLink` does; a
+   * replacement that only forwards `className` would render a chip with no
+   * `data-slot` and no fill. */
   AppLink,
 }: {
   ticket: TicketChipFacts
@@ -319,61 +330,25 @@ export function TicketChips({
         {ticket.helpType ?? "—"}
       </Badge>
       {ticket.appId && ticket.appName && safeAppHref && (
-        <AppLink
-          href={safeAppHref}
-          // NO RING OF ITS OWN — the focus ring is ONE rule in the kit's own
-          // stylesheet and nothing focusable may restate it or suppress the
-          // outline. The radius is here only so the shared ring follows the
-          // lozenge it wraps instead of drawing a rectangle around it.
-          //
-          // `inline-flex items-center` IS AN ALIGNMENT FIX, and worth naming.
-          // `AppLink` is a BARE `<a>` — `in-app-link.tsx` forwards `className`
-          // onto the anchor and adds nothing — so with only `rounded-pill` it
-          // stayed an INLINE box. An inline anchor's height is its LINE BOX,
-          // not its content, so it stood taller than the badge inside it, and
-          // the row's own `items-center` dutifully centred that taller box —
-          // leaving this one chip sitting low while the three beside it sat
-          // true. Client: "what's wrong with alignment chips??"
-          //
-          // Making the anchor a flex box collapses it onto the badge it wraps,
-          // so what gets centred is the chip rather than a line box around it.
-          className="inline-flex items-center rounded-pill"
-        >
-          {/* THE UNDERLINE IS APP-SIDE, NOT THE KIT'S, AND THAT IS A FILED
-              KIT DEFECT, NOT A CHOICE. Client ruling, 18 Sep 2026, verbatim,
-              naming this exact chip: "when its a link make it underlined
-              (for exmaple the app name)." `badge.tsx` (v1.2.118, pinned —
-              `shared/ui/VERSION.json`) added `asChild` for precisely this,
-              drawing its own `LINK_UNDERLINE` the moment a badge carries
-              `asChild` or `href` — the shape the ruling names and the shape
-              tried here first: `<Badge asChild><AppLink>…</AppLink></Badge>`.
-              IT THROWS. `Badge`'s own render always passes THREE children
-              into its root element — `{icon ? … : null}`, `{dot ? … : null}`,
-              `{label}` — even when `icon`/`dot` are never passed, because
-              those are three JSX expression SLOTS, not a conditional count;
-              `asChild` turns that root into a Radix `Slot`
-              (`@radix-ui/react-slot`, pinned 1.2.5), which requires
-              `React.Children.count(children) === 1` — and `Children.count`
-              counts a `null` placeholder same as a real element (proved live,
-              `node -e "React.Children.count([null,null,<span/>])"` → 3), so
-              `asChild` throws `"Slot failed to slot onto its children"` on
-              EVERY Badge that does not pass BOTH `icon` and `dot`, this one
-              included — confirmed the hard way, red across
-              `ticket-detail-no-tabs.test.tsx` and four sibling suites the
-              moment this file tried it. Nobody else in the app has ever
-              called `<Badge asChild>` (grepped clean before this pass), so
-              the path was untested since it shipped. THIS IS A KIT BUG, not
-              an app-side mistake, and `shared/ui/` is never hand-edited here
-              — CLAUDE.md's own rule, "kit changes live in the kit repo
-              only." So the underline is drawn by hand, matching `badge.tsx`'s
-              own `LINK_UNDERLINE` constant CHARACTER FOR CHARACTER
-              (`underline underline-offset-[0.1875rem]`) rather than
-              reinvented, so the day `asChild` is fixed upstream and pulled,
-              swapping back to it changes zero pixels. */}
-          <Badge variant="secondary" size="pill" className="underline underline-offset-[0.1875rem]">
-            {ticket.appName}
-          </Badge>
-        </AppLink>
+        /* THE BADGE IS THE ANCHOR — `asChild` hands the badge's classes,
+           `data-slot="badge"`, `data-dot` and ref to `AppLink`'s real `<a>`
+           through Radix `Slot`, and the kit's own `LINK_UNDERLINE` draws the
+           underline the client ruled on (18 Sep 2026, "when its a link make
+           it underlined (for exmaple the app name)"). No `className` on
+           `AppLink` any more: the alignment fix the old anchor-wraps-badge
+           shape needed (`inline-flex items-center`, so an inline anchor's
+           line box did not stand taller than the badge inside it — client:
+           "what's wrong with alignment chips??") is moot when the anchor IS
+           the badge and carries the badge's own `inline-flex … h-[…]`
+           classes, and the radius the shared focus ring follows is the
+           badge's own `rounded-pill` on the same element. This shape threw
+           on kit v1.2.118–120 and was swapped back in on v1.2.121 — the
+           header tells that story; `check-badge.mjs` section 6 in the kit
+           renders exactly this shape headlessly so it cannot regress
+           silently again. */
+        <Badge asChild variant="secondary" size="pill">
+          <AppLink href={safeAppHref}>{ticket.appName}</AppLink>
+        </Badge>
       )}
     </span>
   )

@@ -1321,6 +1321,44 @@
      brand unit, so these are the CSS side of the same numbers and not a
      second, drifting set. Geometry, not colour: nothing here flips in dark. */
   --folder-lip:            1.905rem;   /* 30.48  lip height = shoulder drop  */
+  /* THE SHARED ALIGNMENT BAND — RULED 18 SEP 2026, v1.2.122, OVER THE RAIL
+     BRAND ROW'S OWN MISALIGNMENT (see `rail.tsx`'s `rail-brand` block).
+
+     `--folder-lip` is a SHAPE measurement: chapter 14's own "tab shoulder
+     30.48px lip", derived from the SVG slice geometry three comments up. It
+     was also, separately, being multiplied and subtracted from in THREE
+     unrelated files to answer one question none of them names: "where does
+     the band a control may occupy, level with the tab strip's own label,
+     start and end?" — `breadcrumb-folders.tsx`'s close control
+     (`top-[calc((var(--folder-lip)_-_var(--control-height-pill))_/_2)]`),
+     `screen-shell.tsx`'s assistant edge-handle (`top-[var(--shell-gutter)]
+     size-[var(--folder-lip)]`), and `rail.tsx`'s brand mark, which computed
+     the SAME band's centre by hand — `--shell-gutter + --folder-lip/2 -
+     --icon-20/2 - --rail-inset` — instead of reading it as a band. Three
+     readings of one fact, and the rail's was the one that also depended on
+     the MARK'S OWN HEIGHT (`--icon-20`) staying in lock-step with the shape
+     it was centring inside, which is the term that let it drift: the client
+     measured a 10px miss in the kit's own harness and an 8.65px miss on the
+     live app at a different root size, neither of which a purely
+     arithmetic, rem-based offset should produce — the fragility was the
+     CALCULATION depending on four independently-editable tokens, not any one
+     of their values.
+
+     `--strip-row` is the name for the BAND, not the shape: same value as
+     `--folder-lip` today (nothing about the geometry changed), but a
+     consumer that wants "the box the tab strip's own label is centred in"
+     now says so, rather than reaching for the shape token and re-deriving
+     the band's edges itself. A consumer places its OWN box at
+     `top: var(--shell-gutter)` (or the equivalent margin once its own
+     ambient inset, e.g. `--rail-inset`, is cancelled out), gives that box
+     `height: var(--strip-row)`, and centres its content with `items-center`
+     — never a margin computed from the content's own measured height. Two
+     boxes built this way share a centre line BY CONSTRUCTION, at any root
+     size and under any independent override of `--shell-gutter` or
+     `--rail-inset`, because neither box's centre is ever computed — it falls
+     out of `top + height/2` the browser already does for every element.
+     See `rail.tsx`'s `rail-brand` block, the first consumer. */
+  --strip-row:             var(--folder-lip);
   --folder-shoulder:       1.845rem;   /* 29.52  the shoulder's own run,
                                                  148.29 - 129.84             */
   --folder-lip-width:     12.984rem;   /* 207.74 the slice's own flat lip    */

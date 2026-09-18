@@ -130,6 +130,7 @@ import type {
   KnowledgePassage,
   KnowledgeSource,
 } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import type { Env } from "../env"
 import { contextLineFor, type ReadKind } from "./source-readers"
 import { extractLink } from "./knowledge-files"
@@ -1458,7 +1459,7 @@ function readInput(input: SourceInput): {
       "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
     )
   return {
-    title: requireText(input.title, "Title", TEXT_LIMITS.short),
+    title: requireText(input.title, "Title", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     body,
     sourceUrl,
     accountId: optionalText(input.accountId, "Account", TEXT_LIMITS.short) ?? null,

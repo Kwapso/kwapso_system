@@ -92,7 +92,7 @@
    ========================================================================= */
 
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot, Slottable } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
@@ -343,6 +343,19 @@ export interface BadgeProps
    * `asChild` is treated as a LINK for `LINK_UNDERLINE`, below, whether or
    * not its child is actually an anchor — the prop is the caller's own
    * declaration of intent, the same way `href` is.
+   *
+   * THE CHILD MUST BE EXACTLY ONE ELEMENT THAT SPREADS ITS PROPS — Radix's
+   * own `Slot` contract: the badge's classes, `data-slot`, `data-dot`, `href`
+   * and ref are MERGED onto that element, so an app's own link component has
+   * to pass what it does not name straight through to its anchor, or the
+   * chip loses its `data-slot="badge"` and its fill. A `dot` or `icon` given
+   * beside `asChild` lands INSIDE the child, before the label (the child IS
+   * the badge; its leading mark belongs in it) — this is `Slottable` at
+   * work, see the render's own comment. Until 18 Sep 2026 this prop threw
+   * on every real call, because the render always spent three child slots
+   * and `Slot` demanded one; `check-badge.mjs` section 6 now MOUNTS this
+   * shape rather than reading the source for it, so a regression here is a
+   * red check and never again a runtime throw the app finds first.
    */
   asChild?: boolean;
   /**
@@ -593,7 +606,35 @@ const Badge = React.forwardRef<HTMLSpanElement | HTMLAnchorElement, BadgeProps>(
             className={cn("size-[var(--dot-status)] shrink-0 rounded-pill", DOT_FILL[dot])}
           />
         ) : null}
-        {label}
+        {asChild ? (
+          /* THE LABEL IS THE SLOT TARGET WHEN `asChild` — and only then.
+             Radix `Slot` needs to find ONE element to merge this badge's
+             props onto, and this render always writes three child
+             expressions (icon, dot, label), two of which are `null` placeholders
+             on a plain link chip. `React.Children.count` counts a `null` the
+             same as an element (proved live 18 Sep 2026: `count([null, null,
+             <a/>])` → 3), so without this wrapper `Slot` saw three children on
+             EVERY `asChild` badge and threw "Slot failed to slot onto its
+             children" — even with `icon` AND `dot` given, because three real
+             elements are still not one. `Slottable` is Radix's own answer to
+             exactly this shape (a Button with a leading glyph beside `asChild`
+             children): `Slot` takes the element inside it as the target, and
+             the siblings outside it — the icon and dot spans above — become
+             that element's own leading children. So `<Badge asChild
+             icon={g}><Link>App</Link></Badge>` renders `<a class="…badge…">
+             <span data-slot="badge-icon">g</span>App</a>`: one anchor, the
+             mark inside it, the label after. Wrapped ONLY under `asChild`,
+             so the other 59 call sites pay no extra component layer, and a
+             non-element `label` (a string, a `count`) under `asChild` still
+             fails Radix's own contract loudly rather than being silently
+             swallowed. Nobody in the app had ever called `<Badge asChild>`
+             (the first real call site, `shared/web/ticket-chips.tsx`'s
+             app-name chip, is what surfaced this), which is why
+             `check-badge.mjs` section 6 now renders this path for real. */
+          <Slottable>{label}</Slottable>
+        ) : (
+          label
+        )}
       </Comp>
     );
   },

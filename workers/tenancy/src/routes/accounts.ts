@@ -25,6 +25,7 @@ import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { isRareAccountToken } from "@shared/workers/account-rarity"
 import { clientUserIds } from "@shared/workers/record-link"
 import type { PortalUser } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
   ACCOUNT_SORTS,
@@ -387,7 +388,7 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
   const accountType = requireText(body.accountType, "Type", TEXT_LIMITS.short)
   if (accountType !== "entity" && accountType !== "individual")
     return fail(400, "invalid_input", "An account is either a company or a person.")
-  const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(body.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const fields = accountFields(body)
   // 0091: the SHAPE first, at the call site (R20) — then, only for a real id,
   // that it names a current staff member (requireStaffMember's own header).
@@ -498,7 +499,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   )
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
-  const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(body.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const patch = accountPatch(body)
   // TRI-STATE (0086): "unreviewed" (the default), "allow" (bypasses the
   // rarity gate), "deny" (refuses to narrow on this word at all, beating

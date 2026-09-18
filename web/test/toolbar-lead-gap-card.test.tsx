@@ -1249,3 +1249,128 @@ describe("R83 -- a toolbar never gets its own container, only the content card's
     expect(clean.length, "the by-name resolution must still find the card clean").toBeGreaterThan(0)
   })
 })
+
+// ============================================================================
+// THE BELOW GAP — TOOLBAR BOTTOM TO THE FIRST VISIBLE ROW, MEASURED 16px ON
+// EVERY TICKETS TAB AGAINST THE RULED 10 (R49/ruling 7, "the 10pc above and
+// below, both in main and details").
+// ============================================================================
+// `<ToolbarRow>` (screen-bits.tsx) pays `--toolbar-content-gap` correctly, as
+// a real token reference on its own inner `data-slot="toolbar-row-column"`:
+// `mb-[var(--toolbar-content-gap)]`, so ruling 7's shrink to `--space-2h`
+// (10px) reached it automatically. `<PagedFind>` (paged-find.tsx) drew the
+// IDENTICAL two-box pinned shape by hand and never wired its own copy to the
+// token — its outer `data-slot="toolbar-row-pin"` carried a literal `pb-4`
+// (`--space-4`, 16px) instead, a number with no reference to
+// `--toolbar-content-gap` at all, so it never moved when the token did.
+// Every Tickets tab (List AND Board — All, Waiting, Open, Ready) draws
+// through `<PagedFind>`, so the table header row sat 16px under the toolbar
+// on all of them, measured live on staging (kit v1.2.120) — 6px over the
+// ruled 10.
+//
+// FIXED AT THE SOURCE, 18 Sep 2026 — paged-find.tsx now pays
+// `pb-[var(--toolbar-content-gap)]` directly on its own outer pin wrapper,
+// the same token `<ToolbarRow>` pays on its inner column, rather than the
+// globals.css-scoped `[data-slot="toolbar-row-pin"].pb-4` override that used
+// to reach the literal from outside. That override is deleted; it would now
+// be a no-op.
+// ============================================================================
+
+describe("the below gap — PagedFind's own pinned toolbar tracks --toolbar-content-gap, not a bare 16px", () => {
+  it("SOURCE: paged-find.tsx pays --toolbar-content-gap directly on its own pinned wrapper, no literal pb-4 left", () => {
+    const source = readFileSync(join(ROOT, "web", "components", "records", "paged-find.tsx"), "utf8")
+    expect(
+      source,
+      'paged-find.tsx must set pb-[var(--toolbar-content-gap)] on its data-slot="toolbar-row-pin" wrapper — the same token <ToolbarRow> pays directly, rather than a literal pb-4 relying on a CSS override to reach it'
+    ).toContain('pb-[var(--toolbar-content-gap)]')
+    expect(
+      source,
+      'paged-find.tsx must carry no bare "pb-4" any more — it was replaced by the token reference directly'
+    ).not.toMatch(/(?:^|[\s,"'`])pb-4(?:[\s,"'`]|$)/)
+  })
+
+  it('CSS: globals.css no longer carries the scoped [data-slot="toolbar-row-pin"].pb-4 override — the fix lives at the source now', () => {
+    const css = readFileSync(join(ROOT, "web", "app", "globals.css"), "utf8")
+    const overrideRule = /\[data-slot="toolbar-row-pin"\]\.pb-4\s*\{\s*padding-bottom:\s*var\(--toolbar-content-gap\)\s*;\s*\}/
+    expect(
+      css,
+      'web/app/globals.css must not carry the scoped [data-slot="toolbar-row-pin"].pb-4 override any more — paged-find.tsx pays the token directly now, so the override became a no-op and was deleted'
+    ).not.toMatch(overrideRule)
+  })
+
+  it("DOM: PagedFind's own pinned wrapper carries the token reference directly, the same one <ToolbarRow> pays", () => {
+    // Reproduced as a fixture, the same restraint every DOM proof in this
+    // file already takes for `<PagedFind>` (it needs a data door this suite
+    // does not stand up) — paged-find.tsx's own literal wrapper today:
+    // `<div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-[var(--toolbar-content-gap)]")}>`.
+    function PagedFindToolbarFixture() {
+      return (
+        <div data-slot="toolbar-row-pin" className={`${PINNED_TOOLBAR} pb-[var(--toolbar-content-gap)]`}>
+          <div data-slot="toolbar-row-column" className="flex min-w-0 flex-col bg-surface-raised rounded-pill">
+            <div data-slot="toolbar-row-track">the track</div>
+          </div>
+        </div>
+      )
+    }
+    render(<PagedFindToolbarFixture />)
+    const pin = document.querySelector('[data-slot="toolbar-row-pin"]') as HTMLElement
+    expect(pin, "PagedFind must render the pinned wrapper").toBeTruthy()
+    expect(
+      pin.className,
+      "the wrapper must carry the --toolbar-content-gap token reference directly, not a bare pb-4"
+    ).toContain("toolbar-content-gap")
+    expect(pin.className, "the wrapper must carry no bare pb-4 any more").not.toMatch(/(?:^|\s)pb-4(?:\s|$)/)
+    // AND THE INNER COLUMN STILL CARRIES NO mb-[var(--toolbar-content-gap)]
+    // OF ITS OWN — the outer pb- is the only payer, same as before.
+    const column = pin.querySelector('[data-slot="toolbar-row-column"]') as HTMLElement
+    expect(
+      column.className,
+      "PagedFind's own inner column must carry no --toolbar-content-gap margin of its own — the outer pb- is the only payer"
+    ).not.toContain("toolbar-content-gap")
+  })
+
+  it("DOM: <ToolbarRow>'s own pinned wrapper carries no pb-4 and no padding-bottom of its own — its gap lives on the CHILD's mb-", () => {
+    // screen-bits.tsx's own literal shape: `<div data-slot="toolbar-row-pin"
+    // className={PINNED_TOOLBAR}>` — no `pb-4`, no padding-bottom of its own
+    // at all — with the gap paid one element down, on
+    // `data-slot="toolbar-row-column"`'s own `mb-[var(--toolbar-content-gap)]`.
+    function ToolbarRowFixture() {
+      return (
+        <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+          <div
+            data-slot="toolbar-row-column"
+            className="flex min-w-0 flex-col bg-surface-raised rounded-pill mb-[var(--toolbar-content-gap)]"
+          >
+            <div data-slot="toolbar-row-track">the track</div>
+          </div>
+        </div>
+      )
+    }
+    render(<ToolbarRowFixture />)
+    const pin = document.querySelector('[data-slot="toolbar-row-pin"]') as HTMLElement
+    expect(pin, "ToolbarRow must render the pinned wrapper").toBeTruthy()
+    expect(pin.className, "ToolbarRow's own wrapper must carry no pb-4").not.toMatch(/(?:^|\s)pb-4(?:\s|$)/)
+    const column = pin.querySelector('[data-slot="toolbar-row-column"]') as HTMLElement
+    expect(column.className, "ToolbarRow's own gap must still live on the child's mb-").toContain(
+      "toolbar-content-gap"
+    )
+  })
+
+  it("RED PROOF: a bare pb-4 with no token reference does not read as today's fixed shape", () => {
+    function PreFixFixture() {
+      return (
+        <div data-slot="toolbar-row-pin" className={`${PINNED_TOOLBAR} pb-4`}>
+          <div data-slot="toolbar-row-column" className="flex min-w-0 flex-col bg-surface-raised rounded-pill">
+            <div data-slot="toolbar-row-track">the track</div>
+          </div>
+        </div>
+      )
+    }
+    render(<PreFixFixture />)
+    const pin = document.querySelector('[data-slot="toolbar-row-pin"]') as HTMLElement
+    expect(
+      pin.className,
+      "a bare pb-4 with no --toolbar-content-gap reference is the pre-fix shape, not today's"
+    ).not.toContain("toolbar-content-gap")
+  })
+})

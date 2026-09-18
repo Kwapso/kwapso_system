@@ -60,6 +60,7 @@ import { TRIAGE_AFTER_DAYS } from "./triage"
 import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import {
   BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_ATTACHMENT_CAP, TICKET_DASHBOARD_GROUP_CAP, TICKET_FACET_CAP
 } from "@shared/workers/limits"
@@ -2087,6 +2088,9 @@ export async function createTicket(
   // touch has already happened — it is us. A client's own question stays theirs
   // to correct until we read it.
   const lockedAt = scope.kind === "portal" ? null : now
+  // R87 (title-length, RULES.md): the door refuses a title over the same
+  // TITLE_MAX_CHARS the form caps its input at (shared/types.ts) — the
+  // positional discipline R20 already holds every other body field to.
   await d1ExecScript(
     cfg,
     guard.databaseId,
@@ -2101,7 +2105,7 @@ export async function createTicket(
     // together — shared/selectable-homes.ts says why that is not an update of
     // this fact.
     `INSERT INTO help (id, help_type, raised_as_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, module_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});
+VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TITLE_MAX_CHARS) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TITLE_MAX_CHARS) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});
 ` +
       // WHERE THE SEQUENCE STARTS (team migration 0066). The first stage event
       // rides INSIDE this script rather than following it, which is a property
@@ -2264,8 +2268,8 @@ export async function updateTicket(
       // An absent title means "leave it alone", not "blank it": the translate
       // door writes ONE of these two and must not erase the other, and a portal
       // form that only knows about its own language must not delete ours.
-      optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? before.title_de,
-      optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? before.title_en,
+      optionalText(input.titleDe, "German title", TITLE_MAX_CHARS) ?? before.title_de,
+      optionalText(input.titleEn, "English title", TITLE_MAX_CHARS) ?? before.title_en,
       appId,
       moduleId,
       raisedBy,

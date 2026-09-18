@@ -103,6 +103,8 @@ export function Field({
   shape: _shape = "input",
   className,
   children,
+  count,
+  countMax,
 }: {
   config: FieldConfig
   /** id of the input inside — wires the label's association. */
@@ -113,6 +115,16 @@ export function Field({
   shape?: FieldShape
   className?: string
   children: React.ReactNode
+  /** LIVE CHARACTER COUNT — R87 (title-length law, RULES.md). Straight through
+   * to the kit `Field`'s own `count`/`countMax` (field.tsx: "characters used
+   * so far … draws the counter") — a NUMBER, not a sentence, which is why it
+   * isn't caught by R81's ban on form hints. Omitted by every field that
+   * carries no length ceiling, so the ~140 existing call sites this wrapper
+   * already serves render byte-identical to before these two props existed. */
+  count?: number
+  /** The ceiling the counter counts towards — usually `TITLE_MAX_CHARS`
+   * (shared/types.ts) or the field's own `validation.maxLength`. */
+  countMax?: number
 }) {
   const t = useT()
   // Hooks before any early return so hook order stays stable.
@@ -129,6 +141,15 @@ export function Field({
       required={config.required}
       disabled={config.disabled}
       className={className}
+      count={count}
+      countMax={countMax}
+      // UI-RULEBOOK F6: "a character-limited text field shows its counter …
+      // format `0/50`" — no spaces around the slash. The kit's own default
+      // formatter prints "96 / 400" (with spaces, its own chapter 9 spelling);
+      // this app settled a tighter one before the kit's counter existed, so
+      // the override travels through this one seam rather than being passed
+      // at each of R87's call sites.
+      formatCount={(c, max) => (max === undefined ? String(c) : `${c}/${max}`)}
     >
       {children}
     </KitField>

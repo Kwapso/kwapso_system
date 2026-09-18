@@ -45,6 +45,7 @@ import type * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { clampRecordHeading } from "@shared/web/record-heading"
 import { formatCount } from "@shared/web/format-count"
 import { TEAM_SECTIONS } from "@/lib/pages"
 import { useCountStandsDown } from "@/components/records/counted-tabs"
@@ -116,8 +117,15 @@ export function CollectionHeading({
        NOTHING SITS ABOVE IT ANY MORE — the eyebrow row that did until
        2026-09-03 is gone (this file's header), so this heading is a single
        node again rather than a fragment holding two. */
-    <Headline as="h1" size="display-m" className="flex items-center gap-2">
-      {t(title)}
+    // R87 (title-length, RULES.md): the same one-line truncation every other
+    // title renderer draws through, applied here too — this heading is drawn
+    // from a static section word today, never a record's own name, but the
+    // law asks every one-line title step to carry it rather than trusting
+    // that stays true forever. `min-w-0` on the wrapper lets the truncated
+    // span actually shrink inside this flex row instead of pushing the badge
+    // off the end.
+    <Headline as="h1" size="display-m" className="flex min-w-0 items-center gap-2">
+      {clampRecordHeading(t(title))}
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
     </Headline>
   )

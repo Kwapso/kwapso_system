@@ -36,10 +36,24 @@
    goes without a check no longer. Wired into `npm run check` in package.json
    beside `check-avatar.mjs`.
 
-   THIS IS A STATIC CHECK, MATCHING THIS KIT'S OTHER `check-*.mjs` FILES —
+   SECTIONS 1–5 ARE STATIC, MATCHING THIS KIT'S OTHER `check-*.mjs` FILES —
    no jsdom/testing-library in this repository, so "no variant still reads a
    muted ink" is verified by reading the source directly rather than by
    mounting the component and reading computed styles.
+
+   SECTION 6 IS NOT, AND THAT IS THE LESSON OF 18 SEP 2026. Section 3 below
+   pinned `asChild` as four source shapes — the `Slot` import, the constant,
+   the `isLink` line, the class application — and every one of them was
+   green on the day the first real `<Badge asChild>` call site in the app
+   (`shared/web/ticket-chips.tsx`'s app-name chip, the exact chip the ruling
+   names) threw "Slot failed to slot onto its children" inside Radix `Slot`.
+   The source SAID the right words; the render was wrong. A static pin can
+   prove a line exists; only a render proves the line works. So section 6
+   MOUNTS the component — through vite's own SSR loader (already a dev
+   dependency; it is what compiles this TSX everywhere else) and
+   `react-dom/server`'s `renderToStaticMarkup` (a peer dependency this repo
+   already has installed for the demo), no DOM needed — and reads the HTML
+   back. No new dependency, no jsdom; roughly a second of wall time.
    ========================================================================= */
 
 import fs from "node:fs";
@@ -121,8 +135,12 @@ if (/class:\s*"[^"]*text-ink-(?:secondary|tertiary)[^"]*"/.test(src)) {
    computation reading BOTH `asChild` and `href`, and the render actually
    applying `LINK_UNDERLINE` when `isLink`.
    ========================================================================= */
-if (!/^import \{ Slot \} from "@radix-ui\/react-slot";$/m.test(src)) {
-  findings.push(`${rel} does not import Slot from @radix-ui/react-slot — asChild has nothing to render through.`);
+if (!/^import \{ Slot, Slottable \} from "@radix-ui\/react-slot";$/m.test(src)) {
+  findings.push(
+    `${rel} does not import both Slot and Slottable from @radix-ui/react-slot — asChild has nothing to render ` +
+      "through, or (Slottable gone) the label is no longer the one element Slot merges onto and every asChild " +
+      "badge throws again (section 6 below proves it either way).",
+  );
 }
 if (!/const LINK_UNDERLINE = "underline underline-offset-\[0\.1875rem\]";/.test(src)) {
   findings.push(
@@ -284,6 +302,128 @@ if (!badgeIconSpanMatch) {
   }
 }
 
+/* ============================================================================
+   6 · `asChild` ACTUALLY RENDERS — mounted, not grepped. 18 SEP 2026: the
+   client's underline ruling ("when its a link make it underlined (for
+   exmaple the app name)") is delivered as `<Badge asChild><Link>…</Link>
+   </Badge>`, and that shape threw on its first real call. WHY: the render
+   writes three child expressions (icon, dot, label) and two are `null`
+   placeholders on a plain link chip; `React.Children.count` counts a `null`
+   like an element (`count([null, null, <a/>])` → 3, proved live), and Radix
+   `Slot` demands exactly one — so `asChild` threw on EVERY badge, with icon
+   and dot too (three real elements are still not one). The fix wraps the
+   label in Radix's own `Slottable` under `asChild`, so `Slot` takes the
+   label element as its target and the icon/dot spans become that element's
+   own leading children. Five renders, each read back as HTML:
+
+     a. asChild, no icon, no dot  — THE reported case: one <a>, badge classes,
+                                    LINK_UNDERLINE, data-slot="badge", label.
+     b. asChild + icon            — the icon span sits INSIDE the anchor,
+                                    before the label.
+     c. asChild + icon + dot      — both marks inside, dot after icon,
+                                    data-dot on the anchor.
+     d. href, no asChild          — the plain <a> path, unchanged.
+     e. plain                     — a <span>, no underline, no Slottable cost.
+
+   The loader is vite's `createServer` + `ssrLoadModule` with `configFile:
+   false` (the kit's own vite.config.ts is the demo's, rooted at demo/) and
+   no dependency pre-bundling; the module graph is badge.tsx → lib/utils
+   → cva/clsx/tailwind-merge → react, all of which resolve from this repo's
+   own node_modules. `renderToStaticMarkup` throws synchronously on a Slot
+   failure, so a regression is a finding with the thrown message in it.
+   ========================================================================= */
+{
+  const KIT_ROOT = path.resolve(HERE, "..", "..");
+  const BADGE_URL = "/" + path.relative(KIT_ROOT, FILE).split(path.sep).join("/");
+  let server = null;
+  try {
+    const [{ createServer }, React, { renderToStaticMarkup }] = await Promise.all([
+      import("vite"),
+      import("react"),
+      import("react-dom/server"),
+    ]);
+    server = await createServer({
+      root: KIT_ROOT,
+      configFile: false,
+      logLevel: "silent",
+      server: { middlewareMode: true, hmr: false, watch: null },
+      optimizeDeps: { noDiscovery: true, include: [] },
+    });
+    const { Badge } = await server.ssrLoadModule(BADGE_URL);
+    const h = React.createElement;
+    const anchor = () => h("a", { href: "/apps/1" }, "App");
+    const glyph = () => h("svg", { "data-glyph": "" });
+    const render = (name, el) => {
+      try {
+        return renderToStaticMarkup(el);
+      } catch (e) {
+        findings.push(`${rel}: rendering <Badge> shape "${name}" THREW — ${e instanceof Error ? e.message : String(e)}`);
+        return null;
+      }
+    };
+
+    // a. THE REPORTED CASE.
+    const a = render("asChild, no icon, no dot", h(Badge, { asChild: true, variant: "secondary", size: "pill" }, anchor()));
+    if (a !== null) {
+      if (!/^<a [^>]*>App<\/a>$/.test(a)) {
+        findings.push(`${rel}: asChild rendered something other than a single <a>…</a> around the label: ${a}`);
+      }
+      if (!/ data-slot="badge"/.test(a)) findings.push(`${rel}: asChild anchor lost data-slot="badge": ${a}`);
+      if (!/ href="\/apps\/1"/.test(a)) findings.push(`${rel}: asChild anchor lost the child's own href: ${a}`);
+      if (!/underline underline-offset-\[0\.1875rem\]/.test(a)) {
+        findings.push(`${rel}: asChild anchor does not carry LINK_UNDERLINE — "when its a link make it underlined": ${a}`);
+      }
+      if (!/rounded-pill/.test(a) || !/\bbg-\[/.test(a)) {
+        findings.push(`${rel}: asChild anchor does not carry the badge's own pill classes/fill (Slot merge lost): ${a}`);
+      }
+      if (/Slottable/.test(a)) findings.push(`${rel}: a Slottable wrapper leaked into the asChild HTML: ${a}`);
+    }
+
+    // b. ICON INSIDE THE ANCHOR, BEFORE THE LABEL.
+    const b = render(
+      "asChild + icon",
+      h(Badge, { asChild: true, icon: glyph(), variant: "secondary", size: "pill" }, anchor()),
+    );
+    if (b !== null && !/^<a [^>]*><span [^>]*data-slot="badge-icon"[^>]*><svg data-glyph=""><\/svg><\/span>App<\/a>$/.test(b)) {
+      findings.push(`${rel}: asChild + icon must render the icon span INSIDE the anchor, before the label: ${b}`);
+    }
+
+    // c. ICON AND DOT INSIDE, DOT AFTER ICON, data-dot ON THE ANCHOR.
+    const c = render(
+      "asChild + icon + dot",
+      h(Badge, { asChild: true, icon: glyph(), dot: "building", variant: "status", size: "pill" }, anchor()),
+    );
+    if (
+      c !== null &&
+      !/^<a [^>]*data-dot="building"[^>]*><span [^>]*data-slot="badge-icon"[^>]*>.*<\/span><span [^>]*data-slot="badge-dot"[^>]*><\/span>App<\/a>$/.test(c)
+    ) {
+      findings.push(`${rel}: asChild + icon + dot must render icon then dot inside the anchor, data-dot on it: ${c}`);
+    }
+
+    // d. THE href PATH, UNCHANGED.
+    const d = render("href", h(Badge, { href: "/apps/1", variant: "secondary", size: "pill" }, "App"));
+    if (d !== null && !/^<a data-slot="badge" href="\/apps\/1" class="[^"]*underline underline-offset-\[0\.1875rem\]">App<\/a>$/.test(d)) {
+      findings.push(`${rel}: the href (no asChild) path changed shape — it must stay a plain underlined <a>: ${d}`);
+    }
+
+    // e. A PLAIN BADGE — a <span>, no underline, no wrapper.
+    const e = render("plain", h(Badge, { variant: "secondary", size: "pill" }, "App"));
+    if (e !== null && !/^<span data-slot="badge" class="[^"]*">App<\/span>$/.test(e)) {
+      findings.push(`${rel}: a plain <Badge> no longer renders a bare <span>…label</span>: ${e}`);
+    }
+    if (e !== null && /underline/.test(e)) {
+      findings.push(`${rel}: a plain <Badge> (no asChild, no href) draws LINK_UNDERLINE — it is not a link: ${e}`);
+    }
+  } catch (e) {
+    findings.push(
+      `${rel}: section 6 could not mount <Badge> at all (${e instanceof Error ? e.message : String(e)}) — the ` +
+        "asChild render path is unproven; fix the loader before trusting the static pins above.",
+    );
+  } finally {
+    if (server) await server.close();
+  }
+}
+
 if (findings.length > 0) {
   console.error("FAIL badge check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -295,5 +435,7 @@ console.log(
     "(asChild or href) always draws LINK_UNDERLINE — the leading-mark gap (LEADING_MARK_GAP, gap-2) is spent " +
     "unconditionally in badgeVariants' own base class list rather than behind a dot-only ternary — every variant " +
     "carries an explicit bg- declaration — the icon prop gives an icon-led chip a real Badge slot — and that " +
-    "slot forces [&_svg]:text-foreground so a caller's own muted icon class can never win.",
+    "slot forces [&_svg]:text-foreground so a caller's own muted icon class can never win — and <Badge asChild> " +
+    "MOUNTS for real (five shapes rendered through vite SSR + react-dom/server): one anchor carrying the badge's " +
+    "classes, underline and data-slot, with any icon/dot inside it before the label.",
 );

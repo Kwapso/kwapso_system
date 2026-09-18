@@ -34,6 +34,17 @@
 // `processes:create` / `:update` and switching one off behind `:delete` — the same
 // rights that let somebody record the app itself, because a section of a system
 // is part of the record of that system.
+//
+// THE NAME FIELD CAPS AT TITLE_MAX_CHARS (R87, 18 Sep 2026) — a module's name
+// draws in the same one-line gallery card title every other title clamps to,
+// so `moduleFields()`'s "Name" (web/components/team/internal-record-dialog.tsx,
+// the shared form both the add and edit dialogs below render through) carries
+// `titleCap: true`, which wires the live counter and the input's own
+// `maxLength`; the door refuses the same 50 positionally
+// (`workers/tenancy/src/routes/processes.ts`'s `postCreateAppModule` /
+// `postUpdateAppModule`). This panel itself renders neither the field nor the
+// door, so nothing here changed — the cap is a property of the RECORD, not of
+// this particular screen onto it.
 
 import * as React from "react"
 

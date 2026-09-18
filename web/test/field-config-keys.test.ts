@@ -58,31 +58,100 @@ function declaredFieldConfigKeys(): Set<string> {
   return keys
 }
 
-type Offence = { file: string; line: number; key: string }
+/** The keys `FieldValidation` declares (shared/web/screen-engine/config.ts),
+ * read the same derived way as `declaredFieldConfigKeys` — so `validation`'s
+ * OWN shape (min/max/minLength/maxLength/pattern) is what a nested
+ * `validation: { ...defaultFieldConfig.validation, maxLength: … }` spread is
+ * checked against, rather than the top-level `FieldConfig` keys it has
+ * nothing to do with. */
+function declaredValidationKeys(): Set<string> {
+  const path = ROOT + "/shared/web/screen-engine/config.ts"
+  const source = ts.sys.readFile(path)
+  if (!source) throw new Error(`could not read ${path} — did the config move?`)
+  const tree = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
+
+  const keys = new Set<string>()
+  const visit = (node: ts.Node) => {
+    if (ts.isInterfaceDeclaration(node) && node.name.text === "FieldValidation") {
+      for (const member of node.members) {
+        if (ts.isPropertySignature(member) && ts.isIdentifier(member.name)) {
+          keys.add(member.name.text)
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return keys
+}
+
+/** `"field"` for an object spreading a `FieldConfig` itself (`...defaultFieldConfig`,
+ * or a named one built from it); `"validation"` for one spreading a FieldConfig's
+ * OWN `.validation` (`...defaultFieldConfig.validation`, or `...appField.validation`)
+ * — the R87 title-length shape. The two are different SHAPES with different allowed
+ * key sets, not one shape read twice: `validation:` is a key `FieldConfig` DOES
+ * declare, so a maxLength set two levels down was being checked against the wrong
+ * interface entirely. */
+type Offence = { file: string; line: number; key: string; shape: "field" | "validation" }
+
+/** True only for a spread of the FIELD CONFIG ITSELF — a bare identifier
+ * (`...defaultFieldConfig`, `...appField`), never a member access off one.
+ * `...defaultFieldConfig.validation` names the SAME identifier in its text
+ * (so the old identifier-agnostic regex matched both shapes as one), but it
+ * spreads a `FieldValidation`, not a `FieldConfig` — a different object with
+ * a different allowed shape, caught instead by `isValidationSpread` below. */
+const isFieldConfigSpread = (obj: ts.ObjectLiteralExpression): boolean =>
+  obj.properties.some(
+    (p) =>
+      ts.isSpreadAssignment(p) &&
+      ts.isIdentifier(p.expression) &&
+      /[Ff]ieldConfig\b/.test(p.expression.getText())
+  )
+
+/** True for a spread of a field config's `.validation` member — a property
+ * access whose own name is `validation` off an expression naming a field
+ * config (`defaultFieldConfig.validation`, `appField.validation`). This is
+ * the nested spread R87's title-length fields all write:
+ * `validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS }`. */
+const isValidationSpread = (obj: ts.ObjectLiteralExpression): boolean =>
+  obj.properties.some(
+    (p) =>
+      ts.isSpreadAssignment(p) &&
+      ts.isPropertyAccessExpression(p.expression) &&
+      p.expression.name.text === "validation" &&
+      /[Ff]ieldConfig\b/.test(p.expression.expression.getText())
+  )
 
 /** Every property key written on an object literal that spreads a field
- * config, whether or not it is one `FieldConfig` actually declares. */
-function fieldConfigKeyCensus(): { offences: Offence[]; objectsSeen: number } {
+ * config (or a field config's own `.validation`), whether or not it is one
+ * the matching type actually declares. `files` defaults to the app's real
+ * source and is overridable so a fixture can drive this off an inline
+ * snippet without touching a real file (see the red/green proof below). */
+function fieldConfigKeyCensus(
+  files: { path: string; tree: ts.SourceFile }[] = [...appFiles()]
+): { offences: Offence[]; objectsSeen: number } {
   const offences: Offence[] = []
   let objectsSeen = 0
 
-  const isFieldConfigSpread = (obj: ts.ObjectLiteralExpression): boolean =>
-    obj.properties.some(
-      (p) => ts.isSpreadAssignment(p) && /[Ff]ieldConfig\b/.test(p.expression.getText())
-    )
-
-  for (const { path, tree } of appFiles()) {
+  for (const { path, tree } of files) {
     const file = relative(ROOT, path)
     const visit = (node: ts.Node) => {
-      if (ts.isObjectLiteralExpression(node) && isFieldConfigSpread(node)) {
-        objectsSeen++
-        for (const prop of node.properties) {
-          if (ts.isSpreadAssignment(prop)) continue
-          const name = prop.name
-          if (name && (ts.isIdentifier(name) || ts.isStringLiteral(name))) {
-            const key = ts.isIdentifier(name) ? name.text : name.text
-            const { line } = tree.getLineAndCharacterOfPosition(prop.getStart(tree))
-            offences.push({ file, line: line + 1, key })
+      if (ts.isObjectLiteralExpression(node)) {
+        const shape: "field" | "validation" | null = isFieldConfigSpread(node)
+          ? "field"
+          : isValidationSpread(node)
+            ? "validation"
+            : null
+        if (shape === "field") objectsSeen++
+        if (shape) {
+          for (const prop of node.properties) {
+            if (ts.isSpreadAssignment(prop)) continue
+            const name = prop.name
+            if (name && (ts.isIdentifier(name) || ts.isStringLiteral(name))) {
+              const key = ts.isIdentifier(name) ? name.text : name.text
+              const { line } = tree.getLineAndCharacterOfPosition(prop.getStart(tree))
+              offences.push({ file, line: line + 1, key, shape })
+            }
           }
         }
       }
@@ -95,6 +164,12 @@ function fieldConfigKeyCensus(): { offences: Offence[]; objectsSeen: number } {
 
 describe("a field config carries no key it does not declare", () => {
   const ALLOWED = declaredFieldConfigKeys()
+  const VALIDATION_ALLOWED = declaredValidationKeys()
+
+  /** Which allowed-key set an offence is judged against — the field config's
+   * own shape, or (for a nested `.validation` spread) `FieldValidation`'s. */
+  const isDeclared = (o: Offence): boolean =>
+    (o.shape === "validation" ? VALIDATION_ALLOWED : ALLOWED).has(o.key)
 
   it("declaredFieldConfigKeys: the read found the interface, not an empty file", () => {
     // A BLIND CHECK REPORTS ALL CLEAR EXACTLY LIKE A PASSING ONE — if the
@@ -111,6 +186,20 @@ describe("a field config carries no key it does not declare", () => {
     )
   })
 
+  it("declaredValidationKeys: the read found FieldValidation, not an empty file", () => {
+    // The same floor as above, for the shape a nested `validation: { … }`
+    // spread is checked against — without it, an empty `VALIDATION_ALLOWED`
+    // would fail every nested spread's every key as "undeclared" rather than
+    // reporting the walk itself broke.
+    expect(
+      VALIDATION_ALLOWED.size,
+      "found no FieldValidation properties — did shared/web/screen-engine/config.ts move or rename the interface?"
+    ).toBeGreaterThanOrEqual(5)
+    expect([...VALIDATION_ALLOWED].sort()).toEqual(
+      ["max", "maxLength", "min", "minLength", "pattern"].sort()
+    )
+  })
+
   it("field-config-keys: no object spreading a field config sets a key the type doesn't have", () => {
     const { offences, objectsSeen } = fieldConfigKeyCensus()
 
@@ -124,12 +213,56 @@ describe("a field config carries no key it does not declare", () => {
       "found under 40 objects spreading a field config — the census may be reading nothing"
     ).toBeGreaterThanOrEqual(40)
 
-    const undeclared = offences.filter((o) => !ALLOWED.has(o.key))
+    const undeclared = offences.filter((o) => !isDeclared(o))
     expect(
-      undeclared.map((o) => `${o.file}:${o.line} sets "${o.key}", which FieldConfig has no such key`),
+      undeclared.map(
+        (o) =>
+          `${o.file}:${o.line} sets "${o.key}", which ${o.shape === "validation" ? "FieldValidation" : "FieldConfig"} has no such key`
+      ),
       "a field config sets a key the type does not declare — it will be silently dropped on the way to the screen " +
-        "(shared/web/field.tsx only forwards label/helpText/required/disabled/visible/visibilityRules/validation). " +
-        "Rename it to the key FieldConfig actually has, most likely helpText."
+        "(shared/web/field.tsx only forwards label/helpText/required/disabled/visible/visibilityRules/validation, " +
+        "and validateField only reads validation's own min/max/minLength/maxLength/pattern). " +
+        "Rename it to the key the type actually has, most likely helpText."
     ).toEqual([])
+  })
+
+  it("field-config-keys (fixture, R87 shape): a bogus top-level key is caught, and a nested " +
+    "validation: { ...defaultFieldConfig.validation, maxLength } spread is not mistaken for one", () => {
+    // THE RED/GREEN PROOF. Real source in the repo cannot carry a bogus key on
+    // purpose, so this drives the same census off an inline snippet: one field
+    // config with an undeclared top-level key (the R33 defect this suite
+    // exists to catch — RED) beside R87's real title-length shape, a nested
+    // `.validation` spread setting `maxLength` (GREEN, and the exact shape
+    // that used to be misread as a top-level `FieldConfig` key — the bug this
+    // change fixes).
+    const fixturePath = ROOT + "/web/test/__fixtures__/field-config-keys.fixture.tsx"
+    const src = `
+      import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+
+      // RED — "hint" is not a key FieldConfig declares (it is "helpText").
+      const bogusField = { ...defaultFieldConfig, hint: "nope" }
+
+      // GREEN — the R87 title-length shape: a top-level spread with a
+      // declared key (label), plus a nested validation spread setting
+      // maxLength, which FieldValidation DOES declare.
+      const titleField = {
+        ...defaultFieldConfig,
+        label: "Title",
+        validation: { ...defaultFieldConfig.validation, maxLength: 50 },
+      }
+    `
+    const tree = ts.createSourceFile(fixturePath, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const { offences, objectsSeen } = fieldConfigKeyCensus([{ path: fixturePath, tree }])
+
+    // Two top-level field-config spreads (bogusField, titleField); the nested
+    // validation spread is its own shape and is not counted here — the same
+    // distinction `objectsSeen` draws against the real repo above.
+    expect(objectsSeen, "the fixture declares two top-level field-config spreads").toBe(2)
+
+    const undeclaredKeys = offences.filter((o) => !isDeclared(o)).map((o) => o.key)
+    expect(
+      undeclaredKeys,
+      "only the bogus top-level key may be caught — the nested validation spread's maxLength must pass"
+    ).toEqual(["hint"])
   })
 })

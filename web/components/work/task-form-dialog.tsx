@@ -33,6 +33,7 @@ import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Plus } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { FilePicker } from "@/components/records/file-picker"
 import { ApiFailure } from "@/lib/api"
@@ -71,7 +72,15 @@ export type TaskFormValues = {
  * own rather than a blank the control silently rejects. */
 const NONE = "__none__"
 
-const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const titleField = {
+  ...defaultFieldConfig,
+  label: "What needs doing",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 const dueField = { ...defaultFieldConfig, label: "Deadline", required: false }
 const assigneeField = {
@@ -234,12 +243,19 @@ export function TaskFormDialog({
         icon: <Plus className="size-4" />,
       }}
     >
-      <Field config={titleField} htmlFor="task-title" className={fieldSpacing}>
+      <Field
+        config={titleField}
+        htmlFor="task-title"
+        className={fieldSpacing}
+        count={values.title.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="task-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
           placeholder={t("e.g. File the quarterly VAT return")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

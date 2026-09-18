@@ -71,6 +71,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { RecordPicker } from "@/components/records/record-picker"
 import type { HelpStakeholder } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import type { PickablePerson } from "@/lib/members"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 // `NEUTRAL_TYPE_COLOUR`/`ticketTypeColour` USED TO BE IMPORTED HERE, for the
@@ -128,6 +129,10 @@ const titleField = (required: boolean) => ({
   ...defaultFieldConfig,
   label: "Title",
   required,
+  // R87 (title-length, RULES.md): every title field reads the one shared
+  // ceiling, so the marker, the counter and the door can never disagree
+  // about what "too long" means.
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
 })
 /** THE PARAGRAPH, AND IT IS CALLED WHAT IT IS.
  *
@@ -1478,12 +1483,18 @@ export function HelpFormDialog({
           screen reader reads, the word a sighted person reads and the button
           that refuses all come off the one boolean and there is nowhere for a
           fourth answer to live. */}
-      <Field config={titleConfig} htmlFor="help-title" className={fieldSpacing}>
+      <Field
+        config={titleConfig}
+        htmlFor="help-title"
+        className={fieldSpacing}
+        count={values.titleEn.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="help-title"
           value={values.titleEn}
           onChange={(e) => setValues((v) => ({ ...v, titleEn: e.target.value }))}
-          maxLength={200}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
         />
       </Field>

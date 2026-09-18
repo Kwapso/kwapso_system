@@ -30,6 +30,9 @@ import { publishChange } from "@shared/workers/realtime"
 import { GuardError, adminGuard, requireRight, teamContext } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import {
+  AGENT_ATTACH_MAX_BYTES,
+  AGENT_ATTACH_MAX_FILES,
+  AGENT_ATTACH_MIME,
   AGENT_CHAT_MAX_BYTES,
   AGENT_FILE_MAX_BYTES,
   AGENT_MAX_FILES,
@@ -39,6 +42,7 @@ import {
   TRANSLATE_MAX_TEXTS,
   TRANSLATE_TOKENS_PER_CHAR,
 } from "@shared/workers/limits"
+import { parseUploadDataUrl } from "@shared/workers/image"
 import { forwardToDoor } from "@shared/workers/http"
 import { consumeAiUnit, getQuota, grantCredits, readUsageLog, refundAiUnits } from "@shared/workers/credits"
 import { cheapAnswer, cheapText, PROVIDER_DEFAULT_MAX_TOKENS } from "@shared/workers/model-text"
@@ -205,6 +209,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
     message?: unknown
     continue?: unknown
     files?: unknown
+    attachments?: unknown
     sources?: unknown
   }
   // CARRY ON: the last turn ran out of its request and the client is asking
@@ -228,6 +233,41 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
       return { name, csv: raw.csv }
     })
   }
+  // Chat attachments (assistant a1, 18 Sep 2026): an image/PDF/text read for
+  // THIS conversation only. Bytes decoded and capped here, at the boundary,
+  // through the SAME data-URL parser every other inline upload in this app
+  // uses (parseUploadDataUrl) — nothing here invents its own base64 reader.
+  // Nothing is written to a bucket and nothing gets a STORED_FILES entry: R40
+  // governs a stored file reaching a person, and this one is never stored
+  // (attachments.ts's header says why at length).
+  let attachments: { name: string; mime: string; bytes: Uint8Array }[] | undefined
+  if (Array.isArray(body.attachments) && body.attachments.length) {
+    if (body.attachments.length > AGENT_ATTACH_MAX_FILES)
+      return fail(400, "too_many_attachments", `Attach up to ${AGENT_ATTACH_MAX_FILES} files at a time.`)
+    attachments = body.attachments.map((a) => {
+      const raw = (a ?? {}) as { name?: unknown; mime?: unknown; dataUrl?: unknown }
+      const name = optionalText(raw.name, "File name", 200) ?? "file"
+      const mime = typeof raw.mime === "string" ? raw.mime : ""
+      if (!AGENT_ATTACH_MIME.test(mime))
+        throw new GuardError(
+          400,
+          "invalid_input",
+          `"${name}" isn't a kind of file the assistant can read here — images, PDFs, or plain text.`
+        )
+      // `allow` narrowed to AGENT_ATTACH_MIME rather than the default
+      // INLINE_SAFE_UPLOAD: this caps at AGENT_ATTACH_MAX_BYTES, well under
+      // the media door's own ceiling, and refuses video/audio, which nothing
+      // here can read.
+      const parsed = parseUploadDataUrl(raw.dataUrl, AGENT_ATTACH_MAX_BYTES, AGENT_ATTACH_MIME)
+      if (!parsed)
+        throw new GuardError(
+          413,
+          "file_too_large",
+          `"${name}" is too large. Attach a file up to ${Math.round(AGENT_ATTACH_MAX_BYTES / 1024 / 1024)} MB.`
+        )
+      return { name, mime: parsed.contentType, bytes: parsed.bytes }
+    })
+  }
   // The caller's own language rides on the session `teamContext` already
   // resolved, so the assistant answers in the language the person reads the
   // rest of the app in without a second lookup or a client-supplied claim.
@@ -246,7 +286,16 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
   const sources = Array.isArray(body.sources)
     ? body.sources.filter((k): k is string => typeof k === "string" && SOURCE_CHIP_KEYS.includes(k))
     : undefined
-  const opts = { threadId, message, continue: carryOn, source: callerSurface(user), files, sources, language: user.language }
+  const opts = {
+    threadId,
+    message,
+    continue: carryOn,
+    source: callerSurface(user),
+    files,
+    attachments,
+    sources,
+    language: user.language,
+  }
   if (wantsStream(request))
     return streamRun(env, (emit) => runChat(env, request, cfg, guard, actor, opts, emit))
   return json(await runChat(env, request, cfg, guard, actor, opts))

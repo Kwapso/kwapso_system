@@ -41,6 +41,7 @@ import { APP_STAGES, appStageDotTone, appStageMark } from "@shared/app-stages"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
@@ -88,7 +89,15 @@ export type AppFormValues = {
   mainStakeholderContactId: string
 }
 
-const nameField = { ...defaultFieldConfig, label: "What it's called", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const nameField = {
+  ...defaultFieldConfig,
+  label: "What it's called",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const accountField = {
   ...defaultFieldConfig,
   label: "Whose system it is",
@@ -346,12 +355,19 @@ export function AppFormDialog({
         disabled: !ready,
       }}
     >
-      <Field config={nameField} htmlFor="app-name" className={fieldSpacing}>
+      <Field
+        config={nameField}
+        htmlFor="app-name"
+        className={fieldSpacing}
+        count={values.name.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="app-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
           placeholder={t("e.g. Dispatch")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

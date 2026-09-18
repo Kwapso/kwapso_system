@@ -504,8 +504,15 @@ export const TICKET_FILE_MAX_BYTES = 10 * 1024 * 1024
  * the whole body — so the caps described what could be imported while the parse
  * described what could be sent, and the parse was 40 MB into a 128 MB isolate.
  * A ceiling is only a ceiling if it is checked BEFORE the expensive step. Sized
- * to fit the caps it guards plus the envelope around them. */
-export const AGENT_CHAT_MAX_BYTES = 42 * 1024 * 1024
+ * to fit the caps it guards plus the envelope around them.
+ *
+ * RAISED 18 SEP 2026 from 42 MB to cover the second thing a chat turn may now
+ * carry (AGENT_ATTACH_MAX_FILES × AGENT_ATTACH_MAX_BYTES below, arriving as
+ * base64 — ~4/3 the raw bytes) ON TOP OF the CSV caps it already covered: 40 MB
+ * (8 × AGENT_FILE_MAX_BYTES, plain text) + ~16 MB (3 × 4 MB × 4/3, base64) +
+ * envelope rounds to 60 MB. Same pairing rule as before: this only bounds
+ * anything while it stays bigger than both caps summed. */
+export const AGENT_CHAT_MAX_BYTES = 60 * 1024 * 1024
 
 /** Bytes one attached CSV may carry into a chat import. Named here beside the
  * request ceiling rather than inline at the door, because the two numbers are a
@@ -514,6 +521,35 @@ export const AGENT_FILE_MAX_BYTES = 5_000_000
 
 /** Files one agent chat message may attach. */
 export const AGENT_MAX_FILES = 8
+
+/** Bytes one CHAT ATTACHMENT (an image, a PDF, or plain text — read for THIS
+ * conversation only, never stored) may carry, before base64. Client decision
+ * "assistant a1", 18 Sep 2026, reversing the 13 Sep 2026 removal. Distinct from
+ * AGENT_FILE_MAX_BYTES above, which bounds a CSV bound for the chat-IMPORT
+ * plan — this one feeds no import at all, and its bytes never reach R2. */
+export const AGENT_ATTACH_MAX_BYTES = 4 * 1024 * 1024
+
+/** Attachments one agent chat message may carry. Small on purpose: a picked
+ * file rides the SAME request as the typed message (no separate upload step,
+ * because nothing is stored to upload TO), so this is a conversation aid, not
+ * a bulk-file door — AGENT_MAX_FILES/import already own that job. */
+export const AGENT_ATTACH_MAX_FILES = 3
+
+/** WHICH KINDS a chat attachment may declare — images the assistant can look
+ * at, PDFs and plain text it can read. Checked at the door (parseUploadDataUrl)
+ * and again client-side for the picker's own filter, so the two can never
+ * silently drift: one pattern, imported both places. Never text/html or svg —
+ * the same XSS reasoning INLINE_SAFE_UPLOAD (shared/workers/image.ts) states,
+ * though this list is narrower still: no video/audio, because there is no
+ * reader for either in a one-turn, never-stored context. */
+export const AGENT_ATTACH_MIME = /^(image\/(png|jpe?g|webp|gif)|application\/pdf|text\/(plain|markdown|csv))$/
+
+/** The SAME kinds, spelled for an `<input accept>` attribute — the picker's own
+ * filter, so a person is never shown a choice the door will refuse. Kept
+ * beside AGENT_ATTACH_MIME rather than derived from it (a regex does not
+ * round-trip to a mime list) so the two are read together at every change. */
+export const AGENT_ATTACH_ACCEPT =
+  "image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv"
 
 // ── translating what a PERSON typed, on demand ───────────────────────────────
 // FOUR NUMBERS, AND THEY ARE A SET WITH A PURPOSE: one press of "Translate" is

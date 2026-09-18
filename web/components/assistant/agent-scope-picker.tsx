@@ -14,6 +14,25 @@
 // composer take over the moment a row below is pressed. `agent-panel.tsx`
 // renders this in place of the ordinary conversation for a tab whose `scope`
 // is still `null` — see that file.
+//
+// "EVERYTHING" IS A REAL, CONCRETE CHOICE — NOT A "DEFAULT" PSEUDO-ENTRY.
+// Client ruling, 18 Sep 2026, verbatim: "kill this 'todsays default' for
+// setting scopo of asistant." This row used to read "Everything (today's
+// default)" — the parenthetical is gone; the label is now just "Everything",
+// the same shape as the other two rows ("This record", "Knowledge"). Nothing
+// about the THIRD row's behaviour changes: it is still one of exactly three
+// rows a person picks from, never an auto-inferred entry standing apart from
+// the real choices — the ruling's own words draw that line ("the scope is
+// what the user picks... with no 'default' pseudo-entry"), and "Everything"
+// already was, and remains, an ordinary pick. `agent-panel.tsx`'s own
+// `handlePickScope` (this file's only caller) independently rebuilds the
+// SAME string for the resulting tab's title — that file is owned by a
+// different lane and is UNCHANGED here; its own `t("Everything (today's
+// default)")` at its own line still needs the identical edit, to
+// `t("Everything")`, so a conversation's tab title stops saying "today's
+// default" too (the tab strip renders `tab.label` verbatim,
+// `agent-tab-strip.tsx:139`). Reported rather than fixed here — see this
+// lane's own report for the exact line number.
 
 import * as React from "react"
 
@@ -85,7 +104,7 @@ export function AgentScopePicker({
         />
         <PickerRow
           icon={<Globe className="size-[18px]" />}
-          label={t("Everything (today's default)")}
+          label={t("Everything")}
           sub={t("All six sources, untick later")}
           onClick={() => onPick("everything")}
         />

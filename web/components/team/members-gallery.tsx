@@ -65,10 +65,17 @@
 // person's initials. That is not a placeholder: R35 ("a record never appears
 // without its face") names the initial as the third and final rung for a record
 // with neither picture nor glyph, and `RecordMark` (shared/web/record-mark.tsx)
-// is the one component that draws all three. `shape="round"` is her "avatar (in
-// round)" and is also the seam's own rule for a person in their own right. It is
-// already handed `picture={m.imageUrl}`, so the day a member gets a photograph
-// the same slot carries the face with no change here.
+// is the one component that draws all three. `shape="round"` WAS her "avatar
+// (in round)", 2026-09-09, and the seam's own rule for a person in their own
+// right — SUPERSEDED 18 Sep 2026: "for stakeholders, i want square tiels (lik
+// in members, with text under the image)." Measured live on staging (kit
+// v1.2.120), this tile was still drawing a 72px CIRCLE, not the square band her
+// later sentence assumes is already here — `PersonCard` (shared/web/
+// person-card.tsx) hardcoded `shape="round"` on the one `RecordMark` call both
+// this wall and the stakeholders panel share, so the fix is there, once, and
+// this wall changes with it. It is already handed `picture={m.imageUrl}`, so
+// the day a member gets a photograph the same slot carries the face with no
+// change here.
 //
 // ── THE TOOLBAR ─────────────────────────────────────────────────────────────
 //

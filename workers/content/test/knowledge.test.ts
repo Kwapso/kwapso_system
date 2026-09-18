@@ -1814,7 +1814,7 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
     it("still refuses a colleague who holds every knowledge right but neither the default role nor a staffing row", async () => {
       staffOnApp(IDS.staffUser)
       await addSource(IDS.staffUser, {
-        title: "Dispatch rollout postmortem — ordinary colleague still refused",
+        title: "Dispatch rollout postmortem — colleague refused",
         body: "The dispatch rollout was paused because the invoice run kept timing out.",
         visibleToAppId: IDS.victimApp,
       })
@@ -2459,8 +2459,8 @@ describe("material a colleague cannot see must not starve the answer", () => {
 describe("an envelope does not take a slot from something that says more", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
-      title: "Invitation: Bergman dispatch review @ Tue Aug 25, 2026 12:30pm",
-      body: "Bergman dispatch review\nTue Aug 25, 2026 12:30pm",
+      title: "Invitation: Bergman dispatch review @ Aug 25",
+      body: "Bergman dispatch review\nAug 25",
     })
     await addSource(IDS.staffUser, {
       title: "Bergman dispatch review",
@@ -2709,7 +2709,7 @@ describe("the same paragraph, arriving under three names, is worth one slot", ()
   // deliberately, and a fixture that sat under it would be measuring nothing.
   // LONG ENOUGH THAT THE TITLE IS NOT THE PASSAGE. The embedding in this suite is
   // a deterministic bag of words (see the head of the file), so on a short body
-  // the extra words in a longer title — "2026/08/19 12:29 CEST — Notes by Gemini"
+  // the extra words in a longer title — "08/19 12:29 CEST — Notes by Gemini"
   // — dilute the match enough to drop that copy under the relevance floor, and
   // only one of the three ever reaches the ranking. The rule would then look
   // enforced by a fixture in which there was nothing to enforce it against.
@@ -2727,7 +2727,7 @@ describe("the same paragraph, arriving under three names, is worth one slot", ()
     // THE SAME WORDS, THREE TIMES, UNDER THE THREE TITLES THE REAL BASE USES.
     for (const title of [
       "Team Assembly",
-      "Team Assembly - 2026/08/19 12:29 CEST - Notes by Gemini",
+      "Team Assembly - 08/19 12:29 CEST - Notes by Gemini",
       "Notes: “Team Assembly” Aug 19, 2026",
     ])
       await addSource(IDS.staffUser, { title, body: NOTES })
@@ -2766,8 +2766,8 @@ describe("the same paragraph, arriving under three names, is worth one slot", ()
     // name. Perfectly RELEVANT — it is a near-perfect match for a question naming
     // the thing it is about — which is exactly why it used to win the slot.
     await addSource(IDS.staffUser, {
-      title: "Updated invitation: Team Assembly @ Wed Aug 19, 2026 4pm - 5pm",
-      body: "Updated invitation: Team Assembly @ Wed Aug 19, 2026 4pm - 5pm",
+      title: "Updated invitation: Team Assembly @ Aug 19, 4pm",
+      body: "Updated invitation: Team Assembly @ Aug 19, 4pm",
     })
     const answer = await ask(IDS.staffUser, "What was agreed at the monthly remote assembly?")
     expect(titles(answer).join(" / ")).not.toMatch(/Updated invitation/)

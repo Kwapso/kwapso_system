@@ -122,6 +122,42 @@ describe("HelpStakeholders — the people list", () => {
     }
   })
 
+  it("draws the SQUARE band, never a circle — client ruling, 18 Sep 2026, same-day follow-up: \"for stakeholders, i want square tiels (lik in members, with text under the image)\" (class census + a live-style jsdom render)", () => {
+    // THE CLASS CENSUS — `PersonCard` (shared/web/person-card.tsx) is the ONE
+    // `RecordMark` call this tile and the members-gallery tile both share; a
+    // regression here proves both walls at once, straight off the source
+    // rather than trusting the render alone (the render can only prove HOW
+    // React interpreted the source today, not that the source itself still
+    // says what the file's header claims).
+    const src = readFileSync(
+      join(import.meta.dirname, "..", "..", "shared", "web", "person-card.tsx"),
+      "utf8"
+    )
+    expect(src, "PersonCard must hand RecordMark shape=\"square\" — the members-gallery tile, not a circular avatar").toMatch(
+      /<RecordMark[^>]*\bshape="square"/
+    )
+    expect(src, "and it must never go back to the round person mark").not.toMatch(/<RecordMark[^>]*\bshape="round"/)
+
+    // THE LIVE RENDER — `RecordMark` (shared/web/record-mark.tsx) resolves
+    // `shape="square"` to `rounded-[var(--radius)]` (R31's box radius) and
+    // `shape="round"` to `rounded-pill`; reading the FACE's own className off
+    // a real jsdom render is the proof a source census alone cannot give —
+    // that the prop actually reaches the box React paints, not just that the
+    // call site spells the right word.
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    for (const name of ["Aurora", "Max Mustermann"]) {
+      const card = screen.getByText(name).closest('[data-slot="stakeholder-card"]') as HTMLElement
+      const face = card.querySelector("[aria-hidden]") as HTMLElement
+      expect(face, `${name}'s card must draw a face`).toBeTruthy()
+      expect(face.className, `${name}'s face must be the rounded-square band`).toContain(
+        "rounded-[var(--radius)]"
+      )
+      expect(face.className, `${name}'s face must not be the round person mark any more`).not.toContain(
+        "rounded-pill"
+      )
+    }
+  })
+
   it("takes no picker-related props at all — the component's own contract shrank with the ruling", () => {
     // `HelpStakeholders` used to require `members`, `canAdd` and `onAdd`
     // alongside `stakeholders`; rendering it above with `stakeholders` alone

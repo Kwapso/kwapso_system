@@ -1847,11 +1847,6 @@ export const SEED: Catalogue = {
     es: "Artículos y archivos indexados",
     ca: "Articles i fitxers indexats",
   },
-  "Everything (today's default)": {
-    de: "Alles (heutige Standardeinstellung)",
-    es: "Todo (opción predeterminada actual)",
-    ca: "Tot (opció predeterminada actual)",
-  },
   "All six sources, untick later": {
     de: "Alle sechs Quellen, später abwählen",
     es: "Las seis fuentes, puedes desmarcarlas después",
@@ -4367,4 +4362,37 @@ export const SEED: Catalogue = {
      word-for-word "loop". */
   "Attach a file": { de: "Datei anhängen", es: "Adjuntar un archivo", ca: "Adjuntar un fitxer" },
   "On the loop": { de: "Auf dem Laufenden", es: "Informado", ca: "Informat" },
+
+  /* 18 Sep 2026 — four more strings `npm run lang` found with no seed entry
+     for de/es/ca, all from the assistant's file-attachment lane
+     (web/lib/use-agent-chat.tsx, web/components/assistant/agent-scope-picker.tsx,
+     agent-panel.tsx). "Everything" is the scope picker's own label, now that
+     the parenthetical "(today's default)" is gone from it (that seed row was
+     an orphan this same `npm run lang` run pruned) — it reuses the bare
+     "Todo"/"Alles"/"Tot" root already settled for "Everything in it,
+     including whatever you put there later." and "Everything else" above,
+     rather than a fresh word for the same sense. The other three are the
+     three refusals `addAttachments` raises for a picked file: over the count
+     cap, an unreadable kind, and over the size cap. They reuse the existing
+     attach/hang verb this file already settled two blocks up ("Attach a
+     file", "Couldn't attach that.", "What they attached") — anhängen/
+     adjuntar/adjuntar — rather than inventing a second one for the same
+     action, and "images, PDFs, or plain text" names the same three kinds
+     `AGENT_ATTACH_MIME` actually accepts, in the order the door checks them. */
+  "Everything": { de: "Alles", es: "Todo", ca: "Tot" },
+  "You can attach up to {count} files.": {
+    de: "Sie können bis zu {count} Dateien anhängen.",
+    es: "Puedes adjuntar hasta {count} archivos.",
+    ca: "Pots adjuntar fins a {count} fitxers.",
+  },
+  "{name} isn't a kind of file the assistant can read here — images, PDFs, or plain text.": {
+    de: "„{name}“ ist hier keine Dateiart, die der Assistent lesen kann — Bilder, PDFs oder reinen Text.",
+    es: "«{name}» no es un tipo de archivo que el asistente pueda leer aquí — imágenes, PDF o texto sin formato.",
+    ca: "«{name}» no és un tipus de fitxer que l'assistent pugui llegir aquí — imatges, PDF o text sense format.",
+  },
+  "{name} is too large. Attach a file up to {size} MB.": {
+    de: "„{name}“ ist zu groß. Hängen Sie eine Datei bis zu {size} MB an.",
+    es: "«{name}» es demasiado grande. Adjunta un archivo de hasta {size} MB.",
+    ca: "«{name}» és massa gran. Adjunta un fitxer de fins a {size} MB.",
+  },
 }

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.120",
-  "sha": "56087f55c6715443e36443a80a67a92e8130a5c4",
+  "tag": "v1.2.122",
+  "sha": "5a52048edf8a70576b5d47158c65ca5d98c381f9",
   "syncedAt": "2026-09-18"
  },
- "generatedAt": "2026-09-18T10:33:21.720Z",
+ "generatedAt": "2026-09-18T11:37:53.536Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 318,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 367,
-  "tokenDeclarations": 567,
+  "tokens": 368,
+  "tokenDeclarations": 568,
   "unresolved": 0
  },
  "components": [
@@ -1073,7 +1073,7 @@
        "name": "asChild",
        "optional": true,
        "kind": "boolean",
-       "note": "Render the caller's own element instead of a `<span>` — an anchor, almost always (a Next `<Link>` wrapping the badge, the same reason `BreadcrumbLink`'s own `asChild` exists: nesting a `<Link>` inside an `<a>` is invalid markup and breaks client-side routing). A badge given `asChild` is treated as a LINK for `LINK_UNDERLINE`, below, whether or not its child is actually an anchor — the prop is the caller's own declaration of intent, the same way `href` is."
+       "note": "Render the caller's own element instead of a `<span>` — an anchor, almost always (a Next `<Link>` wrapping the badge, the same reason `BreadcrumbLink`'s own `asChild` exists: nesting a `<Link>` inside an `<a>` is invalid markup and breaks client-side routing). A badge given `asChild` is treated as a LINK for `LINK_UNDERLINE`, below, whether or not its child is actually an anchor — the prop is the caller's own declaration of intent, the same way `href` is. THE CHILD MUST BE EXACTLY ONE ELEMENT THAT SPREADS ITS PROPS — Radix's own `Slot` contract: the badge's classes, `data-slot`, `data-dot`, `href` and ref are MERGED onto that element, so an app's own link component has to pass what it does not name straight through to its anchor, or the chip loses its `data-slot=\"badge\"` and its fill. A `dot` or `icon` given beside `asChild` lands INSIDE the child, before the label (the child IS the badge; its leading mark belongs in it) — this is `Slottable` at work, see the render's own comment. Until 18 Sep 2026 this prop threw on every real call, because the render always spent three child slots and `Slot` demanded one; `check-badge.mjs` section 6 now MOUNTS this shape rather than reading the source for it, so a regression here is a red check and never again a runtime throw the app finds first."
       },
       {
        "name": "loading",

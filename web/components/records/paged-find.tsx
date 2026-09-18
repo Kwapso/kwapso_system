@@ -658,13 +658,16 @@ export function PagedFind<T>({
     // (screen-bits.tsx has the argument in full): the pill below keeps its own
     // fill and radius, and this box does the pinning and paints the band the
     // rows disappear behind — the pill plus the gap under it, which used to be
-    // this column's parent's `gap-4` and is now `pb-4` INSIDE something that
-    // paints. `bg-surface-raised` is the card's own surface, the same tone the
+    // this column's parent's `gap-4` and is now `pb-[var(--toolbar-content-
+    // gap)]` INSIDE something that paints — the same token `<ToolbarRow>`
+    // (screen-bits.tsx) pays on its own inner column, wired directly rather
+    // than through globals.css's now-deleted scoped `.pb-4` override (18 Sep
+    // 2026). `bg-surface-raised` is the card's own surface, the same tone the
     // pill and the `<CollectionCard>` behind it wear, so nothing changes at
     // rest. `--pinned-chrome-h` is what it pins below — a collection tab strip
     // (this component draws one itself, right at the bottom of this file), a
     // record's strip, or nothing. See shared/web/pinned-chrome.ts.
-    <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4")}>
+    <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-[var(--toolbar-content-gap)]")}>
       <div
         data-slot="toolbar-row-column"
         className={cn(
@@ -832,8 +835,9 @@ export function PagedFind<T>({
     // moment the row above pins, the rows below keep scrolling and carry that
     // reserved space away with them — leaving the first row flush against a
     // pinned bar with nothing between them. The space is unchanged and has
-    // simply moved INSIDE the pinned box, as its own `pb-4`, where it is
-    // repainted at every scroll position the row is stuck at.
+    // simply moved INSIDE the pinned box, as its own `pb-[var(--toolbar-
+    // content-gap)]`, where it is repainted at every scroll position the row
+    // is stuck at.
     <div className="flex w-full flex-col">
       {toolbar}
       {children({

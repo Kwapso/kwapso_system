@@ -37,11 +37,11 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L28)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L30)
 - [3. Detail screens](#3-detail-screens) (D1 to D21)
 - [4. Collections](#4-collections) (K1 to K47)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B20)
-- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F17)
+- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
 - [9. Mobile](#9-mobile) (M1 to M6)
@@ -1148,7 +1148,24 @@ with no overlapping shoulder. The z-index ordering this rule settled (the active
 outranking a shifted neighbour, `<li>`-level, `isolation: isolate` on the strip) is
 untouched — only the shoulder-nesting geometry is gone.
 
-**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+**AMENDED 18 Sep 2026 ~13:20 (Round 20) — reported a sixth time; the standard is now
+explicit: match the content strip exactly.** The client's ruling, verbatim: *"on the
+assistant, the inctove tabds shape is still overlapping with the active one. tahts worng.
+shoudl 100% replicate what hapens with main content tabs."* Every fix above has been
+argued and proved against the assistant strip's OWN geometry — its own z-index, its own
+shoulder-then-gap history — and each round she reports the identical shape again. Her
+words this time name the standard directly rather than describing the symptom once more:
+the assistant `AgentTabStrip` is not merely SIMILAR to the content `BreadcrumbFolders`
+strip, it must be verified AGAINST it, tab for tab. Nothing here supersedes the geometry
+the 18 Sep ~06:40 amendment settled (a visible gap, no shoulder-nesting) or the z-index
+rule this rule opened with (`<li>`-level, `isolation: isolate`) — both strips already share
+the one component (`BreadcrumbFolders`) and the one CSS the kit ships, so a further drift
+between them is a call-site difference, not a second geometry to invent. Open until proved
+on live staging, strip beside strip, the same `ready-means-deployed` standard the 17 Sep
+amendments above were held to.
+
+**Status: reported a sixth time, 18 Sep 2026 (Round 20); open pending a live, side-by-side
+proof against the content strip rather than a further isolated fix to the assistant one.**
 
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
@@ -1271,7 +1288,7 @@ Contacts/Knowledge — "People" corrected to "Contacts" to match the glossary, R
 newest-touched-tab first. Six doors, one question each, no new route: every module already
 answers `q` at its own list door (R14), capped at five results per module for display,
 never a claim about the collection's real size. The search trigger is an icon-only
-button, charcoal not mango — the page's own title carries no act of its own (R84) — and no
+button — mango since Round 20, below — and no
 hint sentence rides under the title (R81). A pinned "+" sits on the content tab strip,
 mirroring the assistant strip's own trailing "+" byte for byte (`iconOnly`,
 `closable: false`), and **you cannot have two**: pressing "+" a second time fronts the one
@@ -1294,6 +1311,21 @@ name. The new-tab screen is now exactly two things: the search bar, and the "Rec
 opened" list read off every other open tab's own trail.
 
 **Status: ruled, in build, 17 Sep 2026.**
+
+**AMENDED 18 Sep 2026 ~13:20 (Round 20) — the search trigger reverses to mango; it is the
+page's one and only act.** The client's ruling, verbatim: *"on new page where to, make the
+button mango."* This reverses the search trigger's own earlier reasoning above (it shipped
+`variant="inverse"`, reasoned as "an icon button beside a bar is not a title-level one"):
+`NewTabScreen` has no `CollectionHeading`/`RecordScreen`/`RecordDetail`/`RecordChrome` to
+carry a [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black)/R84
+title-level action at all, so the search bar's own Go button — beside the "Where to?"
+headline, which is bare text, not a title component — is the page's one and only act, the
+same "one primary act, title-adjacent" shape R84 protects everywhere else. Rather than
+widen `TITLE_TAGS` to treat this row as a fifth title component (which would loosen R84's
+census for every OTHER bare-text headline in the app too), the button is named in
+`MANGO_OUTSIDE_TITLE_OK` (`shared/rules/registry.ts`) with her words as the reason.
+
+**Status: ruled, in build, 18 Sep 2026.**
 
 ### L25: a rest tab gets its own hover fill; the active tab never changes on hover
 
@@ -1411,6 +1443,56 @@ utility group, so this is a value swap on an existing mechanism, not a new one).
 
 **Law.** None registered — the kit's own `check-screen-shell.mjs` pins the handle's size
 against the band it fills.
+
+### L29: the assistant's scope picker offers three real choices, and none of them is a "default"
+
+**The rule.** The client's ruling, 18 Sep 2026 (Round 20), verbatim: *"kill this 'todsays
+default' for setting scopo of asistant."* The scope picker's third row (`agent-scope-
+picker.tsx`) used to read "Everything (today's default)" — the parenthetical implied a
+fourth, auto-inferred state standing apart from the two rows beside it ("This record",
+"Knowledge"), when in fact a person is always PICKING one of exactly three rows, "Everything"
+included. The label is now bare — "Everything", the same shape as its two siblings — with
+nothing about the row's own behaviour changed: it is still one ordinary pick, never an
+entry a person "falls into" by doing nothing.
+
+**The mechanism.** `agent-scope-picker.tsx`'s own `t("Everything (today's default)")`
+became `t("Everything")`; `agent-panel.tsx`'s `handlePickScope` independently rebuilds the
+identical string for the resulting conversation tab's OWN title (the tab strip renders
+`tab.label` verbatim), so both call sites carry the fix — a single seam would have been
+cleaner, but the string is assembled twice today rather than read from one constant, and
+splitting it out is future work, not this ruling's own scope. The stale seed-catalogue row
+("Everything (today's default)") is pruned by `npm run lang`.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered — a copy fix, not a structural one; `shared/i18n-strings.json`'s
+own extract/prune pair (R28) is what catches a stray re-introduction of the old string.
+
+### L30: the assistant's attach affordance is a paperclip that reads a file for one conversation only
+
+**The rule.** Resolves the "DECISION PENDING — the assistant's attach affordance" row this
+book carried since 18 Sep 2026 morning. Asked to choose between four options shown in a
+side-by-side artifact (A1 chat-only attach, A2 files filed into Knowledge, A3 a "+" menu, A4
+no attach at all — the recommended pick was A2, with A4 as the safe fallback), the client's
+own ruling, verbatim: *"assistant a1."* **A1**, not the recommendation: a paperclip button
+returns to the composer's leading edge; picking a file shows it as a tile above the pill
+("Read for this chat only"); sending the message clears the tile — nothing is filed anywhere,
+the attachment lived only for that one turn, in that one conversation. **Artifact:**
+<https://claude.ai/artifact/Nbwa6qGJTnCiGAaG5YrEgf>.
+
+**The mechanism.** `use-agent-chat.tsx`'s `addAttachments` gates a picked file three ways
+before it is held for the turn — over `AGENT_ATTACH_MAX_FILES`, off `AGENT_ATTACH_MIME`
+(images, PDFs, plain text), over `AGENT_ATTACH_MAX_BYTES` — each refusal a toast rather than
+a silent drop (`shared/i18n-seed.ts`, 18 Sep 2026: "You can attach up to {count} files.",
+the unreadable-kind and too-large sentences beside it). Nothing here writes to Knowledge —
+A2's own door stays untouched, so a chat-side attach and a Knowledge upload remain two
+separate paths with two different outcomes, the cost the pros/cons in the artifact named
+against A1 going in.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered — `web/test/agent-chat-attachments.test.tsx` and
+`workers/data-ops/test/agent-attachments.test.ts` cover the mechanism.
 
 ---
 
@@ -2058,7 +2140,14 @@ session:
   narrower tile. The grid is `grid-cols-3` at the panel's own width, "3 should fit in one
   row" read literally rather than derived from a container query, narrowing responsively
   below the panel's own breakpoints (`max-[45rem]:grid-cols-2 max-[24rem]:grid-cols-1`) so
-  the tiles never crowd on a narrow aside.
+  the tiles never crowd on a narrow aside. **Members and Stakeholders share the square band,
+  not just its shape.** `PersonCard` (`shared/web/person-card.tsx`) was extracted from
+  Settings › Team › Members' own gallery cell the same day, 18 Sep 2026, specifically so the
+  Stakeholders panel above could draw the identical tile without a second hand-copied
+  `<CardContent>` block — the mark's two seams and the vertical `band`-over-`tile` layout
+  moved into the shared component; `members-gallery.tsx` now calls `PersonCard` too, in
+  place of the JSX it used to draw by hand. One component, both surfaces, so "like in
+  members" is structural rather than a visual echo two files happen to agree on today.
 
 **Status: ruled, in build, 18 Sep 2026.**
 
@@ -5399,6 +5488,59 @@ takes for the app field beside it.
 
 **Law.** None registered.
 
+### F18: a title fits one line on a MacBook Air
+
+**The rule.** The client's two rulings, 18 Sep 2026, verbatim: *"for all titles (main,
+details, all) i would like to limit the lnght to what would fit in 1 line in a laptiop.
+this menas a max charactes for titles in the forms (not sutting it) wdyt? and ow many
+cahracters would taht be? consider text size regualr and the monitor size of a
+macbook"* — and, shown a side-by-side of three enforcement options: *"for title lenght.
+set this limit considering macbook air, enforce with e3."* Every title-shaped field (a
+ticket's Title, a story's and a task's "What needs doing", a meeting's "What it is
+about", a wave's and a sprint's name, an app's "What it's called", an account's Name, a
+knowledge source's "What is it called?", and a to-do's "What we need from them") is
+capped at `TITLE_MAX_CHARS` characters — 50 — and a title already longer than that,
+written before the ceiling existed, is truncated with an ellipsis wherever it is drawn
+on one line rather than rejected.
+
+**The number.** Canvas-measured, not guessed (artifact "Title Length"): how many
+characters of regular-weight text fit on ONE LINE, at MacBook Air width (1440×900), in
+the app's three one-line title steps — the record heading (64 characters fit), the
+collection heading (65), the list title cell (57). The narrowest of the three, rounded
+down for a margin (a shorter monitor, a wider character, a translated word running
+longer than the English one): 50. One constant for all three rather than three separate
+ceilings, because one title moves between all three renderers — a ticket is a record
+head on its own screen and a list cell in Tickets — and a field that fits its narrowest
+home fits every home.
+
+**E3.** The client's own shorthand from the side-by-side that settled this: the THIRD of
+three enforcement options offered — a hard cap in every form (the input's own
+`maxLength`, so the 51st character never types) plus an ellipsis fallback for a record
+that already exceeded the ceiling before it existed. Not E1 (truncate silently, no cap)
+and not E2 (cap only, no fallback for old records).
+
+**The counter.** [F6](#f6-a-character-limited-text-field-shows-its-counter-under-the-input-right-aligned)'s
+own format, `0/50`, drawn now through the kit `Field`'s own `count`/`countMax` footer
+slot rather than a hand-built line under the input — a NUMBER, not a sentence, so it is
+not a hint under [F12](#f12-a-form-carries-no-hints)'s ban.
+
+**What is a title and what is not.** A dropdown VALUE (a Choice) is not a title. A
+ROLE's name, a PROCESS's name and a STEP's name are named records of their own, but
+outside this ruling's worked examples and the canvas measurement, and are left
+uncapped. A PERSON's name is not a title — the client's own distinction, carried into
+the law — so the contact-creation field ("Marta Bergman") is untouched.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** [R87](../RULES.md) (`title-length`). A source census over the form field
+configs (every `FieldConfig` literal for a title field sets `validation.maxLength` to
+`TITLE_MAX_CHARS` and its `<Input>` carries the same `maxLength`) and over the matching
+write doors (`requireText`/`optionalText` capped at the same constant, positionally,
+R20's own discipline); a render assertion that every one-line title renderer —
+`clampRecordHeading` (`shared/web/record-heading.tsx`), `CollectionHeading`, and
+`RecordTable`'s own first column — truncates with an ellipsis and keeps the full title
+reachable through its `title` attribute.
+
 ---
 
 ## 7. Typography
@@ -5642,6 +5784,39 @@ down by roughly half their current measure, read by eye rather than to an exact 
 she named. `--rail-inset` moves off `--space-5` for the first time since this rule shipped.
 
 **Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+
+**AMENDED 18 Sep 2026 ~13:20 (Round 20) — the rail brand row aligns to the tab strip's own
+band, and a collapsed rail keeps every size.** Two further rulings on the rail, the same
+round:
+
+- *"on the sidebar tge logo is way too up!!! make it aligned with text on foler tabs"* — the
+  rail's own mark-plus-wordmark lockup (`rail-brand`, `rail.tsx`) sat 10px above the active
+  content tab's own label centre, measured live (`verify/shell-chrome/`, 1440×900). Kit
+  v1.2.121 first fixed it by COMPUTING a centre from four tokens
+  (`--shell-gutter + --folder-lip/2 - --icon-20/2 - --rail-inset`) — correct at the kit's own
+  15px harness root, 8.65px off on the live app's 16px root, because one of the four terms
+  stood in for the mark's own rendered height rather than for a fact about the tab strip band
+  it was reaching for. **Kit v1.2.122 rewrote it to build a BAND instead of a centre:** a new
+  token, `--strip-row` (aliased to `--folder-lip`), names the exact box the tab strip's label
+  already centres inside; the rail brand row now takes `h-[var(--strip-row)]` and relies on
+  its own pre-existing `items-center` to centre the mark inside that box, the same way the
+  tab strip centres its label regardless of the label's own line height — two boxes with
+  coincident centres BY CONSTRUCTION, not by an offset computed from outside either one.
+  Measured after the rewrite: 0.53px off at the kit's 15px root, 0.59px off at the live app's
+  16px root — both sub-pixel, both close to identical, which is the actual proof a fix keyed
+  to the wrong facts does not give. **Status: ruled, in build, 18 Sep 2026 (kit v1.2.122).**
+- *"when contracting sidebar, yuo should not make icons or spaces smaller, keep it as it is,
+  just without tetxs"* — collapsing the rail used to shrink each row's own box from
+  `--control-height-button` (37.5px at the kit's 15px root) down to `--avatar-md` (30px), an
+  8px shrink carried straight through to the row-to-row rhythm; the glyph inside was never
+  part of that shrink (`ROW_SHAPE`'s own `[&_svg]:size-[var(--icon-button)]` reads off the
+  row, not a now-absent icon wrapper), so what she is naming as "icons or spaces smaller" is
+  the row box and the rhythm it sets, not the glyph itself. `ROW_COLLAPSED` (`rail.tsx`) now
+  reads the SAME `--control-height-button` token `ROW_EXPANDED` does — one row height, one
+  row-to-row rhythm, in both states — and the rail's own collapsed root width widens the same
+  8px so the now-larger circle still fits without clipping. Only the destination LABEL leaves
+  the layout on collapse; nothing else resizes. **Status: ruled, in build** (kit v1.2.120,
+  already in `HEAD` before this session's own sync to v1.2.122).
 
 ### S3: card padding is `p-4`, panel padding is `p-6`
 
@@ -7207,46 +7382,34 @@ on the app tab, which has no title component of its own). **Status: shipped, thi
 session** — not yet folded into the numbered K-series above; a future documentation pass
 should give it its own line and cross-reference.
 
-**DECISION PENDING — the assistant's attach affordance, 13 Sep vs. 18 Sep.** Two rulings
-across five days describe the assistant composer's own attach control differently, and
-neither has been reconciled against the other yet. The 13 Sep shape (the assistant's own
-composer, distinct from the ticket reply composer D20/D21 cover) shipped with one attach
-affordance; reviewing it again on 18 Sep, the client's ruling was *"need visual options to
-vhoose rfom"* — read as "the two dates' shapes disagree and I want to see them side by side
-before picking," the same working-agreement move this book's own header names ("decisions
-need a visual… build a side-by-side page and point at it"), not yet built. A side-by-side
-artifact comparing the 13 Sep and 18 Sep attach affordances is the next step; her pick, once
-made, resolves this row. **Artifact:** <https://claude.ai/artifact/Nbwa6qGJTnCiGAaG5YrEgf>
-(unread by this pass — linked here rather than summarised, so the next reader opens the
-live page rather than trusting a paraphrase of it).
+**CLOSED, 18 Sep 2026 (Round 20) — the assistant's attach affordance.** Was: "DECISION
+PENDING — the assistant's attach affordance, 13 Sep vs. 18 Sep." The side-by-side artifact
+this row called for was built and shown; the client's pick, verbatim, *"assistant a1,"* is
+now [L30](#l30-the-assistants-attach-affordance-is-a-paperclip-that-reads-a-file-for-one-conversation-only).
+**Artifact:** <https://claude.ai/artifact/Nbwa6qGJTnCiGAaG5YrEgf>.
 
-**DECISION PENDING — a title's maximum length, computed at N=50.** The client's ruling,
-18 Sep 2026 (Round 19), verbatim: *"this is something completey new, and will require an
-artifact. for all titles (main, details, all) i would like to limit the lnght to what
-would fit in 1 line in a laptiop. this menas a max charactes for titles in the forms (not
-sutting it) wdyt? and ow many cahracters would taht be? consider text size regualr and the
-monitor size of a macbook."* A character ceiling for every title field across every form —
-computed against the regular title text size and a MacBook-class viewport — rather than a
-truncation rule on an already-saved value (her own "not cutting it"). The computed answer,
-**N = 50 characters**, is recorded here as the number an artifact arrived at; it is not yet
-wired into any form as a `maxLength`/counter, and the ceiling has not been read back to her
-for a pick. **Artifact:** <https://claude.ai/artifact/TYmJqr1byzjS9oiLosyFaL> (unread by
-this pass — linked rather than summarised, same reason as the row above).
+**CLOSED, 18 Sep 2026 — a title's maximum length.** Was: "DECISION PENDING — a title's
+maximum length, computed at N=50." The ceiling this row recorded as computed-but-unwired is
+now [F18](#f18-a-title-fits-one-line-on-a-macbook-air): `TITLE_MAX_CHARS = 50`, wired into
+every title-shaped field's `maxLength` and live counter, and into the matching write door,
+positionally (R20/R87). F18's own status line already reads "ruled, in build, 18 Sep 2026" —
+this row is closed rather than restated. **Artifact:**
+<https://claude.ai/artifact/TYmJqr1byzjS9oiLosyFaL>.
 
 ---
 
 ## Rule index
 
-**205 rules.**
+**208 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L28 (28) |
+| 2. Page layout and width | L1 to L30 (30) |
 | 3. Detail screens | D1 to D21 (21) |
 | 4. Collections | K1 to K47 (47) |
 | 5. Buttons and actions | B1 to B20 (20) |
-| 6. Forms and dialogs | F1 to F17 (17) |
+| 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |
 | 9. Mobile | M1 to M6 (6) |
@@ -7288,7 +7451,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R79 | [F11](#f11-staff-is-picked-from-a-pill-row-never-a-dropdown-and-the-signed-in-user-starts-selected) | R80 | [K22](#k22-rows-are-a-list-never-a-banded-table) |
 | R82 | [K32](#k32-a-table-row-holds-at-most-six-columns-the-seventh-goes-on-a-second-line-never-squeezed-onto-the-end) | R83 | [K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column) |
 | R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | R85 | [W15](#w15-every-rail-destination-is-named-in-one-word) |
-| R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | | |
+| R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | R87 | [F18](#f18-a-title-fits-one-line-on-a-macbook-air) |
 
 ### The seven files that carry most of it
 

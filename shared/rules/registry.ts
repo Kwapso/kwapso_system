@@ -764,6 +764,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "status-owns-the-chip",
     status: "enforced",
   },
+  {
+    id: "R87",
+    dimension: "ui",
+    law: "A TITLE FITS ONE LINE ON A MACBOOK AIR, AND EVERY TITLE-SHAPED FIELD IS CAPPED THERE. The client's ruling, 18 Sep 2026, verbatim: \"for all titles (main, details, all) i would like to limit the lnght to what would fit in 1 line in a laptiop. this menas a max charactes for titles in the forms (not sutting it) wdyt? and ow many cahracters would taht be? consider text size regualr and the monitor size of a macbook\" — and her pick, shown a side-by-side of three enforcement options: \"for title lenght. set this limit considering macbook air, enforce with e3.\" MEASURED, NOT GUESSED: the artifact \"Title Length\" canvas-measured how many characters of regular-weight text fit on ONE LINE, at MacBook Air width (1440×900), in the app's three one-line title steps — the record heading (64 characters), the collection heading (65), the list title cell (57) — and the narrowest of the three, rounded DOWN for a comfortable margin, is `TITLE_MAX_CHARS = 50` (`shared/types.ts`), ONE constant for all three rather than three separate ceilings, because one title moves between all three renderers (a ticket is a record head on its own screen and a list cell in Tickets, and a field that fits its narrowest home fits every home). \"ENFORCE WITH E3\" names the THIRD of three options the side-by-side offered: a HARD CAP in every form (the input's own `maxLength`, so the 51st character never types, plus a live \"N / 50\" counter through the kit `Field`'s own `count`/`countMax` — a NUMBER, not a sentence, so R81's ban on form hints does not catch it) PLUS an ELLIPSIS FALLBACK for a record that already exceeded the ceiling before it existed — never a retroactive rejection. TWO SEAMS, ONE CONSTANT, so the form and the door can never disagree about what \"too long\" means. THE FORM SEAM: every title-shaped FIELD CONFIG — a ticket's Title, a story's and a task's \"What needs doing\", a meeting's \"What it is about\", a wave's and a sprint's name, an app's \"What it's called\", an account's Name, a knowledge source's \"What is it called?\", and a to-do's (the glossary's Input) \"What we need from them\" — spreads `validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS }` and the input beside it carries the identical `maxLength={TITLE_MAX_CHARS}` and a `count`/`countMax` pair on its `<Field>`. Deliberately NOT counted as titles, and left alone: a dropdown VALUE (`selectable-form-dialog.tsx`'s `optionField` — a Choice, never a record with its own heading), a ROLE's name, a PROCESS's or a STEP's name (named records of their own, but not the ones her ruling's examples or the canvas measurement were taken against), and a PERSON's name (`contact-link-dialog.tsx`'s `ContactCreateDialog.nameField`, \"Marta Bergman\" — a person's name is not a title, and the file sits outside the owned `*-form-dialog.tsx` glob regardless). THE DOOR SEAM: every matching WRITE DOOR — `createTicket`/`updateTicket` (titleEn/titleDe), `createStory`/`updateStory`, `createSprint`/`updateSprint`, `createTask`/`updateTask`, the to-do door, `createMeeting`, `postCreateWave`/`postUpdateWave`, `postCreateApp`/`postUpdateApp`, `createAccount`/`updateAccount`, and every `createSource`/`postCreateKnowledge`/`postUploadKnowledgeFile`/`postUpdateKnowledge` title read — calls `requireText`/`optionalText` with `TITLE_MAX_CHARS` in place of `TEXT_LIMITS.short`, positionally (R20's own discipline, held to this one field on each door). THE RENDER SEAM: every ONE-LINE TITLE RENDERER truncates with an ellipsis and carries the full string as its `title` attribute, so a record whose title predates the ceiling is never rejected, only ever shown short — `clampRecordHeading` (`shared/web/record-heading.tsx`, read by both the bespoke `record-chrome.tsx` detail screens and every recipe-driven detail through `screen-renderer.tsx`) moved from a two-line `line-clamp-2` to a one-line `truncate`, which is a STRICTER bound serving both the 1 Sep 2026 missing-title problem (an arbitrarily long description standing in for one) and this ceiling; `CollectionHeading` (`web/components/records/collection-heading.tsx`) wraps its own text through the same helper; and `RecordTable`'s first column (`web/components/records/record-table.tsx`, \"the list title cell\" by this file's own convention) truncates through the identical helper whether or not a leading `RecordRef` chip is drawn beside it.",
+    why: "Enforced twice over because a limit that only lives in the form is a limit a machine caller (an import, the MCP surface, a future integration) can walk straight past, and a limit that only lives in the door with no COUNTER is a person typing into a void until the 51st keystroke silently vanishes. CHECKED as a source census over the form field configs (every object literal spreading `...defaultFieldConfig` whose `label` matches a title field, walked the same way R81's hint census already walks `field-config-keys.test.ts`'s own parse) and over the door call sites (every `requireText`/`optionalText` call naming a title-shaped field, the same `appFiles()`/route-source walk R20's own positional census stands on), plus a render assertion that `clampRecordHeading` draws `.truncate` rather than `.line-clamp-2` and that `CollectionHeading`/`RecordTable` both import it.",
+    checkId: "title-length",
+    status: "enforced",
+  },
 ]
 
 /** R74 (`import-opens-a-tab`) — the reasoned, rot-checked way out for an
@@ -5292,9 +5300,21 @@ export const TOOLBAR_LEAD_GAP_EXEMPT: Record<string, string> = {}
  * documentation-and-sweep lane that DOES own those two files switched both to
  * `variant="inverse"` the same day and cleared this table: every mango button
  * the census found outside a title component is now fixed, none excused.
- * Empty on purpose — a future entry here is a real, reasoned exception, never
- * a placeholder for "do this later". */
-export const MANGO_OUTSIDE_TITLE_OK: Record<string, string> = {}
+ *
+ * ONE LINE HELD HERE SINCE (18 Sep 2026), the client's own ruling on the new
+ * tab page: "on new page where to, make the button mango." `new-tab-screen.tsx`
+ * has no `CollectionHeading`/`RecordScreen` at all — its `Headline` ("Where
+ * to?") is bare text, not one of the four title components this law reads —
+ * so there is no title slot to move the button INTO; the search row beside
+ * the headline is, on this screen, the only act the page offers at all, which
+ * is the same "one primary act, title-adjacent" shape the law protects
+ * everywhere else. Named here rather than silently reclassifying the search
+ * row as a fifth title component, which would widen `TITLE_TAGS` for every
+ * OTHER screen too. */
+export const MANGO_OUTSIDE_TITLE_OK: Record<string, string> = {
+  "web/components/shell/new-tab-screen.tsx#NewTabScreen":
+    "Client ruling, 18 Sep 2026, verbatim: \"on new page where to, make the button mango.\" The page has no CollectionHeading/RecordScreen/RecordDetail/RecordChrome to host it — the search bar's own Go button is the page's one and only act.",
+}
 
 // ── R85 (rail-labels-one-word) ──────────────────────────────────────────────
 

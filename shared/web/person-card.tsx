@@ -76,7 +76,21 @@ export function PersonCard({
   orientation?: "vertical" | "horizontal"
   size?: RecordMarkSize
 }) {
-  const face = <RecordMark picture={picture} mark={mark} name={markName} shape="round" size={size} />
+  // THE SQUARE BAND, NOT THE CIRCLE — client ruling, 18 Sep 2026, verbatim:
+  // "for stakeholders, i want square tiels (lik in members, with text under
+  // the image). 3 should fit in one row." Measured live on staging (kit
+  // v1.2.120) this face was drawing `shape="round"` — a 72px CIRCLE, not the
+  // square band her sentence names — on BOTH walls this component draws
+  // (members-gallery.tsx AND help-stakeholders.tsx, which reuses this exact
+  // component precisely so the two tiles cannot drift). `shape="square"` is
+  // `RecordMark`'s own rounded-square band (`rounded-[var(--radius)]`, R31),
+  // the same box a client/app/asset mark draws — a PERSON drawn as a card
+  // tile is read as the record it names here, not the "person in their own
+  // right" case `RecordMark`'s own header carves out for a bare round mark
+  // (a stack, a row's leading mark). Both walls change together because
+  // there is only the one component; see this file's own header for why a
+  // second, hand-copied tile was rejected the day this was extracted.
+  const face = <RecordMark picture={picture} mark={mark} name={markName} shape="square" size={size} />
 
   if (orientation === "horizontal") {
     return (

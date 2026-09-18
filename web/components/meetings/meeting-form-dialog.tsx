@@ -23,6 +23,7 @@ import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
@@ -51,7 +52,15 @@ const BRAND = { brand: brand.name }
  * sentinel — the same one the knowledge form uses for the agency's own material. */
 const NONE = "__none__"
 
-const titleField = { ...defaultFieldConfig, label: "What it is about", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const titleField = {
+  ...defaultFieldConfig,
+  label: "What it is about",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const whenField = { ...defaultFieldConfig, label: "When", required: true }
 const untilField = { ...defaultFieldConfig, label: "Until", required: false }
 const clientField = { ...defaultFieldConfig, label: "Who it is with", required: false }
@@ -189,12 +198,19 @@ export function MeetingFormDialog({
         disabled: !ready,
       }}
     >
-      <Field config={titleField} htmlFor="meeting-title" className={fieldSpacing}>
+      <Field
+        config={titleField}
+        htmlFor="meeting-title"
+        className={fieldSpacing}
+        count={values.title.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="meeting-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
           placeholder={t("e.g. Quarterly review with Bergman")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

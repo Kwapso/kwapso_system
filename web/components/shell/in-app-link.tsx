@@ -97,6 +97,7 @@ export function InAppLink({
   className,
   children,
   onNavigate,
+  ...rest
 }: {
   /** A path inside the app — "/t/<teamId>/…" or a top-level module page. */
   href: string
@@ -105,7 +106,10 @@ export function InAppLink({
   /** The host's own `go()`, when the caller has one. Falls back to the shared
    * bus, which resolves to the same function once the shell has registered it. */
   onNavigate?: (path: string) => void
-}) {
+} & Omit<
+  React.ComponentPropsWithoutRef<"a">,
+  "href" | "className" | "children" | "onClick" | "onAuxClick" | "onMouseDown" | "onPointerDown"
+>) {
   // THROUGH THE URL SEAM, even though every caller builds this from a literal
   // and a ULID. The rule is positional on purpose (web/test/rich-text.test.ts):
   // a URL that reaches an href without passing the checker is the shape that
@@ -117,6 +121,22 @@ export function InAppLink({
   const go = onNavigate ?? softNavigate
   return (
     <a
+      // EVERYTHING THIS COMPONENT DOES NOT NAME GOES STRAIGHT ONTO THE ANCHOR,
+      // and it is spread FIRST so the four handlers, the href and the class
+      // below always win. This is the child's half of Radix's `asChild`
+      // contract: `shared/web/ticket-chips.tsx` renders the app-name chip as
+      // `<Badge asChild><InAppLink>…</InAppLink></Badge>` (client ruling,
+      // 18 Sep 2026, "when its a link make it underlined (for exmaple the app
+      // name)"), and `Slot` delivers the badge's own `data-slot="badge"`,
+      // `data-dot` and ref to THIS component as ordinary props. Before this
+      // spread they were dropped on the floor — `className` alone was
+      // forwarded — so the chip rendered without the `data-slot` every chip
+      // census in `web/test/` counts by (`ticket-raised-on.test.tsx`'s
+      // four-chip row, for one). The type says the same thing: the anchor's
+      // own props minus the five this component owns, so a caller cannot
+      // hand in a second `onClick` that the gesture grammar above would then
+      // silently lose.
+      {...rest}
       href={safe}
       onClick={(e) => {
         // ONE GRAMMAR, READ ONCE. `null` covers Shift/Alt (the browser's own

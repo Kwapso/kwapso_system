@@ -20,6 +20,7 @@ import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PaperPlaneTilt } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
@@ -45,7 +46,15 @@ export type TodoFormValues = {
 }
 
 const accountField = { ...defaultFieldConfig, label: "Which account", required: true }
-const titleField = { ...defaultFieldConfig, label: "What we need from them", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const titleField = {
+  ...defaultFieldConfig,
+  label: "What we need from them",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const detailField = { ...defaultFieldConfig, label: "Anything else they should know", required: false }
 /** WHEN THE CLIENT HAS TO COME BACK TO US. Called Deadline, which is the word
  * every other screen in the app uses for the same fact (CHECKLIST 2.5) — this
@@ -240,12 +249,19 @@ export function TodoFormDialog({
           />
         </Field>
       )}
-      <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
+      <Field
+        config={titleField}
+        htmlFor="todo-title"
+        className={fieldSpacing}
+        count={values.title.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="todo-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
           placeholder={t("e.g. Send us your brand logo as an SVG")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

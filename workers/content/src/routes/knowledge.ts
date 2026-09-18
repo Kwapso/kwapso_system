@@ -16,6 +16,7 @@
 import type { Actor, MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
@@ -566,7 +567,7 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
 export async function postCreateKnowledge(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<SourceInput>(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
-  requireText(body.title, "Title", TEXT_LIMITS.short)
+  requireText(body.title, "Title", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const { id, read, refusedBecause } = await createSource(env, cfg, guard, actor, body)
   // Row-level: carry the new source's id so open lists patch just that row.
   await publishChange(env, guard.teamId, "knowledge", id, "add")
@@ -628,7 +629,7 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
   const fileName = requireText(body.fileName, "File name", TEXT_LIMITS.short)
   // The title defaults to the file's own name, because a person who dragged a
   // contract onto the screen has already named it once.
-  const title = optionalText(body.title, "Title", TEXT_LIMITS.short) ?? fileName
+  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? fileName // R87: title-length (RULES.md)
   const parsed = parseUploadDataUrl(body.fileDataUrl, KNOWLEDGE_FILE_MAX_BYTES, ANY_FILE_TYPE)
   if (!parsed)
     return fail(
@@ -865,7 +866,7 @@ export async function postConfirmKnowledgeFile(request: Request, env: Env): Prom
   const contentType = requireText(body.contentType, "File type", TEXT_LIMITS.short)
   if (!ANY_FILE_TYPE.test(contentType))
     return fail(400, "invalid_input", "That upload did not say what kind of file it is. Nothing was saved.")
-  const title = optionalText(body.title, "Title", TEXT_LIMITS.short) ?? fileName
+  const title = optionalText(body.title, "Title", TITLE_MAX_CHARS) ?? fileName // R87: title-length (RULES.md)
   const accountId = optionalText(body.accountId, "Account", TEXT_LIMITS.short) ?? null
   const visibleToAppId = optionalText(body.visibleToAppId, "App", TEXT_LIMITS.short) ?? null
   const privateToMe = optionalText(body.visibility, "Visibility", TEXT_LIMITS.short) === "private"
@@ -966,7 +967,7 @@ export async function postUpdateKnowledge(request: Request, env: Env): Promise<R
   )
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Source", TEXT_LIMITS.short)
-  requireText(body.title, "Title", TEXT_LIMITS.short)
+  requireText(body.title, "Title", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   await updateSource(env, cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "knowledge", id)
   return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })

@@ -33,7 +33,7 @@ import {
 } from "../lib/todos"
 import { countTasks, createTask, getTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
-import { TASK_VIEWS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
+import { TASK_VIEWS, TITLE_MAX_CHARS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
 import type { Env } from "../env"
 
 /** WHOSE WORLD IS THIS CALLER STANDING IN? Resolved once per request, the same
@@ -308,7 +308,7 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   const scope = await refusePortalCaller(cfg, guard)
   const created = await createTodo(cfg, guard, actor, {
     accountId: requireText(body.accountId, "Client", TEXT_LIMITS.short),
-    title: requireText(body.title, "What we need", TEXT_LIMITS.short),
+    title: requireText(body.title, "What we need", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
     dueOn: optionalMoment(body.dueOn, "Due"),
     ticketId: optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short),
@@ -691,7 +691,7 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
   }
 
   const { id, accountId } = await createTask(cfg, guard, actor, {
-    title: requireText(body.title, "What needs doing", TEXT_LIMITS.short),
+    title: requireText(body.title, "What needs doing", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
     dueOn: optionalMoment(body.dueOn, "Deadline"),
     assigneeId,
@@ -748,7 +748,7 @@ export async function postUpdateTask(request: Request, env: Env): Promise<Respon
     return fail(400, "invalid_input", "That person isn't on the team any more.")
 
   const { accountId } = await updateTask(cfg, guard, actor, id, {
-    title: requireText(body.title, "What needs doing", TEXT_LIMITS.short),
+    title: requireText(body.title, "What needs doing", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
     dueOn: optionalMoment(body.dueOn, "Deadline"),
     assigneeId,

@@ -5482,6 +5482,7 @@ describe("RULES — the laws of the base", () => {
       "mango-in-title-only", // R84: web/test/mango-title-only.test.ts — every <Button variant="default"> (stated or omitted) in web/ + web-portal/ + shared/web/, walked for a CollectionHeading/RecordScreen/RecordDetail/RecordChrome ancestor (through JSX attribute initializers too), or named in MANGO_OUTSIDE_TITLE_OK
       "rail-labels-one-word", // R85: web/test/rail-labels-one-word.test.ts — every NAV/TEAM_SECTIONS rail destination's title read off web/lib/pages.ts (the same source app-shell.tsx draws the rail from), or its group named in RAIL_LABEL_WORDS_OK
       "status-owns-the-chip", // R86: web/test/status-owns-the-chip.test.ts — every <Badge variant="status" dot={…}>/<Swatch colour={…}> over shape.tsx + the ticket collection/detail components + tasks-screen.tsx, resolved through local const hops to what it names, or named in COLOURED_CHIP_OK
+      "title-length", // R87: web/test/title-length.test.ts — the ten title-field-config + write-door censuses, plus the clampRecordHeading/CollectionHeading/RecordTable render assertions
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

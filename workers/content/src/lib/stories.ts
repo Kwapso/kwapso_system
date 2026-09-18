@@ -45,7 +45,14 @@ import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
-import { STORY_STATUSES, type Sprint, type Story, type StoryStatus, type StoryViewName } from "@shared/types"
+import {
+  STORY_STATUSES,
+  TITLE_MAX_CHARS,
+  type Sprint,
+  type Story,
+  type StoryStatus,
+  type StoryViewName,
+} from "@shared/types"
 import { requireActiveSelectableValue } from "./vocabulary"
 
 import type { Env } from "../env"
@@ -830,7 +837,7 @@ export async function createStory(
   actor: Actor,
   input: StoryInput
 ): Promise<{ id: string; accountId: string | null }> {
-  const title = requireText(input.title, "Title", TEXT_LIMITS.short)
+  const title = requireText(input.title, "Title", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const detail = optionalText(input.detail, "Detail", TEXT_LIMITS.long) ?? null
   const ticketId = optionalText(input.ticketId, "Ticket", TEXT_LIMITS.short)
   const appId = optionalText(input.appId, "App", TEXT_LIMITS.short)
@@ -924,7 +931,7 @@ export async function updateStory(
   input: StoryInput
 ): Promise<{ accountId: string | null }> {
   const before = await storyOrThrow(cfg, guard, id)
-  const title = requireText(input.title, "Title", TEXT_LIMITS.short)
+  const title = requireText(input.title, "Title", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const detail = optionalText(input.detail, "Detail", TEXT_LIMITS.long) ?? null
   const ticketId = optionalText(input.ticketId, "Ticket", TEXT_LIMITS.short)
   const appId = optionalText(input.appId, "App", TEXT_LIMITS.short)
@@ -1383,7 +1390,7 @@ export async function createSprint(
   actor: Actor,
   input: SprintInput
 ): Promise<{ id: string; accountId: string | null }> {
-  const name = requireText(input.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(input.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(input.goal, "Goal", TEXT_LIMITS.long) ?? null
   const sprintType = optionalText(input.sprintType, "Sprint type", TEXT_LIMITS.short) ?? null
   const appId = optionalText(input.appId, "App", TEXT_LIMITS.short)
@@ -1453,7 +1460,7 @@ export async function updateSprint(
   const before = rows[0]
   if (!before) throw new GuardError(404, "sprint_not_found", "That sprint doesn't exist.")
 
-  const name = requireText(input.name, "Name", TEXT_LIMITS.short)
+  const name = requireText(input.name, "Name", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
   const goal = optionalText(input.goal, "Goal", TEXT_LIMITS.long) ?? null
   const sprintType = optionalText(input.sprintType, "Sprint type", TEXT_LIMITS.short) ?? null
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null

@@ -1165,6 +1165,18 @@ again, which is the only property that matters here.
   field on that row (a type, a category) draws an icon or plain text, never a
   colour — a coloured dot for anything but status needs a real, reasoned line
   in `COLOURED_CHIP_OK` (`shared/rules/registry.ts`).
+- **R87 `title-length`** — if your module gives a record its own TITLE (not a
+  dropdown value, not a role, not a person's name), that field's config sets
+  `validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS }`
+  (`shared/types.ts`) and its `<Input>` carries the identical
+  `maxLength={TITLE_MAX_CHARS}` plus a live `count`/`countMax` on the `<Field>`
+  around it. The write door that saves it caps the same field at
+  `TITLE_MAX_CHARS` too, positionally (R20's own discipline), in place of
+  `TEXT_LIMITS.short`. And wherever your module draws that title on ONE line —
+  a record head, a collection heading, a list cell — it truncates a
+  pre-existing longer one with an ellipsis through the shared
+  `clampRecordHeading` (`shared/web/record-heading.tsx`) rather than a
+  bespoke clamp of its own.
 
 **The words** (the ones that catch every new module, every time)
 

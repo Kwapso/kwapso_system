@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { createPortal } from "react-dom"
 
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
+import { BreadcrumbFolders, type BreadcrumbFoldersItem } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
 
 import { AgentTabStrip } from "@/components/assistant/agent-tab-strip"
 import { AgentDockTabsSlot, useAgentDockTabs } from "@/lib/agent-dock"
@@ -211,6 +212,61 @@ describe("AgentTabStrip", () => {
 // (`items[index]?.closable !== false`), so proving `closable: false` here (as
 // the tests above already do, at the close-button level) is proving the drag
 // gate too, not a second fact to separately pin.
+describe("parity with the main content tab strip — client ruling, 17 Sep 2026, verbatim: \"the inctove tabds shape is still overlapping with the active one. tahts worng. shoudl 100% replicate what hapens with main content tabs\"", () => {
+  // THE KIT HAS ONE STRIP IMPLEMENTATION — `BreadcrumbFolders` — called
+  // directly, with no wrapping `className`, from BOTH mounts: the main
+  // content trail (`app-shell.tsx`'s `breadcrumb` prop) and this file's own
+  // `AgentTabStrip`. Measured live on staging the same day this test was
+  // written (kit v1.2.121, `shared/ui/VERSION.json`, synced 2026-09-18): both
+  // strips already carry the identical `--folder-shoulder`/
+  // `--folder-tab-overlap` custom properties, the identical per-`<li>`
+  // z-index formula (live tab `1`, every rest tab `restZIndex(position)`, the
+  // "stacking" describe block above), and an identical, non-overlapping 8px
+  // gap between adjacent tabs (`STRIP`'s own `gap-[var(--space-2)]`,
+  // `breadcrumb-folders.tsx`'s "THE OVERLAP IS GONE, 18 SEP 2026" comment —
+  // the negative-margin NESTING mechanism this law used to complain about was
+  // retired upstream, in the kit, for both mounts at once). So there is
+  // nothing left for either app-side file to diverge on — this pins that by
+  // reading the actual rendered class string rather than trusting the
+  // comment: neither call site may grow its OWN className on the strip,
+  // because a single character of drift here is exactly how the two strips
+  // would stop being "100% the same" again.
+  it("AgentTabStrip's own <nav> carries byte-for-byte the same class string as a bare BreadcrumbFolders call — the exact shape app-shell.tsx's content trail uses", () => {
+    const { container: agentContainer } = render(<AgentTabStrip {...baseProps()} />)
+    const agentNav = agentContainer.querySelector('nav[data-slot="breadcrumb-folders"]')
+    expect(agentNav, "AgentTabStrip must mount the kit's own BreadcrumbFolders").toBeTruthy()
+
+    // The content trail's own call shape (`app-shell.tsx`), for the SAME
+    // scenario the client's ruling is about — a set of open, closable tabs
+    // ("adjacent tab boxes"): `items`, `activeIndex`, a REAL `onClose`,
+    // `closeLabel`, `onReorder`, `onClickCapture` — no `className` —
+    // reproduced here directly rather than rendering the whole shell, which
+    // needs none of AgentTabStrip's own conversation-tab plumbing to make the
+    // SAME comparison. `onClose` must be a real function, not left
+    // `undefined`: the kit's own `textTrail` gate
+    // (`onCurrentActivate === undefined && onClose === undefined`) adds a
+    // `max-md:hidden` class the moment BOTH are absent, which is the kit's
+    // phone/text-trail fallback and not a difference between the two MOUNTS —
+    // `app-shell.tsx` only ever leaves `onClose` `undefined` on a trail with
+    // nothing closable at all, never on the open-tab-set shape this test (and
+    // the client's own report) is about.
+    const contentItems: BreadcrumbFoldersItem[] = [
+      { key: "tasks", label: "Tasks", href: "#tasks" },
+      { key: "tickets", label: "Tickets", href: "#tickets" },
+    ]
+    const { container: contentContainer } = render(
+      <BreadcrumbFolders items={contentItems} activeIndex={0} onClose={() => {}} closeLabel="Close tab" />
+    )
+    const contentNav = contentContainer.querySelector('nav[data-slot="breadcrumb-folders"]')
+    expect(contentNav, "the bare content-strip-shaped call must mount the same component").toBeTruthy()
+
+    expect(
+      agentNav!.className,
+      "the assistant dock strip's <nav> class string must match the content strip's exactly — neither file may add its own overlap/spacing class"
+    ).toBe(contentNav!.className)
+  })
+})
+
 describe("drag-to-reorder — client ruling, 16 Sep 2026 (\"go with the drag order\")", () => {
   it("only conversation tabs carry the kit's drag handle; History and \"+\" never do", () => {
     render(<AgentTabStrip {...baseProps()} onReorder={vi.fn()} />)

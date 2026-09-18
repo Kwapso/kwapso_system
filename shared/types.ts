@@ -8,6 +8,40 @@
 // prevent — and the copy that drifts would be the one describing money.
 import type { ProcessSaving } from "./workers/savings"
 
+/** THE HARD CEILING ON A TITLE — R87, "title-length" (RULES.md). The client's
+ * two rulings, 18 Sep 2026, verbatim: *"for all titles (main, details, all) i
+ * would like to limit the lnght to what would fit in 1 line in a laptiop. this
+ * menas a max charactes for titles in the forms (not sutting it) wdyt? and ow
+ * many cahracters would taht be? consider text size regualr and the monitor
+ * size of a macbook"*, and her pick when offered a side-by-side: *"for title
+ * lenght. set this limit considering macbook air, enforce with e3."*
+ *
+ * MEASURED, NOT GUESSED. The artifact "Title Length" canvas-measured how many
+ * characters of regular-weight text fit on ONE line, at MacBook Air width
+ * (1440×900), in each of the app's three one-line title steps: the record
+ * heading 64, the collection heading 65, the list title cell 57. The narrowest
+ * of the three, rounded DOWN for a comfortable margin (a shorter monitor, a
+ * wider character, a translated word that runs longer than the English one) —
+ * 57 rounds down to 50, and the same number is kept for all three rather than
+ * three different ceilings, because one title moves between all three renderers
+ * (a ticket is a record head on its own screen and a list cell in Tickets) and
+ * a field that fits its narrowest home fits every home.
+ *
+ * "ENFORCE WITH E3" is the client's own shorthand from the side-by-side that
+ * settled this (verify/decisions.html), naming the THIRD of three enforcement
+ * options offered: a hard cap in every form (the 51st character never types)
+ * PLUS an ellipsis fallback for a record that was already longer before this
+ * ceiling existed. Both halves read this one constant — every title FIELD
+ * CONFIG (`shared/web/screen-engine/config.ts`'s `FieldConfig.validation.
+ * maxLength`) and every WRITE DOOR (`shared/workers/validate.ts`'s
+ * `requireText`/`optionalText`, positionally, the same discipline R20 already
+ * holds every body field to) — so the form and the door can never drift apart
+ * on what "too long" means. A title typed before 18 Sep 2026 that is already
+ * over 50 is never rejected retroactively; it is only ever TRUNCATED, with an
+ * ellipsis and the full string still reachable, wherever a one-line title
+ * renderer draws it (R87's other half). */
+export const TITLE_MAX_CHARS = 50
+
 /** A signed-in person, as the auth worker returns them to the browser. */
 export type SessionUser = {
   id: string

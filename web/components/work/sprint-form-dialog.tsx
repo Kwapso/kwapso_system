@@ -43,6 +43,7 @@ import { dateFromYMD, ymdFromDate } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { SelectableValue } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { useLanguage } from "@shared/web/language"
 import { SPRINT_TYPES } from "@shared/sprint-types"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
@@ -129,7 +130,15 @@ export function sprintTypeLabel(option: SprintTypeOption, lang: string): string 
   return option.mark ? `${option.mark} ${name}` : name
 }
 
-const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const nameField = {
+  ...defaultFieldConfig,
+  label: "Sprint name",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const typeField = { ...defaultFieldConfig, label: "Type", required: false }
 const accountField = { ...defaultFieldConfig, label: "Account", required: false }
 const appField = {
@@ -271,12 +280,19 @@ export function SprintFormDialog({
         disabled: !ready,
       }}
     >
-      <Field config={nameField} htmlFor="sprint-name" className={fieldSpacing}>
+      <Field
+        config={nameField}
+        htmlFor="sprint-name"
+        className={fieldSpacing}
+        count={values.name.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="sprint-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
           placeholder={t("e.g. Dispatch, sprint 4")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

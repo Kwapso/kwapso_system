@@ -104,7 +104,7 @@ describe("isUnusedAgentTab — zero turns, read off the thread model", () => {
 
   it("a draft with a scope picked but nothing sent is STILL unused", () => {
     const id = openNewAgentTab()
-    pickAgentTabScope(id, "everything", "Everything (today's default)")
+    pickAgentTabScope(id, "everything", "Everything")
     const tab = agentTabsSnapshot().find((t) => t.id === id)!
     expect(tab.scope).not.toBeNull() // sanity: the pick did land
     expect(isUnusedAgentTab(tab)).toBe(true)

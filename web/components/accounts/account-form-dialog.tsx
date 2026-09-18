@@ -88,6 +88,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { fileToDataUrl } from "@/lib/image"
@@ -102,7 +103,16 @@ import { sortedOptions } from "@shared/web/sorted-options"
 import { StaffPillPicker } from "@shared/web/staff-pill-picker"
 import type { PickablePerson } from "@/lib/members"
 
-const nameField = { ...defaultFieldConfig, label: "Name", required: true }
+// R87 (title-length, RULES.md): an account's name is the record's own title
+// everywhere it is shown (record heading, list cell, every picker) — every
+// title field reads the one shared ceiling, so the marker, the counter and
+// the door can never disagree about what "too long" means.
+const nameField = {
+  ...defaultFieldConfig,
+  label: "Name",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const emailField = { ...defaultFieldConfig, label: "Email", required: false }
 const phoneField = { ...defaultFieldConfig, label: "Phone", required: false }
 const streetField = { ...defaultFieldConfig, label: "Street", required: false }
@@ -398,12 +408,19 @@ export function AccountFormDialog({
       {/* No Type field. The header says why, and the source assertion in
           web/test/accounts-are-companies.test.tsx holds it to it — a control
           nobody can see is a control nobody would notice coming back. */}
-      <Field config={nameField} htmlFor="account-name" className={fieldSpacing}>
+      <Field
+        config={nameField}
+        htmlFor="account-name"
+        className={fieldSpacing}
+        count={values.name.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="account-name"
           value={values.name}
           onChange={(e) => set({ name: e.target.value })}
           placeholder={t("Bergman S.A.")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

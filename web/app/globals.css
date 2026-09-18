@@ -139,6 +139,19 @@
 }
 
 /* ============================================================================
+   THE 16px REGRESSION, FIXED AT THE SOURCE — PagedFind's own pinned toolbar
+   (paged-find.tsx) used to pay this gap as a literal `pb-4` (16px, never
+   wired to the token) instead of `<ToolbarRow>`'s real `--toolbar-content-gap`
+   reference, so ruling 7's shrink to `--space-2h` (10px) never reached it and
+   Tickets tabs sat 16px under the toolbar instead of the ruled 10.
+   ============================================================================
+   18 Sep 2026 — paged-find.tsx now pays `pb-[var(--toolbar-content-gap)]`
+   directly on its outer pin wrapper, the same token `<ToolbarRow>` pays on
+   its inner column, so this scoped `[data-slot="toolbar-row-pin"].pb-4`
+   override (which existed only to reach that literal from here) is deleted
+   as the no-op it became. Proved by `web/test/toolbar-lead-gap-card.test.tsx`. */
+
+/* ============================================================================
    THE WHOLE VISIBLE GAP ABOVE A TOOLBAR, ON EVERY SCREEN (R83, amended a
    second time, 16 Sep 2026 evening).
    ============================================================================

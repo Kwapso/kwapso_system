@@ -34,9 +34,17 @@
 // the badge), RecordMark (the mark beside every row, a search hit and a
 // recently-opened one alike), CollectionCard (the paper the whole screen
 // stands on, R67). No hint under the title (R81 — the client's own rule
-// against explaining a screen instead of building it) and the search
-// trigger is charcoal, never mango: the page's own title carries no act of
-// its own, and an icon button beside a bar is not a title-level one (R84).
+// against explaining a screen instead of building it).
+//
+// THE FOURTH RULING, 18 Sep 2026, verbatim: "on new page where to, make the
+// button mango." Reverses the search trigger's own earlier reasoning (it
+// shipped `variant="inverse"`, reasoned as "an icon button beside a bar is
+// not a title-level one"): this screen has no CollectionHeading/RecordScreen
+// to carry an R84 title-level action at all, and the Go button beside the
+// bar is the page's one and only act — there is nothing else here for mango
+// to mark as primary. `variant="default"` (mango), named in
+// `MANGO_OUTSIDE_TITLE_OK` (`shared/rules/registry.ts`) with her words rather
+// than widening `TITLE_TAGS` to treat this row as a fifth title component.
 //
 // SIX DOORS, ONE QUESTION EACH, NO NEW ROUTE. Every module already answers
 // `q` at its own list door (R14 — paged, so this is a DISPLAY cap on a
@@ -307,7 +315,6 @@ export function NewTabScreen() {
             <Button
               type="button"
               size="icon"
-              variant="inverse"
               aria-label={t("Search")}
               onClick={() => {
                 const first = flatResults[0]

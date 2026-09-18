@@ -30,6 +30,7 @@ import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { ApiFailure } from "@/lib/api"
 import { RecordPicker } from "@/components/records/record-picker"
@@ -61,7 +62,15 @@ export type WaveFormValues = {
 // `t` is a hook and a field config is a module-level constant, so this is the one
 // class of string in the app that cannot be wrapped where it is declared.
 const clientField = { ...defaultFieldConfig, label: "Account", required: true }
-const nameField = { ...defaultFieldConfig, label: "Wave name", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const nameField = {
+  ...defaultFieldConfig,
+  label: "Wave name",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const appField = {
   ...defaultFieldConfig,
   label: "App",
@@ -187,12 +196,19 @@ export function WaveFormDialog({
           )}
         </Field>
       )}
-      <Field config={nameField} htmlFor="wave-name" className={fieldSpacing}>
+      <Field
+        config={nameField}
+        htmlFor="wave-name"
+        className={fieldSpacing}
+        count={values.name.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="wave-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
           placeholder={t("e.g. Onboarding package")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

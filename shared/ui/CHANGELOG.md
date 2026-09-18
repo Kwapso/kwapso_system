@@ -2,6 +2,128 @@
 
 ## Unreleased
 
+### Fixed — the rail brand row aligns to the workspace tab strip by construction, not by a computed centre — v1.2.122
+
+v1.2.120/121 aligned the rail's brand row to the active folder tab's label
+centre with a four-token calc, `mt-[calc(var(--shell-gutter) +
+var(--folder-lip)/2 - var(--icon-20)/2 - var(--rail-inset))]`, measured
+against the kit's own 15px harness root (0.52px residual). The client
+reported the live app still 8.65px off at its 16px root — "the logo is way
+too up!!! make it aligned with text on foler tabs" — and neither app
+overrides `--shell-gutter`, `--rail-inset` or `--folder-lip` (checked against
+`kwapso_system/web/app/globals.css`), so the four-token formula's own third
+term was the fault: `--icon-20` stood in for "the mark's own rendered
+height", a fact the formula depended on rather than read, and any divergence
+between the two silently reopened the seam a root-size change alone should
+never have touched.
+
+**REWRITTEN AS A SHARED BAND, NOT A COMPUTED CENTRE.** `foundations/tokens/
+tokens.css` gains `--strip-row` (aliased to `--folder-lip`), naming the exact
+box the tab strip's own label already centres inside — the same box
+`screen-shell.tsx`'s assistant edge-handle already stands in
+(`top-[var(--shell-gutter)] size-[var(--folder-lip)]`). `rail.tsx`'s
+`rail-brand` row now takes `h-[var(--strip-row)]` and relies on its own
+pre-existing `items-center` to centre the mark inside that box — however tall
+the mark renders, never a margin computed from its height — with the row's
+top edge landing at `mt-[calc(var(--shell-gutter)_-_var(--rail-inset))]`,
+cancelling `RAIL_COLUMN`'s ambient padding and re-spending the tab strip's own
+inset. Two rows built to the same top offset and the same height share a
+centre by construction; no consumer's own geometry needs to appear in either
+calc again.
+
+**MEASURED, `verify/shell-chrome/`, 1440×900, both roots the two versions
+disagreed on:** 0.53px residual at the kit's 15px harness root, 0.59px at a
+16px root set on `<html>` in the same harness (active tab label centre
+30.64px, matching the live app's own reading exactly) — sub-pixel and nearly
+identical at both, which is the proof the fix no longer depends on the root.
+
+`compositions/templates/check-screen-shell.mjs`'s rail-brand-alignment
+section is rewritten to pin the new shape (`h-[var(--strip-row)]`, the
+two-term top-offset calc, and `--strip-row: var(--folder-lip)` in
+`tokens.css` itself) and to fail if the retired `--icon-20`-dependent centre
+calc reappears on this block.
+
+### Fixed — `<Badge asChild>` no longer throws: the label is Radix's `Slottable`, and the check now mounts the badge instead of grepping it — v1.2.121
+
+**THE CLIENT'S RULING, 18 SEP 2026, VERBATIM: "when its a link make it
+underlined (for exmaple the app name)."** v1.2.116 delivered it as `asChild`
++ `href` on `Badge` and an always-on `LINK_UNDERLINE`, and `badge.tsx`'s own
+docs name the shape the app should reach for: `<Badge asChild><Link>App
+</Link></Badge>`. **The first real call of that shape threw.** The app's
+app-name chip (`shared/web/ticket-chips.tsx`, the exact chip the ruling
+names) hit `Slot failed to slot onto its children. Expected a single React
+element child or \`Slottable\`.` from `@radix-ui/react-slot` — on the app's
+pinned 1.2.5 and on this repo's 1.3.3 alike — and shipped an interim,
+hand-drawn underline instead. Nobody had ever called `<Badge asChild>`
+before; the path went out untested the day it was added.
+
+**ROOT CAUSE, MEASURED.** The render always writes three child expressions
+into its root — `{icon ? … : null}`, `{dot ? … : null}`, `{label}` — and
+`asChild` swaps that root for Radix `Slot`, which needs exactly ONE child to
+merge the badge's props onto. `React.Children.count` counts a `null`
+placeholder the same as an element (`node -e
+"require('react').Children.count([null,null,require('react').createElement('span')])"`
+→ `3`, not `1`), so a plain link chip handed `Slot` three children. Rendered
+through vite SSR + `react-dom/server` before the fix, EVERY `asChild` shape
+threw — no marks, icon only, icon AND dot (three real elements are still not
+one); only the `href`-without-`asChild` path and the plain `<span>` rendered.
+
+**FIX (`components/badge/badge.tsx`).** Under `asChild`, and only then, the
+label is wrapped in Radix's own `Slottable`: `Slot` takes the element inside
+it as its target and treats the siblings outside it — the icon and dot spans
+— as that element's own leading children. So `<Badge asChild icon={g}><Link>
+App</Link></Badge>` renders `<a class="…badge… underline …" data-slot="badge">
+<span data-slot="badge-icon">g</span>App</a>`: one anchor, the mark inside
+it before the label, the badge's classes, `data-slot`, `data-dot`, `href`
+and ref merged onto it. This is Radix's documented pattern for a component
+with fixed leading children beside `asChild` (their own Button-with-icon
+example), not a local invention, and it is the ONLY way the three-slot
+render and `Slot`'s one-child contract coexist without conditionally
+rebuilding the child list. The wrapper is applied only under `asChild`, so
+the other 59 call sites pay no extra component layer, and a non-element
+label under `asChild` (a string, a `count`) still fails Radix's own contract
+loudly. The `asChild` prop doc now states the child's side of the contract:
+it must spread the props it does not name onto its anchor, or the chip loses
+its `data-slot="badge"` and fill — an app link component that only forwards
+`className` is not a valid `asChild` target.
+
+**CHECK (`components/badge/check-badge.mjs`, section 6 — and why it is not
+static like sections 1–5).** Section 3 already pinned `asChild` as four
+source shapes (the `Slot` import, the `LINK_UNDERLINE` constant, the `isLink`
+line, the class application) and every one was green on the day the shape
+threw: the source said the right words and the render was wrong. A static
+pin proves a line exists; only a render proves it works. So section 6 MOUNTS
+`Badge` — vite's `createServer` + `ssrLoadModule` (already the dev dependency
+that compiles this TSX everywhere else) and `react-dom/server`'s
+`renderToStaticMarkup` (a peer dependency already installed for the demo),
+no jsdom, no new dependency, about a second — and reads five renders back
+as HTML: (a) `asChild` with no marks → exactly one `<a>` carrying
+`data-slot="badge"`, the child's `href`, the pill classes and fill, and
+`LINK_UNDERLINE`, with no `Slottable` leaking into the markup; (b) `asChild`
++ `icon` → the icon span INSIDE the anchor, before the label; (c) `asChild` +
+`icon` + `dot` → icon then dot inside, `data-dot` on the anchor; (d) `href`
+without `asChild` → the plain underlined `<a>`, unchanged; (e) a plain badge →
+a bare `<span>`, no underline. A regression is a finding carrying the thrown
+message. Proved red before the fix (a, b, c all threw), green after. The
+section-3 import pin now demands `Slot, Slottable` together, so removing the
+wrapper's import fails twice.
+
+**VERIFY (`verify/badge/page.tsx`, section 7).** A linked row beside the
+existing six sections: an `asChild` chip around a real anchor, an `href`
+chip, and an `asChild` + `icon` chip, each a `[data-badge-cell]` so
+`window.__badgeVerify()` reads their gap the same way it reads every other
+cell (the anchor IS the badge, so the label `Range` and the leading mark are
+found on it exactly as on a `<span>`).
+
+**APP SIDE (`kwapso_system`, this tag's consumer).** `shared/web/
+ticket-chips.tsx` swaps its interim anchor-wraps-badge shape (a hand-copied
+`underline underline-offset-[0.1875rem]`) back to `<Badge asChild><InAppLink>
+…</InAppLink></Badge>`, and `web/components/shell/in-app-link.tsx` spreads
+the anchor props it does not name so the merged `data-slot="badge"`,
+`data-dot` and ref land on the real `<a>` — the child's half of the contract
+the prop doc now states. Zero pixels change; the underline is now the kit's
+own.
+
 ### Fixed — the rail's logo lines up with the folder-tab strip, the assistant dock's tabs are proven to share the content strip's one gap, and the collapsed rail keeps its expanded size — v1.2.120
 
 **THREE CLIENT RULINGS, 18 SEP 2026, VERBATIM.**

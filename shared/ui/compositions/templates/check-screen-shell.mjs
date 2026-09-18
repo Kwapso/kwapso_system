@@ -799,41 +799,72 @@ console.log(
 );
 
 /* ============================================================================
-   THE 18 SEP 2026 RAIL-BRAND-ALIGNMENT CHECK — client ruling, verbatim: "on
-   the sidebar tge logo is way too up!!! make it aligned with text on foler
-   tabs."
+   THE 18 SEP 2026 RAIL-BRAND-ALIGNMENT CHECK, REWRITTEN THE SAME DAY —
+   client ruling, verbatim: "on the sidebar tge logo is way too up!!! make it
+   aligned with text on foler tabs."
 
-   MEASURED, `verify/shell-chrome/` (1440×900, this kit's own 15px harness
-   root), BEFORE this fix: `[data-slot="rail-brand"]`'s own box (mark +
-   wordmark) centred at 18.74px from the viewport top; the active folder
-   tab's own label glyph (a `Range` over its text node, inside
-   `nav[data-slot="breadcrumb-folders"]`) centred at 28.75 — 10px lower.
-   AFTER: 29.27 against 28.75, 0.52px apart (line-box rounding against a
-   geometric flex-row centre; see `rail.tsx`'s own comment on the fix for
-   the full derivation).
+   THE FIRST FIX (v1.2.121, the check this replaces) computed a CENTRE:
+   `mt-[calc(var(--shell-gutter) + var(--folder-lip)/2 - var(--icon-20)/2 -
+   var(--rail-inset))]`. MEASURED at this kit's own 15px harness root it held
+   — 0.52px off the active tab's label centre — but the live app reported
+   8.65px off at 16px root, a residual that should not exist if every term in
+   a rem-based calc scales with the root the way the other three did. The
+   difference was `--icon-20`: the formula's THIRD term stood in for "the
+   mark's own rendered height", which is a fact about `Logotype`/`Isotype`
+   and `MARK_STEP`, not a fact about the tab strip band it was reaching for
+   — so the fix was only ever as good as that assumption holding, on every
+   consumer, forever.
 
-   PINNED AS THE WORKING CALC, not the delta a screenshot could show: the
-   fix reads four tokens already in scope on `rail-brand` (`--shell-gutter`,
-   `--folder-lip`, `--icon-20`, `--rail-inset` — see `rail.tsx`'s own
-   comment for why each is visible there) rather than a literal pixel
-   margin, so a change to any one of the four moves the alignment with it
-   instead of silently drifting stale. */
+   THE REWRITE BUILDS A BAND, NOT A CENTRE, AND THE CHECK NOW PINS THE BAND.
+   `--strip-row` (tokens.css, aliased to `--folder-lip`) names the box the
+   tab strip's own label already centres inside; `rail-brand` now takes
+   `h-[var(--strip-row)]` and relies on its own pre-existing `items-center`
+   to centre the mark inside that box, however tall the mark renders. The
+   only calc left, `mt-[calc(var(--shell-gutter) - var(--rail-inset))]`,
+   moves the box's top edge from where `RAIL_COLUMN`'s ambient padding parks
+   it to `--shell-gutter` below the shared top edge — the same two box-model
+   tokens `screen-shell.tsx`'s own assistant handle reaches for
+   (`top-[var(--shell-gutter)] size-[var(--folder-lip)]`) with none of the
+   mark's own geometry mixed in.
+
+   MEASURED, `verify/shell-chrome/` (1440×900), AFTER THIS REWRITE, AT BOTH
+   ROOTS THE FIRST FIX DISAGREED ON: 0.53px at the kit's 15px harness root,
+   0.59px at the live app's 16px root (tab label centre 30.64px, matching the
+   app measurement in the brief exactly) — both sub-pixel, both close to
+   IDENTICAL, which is the actual proof: a fix whose residual does not move
+   with the root is bound to the band by construction rather than by a
+   coincidence at one root size. */
 const railBrandFindings = [];
 
-const RAIL_BRAND_BLOCK = /data-slot="rail-brand"[\s\S]{0,400}?className=\{cn\(([\s\S]{0,4500}?)\)\}/;
+// 8000, not 4500: the v1.2.122 rewrite's own comment (the derivation this
+// block's rules quote from) runs longer than the block the old cap sized for.
+const RAIL_BRAND_BLOCK = /data-slot="rail-brand"[\s\S]{0,400}?className=\{cn\(([\s\S]{0,8000}?)\)\}/;
 const railBrandMatch = railSrc.match(RAIL_BRAND_BLOCK);
 if (!railBrandMatch) {
   railBrandFindings.push(`${railRel} does not have a data-slot="rail-brand" block with a cn(...) className to check.`);
-} else if (
-  !/mt-\[calc\(var\(--shell-gutter\)_\+_var\(--folder-lip\)\/2_-_var\(--icon-20\)\/2_-_var\(--rail-inset\)\)\]/.test(
-    railBrandMatch[1],
-  )
-) {
-  railBrandFindings.push(
-    `${railRel}'s rail-brand block does not read the 18 Sep alignment calc (mt-[calc(var(--shell-gutter) + ` +
-      "var(--folder-lip)/2 - var(--icon-20)/2 - var(--rail-inset))]) — the logo's own vertical centre would " +
-      "drift back above the workspace tab strip's label centre (measured 10px high before this fix).",
-  );
+} else {
+  if (!/mt-\[calc\(var\(--shell-gutter\)_-_var\(--rail-inset\)\)\]/.test(railBrandMatch[1])) {
+    railBrandFindings.push(
+      `${railRel}'s rail-brand block does not read the band's top-offset calc (mt-[calc(var(--shell-gutter) - ` +
+        "var(--rail-inset))]) — the logo's own box would no longer start where the tab strip's own band starts.",
+    );
+  }
+  if (!/h-\[var\(--strip-row\)\]/.test(railBrandMatch[1])) {
+    railBrandFindings.push(
+      `${railRel}'s rail-brand block does not read h-[var(--strip-row)] — the logo's own box would no longer ` +
+        "share the tab strip's row height, and centring inside it would go back to being computed from the " +
+        "mark's own rendered height (--icon-20) instead of falling out of the box the browser already centres it in.",
+    );
+  }
+  // THE REGRESSION THIS REPLACES A CENTRE-CALC TO GUARD AGAINST: the old
+  // four-token formula reappearing (directly, or copy-pasted onto a related
+  // consumer) is the exact fragility this rewrite exists to retire.
+  if (/var\(--icon-20\)\/2_-_var\(--rail-inset\)/.test(railBrandMatch[1])) {
+    railBrandFindings.push(
+      `${railRel}'s rail-brand block still reads the retired --icon-20-dependent centre calc — the alignment ` +
+        "would again depend on the mark's own rendered height staying in step with a token it does not read.",
+    );
+  }
 }
 
 // A REGRESSION SHAPED LIKE THE BUG THIS RULING FIXED: the row must not go
@@ -848,17 +879,34 @@ if (railBrandMatch && !/\bmt-\[/.test(railBrandMatch[1])) {
   );
 }
 
+// THE SHARED TOKEN'S OTHER HALF: a consumer reading --strip-row is only
+// "the same band as the tab strip" while --strip-row itself is still the tab
+// strip's own lip measurement, and never a second, independently-tunable
+// number. Pinned in tokens.css directly (`compositions/templates/rail.tsx`
+// has no view of `foundations/tokens/tokens.css`), read here off disk.
+const tokensPath = path.join(HERE, "..", "..", "foundations", "tokens", "tokens.css");
+const tokensSrc = fs.readFileSync(tokensPath, "utf8");
+if (!/--strip-row:\s*var\(--folder-lip\)/.test(tokensSrc)) {
+  railBrandFindings.push(
+    "foundations/tokens/tokens.css does not declare --strip-row: var(--folder-lip) — the rail brand row and " +
+      "the workspace tab strip would no longer share one row-height token, and a future change to the tab " +
+      "strip's own band would not carry to the rail by construction any more.",
+  );
+}
+
 if (railBrandFindings.length > 0) {
   console.error(
-    "FAIL rail-brand alignment check (18 Sep ruling):\n" + railBrandFindings.map((f) => `  - ${f}`).join("\n"),
+    "FAIL rail-brand alignment check (18 Sep ruling, v1.2.122 rewrite):\n" +
+      railBrandFindings.map((f) => `  - ${f}`).join("\n"),
   );
   process.exit(1);
 }
 
 console.log(
-  "OK rail-brand alignment check: rail-brand's own vertical centre is bound to --shell-gutter + --folder-lip/2 " +
-    "- --icon-20/2 - --rail-inset — measured live before/after: 10.01px above the active tab's label centre, " +
-    "then 0.52px, at this kit's 15px harness root.",
+  "OK rail-brand alignment check: rail-brand shares --strip-row (== --folder-lip) as its own height with the " +
+    "workspace tab strip's label band, top-offset by mt-[calc(var(--shell-gutter) - var(--rail-inset))] and " +
+    "centred by its own items-center — measured live in verify/shell-chrome: 0.53px residual at the kit's " +
+    "15px harness root, 0.59px at the live app's 16px root (tab label centre 30.64px, matching the brief).",
 );
 
 /* ============================================================================

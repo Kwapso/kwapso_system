@@ -52,12 +52,12 @@ import { useAgentChat } from "@/lib/use-agent-chat"
 describe("the chat state survives AgentPanel's own component being torn down and rebuilt", () => {
   // THE STAGED-ATTACHMENT CASE USED TO BE THE FIRST TEST HERE, and it went with
   // the chat's file upload (owner, 13 Sep 2026: "the file upload feature is
-  // pretty useless, so let's get rid of that completely at the moment" — see
-  // the comment over the composer in web/components/assistant/agent-panel.tsx).
-  // Removed rather than re-pointed at some other piece of state: it existed to
-  // prove ONE fact about ONE field, and the remount invariant it stood for is
-  // still proved below, over the transcript, the thread id and a pending
-  // confirm — which is the state the original bug actually destroyed.
+  // pretty useless, so let's get rid of that completely at the moment" — and
+  // it is BACK, a different shape (assistant a1, 18 Sep 2026): a picked file
+  // read for the conversation as context, never a stored upload. `attached`
+  // is a module-level cell exactly like every field below, for the identical
+  // reason — a person mid-pick when the breakpoint crosses must not lose the
+  // file they just chose. Proved on its own just below.
   it("keeps the transcript, the thread id and a pending confirm across an unmount + remount", async () => {
     const teamId = "team-remount-confirm"
     const first = renderHook(() => useAgentChat(teamId, true, true))
@@ -81,5 +81,21 @@ describe("the chat state survives AgentPanel's own component being torn down and
       second.result.current.items.some((i) => i.role === "user"),
       "the transcript must survive the remount"
     ).toBe(true)
+  })
+
+  it("keeps a picked-but-not-yet-sent attachment across an unmount + remount", async () => {
+    const teamId = "team-remount-attach"
+    const first = renderHook(() => useAgentChat(teamId, true, true))
+    const file = new File(["hello"], "note.txt", { type: "text/plain" })
+
+    act(() => {
+      first.result.current.addAttachments([file])
+    })
+    expect(first.result.current.attached).toEqual([file])
+
+    first.unmount()
+    const second = renderHook(() => useAgentChat(teamId, true, true))
+
+    expect(second.result.current.attached, "a picked file must survive the remount too").toEqual([file])
   })
 })

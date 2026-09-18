@@ -45,6 +45,10 @@ import type { RunStep } from "@shared/ui/components/run-steps/run-steps"
 import type { AgentMessage, AgentQuota, ModelFailure, PendingCall } from "@shared/types"
 import { evidenceFromSaved, mergeEvidence, type TurnEvidence } from "@shared/agent-cites"
 import { SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
+import { AGENT_ATTACH_MAX_BYTES, AGENT_ATTACH_MAX_FILES, AGENT_ATTACH_MIME } from "@shared/workers/limits"
+import { readFileAsDataUrl } from "@shared/web/file"
+import { pickedFileId } from "@shared/web/upload-items"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"
 import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
 import { traceFor } from "@/lib/agent-trace"
@@ -120,6 +124,11 @@ const busyCell = makeCell(false)
 const quotaCell = makeCell<AgentQuota | null>(null)
 const pendingCell = makeCell<{ calls: PendingCall[]; text: string } | null>(null)
 const failureCell = makeCell<ModelFailure | null>(null)
+/** Files picked for the NEXT message, not yet sent — the same
+ * remount-survives-the-breakpoint reasoning as every other cell here (a
+ * tablet rotating through 768px mid-pick must not silently drop what was
+ * already attached). Cleared the moment `send()` actually sends them. */
+const attachedCell = makeCell<File[]>([])
 /** A TURN HAS BEGUN. Module-level rather than a per-instance ref, for the same
  * reason as the cells above: an in-flight resume that started BEFORE a
  * remount must still see the flag it set AFTER the remount, or the exact
@@ -271,6 +280,49 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   const setBusy = busyCell.set
   const quota = quotaCell.useValue()
   const setQuota = quotaCell.set
+
+  // FILES PICKED FOR THE NEXT MESSAGE — assistant a1 (18 Sep 2026), reversing
+  // the 13 Sep 2026 removal. A plain `File[]`, the same shape reply-composer.tsx
+  // and help-form-dialog.tsx already hold their OWN picked-but-not-sent files
+  // in; the only thing this hold adds on top is the size/kind refusal, because
+  // there is no server round trip yet to catch it for us the way an upload's
+  // `.catch` would.
+  const attached = attachedCell.useValue()
+  const setAttached = attachedCell.set
+
+  const addAttachments = React.useCallback(
+    (files: File[]) => {
+      setAttached((prev) => {
+        let next = prev
+        for (const file of files) {
+          if (next.length >= AGENT_ATTACH_MAX_FILES) {
+            toast.error(t("You can attach up to {count} files.", { count: AGENT_ATTACH_MAX_FILES }))
+            break
+          }
+          if (!AGENT_ATTACH_MIME.test(file.type)) {
+            toast.error(t("{name} isn't a kind of file the assistant can read here — images, PDFs, or plain text.", { name: file.name }))
+            continue
+          }
+          if (file.size > AGENT_ATTACH_MAX_BYTES) {
+            toast.error(
+              t("{name} is too large. Attach a file up to {size} MB.", {
+                name: file.name,
+                size: Math.round(AGENT_ATTACH_MAX_BYTES / 1024 / 1024),
+              })
+            )
+            continue
+          }
+          next = [...next, file]
+        }
+        return next
+      })
+    },
+    [setAttached, t]
+  )
+  const removeAttachment = React.useCallback(
+    (id: string) => setAttached((prev) => prev.filter((f) => pickedFileId(f) !== id)),
+    [setAttached]
+  )
   // A paused turn awaiting the user's go-ahead — the proposed actions + the text.
   const pending = pendingCell.useValue()
   const setPending = pendingCell.set
@@ -655,6 +707,12 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     // Optimistic: the user's message appears instantly, and an empty assistant row
     // carries the animated 3-dot indicator (showTyping) until reply text streams.
     const now = new Date().toISOString()
+    // THE TILE GRID EMPTIES NOW, same beat as the text — these files are riding
+    // THIS turn's own request, not sitting in the hold for a second look
+    // (reply-composer.tsx's `start()` empties its own grid the same way, same
+    // reasoning: she has finished with them).
+    const toSend = attached
+    setAttached([])
     setItems((prev) => [
       ...prev,
       { id: newId(), role: "user", content: text, createdAt: now },
@@ -667,9 +725,19 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
       // The ticked set rides every turn. Sent only when it is a real narrowing:
       // all-on is the same request the panel made before the chips existed.
       const narrowed = sources.length < SOURCE_CHIP_KEYS.length ? sources : undefined
+      // Every picked FILE → a base64 data url, the one wire shape this turn can
+      // carry (readFileAsDataUrl, the same seam every other inline upload in
+      // this app already reads through). Read here rather than at pick time:
+      // a file sitting in the tray for five minutes should cost nothing until
+      // the person actually presses send.
+      const attachments = toSend.length
+        ? await Promise.all(
+            toSend.map(async (file) => ({ name: file.name, mime: file.type, dataUrl: await readFileAsDataUrl(file) }))
+          )
+        : undefined
       const first = await consume(
         (onEvent) =>
-          dataOps.agentChatStream({ message: text, threadId, sources: narrowed }, onEvent),
+          dataOps.agentChatStream({ message: text, threadId, sources: narrowed, attachments }, onEvent),
         assistantId
       )
       await carryOn(first, assistantId)
@@ -736,6 +804,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     setThreadId(undefined)
     setPending(null)
     setFailure(null)
+    setAttached([])
     if (teamId) clearLastThread(teamId)
   }
 
@@ -827,6 +896,9 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     usageSummary,
     sources,
     toggleSource,
+    attached,
+    addAttachments,
+    removeAttachment,
     send,
     resolve,
     newChat,

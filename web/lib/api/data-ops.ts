@@ -116,6 +116,12 @@ export const dataOps = {
       /** The last turn ran out of its request; ask for the next segment. */
       continue?: boolean
       files?: { name: string; csv: string }[]
+      /** Files picked for THIS message alone (assistant a1, 18 Sep 2026) — an
+       * image, PDF or plain-text file the assistant reads as context for this
+       * conversation only. Never stored: no knowledge source, no R2 write, no
+       * STORED_FILES entry. `dataUrl` is a base64 data URL, same shape every
+       * other inline upload in this app already sends. */
+      attachments?: { name: string; mime: string; dataUrl: string }[]
       /** WHICH DOORS this conversation may read the knowledge base through — the
        * source chips, as chip keys. Omitted means all of them. It is ENFORCED at
        * the executor rather than described to the model, so a door left out

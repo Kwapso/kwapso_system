@@ -66,6 +66,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
 import type { StoryAttachment } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
 import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -130,7 +131,15 @@ const appField = {
  * it, why show it?" Same reasoning as `workField`/`settledWorkField` in
  * time-form-dialog.tsx, which met this first. */
 const settledAppField = { ...appField, required: false }
-const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const titleField = {
+  ...defaultFieldConfig,
+  label: "What needs doing",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const typeField = {
   ...defaultFieldConfig,
   label: "Type",
@@ -609,12 +618,19 @@ export function StoryFormDialog({
           )
         )}
       </Field>
-      <Field config={titleField} htmlFor="story-title" className={fieldSpacing}>
+      <Field
+        config={titleField}
+        htmlFor="story-title"
+        className={fieldSpacing}
+        count={values.title.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="story-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
           placeholder={t("e.g. Move dispatch onto the driver app")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy}
           autoFocus
         />

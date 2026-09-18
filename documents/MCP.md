@@ -730,6 +730,15 @@ Today it covers:
      `run_import` is deterministic, resumable, and re-readable for free through
      `get_import` when a client loses a plan. Conversational file-drop is the shape a
      person supervises on a screen.
+   - **`agent_chat` takes `message`, not `attachments`.** "Assistant a1" (18 Sep
+     2026) lets a person pick up to 3 files (images, PDFs, plain text — 4 MB each)
+     as a small tile above the composer pill, read for that ONE conversation and
+     never stored anywhere. That is explicitly a person's own choice, shown to them
+     on a screen a headless client does not have — a token holder attaching bytes
+     here would not be relaying something a person picked, it would be inventing
+     the one thing this feature's whole design promises is theirs to pick. Nothing
+     is lost: a caller that already has a file's words can say them to `agent_chat`
+     as `message` text, which this surface already carries in full.
 
    Two other narrowings **were** here and are now closed, because neither had a reason
    that survived being written down: `create_role` takes its `permissions` matrix (the

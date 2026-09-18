@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-86 laws, 84 resolved to at least one check file, 2 unresolved.
+87 laws, 85 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (27)
 
@@ -21,7 +21,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R15 | enforced | `live-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts` |
 | R17 | enforced | `idempotent-transitions` | `web/test/rules.test.ts`<br>`workers/auth/test/language.test.ts`<br>`workers/content/test/google-mail-bin.test.ts`<br>`workers/content/test/meetings.test.ts`<br>`workers/content/test/stories.test.ts`<br>`workers/tenancy/test/accounts.test.ts`<br>`workers/tenancy/test/waves.test.ts` |
 | R18 | enforced | `activity-gate-coverage` | `web/test/rules.test.ts`<br>`workers/tenancy/test/activity-scope.test.ts` |
-| R20 | enforced | `validated-bodies` | `web/test/rules.test.ts`<br>`workers/auth/test/language.test.ts`<br>`workers/content/test/meetings.test.ts` |
+| R20 | enforced | `validated-bodies` | `web/test/rules.test.ts`<br>`web/test/title-length.test.ts`<br>`workers/auth/test/language.test.ts`<br>`workers/content/test/meetings.test.ts` |
 | R21 | enforced | `client-reachable-doors` | `web/test/rules.test.ts`<br>`workers/content/test/google-ingest.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/content/test/meetings.test.ts` |
 | R24 | enforced | `money-taint-outbound` | `web/test/rules.test.ts`<br>`workers/data-ops/test/money-taint.test.ts` |
 | R26 | enforced | `vector-fence` | `workers/content/test/vector-fence.test.ts` |
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (50)
+## UI (51)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -92,6 +92,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R84 | enforced | `mango-in-title-only` | `web/test/mango-title-only.test.ts` |
 | R85 | enforced | `rail-labels-one-word` | `web/test/rail-labels-one-word.test.ts` |
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
+| R87 | enforced | `title-length` | `web/test/title-length.test.ts` |
 
 ## Workflow (2)
 

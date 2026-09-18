@@ -46,6 +46,7 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Meeting, MeetingAttachment, MeetingGuest, MeetingPersonLink } from "@shared/types"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 
@@ -675,7 +676,7 @@ function readInput(input: MeetingInput): ReadInput {
   if (endsAt && Date.parse(endsAt) < Date.parse(startsAt))
     throw new GuardError(400, "invalid_input", "A meeting can't end before it starts.")
   return {
-    title: requireText(input.title, "What it is about", TEXT_LIMITS.short),
+    title: requireText(input.title, "What it is about", TITLE_MAX_CHARS), // R87: title-length (RULES.md)
     accountId: optionalText(input.accountId, "Client", TEXT_LIMITS.short) ?? null,
     appId: optionalText(input.appId, "App", TEXT_LIMITS.short) ?? null,
     purposeId: optionalText(input.purposeId, "Why we are meeting", TEXT_LIMITS.short) ?? null,

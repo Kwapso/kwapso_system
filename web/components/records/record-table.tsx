@@ -65,6 +65,7 @@ import * as React from "react"
 import { ArrowDown, ArrowUp, ArrowsDownUp, DotsThree } from "@shared/ui/foundations/icons"
 
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
+import { clampRecordHeading } from "@shared/web/record-heading"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
@@ -539,13 +540,23 @@ export function RecordTable<T extends TableRowData>({
                 >
                   {columns.map((c) => {
                     const cellValue = c.render ? c.render(row[c.key]) : (row[c.key] as React.ReactNode)
+                    // R87 (title-length, RULES.md): the FIRST column is this
+                    // table's own "list title cell" — the record's own name,
+                    // by this file's convention — so it truncates to one line
+                    // through the SAME shared helper every other title
+                    // renderer uses, whether or not a leading `RecordRef`
+                    // chip is drawn beside it.
                     return (
                       <TableCell key={c.key}>
-                        {refColumn && c === columns[0] ? (
-                          <span className={REF_LEADS_NAME}>
-                            <RecordRef value={row[refColumn] as string | null | undefined} />
-                            <span className="min-w-0 truncate">{cellValue}</span>
-                          </span>
+                        {c === columns[0] ? (
+                          refColumn ? (
+                            <span className={REF_LEADS_NAME}>
+                              <RecordRef value={row[refColumn] as string | null | undefined} />
+                              {clampRecordHeading(cellValue)}
+                            </span>
+                          ) : (
+                            clampRecordHeading(cellValue)
+                          )
                         ) : (
                           cellValue
                         )}

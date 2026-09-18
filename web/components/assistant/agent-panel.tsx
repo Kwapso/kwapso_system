@@ -29,6 +29,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { PopoverContent } from "@shared/ui/components/popover/popover"
 import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
+import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Toggle } from "@shared/ui/components/toggle/toggle"
 
 import { SOURCE_CHIPS, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
@@ -36,6 +37,8 @@ import { CollectionRegister } from "@shared/ui/components/collection-frame/colle
 import { RunSteps } from "@shared/ui/components/run-steps/run-steps"
 import { Title } from "@shared/ui/components/title/title"
 import { cn } from "@shared/ui/lib/utils"
+import { usePickedFileItems } from "@shared/web/upload-items"
+import { AGENT_ATTACH_ACCEPT } from "@shared/workers/limits"
 
 import { AgentHistoryTab } from "@/components/assistant/agent-history-tab"
 import { AgentScopePicker } from "@/components/assistant/agent-scope-picker"
@@ -705,7 +708,11 @@ export function AgentPanel({
         ? (currentRecordLabel ?? t("This record"))
         : scope === "knowledge"
           ? t("Knowledge")
-          : t("Everything (today's default)")
+          // "today's default" is gone (client ruling: "kill this 'today's
+          // default' for setting scope of assistant") — agent-scope-picker.tsx
+          // already dropped it from the picker ROW; this is the same tab
+          // TITLE that row's own comment names as the other call site.
+          : t("Everything")
     pickAgentTabScope(activeAgentTabId, scope, label, scope === "record" ? currentRecordLabel : undefined)
     const target = scope === "record" ? ["records"] : scope === "knowledge" ? ["articles"] : [...SOURCE_CHIP_KEYS]
     for (const key of SOURCE_CHIP_KEYS) {
@@ -736,6 +743,13 @@ export function AgentPanel({
           : text
     return chat.send(prefixed)
   }
+
+  // A HIDDEN NATIVE PICKER, the same shape reply-composer.tsx's own `fileRef`
+  // drives — the paperclip the kit draws for `onAttach` is a plain button and
+  // cannot open a file dialog on its own. `multiple`: nothing about "images,
+  // PDFs, or plain text" asked for one at a time.
+  const fileInput = React.useRef<HTMLInputElement | null>(null)
+  const attachTiles = usePickedFileItems(chat.attached)
 
   // ESCAPE ON A PICKER TAB CLOSES IT — the task's own rule for a surface drawn
   // in the tab body rather than a dialog. DOCKED ONLY: on the narrow, floating
@@ -1119,29 +1133,55 @@ export function AgentPanel({
               last one would silently WIDEN the search. */}
           <SourceChips sources={chat.sources} onToggle={chat.toggleSource} disabled={chat.busy} />
 
-          {/* THE CHAT'S FILE UPLOAD IS GONE (owner, 13 Sep 2026: "the file
+          {/* THE CHAT'S FILE UPLOAD IS BACK (owner, 13 Sep 2026: "the file
               upload feature is pretty useless, so let's get rid of that
-              completely at the moment").
-              WHAT WENT, AND WHAT DID NOT. This removes the ENTRANCE — the
-              paperclip beside Send, the hidden file input, the panel-wide
-              drop zone and the staged-file strip — and with it the client
-              plumbing behind them (`addAttachments` / `attached` /
-              `removeAttachment` in use-agent-chat.tsx). The IMPORT itself is
-              untouched: `run_import_batch` is still a real tool on the
-              catalogue with its own gate, its confirm payload and its MCP
-              twin, and the Import screen still uploads a spreadsheet the
-              ordinary way (`web/components/screens/import-screen.tsx`, which
-              is why `web/lib/file-to-csv.ts` stays). Pulling the server half
-              as well would have meant re-reasoning R9/R13/R19/R22/R27 parity
-              and the MCP twin's own exemption line for a feature the owner
-              asked to hide "at the moment" — so the capability sits behind a
-              door nobody can open from the chat, and putting the door back is
-              this commit reverted rather than a rebuild.
-              THE TEXTAREA GOT ITS STRIP BACK. It reserved `pe-28` (112px) so
-              typed text cleared BOTH the paperclip and Send; with only Send
-              left the measured need is composer `pe-2` (8px) + Send's real
-              ~45px + a gap, so `pe-14` (56px) is the honest number and the
-              other 56px is returned to the words. */}
+              completely at the moment" — REVERSED by the client's own
+              decision on 18 Sep 2026, "assistant a1", verbatim: "A1 Paperclip,
+              files as chat context: paperclip at the left inside the pill; a
+              picked file shows as a small tile above the pill; the file is
+              read by the assistant for THIS conversation only (not stored
+              anywhere else)."
+              A DIFFERENT SHAPE FROM WHAT WAS CUT, ON PURPOSE. The 13 Sep
+              removal's `files` plumbing (still live server-side,
+              `runChat`'s `opts.files`) was always the CSV chat-IMPORT door —
+              `run_import_batch`'s own attach step, and that stays exactly
+              where the removal comment left it: a capability nobody can open
+              from the chat, on purpose, not touched here. This restores a
+              SEPARATE, narrower capability the client's ruling actually asked
+              for — an image/PDF/plain-text file the assistant READS as
+              context for one turn and keeps nowhere (`opts.attachments`,
+              `workers/data-ops/src/lib/attachments.ts`) — so putting the
+              paperclip back does not quietly reopen the import door too.
+              THE TILE GRID CANNOT SIT INSIDE THE KIT'S OWN PILL. `AgentChat`
+              draws its composer (transcript + pill) as one atomic element
+              with no slot between them (its own header logs the same gap for
+              a per-bubble className — "would retire this the day it ships").
+              So the grid renders here, as the last thing ABOVE the whole chat
+              area rather than pixel-adjacent to the pill itself — the same
+              register `SourceChips`/`AssistantLimitNotice` already occupy in
+              this exact spot, mounted only once there is something to show. */}
+          {attachTiles.length > 0 && (
+            <FileUpload
+              files={attachTiles}
+              onFilesSelected={chat.addAttachments}
+              onRemove={chat.removeAttachment}
+              removeLabel={t("Remove")}
+              addLabel={t("Add")}
+              multiple
+            />
+          )}
+          <input
+            ref={fileInput}
+            type="file"
+            className="hidden"
+            multiple
+            accept={AGENT_ATTACH_ACCEPT}
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? [])
+              e.target.value = ""
+              if (picked.length) chat.addAttachments(picked)
+            }}
+          />
           <div className="relative min-h-0 flex-1">
             {/* Fill the panel and shed the component's own card chrome (it
              * ships as a standalone fixed-height card) so it reads as one
@@ -1151,10 +1191,19 @@ export function AgentPanel({
             <AgentChat
               className={cn(
                 "h-full rounded-none border-0 bg-transparent",
-                // The strip typed text must not run under — Send alone now
-                // that the paperclip is gone (see the comment above this
-                // element for the measurement).
-                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:pe-14",
+                // THE STRIP IS BACK TO `pe-28` (112px) — the paperclip returned
+                // (18 Sep 2026, "assistant a1"), so typed text again needs room
+                // to clear it. The kit draws the paperclip INSIDE the flex row,
+                // to the LEFT of the field (agent-chat.tsx's own comment: "a
+                // paperclip inside this pill, to the left of the field"), so
+                // strictly the two controls sit in their own flex slots and
+                // never overlap the textarea's box either way — this reserve
+                // is the same measured-not-assumed caution the removal
+                // comment it replaces already banked on rather than a proven
+                // overlap, restored to its pre-removal number because the
+                // control it was sized for is back. Worth re-measuring live
+                // on staging once deployed, same as every UI claim here.
+                "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:pe-28",
                 // AND THE CARET NEEDS SOMEWHERE TO STAND (owner, 13 Sep 2026:
                 // "the cursor is barely visible whenever I click inside the
                 // empty input box... why not just shift the placeholder that
@@ -1180,7 +1229,7 @@ export function AgentPanel({
                 // here rather than on the pill because the pill's own
                 // `padding-inline-start` is the kit's (22.5px) and is doing a
                 // different job; this is the text's own inset. Verified live
-                // at 6px: the textarea still fits its pill with the `pe-14`
+                // at 6px: the textarea still fits its pill with the `pe-28`
                 // strip intact, and the caret stands clear of the "A".
                 "[&_[data-slot=agent-chat-composer]_[data-slot=textarea]]:ps-1.5",
                 // ITEM (owner, 1 Sep 2026, on the text-write field
@@ -1396,6 +1445,14 @@ export function AgentPanel({
               // comment above this function for why speaker identity does
               // not need a replacement).
               avatars={false}
+              // THE PAPERCLIP (assistant a1, 18 Sep 2026). Opens the hidden
+              // native picker above — the same shape `TicketThread`'s own
+              // `onAttach` already established (agent-chat.tsx mirrors it
+              // deliberately) — disabled under the same conditions the
+              // composer itself is, so a busy/blocked turn cannot pick a file
+              // it has nowhere to send yet.
+              onAttach={() => fileInput.current?.click()}
+              attachLabel={t("Attach a file")}
               // NO `header` any more (ITEM 5, 31 Aug 2026) — ClockCounterClockwise and New
               // chat moved UP to share the panel's own `Title` row, aligned
               // with "Assistant" per the just-established title/actions

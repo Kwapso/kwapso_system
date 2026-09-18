@@ -20,6 +20,14 @@
 // and every recipe-driven detail on BOTH front doors
 // (shared/web/screen-engine/screen-renderer.tsx). Deleting either call site
 // turns this red.
+//
+// ONE LINE, NOT TWO, SINCE 18 SEP 2026 (R87, "title-length", RULES.md). The
+// client's title-length ruling asked every one-line title renderer — the
+// record head named explicitly among them — to truncate with an ellipsis, and
+// `clampRecordHeading` is now that one-line truncation rather than a two-line
+// `line-clamp-2` (see the function's own header for why one clamp serves both
+// the 1 Sep missing-title problem and the 18 Sep character ceiling). This
+// suite's assertions moved from `.line-clamp-2` to `.truncate` with it.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -40,13 +48,13 @@ const LONG =
   "Vorgang an, prüfen die Police, fordern Unterlagen an und geben den Vorgang " +
   "an die Regulierung weiter, die dann entscheidet und den Kunden informiert."
 
-describe("a record's own name is clamped to two lines", () => {
-  it("clamps a string title, and keeps the whole of it reachable", () => {
+describe("a record's own name is truncated to one line", () => {
+  it("truncates a string title, and keeps the whole of it reachable", () => {
     const { container } = render(<RecordScreen title={LONG} />)
     const heading = container.querySelector("h1")
     expect(heading, "the record heading is drawn").toBeTruthy()
-    const clamped = heading!.querySelector(".line-clamp-2")
-    expect(clamped, "the name is clamped inside the heading").toBeTruthy()
+    const clamped = heading!.querySelector(".truncate")
+    expect(clamped, "the name is truncated inside the heading").toBeTruthy()
     // Reachable in full: the pointer/screen-reader route, beside the record body.
     expect(clamped!.getAttribute("title")).toBe(LONG)
     expect(clamped!.textContent).toBe(LONG)
@@ -58,7 +66,7 @@ describe("a record's own name is clamped to two lines", () => {
     )
     const skeleton = container.querySelector('[data-testid="skeleton"]')
     expect(skeleton, "the node is still drawn").toBeTruthy()
-    expect(skeleton!.closest(".line-clamp-2"), "and it is not boxed by the clamp").toBeNull()
+    expect(skeleton!.closest(".truncate"), "and it is not boxed by the truncation").toBeNull()
   })
 
   it("both record-heading seams apply it — read off disk, not off a comment", () => {

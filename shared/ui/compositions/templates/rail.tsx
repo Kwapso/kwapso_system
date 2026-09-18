@@ -1295,49 +1295,68 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
               /* THE LOGO'S OWN VERTICAL CENTRE MATCHES THE WORKSPACE TAB
                  STRIP'S LABEL — 18 Sep 2026 CLIENT RULING, VERBATIM: "on the
                  sidebar tge logo is way too up!!! make it aligned with text
-                 on foler tabs."
+                 on foler tabs." REWRITTEN THE SAME DAY, v1.2.122, AFTER THE
+                 FIRST FIX DID NOT HOLD ON THE LIVE APP.
 
-                 MEASURED LIVE (`verify/shell-chrome/`, 1440×900, this kit's
-                 15px harness root), BEFORE this fix: this row's own box
-                 (mark + wordmark, both `--icon-20` tall, centred by this
-                 row's own `items-center`) sat at centre 18.74px from the
-                 viewport top; the active folder tab's own label glyph sat at
-                 28.75 — 10px lower, the exact "way too up" she is naming.
+                 THE FIRST FIX COMPUTED A CENTRE. It read four tokens —
+                 `--shell-gutter`, `--folder-lip`, `--icon-20`, `--rail-inset`
+                 — and did the arithmetic here: `--shell-gutter +
+                 --folder-lip/2 - --icon-20/2 - --rail-inset`. Correct at the
+                 kit's own 15px harness root (0.52px residual) and wrong on
+                 the live app at 16px root (8.65px off) — not because either
+                 app overrides any of the four (checked: `web/app/globals.css`
+                 redeclares none of them), but because a COMPUTED centre is
+                 only as good as every term in the sum staying in the exact
+                 relationship this formula assumed, and one of those four —
+                 `--icon-20` — was standing in for "the mark's own rendered
+                 height", which is a fact about `Logotype`/`Isotype` and
+                 `MARK_STEP`, not about the tab strip this row is aligning
+                 to. Four independently-editable tokens is four places this
+                 could drift again.
 
-                 BOTH NUMBERS DERIVE FROM TOKENS ALREADY IN SCOPE HERE, so the
-                 fix binds to them rather than to a third, independent
-                 pixel figure. `DENSITY_GUTTER`/`DENSITY_RAIL`
-                 (`screen-shell.tsx`) are both declared on the shared
-                 `screen-shell-card` root the rail dock and the content
-                 column are siblings under, so `--shell-gutter` and
-                 `--rail-inset` both cascade down into this file same as the
-                 two global folder-tab tokens do. The tab strip's own row
-                 starts `--shell-gutter` below that shared top edge (the
-                 content column's own `py`, canceling `breadcrumb-
-                 folders.tsx`'s `pt-1`/negative-margin ring-clearance pair
-                 exactly, so nothing is added there) and its active label
-                 centres in the LIP portion of the tab, never across the
-                 join (`breadcrumb-folders.tsx`'s own "centred in the lip" —
-                 `--folder-lip`/2 further down). The rail dock's own top edge
-                 is the SAME y-coordinate (both columns are siblings with no
-                 offset between them, MEASURED: `screen-shell-rail`'s rect
-                 top and the content column's rect top both read 0 in the
-                 harness above) — so this row's own vertical centre is bound
-                 to `--shell-gutter + --folder-lip/2`, minus half its own
-                 height (`--icon-20`, `MARK_STEP`'s own rung) and minus the
-                 `--rail-inset` padding the column already spent above it
-                 (RAIL_COLUMN pads this box's top edge once already; this
-                 margin is the REMAINDER, not a second, competing offset).
-                 Same formula shape `screen-shell.tsx`'s own assistant-handle
-                 fix already uses to land a control inside this exact tab
-                 band (`--shell-gutter + --folder-lip`), not a new idiom.
+                 THE FIX NOW BUILDS A BAND INSTEAD OF A CENTRE. `--strip-row`
+                 (tokens.css, aliased to `--folder-lip`) names the exact box
+                 the tab strip's own label centres inside — proven the same
+                 shape `screen-shell.tsx`'s assistant edge-handle already
+                 stands in, `top-[var(--shell-gutter)] size-[var(--folder-
+                 lip)]`, and the derivation `breadcrumb-folders.tsx`'s own
+                 `TAB` uses to centre its label (`h-[var(--folder-tab-
+                 height)] pb-[var(--folder-tab-overlap)] items-center`, which
+                 centres the label in exactly the top `--folder-lip` of the
+                 tab, i.e. `[--shell-gutter, --shell-gutter + --strip-row]`
+                 from the shared top edge the rail dock and content column
+                 share). This row now occupies THE SAME BAND: `h-[var(
+                 --strip-row)]` sets its height to the tab strip's own, and
+                 `items-center` (already on this div) centres the mark inside
+                 it — however tall the mark actually renders, the SAME WAY
+                 the tab strip centres its label regardless of the label's
+                 own line height. The two boxes' centres now coincide BY
+                 CONSTRUCTION — `top + height/2`, arithmetic the browser does
+                 once per box — rather than by an offset computed to land on
+                 a second box's centre from outside it.
 
-                 UNCONDITIONAL — BOTH RAIL STATES. `MARK_STEP` gives the
-                 mark the same `--icon-20` height whether the isotype
-                 (collapsed) or the full logotype (expanded) renders, and the
-                 tab strip this aligns against never depends on the rail's
-                 own state either, so one offset serves both. */
-              "mt-[calc(var(--shell-gutter)_+_var(--folder-lip)/2_-_var(--icon-20)/2_-_var(--rail-inset))]",
+                 ONLY TWO TERMS LEFT IN THE ONE CALC THAT REMAINS, AND
+                 NEITHER IS THE MARK'S. `mt-[calc(var(--shell-gutter)_-_var(
+                 --rail-inset))]` moves this box's top edge from where
+                 `RAIL_COLUMN`'s own `p-[var(--rail-inset)]` already parked
+                 it to `--shell-gutter` below the shared top edge — cancelling
+                 the column's ambient padding and re-spending the tab strip's
+                 own inset, the same cancel-and-respend idiom `ROW_EXPANDED`'s
+                 own header already uses one screenful down. `--shell-gutter`
+                 and `--rail-inset` stay two independent tokens on purpose
+                 (`screen-shell.tsx`'s own `DENSITY_RAIL`/`DENSITY_GUTTER`
+                 comments: "the two tokens remain independent by design") —
+                 this calc is the box-model fact of reaching one from inside
+                 the other's padding, not a borrowed pixel figure, and it
+                 holds at any root size because both terms are rem.
+
+                 UNCONDITIONAL — BOTH RAIL STATES, EVERY MARK. `h-[var(
+                 --strip-row)]` and the top offset do not read `MARK_STEP` or
+                 `--icon-20` at all any more, so a future change to the mark's
+                 own size (or a call site's own `mark` node, any height)
+                 cannot re-open this seam the way the first fix's `--icon-20`
+                 term could. */
+              "mt-[calc(var(--shell-gutter)_-_var(--rail-inset))] h-[var(--strip-row)]",
               /* ONE LEADING EDGE DOWN THE WHOLE COLUMN. The client's
                  reference aligns the lockup with the leading edge of the
                  destinations below it, not with the column's padding — and

@@ -56,6 +56,7 @@ import {
 } from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { TITLE_MAX_CHARS } from "@shared/types"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -105,7 +106,15 @@ const NARRATION_STEP_DELAYS_MS = [1200, 2400]
  * forever. */
 const NARRATION_TIMEOUT_MS = 15_000
 
-const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
+// R87 (title-length, RULES.md): every title field reads the one shared
+// ceiling, so the marker, the counter and the door can never disagree about
+// what "too long" means.
+const titleField = {
+  ...defaultFieldConfig,
+  label: "What is it called?",
+  required: true,
+  validation: { ...defaultFieldConfig.validation, maxLength: TITLE_MAX_CHARS },
+}
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
 const linkField = { ...defaultFieldConfig, label: "Link (optional)", required: false }
 const filedField = { ...defaultFieldConfig, label: "Filed under", required: false }
@@ -350,12 +359,19 @@ export function KnowledgeFormDialog({
         loadingLabel: willReadVideoLink ? t("Reading the link…") : undefined,
       }}
     >
-      <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
+      <Field
+        config={titleField}
+        htmlFor="knowledge-title"
+        className={fieldSpacing}
+        count={values.title.length}
+        countMax={TITLE_MAX_CHARS}
+      >
         <Input
           id="knowledge-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
           placeholder={t("e.g. How we handle a Bergman dispatch outage")}
+          maxLength={TITLE_MAX_CHARS}
           disabled={busy || (titleOwnedElsewhere ?? textOwnedElsewhere)}
           autoFocus
         />
