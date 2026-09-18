@@ -72,7 +72,25 @@ export function describeChanges(fields: FieldDiff[]): string {
  * the sentence the caller already wrote (activity-verbs.ts), the origin from the
  * data-door config the caller already holds (origin.ts). Neither is a new
  * argument, so none of the 139 call sites changed and none of them can forget —
- * which is the whole reason both of them ride where they do. */
+ * which is the whole reason both of them ride where they do.
+ *
+ * `INSERT OR IGNORE`, BUILD-5 §J (18 Sep 2026) — NOT because two independent
+ * calls ever mint the same id (`ulid()` draws 16 bytes from `crypto.
+ * getRandomValues`, ~80 bits of real randomness; that colliding is not a risk
+ * worth coding for). Observed live: `UNIQUE constraint failed: activity.id`
+ * during a heavy concurrent run. The id is minted ONCE, here, before the write
+ * — correctly, since re-minting one per attempt would turn a lost-response
+ * retry into a genuine DUPLICATE row instead of one clean write — but
+ * `d1ExecScript` → `cfRaw`'s own retry loop (shared/workers/d1-rest.ts) can
+ * resend this exact script, id and all, when a write TIMES OUT on the client
+ * side after already SUCCEEDING on D1's: the response was lost, not the write.
+ * That second send is not a new activity line, it is the first one arriving
+ * twice, and a `PRIMARY KEY` violation on a retried, byte-identical INSERT is
+ * the write failing to be idempotent, not two writers racing. `OR IGNORE`
+ * makes a retried insert of the SAME row a no-op instead of an error the
+ * caller's own swallow-and-log contract (`logActivity`'s header) would
+ * otherwise report as a missing history line for an action that, this time,
+ * really did write it the first time. */
 async function insertActivity(
   cfg: D1Rest,
   databaseId: string,
@@ -83,7 +101,7 @@ async function insertActivity(
   await d1ExecScript(
     cfg,
     databaseId,
-    `INSERT INTO activity
+    `INSERT OR IGNORE INTO activity
        (id, type, verb, origin, description, related_table, related_row_id,
         created_at, creator_id, creator_email, creator_name)
      VALUES (

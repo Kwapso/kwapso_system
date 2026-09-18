@@ -1744,9 +1744,39 @@ export const INGEST_KINDS: IngestKind[] = [
         // staging the moment v2 landed, which is the only place a sentence built
         // in three pieces can be read as one.
         const noun = isClient ? "client contact" : "colleague of ours"
+        const spellings = nameSpellings(m.first_name, m.last_name, m.email)
         return {
           originRowId: m.id,
-          generatedOnly: !(p?.headline || p?.about || p?.strengths || p?.weaknesses || p?.role_models || p?.personality_type),
+          // BUILD-5 §J (18 Sep 2026): THE OWNER'S OWN QUESTION — "What is
+          // Alex's full name?" — found nothing live on staging, though R47
+          // already mirrors every colleague into the corpus and the full name
+          // was sitting right in `team_members`/`users`. The gap was never
+          // reachability, it was quotability: a colleague with no
+          // `staff_profiles` row was a pure CARD (findable by title, never
+          // quoted — R23's own design), and a name with nothing ELSE written
+          // about it looked, by the old condition, exactly like a colleague
+          // with nothing to say. `name, email, role, team` is a real, standing
+          // fact on its own — but only widen the card when there is a genuine
+          // SPELLING worth disambiguating (`nameSpellings` finds more than the
+          // bare name: a nickname, an initialled surname), never for every
+          // colleague unconditionally. Unconditionally-real is exactly the
+          // failure `generated_only` was invented to stop, in this file's own
+          // motivating story: a forty-character record-mirror sentence
+          // quoted as evidence for "what has this colleague been working
+          // on?" A distinguishing spelling is the narrow, principled line —
+          // it is the one shape of fact an identity question ("what is X's
+          // full name?") genuinely needs answered from a passage, and a
+          // colleague whose first name already IS their only name gains
+          // nothing from this widening.
+          generatedOnly: !(
+            p?.headline ||
+            p?.about ||
+            p?.strengths ||
+            p?.weaknesses ||
+            p?.role_models ||
+            p?.personality_type ||
+            spellings.length > 1
+          ),
           sortAt: m.sort_at,
           title: name,
           summary: buildSummary({
@@ -1769,9 +1799,7 @@ export const INGEST_KINDS: IngestKind[] = [
               : `${name} works here${role ? `, as ${role}` : ""}. Their email address is ${m.email}.`,
             // EVERY SPELLING, ONE LINE. See this kind's header: a colleague is
             // the record type people name by a shortening nobody wrote down.
-            nameSpellings(m.first_name, m.last_name, m.email).length > 1
-              ? `They are also called ${nameSpellings(m.first_name, m.last_name, m.email).join(", ")}.`
-              : "",
+            spellings.length > 1 ? `They are also called ${spellings.join(", ")}.` : "",
             p?.headline ?? "",
             p?.personality_type ? `Personality type: ${p.personality_type}.` : "",
             p?.strengths ? `Strengths: ${p.strengths}` : "",

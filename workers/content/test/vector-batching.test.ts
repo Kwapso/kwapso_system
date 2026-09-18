@@ -145,3 +145,63 @@ describe("vector writes are batched to what Vectorize actually accepts", () => {
     ).rejects.toThrow(/max id count is 100, got 101/)
   })
 })
+
+// BUILD-5 §J (18 Sep 2026), report open item 4. Observed live: `clearIndex`
+// always includes a source's OWN record vector in the delete batch — even at
+// `chunk_count = 0`, so the call is never truly empty — and that batch was
+// occasionally `VECTOR_DELETE_ERROR` (code 40041, "Too Many Requests") under
+// heavy concurrent rebuild load. `deleteVectors`'s existing one retry (`twice`)
+// fires with no gap, so it lands inside the SAME rate-limit window the first
+// attempt just tripped and is close to certain to fail again for the identical
+// reason. Fixed: only when the SECOND failure still reads as a rate limit, one
+// more attempt after a short pause — any other error surfaces exactly as fast
+// as it always did.
+describe("a delete rate-limited twice gets one more try after a pause, not a third instant one", () => {
+  it("succeeds on the third attempt when the first two are rate-limited", async () => {
+    const { index, env } = harness()
+    let calls = 0
+    const real = index.binding.deleteByIds.bind(index.binding)
+    index.binding.deleteByIds = async (ids: string[]) => {
+      calls++
+      if (calls <= 2) throw new Error("VECTOR_DELETE_ERROR (code = 40041): Too Many Requests")
+      return real(ids)
+    }
+    await expect(deleteVectors(env, ["chunk_0"])).resolves.toBeUndefined()
+    expect(calls, "two immediate attempts, then one more after the pause").toBe(3)
+  })
+
+  it("does not spend the pause on a failure that is not a rate limit", async () => {
+    const { env } = harness()
+    let calls = 0
+    const broken = {
+      ...env,
+      KNOWLEDGE_INDEX: {
+        deleteByIds: async () => {
+          calls++
+          throw new Error("vectorize is down")
+        },
+      },
+    } as unknown as typeof env
+    await expect(deleteVectors(broken, ["chunk_0"])).rejects.toThrow("vectorize is down")
+    // TWO, NOT THREE: the pause is bought only by a failure a pause can fix. A
+    // store that is genuinely down gets the same one retry it always got —
+    // spending 500ms on a third attempt against a dead store is exactly the
+    // "worker's lifetime" this mechanism's own header argues against.
+    expect(calls).toBe(2)
+  })
+
+  it("a single blip is still absorbed by the first retry alone, no pause spent", async () => {
+    const { index, env } = harness()
+    let calls = 0
+    const real = index.binding.deleteByIds.bind(index.binding)
+    index.binding.deleteByIds = async (ids: string[]) => {
+      calls++
+      if (calls === 1) throw new Error("connection reset")
+      return real(ids)
+    }
+    const started = Date.now()
+    await expect(deleteVectors(env, ["chunk_0"])).resolves.toBeUndefined()
+    expect(calls).toBe(2)
+    expect(Date.now() - started, "no pause needed when the very next try already lands").toBeLessThan(200)
+  })
+})

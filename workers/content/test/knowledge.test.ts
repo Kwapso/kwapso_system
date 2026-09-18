@@ -1878,6 +1878,58 @@ describe("`records` carries a real path back to what it mirrors, not just a sour
   })
 })
 
+// BUILD-5 §J (18 Sep 2026), report open item 3. `deriveRoute`'s record-level
+// search used to ask Vectorize for exactly ROUTER_TOP_RECORDS (3) — so a DEAD
+// id among the nearest neighbours (R26's own survivable shape: a vector whose
+// row was replaced or removed since it was upserted) silently shrank the real
+// candidate count, indistinguishable from the base genuinely having fewer real
+// things to say. Fixed by overfetching (ROUTER_RECORD_OVERFETCH) and trimming
+// to ROUTER_TOP_RECORDS only after the dead ones are known gone.
+describe("the router overfetches so a dead vector id costs nothing", () => {
+  const guard: MemberGuard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  it("still names two real records when six ghost ids rank ahead of them", async () => {
+    const question = "what happened at the zzqoxphant quarterly retro?"
+    const qv = fakeVector(question)
+
+    // SIX GHOSTS, SCORED TO WIN OUTRIGHT: the exact same vector as the question
+    // itself, so their cosine is 1.0 — nothing a real, imperfect match could
+    // ever outrank. None of them names a real knowledge_sources row. Without
+    // the overfetch, the old topK-3 search would have returned three of THESE
+    // and none of the real sources below.
+    for (let i = 0; i < 6; i++)
+      await vectorIndex.binding.upsert([
+        {
+          id: `01GHOSTDEADVECTOR${i}:summary`,
+          values: qv,
+          namespace: IDS.team,
+          metadata: { level: "record", compartment: "agency", owner: "team" },
+        },
+      ])
+
+    const first = "01REALZZQOXPHANTONEXXXXXXX"
+    const second = "01REALZZQOXPHANTTWOXXXXXXX"
+    for (const [id, title] of [
+      [first, "zzqoxphant retro, day one"],
+      [second, "zzqoxphant retro, day two"],
+    ] as const) {
+      db().exec(
+        `INSERT INTO knowledge_sources (id, kind, compartment, title, summary, body, body_bytes,
+           team_visible, created_at, creator_name)
+         VALUES ('${id}', 'note', 'agency', '${title}', '${title}.',
+           'Notes on the zzqoxphant quarterly retro, real material.', 40, 1, '2026-09-01', 'kwapso');`
+      )
+      await indexSource(env(IDS.staffUser), {} as never, guard, id)
+    }
+
+    const answer = await ask(IDS.staffUser, question)
+    const ids = (answer.records ?? []).map((r) => r.sourceId)
+    expect(ids, `records carried: ${JSON.stringify(answer.records)}`).toContain(first)
+    expect(ids).toContain(second)
+    expect(ids.every((id) => !id.startsWith("01GHOST")), "a dead id must never reach the answer").toBe(true)
+  })
+})
+
 describe("taking a source away really takes it away", () => {
   it("stops answering from it, keeps the row, and does not resurrect it", async () => {
     const id = await addSource(IDS.staffUser, {

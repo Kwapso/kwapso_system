@@ -204,7 +204,17 @@ export const QUESTIONS = [
     // A conversation somebody had, so it has speakers to name (see `attributes`).
     conversation: true,
     cites: ["Team Assembly"],
-    spread: 2,
+    // ONE citation, not two — BUILD-5 §J, 18 Sep 2026, diagnosed and settled
+    // by the planner, not tuned to pass. A second real source exists (a
+    // Google Meet notes email covering the same meeting, scoring above both
+    // retrieval floors) but it is correctly gated: `team_visible = 0`, owned
+    // by one person's personal Google connection (Ishita's), and the bench's
+    // own test member is not that owner — R26's personal fence
+    // (`ownerFilter`, knowledge-vectors.ts) working as designed, not a
+    // ranking bug. Retrieval was left alone on purpose. Whether a Google
+    // Meet-notes email should compute `team_visible` from its own sightings
+    // the way a `meeting` kind's transcript does is a real, separate
+    // question — the owner's to decide, not this bench's to assume.
     lead: ["monthly", "bonding", "rotat", "remote", "culture"],
     topic: ["Team Assembly"],
   },
