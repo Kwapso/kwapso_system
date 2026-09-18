@@ -280,7 +280,7 @@ const RATE_LIMITED = /too many requests|\b429\b|\b40041\b/i
 async function thriceIfRateLimited<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run()
-  } catch (first) {
+  } catch {
     try {
       return await run()
     } catch (second) {
