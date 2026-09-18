@@ -2,6 +2,307 @@
 
 ## Unreleased
 
+### Fixed — the rail's logo lines up with the folder-tab strip, the assistant dock's tabs are proven to share the content strip's one gap, and the collapsed rail keeps its expanded size — v1.2.120
+
+**THREE CLIENT RULINGS, 18 SEP 2026, VERBATIM.**
+
+**1. "on the sidebar tge logo is way too up!!! make it aligned with text on
+foler tabs."** MEASURED LIVE (`verify/shell-chrome/`, 1440×900, this kit's
+own 15px harness root, `?aside=shut&member=given`), BEFORE this fix:
+`[data-slot="rail-brand"]`'s own box (the mark + wordmark row,
+`compositions/templates/rail.tsx`) centred at 18.74px from the viewport top;
+the active folder tab's own label glyph (a `Range` over its text node,
+inside `nav[data-slot="breadcrumb-folders"]`) centred at 28.75 — 10.01px
+lower, exactly the "way too up" she is naming. **Fix:** `rail-brand` now
+carries `mt-[calc(var(--shell-gutter)_+_var(--folder-lip)/2_-_var(--icon-20)/2_-_var(--rail-inset))]`
+— four tokens already in scope on that element rather than a fifth, literal
+pixel figure. `DENSITY_GUTTER`/`DENSITY_RAIL` (`screen-shell.tsx`) are both
+declared on the shared `screen-shell-card` root the rail dock and the
+content column are siblings under, so `--shell-gutter` and `--rail-inset`
+both cascade into `rail.tsx` beside the two global folder-tab tokens
+(`--folder-lip`, `--icon-20`). The tab strip's own row starts
+`--shell-gutter` below that shared top edge; its active label centres in
+the tab's own LIP portion (`breadcrumb-folders.tsx`'s "centred in the lip,
+never across the join" — `--folder-lip`/2 further down); the rail dock's
+own top edge is the identical y-coordinate (both columns are siblings with
+no offset between them, confirmed live: both rects' `top` read 0). Binding
+this row's own centre to that same formula, minus half its own height
+(`--icon-20`, `MARK_STEP`'s rung) and minus the `--rail-inset` padding the
+column already spends above it, lands the two centres on one line — the
+same `--shell-gutter + --folder-lip` shape `screen-shell.tsx`'s own
+assistant-handle fix (v1.2.119) already uses to land a control inside this
+exact band, not a new idiom. Unconditional across both rail states: the
+mark is `--icon-20` tall whether the isotype (collapsed) or the full
+logotype (expanded) renders, and the tab strip never depends on the rail's
+own state either. AFTER: 29.27 against 28.75, 0.52px apart (the residual is
+line-box rounding against a geometric flex-row centre, not the formula).
+**Files:** `compositions/templates/rail.tsx` (the `rail-brand` block's own
+`className`, one `mt-[...]` class added). **Checks:**
+`compositions/templates/check-screen-shell.mjs`'s new rail-brand-alignment
+check pins the working calc string on `rail-brand` and refuses an empty
+`mt-[...]` (the pre-fix shape). Proved by reverting the class to a `cp`
+backup and confirming the check fails red with both findings, then
+restoring and re-verifying green.
+
+**2. "on the assistant, the inctove tabds shape is still overlapping with
+the active one. tahts worng. shoudl 100% replicate what hapens with main
+content tabs."** Investigated for a second component, an old
+`TAB_OVERLAP_MARGIN`/negative-margin variant kept for the dock, or a
+`--folder-shoulder` still applied on the agent dock's `li` — **none exist.**
+`components/breadcrumbs/breadcrumb-folders.tsx` is the ONLY folder-tab strip
+in this kit; there is exactly one `<BreadcrumbList ref={listRef}
+className={cn(STRIP, listClassName)}>` render site in the whole file, and
+`STRIP` has read `gap-[var(--space-2)]` (v1.2.116→v1.2.119's own "THE
+OVERLAP IS GONE" fix, retiring `TAB_OVERLAP_MARGIN` outright) since before
+this session started. The app's own assistant dock
+(`web/components/assistant/agent-tab-strip.tsx`, `@shared/ui`-vendored,
+unreachable from here) calls this exact exported component directly, with
+no wrapper and no `listClassName` override — its own header says so in as
+many words ("DRAWN WITH THE KIT'S OWN `BreadcrumbFolders` — the identical
+component the main content trail uses"). **Live proof, not just source
+inspection:** extended `verify/tabstrip-parity/page.tsx` (already staged the
+content strip and two real assistant-dock shapes — A: active·iconOnly·
+iconOnly, B: rest·active·iconOnly·iconOnly, the drag-reordered shape — from
+each real call site's own literal props) with a new `measureClassParity`
+reading, comparing every host's own `<ol data-slot="breadcrumb-list">`
+className for exact string equality rather than merely "both compute the
+same gap today". Sampled live in the harness: all three read the identical
+72-class string (`text-caption text-ink-tertiary flex flex-nowrap
+items-end isolate gap-[var(--space-2)] max-w-full overflow-x-auto
+overflow-y-hidden scroll-p-2 [scrollbar-width:none]
+[&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:h-0 pt-1
+mt-[calc(var(--space-1)*-1)] mb-[calc(var(--folder-tab-overlap)*-1)]`), and
+`measureNesting`'s existing gap reading is 9px (`--space-2` at this
+harness's root) for every consecutive pair in all three configurations —
+`passes: true` on every one. **What she saw was almost certainly the
+pre-v1.2.116/119 build** (the negative-margin nesting the same file's own
+history records three prior client reports against, on this exact strip),
+not a live divergence in the code as it stands now. **Files:**
+`verify/tabstrip-parity/page.tsx` (`measureClassParity` added, wired into
+`measureAll()`). **Checks:** a new
+`components/breadcrumbs/check-breadcrumb-folders.mjs`, wired into `npm run
+check`, pins the STRUCTURAL guarantee the live proof only samples: exactly
+one `<BreadcrumbList>` render site, that site spending exactly one `STRIP`
+constant merged only with the caller's own `listClassName`, `STRIP` itself
+still reading `gap-[var(--space-2)]` with the retired negative-margin shape
+absent, and exactly one `STRIP`-named constant in the file (refusing a
+future `STRIP_ASIDE`/`STRIP_DOCK` fork before it could ever diverge).
+Proved by reverting `STRIP`'s gap to `--space-1` on a `cp` backup and
+confirming the check fails red, then restoring and re-verifying green.
+
+**3. "when contracting sidebar, yuo should not make icons or spaces
+smaller, keep it as it is, just without tetxs."** MEASURED LIVE
+(`verify/rail/`'s own `data-case="scroll"` two-column proof — a real
+height, real overflow, both rail states side by side, so no click or state
+toggle stands between the two readings), BEFORE this fix: expanded row
+height 37.5px / row-to-row rhythm 45px (`--control-height-button`, 40 at
+16px root) against collapsed row height 30px / rhythm 37.5px (`--avatar-md`,
+32) — an 8px shrink in the row's own box, and, because the row-to-row GAP
+token itself never moved (`--space-2`, 7.5px at this root, measured
+identical in both states — 45−37.5 and 37.5−30 are both 7.5), the SAME 8px
+shrink carried straight through to the rhythm between rows. The icon's own
+glyph was never part of the shrink (15×15px, `--icon-button`, measured
+identical in both states before this fix too) — `ROW_SHAPE`'s shared
+`[&_svg]:size-[var(--icon-button)]` descendant rule reads off the ROW
+itself, not the expanded-only `rail-item-icon` wrapper span the collapsed
+branch never renders. So what actually shrank was the row's own box, which
+is what she is naming as "spaces". **Fix:** `ROW_COLLAPSED` now reads
+`size-[var(--control-height-button)]` (was `size-[var(--avatar-md)]`) —
+the SAME height token `ROW_EXPANDED` already spends, so the two states
+share one row height and therefore one row-to-row rhythm without a second,
+independent number. The rail's own collapsed-state root width widens the
+same 8px, `w-[var(--control-height-button)]` (was `w-[var(--avatar-md)]`),
+so the now-larger circle fits its column without clipping. The member
+chip's own avatar face is untouched — it is a face, not a nav destination,
+and the ruling never named it; `26.02`'s "same circular size as the avatar"
+language on the OLD `ROW_COLLAPSED` is superseded for nav rows by this
+ruling, in place, not deleted. AFTER: 37.5px / 45px in BOTH states,
+identical; collapsed rail width 37.5px (was 32px, at this harness's 15px
+root). **Files:** `compositions/templates/rail.tsx` (`ROW_COLLAPSED`'s own
+`size-[...]` token, and the collapsed rail root's own `w-[...]` token, both
+in place; their own doc comments rewritten to carry the ruling and the
+measurement rather than the retired 26.02 rationale alone). **Checks:**
+`compositions/templates/check-screen-shell.mjs`'s new
+collapsed-rail-keeps-its-size check pins `ROW_COLLAPSED`'s working
+`size-[var(--control-height-button)]` shape, refuses the retired
+`size-[var(--avatar-md)]` reappearing on that one constant (the member
+chip's own, unrelated `--avatar-md` uses elsewhere in the file are
+untouched by the match), and pins the collapsed root's matching
+`w-[var(--control-height-button)]`. Proved by reverting `ROW_COLLAPSED`
+alone to a `cp` backup and confirming the check fails red, then restoring
+and re-verifying green.
+
+**Verify:** `verify/shell-chrome/` (ruling 1, added to `.claude/launch.json`
+as `verify-shell-chrome`, port 5271 — it existed on disk with no launch
+entry) and `verify/rail/` (ruling 3) both measured live via a Vite dev
+server against the actual composed `ScreenShell`/`Rail`, not a hand-built
+stand-in; `verify/tabstrip-parity/` (ruling 2) measured live against the
+actual exported `BreadcrumbFolders`, driven from each real call site's own
+literal props. No staging login was available to this session (the
+Keychain-held test-login key and an existing Google-authenticated browser
+session were both unreachable here), so every number above is a kit-local
+harness reading rather than an `agency-staging` one; the geometry these
+harnesses render is the same composed kit source `shared/ui/` vendors
+byte-for-byte (confirmed: `shared/ui/VERSION.json` pins v1.2.119, `diff`
+against this repo's `components/breadcrumbs/breadcrumb-folders.tsx` at that
+tag is empty), so the readings hold for the deployed app once this v1.2.120
+tag is cut and synced — but that live confirmation is still owed.
+
+### Fixed — the shut assistant handle now fills its whole band, and a Badge icon can no longer be muted by the caller — v1.2.119
+
+**TWO CLIENT RULINGS, 18 SEP 2026, VERBATIM.**
+
+**1. "need to be bigger, as big as the space allows it."** A second, same-day
+ruling on top of v1.2.116's own fix, which had sized the shut assistant
+opener (`compositions/templates/screen-shell.tsx`'s `EdgeHandle` at
+`edge="aside"`) down to `--control-height-pill` (26px) so its bottom edge
+would stop running 9.52px past the content card's own top edge —
+`trail-line.tsx`'s own borrowed token for a DIFFERENT control (its close
+chip) sharing the same `--folder-lip` (30.48px) band. That fix was correct
+against the overlap complaint and left 4.48px of air on every side; "as big
+as the space allows it" asks for the band's own full height, not a second
+borrowed control size. **Fix:** the shut branch now reads
+`size-[var(--folder-lip)]` instead of `size-[var(--control-height-pill)]` —
+one value swap, same `cn()`-merge mechanism as the v1.2.116 fix. New bottom
+edge: `--shell-gutter` (16px) + `--folder-lip` (30.48px) = 46.48px, which
+is exactly the content card's own top edge (the same 16px column padding
+plus `--folder-lip` — the SAME token `trail-line.tsx` already proved fits
+this exact band) — zero clearance either side, not the earlier overlap and
+not the 26px fix's own leftover air. `size-` sets both axes, so the box
+stays a true square at the new height with no separate width to pick. The
+icon inside is unchanged at `--icon-button` (16px, from `HANDLE_HIT`), so
+growing the box only grows the air around the mark. The OPEN branch (the
+mid-edge grab at `HANDLE_HIT`'s own 40px) is untouched — this ruling only
+ever named the shut, top-strip corner. **Files:**
+`compositions/templates/screen-shell.tsx` (the shut branch's `placement`
+string inside `EdgeHandle`'s `edge="aside"` call, and its own comment,
+updated in place). **Checks:**
+`compositions/templates/check-screen-shell.mjs`'s assistant-handle-in-the-band
+check extended: the positive pin now requires `size-[var(--folder-lip)]`
+rather than `size-[var(--control-height-pill)]`; a new guard explicitly
+fails if the retired 26px sizing reappears in that branch (so a revert to
+the v1.2.116 fix alone, which would otherwise still read as "not
+overlapping", is caught); and a new numeric pin computes
+`--shell-gutter + --folder-lip` against the card's own measured top edge
+(46.48px) and fails if the sum ever runs past it. Proved by reverting the
+branch to `size-[var(--control-height-pill)]` and confirming the check
+fails red with both the "wrong token" and "old token still present"
+findings, then restoring from a `cp` backup and re-verifying green.
+**Verify:** measured live in `verify/shell-chrome/` (`?aside=shut`) —
+`screen-shell-handle[data-edge="aside"]`'s own `getBoundingClientRect()`
+bottom edge (43.5625px at this harness's 15px root, i.e. 46.48px scaled by
+15/16) lands within 0.02px of `screen-shell-content`'s own top edge
+(43.578125px) — flush, not short, not past — and the handle box measures
+square (28.5625 × 28.5625) at that same root.
+
+**2. From her screenshot of a ticket head: "type icon is still gray."** The
+ticket-type chip's own TYPE badge (`shared/web/ticket-chips.tsx`, the app
+repo, unreachable from here) is `variant="secondary"` with an `icon` prop —
+v1.2.118 already fixed that variant's LABEL to read `text-foreground`
+instead of `text-ink-secondary`, but the icon beside it stayed grey because
+`components/badge/badge.tsx`'s icon slot (`data-slot="badge-icon"`)
+deliberately left colour to the call site ("sized and coloured at the call
+site"), and the call site hands in a Phosphor glyph carrying its own
+`text-muted-foreground` class — reproduced deliberately in
+`verify/badge/page.tsx`'s own icon-led section for exactly this reason, so
+the repro stays visible rather than quietly deleted. **Fix:** the
+`badge-icon` wrapping span now carries `text-foreground
+[&_svg]:text-foreground` — the bracket form compiles to a descendant
+selector (one class plus one element) that OUTRANKS, in CSS specificity, a
+single colour class written directly on the caller's own SVG, regardless of
+source order, so it wins even against a call site that still passes
+`text-muted-foreground` and cannot be edited from here. Sizing is
+untouched — only colour is forced. The same descendant-selector rescue is
+already standing kit practice (`select.tsx`'s `[&_svg]:text-ink-secondary`,
+`view-switch.tsx`'s identical pattern), not invented for this fix. No
+opacity utility is used, for the same reason opacity was never right for
+the label: it dims the ink rather than replacing it. **Files:**
+`components/badge/badge.tsx` (the `badge-icon` span's `className`, and its
+own comment; a new header-law bullet naming the ruling). **Checks:**
+`components/badge/check-badge.mjs` extended with a fifth section: the exact
+`badge-icon` render-site class string is matched (not a bare substring
+search for "text-foreground", which the file's own doc prose already
+contains) and asserted to carry `[&_svg]:text-foreground`, to carry no
+muted-ink class of its own (`text-muted-foreground`/`text-ink-secondary`/
+`text-ink-tertiary`/`text-ink-disabled`), and no `opacity-*` utility.
+Proved by stripping the forced class back to
+`className="inline-flex shrink-0 items-center"` and confirming the check
+fails red, then restoring from a `cp` backup and re-verifying green.
+**Verify page:** `verify/badge/` (existing, port 5341) — its icon-led cells
+already pass `text-muted-foreground` on each of their four icons; measured
+live via `getComputedStyle`, every one of those SVGs now computes
+`rgb(26, 25, 24)`, identical to its own badge's `color`, despite the muted
+class still present on the element.
+
+### Fixed — the trail's gap asymmetry (10 above, 16 below) and the badge leading-mark gap/fill made universal — v1.2.118
+
+**TWO CLIENT RULINGS, 18 SEP 2026, VERBATIM.**
+
+**1. "change to trail line 10px abpove 16below."** Supersedes the earlier
+18 Sep ruling ("exactly same under") that made `screen-shell.tsx`'s
+`DENSITY_TRAIL` `pt` and `TRAIL_GAP` `mb` read the identical `--space-2h`
+(10px) token. `DENSITY_TRAIL`'s `pt` is UNCHANGED — it still reads
+`--space-2h` at both densities, which is what "10px above" asks for.
+`TRAIL_GAP` moves one rung up, from `--space-2h` (10) to `--space-4` (16) —
+the next step on the same scale, not a new `--trail-gap` custom property.
+**Files:** `compositions/templates/screen-shell.tsx` (`TRAIL_GAP`, and its
+own comment, updated in place; `DENSITY_TRAIL` untouched). **Checks:**
+`compositions/templates/check-screen-shell.mjs`'s trail-spacing check now
+pins `TRAIL_GAP` to `mb-[var(--space-4)]` instead of asserting it reads the
+same token as `DENSITY_TRAIL`'s `pt`. `verify/trail-line/page.tsx`'s own
+proof points move with it: `gapBelowTrailIs10` is renamed
+`gapBelowTrailIs16` (tolerance window moved from 10 to 16), `gapAboveTrailIs10`
+is unchanged, and the now-obsolete `gapAboveEqualsBelow` reading is retired —
+asserting the two gaps are equal would itself be the regression this ruling
+guards against.
+
+**2. "on ticket list views, its missing the space between icon and name and
+the backgorund card. always, make it a rule, for everythng wether its a dot
+or an icno, for all chips / pills."** The reproducing case is real: the
+ticket-type chip (`kwapso_system/web/components/tickets/tickets-collection.tsx`'s
+`type` column cell, and `shared/web/ticket-chips.tsx`'s own type chip) hands
+a Phosphor glyph in as a plain CHILD beside the label text, never through
+`components/badge/badge.tsx`'s `dot` prop — so the old gap (`GAP_WITH_DOT`,
+applied only when `dot` was truthy) never applied to it. **Fix:** the
+leading-mark gap (renamed `LEADING_MARK_GAP`, still `gap-2` / `--space-2`,
+8px — the same rung the status dot always spent) now lives UNCONDITIONALLY
+in `badgeVariants`' own base class list rather than behind a
+`dot ? … : undefined` ternary, so it draws between ANY two children — a
+dot, an icon, or (per the ruling's own third example) a face — and costs
+nothing on a one-child, label-only badge. A new `icon?: React.ReactNode`
+prop gives an icon-led chip the same formal slot `dot` already has, so a
+call site never has to hand-roll an `<Icon/>` + `<span>` pair again. The
+fill half of the ruling ("no variant may render bare text without a fill")
+was already true of every variant (`outline`'s `bg-transparent` is a
+declared choice, not an absent one) but is now a standing, checked
+invariant rather than true today by accident. **Files:**
+`components/badge/badge.tsx` (`LEADING_MARK_GAP` replaces the retired
+`GAP_WITH_DOT`; `icon` prop + render slot added; the old conditional gap
+application removed). **Checks:** `components/badge/check-badge.mjs`
+extended with a fourth section: `LEADING_MARK_GAP` is defined and spent in
+`badgeVariants`' own base class array (not behind a `dot ?` ternary — the
+exact regression shape is checked for and refused), every entry in the
+`variant: { … }` block carries an explicit `bg-` declaration, and
+`BadgeProps`/the render function both carry the `icon` slot. Proved by
+breaking each guard in turn (the `outline` fill, the conditional-gap
+reversion) and confirming `check-badge.mjs` fails red, then restoring from
+a `cp` backup. **Verify page:** `verify/badge/` (new — `page.tsx`,
+`main.tsx`, `index.html`, `entry.css`, `vite.config.ts`, port 5341; a
+`verify-badge` launch config added), a live Vite harness (not a static CSS
+mirror, unlike the retired-topic `verify/badge-default-comparison.html`
+beside it) showing dot-led, icon-led (reproducing the ticket-type chip),
+face-led, the OLD ad-hoc-child shape, label-only, and a fill audit of every
+variant, side by side. `window.__badgeVerify()` measures the REAL rendered
+pixel gap (a `Range` read off the label text node, not the flex
+container's own `column-gap` — that CSS property is non-zero on every
+badge regardless of child count, so an earlier draft of this readout wrongly
+reported a "gap" on every label-only cell; the rendered-pixel read is the
+one that reproduces and catches the actual client-reported bug) — 28/28
+cells pass; reintroducing the conditional-gap regression live in the
+browser correctly fails exactly the icon-led, face-led and ad-hoc-child
+cells while leaving the dot-led ones green, then the file was restored from
+a `cp` backup and re-verified green.
+
 ### Fixed — the record header region's own stray inline padding, the second place the trail/title left edge could still drift apart — v1.2.117
 
 **CLIENT RULING, 18 SEP 2026, VERBATIM (SAME RULING AS v1.2.116'S ITEM 1,

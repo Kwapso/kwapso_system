@@ -143,6 +143,13 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // to a `const`, ninety-four of them away from the cap.
       "content/src/lib/help.ts: statuses":
         "the stage set the ticket list narrows by — the route keeps only HELP_STATUSES members (6) and de-dupes them, so the list cannot exceed the vocabulary",
+      // PROVEN by the guard two lines above the statement (team migration
+      // 0105): `addReply` refuses past TICKET_ATTACHMENT_CAP (50) — a reply's
+      // own file ceiling, the same one `addAttachment` refuses past for the
+      // ticket-wide list — before it ever builds the `IN (...)`, and the set
+      // is de-duped first. Fifty placeholders, plus the one for `help_id`.
+      "content/src/lib/help.ts: attachIds":
+        `the ids a reply claims, capped at TICKET_ATTACHMENT_CAP (50) by addReply's own guard, well inside D1's cap`,
       "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
         "Derived from HELP_STATUSES, fixed at author time.",

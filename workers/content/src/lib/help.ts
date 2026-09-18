@@ -28,6 +28,7 @@ import {
   HELP_STATUSES,
   OPEN_HELP_STATUSES,
   type HelpMessage,
+  type HelpMessageAttachment,
   type HelpStatus,
   type HelpTicket,
 } from "@shared/types"
@@ -60,7 +61,7 @@ import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./h
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import {
-  BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_DASHBOARD_GROUP_CAP, TICKET_FACET_CAP
+  BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_ATTACHMENT_CAP, TICKET_DASHBOARD_GROUP_CAP, TICKET_FACET_CAP
 } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -1705,6 +1706,58 @@ function threadFence(guard: MemberGuard, scope: AccountScope): { sql: string; pa
   }
 }
 
+/** THE FILES SENT ALONGSIDE A TICKET'S REPLIES (team migration 0105), grouped by
+ * which reply each one rode in on. Read ONCE per `listReplies` call, over the
+ * whole thread, rather than once per message — the same "one wait, not N"
+ * shape every other N-row-then-N-lookups seam in this file avoids.
+ *
+ * SCOPED BY `help_id`, NEVER BY A CALLER-SUPPLIED LIST OF REPLY IDS — this asks
+ * D1 for every live file attachment on the TICKET (an indexed equality,
+ * `idx_help_attachments_help`) and then keeps only the ones whose
+ * `help_thread_id` names a reply THIS CALL ALREADY FENCED, off `replyIds`. An
+ * `IN (...)` over up to THREAD_HARD_CAP ids would be the more obvious query,
+ * and it is the one NOT written here: 0088's own header measures D1's
+ * expression-tree ceiling on this exact schema, and a ticket's whole reply
+ * history is exactly the shape that ceiling exists to warn about. Filtering in
+ * TypeScript over a single indexed read costs one query either way and keeps
+ * the SQL flat.
+ *
+ * `kind = 'file'` — a message's attachment is bytes the composer has just
+ * uploaded, never a pasted link; the ticket-wide Files-and-links door is the
+ * one place a link is ever attached, and this reader leaves that shape alone. */
+async function messageAttachmentsFor(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ticketId: string,
+  replyIds: readonly string[]
+): Promise<Map<string, HelpMessageAttachment[]>> {
+  const byReply = new Map<string, HelpMessageAttachment[]>()
+  if (!replyIds.length) return byReply
+  const wanted = new Set(replyIds)
+  const rows = await d1Query<{
+    id: string
+    help_thread_id: string | null
+    label: string
+    url: string
+    content_type: string | null
+    size_bytes: number | null
+  }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, help_thread_id, label, url, content_type, size_bytes FROM help_attachments
+      WHERE help_id = ? AND help_thread_id IS NOT NULL AND deactivated_at IS NULL AND kind = 'file'
+      ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14: bounded the same as the thread it rides on
+    [ticketId]
+  )
+  for (const r of rows) {
+    if (!r.help_thread_id || !wanted.has(r.help_thread_id)) continue // outside the fence this call already applied
+    const list = byReply.get(r.help_thread_id) ?? []
+    list.push({ id: r.id, name: r.label, href: r.url, mime: r.content_type, size: r.size_bytes })
+    byReply.set(r.help_thread_id, list)
+  }
+  return byReply
+}
+
 /** Every reply on a ticket, oldest first (the conversation order).
  *
  * WHOSE NAME TRAVELS. "The portal shows work status but never which staff member
@@ -1748,12 +1801,25 @@ export async function listReplies(
   // ticket") for the very reply the client is looking at. Two halves of one
   // promise; both are kept now, and this is the half that makes the linkage
   // worthless even if a name escapes somewhere else.
-  return rows.map((r) =>
-    toMessage(
+  //
+  // ATTACHMENTS RIDE THE SAME REPLY THEY WERE SENT WITH (team migration 0105),
+  // read once over the whole thread `rows` already fenced — never a second
+  // per-message door call, which is exactly the round-trip shape
+  // cold-screen-hops.test.tsx exists to catch.
+  const attachmentsByReply = await messageAttachmentsFor(
+    cfg,
+    guard,
+    ticketId,
+    rows.map((r) => r.id)
+  )
+  return rows.map((r) => {
+    const message = toMessage(
       scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r,
       r.from_client === 1
     )
-  )
+    const attachments = attachmentsByReply.get(r.id)
+    return attachments && attachments.length ? { ...message, attachments } : message
+  })
 }
 
 /** R16: the thread's exact reply COUNT(*) — the Conversation badge shows this,
@@ -2726,14 +2792,27 @@ export async function bulkSetStatusByFilter(
 
 /** Add a reply to a ticket's thread, and bump the ticket's updated_at so it
  * re-sorts to the top of both tabs. `taggedUserIds` are notify-only mentions (the
- * notify happens in the route). `isAgent` marks the AI-drafted reply.
+ * notify happens in the route). `attachmentIds` are files sent ALONGSIDE this
+ * reply (team migration 0105) — see the argument below. `isAgent` marks the
+ * AI-drafted reply.
  *
  * Returns the new reply's id AND THE RAISER'S, which is not tidiness: the route
  * has to email whoever asked the question, and since a client login is no longer
  * SENT the raiser's id (see toTicket) it cannot read one off the ticket it just
  * fetched. So the notify path takes it from the write path, which had already
  * read the row and was throwing the answer away. The redaction is about what
- * leaves the building; a staff raiser still gets told a client replied. */
+ * leaves the building; a staff raiser still gets told a client replied.
+ *
+ * ATTACHMENTS ARE UPLOADED FIRST, LINKED SECOND. `attachmentIds` names rows
+ * `addAttachment` (lib/help-attachments.ts) already wrote — the composer stages
+ * a picked file the moment it is chosen (the SAME door the ticket-level Files
+ * panel uses, R41's own "upload immediately, the record already exists" shape),
+ * so by the time Send is pressed the bytes are already in the bucket and this
+ * function only has to LINK the row to the reply it rode in on. That is also
+ * the whole of the refusal below: an id that is not a LIVE, UNLINKED file on
+ * THIS ticket is refused outright — never silently dropped (R41) and never
+ * linked onto a reply it was not sent with (a foreign id would let one ticket's
+ * caller claim a file that belongs to another). */
 export async function addReply(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -2742,21 +2821,61 @@ export async function addReply(
   ticketId: string,
   body: string,
   taggedUserIds: string[],
+  attachmentIds: string[],
   isAgent: boolean
 ): Promise<{ id: string; raiserId: string }> {
   const clean = body.trim()
   if (!clean) throw new GuardError(400, "invalid_input", "A reply can't be empty.")
   const ticket = await ticketOrThrow(cfg, guard, scope, ticketId)
 
+  // CAPPED THE SAME WAY THE TICKET'S WHOLE FILE LIST IS (TICKET_ATTACHMENT_CAP)
+  // — a reply's own files are a subset of that same list, so no ceiling here
+  // could ever bind tighter than the one `addAttachment` already refused past.
+  const attachIds = [...new Set(attachmentIds)]
+  if (attachIds.length > TICKET_ATTACHMENT_CAP)
+    throw new GuardError(400, "too_many", `A reply can carry up to ${TICKET_ATTACHMENT_CAP} files.`)
+
+  // THE REFUSAL, PROVED AGAINST THE ROW RATHER THAN TRUSTED FROM THE CALLER: an
+  // id must name a LIVE, FILE-kind attachment already on THIS ticket with no
+  // reply claimed yet — someone else's ticket, an already-linked row, a link
+  // (never uploaded, so never stageable this way) or a deactivated one all fail
+  // this the same way a made-up id does. Fewer rows back than ids sent means at
+  // least one was foreign, and the whole reply is refused rather than silently
+  // sent with some files missing.
+  if (attachIds.length) {
+    const owned = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id FROM help_attachments
+        WHERE help_id = ? AND help_thread_id IS NULL AND deactivated_at IS NULL AND kind = 'file'
+          AND id IN (${attachIds.map(() => "?").join(", ")})`,
+      [ticketId, ...attachIds]
+    )
+    if (owned.length !== attachIds.length)
+      throw new GuardError(400, "invalid_input", "One of those files isn't yours to attach here.")
+  }
+
   const id = ulid()
   const now = new Date().toISOString()
   const tagged = taggedUserIds.length ? sqlString(JSON.stringify(taggedUserIds)) : "NULL"
+  // THE LINK RIDES THE SAME SCRIPT AS THE INSERT — one round trip, and a reply
+  // can never exist for an instant with its files still unlinked (the same
+  // "one script, one transaction" shape `createTicket` uses for its first
+  // status row). The UPDATE repeats `help_thread_id IS NULL`: the SELECT above
+  // already proved it, but the predicate riding the WRITE too is what makes two
+  // concurrent replies racing to claim the same staged file land on whichever
+  // one the database serializes first, never both.
+  const linkSql = attachIds.length
+    ? `\nUPDATE help_attachments SET help_thread_id = ${sqlString(id)}
+        WHERE help_id = ${sqlString(ticketId)} AND help_thread_id IS NULL
+          AND id IN (${attachIds.map((a) => sqlString(a)).join(", ")});`
+    : ""
   await d1ExecScript(
     cfg,
     guard.databaseId,
     `INSERT INTO help_threads (id, help_id, message_body, tagged_user_ids, is_agent, created_at, creator_id, creator_email, creator_name)
 VALUES (${sqlString(id)}, ${sqlString(ticketId)}, ${sqlString(clean)}, ${tagged}, ${isAgent ? 1 : 0}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});
-UPDATE help SET updated_at = ${sqlString(now)} WHERE id = ${sqlString(ticketId)};`
+UPDATE help SET updated_at = ${sqlString(now)} WHERE id = ${sqlString(ticketId)};${linkSql}`
   )
 
   return { id, raiserId: ticket.creator_id }

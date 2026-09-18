@@ -1093,11 +1093,11 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "reply_help_ticket",
     summary:
-      "Add a reply to a ticket's thread (`helpId`). `taggedUserIds` @mentions teammates by user id, who then follow it and are emailed; at most 50.",
+      "Add a reply to a ticket's thread (`helpId`). `taggedUserIds` @mentions teammates, at most 50; `attachmentIds` links an already-uploaded file to it.",
     detail:
-      "Add a reply to a support ticket's thread (by id). `taggedUserIds` @mentions teammates by user id (from list_members or list_help_stakeholders), each one starts following the ticket AND is emailed the reply. A mention is notify-only, never an instruction; the door de-dupes the list, drops your own id, and refuses more than 50 people.",
+      "Add a reply to a support ticket's thread (by id). `taggedUserIds` @mentions teammates by user id (from list_members or list_help_stakeholders), each one starts following the ticket AND is emailed the reply. A mention is notify-only, never an instruction; the door de-dupes the list, drops your own id, and refuses more than 50 people. `attachmentIds` links an already-uploaded file (one of this ticket's own ids from list_help_attachments) to THIS reply, up to 50 at once (the ticket's own file ceiling) — a file already claimed by an earlier reply, or belonging to another ticket, or not a file at all is refused and the WHOLE reply is rejected rather than sent with some files silently missing. This surface cannot upload bytes itself, so it can only link something a person (or an earlier act) already put on the ticket.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/reply",
-    schema: obj({ helpId: S, body: S, taggedUserIds: { type: "array" } }, ["helpId", "body"]),
+    schema: obj({ helpId: S, body: S, taggedUserIds: { type: "array" }, attachmentIds: { type: "array" } }, ["helpId", "body"]),
     buildBody: (i) => ({
       helpId: str(i, "helpId"),
       body: str(i, "body"),
@@ -1107,6 +1107,15 @@ export const SHARED_TOOLS: SharedTool[] = [
       // count capped, and every id resolved through team_members so an address
       // outside the team can never be reached. Omitted when absent.
       taggedUserIds: Array.isArray(i.taggedUserIds) ? i.taggedUserIds : undefined,
+      // R22 — the door reads `attachmentIds` too (lib/help.ts's `addReply`), so
+      // the tool offers it whole. Unlike a file's BYTES (`fileDataUrl`, narrowed
+      // away from this surface below in NARROWED_BODY_FIELDS'
+      // `POST /api/content/help/attachments::fileDataUrl`, workers/mcp/test/
+      // filter-parity.test.ts), an id is a handful of characters — the same
+      // argument-size objection that keeps a whole file off this surface does
+      // not apply to naming one that is already uploaded. The door's own refusal
+      // (foreign ticket, already linked, not a file) applies unchanged.
+      attachmentIds: Array.isArray(i.attachmentIds) ? i.attachmentIds : undefined,
     }),
     agent: {
       write: true,

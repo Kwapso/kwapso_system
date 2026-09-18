@@ -8,6 +8,12 @@
    text shhould be black. when its a link make it underlined (for exmaple
    the app name)."
 
+   EXTENDED 18 SEP 2026, A SECOND RULING THE SAME DAY, VERBATIM: "on ticket
+   list views, its missing the space between icon and name and the
+   backgorund card. always, make it a rule, for everythng wether its a dot
+   or an icno, for all chips / pills." See section 4, below, for the two
+   defects this second ruling reports and how each is checked.
+
    TWO DEFECTS, ONE CHIP. The ticket-type badge is `variant="secondary"` —
    the quiet counter — and that variant's own label read `text-ink-secondary`
    (a muted grey, `#4a4946` on paper) while every COLOURED variant in this
@@ -137,6 +143,147 @@ if (!/asChild\?: boolean;/.test(src) || !/href\?: string;/.test(src)) {
   findings.push(`${rel}'s BadgeProps does not declare both asChild?: boolean and href?: string.`);
 }
 
+/* ============================================================================
+   4 · THE LEADING-MARK GAP IS UNIVERSAL AND EVERY VARIANT CARRIES A FILL —
+   18 SEP 2026, A SECOND RULING THE SAME DAY, VERBATIM: "on ticket list
+   views, its missing the space between icon and name and the backgorund
+   card. always, make it a rule, for everythng wether its a dot or an icno,
+   for all chips / pills." Two defects, checked separately: the gap used to
+   apply only when the `dot` PROP was truthy, so an icon handed in as a plain
+   child (the ticket-type chip's own shape, never through `dot`) got none at
+   all — fixed by moving the gap into `badgeVariants`' own BASE class list,
+   unconditional; and the ruling's "no variant may render bare text without
+   a fill" is pinned so a future variant cannot omit a `bg-` declaration the
+   way the ad-hoc chip (outside this file) omitted its gap.
+   ========================================================================= */
+
+// 4a · THE GAP TOKEN IS DEFINED — "gap-2", --space-2, the same rung the
+// status dot already spent (see the retired GAP_WITH_DOT's own comment).
+if (!/const LEADING_MARK_GAP = "gap-2";/.test(src)) {
+  findings.push(
+    `${rel} does not define const LEADING_MARK_GAP = "gap-2" — the 18 Sep ruling's leading-mark gap, the same ` +
+      "rung the status dot already spent.",
+  );
+}
+
+// 4b · THE GAP IS SPENT IN THE BASE CLASS LIST, NOT BEHIND A `dot ? … :`
+// TERNARY. Matched inside badgeVariants' own first cva() argument — the
+// array of base classes shared by every variant — so a LEADING_MARK_GAP
+// reference anywhere else in the file (a doc comment, for instance) cannot
+// satisfy this.
+const cvaBaseArrayMatch = src.match(/const badgeVariants = cva\(\s*\[([\s\S]*?)\],\s*\{/);
+if (!cvaBaseArrayMatch) {
+  findings.push(`Could not locate badgeVariants' own base class array in ${rel} to check — the cva(...) call shape moved.`);
+} else if (!/LEADING_MARK_GAP/.test(cvaBaseArrayMatch[1])) {
+  findings.push(
+    `badgeVariants' own base class array in ${rel} does not spend LEADING_MARK_GAP — the leading-mark gap must ` +
+      "draw unconditionally (a gap utility costs nothing on a one-child, label-only badge), not only when a dot " +
+      "or an icon happens to be present.",
+  );
+}
+
+// 4c · THE OLD CONDITIONAL APPLICATION IS GONE — the exact regression shape
+// the ruling reports: a gap that only fires when `dot` is truthy leaves an
+// icon-led chip (icon handed in some OTHER way) with none.
+if (/dot\s*\?\s*(GAP_WITH_DOT|LEADING_MARK_GAP)\s*:\s*undefined/.test(src)) {
+  findings.push(
+    `${rel} still applies its leading-mark gap conditionally (dot ? … : undefined) — the 18 Sep ruling requires ` +
+      "it in badgeVariants' own base class list, spent on every badge regardless of what (if anything) leads.",
+  );
+}
+
+// 4d · EVERY VARIANT CARRIES A `bg-` DECLARATION — re-scoped to the same
+// `variant: { … }` block section 1 reads, comments stripped the same way,
+// so a doc comment mentioning "no fill" in prose cannot itself trigger or
+// satisfy this. `outline`'s bg-transparent counts: it is a DECLARED choice
+// (this file's own header law explains why), not an absent one — the guard
+// is against a variant with no `bg-` utility in its class string at all.
+if (variantsBlockMatch) {
+  const codeOnlyForFill = variantsBlockMatch[1].replace(/\/\*[\s\S]*?\*\//g, "");
+  const variantEntryPattern = /(\w+):\s*"([^"]+)",/g;
+  const noFill = [];
+  let m;
+  while ((m = variantEntryPattern.exec(codeOnlyForFill)) !== null) {
+    const [, name, classes] = m;
+    if (!/\bbg-/.test(classes)) noFill.push(name);
+  }
+  if (noFill.length > 0) {
+    findings.push(
+      `The following variant(s) in ${rel}'s own \`variant: { … }\` block carry no bg- declaration at all: ` +
+        `${noFill.join(", ")} — the 18 Sep ruling ("no variant may render bare text without a fill") requires ` +
+        "every variant to declare a background, even bg-transparent, as a deliberate choice.",
+    );
+  }
+}
+
+// 4e · THE ICON SLOT — a formal prop, not an ad-hoc `<Icon/>` + `<span>`
+// pair. Checked as BadgeProps' own declaration, the render destructure, and
+// the actual render site drawing a data-slot="badge-icon" wrapper.
+if (!/icon\?:\s*React\.ReactNode;/.test(src)) {
+  findings.push(`${rel}'s BadgeProps does not declare icon?: React.ReactNode — the icon-led chip's own formal slot.`);
+}
+if (!/\n\s+dot,\n\s+icon,\n/.test(src)) {
+  findings.push(`${rel}'s Badge render function does not destructure icon alongside dot.`);
+}
+if (!/data-slot="badge-icon"/.test(src)) {
+  findings.push(`${rel} does not render a data-slot="badge-icon" wrapper — the icon prop is declared but not drawn.`);
+}
+
+/* ============================================================================
+   5 · THE ICON SLOT'S COLOUR IS FORCED, NEVER MUTED — 18 SEP 2026, A THIRD
+   RULING THE SAME DAY, over a screenshot of a ticket head: "type icon is
+   still gray." The icon slot used to leave colour entirely to the caller
+   ("sized and coloured at the call site") and the app repo's own ticket-type
+   chip call sites (outside this repo, unreachable from here) hand it a
+   Phosphor glyph carrying its own `text-muted-foreground` — reproduced
+   deliberately in `verify/badge/page.tsx`'s icon-led section for exactly
+   this reason. The fix has to win even against a caller that still writes a
+   muted class directly on its own SVG, which a bare `text-foreground` on the
+   wrapping span cannot do (a directly-set colour beats an inherited one
+   regardless of the ancestor's own class) — so the wrapper forces it with
+   `[&_svg]:text-foreground`, the same descendant-selector rescue `select.tsx`
+   already uses for its own icons. Checked as the EXACT render-site class
+   string, not a bare substring search for "text-foreground" anywhere in the
+   file (the file's own doc prose already says that word many times) — and
+   as the ABSENCE of any muted-ink or opacity utility on that specific span,
+   so a regression that reintroduces "coloured at the call site" by deleting
+   the forced class, or that mutes the icon a different way (an opacity
+   utility rather than a colour class), both fail loudly.
+   ========================================================================= */
+const badgeIconSpanMatch = src.match(
+  /<span\s+aria-hidden="true"\s+data-slot="badge-icon"\s+className="([^"]*)"\s*>/,
+);
+if (!badgeIconSpanMatch) {
+  findings.push(
+    `Could not locate the exact <span aria-hidden="true" data-slot="badge-icon" className="…"> render site in ` +
+      `${rel} to check — its shape moved (attribute order or formatting), so this pin can no longer confirm the ` +
+      "icon's colour is forced.",
+  );
+} else {
+  const badgeIconClass = badgeIconSpanMatch[1];
+  if (!/\[&_svg\]:text-foreground/.test(badgeIconClass)) {
+    findings.push(
+      `${rel}'s badge-icon span does not carry [&_svg]:text-foreground — a caller's own SVG can still set its own ` +
+        'muted colour class (text-muted-foreground, the exact shape the client\'s "type icon is still gray" report ' +
+        "found), and a bare text-foreground on the wrapper cannot outrank a colour set directly on the child.",
+    );
+  }
+  if (/text-(?:muted-foreground|ink-secondary|ink-tertiary|ink-disabled)\b/.test(badgeIconClass)) {
+    findings.push(
+      `${rel}'s badge-icon span itself reads a muted ink class (text-muted-foreground/text-ink-secondary/` +
+        "text-ink-tertiary/text-ink-disabled) — the icon slot carries no muted colour of its own; it forces " +
+        "text-foreground, full stop.",
+    );
+  }
+  if (/\bopacity-\d/.test(badgeIconClass)) {
+    findings.push(
+      `${rel}'s badge-icon span applies an opacity-* utility — muting the icon by opacity dims the same ink an ` +
+        "un-muted icon already passes contrast at, which is the identical mistake the label's own muted-ink fix " +
+        "(section 1, above) already rules out for text.",
+    );
+  }
+}
+
 if (findings.length > 0) {
   console.error("FAIL badge check:\n" + findings.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
@@ -144,6 +291,9 @@ if (findings.length > 0) {
 
 console.log(
   "OK badge check: no variant (base or compound) reads a muted ink for its label — secondary reads " +
-    "text-foreground and the retired Archived tertiary-label compound variant stays gone — and a linked badge " +
-    "(asChild or href) always draws LINK_UNDERLINE.",
+    "text-foreground and the retired Archived tertiary-label compound variant stays gone — a linked badge " +
+    "(asChild or href) always draws LINK_UNDERLINE — the leading-mark gap (LEADING_MARK_GAP, gap-2) is spent " +
+    "unconditionally in badgeVariants' own base class list rather than behind a dot-only ternary — every variant " +
+    "carries an explicit bg- declaration — the icon prop gives an icon-led chip a real Badge slot — and that " +
+    "slot forces [&_svg]:text-foreground so a caller's own muted icon class can never win.",
 );

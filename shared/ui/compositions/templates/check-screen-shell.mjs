@@ -49,9 +49,12 @@ const RECORD_CHROME_FILE = path.join(HERE, "record-chrome.tsx");
 const RECORD_DETAIL_FILE = path.join(HERE, "..", "..", "components", "record-detail", "record-detail.tsx");
 const TITLE_FILE = path.join(HERE, "..", "..", "components", "title", "title.tsx");
 const TRAIL_LINE_FILE = path.join(HERE, "..", "..", "components", "breadcrumbs", "trail-line.tsx");
+const RAIL_FILE = path.join(HERE, "rail.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
 const rel = path.relative(process.cwd(), FILE);
+const railSrc = fs.readFileSync(RAIL_FILE, "utf8");
+const railRel = path.relative(process.cwd(), RAIL_FILE);
 const trailLineSrc = fs.readFileSync(TRAIL_LINE_FILE, "utf8");
 const trailLineRel = path.relative(process.cwd(), TRAIL_LINE_FILE);
 const cardSrc = fs.readFileSync(CARD_FILE, "utf8");
@@ -206,15 +209,23 @@ console.log(
    under" reads that identical custom property into `TRAIL_GAP` too, rather
    than leaving it at S3's unrelated 8. The divider is retired outright.
 
+   SUPERSEDED AGAIN, THE SAME DAY — CLIENT RULING, VERBATIM: "change to
+   trail line 10px abpove 16below." `above` and `below` are no longer "the
+   SAME token" — `DENSITY_TRAIL`'s `pt` stays `--space-2h` (10, unchanged by
+   this ruling), `TRAIL_GAP`'s `mb` moves one rung up to `--space-4` (16).
+   The check below moves with it: it now asserts the two constants read
+   DIFFERENT tokens, not the same one, and the "exactly same" pattern this
+   comment used to test for would itself be a regression.
+
    Asserted as working code shapes, the same style every check in this file
    uses: `DENSITY_TRAIL` carries a flat `pt-[var(--space-2h)]` at BOTH
    densities (the ruling named one number, not a density pair), `TRAIL_GAP`
-   is `mb-[var(--space-2h)]` — the SAME token, not a second one that merely
-   agrees today — and the trail slot renders `{trail}` with NO `<Separator
-   />` anywhere inside it. A regression that reverts any one of the three —
-   a bad merge, a "let's put it back to S3" edit that forgets the other two
-   moved with it, or a divider that creeps back in — fails here instead of
-   waiting for the next client screenshot.
+   is `mb-[var(--space-4)]` — the next rung up, per the second 18 Sep ruling
+   — and the trail slot renders `{trail}` with NO `<Separator />` anywhere
+   inside it. A regression that reverts any one of the three — a bad merge,
+   a "let's put it back to equal" edit that forgets the two now read
+   different tokens, or a divider that creeps back in — fails here instead
+   of waiting for the next client screenshot.
 
    EXTENDED 2026-09-17 NIGHT — THE TITLE SLOT'S OWN LEADING PADDING, PINNED
    TO ZERO WHEN A TRAIL RENDERS. `DENSITY_TRAIL`'s `pt` and `TRAIL_GAP` were
@@ -248,11 +259,12 @@ if (!DENSITY_TRAIL_PATTERN.test(src)) {
   );
 }
 
-const TRAIL_GAP_PATTERN = /const TRAIL_GAP = "mb-\[var\(--space-2h\)\]";/;
+const TRAIL_GAP_PATTERN = /const TRAIL_GAP = "mb-\[var\(--space-4\)\]";/;
 if (!TRAIL_GAP_PATTERN.test(src)) {
   trailSpacingFindings.push(
-    `TRAIL_GAP in ${rel} does not read mb-[var(--space-2h)] — the 18 Sep ruling ("exactly same under") reads the ` +
-      "SAME token DENSITY_TRAIL's own pt does, not S3's separate --space-2.",
+    `TRAIL_GAP in ${rel} does not read mb-[var(--space-4)] — the 18 Sep ruling ("trail line 10px abpove 16below") ` +
+      "supersedes the earlier 'exactly same under' ruling and moves TRAIL_GAP one rung up from DENSITY_TRAIL's " +
+      "own --space-2h pt, to --space-4 (16px).",
   );
 }
 
@@ -343,10 +355,10 @@ if (trailSpacingFindings.length > 0) {
 }
 
 console.log(
-  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt and TRAIL_GAP both read the SAME --space-2h (10px, half " +
-    "of S3's 20), no <Separator /> renders in the trail slot (and none is imported), the title slot's leading pt " +
-    "stays pinned to zero (header and body) whenever a trail renders, and trail-line.tsx draws neither the " +
-    "magnifier nor the ⌘K hint any more.",
+  "OK screen-shell trail-spacing check: DENSITY_TRAIL pt reads --space-2h (10px above the trail) and TRAIL_GAP " +
+    "reads --space-4 (16px below it, the 18 Sep 'trail line 10px abpove 16below' ruling), no <Separator /> renders " +
+    "in the trail slot (and none is imported), the title slot's leading pt stays pinned to zero (header and body) " +
+    "whenever a trail renders, and trail-line.tsx draws neither the magnifier nor the ⌘K hint any more.",
 );
 
 /* ============================================================================
@@ -694,50 +706,221 @@ console.log(
 /* ============================================================================
    THE 18 SEP 2026 ASSISTANT-HANDLE-IN-THE-BAND CHECK — client, verbatim: "put
    the open assistant button completely on the top margin, not liek now that
-   its slightly overlaping with main content."
+   its slightly overlaping with main content." EXTENDED THE SAME DAY, A
+   SECOND RULING, verbatim: "need to be bigger, as big as the space allows
+   it."
 
-   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE this
-   fix: the shut aside handle at top 16px (`--shell-gutter`), `HANDLE_HIT`'s
-   own 40px (`--control-height-button`) box put its bottom edge at 56px —
-   9.52px past the content card's own top edge (46.48px). The fix sizes this
-   ONE branch to `--control-height-pill` (26px), the same token
-   `trail-line.tsx` already proved fits the identical `--folder-lip` (30.48px)
-   band; new bottom edge 42px, 4.48px clear of the card. */
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE the
+   FIRST fix: the shut aside handle at top 16px (`--shell-gutter`),
+   `HANDLE_HIT`'s own 40px (`--control-height-button`) box put its bottom
+   edge at 56px — 9.52px past the content card's own top edge (46.48px).
+   That fix sized this ONE branch to `--control-height-pill` (26px), the
+   same token `trail-line.tsx` already proved fits the identical
+   `--folder-lip` (30.48px) band; bottom edge 42px, 4.48px clear of the
+   card — correct against the overlap complaint, but "as big as the space
+   allows" is bigger than that: the SECOND fix sizes the branch to the
+   band's own height, `--folder-lip` (30.48px) directly, so the bottom edge
+   lands at 16 + 30.48 = 46.48px — exactly the card's own top edge, the same
+   number by construction, not a coincidence this check can drift away from
+   without also catching the band's own two component tokens moving apart. */
 const assistantHandleFindings = [];
 
 if (
-  !/: cn\(\s*"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--control-height-pill\)\]",\s*\),/.test(
+  !/: cn\(\s*"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--folder-lip\)\]",\s*\),/.test(
     src,
   )
 ) {
   assistantHandleFindings.push(
-    `${rel}'s shut aside handle placement does not size itself to size-[var(--control-height-pill)] — at ` +
-      "HANDLE_HIT's own 40px (--control-height-button) its bottom edge (top-[var(--shell-gutter)] + 40px) runs " +
-      "past the content card's own top edge, which is the 18 Sep overlap ruling.",
+    `${rel}'s shut aside handle placement does not size itself to size-[var(--folder-lip)] — at HANDLE_HIT's own ` +
+      "40px (--control-height-button) its bottom edge (top-[var(--shell-gutter)] + 40px) runs past the content " +
+      "card's own top edge, and at the retired --control-height-pill (26px) it falls short of the 18 Sep " +
+      '"as big as the space allows it" ruling.',
+  );
+}
+
+// THE OLD, UNDERSIZED FIX MUST STAY GONE — a regression that reverts to the
+// first ruling's own answer (26px, correct for the overlap complaint alone)
+// would pass every other check here and still fail the second ruling.
+if (/"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--control-height-pill\)\]",/.test(src)) {
+  assistantHandleFindings.push(
+    `${rel}'s shut aside handle still sizes itself to size-[var(--control-height-pill)] (26px) in the shut-band ` +
+      "branch — the 18 Sep \"as big as the space allows it\" ruling replaced that with size-[var(--folder-lip)] " +
+      "(30.48px), the band's own full height, not another borrowed control size.",
   );
 }
 
 // THE OPEN BRANCH MUST STAY UNTOUCHED — it is a mid-edge grab against the
 // open column, not a top-strip corner, and HANDLE_HIT's own 40px still
 // applies to it (and to the rail's own handle, both states) exactly as
-// before this ruling.
+// before either ruling.
 if (!/isAsideOpen\s*\n\s*\? "max-\[45rem\]:hidden top-1\/2 -translate-y-1\/2 end-\[var\(--shell-gutter\)\]"/.test(src)) {
   assistantHandleFindings.push(
     `${rel}'s open aside handle placement changed — it must stay the mid-edge grab at HANDLE_HIT's own 40px; ` +
-      "only the SHUT branch's own top-strip corner is sized down by the 18 Sep ruling.",
+      "only the SHUT branch's own top-strip corner is sized by either 18 Sep ruling.",
+  );
+}
+
+// THE PINNED MATH ITSELF — --shell-gutter is --space-4 (16px, tokens.css)
+// and --folder-lip is 1.905rem (30.48px, tokens.css), so the shut handle's
+// bottom edge (top inset + its own height, both these same two tokens) must
+// land AT OR BEFORE the content card's own top edge (46.48px — the same
+// 16px column padding plus --folder-lip; see this file's own comment and
+// trail-line.tsx's identical math). Equal is the ruling's own answer ("as
+// big as the space allows", not "smaller than the space"); past it is the
+// exact overlap the FIRST ruling already fixed once and this must not
+// reopen.
+const SHELL_GUTTER_PX = 16;
+const FOLDER_LIP_PX = 30.48;
+const CARD_TOP_PX = 46.48;
+const handleBottomPx = SHELL_GUTTER_PX + FOLDER_LIP_PX;
+if (handleBottomPx > CARD_TOP_PX + 0.005) {
+  assistantHandleFindings.push(
+    `The shut aside handle's pinned math no longer holds in ${rel}: --shell-gutter (${SHELL_GUTTER_PX}px) + ` +
+      `--folder-lip (${FOLDER_LIP_PX}px) = ${handleBottomPx.toFixed(2)}px, which now runs past the content ` +
+      `card's own top edge (${CARD_TOP_PX}px) — the handle would overlap the card again, the exact defect the ` +
+      "first 18 Sep ruling fixed.",
   );
 }
 
 if (assistantHandleFindings.length > 0) {
   console.error(
-    "FAIL screen-shell assistant-handle-in-the-band check (18 Sep ruling):\n" +
+    "FAIL screen-shell assistant-handle-in-the-band check (18 Sep rulings):\n" +
       assistantHandleFindings.map((f) => `  - ${f}`).join("\n"),
   );
   process.exit(1);
 }
 
 console.log(
-  "OK screen-shell assistant-handle-in-the-band check: the shut aside handle sizes itself to " +
-    "--control-height-pill (26px) so its bottom edge stays inside the --folder-lip band above the card, and the " +
-    "open branch's mid-edge grab is untouched.",
+  "OK screen-shell assistant-handle-in-the-band check: the shut aside handle sizes itself to --folder-lip " +
+    "(30.48px) — the band's own full height, \"as big as the space allows it\" — its pinned bottom edge " +
+    "(--shell-gutter + --folder-lip = 46.48px) lands exactly at, never past, the content card's own top edge, " +
+    "the retired --control-height-pill (26px) sizing stays gone, and the open branch's mid-edge grab is " +
+    "untouched.",
+);
+
+/* ============================================================================
+   THE 18 SEP 2026 RAIL-BRAND-ALIGNMENT CHECK — client ruling, verbatim: "on
+   the sidebar tge logo is way too up!!! make it aligned with text on foler
+   tabs."
+
+   MEASURED, `verify/shell-chrome/` (1440×900, this kit's own 15px harness
+   root), BEFORE this fix: `[data-slot="rail-brand"]`'s own box (mark +
+   wordmark) centred at 18.74px from the viewport top; the active folder
+   tab's own label glyph (a `Range` over its text node, inside
+   `nav[data-slot="breadcrumb-folders"]`) centred at 28.75 — 10px lower.
+   AFTER: 29.27 against 28.75, 0.52px apart (line-box rounding against a
+   geometric flex-row centre; see `rail.tsx`'s own comment on the fix for
+   the full derivation).
+
+   PINNED AS THE WORKING CALC, not the delta a screenshot could show: the
+   fix reads four tokens already in scope on `rail-brand` (`--shell-gutter`,
+   `--folder-lip`, `--icon-20`, `--rail-inset` — see `rail.tsx`'s own
+   comment for why each is visible there) rather than a literal pixel
+   margin, so a change to any one of the four moves the alignment with it
+   instead of silently drifting stale. */
+const railBrandFindings = [];
+
+const RAIL_BRAND_BLOCK = /data-slot="rail-brand"[\s\S]{0,400}?className=\{cn\(([\s\S]{0,4500}?)\)\}/;
+const railBrandMatch = railSrc.match(RAIL_BRAND_BLOCK);
+if (!railBrandMatch) {
+  railBrandFindings.push(`${railRel} does not have a data-slot="rail-brand" block with a cn(...) className to check.`);
+} else if (
+  !/mt-\[calc\(var\(--shell-gutter\)_\+_var\(--folder-lip\)\/2_-_var\(--icon-20\)\/2_-_var\(--rail-inset\)\)\]/.test(
+    railBrandMatch[1],
+  )
+) {
+  railBrandFindings.push(
+    `${railRel}'s rail-brand block does not read the 18 Sep alignment calc (mt-[calc(var(--shell-gutter) + ` +
+      "var(--folder-lip)/2 - var(--icon-20)/2 - var(--rail-inset))]) — the logo's own vertical centre would " +
+      "drift back above the workspace tab strip's label centre (measured 10px high before this fix).",
+  );
+}
+
+// A REGRESSION SHAPED LIKE THE BUG THIS RULING FIXED: the row must not go
+// back to having NO top-alignment margin at all (the pre-fix shape) — the
+// specific calc string is the strongest pin, but an empty diff here (no
+// `mt-` on this block at all) is the exact starting point the ruling fixed,
+// so it is named as its own finding rather than relying on the first check
+// alone to imply it.
+if (railBrandMatch && !/\bmt-\[/.test(railBrandMatch[1])) {
+  railBrandFindings.push(
+    `${railRel}'s rail-brand block carries no mt-[...] at all — back to the pre-18-Sep shape the ruling reported.`,
+  );
+}
+
+if (railBrandFindings.length > 0) {
+  console.error(
+    "FAIL rail-brand alignment check (18 Sep ruling):\n" + railBrandFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK rail-brand alignment check: rail-brand's own vertical centre is bound to --shell-gutter + --folder-lip/2 " +
+    "- --icon-20/2 - --rail-inset — measured live before/after: 10.01px above the active tab's label centre, " +
+    "then 0.52px, at this kit's 15px harness root.",
+);
+
+/* ============================================================================
+   THE 18 SEP 2026 COLLAPSED-RAIL-KEEPS-ITS-SIZE CHECK — client ruling,
+   verbatim: "when contracting sidebar, yuo should not make icons or spaces
+   smaller, keep it as it is, just without tetxs."
+
+   MEASURED, `verify/rail/`'s own `data-case="scroll"` two-column proof (a
+   real height, real overflow, both rail states side by side), BEFORE this
+   fix: expanded row height 37.5px / row-to-row rhythm 45px (`--control-
+   height-button`, 40 at 16px root) against collapsed row height 30px /
+   rhythm 37.5px (`--avatar-md`, 32) — an 8px shrink in both the row's own
+   box and, because the row-to-row GAP token itself never changed
+   (`--space-2` measured identical, 7.5px, in both states), the rhythm that
+   box height drives. AFTER: 37.5px / 45px in BOTH states — identical. The
+   icon's own glyph was NEVER part of the shrink (15×15 measured before and
+   after, in both states — `ROW_SHAPE`'s shared `[&_svg]:size-[var(--icon-
+   button)]` descendant rule reads off the row, not the expanded-only
+   `rail-item-icon` wrapper), so this check pins only what actually moved:
+   the row's own box, and the column width that must widen with it or a
+   `--control-height-button` circle clips against a narrower column. */
+const railCollapsedFindings = [];
+
+if (!/const ROW_COLLAPSED = cn\(\s*"size-\[var\(--control-height-button\)\] justify-center rounded-pill p-0",?\s*\);/.test(railSrc)) {
+  railCollapsedFindings.push(
+    `${railRel}'s ROW_COLLAPSED does not read size-[var(--control-height-button)] — a regression back to size-` +
+      "[var(--avatar-md)] (32px) shrinks the collapsed row 8px against its own expanded state (measured: 30px " +
+      "vs 37.5px row height, 37.5px vs 45px row-to-row rhythm), the exact 'icons or spaces smaller' the 18 Sep " +
+      "ruling refused.",
+  );
+}
+
+// THE OLD, SMALLER TOKEN MUST STAY GONE FROM THIS ONE CONSTANT — matched
+// narrowly (the ROW_COLLAPSED declaration itself, not every --avatar-md in
+// the file) because the member chip's own avatar is untouched by this
+// ruling and legitimately keeps reading --avatar-md elsewhere.
+if (/const ROW_COLLAPSED = cn\(\s*"size-\[var\(--avatar-md\)\]/.test(railSrc)) {
+  railCollapsedFindings.push(
+    `${railRel}'s ROW_COLLAPSED still sizes itself to size-[var(--avatar-md)] — the 18 Sep ruling replaced it ` +
+      "with size-[var(--control-height-button)] so a collapsed destination row stays the same size as its " +
+      "expanded self.",
+  );
+}
+
+if (!/isCollapsed && "w-\[var\(--control-height-button\)\] flex-none items-center"/.test(railSrc)) {
+  railCollapsedFindings.push(
+    `${railRel}'s collapsed rail root does not widen to w-[var(--control-height-button)] — a ROW_COLLAPSED row ` +
+      "sized to that same token would overflow a column still reading the narrower --avatar-md width.",
+  );
+}
+
+if (railCollapsedFindings.length > 0) {
+  console.error(
+    "FAIL collapsed-rail-keeps-its-size check (18 Sep ruling):\n" +
+      railCollapsedFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK collapsed-rail-keeps-its-size check: ROW_COLLAPSED reads size-[var(--control-height-button)] (matching " +
+    "ROW_EXPANDED's own height token, not the smaller --avatar-md), the collapsed rail root widens to match, and " +
+    "the retired --avatar-md row sizing stays gone — measured live before/after: 30px/37.5px row height and " +
+    "37.5px/45px row rhythm collapsing to one 37.5px/45px pair in both rail states.",
 );

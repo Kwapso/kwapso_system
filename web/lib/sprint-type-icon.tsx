@@ -37,6 +37,17 @@ const SPRINT_TYPE_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: n
   TrendUp,
 }
 
+/** WHETHER `SprintTypeGlyph` WOULD DRAW ANYTHING — a call site that hands the
+ * glyph into `Badge`'s own `icon` prop (R39/18 Sep 2026's leading-mark-gap
+ * ruling) needs this BEFORE rendering: `icon`'s wrapper span is drawn
+ * whenever the prop is not `undefined`, so handing in a `SprintTypeGlyph`
+ * that itself resolves to `null` (a retired or team-coined type) would still
+ * pay the leading-mark gap for an empty slot. This is the same emptiness
+ * `SprintTypeGlyph` itself checks, exported so a caller can ask first. */
+export function sprintTypeHasGlyph(type: string | null | undefined): boolean {
+  return sprintTypeIcon(type) in SPRINT_TYPE_ICON_COMPONENTS
+}
+
 /** The sprint type pill's icon, drawn — `null` for a type the code has never
  * met (a team's own word, or one migration 0098 retired), the same
  * "reads as itself, draws no glyph" answer every retired-word lookup in this

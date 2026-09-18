@@ -37,8 +37,8 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L27)
-- [3. Detail screens](#3-detail-screens) (D1 to D20)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L28)
+- [3. Detail screens](#3-detail-screens) (D1 to D21)
 - [4. Collections](#4-collections) (K1 to K47)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B20)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F17)
@@ -911,6 +911,34 @@ rulings, the same session, read together:
 
 **Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
 
+**AMENDED 18 Sep 2026 ~10:30 (Round 18) — the trail's own two gaps split, 10 above and 16
+below; the identity chips keep 10 above the title, corrected down from an overshoot.** Her
+"ready to review" list that morning carried two spacing corrections in the same sentence,
+verbatim: *"change to trail line 10px abpove 16below, from chips to tile only 10."*
+
+- **The trail line itself** — `DENSITY_TRAIL`'s own `pt` above the trail was already
+  `--space-2h` (10px, T1's "exactly same" pick, Round 17); this ruling leaves it untouched
+  and moves only `TRAIL_GAP`, the gap AFTER the trail down to whatever follows (the chip
+  row or the body), from `--space-2h` (10) to `--space-4` (16) — the next rung up the same
+  scale, not a new custom property. "Above" and "below" are two different rungs on purpose
+  now, not one token read twice the way T1 had it. Shipped in kit v1.2.118/v1.2.119
+  (`shared/ui/compositions/templates/screen-shell.tsx`'s own `TRAIL_GAP` constant);
+  `web/test/trail-slot-spacing.test.tsx` pins both rungs against the kit source directly.
+- **The identity chips' own gap above the title** is a separate span, one level down, not
+  drawn by the trail slot at all — this is the "from chips to tile" half of her sentence.
+  It had already been corrected the same session, from a first pick of 8px
+  (`mb-[var(--space-2)]`, her earlier "t1 and c2" artifact choice) up to the 10px
+  (`mb-[var(--space-2h)]`) this ruling names, reading the deployed 8px back and finding it
+  undershot. `web/components/records/record-chrome.tsx`'s identity-chips wrapper carries
+  the correction; `web/test/record-head-chip-gap.test.ts` pins it structurally off the
+  source, the same discipline `record-head-mark.test.tsx` already holds to for this file,
+  because jsdom runs no layout engine to measure against.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.119; record-chrome.tsx). Two different
+gaps, corrected in the same ruling, never to be conflated: the trail's own 10/16 split
+lives in the kit's `screen-shell.tsx`; the chips-to-title 10px lives app-side in
+`record-chrome.tsx`, one level below the trail slot.**
+
 ### L14: the assistant column's width is a drag, snapping to three sizes
 
 **The rule.** *"Is it possible that we can, while using the app, adjust the width of the
@@ -1346,6 +1374,43 @@ existing horizontal scroll affordance beside it, which is untouched.
 constants' own source and fails if either one drops the override or re-opens the axis with
 a bare `overflow-auto`; proved red against the unmodified constants (the override stripped,
 via a `cp` backup) before being proved green again.
+
+---
+
+### L28: the assistant's shut handle fills its own band, and the icon inside it does not grow with it
+
+**The rule, two rulings the same day, 18 Sep 2026.** The resize feature L14/L17 describe is
+gone (16 Sep 2026, "let's forget about the resize"); what is left on the aside's own
+left/start edge, when the assistant is CLOSED, is a single round button that reopens it —
+the "shut handle," drawn in the same corner the assistant's folder tab and the top bar's own
+trigger also reach, one of three ways to open it. First ruling, over the shipped size:
+correcting an earlier size that overlapped the content card's own top edge by 9.52px. The
+fix borrowed `trail-line.tsx`'s own `--control-height-pill` (26px) for the handle, the same
+rung that control's neighbouring close chip already used for a different job on the same
+band — closing the overlap but leaving 4.48px of unclaimed air around the icon, because a
+size built for a DIFFERENT control on the SAME band is still a borrowed number. **Second
+ruling, the same day, over that fix:** *"need to be bigger, as big as the space allows
+it."* The band itself never moved — it is still exactly `--folder-lip` (30.48px), the gap
+between the shell's own gutter and the content card's top edge — what moved is which token
+fills it: `size-[var(--folder-lip)]` now sets the handle's own box to the band's FULL height,
+zero clearance on any side, rather than a second file's borrowed control size. The glyph
+inside does not grow with the box — `HANDLE_HIT`'s `[&_svg]:size-[var(--icon-button)]` stays
+fixed at 16px — so growing the button from 26 to 30.48px only grows the air around the mark,
+never the mark itself, the same "the label is the whole instruction, the icon is not resized
+to fill its own button" discipline this book holds everywhere a fixed glyph sits inside a
+variable box.
+
+**The mechanism.** `shared/ui/compositions/templates/screen-shell.tsx`'s own `placement`
+ternary on the assistant's `Handle`: open, the button sits at the aside's mid-height on its
+own inner edge; shut, it sits in the top-right corner at `top-[var(--shell-gutter)]`,
+sized `size-[var(--folder-lip)]` rather than `HANDLE_HIT`'s own default
+`size-[var(--control-height-button)]` (the `cn()` merge's last write wins on the same
+utility group, so this is a value swap on an existing mechanism, not a new one).
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.119).**
+
+**Law.** None registered — the kit's own `check-screen-shell.mjs` pins the handle's size
+against the band it fills.
 
 ---
 
@@ -1934,6 +1999,106 @@ removed from that menu entirely — not re-homed a second time. A ticket's attac
 exactly one place they are read: the conversation.
 
 **Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED A FIFTH TIME, 18 Sep 2026 ~10:30 (Round 18) — the composer becomes the card's own
+footer, and attachments are per-message, not a ticket-wide tray.** The client's ruling,
+verbatim: *"ticket page: the footer is not on the footer position!! fix that! wtf is his
+files inside the ocnversation lol thats not what i meant, i meant that each message can have
+images or files, check in the kit because we already biult the ui for that."* Two separate
+corrections, read together — see [D21](#d21-a-footer-is-at-the-bottom) for the LAW this
+ruling's own first clause becomes once she restates it explicitly the same day:
+
+- **The footer.** `TicketConversationPanel`'s reply composer had been a third flex child
+  inside one padded `CardContent`, alongside the thread and a same-day attachments tray —
+  `thread`/`attachments`/`composer` stacked with a flex `gap`, each `shrink-0`, which reads
+  as "three things in a padded box," not a footer, because `CardContent`'s own inset wraps
+  the composer on every side including the bottom. The kit's own `Card` already draws the
+  shape this ruling asks for (its own chapter-13 quote: "Header, body, and footer are
+  hairline-separated inside one 24px shell — never three stacked cards"): `CardContent` now
+  holds only the scrolling THREAD, and `CardFooter` — hairline-separated from the body, no
+  fill of its own — holds the composer as the Card's own LAST child, so the panel tone the
+  ruling asks the footer to carry is automatic (`Card`'s own `--surface-panel`), not a class
+  to add.
+- **Per-message files, not a ticket-wide tray.** The SAME day's earlier ruling (this rule's
+  fourth amendment, above) had read "attach button on the composer" as "one shared
+  files-and-links tray inside the conversation" — a `<HelpAttachmentsPanel>` mounted between
+  `thread` and `composer` as an `attachments` prop. Reading the shipped result back, her
+  correction is explicit: a ticket-wide list box was never what she asked for. Each MESSAGE
+  carries its own images or files, fed from the kit's own `TicketThread` component (already
+  built for exactly this, per her "check in the kit"), shipped behind team migration 0105
+  (`help_attachments.help_thread_id`). `TicketConversationPanel` itself needed no new slot
+  for this — the files ride the `thread` prop it already took — so the `attachments` prop
+  this rule's fourth amendment added is deleted outright rather than restored, its one caller
+  (`help-detail.tsx`) having nothing left to pass it.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED A SIXTH TIME, 18 Sep 2026 ~12:00 (Round 19) — no "Stages" title above the ladder,
+and stakeholders draw as square tiles, three to a row.** Two of the client's rulings that
+session:
+
+- *"inside tikects temove the 'stages' as a title"* — the eyebrow `ticket-stages.tsx` used to
+  print above the rail (`<span id={headingId}>{t("Stages")}</span>`, visible, `text-caption`)
+  is gone outright — not shrunk, removed, the same "subtraction, not smaller type" reading
+  the stage-ladder shrink (K38's own amendment) already took for the stage word and the
+  two-line date: the ladder's own fills and dates already say what it is, so a label
+  repeating that is the redundancy her "just smaller" goal was always naming. The accessible
+  name survives without the visible text — `aria-labelledby` pointed at that span; the
+  `<section>` and the scrolling `<div role="group">` now carry `aria-label={t("Stages")}`
+  directly, so a screen reader still announces "Stages" on the region with nothing printed
+  for a sighted reader.
+- *"inside ticket detail, for stakeholders, i want square tiels (lik in members, with text
+  under the image). 3 should fit in one row"* — the Stakeholders panel's third amendment
+  above had already moved from a bare list of names to member CARDS, but read as a
+  HORIZONTAL row (`orientation="horizontal" size="tile"`, face beside the name) rather than
+  the square, face-above-name tile Settings › Team › Members actually draws — "cards" was
+  read for its shape alone, not "square tiles… like in members." `PersonCard`'s own defaults
+  (`orientation="vertical"`, no `size` override) are exactly that tile with nothing
+  reinvented, so both props are gone from this call site rather than pinned to a second,
+  narrower tile. The grid is `grid-cols-3` at the panel's own width, "3 should fit in one
+  row" read literally rather than derived from a container query, narrowing responsively
+  below the panel's own breakpoints (`max-[45rem]:grid-cols-2 max-[24rem]:grid-cols-1`) so
+  the tiles never crowd on a narrow aside.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+### D21: a footer is at the bottom
+
+**The rule.** The client's ruling, 18 Sep 2026, said twice the same session, the second time
+naming it a standing law outright. First, over the shipped ticket page: *"ticket page: the
+footer is not on the footer position!! fix that!"* — answered the same round (see D20's own
+fifth amendment, above, for the mechanism: the composer moved off a third flex child inside a
+padded `CardContent` and onto the kit's own `CardFooter`, `Card`'s real last child).
+Reviewing the SAME page again roughly ninety minutes later, verbatim: *"but the footer is in
+the worng position, above al cointent! dhoudl be at the bottom (this is a law for footer)."*
+Her own words make the general case explicit: a footer is not a box styled to look like one
+partway down a card, it is whatever sits at the true bottom, with nothing rendered after it.
+
+**The shape.** A "footer" in this app is the kit's own `CardFooter` — hairline-separated from
+the body, no fill of its own, drawing whatever tone the `Card` around it already carries — or
+the one component this app calls a "composer" today, `ReplyComposer`
+(`web/components/tickets/reply-composer.tsx`), wherever it is not already wrapped in a
+`CardFooter`. Either one must be the LAST real child of its nearest enclosing card — nothing
+rendered after it, ever, on purpose or by accident. A card that has nothing to say after its
+footer needs no exemption; a card that genuinely draws a real element below its own footer
+(none exist today) would need one, reasoned, in the registry below.
+
+**The check.** A static census, off the disk: every `<CardFooter>`/`<CardFooter />` and every
+`<ReplyComposer>`/`<ReplyComposer />` in `web/` is found, its nearest enclosing JSX element is
+resolved (walking up through a `{…}` expression or a fragment, the same climb
+[K33](#k33-the-gap-above-a-toolbar-equals-the-gap-below-it-the-tab-strip-and-its-card-share-one-gapless-column)'s
+own `enclosingBox` already makes for a different law), and that element's own last non-
+whitespace child must be, or contain, the footer/composer node — never a sibling drawn after
+it. `FOOTER_IS_LAST_EXEMPT` (`shared/rules/registry.ts`) is the reasoned, rot-checked way out;
+it opens empty, because the one call site this census can see today
+(`TicketConversationPanel`, `web/components/tickets/ticket-detail-body.tsx`) was already fixed
+the day this law was written.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered in `RULES.md`'s numbered list — a structural UI census on an
+existing component seam, the same weight this book gives R83's own toolbar-gap census
+before it graduated to R83. `web/test/footer-is-last.test.ts`.
 
 ---
 
@@ -3485,6 +3650,42 @@ cannot drift back to the pre-fix spacing.
 
 **Status: ruled, in build, 18 Sep 2026.**
 
+**AMENDED A FOURTH TIME, 18 Sep 2026 ~10:30 (Round 18) — the 32/20 split shrinks to 10 above
+and 10 below, both above the toolbar and above a record detail's own strip, and the beige
+container's missing roundness is fixed.** Two of the client's rulings the same session, read
+together:
+
+- *"toolbar iss till worng in many many. palce! for exmaple in tickets / waiting, open,
+  ready..... the beige cotainer is missing the roundness and theres too muvh space above
+  toolbar search"* — on Tickets' own status-tab screens, `renderFolderTabs(tabs)` is called
+  OUTSIDE `<PagedFind>` (`tickets-collection.tsx` passes no `tabs` prop), and
+  `paged-find.tsx`'s own return unconditionally wraps its card in one extra, gapless
+  `<div className="flex w-full flex-col">` — invisible to the eye but a real DOM node
+  between `.pinned-strip` and the card, so `.pinned-strip + [data-slot="card"]`'s plain
+  adjacent-sibling selector matched nothing across it. This rule's own third amendment
+  above was therefore never firing on precisely the screens she named, and
+  `CollectionCard`'s hardcoded `--pinned-lead`/`--pinned-inset-x` pair (16–32px, a stale
+  app-side override that no longer agreed with the kit's own `CardContent` inset) applied
+  instead — the band's rounded `::before` was drawn at a corner that was not where the
+  card's real border box actually sat, reading as a square edge instead of a rounded one.
+  `.pinned-strip + * > [data-slot="card"]:first-child` now reaches through that one wrapper
+  the same descendant-selector shape the nested-tab-pane rule already uses for
+  `PagedPanelBody`'s own flow div, so the toolbar-lead rule fires on every screen ruling 6
+  named, corner included.
+- *"too much!!!! i liked more the thinner verison from before! the 10pc above and below,
+  both in main and details."* Supersedes the second amendment's 32px-above/20px-below
+  split outright: `--toolbar-lead-gap` now spells the card's own leading `padding-top`
+  DIRECTLY, no `calc()` remainder against the strip's own `pb-[var(--tab-content-gap)]` any
+  more, at `--space-2h` (10px) — "the 10pc above," one of the scale's own admitted
+  half-steps. `--toolbar-content-gap` (below the toolbar) drops to the same `--space-2h`
+  (10px) too — "and below," matching above for the first time since this rule's very first
+  ruling asked for exactly that shape. "Both in main and details" reaches a record's own
+  inner tab strip (`STICKY_TABS`, `record-chrome.tsx`) the identical way, paying the SAME
+  `--toolbar-lead-gap` token rather than a second number for the same relationship one
+  screen kind over.
+
+**Status: ruled, in build, 18 Sep 2026 (`web/app/globals.css`).**
+
 ### K34: the Accounts collection strip is Active · Inactive · All, defaulting to Active
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"For account status, let's keep
@@ -3791,6 +3992,48 @@ without reaching for a second colour.
 
 **Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
 
+**AMENDED 18 Sep 2026 ~10:30 (Round 18) — every chip and pill carries its leading-mark gap
+as a standing rule, dot or icon alike.** The client's ruling, verbatim, over the ticket
+list views: *"on ticket list views, its missing the space between icon and name and the
+backgorund card. always, make it a rule, for everythng wether its a dot or an icno, for
+all chips / pills."* The gap between a chip's leading mark (its status dot, or an icon like
+the ticket-type glyph this rule already governs) and its label text — Round 16's earlier
+fix for the automations status chip's dot-to-label gap — is widened from a `dot`-only
+special case to the badge's own base geometry: `LEADING_MARK_GAP` (`gap-2`, `--space-2`,
+8px) sits in `badgeVariants`' own base class list, not behind a `dot ? … : undefined`
+ternary, so it draws between ANY two children — dot-led or icon-led alike — and costs
+nothing on a label-only badge (a `gap` utility only ever spends space between flex
+children). The Badge's own `icon` prop (new) gives an icon-led chip — the ticket-type chip
+this rule already names — the same formal slot `dot` already had, so a call site never
+hand-rolls an `<Icon/>` + `<span>` pair beside a Badge again; every variant's own fill
+(`bg-` declaration) already existed, standing as the "background to the card" half of her
+sentence. Shipped in the kit (`shared/ui/components/badge/badge.tsx`, v1.2.118/v1.2.119);
+`web/test/badge-dot-gap.test.tsx` and `web/test/chips-are-badges.test.ts` pin it.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.119).**
+
+**AMENDED 18 Sep 2026 ~12:00 (Round 19) — the type icon's own colour is forced, not left to
+the call site.** Two of the client's rulings that session, reviewing the same screenshot
+twice: first, over the list view's type column, *"on the cokumn type in the ist viees,
+still missing the tex in black and the background card container around it"* — read
+against the two fixes already above (black label text, a fill on every variant), this was
+the same regression surfacing again on one more screen rather than a new defect, and closed
+by the same two rules once that screen's own chip render routed through the Badge
+component the other rows already used. Second, over a fresh screenshot the same session,
+*"no id ont see it. look in screenshot, type icon is still gray, and the app name (a link)
+is not underlined"* — the icon's colour had been left to the call site
+(`ticket-chips.tsx`'s own type chip wrote `text-muted-foreground` on its Phosphor glyph
+directly), which is backwards for a chip whose whole law is that the FILL carries the
+tone and the ink is forced. The Badge's icon slot (`[data-slot="badge-icon"]`) now forces
+`[&_svg]:text-foreground` on whatever the caller hands it, outranking any colour class the
+call site writes by CSS specificity — the same "charcoal on every accent" law this book
+already states for the label, now closing the identical gap over the icon beside it. The
+app-name link's underline (named again in the same sentence) was already shipped the
+previous round and unaffected by this fix; her "no I still don't see it" was about the icon
+colour, confirmed fixed on the next pass. Shipped in the kit (`badge.tsx`, v1.2.119).
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.119).**
+
 ---
 
 ### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
@@ -3870,6 +4113,30 @@ on ([D19](#d19-raised-on-is-a-fact-under-raised-by-with-the-exact-date-and-how-m
 no longer share one combined cell on a tickets list view either: each gets its own column,
 so a row's raiser and its raised date can be scanned, sorted and read independently rather
 than as one run-on fact.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED A SECOND TIME, 18 Sep 2026 ~12:00 (Round 19) — the Raised by column carries the
+raiser's own face.** The client's ruling, verbatim, reviewing the deployed build: *"on
+cokumn raised by i am misisng the avatar."* The top-level Tickets list's own Raised by
+column had drawn a name-only `<RecordMark>` since this rule's own first version — `TicketFace`'s
+`raiserId`/`raiserName` pair carried no `picture` prop, because `HelpTicket` stores no avatar
+URL for a raiser and nothing on this screen had ever read the team's members cache to resolve
+one, even though the app record's own Tickets tab (`AppTicketsPanel`, `work-panels.tsx`)
+always had, through its own local `memberAvatar` lookup. `memberFace`
+(`tickets-collection.tsx`) is the ONE resolver now, the same `.find()`-by-userId shape
+`memberAvatar` already used, shared by both call sites rather than kept as two copies of one
+lookup; `TicketRowsTable` takes `members` as an optional prop so its raisedBy cell can call
+it. This is a face lookup only — never a picker — and `tickets-collection.tsx`'s own read of
+the members cache is named in `NOT_A_WORK_PICKER`
+([D20](#d20-a-tickets-own-detail-is-one-page-no-tabs-the-stage-ladder-above-a-two-column-body-conversation-two-thirds-stories-work-logs-stakeholders-stacked-beside-it)'s
+own `TicketConversationPanel` reads the identical cache for the conversation's own sender
+faces, the same reasoning). Proved by rendering rather than by reading the source —
+`web/test/ticket-raised-by-avatar-and-app-link.test.tsx` — the same posture this rule's own
+`ticket-row-opens-beside.test.tsx` already takes over the same component. The same test also
+re-proves the type column's icon ink fix ([K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status)'s
+own amendment) against a live render, because her same-session sentence named both in one
+breath: *"type icon is still gray, and the app name (a link) is not underlined."*
 
 **Status: ruled, in build, 18 Sep 2026.**
 
@@ -6940,17 +7207,43 @@ on the app tab, which has no title component of its own). **Status: shipped, thi
 session** — not yet folded into the numbered K-series above; a future documentation pass
 should give it its own line and cross-reference.
 
+**DECISION PENDING — the assistant's attach affordance, 13 Sep vs. 18 Sep.** Two rulings
+across five days describe the assistant composer's own attach control differently, and
+neither has been reconciled against the other yet. The 13 Sep shape (the assistant's own
+composer, distinct from the ticket reply composer D20/D21 cover) shipped with one attach
+affordance; reviewing it again on 18 Sep, the client's ruling was *"need visual options to
+vhoose rfom"* — read as "the two dates' shapes disagree and I want to see them side by side
+before picking," the same working-agreement move this book's own header names ("decisions
+need a visual… build a side-by-side page and point at it"), not yet built. A side-by-side
+artifact comparing the 13 Sep and 18 Sep attach affordances is the next step; her pick, once
+made, resolves this row. **Artifact:** <https://claude.ai/artifact/Nbwa6qGJTnCiGAaG5YrEgf>
+(unread by this pass — linked here rather than summarised, so the next reader opens the
+live page rather than trusting a paraphrase of it).
+
+**DECISION PENDING — a title's maximum length, computed at N=50.** The client's ruling,
+18 Sep 2026 (Round 19), verbatim: *"this is something completey new, and will require an
+artifact. for all titles (main, details, all) i would like to limit the lnght to what
+would fit in 1 line in a laptiop. this menas a max charactes for titles in the forms (not
+sutting it) wdyt? and ow many cahracters would taht be? consider text size regualr and the
+monitor size of a macbook."* A character ceiling for every title field across every form —
+computed against the regular title text size and a MacBook-class viewport — rather than a
+truncation rule on an already-saved value (her own "not cutting it"). The computed answer,
+**N = 50 characters**, is recorded here as the number an artifact arrived at; it is not yet
+wired into any form as a `maxLength`/counter, and the ceiling has not been read back to her
+for a pick. **Artifact:** <https://claude.ai/artifact/TYmJqr1byzjS9oiLosyFaL> (unread by
+this pass — linked rather than summarised, same reason as the row above).
+
 ---
 
 ## Rule index
 
-**203 rules.**
+**205 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L27 (27) |
-| 3. Detail screens | D1 to D20 (20) |
+| 2. Page layout and width | L1 to L28 (28) |
+| 3. Detail screens | D1 to D21 (21) |
 | 4. Collections | K1 to K47 (47) |
 | 5. Buttons and actions | B1 to B20 (20) |
 | 6. Forms and dialogs | F1 to F17 (17) |

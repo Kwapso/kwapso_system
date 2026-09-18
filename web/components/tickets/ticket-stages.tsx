@@ -196,6 +196,27 @@
 // Together the ladder is visibly shorter and narrower than it was — proved by
 // `web/test/ticket-stages-shrink.test.tsx`, which pins the live component's
 // rendered height against a fixture and asserts no stage word reaches the DOM.
+//
+// ── AND THEN NO TITLE AT ALL, 18 Sep 2026 ───────────────────────────────────
+//
+// The client, reading the shrunk ladder back: "inside tickets temove the
+// 'stages' as a title" — the eyebrow this file used to print above the rail
+// (`<span id={headingId}>{t("Stages")}</span>`, `text-caption`, visible) is
+// gone outright, the same "subtraction, not smaller type" reading the 17 Sep
+// pass above took for the stage word and the two-line date. R81-style: the
+// ladder's own fills and dates already say what it is ("we can see the
+// colors" carried the identical argument three rulings ago), so a label
+// repeating that is exactly the redundancy her "just smaller"/now
+// title-less goal keeps naming.
+//
+// THE ACCESSIBLE NAME SURVIVES WITHOUT THE VISIBLE TEXT. `aria-labelledby`
+// pointed at that span; both the `<section>` and the scrolling `<div
+// role="group">` now carry `aria-label={t("Stages")}` directly instead, so a
+// screen reader still announces "Stages" on the region and nothing is
+// printed for a sighted reader to read. `web/test/ticket-stages-above-
+// tabs.test.tsx`'s own assertions moved from `getByText("Stages")` (which a
+// live DOM read now correctly returns nothing for) to `getByRole("group", {
+// name: "Stages" })`, which the aria-label still satisfies.
 
 import * as React from "react"
 
@@ -362,7 +383,6 @@ const SMALLER_DOT = "[--control-height-pill:1.25rem]"
 
 export function TicketStages({ ticketId, status }: { ticketId: string; status: HelpStatus }) {
   const { t, lang } = useLanguage()
-  const headingId = React.useId()
   const stagesQ = useCached<TicketStageHistory>(helpStagesKey(ticketId), () =>
     contentApi.helpStages(ticketId)
   )
@@ -412,18 +432,16 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
     // nobody got round to adding. `UNCONTAINED_SECTION_OK`
     // (shared/rules/registry.ts) carries the entry and her words, the same
     // shape the Tasks progress line's own entry uses.
-    <section className="flex flex-col gap-[var(--space-3)]" aria-labelledby={headingId}>
-      <span id={headingId} className="text-muted-foreground text-caption">
-        {t("Stages")}
-      </span>
+    <section className="flex flex-col gap-[var(--space-3)]" aria-label={t("Stages")}>
       {/* THE RAIL SCROLLS, THE PAGE NEVER DOES (R29). `min-w-0` so a flex
           ancestor cannot let this box grow to its content instead of clipping
           it; `tabIndex` because a scrolling region no keyboard can reach is a
-          region whose last stage nobody can read; `role`/`aria-labelledby` so
-          that tab stop announces the eyebrow above it rather than nothing. */}
+          region whose last stage nobody can read; `aria-label` (not the
+          removed eyebrow span, not `aria-labelledby`) carries the same name
+          so that tab stop still announces "Stages" with nothing printed. */}
       <div
         role="group"
-        aria-labelledby={headingId}
+        aria-label={t("Stages")}
         tabIndex={0}
         className={`min-w-0 overflow-x-auto pb-[var(--space-2)] ${SMALLER_DOT}`}
       >

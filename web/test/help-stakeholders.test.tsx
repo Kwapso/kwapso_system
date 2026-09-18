@@ -15,6 +15,13 @@
 // and now carries a relation label — "Raised by" for the one raiser, "On the
 // loop" for everyone else — never a THIRD fact beyond the face, the name and
 // that one label.
+//
+// AMENDED AGAIN, SAME DAY — client ruling, verbatim: "inside ticket detail,
+// for stakeholders, i want square tiels (lik in members, with text under the
+// image). 3 should fit in one row." The card became the SAME tile the
+// members gallery draws (`PersonCard`'s default `vertical` orientation and
+// `band` size, not the `horizontal`/`tile` pair the first pass reached for)
+// in a `grid-cols-3` panel.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -91,6 +98,28 @@ describe("HelpStakeholders — the people list", () => {
   it("draws one card, and one face (an initial fallback, with no photo), per stakeholder", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
     expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(2)
+  })
+
+  it("lays the cards three per row (18 Sep 2026 ruling), with each face above its name", () => {
+    const { container } = render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    // THREE PER ROW, AT THE PANEL'S OWN WIDTH — a class census, the same
+    // shape R31/R32's own checks read a value off a className string.
+    const grid = container.firstElementChild as HTMLElement
+    expect(grid.className).toContain("grid-cols-3")
+
+    // THE FACE ABOVE THE NAME — `PersonCard`'s `vertical` orientation (the
+    // kit default, never overridden here any more) draws the mark
+    // (`RecordMark`, `aria-hidden`) before the title in DOM order; a
+    // `horizontal` tile would draw them side by side instead.
+    for (const name of ["Aurora", "Max Mustermann"]) {
+      const card = screen.getByText(name).closest('[data-slot="stakeholder-card"]') as HTMLElement
+      expect(card).toBeTruthy()
+      const face = card.querySelector("[aria-hidden]") as HTMLElement
+      expect(face).toBeTruthy()
+      const nameNode = screen.getByText(name)
+      // eslint-disable-next-line no-bitwise
+      expect(face.compareDocumentPosition(nameNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
   })
 
   it("takes no picker-related props at all — the component's own contract shrank with the ruling", () => {

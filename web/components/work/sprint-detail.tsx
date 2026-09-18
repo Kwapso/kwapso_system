@@ -40,7 +40,7 @@ import {
   sprintTypeName,
   useSprintTypes,
 } from "@/components/work/sprint-form-dialog"
-import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
@@ -312,8 +312,15 @@ export function SprintDetailScreen({
               carries no type at all — a chip is a fact about the record, not
               a blank placeholder. */}
           {sprint.sprintType && (
-            <Badge variant="secondary" size="pill">
-              <SprintTypeGlyph type={sprint.sprintType} />
+            <Badge
+              variant="secondary"
+              size="pill"
+              icon={
+                sprintTypeHasGlyph(sprint.sprintType) ? (
+                  <SprintTypeGlyph type={sprint.sprintType} className="size-3.5 shrink-0" />
+                ) : undefined
+              }
+            >
               {kindWord}
             </Badge>
           )}

@@ -1222,8 +1222,13 @@ export function RecordScreen({
   // and her pick, verbatim, was "t1 and c2" — T1 is the separate
   // breadcrumb/search ruling the same session (UI-RULEBOOK.md L13), and C2
   // was named as HALF of the gap that was live that day. The gap live that
-  // day was `--space-4` (16px, the 2026-09-01 ruling above), so C2 is 8px —
-  // `mb-[var(--space-2)]`, not `--space-4` any more.
+  // day was `--space-4` (16px, the 2026-09-01 ruling above), so C2 landed at
+  // 8px, `mb-[var(--space-2)]`.
+  //
+  // CORRECTED THE SAME DAY, reading the deployed 8px back — CLIENT RULING,
+  // VERBATIM: "from chips to tile only 10." 8px undershot; `mb-[var(--space-2h)]`
+  // (10px, tokens.css's own "dense row gap" rung) is the pick, not `--space-2`
+  // any more.
   //
   // THE TITLE'S OWN LINE — plain when there is nothing beside it (the shape
   // the record-heading-clamps suite already pins), or, since B1, the mark and
@@ -1245,7 +1250,7 @@ export function RecordScreen({
     ) : (
       <span className="flex min-w-0 flex-col">
         {identityChips !== undefined ? (
-          <span className="mb-[var(--space-2)]">{identityChips}</span>
+          <span className="mb-[var(--space-2h)]">{identityChips}</span>
         ) : null}
         <span className="flex min-w-0 flex-col gap-[var(--space-1h)]">
           {titleLine}

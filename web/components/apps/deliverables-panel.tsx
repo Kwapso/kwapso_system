@@ -371,8 +371,14 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                       switch still reads on. */}
                   {d.visibleToClientAt && (
                     <span className="mt-1 flex flex-wrap items-center gap-1">
-                      <Badge variant="success" className="gap-1">
-                        <Eye className="size-3" />
+                      {/* THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN
+                          CHILD — client ruling, 18 Sep 2026 ("all chips /
+                          pills" need the leading-mark gap "wether its a dot
+                          or an icno"). The old shape also fought the kit's
+                          own gap with a local `className="gap-1"` override
+                          (badgeVariants' base `LEADING_MARK_GAP` is
+                          `gap-2`) — dropped along with the plain child. */}
+                      <Badge variant="success" icon={<Eye className="size-3" />}>
                         {t("Client can see this")}
                       </Badge>
                       {!d.active && (

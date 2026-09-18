@@ -872,6 +872,32 @@ export type StoryAttachment = {
   addedByName: string | null
 }
 
+/** ONE FILE ON ONE REPLY (team migration 0105, `help_attachments.help_thread_id`)
+ * — the client's own shape for it, 18 Sep 2026: "each message can have images
+ * or files". Deliberately leaner than `HelpAttachment` (the ticket-wide list's
+ * own shape, one table along): a message bubble draws a name, a size and a link
+ * — R40's own three, `href` named literally as that — never the kind/label/
+ * addedBy fields the ticket-level Files-and-links row still carries, because
+ * this shape's one reader is `ThreadMessage.attachments`/`media`
+ * (shared/ui/components/ticket-thread/ticket-thread.tsx), which asks for
+ * exactly this and nothing more. */
+export type HelpMessageAttachment = {
+  id: string
+  /** What a person reads — the file's own name. */
+  name: string
+  /** R40: the bytes, reachable. `/media/<key>` — the same shared bucket
+   * `HelpAttachment.url` already points into, never a raw R2 key. */
+  href: string
+  /** What the file declared itself to be, so a reader can decide whether to
+   * draw a picture (`isRenderableImage`, shared/workers/image.ts) or a
+   * document glyph (`fileTypeIcon`, shared/web/screen-engine/file-type-icon.tsx).
+   * Null on any row written before the column existed, which reads as "not a
+   * picture" — the safe direction. */
+  mime: string | null
+  /** Bytes, for the size a tile/chip shows. Null the same way `mime` is. */
+  size: number | null
+}
+
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention
  * is notification-only (every member can see every ticket via the All tab).
  *
@@ -894,6 +920,10 @@ export type HelpMessage = {
    * a colleague is named by their first name, a contact in full. */
   authorIsClient: boolean
   createdAt: string
+  /** THE FILES SENT ALONGSIDE THIS REPLY — team migration 0105. Omitted
+   * (never an empty array) when the reply carries none, so a screen's own
+   * `r.attachments?.length` reads true only when there is something to draw. */
+  attachments?: HelpMessageAttachment[]
 }
 
 /** One stakeholder on a ticket. Origin tells the UI why they're here (and that

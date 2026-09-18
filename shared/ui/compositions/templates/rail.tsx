@@ -504,13 +504,31 @@ const ROW_SHAPE = cn(
 const ROW_EXPANDED = cn("h-[var(--control-height-button)] w-auto rounded-pill px-[var(--space-3)]");
 
 /**
- * Collapsed: "only its icon remains, centered in the rail, at the same …
- * circular size as the avatar" (26.02). `--avatar-md` is that size, and the
- * circle is the shape 27.8 and 27.1's tablet render both draw — full-bleed
- * belongs to the expanded rail and there is no square in a 32-wide column.
+ * Collapsed row, RESIZED 18 Sep 2026 — CLIENT RULING, VERBATIM: "when
+ * contracting sidebar, yuo should not make icons or spaces smaller, keep it
+ * as it is, just without tetxs." 26.02's own "at the same … circular size as
+ * the avatar" (`--avatar-md`, 32) is exactly the shrink she is naming: MEASURED
+ * live (`verify/rail/`'s own `data-case="scroll"` two-column proof, 15px
+ * harness root, BEFORE this fix) — expanded row height 37.5 (`--control-
+ * height-button`, 40 at 16px root) against collapsed 30 (`--avatar-md`, 32),
+ * an 8px shrink carried straight through to the row-to-row rhythm (45 vs
+ * 37.5 measured top-to-top); the icon's own glyph was NOT part of the shrink
+ * (both states measured 15×15, `--icon-button`, because `ROW_SHAPE`'s shared
+ * `[&_svg]:size-[var(--icon-button)]` rule reads off the ROW, not the now-
+ * absent `rail-item-icon` wrapper span) — but "spaces" (the row box itself,
+ * and the gap that box's height sets) were exactly what shrank. The fix is
+ * the token swap the ruling asks for: this row now reads the SAME
+ * `--control-height-button` `ROW_EXPANDED` does, so the two states share one
+ * row height and therefore one row-to-row rhythm (the underlying gap token
+ * between rows is `--space-2` in both states already — the ONLY thing that
+ * moved is the row's own box). The rail's own root width (below, `w-[var(
+ * --control-height-button)]` when collapsed) widens the SAME 8px so a now-
+ * taller/wider circle still fits the column without clipping. The member
+ * chip's own avatar is UNCHANGED — it is a face, not a destination, and the
+ * ruling never named it.
  */
 const ROW_COLLAPSED = cn(
-  "size-[var(--avatar-md)] justify-center rounded-pill p-0",
+  "size-[var(--control-height-button)] justify-center rounded-pill p-0",
 );
 
 /**
@@ -1253,7 +1271,11 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
              and the rail grows exactly as it always did. What gives instead
              is the nav below, which is now the one thing here that scrolls. */
           "flex max-h-full min-h-full min-w-0 flex-1 flex-col gap-[var(--space-6)]",
-          isCollapsed && "w-[var(--avatar-md)] flex-none items-center",
+          /* WIDENED WITH `ROW_COLLAPSED`, 18 Sep 2026, SAME RULING — the
+             column must stay exactly as wide as the row it holds (see that
+             constant's own comment) or a `--control-height-button` circle
+             clips against a `--avatar-md` column. */
+          isCollapsed && "w-[var(--control-height-button)] flex-none items-center",
           className,
         )}
         {...props}
@@ -1270,6 +1292,52 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             data-slot="rail-brand"
             className={cn(
               "flex min-w-0 items-center gap-[var(--space-3)]",
+              /* THE LOGO'S OWN VERTICAL CENTRE MATCHES THE WORKSPACE TAB
+                 STRIP'S LABEL — 18 Sep 2026 CLIENT RULING, VERBATIM: "on the
+                 sidebar tge logo is way too up!!! make it aligned with text
+                 on foler tabs."
+
+                 MEASURED LIVE (`verify/shell-chrome/`, 1440×900, this kit's
+                 15px harness root), BEFORE this fix: this row's own box
+                 (mark + wordmark, both `--icon-20` tall, centred by this
+                 row's own `items-center`) sat at centre 18.74px from the
+                 viewport top; the active folder tab's own label glyph sat at
+                 28.75 — 10px lower, the exact "way too up" she is naming.
+
+                 BOTH NUMBERS DERIVE FROM TOKENS ALREADY IN SCOPE HERE, so the
+                 fix binds to them rather than to a third, independent
+                 pixel figure. `DENSITY_GUTTER`/`DENSITY_RAIL`
+                 (`screen-shell.tsx`) are both declared on the shared
+                 `screen-shell-card` root the rail dock and the content
+                 column are siblings under, so `--shell-gutter` and
+                 `--rail-inset` both cascade down into this file same as the
+                 two global folder-tab tokens do. The tab strip's own row
+                 starts `--shell-gutter` below that shared top edge (the
+                 content column's own `py`, canceling `breadcrumb-
+                 folders.tsx`'s `pt-1`/negative-margin ring-clearance pair
+                 exactly, so nothing is added there) and its active label
+                 centres in the LIP portion of the tab, never across the
+                 join (`breadcrumb-folders.tsx`'s own "centred in the lip" —
+                 `--folder-lip`/2 further down). The rail dock's own top edge
+                 is the SAME y-coordinate (both columns are siblings with no
+                 offset between them, MEASURED: `screen-shell-rail`'s rect
+                 top and the content column's rect top both read 0 in the
+                 harness above) — so this row's own vertical centre is bound
+                 to `--shell-gutter + --folder-lip/2`, minus half its own
+                 height (`--icon-20`, `MARK_STEP`'s own rung) and minus the
+                 `--rail-inset` padding the column already spent above it
+                 (RAIL_COLUMN pads this box's top edge once already; this
+                 margin is the REMAINDER, not a second, competing offset).
+                 Same formula shape `screen-shell.tsx`'s own assistant-handle
+                 fix already uses to land a control inside this exact tab
+                 band (`--shell-gutter + --folder-lip`), not a new idiom.
+
+                 UNCONDITIONAL — BOTH RAIL STATES. `MARK_STEP` gives the
+                 mark the same `--icon-20` height whether the isotype
+                 (collapsed) or the full logotype (expanded) renders, and the
+                 tab strip this aligns against never depends on the rail's
+                 own state either, so one offset serves both. */
+              "mt-[calc(var(--shell-gutter)_+_var(--folder-lip)/2_-_var(--icon-20)/2_-_var(--rail-inset))]",
               /* ONE LEADING EDGE DOWN THE WHOLE COLUMN. The client's
                  reference aligns the lockup with the leading edge of the
                  destinations below it, not with the column's padding — and

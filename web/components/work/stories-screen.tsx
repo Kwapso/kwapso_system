@@ -283,9 +283,14 @@ export function storyTypeChip(value: string | null | undefined): React.ReactNode
   if (!value) return <span className="text-muted-foreground text-sm">—</span>
   const iconName = storyTypeIconName(value)
   const Icon = iconName ? iconComponent(iconName) : null
+  // THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN CHILD — client
+  // ruling, 18 Sep 2026 ("all chips / pills" need the leading-mark gap
+  // "wether its a dot or an icno"). The old shape also fought the kit's own
+  // gap with a local `className="gap-1"` override (badgeVariants' base
+  // LEADING_MARK_GAP is `gap-2`) — dropped along with the plain child, so
+  // this chip now spends the same rung every other icon-led Badge does.
   return (
-    <Badge variant="secondary" className="gap-1">
-      {Icon && <Icon className="size-3.5" />}
+    <Badge variant="secondary" icon={Icon ? <Icon className="size-3.5" /> : undefined}>
       {value}
     </Badge>
   )

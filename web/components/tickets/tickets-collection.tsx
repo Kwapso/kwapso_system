@@ -173,7 +173,7 @@ import { useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language, Vars } from "@shared/i18n"
 import { HELP_STATUSES, OPEN_TAB_STATUSES } from "@shared/types"
-import type { Account, AppRow, HelpStatus, HelpTicket } from "@shared/types"
+import type { Account, AppRow, HelpStatus, HelpTicket, TeamMember } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 import { TriageChips } from "@/components/tickets/triage-chips"
 import { ReadySplit } from "@/components/tickets/ready-split"
@@ -1049,6 +1049,17 @@ export function TicketsCollection({
     tenancy.accounts().then((r) => r.accounts)
   )
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  /** THE STAFF RAISER'S FACE (R35, client ruling 18 Sep 2026: "on column
+   * raised by i am missing the avatar") — the team's own members cache, the
+   * same key `AppTicketsPanel` (work-panels.tsx) and `TriageQueue` already
+   * hold (`members:<teamId>`, R56: one door, one key), read HERE too so the
+   * top-level list's own `TicketRowsTable` call below can resolve a staff
+   * raiser's picture through `memberFace` instead of drawing only their
+   * initial. This cache was never read on this screen before today — the
+   * app tab resolved it locally and the top-level list simply did not. */
+  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+    tenancy.members().then((r) => r.members)
+  )
   const byAccount = useCachedValue<HelpAccountFacet[]>(helpByAccountKey(teamId))
   /** The accounts we happen to hold, by id — a FACE lookup and nothing else.
    * Never the option list itself: that is `byAccount` above, and the difference
@@ -1655,6 +1666,7 @@ export function TicketsCollection({
                         label={t("Tickets")}
                         teamId={teamId}
                         columns={helpTabColumns(facet)}
+                        members={membersQ.data}
                       />
                     )}
                     <LoadMore
@@ -1778,6 +1790,35 @@ export type TicketFace = {
   raisedByContactLogo?: string | null
 }
 
+/** THE STAFF RAISER'S FACE (R35) — ONE RESOLVER, client ruling 18 Sep 2026:
+ * "on column raised by i am missing the avatar." `HelpTicket` carries
+ * `raiserId`/`raiserName` for a colleague but no picture — a person's face
+ * lives in the team's GLOBAL core DB, never the team's own (R47's own
+ * finding, the identical reason `resolverId` beside it has none either) — so
+ * it is resolved here, client-side, against the team's own members cache
+ * every staff picker in this app already holds (`members:<teamId>`, the same
+ * key `TEAM_RESOURCES.members` names). A client contact draws through the
+ * OTHER half of `TicketFace`'s own pair instead (`raisedByContactLogo`,
+ * resolved by the door already — see the cell below), so this is only ever
+ * asked about a staff `raiserId`.
+ *
+ * THE SAME FUNCTION, EVERYWHERE A STAFF RAISER'S FACE IS DRAWN — the top-level
+ * list and the triage queue both draw through `TicketRowsTable` below, which
+ * takes `members` as a prop and calls this; the app record's own Tickets tab
+ * (`AppTicketsPanel`, work-panels.tsx) draws a different table over the same
+ * `HelpTicket` rows and calls this too, rather than keeping the second, local
+ * `memberAvatar` it used to carry — one seam instead of two that happened to
+ * agree. `undefined` members (still loading) and an id the cache does not
+ * hold both fall through to `undefined`, which `RecordMark` already reads as
+ * "no picture, draw the initial." */
+export function memberFace(
+  members: TeamMember[] | undefined,
+  userId: string | null | undefined
+): string | null | undefined {
+  if (!userId) return undefined
+  return members?.find((m) => m.userId === userId)?.imageUrl
+}
+
 /** ONE TABLE FOR EVERY TAB THAT SHOWS ROWS — client, 2026-09-06: "For the tabs
  * Open, Closed, and All, do the list view exactly the same as we have it in the
  * Triage list."
@@ -1829,6 +1870,7 @@ export function TicketRowsTable<T extends TicketFace>({
   teamId,
   columns = TICKET_COLUMNS_DEFAULT,
   decide,
+  members,
 }: {
   rows: readonly T[]
   onOpen: (id: string) => void
@@ -1871,6 +1913,12 @@ export function TicketRowsTable<T extends TicketFace>({
     /** A full-width strip beneath this row, when this row is mid-decision. */
     strip?: (row: T) => React.ReactNode
   }
+  /** THE TEAM'S OWN MEMBERS CACHE — a FACE lookup for a staff raiser and
+   * nothing else (see `memberFace`'s own header, one function up). Optional:
+   * the triage queue draws through this same table and its rows never carry
+   * a `raiserId` at all (`TicketFace`'s own header), so a caller with nothing
+   * to resolve passes nothing rather than fetching a cache it never reads. */
+  members?: TeamMember[]
 }) {
   const { t, lang } = useLanguage()
   const span = columns.length + (decide ? 1 : 0)
@@ -2046,46 +2094,66 @@ export function TicketRowsTable<T extends TicketFace>({
               )}
               {columns.includes("type") && (
                 <TableCell>
-                  <span className="flex items-center gap-2">
-                    {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
-                        screenshot of this exact column: "for type, kill the
-                        emojis. this is legacy. in current system we use colors."
+                  {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
+                      screenshot of this exact column: "for type, kill the
+                      emojis. this is legacy. in current system we use colors."
 
-                        WHAT STOOD HERE was the team's own glyph for the kind, read
-                        off the `Ticket type` dropdown value through `markMap` and
-                        drawn beside the pill. The stored glyphs are untouched (see
-                        the note beside the facets above); the READ is gone, and
-                        with it the argument this comment used to make — that
-                        dropping it "would have quietly deleted a capability nobody
-                        asked to lose". Somebody asked. A pictograph in front of a
-                        coloured pill was two marks for one fact, and the ruling
-                        picks the one the rest of the app already uses.
+                      WHAT STOOD HERE was the team's own glyph for the kind, read
+                      off the `Ticket type` dropdown value through `markMap` and
+                      drawn beside the pill. The stored glyphs are untouched (see
+                      the note beside the facets above); the READ is gone, and
+                      with it the argument this comment used to make — that
+                      dropping it "would have quietly deleted a capability nobody
+                      asked to lose". Somebody asked. A pictograph in front of a
+                      coloured pill was two marks for one fact, and the ruling
+                      picks the one the rest of the app already uses.
 
-                        THE SAME GLYPH, FROM THE SAME MAP as the triage card's
-                        chips and the type picker draw — client, 17 Sep 2026,
-                        superseding the sentence above: "the one that gets the
-                        chip with the color is always the status … for tickets,
-                        we need to find icons for the ticket type." `Icon` +
-                        `ticketTypeIconName` (shared/ticket-types.ts) rather than
-                        a second resolution that agrees with it today: the whole
-                        reason that map is one file is that a type's icon cannot
-                        be decided twice. Status, not type, keeps the dot
-                        (`shared/status-tones.ts`, D17).
+                      THE SAME GLYPH, FROM THE SAME MAP as the triage card's
+                      chips and the type picker draw — client, 17 Sep 2026,
+                      superseding the sentence above: "the one that gets the
+                      chip with the color is always the status … for tickets,
+                      we need to find icons for the ticket type." `Icon` +
+                      `ticketTypeIconName` (shared/ticket-types.ts) rather than
+                      a second resolution that agrees with it today: the whole
+                      reason that map is one file is that a type's icon cannot
+                      be decided twice. Status, not type, keeps the dot
+                      (`shared/status-tones.ts`, D17).
 
-                        A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
-                        so with an em dash: a column with a pill on four rows and a
-                        hole on the fifth reads as the broken row rather than the
-                        untyped one. */}
-                    <Badge variant="secondary" size="pill">
-                      {ticketTypeIconName(w.helpType) && (
-                        <Icon
-                          name={ticketTypeIconName(w.helpType)!}
-                          className="text-muted-foreground size-3.5 shrink-0"
-                        />
-                      )}
-                      {w.helpType ?? "—"}
-                    </Badge>
-                  </span>
+                      A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
+                      so with an em dash: a column with a pill on four rows and a
+                      hole on the fifth reads as the broken row rather than the
+                      untyped one.
+
+                      THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN CHILD
+                      — client ruling, 18 Sep 2026 ("all chips / pills" need the
+                      leading-mark gap "wether its a dot or an icno"), and
+                      `badge.tsx`'s own header names this exact cell as the call
+                      site the ruling was written about. Handing the glyph in as
+                      a bare JSX child (the old shape) is what this file's own
+                      census (`web/test/chips-are-badges.test.ts`) now refuses
+                      everywhere but here; the `icon` prop is what keeps it a
+                      real Badge. */}
+                  <Badge
+                    variant="secondary"
+                    size="pill"
+                    icon={
+                      ticketTypeIconName(w.helpType) ? (
+                        // NO FORCED COLOUR (client ruling, 18 Sep 2026: "type
+                        // icon is still gray"). The kit's own `secondary`
+                        // Badge already draws `text-foreground` (black, not
+                        // `text-ink-secondary`) and `Badge`'s own `icon` slot
+                        // renders a caller's node AS-IS — so a
+                        // `text-muted-foreground` class here was the one
+                        // thing still forcing grey over the kit's own fix.
+                        // Removed rather than repainted: the glyph now
+                        // inherits `currentColor` from the pill exactly as
+                        // the label beside it does.
+                        <Icon name={ticketTypeIconName(w.helpType)!} className="size-3.5 shrink-0" />
+                      ) : undefined
+                    }
+                  >
+                    {w.helpType ?? "—"}
+                  </Badge>
                 </TableCell>
               )}
               {/* THE QUIET COLUMNS — app, and the two dates below it — as her
@@ -2142,7 +2210,21 @@ export function TicketRowsTable<T extends TicketFace>({
                 <TableCell className="text-muted-foreground">
                   {w.raiserName ? (
                     <span className="flex items-center gap-2">
-                      <RecordMark name={w.raiserName} shape="round" size="choice" />
+                      {/* THE STAFF RAISER'S FACE (R35) — `memberFace`, one
+                          function up: `HelpTicket` carries no picture for
+                          `raiserId`, so it is resolved against the members
+                          cache this table's caller passes in. A CLIENT login
+                          raising their own ticket also has `raiserId` (an
+                          ordinary team member, `w.raiserIsClient`), and the
+                          same lookup finds their face too — the members
+                          cache holds every login on the team, not staff
+                          alone. */}
+                      <RecordMark
+                        picture={memberFace(members, w.raiserId)}
+                        name={w.raiserName}
+                        shape="round"
+                        size="choice"
+                      />
                       <span className="min-w-0 truncate">
                         {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
                       </span>

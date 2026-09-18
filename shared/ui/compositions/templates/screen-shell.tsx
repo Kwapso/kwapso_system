@@ -2053,8 +2053,22 @@ const CARD_JOINED = "md:rounded-ss-none";
    sentence retires it outright — "no line divider under" — so the trail
    slot renders only `{trail}` now; `TRAIL_GAP`'s `mb` is the one gap
    between the trail and whatever follows (`band`, or the body), with
-   nothing drawn between them any more. */
-const TRAIL_GAP = "mb-[var(--space-2h)]";
+   nothing drawn between them any more.
+
+   NO LONGER "EXACTLY SAME," 18 SEP 2026, A SECOND RULING THE SAME DAY —
+   CLIENT, VERBATIM: "change to trail line 10px abpove 16below." This
+   SUPERSEDES the "exactly same under" clause two paragraphs up: `above` and
+   `below` are now two different rungs on purpose, not one token read twice.
+   `DENSITY_TRAIL`'s own `pt` is UNCHANGED by this ruling — it still reads
+   `--space-2h` (10) at both densities, which is what "10px above" asks for,
+   so nothing above this line moved. Only `TRAIL_GAP` moves, from
+   `--space-2h` (10) to `--space-4` (16) — the very next rung up the same
+   scale, not a new custom property, the same "no `--trail-gap` token"
+   standard the paragraph above states for why this reaches for an existing
+   step rather than inventing one. `check-screen-shell.mjs`'s trail-spacing
+   check and `verify/trail-line/page.tsx`'s own `gapAboveTrailIs10` /
+   `gapBelowTrailIs16` proofs both move with it. */
+const TRAIL_GAP = "mb-[var(--space-4)]";
 
 /* ----------------------------------------------------------------------------
    THE BODY — the card's tone, and NOT a container.
@@ -5618,45 +5632,52 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
                     : cn(
                         "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
-                        /* SIZED TO THE BAND IT STANDS IN, 18 SEP 2026 — CLIENT
-                           RULING, VERBATIM: "put the open assistant button
-                           completely on the top margin, not liek now that
-                           its slightly overlaping with main content." MEASURED,
-                           `agency-staging`, a ticket record, 1440 viewport:
-                           this handle at `top-[var(--shell-gutter)]` (16px)
-                           and `HANDLE_HIT`'s own `size-[var(--control-height-
-                           button)]` (40px) put its bottom edge at 56px —
-                           9.52px PAST the content card's own top edge
-                           (46.48px = the SAME 16px column padding plus
-                           `--folder-lip`, 30.48, the tab strip's own lip
-                           height above the card). The band this corner
-                           actually has to stand in, top to card, is exactly
-                           that `--folder-lip` — the SAME token `trail-line.tsx`
-                           already sized ITS OWN top-strip control against
-                           ("the box a control may occupy is the difference —
-                           `--folder-lip`, 30.48"), and that file's own answer
-                           is `--control-height-pill` (26), which fits with
-                           2.24px of air on every side. This handle reaches
-                           for the identical, already-proven token rather than
-                           inventing a second number for the same band:
-                           `size-[var(--control-height-pill)]` here wins the
-                           `cn()` merge against `HANDLE_HIT`'s own
-                           `size-[var(--control-height-button)]` (last write
-                           wins, same utility group), dropping this ONE
-                           branch's box to 26px — the OPEN branch above is
-                           untouched (it is a mid-edge grab against the open
-                           column, not a top-strip corner, and the 2026-09-1x
-                           "needs to be bigger" ruling that set 40px stands for
-                           every other use of `HANDLE_HIT`). New bottom edge:
-                           16 + 26 = 42px, 4.48px clear of the card's 46.48px
-                           top — see `check-screen-shell.mjs`'s own pin. The
-                           icon inside does not shrink with it:
-                           `HANDLE_HIT`'s `[&_svg]:size-[var(--icon-button)]`
-                           is 16px, the SAME size `trail-line.tsx`'s own
-                           arrows draw inside the identical 26px pill, so the
-                           mark reads at the one proportion this kit already
-                           uses for a control in this exact band. */
-                        "size-[var(--control-height-pill)]",
+                        /* SIZED TO FILL THE BAND IT STANDS IN, 18 SEP 2026 —
+                           A SECOND RULING THE SAME DAY, VERBATIM, over the
+                           26px fix directly below this comment's own history:
+                           "need to be bigger, as big as the space allows it."
+
+                           THE BAND ITSELF DID NOT MOVE. It is still exactly
+                           `--folder-lip` (30.48px) — `top-[var(--shell-
+                           gutter)]` (16px) down to the content card's own top
+                           edge (46.48px = the same 16px column padding plus
+                           `--folder-lip`; see `trail-line.tsx`'s identical
+                           math, "the box a control may occupy is the
+                           difference — `--folder-lip`, 30.48"). What moved is
+                           which token fills it. The PREVIOUS fix reached for
+                           `--control-height-pill` (26) — `trail-line.tsx`'s
+                           own answer for a DIFFERENT control (its close chip)
+                           sharing this exact band — and that borrowed number
+                           left 2.24px of air on every side: correct for a
+                           button that sits ON a tab, wrong for the one button
+                           THIS band exists to hold. "As big as the space
+                           allows" is not another borrowed rung; it is the
+                           band's OWN height, so this branch now reaches for
+                           `--folder-lip` directly rather than a second file's
+                           control size — `size-[var(--folder-lip)]` wins the
+                           `cn()` merge against `HANDLE_HIT`'s own `size-[var(
+                           --control-height-button)]` (last write wins, same
+                           utility group) exactly as the 26px fix did, so this
+                           is a value swap, not a new mechanism.
+
+                           NEW BOTTOM EDGE: 16 + 30.48 = 46.48px — the content
+                           card's own top edge, EXACTLY, zero clearance either
+                           side: not the 9.52px overlap the first ruling
+                           fixed, not the 4.48px of unclaimed air the second
+                           fix left. `size-` sets both axes, so the box is a
+                           true square at the new height with no separate
+                           width to pick — "width follows the height" is free.
+                           See `check-screen-shell.mjs`'s own pin, extended to
+                           this ruling.
+
+                           THE ICON INSIDE STILL DOES NOT SHRINK: `HANDLE_HIT`'s
+                           `[&_svg]:size-[var(--icon-button)]` is unchanged at
+                           16px, so growing the box from 26 to 30.48 only grows
+                           the air around the mark (2.24px of it per side
+                           before, 7.24px now) — the same glyph, more visibly
+                           the tallest thing in its own band, which is the
+                           whole ask. */
+                        "size-[var(--folder-lip)]",
                       ),
                 )}
               />

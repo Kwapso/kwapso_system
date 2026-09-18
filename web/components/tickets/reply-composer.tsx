@@ -61,24 +61,48 @@
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
+import { FileUpload, type FileUploadItem } from "@shared/ui/components/file-upload/file-upload"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
 import { PaperPlaneTilt, Paperclip } from "@shared/ui/foundations/icons"
 import { useLanguage } from "@shared/web/language"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 
+import type { HelpMessageAttachment } from "@shared/types"
 import { createSendHold, type SendHold, type SendHoldView } from "@/lib/send-hold"
 
-/** WHAT IS HELD FOR FIVE SECONDS. Text and a caret, and nothing else — this
- * composer has no attachment control, because the kit's own rule for a thread is
- * that "a message is text, files live on the record", and this ticket's files
- * live on its Files and links tab. If one is ever added here it rides in this
- * object, which is why the shape is named. */
+/** ONE PICKED FILE, ANYWHERE ON THE TICK-TOCK FROM "JUST CHOSEN" TO "SENT" —
+ * team migration 0105, the client's ruling of 18 Sep 2026 restated at the top
+ * of this file's own header. `key` is the tile's stable identity for the whole
+ * of that arc: `pickedFileId(file)` the moment it is picked, so React and
+ * `onRemove` never lose track of a tile across a re-render, and it stays the
+ * SAME string once the row lands on the server — `done`'s `attachment.id` is a
+ * different id space (the `help_attachments` row), and conflating the two
+ * would mean a tile's identity changes under it mid-upload.
+ *
+ * UPLOADED IMMEDIATELY ON PICK, never deferred to Send (R41's "the record
+ * already exists" branch — this ticket has, so there is nowhere a picked file
+ * has to wait). `done` is the ONLY state Send may act on; `uploading`/`error`
+ * slots are shown, never silently sent and never silently dropped. */
+export type AttachSlot =
+  | { key: string; status: "uploading" | "error"; file: File; message?: string }
+  | { key: string; status: "done"; attachment: HelpMessageAttachment }
+
+/** WHAT IS HELD FOR FIVE SECONDS. Text, a caret, and — since team migration
+ * 0105 — the files that were staged (uploaded, not yet sent) the moment Send
+ * was pressed. Already-uploaded rows (`HelpMessageAttachment`, not `File`s):
+ * the bytes are in the bucket the instant a tile turns `done`, well before the
+ * hold starts, so what the hold needs to remember is which ROWS to claim, not
+ * bytes to resend. */
 type HeldReply = {
   text: string
   /** Where the cursor was when she pressed send, so Undo puts it back exactly
    * there rather than at the end of a sentence she was editing the middle of. */
   caret: number
+  /** The files Send swept off the tile grid. Undo and a failed send both put
+   * them straight back — see `useReplySend`'s own `restoreAttachments`. */
+  attachments: HelpMessageAttachment[]
 }
 
 /** WHAT THE HOOK HANDS THE DRAWING. Everything the composer needs and nothing
@@ -95,6 +119,23 @@ export type ReplySend = {
   start: () => void
   /** The field itself, so the caret can be read on press and restored on Undo. */
   field: React.RefObject<HTMLInputElement | null>
+  /** THE TILE GRID'S OWN STATE — team migration 0105, one slot per picked
+   * file, from the instant it is picked through upload and until Send (or
+   * Undo, or a refusal) clears it. RAW, not pre-built into `FileUploadItem`s:
+   * `file-upload-items-feed-tiles.test.ts`'s own census reads a `<FileUpload`
+   * mount's ENCLOSING COMPONENT for `usePickedFileItems`/
+   * `storedFileToUploadItem`, so the actual tile-building has to happen in
+   * `ReplyComposer` itself — the same shape every other `<FileUpload>` call
+   * site in this app already uses — rather than being handed down pre-built
+   * from a hook the census cannot see into. */
+  attachSlots: AttachSlot[]
+  /** A file is still going up. Send is disabled while this is true. */
+  attachBusy: boolean
+  /** Hand it whatever was picked or dropped. */
+  addFiles: (files: File[]) => void
+  /** Take one tile off, by its stable key (`AttachSlot.key`, never the door's
+   * own attachment id — see that type's own header). */
+  removeAttachment: (key: string) => void
 }
 
 export function useReplySend({
@@ -104,14 +145,56 @@ export function useReplySend({
   /** DO IT. Returns the sentence the settling toast should say — so the words
    * for "sent" are decided by the caller that knows what the door actually
    * answered, not guessed at here. `leaving` is true only on the tab-closing
-   * path, where it must reach `fetch` as `keepalive`. */
+   * path, where it must reach `fetch` as `keepalive`. `attachmentIds` are the
+   * rows staged by `uploadFile` below, ready to be claimed by this reply. */
   onSend,
+  /** UPLOAD ONE PICKED FILE, IMMEDIATELY — the moment `addFiles` (below) is
+   * handed it, never deferred to Send (R41: the ticket already exists, so
+   * there is nowhere for the bytes to wait). The caller does the actual door
+   * call (`content.addHelpAttachment` on the agency, the portal's own
+   * equivalent) and hands back the row's own shape; a rejection is a plain
+   * `Error` whose `.message` is what the tile's error state shows. */
+  uploadFile,
+  /** TAKE A STAGED FILE BACK OFF, when its tile's remove control is pressed
+   * before Send. Best-effort — the tile leaves the grid either way, because a
+   * person pressing remove has already decided, and a failed cleanup call
+   * leaves an orphaned ticket-level row rather than a stuck control. */
+  removeUploadedFile,
 }: {
   ticketId: string
-  onSend: (text: string, leaving: boolean) => Promise<string>
+  onSend: (text: string, leaving: boolean, attachmentIds: string[]) => Promise<string>
+  uploadFile: (file: File) => Promise<HelpMessageAttachment>
+  removeUploadedFile: (attachmentId: string) => Promise<void>
 }): ReplySend {
   const { t } = useLanguage()
   const field = React.useRef<HTMLInputElement | null>(null)
+
+  // THE TILE GRID'S OWN STATE — see `AttachSlot`'s header above. Kept OUTSIDE
+  // the draft (`useFormDraft`) on purpose: a `File` cannot survive
+  // `JSON.stringify` into localStorage, and a row that already finished
+  // uploading is recoverable from the server (the ticket-level door still
+  // lists it) even if this tab is killed mid-wait — the one failure mode the
+  // TEXT draft exists to cover has no equivalent hole here.
+  const [slots, setSlots] = React.useState<AttachSlot[]>([])
+  // SEQUENTIAL, NEVER PARALLEL. Two uploads racing on the SAME ticket would
+  // answer with two "whole list" responses whose ORDER on the wire is not
+  // guaranteed to match the order they were fired in, and the only way this
+  // hook finds out WHICH row a call just created is "the newest one on the
+  // list I got back" (see the host's own `uploadFile`, e.g. help-detail.tsx).
+  // A promise chain — not `Promise.all` — is what keeps that reading honest:
+  // the second file's upload does not even START until the first one's
+  // response has been read.
+  const uploadChain = React.useRef<Promise<void>>(Promise.resolve())
+
+  /** THE SAME RESTORE, FOR TWO DIFFERENT REASONS. Undo and a refused send both
+   * mean "nothing happened, put it all back" — the words AND the files, which
+   * is the whole of R41's promise here: a picked file that made it as far as
+   * `done` is never lost to a mistake a person can still take back. */
+  const restoreAttachments = React.useCallback(
+    (attachments: HelpMessageAttachment[]) =>
+      setSlots(attachments.map((attachment): AttachSlot => ({ key: attachment.id, status: "done", attachment }))),
+    []
+  )
 
   // THE DRAFT, KEPT PER TICKET (CACHING.md §11, the same seam every form dialog
   // uses). This is the answer to the one failure mode the five seconds cannot
@@ -144,15 +227,19 @@ export function useReplySend({
      way would be in no catalogue, would be translated nowhere, and would ship in
      English to somebody who chose German with a green build. Wrapping it at the
      render position keeps the law able to see it and costs one line. */
-  const words = { refused: t("Couldn't post your reply.") }
-  const latest = React.useRef({ onSend, setDraft, clearDraft, words })
-  latest.current = { onSend, setDraft, clearDraft, words }
+  const words = { refused: t("Couldn't post your reply."), attachFailed: t("Couldn't attach that.") }
+  const latest = React.useRef({ onSend, uploadFile, removeUploadedFile, setDraft, clearDraft, restoreAttachments, words })
+  latest.current = { onSend, uploadFile, removeUploadedFile, setDraft, clearDraft, restoreAttachments, words }
 
   const holdRef = React.useRef<SendHold<HeldReply> | null>(null)
   if (holdRef.current === null) {
     holdRef.current = createSendHold<HeldReply>({
       send: async (held, { keepalive }) => {
-        const said = await latest.current.onSend(held.text, keepalive)
+        const said = await latest.current.onSend(
+          held.text,
+          keepalive,
+          held.attachments.map((a) => a.id)
+        )
         // Nothing is drawn on a page that is being torn down. The request is
         // already in flight and will outlive this document; a toast would not.
         if (keepalive) return
@@ -162,10 +249,11 @@ export function useReplySend({
         toast.success(said, { id: toastId, duration: 2600 })
       },
       onFailed: (held) => {
-        // THE WORDS COME BACK. A refusal must never cost somebody the sentence
-        // they wrote — the composer emptied on press, so this is the only route
-        // back to it, exactly as Undo is.
+        // THE WORDS COME BACK, AND SO DO THE FILES. A refusal must never cost
+        // somebody the sentence they wrote OR the files they picked — the
+        // composer emptied on press, so this is the only route back to either.
         latest.current.setDraft({ text: held.text })
+        latest.current.restoreAttachments(held.attachments)
         toast.error(latest.current.words.refused, { id: toastId })
       },
       onChange: setView,
@@ -176,13 +264,14 @@ export function useReplySend({
   const held = view.payload
 
   /** STOP IT. Nothing was sent, so nothing has to be unwound: the bubble goes,
-   * and her words, her caret and (when there is ever one) her attachment come
-   * back to the composer. This is non-negotiable — the composer empties on press,
-   * so Undo is the only route back to what she wrote. */
+   * and her words, her caret and her files come back to the composer. This is
+   * non-negotiable — the composer empties on press, so Undo is the only route
+   * back to what she wrote AND to what she picked. */
   const undo = React.useCallback(() => {
     const stopped = hold.undo()
     if (!stopped) return
     latest.current.setDraft({ text: stopped.text })
+    latest.current.restoreAttachments(stopped.attachments)
     toast.success(t("Nothing was sent. Your words are back in the composer."), {
       id: toastId,
       duration: 4000,
@@ -265,18 +354,70 @@ export function useReplySend({
     }
   }, [hold])
 
+  /** PICK, UPLOAD, TILE — one call per file, chained so responses land in the
+   * order they were sent (see `uploadChain`'s own comment). Each file gets a
+   * tile the INSTANT it is picked (`uploading`), well before the network call
+   * resolves — the same "show it immediately, reconcile after" shape the
+   * optimistic reply echo (help-detail.tsx's `sendReply`) already uses one
+   * level up. */
+  const addFiles = React.useCallback((files: File[]) => {
+    for (const file of files) {
+      const key = pickedFileId(file)
+      setSlots((prev) => [...prev, { key, status: "uploading", file }])
+      uploadChain.current = uploadChain.current
+        .then(() => latest.current.uploadFile(file))
+        .then((attachment) => {
+          setSlots((prev) => prev.map((s) => (s.key === key ? { key, status: "done", attachment } : s)))
+        })
+        .catch((err) => {
+          const message = err instanceof Error ? err.message : latest.current.words.attachFailed
+          setSlots((prev) => prev.map((s) => (s.key === key ? { key, status: "error", file, message } : s)))
+          toast.error(message)
+        })
+    }
+  }, [])
+
+  /** TAKE ONE OFF, before Send. A `done` tile's row is already on the ticket —
+   * `removeUploadedFile` deactivates it, best-effort (see the prop's own doc) —
+   * an `uploading`/`error` tile has no row yet, so removing it is simply
+   * forgetting the `File`; the chained upload above still resolves into a
+   * `done` slot nobody is holding a reference to any more and that write is
+   * harmless (the row would just sit unlinked, exactly like any other
+   * ticket-level attachment nobody has claimed). */
+  const removeAttachment = React.useCallback((key: string) => {
+    setSlots((prev) => {
+      const slot = prev.find((s) => s.key === key)
+      if (slot?.status === "done") void latest.current.removeUploadedFile(slot.attachment.id).catch(() => {})
+      return prev.filter((s) => s.key !== key)
+    })
+  }, [])
+
+  // Send is held off while a file is still going up: what Send would carry is
+  // exactly `slots.filter(done)`, and a person pressing it mid-upload should
+  // see the tile finish rather than have a reply go out that silently left
+  // their newest file behind.
+  const attachBusy = slots.some((s) => s.status === "uploading")
+
   function start() {
-    if (text.trim().length === 0) return
+    if (text.trim().length === 0 || attachBusy) return
     hold.start({
       text,
       caret: field.current?.selectionStart ?? text.length,
+      // ONLY `done` RIDES THE REPLY. An `error` tile already told the person
+      // its file did not make it — pressing Send anyway sends the words
+      // without it, which is the refusal R41 asks for, made visible before
+      // the press rather than discovered after.
+      attachments: slots.filter((s): s is Extract<AttachSlot, { status: "done" }> => s.status === "done").map((s) => s.attachment),
     })
     // The composer empties NOW, not when the send lands — she has finished with
     // these words and the next thing she types is the next message. Undo is what
     // brings them back, and the draft is dropped with them so a reload during
-    // the wait does not resurrect a sentence that is already on its way.
+    // the wait does not resurrect a sentence that is already on its way. The
+    // tile grid empties with it — the files are riding the held bubble now,
+    // same as the text.
     latest.current.setDraft({ text: "" })
     latest.current.clearDraft()
+    setSlots([])
   }
 
   return {
@@ -286,6 +427,10 @@ export function useReplySend({
     secondsLeft: view.secondsLeft,
     start,
     field,
+    attachSlots: slots,
+    attachBusy,
+    addFiles,
+    removeAttachment,
   }
 }
 
@@ -295,20 +440,47 @@ export function ReplyComposer({
   /** The ticket is already answered. Only the placeholder changes: a reply on a
    * closed ticket appends and touches no status, which is worth saying. */
   answered,
-  /** OPENS THE SAME FILE PICKER `HelpAttachmentsPanel` already has, client
-   * ruling, 18 Sep 2026: "the customers can attach images & files. so do
-   * we… that's why I ask for the attach button on the text input field."
-   * Absent draws no button — a caller with no attachment door of its own
-   * (there is none today) gets a composer identical to before. */
-  onAttach,
 }: {
   send: ReplySend
   answered: boolean
-  onAttach?: () => void
 }) {
   const { t } = useLanguage()
-  const { text, setText, held, secondsLeft, start, field } = send
+  const { text, setText, held, secondsLeft, start, field, attachSlots, attachBusy, addFiles, removeAttachment } = send
   const ready = text.trim().length > 0
+  // A HIDDEN NATIVE PICKER, the same shape `record-attachments.tsx`'s own
+  // `fileRef` drives — the Paperclip below is a plain button, and a button
+  // cannot open a file dialog on its own. `multiple`: the client's own ask was
+  // "images OR files", never "one at a time".
+  const fileInput = React.useRef<HTMLInputElement | null>(null)
+
+  // THE TILE GRID ITSELF (kit `FileUpload`, OPTION B — a picked file becomes a
+  // tile the moment it lands), built HERE rather than inside `useReplySend` —
+  // `file-upload-items-feed-tiles.test.ts`'s own census reads a `<FileUpload`
+  // mount's ENCLOSING COMPONENT for `usePickedFileItems`/
+  // `storedFileToUploadItem`, the same "one level of indirection, never
+  // further" allowance every other call site in this app already stands on.
+  // `uploading`/`error` slots draw a LOCAL preview off the `File` they still
+  // hold; `done` slots draw the SERVED preview off the row the door already
+  // wrote — an object URL would still work for those too, but the served one
+  // is what Undo/a failed send restores from (no `File` survives that round
+  // trip), so using it here as well keeps a tile's picture identical before
+  // and after the hold, rather than swapping the instant Send is pressed.
+  const pendingSlots = attachSlots.filter(
+    (s): s is Extract<AttachSlot, { status: "uploading" | "error" }> => s.status !== "done"
+  )
+  const pendingItems = usePickedFileItems(pendingSlots.map((s) => s.file))
+  const attachTiles: FileUploadItem[] = attachSlots.map((s) => {
+    if (s.status === "done")
+      return storedFileToUploadItem({
+        id: s.key,
+        name: s.attachment.name,
+        href: s.attachment.href,
+        mime: s.attachment.mime,
+        size: s.attachment.size,
+      })
+    const idx = pendingSlots.findIndex((p) => p.key === s.key)
+    return { ...pendingItems[idx], id: s.key, status: s.status, error: s.status === "error" ? s.message : undefined }
+  })
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -326,6 +498,29 @@ export function ReplyComposer({
           </span>
         </div>
       ) : null}
+
+      {/* THE TILE GRID (team migration 0105) — kit `FileUpload`'s OPTION B, a
+          picked file becomes a tile the moment it lands, drawn ABOVE the pill
+          rather than inside it: the pill is a single-line composite control
+          (`data-focus-shell`, below) and a wrapping grid of 5.5rem tiles has
+          no home inside a pill's own row. Mounted only once there is
+          something to show — an empty grid drawn every time the composer
+          renders would be the full dashed drop zone sitting under an empty
+          message field, which is not what "a message can carry a picture"
+          asked for. `readOnly` is never set: the grid's own Add tile shares
+          `addFiles` with the Paperclip below (same handler, so a click on
+          either does the same thing), and `onRemove` reaches this hold's own
+          `removeAttachment`. */}
+      {attachTiles.length > 0 && (
+        <FileUpload
+          files={attachTiles}
+          onFilesSelected={addFiles}
+          onRemove={removeAttachment}
+          removeLabel={t("Remove")}
+          addLabel={t("Add")}
+          multiple
+        />
+      )}
 
       {/* The kit's own composer pill, drawn here because this composer needs an
           `aria-label`/tooltip pair the kit's `sendLabel` cannot express. Same
@@ -388,33 +583,45 @@ export function ReplyComposer({
         }}
         className="flex min-w-0 items-center gap-2 rounded-pill bg-surface-panel py-2 ps-4 pe-2"
       >
-        {/* ATTACH — a Paperclip beside the field, wired to the SAME file
-            picker `HelpAttachmentsPanel` (now inline below the thread) opens
-            on "Add a file"; `onAttach` is that panel's `openRef`, read
-            through help-detail.tsx. Icon-only and quiet: this is a composer
-            control, not the record's title, so `ghost` per the kit's own
-            "an icon-only control is secondary anyway" note (button.tsx) is
-            the wrong read here specifically — SECONDARY reaches for a fill
-            in the OTHER paper tone, and this pill's own fill (`bg-card`) IS
-            that tone, so a secondary button beside it would repaint the
-            pill's own ground. `ghost` (no fill) reads correctly on top of it. */}
-        {onAttach && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onAttach}
-                aria-label={t("Attach a file")}
-                className="w-[var(--control-height-dense)] shrink-0 px-0"
-              >
-                <Paperclip aria-hidden="true" focusable="false" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("Attach a file")}</TooltipContent>
-          </Tooltip>
-        )}
+        {/* ATTACH — a Paperclip beside the field, back for real (team migration
+            0105, the client's ruling of 18 Sep 2026 restated at the top of
+            this file's own header). It opens the hidden native picker below;
+            `addFiles` — SHARED with the tile grid's own Add tile above — does
+            the actual work. Icon-only and quiet: this is a composer control,
+            not the record's title, so `ghost` per the kit's own "an icon-only
+            control is secondary anyway" note (button.tsx) is the wrong read
+            here specifically — SECONDARY reaches for a fill in the OTHER
+            paper tone, and this pill's own fill (`bg-card`) IS that tone, so
+            a secondary button beside it would repaint the pill's own ground.
+            `ghost` (no fill) reads correctly on top of it. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInput.current?.click()}
+              aria-label={t("Attach a file")}
+              className="w-[var(--control-height-dense)] shrink-0 px-0"
+            >
+              <Paperclip aria-hidden="true" focusable="false" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("Attach a file")}</TooltipContent>
+        </Tooltip>
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            if (files.length) addFiles(files)
+            // Cleared so picking the SAME file twice in a row still fires
+            // `onChange` — a native input only changes on a DIFFERENT value.
+            event.target.value = ""
+          }}
+        />
         <input
           ref={field}
           type="text"
@@ -433,7 +640,7 @@ export function ReplyComposer({
               type="submit"
               variant="inverse"
               size="sm"
-              disabled={!ready}
+              disabled={!ready || attachBusy}
               /* THE NAME A SCREEN READER HEARS, and the name the tooltip shows,
                  and they are the same two words on purpose. */
               aria-label={t("Send reply")}

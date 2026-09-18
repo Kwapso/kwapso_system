@@ -1,5 +1,22 @@
-// R83 AMENDMENT, 16 Sep 2026 EVENING — THE CARD PAYS THE REMAINDER OF
-// `--toolbar-lead-gap`, NEVER THE WHOLE INSET AND NEVER ZERO.
+// R83 RE-SCOPED, 18 Sep 2026 (RULING 7) — "too much!!!! i liked more the
+// thinner verison from before! the 10pc above and below, both in main and
+// details." `--toolbar-lead-gap` no longer means "the whole visible distance
+// from the strip's own bottom edge" (below, superseded but kept for history);
+// it means the CARD's own top edge to the toolbar it hosts, paid WHOLE —
+// `--space-2h` (10px), no `calc()` remainder against the strip's separate
+// `--tab-content-gap`. Measuring staging for this ruling also surfaced a real,
+// previously-unproven gap in this file's own coverage: `PagedFind` (paged-
+// find.tsx) unconditionally wraps its card in an extra `<div>` when a screen
+// calls `renderFolderTabs` itself and passes no `tabs` prop — exactly
+// tickets-collection.tsx's shape for the All/Waiting/Open/Ready tabs, ruling
+// 6's own named examples — so `.pinned-strip + [data-slot="card"]` (a plain
+// adjacent-sibling selector) never matched there, and the card fell back to
+// `CollectionCard`'s own un-remediated, now-stale hardcoded inset. Fixed with
+// a second selector, `.pinned-strip + * > [data-slot="card"]:first-child`,
+// joined to the first so both selectors always carry the identical value.
+//
+// R83 AMENDMENT, 16 Sep 2026 EVENING (HISTORY) — THE CARD PAID THE REMAINDER
+// OF `--toolbar-lead-gap`, NEVER THE WHOLE INSET AND NEVER ZERO.
 //
 // `toolbar-lead-gap.test.ts` (this file's own sibling) censuses a DIFFERENT
 // double-payment — a screen wrapping `renderFolderTabs(...)` and its card in
@@ -158,64 +175,118 @@ describe("R83 amendment -- the card owes no second leading gap above a toolbar i
     ).toBe("toolbar-row-pin")
   })
 
-  it("CSS: globals.css defines --toolbar-lead-gap at the scale's real 32px step and pays the card's remainder off it", () => {
+  it("CSS: globals.css defines --toolbar-lead-gap at the scale's 10px half-step and the card pays it WHOLE, direct sibling or one wrapper deep", () => {
     const css = readFileSync(join(ROOT, "web", "app", "globals.css"), "utf8")
 
-    // THE TOKEN -- `--space-7` is the scale's own 32px step
-    // (`shared/ui/foundations/tokens/tokens.css`: "p-8 is 32px, which is
-    // --space-7 here"), never `--space-6` (24px, a card inset) -- a guess
-    // that this token means --space-6 is wrong: --space-6 is 24px.
-    const tokenRule = /--toolbar-lead-gap:\s*var\(--space-7\)\s*;/
+    // THE TOKEN -- ruling 7, 18 Sep 2026: "the 10pc above and below, both in
+    // main and details." `--space-2h` is the scale's own 10px half-step
+    // (tokens.css: "6/10/14/18 inside a component"), never --space-1 (4px)
+    // or --space-2 (8px) -- neither is 10.
+    const tokenRule = /--toolbar-lead-gap:\s*var\(--space-2h\)\s*;/
     expect(
       css,
-      "web/app/globals.css must define --toolbar-lead-gap: var(--space-7) at :root -- --space-7 is the scale's real 32px step, not --space-6 (24px)"
+      "web/app/globals.css must define --toolbar-lead-gap: var(--space-2h) at :root -- --space-2h is the scale's real 10px half-step"
     ).toMatch(tokenRule)
 
-    // THE CARD'S OWN REMAINDER -- the strip already paid --tab-content-gap
-    // (20px); the card pays only what is left of --toolbar-lead-gap (32px),
-    // 12px, on BOTH the real padding and the R63 lead property that
-    // reproduces it while pinned.
-    const remainder = "calc(var(--toolbar-lead-gap) - var(--tab-content-gap))"
+    // THE CARD PAYS THE WHOLE TOKEN NOW, NO REMAINDER -- ruling 7 measures the
+    // CARD's own top edge to the toolbar, never the strip's separate trailing
+    // gap, so there is nothing left to subtract. Asserted on BOTH the direct-
+    // sibling shape (`.pinned-strip + [data-slot="card"]`, `SectionWithCreate`/
+    // `waves-screen.tsx`'s own literal `<CollectionCard>`) and the one-wrapper
+    // shape (`.pinned-strip + * > [data-slot="card"]:first-child`, `PagedFind`'s
+    // own unconditional wrapper when a screen calls `renderFolderTabs` itself
+    // and passes no `tabs` prop -- tickets-collection.tsx's All/Waiting/Open/
+    // Ready tabs, MEASURED live as the actual, un-fixed shape on staging before
+    // this rule existed).
+    const direct = "var(--toolbar-lead-gap)"
     const leadRule = new RegExp(
-      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*\{\s*--pinned-lead:\s*` +
-        escapeRe(remainder) +
+      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*,\s*` +
+        String.raw`\.pinned-strip\s*\+\s*\*\s*>\s*\[data-slot="card"\]:first-child\s*\{\s*--pinned-lead:\s*` +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
     const paddingRule = new RegExp(
-      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
-        escapeRe(remainder) +
+      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*>\s*\[data-slot="card-content"\]\s*,\s*` +
+        String.raw`\.pinned-strip\s*\+\s*\*\s*>\s*\[data-slot="card"\]:first-child\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
 
     expect(
       css,
-      `web/app/globals.css must set [data-slot="card-content"]'s own padding-top to ${remainder} when it is the strip's next sibling -- the strip already paid --tab-content-gap, so the card pays only what --toolbar-lead-gap has left`
+      `web/app/globals.css must set [data-slot="card-content"]'s own padding-top to ${direct}, on both the direct-sibling selector and the one-wrapper-deep selector, joined so neither can drift from the other`
     ).toMatch(paddingRule)
 
     expect(
       css,
-      `and web/app/globals.css must set the SAME sibling's --pinned-lead to ${remainder} alongside it -- PINNED_TOOLBAR's own mt/pt pair (shared/web/pinned-chrome.ts) only cancels a lead at rest; leaving --pinned-lead at a different number from the real padding pulls a PINNED toolbar to the wrong place`
+      `and web/app/globals.css must set the SAME two selectors' --pinned-lead to ${direct} alongside it -- PINNED_TOOLBAR's own mt/pt pair (shared/web/pinned-chrome.ts) only cancels a lead at rest; leaving --pinned-lead at a different number from the real padding pulls a PINNED toolbar to the wrong place`
     ).toMatch(leadRule)
   })
 
-  // THE RED PROOFS -- the shape every current screen was actually in between
-  // the two amendments: the strip's own gap is correct, but the card either
-  // adds a second, unrelated ladder above a leading toolbar (the original
-  // bug, unrepresented here because it never had a matching override rule to
-  // begin with -- see "no override at all" below) or drops it to flush zero
-  // (the afternoon's overcorrection, which the client herself rejected that
-  // evening). Replayed against fixtures rather than a git diff, the same
-  // discipline toolbar-lead-gap.test.ts's own waves-screen fixture uses.
-  it("neither the pre-fix stylesheet (no override) nor the flush-zero overcorrection matches the current, remainder-paying rule", () => {
-    const remainder = "calc(var(--toolbar-lead-gap) - var(--tab-content-gap))"
+  it("DOM: the one-wrapper-deep shape -- renderFolderTabs called OUTSIDE PagedFind, PagedFind given no tabs prop -- is exactly tickets-collection.tsx's own All/Waiting/Open/Ready shape, and the new selector reaches it", () => {
+    // paged-find.tsx's own return, unconditionally: `<div className="flex
+    // w-full flex-col">{renderFolderTabs(tabs)}{wrap ? wrap(toolbarAndRows) :
+    // toolbarAndRows}</div>` -- with no `tabs` prop, `renderFolderTabs`
+    // returns null and this div still wraps the card alone, "one more <div>
+    // around exactly the markup this returned before" (paged-find.tsx's own
+    // comment). Reproduced here as a fixture rather than rendering the real
+    // `<PagedFind>` (which needs a data door this test does not stand up),
+    // the same restraint the strip-adjacency fixture above already takes.
+    function TicketsShapedFixture() {
+      return (
+        <div className="flex flex-col">
+          {renderFolderTabs({
+            config: {
+              ...defaultTabsConfig,
+              tabs: [{ value: "all", label: "All", icon: "", badge: "", badgeVariant: "" }],
+            },
+            value: "all",
+            onValueChange: () => {},
+          })}
+          <div className="flex w-full flex-col">
+            <CollectionCard>
+              <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                <div data-slot="toolbar-row-column">the toolbar</div>
+              </div>
+              <div data-testid="rows">the rows</div>
+            </CollectionCard>
+          </div>
+        </div>
+      )
+    }
+    render(<TicketsShapedFixture />)
+
+    const strip = document.querySelector(".pinned-strip")
+    expect(strip).toBeTruthy()
+
+    // THE CARD IS *NOT* THE STRIP'S DIRECT SIBLING HERE -- the wrapper div is.
+    expect(
+      strip!.nextElementSibling?.getAttribute("data-slot"),
+      "PagedFind's own unconditional wrapper sits between the strip and the card -- if this ever changes, the fixture no longer represents the live bug the new selector exists for"
+    ).not.toBe("card")
+
+    const wrapper = strip!.nextElementSibling
+    const card = wrapper?.firstElementChild
+    expect(card?.getAttribute("data-slot"), "the card must still be the wrapper's own first child, which is what `.pinned-strip + * > [data-slot=\"card\"]:first-child` keys off").toBe("card")
+  })
+
+  // THE RED PROOFS -- three shapes this rule must NOT read as: no override at
+  // all, the OLD remainder formula (correct once, superseded by ruling 7), and
+  // a direct-sibling-only rule that never learned to reach through PagedFind's
+  // own wrapper div. Replayed against fixtures rather than a git diff, the
+  // same discipline toolbar-lead-gap.test.ts's own waves-screen fixture uses.
+  it("neither no override, nor the old remainder formula, nor a direct-sibling-only rule matches today's whole-token, two-selector rule", () => {
+    const direct = "var(--toolbar-lead-gap)"
     const leadRule = new RegExp(
-      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*\{\s*--pinned-lead:\s*` +
-        escapeRe(remainder) +
+      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*,\s*` +
+        String.raw`\.pinned-strip\s*\+\s*\*\s*>\s*\[data-slot="card"\]:first-child\s*\{\s*--pinned-lead:\s*` +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
     const paddingRule = new RegExp(
-      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
-        escapeRe(remainder) +
+      String.raw`\.pinned-strip\s*\+\s*\[data-slot="card"\]\s*>\s*\[data-slot="card-content"\]\s*,\s*` +
+        String.raw`\.pinned-strip\s*\+\s*\*\s*>\s*\[data-slot="card"\]:first-child\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
 
@@ -226,24 +297,41 @@ describe("R83 amendment -- the card owes no second leading gap above a toolbar i
     expect(preFix, "the pre-fix stylesheet has no override rule at all").not.toMatch(paddingRule)
     expect(preFix, "and no --pinned-lead override either").not.toMatch(leadRule)
 
-    // THE AFTERNOON'S OWN SHAPE -- flush-zero, correct in isolation on 16 Sep
-    // 2026 afternoon and wrong by that evening's ruling. It must not satisfy
-    // today's remainder-based rule either, because `0px` is not
-    // `calc(var(--toolbar-lead-gap) - var(--tab-content-gap))` textually,
-    // even though both happened to read 20px total under the FIRST amendment
-    // -- this rule reads the stylesheet, never the rendered number.
-    const flushZero = `
+    // THE OLD REMAINDER SHAPE -- correct under the pre-ruling-7 token meaning,
+    // wrong now: ruling 7 retargets the token to "card top to toolbar," which
+    // the card pays WHOLE, and this formula also never reaches PagedFind's own
+    // wrapper div (the live bug ruling 6 reports on Tickets All/Waiting/Open/
+    // Ready).
+    const oldRemainder = `
       .pinned-strip + [data-slot="card"] {
-        --pinned-lead: 0px;
+        --pinned-lead: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
       }
       .pinned-strip + [data-slot="card"] > [data-slot="card-content"] {
-        padding-top: 0px;
+        padding-top: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
       }
     `
-    expect(flushZero, "the flush-zero overcorrection must not read as today's remainder-paying rule").not.toMatch(
+    expect(oldRemainder, "the old remainder formula must not read as today's whole-token rule").not.toMatch(
       paddingRule
     )
-    expect(flushZero, "same, for --pinned-lead").not.toMatch(leadRule)
+    expect(oldRemainder, "same, for --pinned-lead").not.toMatch(leadRule)
+
+    // DIRECT-SIBLING-ONLY -- the right VALUE, the wrong REACH: this shape
+    // never matches a card sitting one PagedFind wrapper div deep, which is
+    // exactly what left Tickets All/Waiting/Open/Ready unreached and is the
+    // reason this rule now carries two selectors, joined, rather than one.
+    const directSiblingOnly = `
+      .pinned-strip + [data-slot="card"] {
+        --pinned-lead: var(--toolbar-lead-gap);
+      }
+      .pinned-strip + [data-slot="card"] > [data-slot="card-content"] {
+        padding-top: var(--toolbar-lead-gap);
+      }
+    `
+    expect(
+      directSiblingOnly,
+      "a rule missing the one-wrapper-deep selector must not read as today's complete, two-selector rule"
+    ).not.toMatch(paddingRule)
+    expect(directSiblingOnly, "same, for --pinned-lead").not.toMatch(leadRule)
   })
 })
 
@@ -342,28 +430,28 @@ describe("R83 extended -- a record's own tab pane pays the same remainder, never
     ).toBe(true)
   })
 
-  it("CSS: globals.css reaches a card nested inside a tab pane by [data-tab-pane] descendant + :first-child, and pays the IDENTICAL strip remainder -toolbar-lead-gap minus -tab-content-gap, never a third number", () => {
+  it("CSS: globals.css reaches a card nested inside a tab pane by [data-tab-pane] descendant + :first-child, and pays the IDENTICAL whole --toolbar-lead-gap a top-level card does, never a remainder or a third number", () => {
     const css = readFileSync(join(ROOT, "web", "app", "globals.css"), "utf8")
-    const remainder = "calc(var(--toolbar-lead-gap) - var(--tab-content-gap))"
+    const direct = "var(--toolbar-lead-gap)"
 
     const leadRule = new RegExp(
       String.raw`\[data-tab-pane\]\s+\[data-slot="card"\]:first-child\s*\{\s*--pinned-lead:\s*` +
-        escapeRe(remainder) +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
     const paddingRule = new RegExp(
       String.raw`\[data-tab-pane\]\s+\[data-slot="card"\]:first-child\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
-        escapeRe(remainder) +
+        escapeRe(direct) +
         String.raw`\s*;\s*\}`
     )
 
     expect(
       css,
-      'web/app/globals.css must set --pinned-lead to the same strip remainder on [data-tab-pane] [data-slot="card"]:first-child, so a PINNED toolbar inside a record tab lands at the identical distance a top-level one does'
+      'web/app/globals.css must set --pinned-lead to the whole --toolbar-lead-gap on [data-tab-pane] [data-slot="card"]:first-child, so a PINNED toolbar inside a record tab lands at the identical 10px distance a top-level one does'
     ).toMatch(leadRule)
     expect(
       css,
-      "and the same remainder on that card's own CardContent padding-top, at rest"
+      "and the same whole --toolbar-lead-gap on that card's own CardContent padding-top, at rest"
     ).toMatch(paddingRule)
   })
 

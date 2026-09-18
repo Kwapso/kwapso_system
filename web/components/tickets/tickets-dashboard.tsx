@@ -63,6 +63,7 @@
 import * as React from "react"
 
 import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Button } from "@shared/ui/components/button/button"
 // THE KIT'S OWN FLOATING PANEL, opened by hover AND by focus (client, 6 Sep
@@ -1802,11 +1803,16 @@ export function TicketsDashboard({
       </Card>
     )
 
+  // THROUGH THE KIT'S OWN Badge, NOT A HAND-ROLLED FILL — client ruling,
+  // 18 Sep 2026 ("for everythng wether its a dot or an icno, for all
+  // chips / pills"): a hand-rolled `bg-warning … rounded-pill` span was
+  // exactly the ad-hoc pill the ruling closes off, drawn beside every other
+  // panel chip in this file that already goes through `Badge`.
   const openWorkChip =
     data && data.unopenedPastLine > 0 ? (
-      <span className="bg-warning text-warning-foreground rounded-pill px-3 py-1 text-xs tabular-nums">
+      <Badge variant="warning">
         {t("{count} past the three-day line", { count: data.unopenedPastLine })}
-      </span>
+      </Badge>
     ) : null
 
   return (

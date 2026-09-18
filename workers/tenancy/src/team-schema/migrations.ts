@@ -7461,6 +7461,52 @@ CREATE INDEX idx_todos_app ON todos (app_id);
 ALTER TABLE app_modules ADD COLUMN icon TEXT;
 `,
   },
+  {
+    // A REPLY CAN CARRY ITS OWN FILES — the client, 18 Sep 2026, verbatim:
+    // "i meant that each message can have images or files, check in the kit
+    // because we already biult the ui for that" and, the same conversation,
+    // "the customers cann attach fimages & files. so do we. tahts why i ask
+    // of the attach button on the text input field." `help_attachments`
+    // (0028) has carried "several files and several links on one ticket"
+    // since it was created, but only ONE list per TICKET — nothing on the
+    // row said WHICH reply, if any, it rode in on. `help-detail.tsx`'s own
+    // header (18 Sep 2026, the correction that pulled the ticket-wide tray
+    // back out — "wtf is his files inside the ocnversation … thats not what
+    // i meant") named this exact column as the door change the per-message
+    // view needs before it can read anything.
+    //
+    // NULLABLE, ON PURPOSE, so this is additive rather than a reclassification
+    // of history: NULL keeps meaning exactly what it always has — a file
+    // attached through the ticket-level door (`addAttachment`,
+    // workers/content/src/lib/help-attachments.ts, unchanged for backwards
+    // compatibility) with no one message claiming it — and a value means a
+    // file rode in on that one reply, written by `addReply`
+    // (workers/content/src/lib/help.ts) in the same script as the
+    // `help_threads` row it belongs to. No backfill: every existing
+    // attachment was ticket-level the day it was written and stays read that
+    // way; nothing here re-decides which message an old file "really"
+    // belonged to.
+    //
+    // INDEXED, matching `idx_help_attachments_help` (0028) one column along —
+    // `listReplies` reads every live attachment for a ticket's whole thread in
+    // one query and groups it by this column in TypeScript, so the column is
+    // filtered on every time a conversation is read, not only on the odd
+    // write.
+    //
+    // NUMBERED 0105 — read live off the tail of this file right before
+    // appending (CLAUDE.md, "team migration numbers are read, never
+    // recalled"): 0104 is the highest version in this tree, so 0105 is the
+    // next free number. This lane ran with no git access (its own brief: "No
+    // git"), so — exactly as 0104's own header says of itself — this is read
+    // off the LOCAL tree only. A collision against `origin/main` is caught
+    // and renumbered the way 0102's header describes, by whichever lane
+    // appends next and actually runs `git fetch origin`.
+    version: "0105_a_reply_can_carry_its_own_files",
+    sql: `
+ALTER TABLE help_attachments ADD COLUMN help_thread_id TEXT REFERENCES help_threads (id);
+CREATE INDEX idx_help_attachments_thread ON help_attachments (help_thread_id);
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

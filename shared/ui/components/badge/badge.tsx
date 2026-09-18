@@ -54,6 +54,38 @@
      in both palettes — and the two tokens that carried the exception
      (`--pill-fill-building`, `--pill-label-building`) are gone from
      tokens.css with it; nothing here reaches for them any more.
+   · THE LEADING-MARK GAP IS UNIVERSAL, NOT A DOT-ONLY SPECIAL CASE — CLIENT
+     RULING, 18 SEP 2026, VERBATIM: "on ticket list views, its missing the
+     space between icon and name and the backgorund card. always, make it a
+     rule, for everythng wether its a dot or an icno, for all chips / pills."
+     `LEADING_MARK_GAP` (`gap-2`, `--space-2`, 8px — the SAME rung the status
+     dot already spent; see the retired `GAP_WITH_DOT`'s own history, just
+     above `badgeVariants`)
+     now lives in `badgeVariants`' own BASE class list, not behind a `dot ?
+     ... : undefined` ternary: a `gap` utility only ever draws space BETWEEN
+     flex children, so a label-only badge (one child) pays nothing for it and
+     any two-child badge — dot-led or icon-led, whichever mark it leads
+     with — gets it for free. This closes the exact bug the ruling reports:
+     the ticket-type chip (`web/components/tickets/tickets-collection.tsx`'s
+     `type` column cell, and `shared/web/ticket-chips.tsx`'s own type chip)
+     hands an icon element in as a plain CHILD beside the label text, never
+     through the `dot` prop, so the old dot-only gap never applied to it.
+     THE FILL WAS NEVER ACTUALLY MISSING — every variant already carries a
+     real `bg-` declaration, `outline` included (`bg-transparent` is a
+     DECLARED choice, not an absent one) — but the ruling's own second
+     clause ("no variant may render bare text without a fill") is now a
+     standing invariant `check-badge.mjs` pins structurally, not merely true
+     today by accident. `icon`, a new prop below, gives an icon-led chip the
+     same formal slot `dot` already has, so a call site never has to
+     hand-roll an `<Icon/>` + `<span>` pair again — see `BadgeProps.icon`'s
+     own doc.
+   · THE ICON SLOT'S COLOUR IS FORCED, NOT LEFT TO THE CALL SITE — CLIENT
+     RULING, 18 SEP 2026, over a screenshot of a ticket head: "type icon is
+     still gray." `[icon-led-chip]`'s own `data-slot="badge-icon"` wrapper
+     now carries `[&_svg]:text-foreground`, which outranks any colour class
+     the caller's own SVG writes (CSS specificity, not source order — see the
+     render site's own comment). "Charcoal on every accent" already named the
+     LABEL; this closes the same law over the icon beside it.
 
    RENDERING CONTEXT
    No `"use client"`. No hook, no state, no browser API, no event handler.
@@ -64,6 +96,18 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
+
+/** THE LEADING-MARK GAP — `--space-2` (8px), the SAME rung the status dot
+ * always spent (formerly `GAP_WITH_DOT`, applied only when `dot` was truthy;
+ * retired 18 Sep 2026, see this file's own header law for the ruling). Lives
+ * in `badgeVariants`' own BASE class list below, unconditionally, rather than
+ * behind a `dot ? … : undefined` ternary — a `gap` utility only ever spends
+ * space BETWEEN flex children, so it is free on a label-only badge (one
+ * child) and applies identically whether the second child is the `dot` span,
+ * the new `icon` slot, or (should a future badge draw one) a face/avatar. One
+ * rung, one name, one place it is spent — a dot-chip and an icon-chip can
+ * never drift to two different gaps again. */
+const LEADING_MARK_GAP = "gap-2";
 
 const badgeVariants = cva(
   [
@@ -76,6 +120,9 @@ const badgeVariants = cva(
     "text-badge leading-none font-medium",
     // Every number in a badge, a column or a KPI is tabular.
     "tabular-nums",
+    // THE LEADING-MARK GAP, UNCONDITIONAL — see LEADING_MARK_GAP's own
+    // comment above for why a base-class gap is safe on a one-child badge.
+    LEADING_MARK_GAP,
   ],
   {
     variants: {
@@ -87,19 +134,20 @@ const badgeVariants = cva(
          * `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the
          * drawn `padding: 6px 14px`).
          *
-         * THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `GAP_WITH_DOT`
-         * below. It used to live on this size step alone, which read as "a
-         * status pill always has the gap" and is exactly backwards: the gap
-         * belongs to the DOT, not to the size. `variant="status"` docs its
-         * own `dot` as "usually paired with … `size="pill"`" — a call site
-         * that forgot the pairing (fourteen of them, 17 Sep 2026 census) got
-         * `size="counter"`'s geometry with no gap at all, the dot sitting
-         * flush against the word. Client, same day, on the automations
-         * status chip: "Validated the colors, but it's missing the space
-         * between the dot and the word. Fix that." Moving the gap onto the
-         * dot's own presence fixes every existing call site FOR FREE and
-         * makes the doc comment's "usually" true without a caller having to
-         * remember a second prop.
+         * THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `LEADING_MARK_GAP`
+         * above `badgeVariants`. It used to live on this size step alone,
+         * which read as "a status pill always has the gap" and is exactly
+         * backwards: the gap belongs to the LEADING MARK, not to the size.
+         * `variant="status"` docs its own `dot` as "usually paired with …
+         * `size="pill"`" — a call site that forgot the pairing (fourteen of
+         * them, 17 Sep 2026 census) got `size="counter"`'s geometry with no
+         * gap at all, the dot sitting flush against the word. Client, same
+         * day, on the automations status chip: "Validated the colors, but
+         * it's missing the space between the dot and the word. Fix that."
+         * Moving the gap first onto the dot's own presence (17 Sep) and then
+         * (18 Sep, second ruling) onto `badgeVariants`' own BASE class —
+         * unconditional, not keyed on `dot` at all — fixes every existing
+         * and future call site FOR FREE, dot-led or icon-led alike.
          */
         pill: "h-[var(--control-height-pill)] px-[var(--space-3h)]",
       },
@@ -224,13 +272,14 @@ const badgeVariants = cva(
   },
 );
 
-/** The dot's own gap, `--space-2` (8px) — spent ONLY when a `dot` renders, at
- * either size, never tied to `size="pill"`. See the note on `pill` above for
- * why it moved: the gap is a property of having two children (a dot span and
- * a label) to separate, not of the pill's own geometry, and a `size="counter"`
- * badge with a dot needs the identical 8px the pill was quietly the only one
- * offering. */
-const GAP_WITH_DOT = "gap-2";
+/* GAP_WITH_DOT — RETIRED 18 SEP 2026, THE SAME RULING THAT GENERALISED IT.
+   Used to read "The dot's own gap, --space-2 (8px) — spent ONLY when a `dot`
+   renders" and lived here, applied conditionally at the render site below.
+   `LEADING_MARK_GAP` (above `badgeVariants`, in the base class list) replaced
+   it outright rather than sitting beside it — this file's own standard for a
+   retired mechanism is no dead body left for a future session to trip on,
+   the same standard the retired Archived-pill compound variant is held to
+   a few hundred lines up. */
 
 /** THE LINK UNDERLINE — 18 SEP 2026, CLIENT RULING, VERBATIM: "when its a
  * link make it underlined (for exmaple the app name)." Unlike
@@ -312,10 +361,29 @@ export interface BadgeProps
    * vocabulary reuses the same tones: With us → `building`,
    * Your answer → `review`, Done → `done`. Usually paired with
    * `variant="status"`; `size="pill"` is the taller geometry a status chip
-   * usually wants, but the dot-to-label gap (`GAP_WITH_DOT`) no longer
-   * depends on it — a `dot` at `size="counter"` still gets its 8px.
+   * usually wants, but the leading-mark gap (`LEADING_MARK_GAP`, in
+   * `badgeVariants`' own base class list) no longer depends on it — a `dot`
+   * at `size="counter"` still gets its 8px, and so does `icon`, below.
    */
   dot?: BadgeDot;
+  /**
+   * THE ICON-LED CHIP'S OWN SLOT — 18 SEP 2026, CLIENT RULING (the same one
+   * `LEADING_MARK_GAP` answers): "for everythng wether its a dot or an
+   * icno, for all chips / pills." A caller-drawn node (a Phosphor glyph from
+   * `foundations/icons`, sized and coloured by the caller, exactly the shape
+   * `typeDot`/`ticketTypeIconName` already hand in on the ticket-type chip
+   * this ruling names) drawn before the label, the identical position `dot`
+   * takes when both are absent. Rendering it through THIS prop — rather
+   * than as a plain child beside the label text, the shape the ticket-type
+   * chip used before this ruling — is what makes it a real Badge instead of
+   * an ad-hoc `<Icon/>` + `<span>` pair: the leading-mark gap and the
+   * variant's own fill both apply automatically, and a future icon-led chip
+   * never has to remember to wire either by hand. `aria-hidden`, same as
+   * `dot` — the label is still what says the state in words. Legal at
+   * either `size`; if a call site also passes `dot`, both render (an
+   * unusual pairing, not a forbidden one).
+   */
+  icon?: React.ReactNode;
   /**
    * A count, abbreviated by the kit's rule and rendered as the badge's label.
    * Zero or negative renders nothing at all — the kit never shows "0".
@@ -397,6 +465,7 @@ const Badge = React.forwardRef<HTMLSpanElement | HTMLAnchorElement, BadgeProps>(
       variant = "secondary",
       size = "counter",
       dot,
+      icon,
       count,
       thousandSuffix = "k",
       millionSuffix = "m+",
@@ -442,13 +511,71 @@ const Badge = React.forwardRef<HTMLSpanElement | HTMLAnchorElement, BadgeProps>(
         data-dot={dot}
         {...(href !== undefined ? { href } : undefined)}
         className={cn(
+          // THE LEADING-MARK GAP IS NO LONGER APPLIED HERE — it lives in
+          // badgeVariants' own base class list now (LEADING_MARK_GAP), so
+          // it draws whenever there are two children (dot-led or icon-led
+          // alike) and costs nothing on a label-only badge. See this file's
+          // own header law for the 18 Sep ruling.
           badgeVariants({ variant, size, dotTone: dot }),
-          dot ? GAP_WITH_DOT : undefined,
           isLink ? LINK_UNDERLINE : undefined,
           className,
         )}
         {...props}
       >
+        {icon ? (
+          /* THE ICON-LED CHIP'S OWN SLOT — see BadgeProps.icon's own doc.
+             aria-hidden for the same reason as the dot below: the icon never
+             carries the meaning alone, the label says it in words. No forced
+             SIZE — the caller's own node still picks its own `size-*` — but
+             the COLOUR is forced now, and that reversal is the 18 Sep 2026
+             ruling below.
+
+             THE COLOUR USED TO BE LEFT TO THE CALL SITE ("sized and coloured
+             at the call site") AND THAT WAS THE BUG. Her screenshot of a
+             ticket head, same day as the grey-label report this file's own
+             header already fixed: "type icon is still gray" — while the
+             label beside it was already charcoal, because `shared/web/
+             ticket-chips.tsx`'s own type chip hands this slot a Phosphor
+             glyph with its OWN `text-muted-foreground` written at the call
+             site (reproduced deliberately in `verify/badge/page.tsx`'s
+             icon-led section, `text-muted-foreground` on every one of its
+             four icons, so the defect stays visible rather than quietly
+             fixed by deleting the repro). "Coloured at the call site" is
+             exactly backwards for a chip whose whole law (this file's own
+             header, "charcoal on every accent") is that the FILL carries the
+             tone and everything drawn on it is ink — a caller should no more
+             be able to grey this icon than to grey the label three lines
+             down, and until this ruling it could.
+
+             `[&_svg]:text-foreground` RATHER THAN A BARE `text-foreground`
+             ON THIS SPAN, because a bare class here only sets the colour a
+             child WITHOUT its own colour class would inherit — `currentColor`
+             flows down, but an SVG that names its own utility (`text-muted-
+             foreground`, above) sets `color` directly on itself, and a
+             directly-set value always beats one merely inherited from an
+             ancestor, however that ancestor's class is spelled. The bracket
+             form instead compiles to a descendant selector — one class plus
+             one element, `.badge-icon svg { color: … }` — which OUTRANKS the
+             single class the caller wrote directly on the SVG in CSS
+             specificity math regardless of source order, so it wins even
+             against a call site that still passes `text-muted-foreground`
+             (the read-only app repo's own call sites do, today, and cannot
+             be edited from here — see `check-badge.mjs`'s own note). The
+             identical rescue is already standing kit practice, not invented
+             for this fix — `select.tsx` forces `[&_svg]:text-ink-secondary`
+             the same way, `view-switch.tsx` documents the same pattern by
+             name. No opacity utility is used for the same reason opacity was
+             never right for the label: it dims the ink rather than
+             replacing it, so a "muted" icon would still fail a contrast
+             check the SAME ink at full strength already passes. */
+          <span
+            aria-hidden="true"
+            data-slot="badge-icon"
+            className="inline-flex shrink-0 items-center text-foreground [&_svg]:text-foreground"
+          >
+            {icon}
+          </span>
+        ) : null}
         {dot ? (
           /* `--dot-status` — the kit's one dot size (7). aria-hidden: the dot
              never carries the meaning alone (ruling 26); the label says it. */

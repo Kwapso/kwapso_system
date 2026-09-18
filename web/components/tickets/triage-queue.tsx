@@ -1154,8 +1154,16 @@ export function TriageQueue({
                   {sittingTally.byType.map(([type, n]) => {
                     const iconName = ticketTypeIconName(type)
                     return (
-                      <Badge key={type} variant="secondary" size="pill">
-                        {iconName && <Icon name={iconName} className="text-muted-foreground size-3.5 shrink-0" />}
+                      <Badge
+                        key={type}
+                        variant="secondary"
+                        size="pill"
+                        icon={
+                          iconName ? (
+                            <Icon name={iconName} className="text-muted-foreground size-3.5 shrink-0" />
+                          ) : undefined
+                        }
+                      >
                         {t("{count} {type}", { count: n, type })}
                       </Badge>
                     )

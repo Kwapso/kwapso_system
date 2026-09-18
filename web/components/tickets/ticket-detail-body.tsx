@@ -55,7 +55,7 @@
 
 import * as React from "react"
 
-import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
  * built before the tab strip existed — `?tab=stories`, the rail, anywhere
@@ -206,29 +206,54 @@ export function TicketSidePanel({
  * rather than express it. Below `lg` there is no second column to stretch
  * against, so the old viewport-relative height stays exactly as it was.
  *
- * `attachments`, OPTIONAL, BETWEEN THE THREAD AND THE COMPOSER — client
- * ruling, 18 Sep 2026: "kill this whole files & links… button. fyi those are
- * visible in the conversation itself." A tray, not a scrolling list item: it
- * sits in this same gapped column, `shrink-0` like the composer beside it,
- * so it never scrolls out of reach with the transcript and never eats into
- * the composer's own fixed row. Absent draws nothing, which is the shape
- * `story-detail.tsx`'s files tab (unaffected by this ruling) still uses. */
+ * THE COMPOSER IS THE CARD'S `CardFooter` NOW, NOT A THIRD FLEX CHILD OF A
+ * PADDED `CardContent` — client ruling, 18 Sep 2026, verbatim: "the footer
+ * is not on the footer position!! fix that!" The earlier shape put
+ * `thread`/`attachments`/`composer` as three siblings inside ONE
+ * `CardContent`, each wrapped `shrink-0` and separated by a flex `gap` —
+ * which reads as "three things in a padded box," not a footer, because
+ * `CardContent`'s own inset wraps the composer on every side including the
+ * bottom, leaving a gap between the pill and the card's own bottom edge/
+ * radius. The kit's `Card` already has the shape this ruling asks for
+ * (card.tsx's own chapter-13 quote: "Header, body, and footer are
+ * hairline-separated inside one 24px shell — never three stacked cards"):
+ * `CardContent` holds only the scrolling THREAD now, and `CardFooter` —
+ * the kit's own footer band, hairline-separated from the body, no fill of
+ * its own — holds the composer as the LAST child of `Card`. Neither
+ * `CardContent` nor `CardFooter` paints a background, so the only fill in
+ * the shell is `Card`'s own (`variant="default"`, `--surface-panel`) —
+ * "the panel tone" the ruling asks the footer to carry is automatic, not a
+ * class to add — and `Card`'s own `rounded-[var(--radius)]` with no
+ * `overflow: hidden` (card.tsx's own note) means the footer's bottom edge
+ * sits flush inside the card's real bottom radius rather than a second,
+ * inset box drawing its own.
+ *
+ * THE "FILES AND LINKS" TRAY THAT USED TO SIT BETWEEN `thread` AND
+ * `composer` (an `attachments` prop, added the same day) IS GONE — the
+ * SAME DAY'S later ruling, verbatim: "wtf is his files inside the
+ * ocnversation lol thats not what i meant, i meant that each message can
+ * have images or files." A ticket-wide list box floating inside the
+ * conversation was never what was asked for; `help-detail.tsx`'s own
+ * header carries the full account of what replaces it — per-message
+ * attachments, fed from the kit's `TicketThread`, now shipped behind team
+ * migration 0105 (`help_attachments.help_thread_id`). This panel itself
+ * needed no change for that: the files ride the MESSAGES `thread` already
+ * carries, never a second slot beside it. The `attachments` prop stays
+ * deleted rather than restored: its
+ * one caller (`help-detail.tsx`) no longer has anything to pass it, and an
+ * unused slot to a removed feature is exactly the kind of code this base's
+ * first prime directive ("too much code is a defect") exists to catch. */
 export function TicketConversationPanel({
   thread,
-  attachments,
   composer,
 }: {
   thread: React.ReactNode
-  attachments?: React.ReactNode
   composer: React.ReactNode
 }) {
   return (
     <Card variant="default" className="flex h-[min(78vh,760px)] min-h-[420px] flex-col lg:h-full">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-[var(--space-5)] p-4">
-        <div className="min-h-0 flex-1 overflow-y-auto">{thread}</div>
-        {attachments ? <div className="shrink-0">{attachments}</div> : null}
-        <div className="shrink-0">{composer}</div>
-      </CardContent>
+      <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
+      <CardFooter className="shrink-0 p-4">{composer}</CardFooter>
     </Card>
   )
 }

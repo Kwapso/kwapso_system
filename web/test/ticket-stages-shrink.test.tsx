@@ -71,6 +71,21 @@ function renderLadder(status: HelpStatus, h: TicketStageHistory) {
 }
 
 describe("the ladder shrink, 17 Sep 2026 — no stage word, one date line, a smaller mark", () => {
+  it("prints no visible 'Stages' title any more, 18 Sep 2026 — the name survives as an aria-label", async () => {
+    renderLadder("new", {
+      recorded: false,
+      fromCreation: false,
+      events: [],
+      spans: [],
+      reopens: null,
+    })
+    // "inside tickets temove the 'stages' as a title" — the eyebrow that
+    // used to print the word is gone outright, so nothing in the rendered
+    // DOM reads "Stages" as text.
+    expect(await screen.findByRole("group", { name: "Stages" })).toBeTruthy()
+    expect(screen.queryByText("Stages")).toBeNull()
+  })
+
   it("prints no stage word anywhere on the ladder, once the history has loaded", async () => {
     renderLadder("in_progress", {
       recorded: true,

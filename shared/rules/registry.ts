@@ -4950,6 +4950,8 @@ export const NOT_A_WORK_PICKER: Record<string, string> = {
     "the team roster on the agency's own record — a list of who is here, not a list of who can be given something",
   "work/work-panels.tsx":
     "reads the members list once, in AppTicketsPanel, only to resolve a ticket's editor/resolver AVATAR (`memberAvatar`, a `.find()` by userId) — a lookup by id, never turned into an option list. This file offers nobody a member to PICK. (The to-do form's own new 'Assigned to' field, migration 0103, is a different picker entirely — the account's own CONTACT, off `contactOptions`, never the team members list this census watches.)",
+  "tickets/tickets-collection.tsx":
+    "the top-level ticket list's own `membersQ` (R35, client ruling 18 Sep 2026: 'on column raised by i am missing the avatar') — read only so `TicketRowsTable`'s `memberFace(members, w.raiserId)` can resolve a staff raiser's picture, a `.find()` by userId exactly like `work-panels.tsx`'s AVATAR lookup above. Never turned into an option list; nothing on this screen lets a person pick a member from it.",
 }
 
 // ── orphan-components ───────────────────────────────────────────────────────
@@ -4975,6 +4977,24 @@ export const PARKED: Record<string, string> = {
     "that wants one — delete this line and the file together the day nothing ever " +
     "mounts it again, or a caller reappears and this line comes out on its own " +
     "(the rot check below catches that).",
+  "tickets/help-attachments":
+    "the ticket's whole-file-list panel (`HelpAttachmentsPanel`, over " +
+    "`records/record-attachments.tsx`). Mounted inline inside the Conversation " +
+    "card's own tray for one day, 18 Sep 2026, at the client's ruling ('kill this " +
+    "whole files & links … button. those are visible in the conversation itself'), " +
+    "then pulled the SAME DAY reading the deployed tray back, verbatim: 'wtf is " +
+    "his files inside the ocnversation lol thats not what i meant, i meant that " +
+    "each message can have images or files, check in the kit because we already " +
+    "biult the ui for that.' Parked, not dead: what she asked for is each MESSAGE " +
+    "carrying its own attachments through the kit's `TicketThread` " +
+    "(`ThreadMessage.attachments`/`media`, shared/ui/components/ticket-thread/" +
+    "ticket-thread.tsx), which needs a door change first — `help_attachments` " +
+    "(workers/tenancy/src/team-schema/migrations.ts) is keyed by `help_id` only, " +
+    "with no column to join a file to the one reply it was sent on. " +
+    "help-detail.tsx's own header carries the full account and the exact " +
+    "migration this needs. Delete this line and the file together only once " +
+    "something reaches it again with a real reader, never by re-adding the same " +
+    "ticket-wide tray this ruling removed.",
 }
 
 // ── R41 (picked-files-are-sent) ─────────────────────────────────────────────
@@ -5333,3 +5353,43 @@ export const COLOURED_CHIP_OK: Record<string, string> = {
     "state — added 17 Sep 2026 (\"contact live green\"). Same reason: `a.active` is the record's STATUS and the " +
     "census's word-in-the-expression regex has no way to read that from the variable's own name.",
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   EVERY CHIP/PILL IS THE KIT'S Badge — client ruling, 18 Sep 2026, verbatim:
+   "on ticket list views, its missing the space between icon and name and
+   the backgorund card. always, make it a rule, for everythng wether its a
+   dot or an icno, for all chips / pills." `web/test/chips-are-badges.test.ts`
+   censuses two shapes: an ad-hoc `<span>`/`<div>` pill that never reaches
+   for Badge at all, and a real `<Badge>` whose icon rides a plain JSX child
+   instead of its own `icon` prop (badge.tsx's own header names this second
+   shape as the bug the ruling was written about). Every call site the 18 Sep
+   sweep found — the ticket TYPE cell (`tickets-collection.tsx`,
+   `work-panels.tsx`, `triage-queue.tsx`), `shared/web/ticket-chips.tsx`'s
+   own type chip, the story type chip (`stories-screen.tsx`'s `storyType
+   Chip`), the sprint type chip (`sprint-detail.tsx`, `wave-detail.tsx`) and
+   the deliverable "Client can see this" chip (`deliverables-panel.tsx`) —
+   was converted rather than excused, so this list opens EMPTY. A reasoned
+   entry here is for a NON-CHIP the census cannot tell apart from a chip by
+   shape alone (a selection control, a toolbar pill), never for a chip that
+   is merely inconvenient to convert — the same posture COLOURED_CHIP_OK,
+   directly above, already takes for its own law. */
+export const CHIP_BADGE_EXEMPT: Record<string, string> = {}
+
+/* ════════════════════════════════════════════════════════════════════════
+   A FOOTER IS AT THE BOTTOM — client ruling, 18 Sep 2026, verbatim, twice
+   the same session, the second time naming it a law outright: "ticket page:
+   the footer is not on the footer position!! fix that!" and, reviewing the
+   same page again an hour and a half later, "but the footer is in the worng
+   position, above al cointent! dhoudl be at the bottom (this is a law for
+   footer)." See UI-RULEBOOK.md D21 for the full account.
+   `web/test/footer-is-last.test.ts` censuses every `<CardFooter>` and every
+   `<ReplyComposer>` (the one component this app calls a "composer" today)
+   against its nearest enclosing card-shaped JSX element, and fails the
+   moment either one is not that element's own last rendered child. Every
+   call site the census can see today — `TicketConversationPanel`
+   (`web/components/tickets/ticket-detail-body.tsx`) — was already fixed the
+   day this law was written, so this list opens EMPTY. A reasoned entry here
+   is for a footer that genuinely is not a screen's own bottom-most element
+   (a card nested inside a larger scrolling region, say), never for one that
+   is merely inconvenient to move. */
+export const FOOTER_IS_LAST_EXEMPT: Record<string, string> = {}

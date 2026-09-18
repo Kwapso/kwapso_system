@@ -28,7 +28,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R36 | enforced | `offered-rights` | `web/test/rules.test.ts` |
 | R37 | enforced | `in-app-anchors` | `web/test/shell-nav.test.ts` |
 | R40 | enforced | `reachable-bytes` | `web/test/reachable-bytes.test.ts` |
-| R41 | enforced | `picked-files-are-sent` | `web/test/picked-files-are-sent.test.ts` |
+| R41 | enforced | `picked-files-are-sent` | `web/test/picked-files-are-sent.test.ts`<br>`workers/content/test/reply-attachments.test.ts` |
 | R42 | enforced | `declared-readers` | `workers/content/test/source-readers.test.ts` |
 | R55 | enforced | `refs-match-the-formula` | `web/test/refs-match-the-formula.test.ts` |
 | R56 | enforced | `one-door-per-unit` | `web/test/rules.test.ts` |
@@ -56,7 +56,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R32 | enforced | `closed-palette` | `web/test/rules.test.ts` |
 | R33 | enforced | `wrapped-strings` | `web/test/wrapped-strings.test.ts` |
 | R34 | enforced | `glossary-in-copy` | `web/test/rules.test.ts` |
-| R35 | enforced | `records-carry-their-face` | `web/test/rules.test.ts`<br>`workers/content/test/ticket-work-engine.test.ts` |
+| R35 | enforced | `records-carry-their-face` | `web/test/rules.test.ts`<br>`web/test/ticket-raised-by-avatar-and-app-link.test.tsx`<br>`workers/content/test/ticket-work-engine.test.ts` |
 | R38 | enforced | `details-ask-the-door` | `web/test/rules.test.ts` |
 | R39 | enforced | `kit-supplies-the-ui` | `web/test/rules.test.ts` |
 | R44 | enforced | `translation-ceiling` | `web/test/translation-ceiling.test.ts` |

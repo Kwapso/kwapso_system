@@ -2,11 +2,20 @@
 //
 // Staging measured 12px above the trail line and 40px between the trail and
 // the title, against S3's ruling of 20 above and 8 below. The kit's own
-// `screen-shell.tsx` (v1.2.112) produces 20/8 by construction — one token
-// above the trail (`DENSITY_TRAIL`'s `pt`), one token after it (`TRAIL_GAP`'s
-// `mb`), a hairline `<Separator />` inside that same padded box, and the
-// title band's own leading `pt` zeroed to `pt-0` whenever a trail renders so
-// the two tokens never stack into a "30px, not 8" bug a second time.
+// `screen-shell.tsx` moved through several rungs on the way to today's
+// numbers — 20/8, then an "exactly same" 10/10 — before CLIENT RULING,
+// 18 SEP 2026, VERBATIM, SUPERSEDING BOTH: "change to trail line 10px
+// abpove 16below." `DENSITY_TRAIL`'s own `pt` (above the trail) was
+// UNCHANGED by that ruling, it still reads `--space-2h` (10) at both
+// densities; only `TRAIL_GAP` (below the trail) moved, from `--space-2h`
+// (10) to `--space-4` (16) — the next rung up the same scale, not a new
+// custom property. So the kit's own `screen-shell.tsx` (v1.2.119) produces
+// 10/16 by construction — one token above the trail (`DENSITY_TRAIL`'s
+// `pt`), one token after it (`TRAIL_GAP`'s `mb`, no separator inside that
+// padded box — the same 18 Sep ruling's own last sentence, "no line divider
+// under," retired it outright), and the title band's own leading `pt`
+// zeroed to `pt-0` whenever a trail renders so the two tokens never stack
+// into a "30px, not 16" bug a second time.
 //
 // So the rule this file locks is NOT "the numbers are 20/8" — that is the
 // kit's own job and belongs to the kit's repo. It is: THE APP MUST NOT OWN
@@ -32,15 +41,17 @@ afterEach(cleanup)
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
 
-describe("the kit's own trail slot — screen-shell.tsx, v1.2.114", () => {
-  // CLIENT RULING, 18 SEP 2026, VERBATIM: "for the breadrcumbs / search -
-  // half of the margin that now is on top, and exactly same under. no line
-  // divider under. inckude the nav. arrows in the colored background."
-  // Her pick: t1 and c2.
+describe("the kit's own trail slot — screen-shell.tsx, v1.2.119", () => {
+  // CLIENT RULING, 18 SEP 2026, VERBATIM: "change to trail line 10px abpove
+  // 16below." Supersedes the same day's earlier "exactly same under" pick
+  // (10/10) — above and below are two different rungs on purpose now, not
+  // one token read twice. The "no line divider under" and "include the nav.
+  // arrows in the colored background" clauses from that same day's first
+  // ruling are untouched by this one.
   //
-  // SABOTAGE: change pt to `pt-[var(--space-5)]` (the old value) or mb to
-  // `mb-[var(--space-2)]` (the old value), or add back a `<Separator />`
-  // inside the slot →
+  // SABOTAGE: change pt to `pt-[var(--space-5)]` (an old value) or mb to
+  // `mb-[var(--space-2h)]` (the pre-18-Sep-evening value), or add back a
+  // `<Separator />` inside the slot →
   //   × wraps a trail with the new spacing and no separator
   //     AssertionError: expected 'pt-[var(--space-2h)]' to contain ... (or
   //     expected null not to be null)
@@ -53,15 +64,16 @@ describe("the kit's own trail slot — screen-shell.tsx, v1.2.114", () => {
     const slot = container.querySelector('[data-slot="screen-shell-trail"]')
     expect(slot, "a trail must render through the kit's own screen-shell-trail slot").toBeTruthy()
     // ABOVE THE TRAIL — DENSITY_TRAIL's own `pt`, 10px (var(--space-2h)),
-    // half the margin that was above before, at the shell's default
-    // (comfortable) density.
+    // unchanged by the 18 Sep evening ruling — "10px above" was already
+    // true.
     expect(slot!.className, "10px above, DENSITY_TRAIL's pt, not an app-owned class").toContain(
       "pt-[var(--space-2h)]"
     )
-    // AFTER THE TRAIL — TRAIL_GAP's own `mb`, 10px (var(--space-2h)),
-    // exactly same under as above.
-    expect(slot!.className, "10px after, TRAIL_GAP's mb, not an app-owned class").toContain(
-      "mb-[var(--space-2h)]"
+    // AFTER THE TRAIL — TRAIL_GAP's own `mb`, now 16px (var(--space-4)),
+    // her "10px abpove 16below" — the next rung up from the 10px it used to
+    // read, not the same token as above any more.
+    expect(slot!.className, "16px after, TRAIL_GAP's mb, not an app-owned class").toContain(
+      "mb-[var(--space-4)]"
     )
     // IT IS THE WRAPPER, not a sibling — the node this file hands the `trail`
     // prop renders INSIDE the slot.

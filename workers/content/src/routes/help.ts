@@ -9,7 +9,7 @@
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { afterResponse } from "@shared/workers/parallel"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { MENTIONS_LIMIT } from "@shared/workers/limits"
+import { MENTIONS_LIMIT, TICKET_ATTACHMENT_CAP } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -484,6 +484,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     helpId?: string
     body?: string
     taggedUserIds?: unknown
+    attachmentIds?: unknown
   }>(request, env, "help", "read")
   const helpId = requireText(body.helpId, "Ticket", TEXT_LIMITS.short)
   const replyBody = requireText(body.body, "Reply", TEXT_LIMITS.long)
@@ -524,10 +525,36 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     return fail(400, "too_many_mentions", `A reply can mention up to ${MENTIONS_LIMIT} people.`)
   for (const id of tagged) requireText(id, "Mentioned person", TEXT_LIMITS.short)
 
+  // FILES SENT WITH THIS REPLY (team migration 0105) — the composer's own
+  // Paperclip flow stages each picked file THE MOMENT it is chosen (the same
+  // door the ticket's Files panel already uses, `POST /api/content/help/
+  // attachments`), so what arrives here is a list of ids naming rows already in
+  // the bucket. De-duped and bounded the same way `tagged` is above; each id is
+  // proved to be a live, unlinked file on THIS ticket inside `addReply` itself
+  // (lib/help.ts), which is the only place that can check it without a second
+  // round trip — an id that fails that check refuses the whole reply (R41: sent
+  // or refused, never silently dropped).
+  const attachmentIds = Array.isArray(body.attachmentIds)
+    ? [...new Set(body.attachmentIds.filter((x): x is string => typeof x === "string"))]
+    : []
+  if (attachmentIds.length > TICKET_ATTACHMENT_CAP)
+    return fail(400, "too_many", `A reply can carry up to ${TICKET_ATTACHMENT_CAP} files.`)
+  for (const id of attachmentIds) requireText(id, "Attachment", TEXT_LIMITS.short)
+
   // `raiserId` comes back from the WRITE, not off the ticket above: a client
   // login is no longer sent the raiser's id (staff anonymity, lib/help toTicket),
   // and the person who asked the question still has to be told there's an answer.
-  const { id: replyId, raiserId } = await addReply(cfg, guard, scope, actor, helpId, replyBody, tagged, false)
+  const { id: replyId, raiserId } = await addReply(
+    cfg,
+    guard,
+    scope,
+    actor,
+    helpId,
+    replyBody,
+    tagged,
+    attachmentIds,
+    false
+  )
   // Both pings carry the ticket's account: a reply typed by the agency has to
   // land on the client's screen, and on their colleagues' — and on nobody else's.
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", ticket.accountId ?? undefined)
@@ -596,7 +623,9 @@ export async function postResolveHelp(request: Request, env: Env): Promise<Respo
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, "resolved")
   if (!moved) return json({ sent: false, alreadyResolved: true })
 
-  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], false)
+  // A RESOLUTION CARRIES NO FILES OF ITS OWN — `[]`, matching the mentions
+  // list beside it: this door writes the closing sentence, never a file pick.
+  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], [], false)
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", accountId ?? undefined)
   await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
   // Best-effort and last: a failed email must never fail the answer. It is on

@@ -612,9 +612,17 @@ export const content = {
    * gives back no response to reconcile the thread with. `fetch` with
    * `keepalive` does both, at the cost of a 64 KB body limit that a reply
    * (TEXT_LIMITS.long) is nowhere near. */
-  replyHelp: (helpId: string, body: string, taggedUserIds?: string[], leaving?: boolean) =>
+  /** `attachmentIds` — team migration 0105: files staged through `addHelpAttachment`
+   * the moment the composer's Paperclip picked them, now claimed by THIS reply. */
+  replyHelp: (
+    helpId: string,
+    body: string,
+    taggedUserIds?: string[],
+    leaving?: boolean,
+    attachmentIds?: string[]
+  ) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", {
-      ...post({ helpId, body, taggedUserIds }),
+      ...post({ helpId, body, taggedUserIds, attachmentIds }),
       keepalive: leaving === true,
     }),
   helpStakeholders: (id: string) =>

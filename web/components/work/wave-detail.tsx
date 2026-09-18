@@ -53,7 +53,7 @@ import {
 import { ApiFailure } from "@/lib/api"
 import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
-import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
+import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { content as contentApi } from "@/lib/api/content"
 import { sliceKey } from "@/components/work/work-panels"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
@@ -484,8 +484,16 @@ export function WaveDetailScreen({
                             16 Sep 2026: "they will not have colors, but
                             icons." Absent where the sprint carries no type. */}
                         {s.sprintType && (
-                          <Badge variant="secondary" size="pill" className="shrink-0">
-                            <SprintTypeGlyph type={s.sprintType} />
+                          <Badge
+                            variant="secondary"
+                            size="pill"
+                            className="shrink-0"
+                            icon={
+                              sprintTypeHasGlyph(s.sprintType) ? (
+                                <SprintTypeGlyph type={s.sprintType} />
+                              ) : undefined
+                            }
+                          >
                             {t(s.sprintType)}
                           </Badge>
                         )}

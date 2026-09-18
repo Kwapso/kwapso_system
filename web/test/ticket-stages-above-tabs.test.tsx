@@ -20,6 +20,16 @@
 // DRIVEN, NOT SCANNED — same reasoning `ticket-close-moved-to-top.test.tsx`
 // gives: a comment can say the right thing beside a prop that does the wrong
 // one, and only a render that reads the DOM back catches that.
+//
+// AMENDED 18 Sep 2026 — client ruling, verbatim: "inside tickets temove the
+// 'stages' as a title." `ticket-stages.tsx` no longer prints the word
+// "Stages" anywhere on the page; it carries that name as an `aria-label`
+// instead. The assertions below that used to prove "the ladder is the one
+// thing above the body" by reading that eyebrow's TEXT (`getByText`/
+// `getAllByText("Stages")`) now prove the identical thing by its ACCESSIBLE
+// NAME instead (`getByRole("group", { name: "Stages" })`), which the
+// `aria-label` still satisfies — the ladder's own single mount is still
+// provable, the printed word just is not there to read any more.
 
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -141,7 +151,7 @@ describe("the ticket's stage ladder, on top of the body", () => {
     await screen.findByRole("heading", { level: 1 })
     const hero = heroRegion()
     expect(hero).toBeTruthy()
-    expect(within(hero!).getByText("Stages")).toBeTruthy()
+    expect(within(hero!).getByRole("group", { name: "Stages" })).toBeTruthy()
 
     // NO TABLIST — the whole point of 17 Sep 2026's second ruling. There is
     // nothing left for the ladder to be "above" in the tab-strip sense; it is
@@ -162,9 +172,10 @@ describe("the ticket's stage ladder, on top of the body", () => {
   it("draws exactly once — never a second copy inside a body panel", async () => {
     openTicket("triaged")
     await screen.findByRole("heading", { level: 1 })
-    // "Stages" is this component's own eyebrow (ticket-stages.tsx), drawn
-    // nowhere else on this screen — one hit proves one mount.
-    expect(screen.getAllByText("Stages")).toHaveLength(1)
+    // "Stages" is this component's own accessible name (ticket-stages.tsx —
+    // no eyebrow prints it any more, 18 Sep 2026), carried nowhere else on
+    // this screen — one hit proves one mount.
+    expect(screen.getAllByRole("group", { name: "Stages" })).toHaveLength(1)
   })
 
   it("stays mounted — nothing on this screen unmounts a panel any more, so nothing can unmount the ladder either", async () => {
@@ -177,8 +188,8 @@ describe("the ticket's stage ladder, on top of the body", () => {
     // beside the conversation, with the ladder still exactly once and still
     // in the hero region throughout.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
-    expect(screen.getAllByText("Stages")).toHaveLength(1)
-    expect(within(heroRegion()!).getByText("Stages")).toBeTruthy()
+    expect(screen.getAllByRole("group", { name: "Stages" })).toHaveLength(1)
+    expect(within(heroRegion()!).getByRole("group", { name: "Stages" })).toBeTruthy()
   })
 
   it("the body's own panels draw no second ladder of their own", async () => {
@@ -187,10 +198,10 @@ describe("the ticket's stage ladder, on top of the body", () => {
     const anchor = bodyAnchor()
     expect(anchor).toBeTruthy()
     // Climb to the panel that holds the conversation and confirm it carries
-    // no "Stages" text of its own — the one copy lives in the hero region,
-    // proved above.
+    // no ladder of its own — the one copy lives in the hero region, proved
+    // above.
     const conversationCard = anchor!.closest('[data-slot="card"]') ?? anchor!.parentElement
     expect(conversationCard).toBeTruthy()
-    expect(within(conversationCard as HTMLElement).queryByText("Stages")).toBeNull()
+    expect(within(conversationCard as HTMLElement).queryByRole("group", { name: "Stages" })).toBeNull()
   })
 })

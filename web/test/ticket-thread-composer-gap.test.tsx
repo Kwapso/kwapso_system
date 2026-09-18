@@ -12,10 +12,28 @@
 // never scrolling out of view — the client's "she can carry on reading the
 // ticket while it counts" (reply-composer.tsx's own header), now read as a
 // chat panel that keeps its send row on screen. T3820's own concern — a real
-// gap between the latest message and the compose bar — still has to hold in
-// this shape: the two regions are direct children of ONE flex column
-// (`TicketConversationPanel`'s `CardContent`) carrying the same panel
-// spacing token as before, `gap-[var(--space-5)]`, no pixel literal.
+// gap between the latest message and the compose bar — held in THAT shape
+// through a flex `gap-[var(--space-5)]` shared by both children of one
+// `CardContent`.
+//
+// REWRITTEN 18 Sep 2026 — client ruling, reading the deployed page back,
+// verbatim: "the footer is not on the footer position!! fix that!" The
+// `gap`-separated shape above put `thread`/`attachments`/`composer` as three
+// siblings inside ONE padded `CardContent`, each `shrink-0` — which reads as
+// "three things stacked in a box," not a footer, because `CardContent`'s own
+// inset wraps the composer on every side including the bottom, leaving a gap
+// between the pill and the card's own bottom edge. `TicketConversationPanel`
+// now uses the kit's own `CardFooter` (card.tsx's chapter-13 anatomy —
+// "header, body and footer are hairline-separated inside one shell") as the
+// composer's home: `CardContent` holds only the scrolling thread,
+// `CardFooter` is the LAST child of `Card` and holds the composer, and the
+// hairline `CardFooter` already draws (`shadow-[var(--hairline-over)]`) is
+// what separates it from the transcript now — not a flex gap token. This
+// file's assertions follow that shape: the thread's own scroll region, the
+// composer sitting OUTSIDE it as the conversation card's last child, and
+// nothing painting a second fill inside the card (the "panel tone" the
+// ruling asks the footer to carry falls out of `CardFooter` having no
+// background of its own, over `Card`'s own `--surface-panel`).
 
 import { cleanup, render, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -105,8 +123,8 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
 })
 
-describe("the conversation and the composer sit in one gapped column, on their own paper", () => {
-  it("the thread scrolls inside its own region; the composer sits outside that scroller, pinned below it", async () => {
+describe("the composer is the conversation card's own footer, not a third padded child", () => {
+  it("the thread scrolls inside CardContent; the composer sits outside it, in CardFooter, as the card's last child", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
 
     // V1 draws every panel at once — no tab click needed to reach either.
@@ -117,10 +135,11 @@ describe("the conversation and the composer sit in one gapped column, on their o
     const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
     expect(composerForm, "the app's own composer never rendered").toBeTruthy()
 
-    // THE THREAD'S OWN SCROLL REGION. It is the thread's direct parent — the
+    // THE THREAD'S OWN SCROLL REGION IS THE KIT'S `CardContent` — the
     // fragment TicketThread sits in (alongside TranslateAction) carries no
     // DOM node of its own, so the first real ancestor IS the scroller.
     const scroller = thread.parentElement as HTMLElement
+    expect(scroller.getAttribute("data-slot")).toBe("card-content")
     expect(scroller.className).toContain("overflow-y-auto")
     expect(scroller.className).toContain("min-h-0")
 
@@ -129,22 +148,48 @@ describe("the conversation and the composer sit in one gapped column, on their o
     // pinned send row.
     expect(scroller.contains(composerForm)).toBe(false)
 
-    // ONE SHARED PARENT, PAYING THE GAP ONCE — the panel's own column
-    // (`TicketConversationPanel`'s `CardContent`). The scroller sits
-    // directly inside it; the composer sits one level deeper (its own
-    // `shrink-0` wrapper, then `ReplyComposer`'s own root `<div
-    // className="flex min-w-0 flex-col gap-4">`, then the form) — either
-    // way, one shared ancestor pays the gap, not two children guessing at
-    // each other's edge.
-    const composerShrinkWrapper = composerForm.parentElement!.parentElement as HTMLElement
-    expect(composerShrinkWrapper.className).toContain("shrink-0")
-    const column = scroller.parentElement as HTMLElement
-    expect(column).toBe(composerShrinkWrapper.parentElement)
-    expect(column.className).toContain("flex-col")
-    expect(column.className).toContain("gap-[var(--space-5)]")
+    // THE COMPOSER'S HOME IS THE KIT'S OWN `CardFooter` — ReplyComposer's
+    // root (`<div className="flex min-w-0 flex-col gap-4">`) is CardFooter's
+    // direct DOM child.
+    const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
+    expect(composerFooter.getAttribute("data-slot")).toBe("card-footer")
+    expect(composerFooter.className).toContain("shrink-0")
 
-    // NO PIXEL LITERAL smuggled in beside the token.
-    expect(column.className).not.toMatch(/gap-\[\d+px\]/)
+    // ONE SHARED PARENT — the conversation `Card` itself — holds both
+    // regions as DIRECT children, CardContent then CardFooter, so the
+    // composer really is the card's LAST child rather than nested one
+    // level deeper than the scroller.
+    const card = scroller.parentElement as HTMLElement
+    expect(card.getAttribute("data-slot")).toBe("card")
+    expect(card).toBe(composerFooter.parentElement)
+    expect(card.className).toContain("flex-col")
+    expect(Array.from(card.children)).toEqual([scroller, composerFooter])
+    expect(card.lastElementChild).toBe(composerFooter)
+
+    // THE HAIRLINE, NOT A FLEX GAP, IS WHAT NOW SEPARATES THEM — CardFooter's
+    // own chapter-13 rule (card.tsx), not a pixel or a token gap re-invented
+    // on this screen.
+    expect(composerFooter.className).toMatch(/shadow-\[var\(--hairline-over\)\]/)
+  })
+
+  it("draws no second fill inside the card — CardContent and CardFooter both paint nothing of their own, over Card's own --surface-panel", async () => {
+    render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
+    const thread = await waitFor(() => {
+      const el = document.querySelector('[data-slot="ticket-thread"]') as HTMLElement | null
+      if (!el) throw new Error("thread not rendered yet")
+      return el
+    })
+    const scroller = thread.parentElement as HTMLElement
+    const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
+    const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
+    const card = scroller.parentElement as HTMLElement
+
+    expect(card.getAttribute("data-variant")).toBe("default")
+    // Neither region repaints the card's own `--surface-panel` fill — no
+    // `bg-*` utility of their own, which is what makes "the panel tone" on
+    // the footer automatic rather than a class somebody has to remember.
+    expect(scroller.className).not.toMatch(/\bbg-/)
+    expect(composerFooter.className).not.toMatch(/\bbg-/)
   })
 })
 

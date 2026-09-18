@@ -26,10 +26,41 @@
 // NO FILES-AND-LINKS MENU ITEM, no EdgePanel sheet behind it either — the
 // SAME DAY'S later ruling: "kill this whole files & links … button. those
 // are visible in the conversation itself! the customers can attach images &
-// files. so do we." `<HelpAttachmentsPanel>` now renders inline inside
-// `TicketConversationPanel`'s own `attachments` tray, and the reply
-// composer's new Paperclip button opens the SAME panel's file picker
-// (`attachRef`, below) rather than a second upload path.
+// files. so do we." That ruling was first read as "show the ticket's whole
+// file list inline, in the conversation card" and shipped that way
+// (`<HelpAttachmentsPanel>` in `TicketConversationPanel`'s `attachments`
+// tray, with a Paperclip button on the composer opening the same panel's
+// picker) — and the SAME DAY, reading the deployed page back, she corrected
+// it: "wtf is his files inside the ocnversation lol thats not what i meant,
+// i meant that each message can have images or files, check in the kit
+// because we already biult the ui for that." So the tray is gone (parked,
+// not deleted — `PARKED["tickets/help-attachments"]`,
+// shared/rules/registry.ts) and so is the composer's attach button — there
+// is nowhere left for a picked file to be shown, and R41's own law is that a
+// picked file is sent or refused, never dropped silently into a list nobody
+// can see.
+//
+// WHAT SHE ACTUALLY ASKED FOR — each MESSAGE carrying its own images and
+// files — IS DRAWN NOW (team migration 0105, `help_attachments.help_thread_id`
+// — nullable: NULL is still an ordinary ticket-level file, unchanged; a value
+// names the ONE reply it rode in on). The kit's `TicketThread` seam this door
+// change was written for: `ThreadMessage.attachments`
+// (shared/ui/components/ticket-thread/ticket-thread.tsx) draws one PILL CHIP
+// per file under that message's own bubble — a name, a size and (if `href` is
+// set) a link — and `ThreadMessage.media` is a second, separate slot for an
+// image bubble on the sender's own side, a bare `React.ReactNode` this screen
+// builds rather than the kit fetching or drawing anything itself. Both are
+// fed by `messageFilesFor`, below, off the SAME tile/preview helpers the
+// upload zone already used for the ticket-level list —
+// `shared/web/attachment-preview.tsx`'s `AttachmentPreview`/`hasPreview` for
+// a picture, `shared/web/screen-engine/file-type-icon.tsx`'s `fileTypeIcon`
+// for a document's chip glyph — never a second, bespoke thumbnail built for
+// this one screen. `workers/content/src/lib/help.ts`'s `listReplies` reads
+// the new column back onto `HelpMessage.attachments`
+// (`HelpMessageAttachment[]`, shared/types.ts) and `addReply` claims a
+// composer-staged file for the reply it rides with — see that function's own
+// header for the upload-first, link-second shape. The composer's own attach
+// button is back, for real, in `reply-composer.tsx`.
 
 import * as React from "react"
 
@@ -37,12 +68,21 @@ import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
+import { TicketThread, type ThreadAttachment } from "@shared/ui/components/ticket-thread/ticket-thread"
 import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 import { RecordRef } from "@shared/web/record-ref"
 import { EditPenButton } from "@shared/web/edit-pen-button"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { nameInitials } from "@/lib/identity"
+// EACH MESSAGE'S OWN FILES (team migration 0105) — the same three pieces this
+// file's own header already named as the day-one answer: `AttachmentPreview`/
+// `hasPreview` for the media well an image gets, `fileTypeIcon` for the glyph
+// a document's pill chip carries, `readFileAsDataUrl` for the composer's own
+// upload (the exact seam `help-form-dialog.tsx`'s `attach()` already uses).
+import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
+import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
+import { readFileAsDataUrl } from "@shared/web/file"
+import { isFollowable, spellSize } from "@/lib/attachments"
 
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
@@ -71,7 +111,9 @@ function mentionableTeamMembers(
 }
 
 import type {
+  HelpAttachment,
   HelpMessage,
+  HelpMessageAttachment,
   HelpStakeholder,
   HelpStatus,
   HelpTicket,
@@ -97,7 +139,6 @@ import { mergePage, invalidate, primeCache, removeFromPage, useCached, useCached
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
-import { HelpAttachmentsPanel } from "@/components/tickets/help-attachments"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
 import { InAppLink } from "@/components/shell/in-app-link"
@@ -135,9 +176,10 @@ import {
  * this page), but the SCROLL TARGET a stale link points at is still a real
  * panel on the page, so it still resolves rather than landing on nothing.
  * `files` USED TO open the ⋯ menu's own sheet outside this table; that sheet
- * is gone (18 Sep 2026, this file's own header) and the attachments it held
- * now render inline inside Conversation, so `files` resolves there like any
- * other retired value. */
+ * is gone (18 Sep 2026, this file's own header), and so — the same day's
+ * later correction — is the inline tray it moved into next. `files` still
+ * resolves to Conversation, the nearest real panel a stale link can land
+ * on, even though nothing there shows a file list today. */
 const DEEP_LINK_TICKET_PANEL: Partial<Record<string, TicketPanelName>> = {
   conversation: "conversation",
   overview: "stakeholders",
@@ -179,6 +221,56 @@ function helpStatusLabel(status: HelpStatus, t: (s: string) => string): string {
       return t("Ready")
     case "resolved":
       return t("Resolved")
+  }
+}
+
+/** EACH MESSAGE'S OWN FILES (team migration 0105) — what the client asked for
+ * verbatim on 18 Sep 2026, read here into the two slots the kit's
+ * `ThreadMessage` already carries for exactly this (this file's own header
+ * names both): `attachments`, a pill chip per file under the bubble — every
+ * one of them, image or document alike, a file-type glyph (`fileTypeIcon`)
+ * beside its name and size — and `media`, an image's own well
+ * (`AttachmentPreview`, the SAME component and the SAME letterboxed `fit`
+ * the ticket-level Files panel already draws a picture with), stacked above
+ * the bubble on the sender's own side, one per PICTURE the message carries.
+ * A document gets no media well — there is no thumbnail to show, only the
+ * glyph the chip already carries — which is `hasPreview`'s own question,
+ * asked once here rather than re-decided per file.
+ *
+ * `href` GOES THROUGH `isFollowable` — the render-side half of R20/R40, the
+ * same check the ticket-level attachment list already runs before an `href`
+ * reaches a page a colleague trusts. A row this door wrote should always pass
+ * it; the check stays because the shape of a miss (stored XSS on a row a
+ * client login could write) is not one worth trusting past. */
+function messageFilesFor(attachments: HelpMessageAttachment[] | undefined): {
+  attachments?: ThreadAttachment[]
+  media?: React.ReactNode
+} {
+  if (!attachments || !attachments.length) return {}
+  const pictures = attachments.filter((a) => hasPreview("file", a.mime))
+  return {
+    attachments: attachments.map((a) => {
+      const Glyph = fileTypeIcon(a.name)
+      const size = spellSize(a.size)
+      return {
+        id: a.id,
+        name: (
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <Glyph aria-hidden="true" className="size-3.5 shrink-0" />
+            <span className="min-w-0 truncate">{a.name}</span>
+          </span>
+        ),
+        size: size || undefined,
+        href: isFollowable(a.href) ? a.href : undefined,
+      }
+    }),
+    media: pictures.length ? (
+      <div className="flex flex-col gap-2">
+        {pictures.map((a) => (
+          <AttachmentPreview key={a.id} kind="file" url={a.href} contentType={a.mime} />
+        ))}
+      </div>
+    ) : undefined,
   }
 }
 
@@ -303,13 +395,12 @@ export function HelpDetailScreen({
   // showing, once the small figure it fed was removed. `workLogAddRef`,
   // below, is what the title row's new "+" reaches for instead.
   const workLogAddRef = React.useRef<(() => void) | null>(null)
-  // ATTACH, FROM THE COMPOSER — client ruling, 18 Sep 2026: "the customers
-  // can attach images & files. so do we… that's why I ask for the attach
-  // button on the text input field." `HelpAttachmentsPanel` (now inline
-  // below the thread) writes its own file-picker opener into this ref; the
-  // composer's Paperclip button calls it, so there is one upload path, not
-  // two (`openRef`'s own doc comment, record-attachments.tsx).
-  const attachRef = React.useRef<(() => void) | null>(null)
+  // `attachRef`/the composer's Paperclip button STOOD HERE — wired to
+  // `HelpAttachmentsPanel`'s own `openRef` (record-attachments.tsx). Gone
+  // with the tray it opened: see this file's own header for the 18 Sep 2026
+  // correction ("wtf is his files inside the ocnversation … thats not what
+  // i meant") and why an attach control with nowhere to show what it picked
+  // is not drawn rather than drawn and silently discarding the file (R41).
 
   const [editing, setEditing] = React.useState(false)
   /* `storiesSheetOpen` STOOD HERE — the flag that opened the FULL
@@ -466,7 +557,12 @@ export function HelpDetailScreen({
   // hold scoped to the screen rather than to one panel is what makes that true
   // regardless of what a panel does or does not do to its own children. A
   // hook, so it sits above the three early returns below.
-  const reply = useReplySend({ ticketId: helpId, onSend: sendReply })
+  const reply = useReplySend({
+    ticketId: helpId,
+    onSend: sendReply,
+    uploadFile: uploadReplyFile,
+    removeUploadedFile: removeReplyFile,
+  })
   /* `run` WAS HERE — the shared shape for "do it, say plainly if it was
    * refused, re-prime the list cache and the record's own history", written for
    * THREE acts a person could still perform on a ticket by hand.
@@ -563,8 +659,13 @@ export function HelpDetailScreen({
    *
    * IT THROWS ON A REFUSAL rather than swallowing it: the composer catches it,
    * says so, and puts her words back in the field. A reply lost to a 500 is the
-   * one outcome worse than a slow one. */
-  async function sendReply(body: string, leaving: boolean): Promise<string> {
+   * one outcome worse than a slow one.
+   *
+   * `attachmentIds` — team migration 0105 — are files the composer's own tile
+   * grid already staged (`uploadReplyFile`, below) before the hold even
+   * started; this function only has to CARRY them to the door, which links
+   * them to the reply it is about to write (lib/help.ts's `addReply`). */
+  async function sendReply(body: string, leaving: boolean, attachmentIds: string[]): Promise<string> {
     // The mention list is read OUT OF the sent text by name-match against the
     // members we may tag, exactly as the kit composer's own call site did.
     //
@@ -599,7 +700,8 @@ export function HelpDetailScreen({
         helpId,
         body,
         mentions.map((m) => m.id),
-        leaving
+        leaving,
+        attachmentIds
       )
       primeCache(`help-thread:${helpId}`, replies) // reconcile with server truth
       invalidate(`help:${teamId}`)
@@ -608,6 +710,48 @@ export function HelpDetailScreen({
       primeCache(`help-thread:${helpId}`, prev) // rollback the echo
       throw err
     }
+  }
+
+  /** UPLOAD ONE PICKED FILE, THE MOMENT THE COMPOSER'S PAPERCLIP PICKS IT —
+   * `useReplySend`'s own `uploadFile`. The SAME door and the SAME data-URL
+   * seam the ticket's own attach flow already uses (`help-form-dialog.tsx`'s
+   * `attach()`), because staging a file for a reply and attaching one to the
+   * ticket directly are the same act at the door — `kind: "file"`, no
+   * `help_thread_id` yet. `addReply` (lib/help.ts) is what claims the row for
+   * a specific message once Send is actually pressed.
+   *
+   * THE NEWEST ROW, TAKEN OFF THE END OF THE LIST THE DOOR HANDS BACK — the
+   * door has no "here is the id you just made" reply of its own (it answers
+   * with the whole refreshed list, same as every other attach call in this
+   * app), so this reads the last entry of `attachments`, ordered oldest first
+   * by the door itself. Safe ONLY because `useReplySend` uploads one file at a
+   * time (its own `uploadChain`, reply-composer.tsx) — two calls racing on
+   * this same ticket could otherwise land in either order on the wire. */
+  async function uploadReplyFile(file: File): Promise<HelpMessageAttachment> {
+    let r: { attachments: HelpAttachment[] }
+    try {
+      r = await content.addHelpAttachment({
+        id: helpId,
+        kind: "file",
+        label: file.name,
+        fileDataUrl: await readFileAsDataUrl(file),
+      })
+    } catch (err) {
+      throw new Error(err instanceof ApiFailure ? err.message : t("Couldn't attach that."))
+    }
+    const created = r.attachments[r.attachments.length - 1]
+    if (!created) throw new Error(t("Couldn't attach that."))
+    return { id: created.id, name: created.label, href: created.url, mime: created.contentType, size: created.sizeBytes }
+  }
+
+  /** TAKE A STAGED FILE BACK OFF, before it is claimed by a reply — the SAME
+   * door the ticket-level Files panel's own remove control calls
+   * (`removeAttachment`, help-attachments.ts). Best-effort: `useReplySend`'s
+   * own `removeAttachment` already drops the tile from the grid whatever this
+   * does, matching the panel's own "the row keeps its history, this is the row
+   * leaving the LIST" register (R17). */
+  async function removeReplyFile(attachmentId: string): Promise<void> {
+    await content.removeHelpAttachment(helpId, attachmentId)
   }
 
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
@@ -749,6 +893,8 @@ export function HelpDetailScreen({
     // words — `of` is a lookup, not a save.
     body: translation.of(r.body),
     aiDrafted: r.isAgent,
+    // team migration 0105 — see `messageFilesFor`'s own header, above.
+    ...messageFilesFor(r.attachments),
   }))
 
   /* `overviewItems`/`<OverviewList>` STOOD HERE — the fact rows below the
@@ -810,7 +956,15 @@ export function HelpDetailScreen({
                           out entirely ("kill this whole files & links …
                           button … visible in the conversation itself") and
                           it moved a second time, into the Conversation
-                          panel's own `attachments` tray, below.
+                          panel's own tray — and the SAME DAY, reading the
+                          deployed tray back, a THIRD move: "wtf is his files
+                          inside the ocnversation … thats not what i meant, i
+                          meant that each message can have images or files."
+                          The tray is gone (parked, `PARKED["tickets/
+                          help-attachments"]`, shared/rules/registry.ts);
+                          per-message attachments are the target and are not
+                          drawn yet — this file's own header carries the
+                          full account and the door change still needed.
        · Stakeholders  → `<HelpStakeholders>`, card-shaped since 18 Sep 2026
                           (see that file's own header), with the Overview
                           facts still under it (removed 17 Sep 2026).
@@ -885,9 +1039,10 @@ export function HelpDetailScreen({
     // where they were.
     // FILES AND LINKS LEFT THE MENU TOO, 18 Sep 2026 — client ruling: "kill
     // this whole files & links … button. those are visible in the
-    // conversation itself." The sheet this item opened is gone; the panel it
-    // held is inline in the Conversation card now (`attachments`, the
-    // `<TicketDetailBody>` call below).
+    // conversation itself." The sheet this item opened is gone, and so —
+    // the SAME DAY'S later correction — is the tray it moved into (this
+    // file's own header carries the full account); the panel it held is
+    // `PARKED` now, not drawn anywhere on this screen.
     // PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in colour
     // because it takes the request out of the everyday lists, and reversible,
     // which the confirm-free restore says out loud.
@@ -1273,6 +1428,11 @@ export function HelpDetailScreen({
                         ) : (
                           r.body
                         ),
+                      // team migration 0105 — a pill chip per file
+                      // (`attachments`) and an image's own well (`media`),
+                      // both already built onto `r` by `messageFilesFor`.
+                      attachments: r.attachments,
+                      media: r.media,
                     })),
                   ]}
                   /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.
@@ -1290,38 +1450,21 @@ export function HelpDetailScreen({
                 />
               </>
             }
-            // ATTACHMENTS, INLINE — client ruling, 18 Sep 2026: "kill this
-            // whole files & links … button. those are visible in the
-            // conversation itself." `HelpAttachmentsPanel` is unchanged
-            // (still `records/record-attachments.tsx` under it); only where
-            // it renders moved, off the ⋯ menu's `EdgePanel` and into this
-            // tray. `openRef` hands its file picker to the composer's own
-            // Paperclip button below, so pressing either one opens the SAME
-            // dialog. `max-h-40` + its own scroll: a tray, not a second
-            // scrolling region competing with the thread above it, for a
-            // ticket that has picked up a dozen attachments over its life.
-            attachments={
-              // `bg-card`, NOT `bg-surface-panel` — this tray sits inside
-              // `TicketConversationPanel`, which is `variant="default"`
-              // (`--surface-panel`) since the 18 Sep 2026 container ruling
-              // (ticket-detail-body.tsx's own header); repainting the same
-              // tone here would be the exact "container on the same ground
-              // it stands on" bug R67 exists to catch. `--card` is the
-              // raised alternation, the same tone the composer pill below
-              // already draws.
-              <div className="max-h-40 overflow-y-auto rounded-[var(--radius)] bg-card p-3">
-                <h4 className="text-micro text-muted-foreground mb-2 uppercase">
-                  {t("Files and links")}
-                </h4>
-                <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "update")} openRef={attachRef} />
-              </div>
-            }
+            // THE "FILES AND LINKS" TRAY (`attachments` prop, `<HelpAttachmentsPanel>`,
+            // a Paperclip button here calling its `openRef`) STOOD HERE for one
+            // day, 18 Sep 2026 — see this file's own header for the correction
+            // that pulled it ("wtf is his files inside the ocnversation …
+            // thats not what i meant") and named per-message attachments as
+            // what she actually wanted instead. `TicketConversationPanel`
+            // still takes no `attachments` prop (ticket-detail-body.tsx's own
+            // header says why — that tray stays PARKED, not re-mounted); what
+            // she asked for lives on the messages themselves now (`replies`'
+            // own `attachments`/`media`, fed above) and on the composer's own
+            // Paperclip (`reply-composer.tsx`), which needs no prop from here
+            // at all — it stages and uploads through `useReplySend`'s own
+            // `uploadFile`/`removeUploadedFile`, wired above.
             composer={
-              <ReplyComposer
-                send={reply}
-                answered={ticket.status === "resolved"}
-                onAttach={can("help", "update") ? () => attachRef.current?.() : undefined}
-              />
+              <ReplyComposer send={reply} answered={ticket.status === "resolved"} />
             }
           />
         }
@@ -1380,10 +1523,12 @@ export function HelpDetailScreen({
                       >
                         {s.title}
                       </InAppLink>
-                      <Badge variant="secondary" size="pill" className="shrink-0">
-                        {typeIconName ? (
-                          <Icon name={typeIconName} className="size-3.5 shrink-0" />
-                        ) : null}
+                      <Badge
+                        variant="secondary"
+                        size="pill"
+                        className="shrink-0"
+                        icon={typeIconName ? <Icon name={typeIconName} className="size-3.5 shrink-0" /> : undefined}
+                      >
                         {s.storyType ?? "—"}
                       </Badge>
                       {/* THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot,
@@ -1468,11 +1613,15 @@ export function HelpDetailScreen({
       {/* FILES AND LINKS, BEHIND THE ⋯ MENU, STOOD HERE — B19's own pattern,
           "the way other records do": a sheet, not a tab. CLIENT RULING,
           18 Sep 2026, retired it outright: "kill this whole files & links …
-          button. those are visible in the conversation itself." The one
-          `<HelpAttachmentsPanel>` on this page now renders inline, inside
-          `TicketConversationPanel`'s own `attachments` tray (the `stories`
-          field's sibling, above, inside `conversation`) — not deleted, only
-          moved a second time, off a sheet and onto the page itself. */}
+          button. those are visible in the conversation itself." It then
+          moved into `TicketConversationPanel`'s own tray — and the SAME DAY,
+          reading the deployed tray back, a third ruling pulled it again:
+          "wtf is his files inside the ocnversation … thats not what i
+          meant, i meant that each message can have images or files."
+          `<HelpAttachmentsPanel>` is `PARKED` now (shared/rules/registry.ts),
+          not deleted — this file's own header carries the full account,
+          including the exact door change per-message attachments still
+          need before it can come back in that shape. */}
 
       {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
           request behind the work is a fact about where you are standing, not a

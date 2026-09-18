@@ -82,7 +82,7 @@ import { PagedFind, type FindPage, type FindQuery } from "@/components/records/p
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { HELP_STATUS, ticketStatusCell } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
-import { ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
+import { memberFace, ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
 import { ticketTitle } from "@shared/web/ticket-chips"
 
 /** The four states a story moves through, in the words a person reads. The
@@ -1042,8 +1042,14 @@ export function AppTicketsPanel({
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
+  // R35's ONE resolver now (`memberFace`, tickets-collection.tsx) — the exact
+  // lookup this line used to carry alone, moved so the top-level ticket list
+  // draws a staff raiser's face through the identical function rather than a
+  // second copy that happened to agree (client ruling, 18 Sep 2026: "on
+  // column raised by i am missing the avatar" — that screen had no lookup at
+  // all until this seam existed to share).
   const memberAvatar = (userId: string | null): string | null | undefined =>
-    membersQ.data?.find((m) => m.userId === userId)?.imageUrl
+    memberFace(membersQ.data, userId)
 
   /* ══ THE LIST — A TABLE, THE SAME SHAPE THE TICKET LIST ALREADY DRAWS ═════
      Client, 6 Sep 2026: "create me, in each app, the ticket page. Put me in the
@@ -1233,13 +1239,23 @@ export function AppTicketsPanel({
                   its pill, saying so with an em dash: a column with a pill on
                   four rows and a hole on the fifth reads as the broken row
                   rather than the untyped one. */}
-              <Badge variant="secondary" size="pill">
-                {ticketTypeIconName(ticket.helpType) && (
-                  <Icon
-                    name={ticketTypeIconName(ticket.helpType)!}
-                    className="text-muted-foreground size-3.5 shrink-0"
-                  />
-                )}
+              <Badge
+                variant="secondary"
+                size="pill"
+                icon={
+                  ticketTypeIconName(ticket.helpType) ? (
+                    // NO FORCED COLOUR — the identical fix as the top-level
+                    // ticket list's own Type cell (`tickets-collection.tsx`,
+                    // client ruling 18 Sep 2026: "type icon is still gray").
+                    // The kit's `secondary` Badge already draws
+                    // `text-foreground` and hands the `icon` slot's node
+                    // through as-is, so a `text-muted-foreground` class here
+                    // was overriding that inherited black rather than
+                    // leaving it be.
+                    <Icon name={ticketTypeIconName(ticket.helpType)!} className="size-3.5 shrink-0" />
+                  ) : undefined
+                }
+              >
                 {ticket.helpType ?? "—"}
               </Badge>
             </TableCell>

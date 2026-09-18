@@ -152,9 +152,17 @@ export const support = {
   raise: (input: { description: string; helpType?: string; appId?: string; moduleId?: string }) =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>("/api/content/help", post(input)),
   /** Add to the conversation. No @mentions from this surface: a client has no
-   * business naming which staff member picks it up (SCOPE ch.06). */
-  reply: (helpId: string, body: string) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body })),
+   * business naming which staff member picks it up (SCOPE ch.06).
+   *
+   * `attachmentIds` — team migration 0105, "the customers can attach images &
+   * files. so do we" (18 Sep 2026): files the composer's own attach button
+   * staged through `attach` below, the moment they were picked, now claimed by
+   * THIS reply. */
+  reply: (helpId: string, body: string, attachmentIds?: string[]) =>
+    api<{ replies: HelpMessage[]; total: number }>(
+      "/api/content/help/reply",
+      post({ helpId, body, attachmentIds })
+    ),
   /** CORRECT YOUR OWN WORDING, while it is still yours to correct. The door
    * refuses once a staff member has read it (SCOPE ch.07's lock), and refuses a
    * colleague's ticket outright — this side does not decide either. */

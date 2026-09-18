@@ -46,10 +46,20 @@ function Host({
   showing = true,
 }: {
   answered: boolean
-  onSend: (text: string, leaving: boolean) => Promise<string>
+  onSend: (text: string, leaving: boolean, attachmentIds: string[]) => Promise<string>
   showing?: boolean
 }) {
-  const send = useReplySend({ ticketId: "01TICKET", onSend })
+  // `uploadFile`/`removeUploadedFile` — team migration 0105. No test in this
+  // file picks a file (that behaviour is `reply-composer-attachments.test.tsx`'s
+  // own job), so these are never actually called; they exist to satisfy the
+  // hook's contract, the same reason `onSend` above is a stub that records
+  // rather than posting anywhere real.
+  const send = useReplySend({
+    ticketId: "01TICKET",
+    onSend,
+    uploadFile: () => Promise.reject(new Error("not exercised in this file")),
+    removeUploadedFile: () => Promise.resolve(),
+  })
   return showing ? <ReplyComposer send={send} answered={answered} /> : null
 }
 
@@ -64,7 +74,8 @@ function draw(options?: { answered?: boolean; showing?: boolean }) {
       <Host
         answered={options?.answered ?? false}
         showing={options?.showing ?? true}
-        onSend={async (text, leaving) => {
+        onSend={async (text, leaving, attachmentIds) => {
+          void attachmentIds
           sent.push({ text, leaving })
           return "Sent."
         }}
@@ -145,8 +156,11 @@ describe("the ticket composer's one send", () => {
     // here, one stray click from Send. It has no button, at any status, any
     // more; closing moved to the title (`ticket-close-moved-to-top.test.tsx`).
     expect(screen.queryByRole("button", { name: "Send and close" })).toBeNull()
-    // …and the row holds exactly one button — typing, and Send.
-    expect(screen.getAllByRole("button")).toHaveLength(1)
+    // …and the row holds exactly two buttons — Attach (team migration 0105,
+    // back for real) and Send. `reply-composer-attachments.test.tsx` is the
+    // Paperclip's own suite; this file only has to not regress its count.
+    expect(screen.getAllByRole("button")).toHaveLength(2)
+    expect(screen.getByRole("button", { name: "Attach a file" })).toBeTruthy()
   })
 
   it("hands the focus ring to the pill, so the ring is the shape a reader sees", () => {

@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.117",
-  "sha": "2932dc20dde41593ce1e1d59fdc12df3abd3af9c",
+  "tag": "v1.2.120",
+  "sha": "56087f55c6715443e36443a80a67a92e8130a5c4",
   "syncedAt": "2026-09-18"
  },
- "generatedAt": "2026-09-18T08:36:47.280Z",
+ "generatedAt": "2026-09-18T10:33:21.720Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -928,8 +928,8 @@
     {
      "file": "components/badge/badge.tsx",
      "name": "badgeVariants",
-     "line": 68,
-     "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums",
+     "line": 112,
+     "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums gap-2",
      "groups": [
       {
        "name": "size",
@@ -942,7 +942,7 @@
         {
          "name": "pill",
          "classes": "h-[var(--control-height-pill)] px-[var(--space-3h)]",
-         "note": "The status pill and the tag — CH11's second geometry: `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the drawn `padding: 6px 14px`). THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `GAP_WITH_DOT` below. It used to live on this size step alone, which read as \"a status pill always has the gap\" and is exactly backwards: the gap belongs to the DOT, not to the size. `variant=\"status\"` docs its own `dot` as \"usually paired with … `size=\"pill\"`\" — a call site that forgot the pairing (fourteen of them, 17 Sep 2026 census) got `size=\"counter\"`'s geometry with no gap at all, the dot sitting flush against the word. Client, same day, on the automations status chip: \"Validated the colors, but it's missing the space between the dot and the word. Fix that.\" Moving the gap onto the dot's own presence fixes every existing call site FOR FREE and makes the doc comment's \"usually\" true without a caller having to remember a second prop."
+         "note": "The status pill and the tag — CH11's second geometry: `--control-height-pill` (26) tall, 14 inline (`--space-3h`, the drawn `padding: 6px 14px`). THE DOT-TO-LABEL GAP IS NOT HERE ANY MORE — see `LEADING_MARK_GAP` above `badgeVariants`. It used to live on this size step alone, which read as \"a status pill always has the gap\" and is exactly backwards: the gap belongs to the LEADING MARK, not to the size. `variant=\"status\"` docs its own `dot` as \"usually paired with … `size=\"pill\"`\" — a call site that forgot the pairing (fourteen of them, 17 Sep 2026 census) got `size=\"counter\"`'s geometry with no gap at all, the dot sitting flush against the word. Client, same day, on the automations status chip: \"Validated the colors, but it's missing the space between the dot and the word. Fix that.\" Moving the gap first onto the dot's own presence (17 Sep) and then (18 Sep, second ruling) onto `badgeVariants`' own BASE class — unconditional, not keyed on `dot` at all — fixes every existing and future call site FOR FREE, dot-led or icon-led alike."
         }
        ]
       },

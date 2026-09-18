@@ -33,6 +33,24 @@
 // plus, now, who raised it and who is on the loop — never a paragraph above
 // the cards explaining the mechanism.
 //
+// SQUARE TILES, THREE TO A ROW — the same-day follow-up, verbatim: "inside
+// ticket detail, for stakeholders, i want square tiels (lik in members, with
+// text under the image). 3 should fit in one row." The first pass above
+// landed a HORIZONTAL row (`orientation="horizontal" size="tile"`, face
+// beside the text) in a two-column grid — the right component, the wrong
+// shape of it, read off "cards" alone rather than "square tiles… like in
+// members". `PersonCard`'s `orientation` defaults to `"vertical"` and its
+// `size` to `"band"`, which is EXACTLY the members-gallery cell (`members-
+// gallery.tsx` passes neither prop) — "if the members gallery already is
+// that tile, reuse as is" is why neither is set here any more: the face
+// sits on top, the relation chip and the name centre under it, matching the
+// wall this ruling names rather than a second, narrower tile invented for
+// this panel. The grid is `grid-cols-3` at the panel's own width (never a
+// fluid `minmax`, because the ask is an exact count, not a floor), stepping
+// down at the kit's own phone cutoff (`max-[45rem]`, the same one
+// `ticket-stages.tsx` uses for its rail) to two, and again below that to one
+// for a genuinely narrow phone.
+//
 // NO LINK ON THE CARD. The members wall's card is a door to a staff profile
 // (`/t/<team>/members/<id>`) because every row on that wall is a team member
 // by construction; a stakeholder can be the ticket's RAISER, and R54 already
@@ -58,7 +76,11 @@ export function HelpStakeholders({ stakeholders }: { stakeholders: HelpStakehold
   }
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    // THREE PER ROW AT THE PANEL'S OWN WIDTH, TWO THEN ONE ON A PHONE — see
+    // this file's header. `grid-cols-3` because the ask is an exact count,
+    // never `CardGrid`'s `fluid` floor; `max-[45rem]` is the kit's own phone
+    // cutoff (`ticket-stages.tsx` uses the identical value for its rail).
+    <div className="grid grid-cols-3 gap-[var(--space-3)] max-[45rem]:grid-cols-2 max-[24rem]:grid-cols-1">
       {stakeholders.map((s) => {
         // R54. `origin: "raiser"` is the one value here that can be a client
         // contact — every other way onto this list (an admin, a mention, a
@@ -67,23 +89,28 @@ export function HelpStakeholders({ stakeholders }: { stakeholders: HelpStakehold
         const name = (s.origin === "raiser" ? s.name : staffNameFromSnapshot(s.name)) || s.email
         return (
           <Card key={s.userId} data-slot="stakeholder-card" variant="raised">
-            <CardContent className="p-3">
+            {/* `flex flex-col items-center … text-center` MATCHES `members-
+                gallery.tsx`'s own `CardContent` verbatim — the padding and
+                centring the square tile stands on, not redrawn inside
+                `PersonCard` a second time. */}
+            <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
               {/* `<CardTitle>` STAYS WRITTEN HERE, not built inside
                   `PersonCard` — R65's own census reads it off THIS file's
                   `<Card>` block, textually (person-card.tsx's own header
-                  has the argument). */}
+                  has the argument). NO `orientation`/`size` OVERRIDE — the
+                  kit defaults (`vertical`, `band`) are the members-gallery
+                  tile itself; see this file's header on why the earlier
+                  `horizontal`/`tile` pair was the wrong reading. */}
               <PersonCard
                 picture={s.imageUrl}
                 mark={nameInitials(s.name)}
                 markName={name}
-                orientation="horizontal"
-                size="tile"
                 chip={
                   <span className="text-micro text-muted-foreground uppercase">
                     {s.origin === "raiser" ? t("Raised by") : t("On the loop")}
                   </span>
                 }
-                title={<CardTitle className="min-w-0 truncate text-sm">{name}</CardTitle>}
+                title={<CardTitle className="text-sm">{name}</CardTitle>}
               />
             </CardContent>
           </Card>

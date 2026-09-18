@@ -13,7 +13,10 @@
 //     stories, Work logs, Stakeholders;
 //   · a `?tab=stories` deep link still resolves — it scrolls to the panel
 //     rather than switching to a tab that no longer exists;
-//   · Files and links is reachable from the ⋯ menu, as a sheet.
+//   · Files and links is reachable from NEITHER the ⋯ menu NOR a tray inside
+//     the conversation — see this file's own describe block below, and
+//     help-detail.tsx's own header, for the two 18 Sep 2026 rulings that
+//     took it there and then pulled it back out.
 // `ticket-close-moved-to-top.test.tsx` already proves the mango Close button
 // stays the title's one primary action, and the standalone Edit pen beside
 // it — unaffected by this file's own change, so neither is re-proved here.
@@ -311,12 +314,20 @@ describe("related stories show every row, uncapped, with a type chip and a statu
   })
 })
 
-// AMENDED 18 Sep 2026 — client ruling, verbatim: "kill this whole files &
-// links … button. those are visible in the conversation itself! the
-// customers can attach images & files. so do we." The ⋯ menu item and its
-// EdgePanel sheet are both gone; the SAME `<HelpAttachmentsPanel>` renders
-// inline, inside the Conversation card.
-describe("files are inline in the conversation, not behind the ⋯ menu", () => {
+// AMENDED 18 Sep 2026, TWICE THE SAME DAY. First: client ruling, verbatim:
+// "kill this whole files & links … button. those are visible in the
+// conversation itself! the customers can attach images & files. so do we." —
+// the ⋯ menu item and its EdgePanel sheet went, and `<HelpAttachmentsPanel>`
+// was mounted inline inside the Conversation card instead. Then, reading
+// THAT shape deployed, a second ruling pulled it again, verbatim: "wtf is
+// his files inside the ocnversation lol thats not what i meant, i meant
+// that each message can have images or files, check in the kit because we
+// already biult the ui for that." So there is no ⋯ menu item (unchanged
+// from the first ruling) AND no inline tray any more either — the panel is
+// `PARKED` (shared/rules/registry.ts, "tickets/help-attachments") until
+// per-message attachments have a door to read from (help-detail.tsx's own
+// header carries the exact migration this needs).
+describe("files are neither behind the ⋯ menu nor in a tray inside the conversation", () => {
   it("draws no 'Files and links' item in the ⋯ menu", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
@@ -324,23 +335,23 @@ describe("files are inline in the conversation, not behind the ⋯ menu", () => 
     fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
     fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
     fireEvent.click(trigger)
-    // The heading text below still says "Files and links" — as the inline
-    // tray's own caption — so this asks specifically for a MENU ITEM
-    // (Radix's own role) rather than the bare text, which would find that
-    // caption anywhere on the page and pass for the wrong reason.
     expect(screen.queryByRole("menuitem", { name: "Files and links" })).toBeNull()
   })
 
-  it("renders the attachments panel's own empty state inline, inside the conversation card, with no click needed", async () => {
+  it("draws no attachments tray inside the conversation card either — the panel is parked, not inline", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     ) as HTMLElement
-    // The attachments panel's own empty-state sentence (help-attachments.tsx),
-    // now inside the Conversation card's own tray rather than a tab panel or
-    // a sheet — and nothing was clicked to reach it.
-    expect(await within(conversation).findByText("Nothing attached to this ticket yet.")).toBeTruthy()
+    // Neither the tray's own caption nor the panel's empty-state sentence
+    // (help-attachments.tsx) renders anywhere — the whole panel is unmounted
+    // on this screen, not merely relabelled.
+    expect(within(conversation).queryByText("Files and links")).toBeNull()
+    expect(within(conversation).queryByText("Nothing attached to this ticket yet.")).toBeNull()
+    // THE COMPOSER'S OWN ATTACH BUTTON IS BACK (team migration 0105) — see
+    // this file's own composer describe block below for the dedicated
+    // assertion of what it does now that per-message attachments have a door.
   })
 })
 
@@ -369,8 +380,11 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
     const thread = document.querySelector('[data-slot="ticket-thread"]') as HTMLElement
     const calledOn = scrollIntoView.mock.instances[0] as unknown as HTMLElement
     expect(calledOn.contains(thread)).toBe(true)
-    // The attachments the old sheet held are right there once landed.
-    expect(await screen.findByText("Nothing attached to this ticket yet.")).toBeTruthy()
+    // NO ATTACHMENTS TRAY WAITS THERE ANY MORE — the 18 Sep 2026 correction
+    // (see this file's own "files are neither behind the ⋯ menu nor in a
+    // tray" describe block, above) pulled it; `files` now lands on the
+    // nearest real panel, Conversation, and nothing more.
+    expect(screen.queryByText("Nothing attached to this ticket yet.")).toBeNull()
   })
 
   it("lands on the page with no error for a plain deep link (no ?tab= at all)", async () => {
@@ -475,16 +489,21 @@ describe("every message in the thread carries the sender's face", () => {
 })
 
 // CLIENT RULING, 18 Sep 2026, VERBATIM: "missing the attach button … the
-// customers can attach images & files. so do we."
-describe("the composer carries an attach button, wired to the same file picker", () => {
-  it("draws a Paperclip button beside the send button, and it opens the SAME attachments panel inline below", async () => {
+// customers can attach images & files. so do we." — drew a Paperclip button
+// on the composer, wired to `HelpAttachmentsPanel`'s own file picker, for
+// one day. THE SAME DAY'S LATER CORRECTION pulled the panel it opened
+// ("wtf is his files inside the ocnversation … thats not what i meant",
+// help-detail.tsx's own header), and named what she actually wanted instead:
+// each MESSAGE carrying its own files. Team migration 0105 is that door, and
+// the button is back for real — `ReplyComposer` draws it unconditionally now
+// (reply-composer.tsx), staging a pick through `useReplySend`'s own
+// `uploadFile`. The full pick → tile → send → per-message render path is
+// `reply-attachments.test.tsx`'s own suite; this file only has to prove the
+// control is on screen, on THIS host, wired to something real.
+describe("the composer's attach button is back", () => {
+  it("draws a Paperclip / 'Attach a file' control on the composer", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
-    const attach = await screen.findByRole("button", { name: "Attach a file" })
-    expect(attach).toBeTruthy()
-    // The panel it reaches is already on the page (inline in the
-    // conversation), proving there is one upload path, not a second one
-    // conjured by this button.
-    expect(screen.getByText("Nothing attached to this ticket yet.")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Attach a file" })).toBeTruthy()
   })
 })
