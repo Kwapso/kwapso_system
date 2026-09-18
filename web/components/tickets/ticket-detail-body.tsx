@@ -79,18 +79,45 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * 18 Sep 2026, verbatim: "the ticket detail conversation should have more
  * height, depending on the height of the right column components. they
  * should be, the addition of the three of the right, same as conversation."
- * A real CSS GRID does this with no JS measuring: `lg:grid-rows-3` gives the
- * right column three explicit rows, the conversation cell carries
- * `lg:row-span-3` (grid-row: span 3), and grid auto-placement puts Related
- * stories/Work logs/Stakeholders into the three column-2 cells it leaves
- * behind — the standard "one tall cell beside a stack" trick, not a manual
- * `grid-row` on each of the three. `items-stretch` (the grid default, stated
- * here rather than left implicit) is what makes the SPANNING cell's height
- * follow the stack's own natural height rather than the other way round:
- * `TicketConversationPanel` drops its old viewport-relative
- * `h-[min(78vh,760px)]` for `lg:h-full` so it fills whatever the grid hands
- * it, keeping the old height only below `lg`, where there is no second
- * column to measure against and the panel is on its own again. */
+ *
+ * CORRECTED THE SAME DAY, MEASURED LIVE ON STAGING (T0001): the first cut
+ * used `lg:grid-rows-3`, Tailwind's `grid-template-rows: repeat(3, minmax(0,
+ * 1fr))` — three EQUAL, flexible tracks. An `fr` track in an auto-height
+ * grid still sizes to the tallest CONTENT it is asked to hold before
+ * dividing the space evenly, so the spanning conversation cell (whose own
+ * intrinsic height dwarfs any single right-column card) dragged all three
+ * tracks up to a third of ITS height each — the right column's three cards
+ * stayed their own short height, and the "gap" between their stack and the
+ * conversation's own bottom edge was blank leftover track space, not a
+ * uniform 24px gap. Measured: conversation 1015.78px against the three
+ * right cards' own 136.3 + 322.59 + 208.3 plus two 24px gaps = 901.49px —
+ * 114px of exactly this kind of dead space.
+ *
+ * THE FIX IS THE ROWS' OWN SIZE, NOT A SPAN. `lg:grid-rows-[auto_auto_auto]`
+ * sizes each of the right column's three tracks to ITS OWN cell's content —
+ * Related stories/Work logs/Stakeholders auto-placed into them exactly as
+ * before — so the conversation's `row-span-3` height becomes the SUM of
+ * three tracks the right column alone decided, which is the client's own
+ * arithmetic ("the addition of the three of the right, same as
+ * conversation") drawn structurally rather than approximated. The
+ * conversation cell also carries `lg:min-h-0` beside `lg:h-full`: a grid
+ * item's default min-height is `auto` (its own content's min-content size),
+ * which — spanning three auto tracks — would otherwise feed the
+ * conversation's OWN tall intrinsic height back into the very rows it is
+ * trying to measure FROM, inflating them again by the back door
+ * `grid-rows-3` used the front one for. `min-h-0` floors that contribution
+ * to zero, so only the right column's three cells set the tracks.
+ * `items-stretch` (the grid default, stated here rather than left implicit)
+ * then stretches the conversation cell to the FULL sum of those tracks, and
+ * `TicketConversationPanel`'s own `lg:h-full` fills whatever height that
+ * cell resolves to — a grid item's used size is definite for a descendant's
+ * percentage height the same way a flex item's is, so `h-full` there
+ * resolves against a real number rather than `auto`. The thread scrolls
+ * inside (`overflow-y-auto`, `min-h-0`, already on `TicketConversationPanel`
+ * below) so a long conversation never forces the card — and therefore the
+ * tracks — taller than the right column's own three cards decided. Below
+ * `lg` there is no second column to measure against and the grid collapses
+ * to one, exactly as before. */
 export function TicketDetailBody({
   conversation,
   stories,
@@ -103,10 +130,10 @@ export function TicketDetailBody({
   stakeholders: React.ReactNode
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr] lg:grid-rows-3">
+    <div className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto_auto]">
       <div
         id={TICKET_PANEL_ANCHOR.conversation}
-        className="min-w-0 lg:row-span-3"
+        className="min-w-0 lg:row-span-3 lg:h-full lg:min-h-0"
       >
         {conversation}
       </div>

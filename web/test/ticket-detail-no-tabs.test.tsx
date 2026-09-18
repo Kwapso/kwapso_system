@@ -386,20 +386,45 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
 // components. they should be, the addition of the three of the right, same
 // as conversation." Proved structurally (jsdom has no layout engine to
 // measure a real height against): the grid carries the two-column,
-// three-row template and `items-stretch`, the conversation cell spans all
-// three rows, and the three right-column panels are direct grid children —
-// no wrapping `flex-col` box left to give them a height of their own for the
-// span to measure.
+// three-AUTO-row template and `items-stretch`, the conversation cell spans
+// all three rows with `min-h-0`/`h-full` so it never feeds its own height
+// back into them, and the three right-column panels are direct grid
+// children — no wrapping `flex-col` box left to give them a height of their
+// own for the span to measure.
+//
+// AMENDED 18 Sep 2026, SAME DAY — live proof on staging (T0001) measured the
+// FIRST cut of this fix (`lg:grid-rows-3`, three EQUAL `fr` tracks) still
+// short: conversation 1015.78px against the three right cards' own
+// 136.3 + 322.59 + 208.3 plus two 24px gaps = 901.49px. An `fr` track in an
+// auto-height grid sizes to the tallest CONTENT before dividing space
+// evenly, so the spanning conversation cell dragged all three equal tracks
+// up to a third of ITS OWN height each, and the "gap" under the right
+// column's three short cards was leftover track space, not a uniform 24px
+// gap. `lg:grid-rows-[auto_auto_auto]` sizes each track to its OWN cell
+// instead, so the span's height becomes the sum the right column alone
+// decided — see ticket-detail-body.tsx's own header for the full account.
 describe("the conversation cell spans the right column's three rows (R16 sibling ruling)", () => {
-  it("the grid is two columns × three rows, stretched, with the conversation cell spanning all three", async () => {
+  it("the grid is two columns × three auto rows, stretched, with the conversation cell spanning all three", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
     expect(grid.className).toContain("lg:grid-cols-[2fr_1fr]")
-    expect(grid.className).toContain("lg:grid-rows-3")
+    // THREE AUTO ROWS, NOT THREE EQUAL `fr` ONES — `grid-rows-3` (Tailwind's
+    // `repeat(3, minmax(0, 1fr))`) is exactly the shape that dragged all
+    // three tracks up to the spanning conversation cell's own height; this
+    // must never come back.
+    expect(grid.className).toContain("lg:grid-rows-[auto_auto_auto]")
+    expect(grid.className).not.toMatch(/lg:grid-rows-3\b/)
     expect(grid.className).toContain("items-stretch")
     expect(conversationAnchor.className).toContain("lg:row-span-3")
+    // THE SPAN MUST NOT FEED ITS OWN HEIGHT BACK INTO THE TRACKS IT SPANS —
+    // a grid item's default min-height is its own content's min-content
+    // size, which `min-h-0` floors to zero so only the right column's three
+    // cells set the auto tracks; `h-full` then fills whatever height the
+    // grid hands back.
+    expect(conversationAnchor.className).toContain("lg:min-h-0")
+    expect(conversationAnchor.className).toContain("lg:h-full")
 
     // THE THREE RIGHT-COLUMN PANELS ARE DIRECT GRID CHILDREN, not nested in
     // a `flex-col` box of their own — that box is exactly what USED to give

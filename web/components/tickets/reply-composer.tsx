@@ -361,7 +361,24 @@ export function ReplyComposer({
           the ring lives in the kit's CSS, on `[data-focus-proxy]`, and it is
           written on a node the rule above guarantees has a visible ring around
           it. Nothing here suppresses a ring and nothing here defines a second
-          one, which is what `focus-ring.test.ts` reads this file for. */}
+          one, which is what `focus-ring.test.ts` reads this file for.
+
+          THE PILL'S OWN GROUND — live proof on the deployed ticket screen
+          (T0001) measured this pill's `background-color` as
+          `rgb(255,254,249)` (#FFFEF9), which is `--card` AND `--background`
+          in light — the SAME tone as the page behind the whole record (see
+          `ticket-detail-body.tsx`'s own header, the R67 note that the two
+          are byte-identical in light). A composer drawn `bg-card` therefore
+          stood on its own ground exactly the way R67 forbids everywhere
+          else: no contrast at all between the "container" and the page it
+          sits on. Every other composer/input container in the app answers
+          this the same way — `agent-panel.tsx` repoints `--card` to
+          `--surface-panel` for the kit's own `AgentChat` composer pill it
+          cannot hand-edit ("the color of the text write field #F7F2EB, like
+          everywhere else"). This composer is APP-DRAWN, not the kit's, so
+          there is no vendored class to work around: `bg-surface-panel`
+          directly, the soft-paper tone (`--surface-panel` #F7F2EB light)
+          every other container in the app already grounds on. */}
       <form
         data-slot="reply-composer"
         data-focus-shell=""
@@ -369,7 +386,7 @@ export function ReplyComposer({
           event.preventDefault()
           start()
         }}
-        className="flex min-w-0 items-center gap-2 rounded-pill bg-card py-2 ps-4 pe-2"
+        className="flex min-w-0 items-center gap-2 rounded-pill bg-surface-panel py-2 ps-4 pe-2"
       >
         {/* ATTACH — a Paperclip beside the field, wired to the SAME file
             picker `HelpAttachmentsPanel` (now inline below the thread) opens

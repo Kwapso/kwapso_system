@@ -883,9 +883,26 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
         {hasBand ? (
           <div
             data-record-region="header"
-            /* 14 between the mark and the text, 4 of inline breathing so the
-               band's type lines up with the panel's inset below it. */
-            className="flex items-start gap-[var(--space-3h)] px-1"
+            /* 14 between the mark and the text, no inline padding of its own
+               — CLIENT RULING, 18 SEP 2026, VERBATIM: "pils and title are
+               slightliy wider that the topnavbar. should not be. they shoul
+               be same width and end at the same point in the left." Live
+               measurement after v1.2.116: the trail field and this
+               component's own root both sat at left 219px; this band —
+               carrying the title AND, through `meta`, `RecordChrome`'s own
+               identity-row chips — sat at 223px, 4px right of both. The
+               `px-1` deleted here was the cause; the comment it carried
+               ("4 of inline breathing so the band's type lines up with the
+               panel's inset below it") does not hold arithmetically and
+               never did — the panel's own inset is `--space-5` (20) opening
+               to `--space-7` (32) at `lg:`, and no multiple of either is 4.
+               This wrapper needs no inset of its own: it is a child of the
+               record root, which carries none either, so both it and the
+               trail above already read the SAME parent edge — the "already
+               share the parent's inset" this file's region-1 and region-2
+               wrappers both rely on. The panel keeps its own separate inset
+               unchanged; it was never the thing out of line. */
+            className="flex items-start gap-[var(--space-3h)]"
           >
             {mark ? <span className="flex-none">{mark}</span> : null}
             <div className="flex min-w-0 flex-1 flex-col gap-1">

@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+### Fixed — the record header region's own stray inline padding, the second place the trail/title left edge could still drift apart — v1.2.117
+
+**CLIENT RULING, 18 SEP 2026, VERBATIM (SAME RULING AS v1.2.116'S ITEM 1,
+A SECOND INSTANCE OF IT):** "pils and title are slightliy wider that the
+topnavbar. should not be. they shoul be same width and end at the same
+point in the left." v1.2.116 fixed `DENSITY_TRAIL` in
+`compositions/templates/screen-shell.tsx` so the trail field's own left
+edge reads the SAME `CARD_CONTENT_INSET_X` identifier the body does — that
+closed an 8px gap (231 vs 223) measured at the `screen-shell`/`DENSITY_BODY`
+level. It did not touch `components/record-detail/record-detail.tsx`, a
+different file one layer further in, and a second, smaller offset survived
+inside it: LIVE MEASUREMENT AFTER v1.2.116, a ticket record, 1440 viewport —
+the trail field and `record-detail`'s own root both sat at left 219px; the
+mark/Title/chip-row band sat at 223px, still 4px right of both.
+
+**CAUSE.** `record-detail.tsx`'s region-1 header wrapper (`data-record-
+region="header"`) carried `className="flex items-start gap-[var(--space-3h)]
+px-1"`. Its own comment claimed the `px-1` was "4 of inline breathing so the
+band's type lines up with the panel's inset below it" — arithmetically
+false and never load-bearing: the panel's own inset is `--space-5` (20)
+opening to `--space-7` (32) at `lg:`, and no multiple of either is 4. The
+wrapper is a child of the record root, which spends no inline padding of
+its own, so it and the trail above it already shared the same parent edge
+without help; `px-1` was the entire 4px offset, on both the title AND, via
+`meta`, `RecordChrome`'s own identity-row chips (the "pils") rendered
+inside the same wrapper.
+
+**FIX.** `px-1` deleted outright, not reduced or replaced — the wrapper
+now spends nothing on the inline axis. The panel's own separate inset
+(`CardContent`'s `CARD_CONTENT_INSET_X`) is unchanged; it was never the
+thing out of line and this fix does not touch `components/card/card.tsx`.
+
+**Files:** `components/record-detail/record-detail.tsx`. **Checks:**
+`compositions/templates/check-screen-shell.mjs`'s existing "17 Sep 2026
+night body-hosted title" block (`bodyTitleFindings`), which already pinned
+this same region against a leading `pt-`/`mt-`, is extended to also fail on
+any `px-`/`pl-`/`pr-`/`ps-`/`pe-` utility there — a regression that
+reintroduces inline padding on this wrapper, in any amount, fails `npm run
+check` instead of waiting for the next live screenshot. Verified against
+`verify/trail-line/page.tsx`'s own `record` case, reading trail-field left,
+`record-detail` root left and `[data-slot=title-heading]` left as the same
+pixel.
+
 ### Fixed — six client rulings on the record shell (trail inset, search chrome, tab gap, rail gutter, assistant handle, badge ink/links) plus one new icon — v1.2.116
 
 **CLIENT RULINGS, 18 SEP 2026, VERBATIM, ALL KIT-LEVEL.** Six items, each

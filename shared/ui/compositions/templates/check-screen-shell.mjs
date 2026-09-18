@@ -383,10 +383,35 @@ console.log(
    leading `pt`/`mt` fails here instead of waiting for the next
    `getComputedStyle` read to catch it by hand. `verify/trail-line/`'s own
    `record` case renders this exact composition and reads the same 8 off the
-   live DOM — this check is the static half of that proof. */
+   live DOM — this check is the static half of that proof.
+
+   EXTENDED 18 SEP 2026 — THE SAME REGION'S INLINE AXIS, NOT ONLY ITS BLOCK
+   ONE. Client, verbatim, on a ticket record: "pils and title are slightliy
+   wider that the topnavbar. should not be. they shoul be same width and end
+   at the same point in the left." Live measurement after v1.2.116: the trail
+   field and this component's own root both sat at left 219px; this header
+   region — carrying the title AND, through `meta`, `RecordChrome`'s own
+   identity-row chips ("pils") — sat at 223px. The cause was `px-1` on this
+   exact div, carrying a comment claiming it lined the band's type up with
+   the panel's inset below ("4 of inline breathing") — arithmetically false
+   (the panel's own inset is `--space-5`/20 opening to `--space-7`/32, no
+   multiple of which is 4) and never load-bearing: this wrapper is a child of
+   the record root, which carries no inline padding of its own either, so
+   both it and the trail above it already read the SAME parent edge without
+   help. `px-1` is deleted, not merely commented around, so this check pins
+   its absence the same way it already pins pt-/mt-'s: any `px-`/`pl-`/`pr-`/
+   `ps-`/`pe-` utility on this region reopens the exact 4px the ruling named,
+   whether or not it happens to be a 4px value again — the fix is that this
+   wrapper spends NOTHING on the inline axis, not that it spends the right
+   number. */
 const bodyTitleFindings = [];
 
-const RECORD_DETAIL_HEADER_BLOCK = /data-record-region="header"[\s\S]{0,300}?className="([^"]*)"/;
+// {0,1800}: 18 Sep 2026's own px-1 finding widened this file's inline
+// comment on the region well past the old {0,300} window (the previous
+// comment was two lines; this one documents a live regression with its own
+// measurement, matching the length this file's other multi-hundred-char
+// comments already run to elsewhere in record-detail.tsx).
+const RECORD_DETAIL_HEADER_BLOCK = /data-record-region="header"[\s\S]{0,1800}?className="([^"]*)"/;
 const recordDetailHeaderMatch = recordDetailSrc.match(RECORD_DETAIL_HEADER_BLOCK);
 if (!recordDetailHeaderMatch) {
   bodyTitleFindings.push(
@@ -397,6 +422,13 @@ if (!recordDetailHeaderMatch) {
     `${recordDetailRel}'s header region (data-record-region="header") carries its own leading pt-/mt- ` +
       `("${recordDetailHeaderMatch[1]}") — that doubles the gap above a body-hosted title exactly the way ` +
       "DENSITY_HEADER's pt once doubled the header-band one.",
+  );
+} else if (/\b(?:px|pl|pr|ps|pe)-[^\s"]/.test(recordDetailHeaderMatch[1])) {
+  bodyTitleFindings.push(
+    `${recordDetailRel}'s header region (data-record-region="header") carries its own inline px-/pl-/pr-/ps-/pe- ` +
+      `("${recordDetailHeaderMatch[1]}") — this wrapper is a child of the record root, which spends no inline ` +
+      "padding of its own, so any padding here pushes the title and RecordChrome's identity-row chips off the " +
+      'trail\'s left edge (the 18 Sep 2026 ruling: "should be same width and end at the same point in the left").',
   );
 }
 
@@ -454,7 +486,8 @@ if (bodyTitleFindings.length > 0) {
 console.log(
   "OK screen-shell body-hosted-title check: record-chrome.tsx's root, record-detail.tsx's header region and " +
     "title.tsx's own root all stay pt-/mt-free, so a record's body-hosted title carries no leading space of its " +
-    "own beyond screen-shell-body's already-checked pt-0.",
+    "own beyond screen-shell-body's already-checked pt-0; record-detail.tsx's header region also stays " +
+    "px-/pl-/pr-/ps-/pe-free, so the title and its chip row cannot drift off the trail's left edge either.",
 );
 
 /* ============================================================================

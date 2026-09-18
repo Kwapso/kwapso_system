@@ -147,3 +147,26 @@ describe("the conversation and the composer sit in one gapped column, on their o
     expect(column.className).not.toMatch(/gap-\[\d+px\]/)
   })
 })
+
+// LIVE PROOF ON STAGING (T0001): the composer pill's `background-color`
+// measured `rgb(255,254,249)` (#FFFEF9), which is `--card` — and, in light,
+// `--card` and `--background` are byte-identical (ticket-detail-body.tsx's
+// own R67 header), so the "container" read as no container at all, standing
+// on the exact tone of the page behind it. Every other composer/input
+// container in the app grounds on the soft-paper tone instead
+// (`--surface-panel` #F7F2EB) — `agent-panel.tsx` repoints `--card` to reach
+// it for the kit's own vendored composer pill it cannot hand-edit; this
+// composer is APP-drawn, so the fix is the plain class, no token override
+// needed.
+describe("the composer pill stands on the panel tone, not the page's own ground", () => {
+  it("the composer root carries bg-surface-panel, never bg-card", async () => {
+    render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
+    const composerForm = await waitFor(() => {
+      const el = document.querySelector('[data-slot="reply-composer"]') as HTMLElement | null
+      if (!el) throw new Error("composer not rendered yet")
+      return el
+    })
+    expect(composerForm.className).toContain("bg-surface-panel")
+    expect(composerForm.className).not.toMatch(/\bbg-card\b/)
+  })
+})
