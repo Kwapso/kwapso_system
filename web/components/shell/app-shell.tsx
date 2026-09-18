@@ -12,8 +12,10 @@ import { usePathname } from "next/navigation"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
 // The rail's own brand artwork, reached directly (R39: kit supplies the UI) —
-// see the note above `NavBrandHeader` for why this file draws the mark itself
-// instead of leaving it to Rail's own default.
+// see the note above `railBrandMark` for why this file still builds the mark
+// node itself (the size and the click-to-home behaviour are this app's own)
+// rather than leaving it to Rail's own default, while handing it to Rail's
+// OWN `mark` slot so the kit's v1.2.122 alignment fix applies to it.
 import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/brand"
 // THE TRAIL, AS FOLDER TABS (kit v1.2.28, workspace-tab props at v1.2.59). It
 // used to be `Breadcrumbs` — a line of text inside the card's header band. The
@@ -319,44 +321,63 @@ function StandaloneNavItem({
   )
 }
 
-/** THE MARK — ALONE NOW (client feedback, 31 Aug 2026: "make the logo bigger,
- * and leave air underneath it before starting with the sections"). This used
- * to also carry the collapse toggle beside it (client, earlier the same day:
- * "collapse text should be hidden unless hover and place it at the top") —
- * the toggle has since moved again, to a floating edge-handle at the rail's
- * foot (see the note beside `railEdgeToggle` in `AppShell`), so this
- * component is back to drawing only the mark. Rail draws its own mark by
- * default; this file passes `mark={null}` to Rail and draws it here instead
- * so it can sit at the top with its own spacing, independent of the nav
- * below it. R39 — the kit supplies the artwork (`Logotype`/`Isotype`), this
- * file only places it and sets its size.
+/** THE MARK — HANDED TO RAIL'S OWN BRAND SLOT (migrated off a hand-rolled
+ * header, 18 Sep 2026). R45's own rule ("an app-side copy of a kit
+ * composition is a bug") applied here as much as it does to any other part
+ * of `rail.tsx`: `Rail` has drawn a `data-slot="rail-brand"` row since it
+ * shipped, sized and — since kit v1.2.122 — aligned to the workspace tab
+ * strip's own label centre by construction (`h-[var(--strip-row)]`,
+ * `items-center`), and this file was drawing a second, unaligned copy beside
+ * it instead of using it. Measured live before the fix: the hand-rolled
+ * header's logotype centred 8.65px above the tab label's centre — the kit's
+ * own alignment fix landing in `rail.tsx` and never reaching the screen,
+ * because the screen never called the code that carries it.
  *
- * THE STEP WENT UP, REVERSING THE EARLIER RULING. It was `--icon-20` on a
- * 24 Aug 2026 instruction with a reference screenshot ("the logo on top of
- * sidebar smaller, check screenshot for reference"); the client, live on
- * staging a week later, asked the opposite: "make the logo bigger". One rung
- * up the ladder, `--icon-24` (tokens.css's icon delivery sizes), the next
- * step after the 22/24 pair and the ladder's own next-common size after 20 —
- * a correction, not a guess at a new number. The air below it moved with the
- * mark: see the `pb-6` on this component's wrapper in `AppShell`, doubled
- * from the `pb-3` it shared with every other block in the rail's rhythm,
- * because the client asked for it by name ("leave air underneath it"),
- * not for a bigger gap that happened to read the same as everyone else's. */
-function NavBrandHeader({
-  collapsed,
-  homeLabel,
-  spine,
-}: {
-  collapsed: boolean
-  homeLabel: string
-  spine: Spine
-}) {
+ * THIS FUNCTION NOW RETURNS THE MARK NODE ONLY, for Rail's own `mark` prop —
+ * not a self-positioning `<div>`. Positioning (the centring, the padding,
+ * the v1.2.122 band) is `rail-brand`'s own job now; this file's job shrinks
+ * to what the kit's `mark` prop is FOR: "a call site with a reason" (the
+ * prop's own doc in `rail.tsx`) — the click-to-home behaviour and the
+ * client's own size ruling below, neither of which the kit's default mark
+ * carries.
+ *
+ * TWO THINGS STILL DIVERGE FROM THE KIT'S DEFAULT, BOTH ON RECORD.
+ *  (1) SIZE. The kit's own default mark is `--icon-20` (rail.tsx's
+ *      `MARK_STEP`, the 24 Aug 2026 ruling with a reference screenshot). The
+ *      client asked the opposite a week later, live on staging: "make the
+ *      logo bigger" (31 Aug 2026) — one rung up the ladder, `--icon-24`
+ *      (tokens.css's icon delivery sizes), the next step after the 20/24
+ *      pair. That ruling was never carried back into the kit's own
+ *      `MARK_STEP`, so this file still overrides it via the same `mark` prop
+ *      escape hatch `rail.tsx` documents for exactly this. The air below the
+ *      mark ("leave air underneath it before starting with the sections")
+ *      is the rail's own root `gap-[var(--space-6)]` between `rail-brand`
+ *      and the nav below it — already the value this file's old `pb-6`
+ *      wrapper duplicated by hand; the kit's own gap does the job now.
+ *  (2) THE CLICK-TO-HOME BEHAVIOUR. Client, 31 Aug 2026: "remove home from
+ *      navbar, make that when we click the icon kwapso on top of sidebar it
+ *      takes us there" — Welcome (the old "House") has no rail row of its
+ *      own any more (`inRail: false` in pages.ts), so the brand mark is its
+ *      only entry point besides landing here straight off sign-in. `Rail`'s
+ *      own `mark` prop takes a bare `React.ReactNode` with no notion of a
+ *      click, by design (SHELL.md: "the repo ships components, not
+ *      routing") — an application-level navigation, wired through
+ *      `softNavigate` for the same reason every other rail entry is
+ *      (EDGE-CASES.md's static-export trap, R37), has no home in the kit and
+ *      is built here around the artwork instead.
+ *
+ * EVERYTHING ELSE — the spine-driven cut, `Isotype`/`Logotype` collapsed vs.
+ * expanded, the pill shape and the 1px press nudge — is this file matching
+ * the kit's OWN default mark byte for byte (rail.tsx's own `markField` and
+ * `MARK_STEP` block), because a call site overriding `mark` for one reason
+ * (size, a click) should not silently drop everything the default got
+ * right. */
+function railBrandMark(collapsed: boolean, homeLabel: string, spine: Spine): React.ReactNode {
   /* THE CUT COMES FROM THE SPINE, NOT FROM THE THEME — the kit's own law,
      stated at rail.tsx §"THE SAME LOGIC IS WHY `markField` PICKS THE CUT FROM
      THE SPINE AND NOT FROM THE MEDIA QUERY", and this line is that file's own
-     `markField` expression, transcribed for the same reason the row shape
-     below it is: this file draws the mark itself (`mark={null}` to Rail) and
-     the kit exports the mapping as a local, not as a helper.
+     `markField` expression, transcribed because this file overrides the
+     mark's SIZE and needs the same cut logic the override replaces.
 
      It used to pass `on="paper"` unconditionally. `paper` is the THEME-driven
      field — the kit hides one cut and shows the other on `prefers-color-
@@ -372,26 +393,19 @@ function NavBrandHeader({
      note on `railContent`'s own root below. A rail that paints its own ground
      must own its own foregrounds; inheriting them from the theme is the bug. */
   const markField: BrandField = spine === "ink" ? "unlit" : spine === "mango" ? "brand" : "paper"
-  // THE MARK IS THE WAY HOME (client, 31 Aug 2026): "remove home from navbar,
-  // make that when we click the icon kwapso on top of sidebar it takes us
-  // there" — Welcome (the old "House") has no rail row of its own any more
-  // (`inRail: false` in pages.ts), so the brand mark is now its only entry
-  // point besides landing here straight off sign-in.
   return (
-    <div className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "px-[var(--space-3)]"}`}>
-      <button
-        type="button"
-        onClick={() => softNavigate("/home")}
-        className="min-w-0 shrink-0 cursor-pointer rounded-pill active:translate-y-[0.0625rem]"
-        aria-label={homeLabel}
-      >
-        {collapsed ? (
-          <Isotype className="[--brand-step:var(--icon-24)]" on={markField} />
-        ) : (
-          <Logotype className="[--brand-step:var(--icon-24)]" on={markField} />
-        )}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={() => softNavigate("/home")}
+      className="min-w-0 shrink-0 cursor-pointer rounded-pill active:translate-y-[0.0625rem]"
+      aria-label={homeLabel}
+    >
+      {collapsed ? (
+        <Isotype className="[--brand-step:var(--icon-24)]" on={markField} />
+      ) : (
+        <Logotype className="[--brand-step:var(--icon-24)]" on={markField} />
+      )}
+    </button>
   )
 }
 
@@ -1015,10 +1029,13 @@ export function AppShell({
   // ever existing is exactly the condition under which its name would stop
   // matching the wordmark, so a fork that flips it back on gets its switcher
   // back here too, unlike the mobile top bar which keeps it unconditionally
-  // (nothing else names the team there). Rail draws NO mark of its own
-  // (`mark`/`wordmark` both `null` below) — `NavBrandHeader` draws the same
-  // artwork instead, at the top of the column on its own (see the note on
-  // that component for why Rail's own default isn't used here, and the note
+  // (nothing else names the team there). Rail draws its OWN mark now
+  // (`mark={railBrandMark(...)}` below, `wordmark` left at the kit's own
+  // `null` default — "side by side the word" is already inside the artwork)
+  // — this app still builds the mark NODE itself, for the size override and
+  // the click-to-home behaviour neither of which the kit's default mark
+  // carries (see the note on `railBrandMark` for why those two stay
+  // app-side and why the alignment itself does not), and the note
   // on `railEdgeToggle` for where the collapse control lives now).
   //
   // THE ACCOUNT MENU (profile / settings / appearance / sign out) has no home
@@ -1199,14 +1216,13 @@ export function AppShell({
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} collapsed={collapsed} />
         </div>
       )}
-      {/* pb-6, DOUBLED FROM THE RAIL'S OWN pb-3 RHYTHM (client, 31 Aug 2026:
-          "leave air underneath it before starting with the sections") — the
-          one gap in this column that is bigger than its neighbours, on
-          purpose, because the client asked for air under the mark
-          specifically and not for the whole rail to breathe more. */}
-      <div className="pb-6">
-        <NavBrandHeader collapsed={collapsed} homeLabel={t("Go to Welcome")} spine={spine} />
-      </div>
+      {/* THE MARK ITSELF IS NO LONGER DRAWN HERE — it moved into Rail's own
+          `mark` prop below (see `railBrandMark`'s own header for why), so
+          the kit's `rail-brand` slot positions it, and the "air underneath
+          it before starting with the sections" the client asked for
+          (31 Aug 2026) is the rail's own root `gap-[var(--space-6)]` between
+          that slot and the nav, not a `pb-6` this file no longer needs to
+          spend by hand. */}
       {homeStandalone.map((item) => (
         <div key={item.slug} className="pb-3">
           <StandaloneNavItem
@@ -1282,8 +1298,7 @@ export function AppShell({
           groups={railGroups}
           current={activeRailId}
           spine={spine}
-          mark={null}
-          wordmark={null}
+          mark={railBrandMark(collapsed, t("Go to Welcome"), spine)}
           member={null}
           label={t("Sections")}
           collapsed={collapsed}

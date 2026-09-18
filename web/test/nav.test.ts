@@ -180,7 +180,8 @@ describe("the sidebar sequence the client fixed", () => {
     // Home to leave the rail altogether ("remove home from navbar, make that
     // when we click the icon kwapso on top of sidebar it takes us there"), so
     // `home` in NAV now carries `inRail: false` like Settings and Kwapso, and
-    // the brand mark is its only door (NavBrandHeader, app-shell.tsx). This
+    // the brand mark is its only door (`railBrandMark`, app-shell.tsx, handed
+    // to the kit Rail's own `mark` slot). This
     // composition reads the same `inRail` field the shell does, so an empty
     // array here is the correct answer, not a regression.
     expect(composeLikeTheShell().home).toEqual([])
