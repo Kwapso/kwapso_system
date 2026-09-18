@@ -27,7 +27,7 @@ import {
   tasksKey,
   totalKey,
 } from "@/lib/live-resources"
-import { invalidate, primeCache, readCache } from "@shared/web/store"
+import { invalidate, mergePage, primeCache, readCache, removeFromPage } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { Translate } from "@shared/web/format"
 import type { AccountFormValues } from "@/components/accounts/account-form-dialog"
@@ -197,11 +197,15 @@ export function useScreenActions(teamId: string | null) {
             payload.id,
             payload.done === "true"
           )
-          // The door answers with the OPEN list, which is the one the row just
-          // left (or rejoined) — so that one is primed and the ALL list, which
-          // this response is not, is dropped and re-read. R16: both badges come
-          // back from the same write, so neither goes stale behind the other.
-          primeCache(tasksKey(teamId, "open"), tasks)
+          // The row just LEFT the open list (ticked done) or REJOINED it (put
+          // back) — never merely "changed within it", so the open cache is
+          // spliced directly rather than replaced wholesale with the touched
+          // row: remove on done, merge back in on undone. The ALL list, which
+          // this response does not carry, is dropped and re-read. R16: both
+          // badges come back from the same write, so neither goes stale behind
+          // the other.
+          if (payload.done === "true") removeFromPage(tasksKey(teamId, "open"), "id", payload.id)
+          else mergePage(tasksKey(teamId, "open"), "id", tasks as unknown as Record<string, unknown>[])
           primeCache(totalKey("tasks", teamId), openTotal)
           primeCache(totalKey("tasks-all", teamId), allTotal)
           invalidate(tasksKey(teamId, "all"))

@@ -79,7 +79,7 @@ import { formatRelative } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
-import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { mergePage, invalidate, primeCache, removeFromPage, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -616,8 +616,12 @@ export function HelpDetailScreen({
       run: () =>
         runArchive(
           async () => {
-            const { tickets } = await content.archiveHelp(helpId, true)
-            primeCache(`help:${teamId}`, tickets)
+            // Archiving takes the ticket OUT of the everyday (live) list this
+            // cache holds — a merge would be exactly wrong the moment it no
+            // longer belongs, so it is spliced out directly rather than the
+            // cache being replaced wholesale with the one-row reply.
+            await content.archiveHelp(helpId, true)
+            removeFromPage(`help:${teamId}`, "id", helpId)
             invalidate(recordActivityKey("help", helpId))
           },
           t("Put away."),
@@ -629,8 +633,10 @@ export function HelpDetailScreen({
   async function restoreTicket() {
     setStatusBusy(true)
     try {
+      // Restoring puts the ticket BACK into the everyday list — the row this
+      // call touched rejoins it, so merge (not replace) is correct here.
       const { tickets } = await content.archiveHelp(helpId, false)
-      primeCache(`help:${teamId}`, tickets)
+      mergePage(`help:${teamId}`, "id", tickets as unknown as Record<string, unknown>[])
       invalidate(recordActivityKey("help", helpId))
       toast.success(t("Taken back out."))
     } catch (err) {
