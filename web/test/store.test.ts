@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
-import { mergePage, invalidate, patchRow, primeCache, reconcile, useCached } from "@shared/web/store"
+import { mergePage, invalidate, patchRow, primeCache, reconcile, removeFromPage, useCached } from "@shared/web/store"
 
 type Row = Record<string, unknown>
 
@@ -292,5 +292,42 @@ describe("mergePage", () => {
   it("cold key: the page simply becomes the value", () => {
     mergePage("mp:cold", "id", [{ id: "z", v: 1 }])
     expect(readCache("mp:cold")).toEqual([{ id: "z", v: 1 }])
+  })
+})
+
+// MERGE PAGE'S OPPOSITE: a write reply that just moved the touched row OUT of
+// the view its own door answers for — a task ticked done leaving "open", a
+// ticket archived leaving the everyday list — cannot be `mergePage`d back in,
+// because merging is exactly wrong the moment the row no longer belongs.
+describe("removeFromPage", () => {
+  it("splices the row out by id and notifies subscribers — no refetch", () => {
+    const key = freshKey()
+    primeCache(key, [{ id: "a", v: 1 }, { id: "b", v: 1 }, { id: "c", v: 1 }])
+    // A subscriber mounted BEFORE the removal, exactly as a screen already
+    // showing the list would be — proves the update reaches it live, without
+    // it ever calling its fetcher again (the fetcher below would fail the test
+    // if it ran, since it returns something else entirely).
+    const hook = renderHook(() =>
+      useCached<Row[]>(key, async () => {
+        throw new Error("removeFromPage must not trigger a refetch")
+      })
+    )
+    expect(hook.result.current.data).toEqual([{ id: "a", v: 1 }, { id: "b", v: 1 }, { id: "c", v: 1 }])
+    act(() => removeFromPage(key, "id", "b"))
+    expect(hook.result.current.data).toEqual([{ id: "a", v: 1 }, { id: "c", v: 1 }])
+    hook.unmount()
+  })
+
+  it("an id that was never cached is a no-op, not an error", () => {
+    const key = freshKey()
+    primeCache(key, [{ id: "a", v: 1 }])
+    removeFromPage(key, "id", "does-not-exist")
+    expect(readCache(key)).toEqual([{ id: "a", v: 1 }])
+  })
+
+  it("a cold key is a no-op — nothing loaded to remove from", () => {
+    const key = freshKey()
+    expect(() => removeFromPage(key, "id", "a")).not.toThrow()
+    expect(readCache(key)).toBeUndefined()
   })
 })

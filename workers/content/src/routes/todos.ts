@@ -160,11 +160,18 @@ async function todoPage(
  * reason. `createTodo` already resolves the write door needed no second lookup
  * to answer with an id (`created.id`); this always re-reads the row so the
  * reply carries the same fields the list would have for it. */
+/** `withFacets` defaults OFF for the extra sidecar fields — census of every UI
+ * caller of the two doors that reach this (2026-09-18): `raiseTodo` (create)
+ * and `cancelTodo` are both called and never destructured beyond throwing the
+ * result away, so neither reads a single facet field. `total` itself always
+ * rides `countTodos`, the one grouped query either way, so its accuracy costs
+ * nothing extra. */
 async function todoMutationReply(
   cfg: Parameters<typeof listTodos>[0],
   guard: Parameters<typeof listTodos>[1],
   scope: AccountScope,
-  id: string
+  id: string,
+  withFacets = false
 ): Promise<Response> {
   const [one, counts] = await Promise.all([
     getTodo(cfg, guard, scope, id),
@@ -173,14 +180,16 @@ async function todoMutationReply(
   return pagedJson(
     "todos",
     { rows: one ? [one] : [], total: todoViewTotal(counts, "open"), hasMore: false, nextCursor: null },
-    {
-      openTotal: counts.open,
-      doneTotal: counts.done,
-      allTotal: counts.all,
-      waitingTotal: counts.waiting,
-      overdueTotal: counts.overdue,
-      receivedTotal: counts.received,
-    }
+    withFacets
+      ? {
+          openTotal: counts.open,
+          doneTotal: counts.done,
+          allTotal: counts.all,
+          waitingTotal: counts.waiting,
+          overdueTotal: counts.overdue,
+          receivedTotal: counts.received,
+        }
+      : {}
   )
 }
 
@@ -379,7 +388,7 @@ export async function postCancelTodo(request: Request, env: Env): Promise<Respon
   const id = requireText(body.id, "To-do", TEXT_LIMITS.short)
   const { moved, accountId } = await cancelTodo(cfg, guard, actor, id)
   if (moved) await publishChange(env, guard.teamId, "todos", id, "edit", accountId ?? undefined)
-  return todoPage(cfg, guard, scope, { view: "open" }, null)
+  return todoMutationReply(cfg, guard, scope, id)
 }
 
 /** GET /api/content/portal/delivery — the client's own picture of the work they
@@ -474,11 +483,22 @@ async function taskPage(
 /** WHAT A MUTATION ANSWERS WITH: the row it just touched, never the open pile's
  * whole page — the same fix as `help.ts`'s `ticketMutationReply`. Neither
  * `createTask` nor `updateTask` used to surface the row's own id at all; this
- * always re-reads it, so create and update both now do. */
+ * always re-reads it, so create and update both now do.
+ *
+ * `withFacets` defaults OFF for the EXTRA sidecar fields only (`total` itself
+ * always rides `countTasks`, the same one grouped query either way — there is
+ * no cheaper "total-only" read to fall back to, so accuracy there costs
+ * nothing). Census of every UI caller (2026-09-18): task-detail.tsx's save and
+ * tasks-screen.tsx's addTask/movePriority read only `tasks`/nothing at all, no
+ * facet field. Only `"tasks.done"` (web/lib/use-screen-actions.ts) reads
+ * `openTotal`/`allTotal` off this reply to prime the two total caches — that
+ * call passes `true`, and gets all nine rather than two because they come off
+ * the one query for free. */
 async function taskMutationReply(
   cfg: Parameters<typeof listTasks>[0],
   guard: Parameters<typeof listTasks>[1],
-  id: string
+  id: string,
+  withFacets = false
 ): Promise<Response> {
   const [one, counts] = await Promise.all([
     getTask(cfg, guard, id),
@@ -488,15 +508,19 @@ async function taskMutationReply(
     "tasks",
     { rows: one ? [one] : [], total: counts.open, hasMore: false, nextCursor: null },
     {
-      openTotal: counts.open,
-      allTotal: counts.all,
-      overdueTotal: counts.overdue,
-      plannedTotal: counts.planned,
-      upcomingTotal: counts.upcoming,
-      completedTotal: counts.completed,
-      calendarTotal: counts.calendar,
-      dueTodayTotal: counts.dueToday,
-      dueTodayDone: counts.dueTodayDone,
+      ...(withFacets
+        ? {
+            openTotal: counts.open,
+            allTotal: counts.all,
+            overdueTotal: counts.overdue,
+            plannedTotal: counts.planned,
+            upcomingTotal: counts.upcoming,
+            completedTotal: counts.completed,
+            calendarTotal: counts.calendar,
+            dueTodayTotal: counts.dueToday,
+            dueTodayDone: counts.dueTodayDone,
+          }
+        : {}),
       id,
     }
   )
@@ -753,5 +777,7 @@ export async function postTaskDone(request: Request, env: Env): Promise<Response
   if (typeof body.done !== "boolean") return fail(400, "invalid_input", "done must be true or false.")
   const { moved, accountId } = await setTaskDone(cfg, guard, actor, id, body.done)
   if (moved) await publishChange(env, guard.teamId, "tasks", id, "edit", accountId ?? undefined)
-  return taskPage(cfg, guard, { view: "open" })
+  // withFacets: "tasks.done" (web/lib/use-screen-actions.ts) primes the open/
+  // all total caches off this reply's openTotal/allTotal.
+  return taskMutationReply(cfg, guard, id, true)
 }
