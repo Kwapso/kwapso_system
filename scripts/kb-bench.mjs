@@ -38,11 +38,16 @@
 //
 // ── WHAT IT COSTS ───────────────────────────────────────────────────────────
 //
-// One embedding call per question (a few thousand tokens, on Workers AI) and one
-// Vectorize query each. It never asks for `compose`, so it spends nothing from
-// the team's own AI allowance — composing is the only act on this module that
-// draws it. The token comes from the Keychain, like every other script here.
-// Nothing is written: every statement this runs is a SELECT.
+// One embedding call per question (a few thousand tokens, on Workers AI), one
+// Vectorize query, and — by default, since BUILD-5 §J — one reader call
+// (`readShortlist`, the same cheap judgment `payToRead` makes on the real
+// door, ≈$0.0027 per COSTS.md's "one knowledge question"; `--no-read` skips
+// it). It never asks for `compose`, so composing is the only act on this
+// module that draws from the team's own AI allowance — the reader call above
+// goes straight to Workers AI over the Keychain token, same as the embed and
+// the query, never through the door's own gate/meter. The token comes from
+// the Keychain, like every other script here. Nothing is written: every
+// statement this runs is a SELECT.
 //
 import "./lib/shared-alias.mjs"
 
@@ -58,6 +63,18 @@ const VERBOSE = process.argv.includes("--verbose")
 /** GRADE THE ANSWER TOO — off by default, because it is the half that costs.
  * See "WHAT IT COSTS" above and `composeScore` below. */
 const COMPOSE = process.argv.includes("--compose")
+/** BUILD-5 §J (18 Sep 2026) — ON BY DEFAULT, MATCHING PRODUCTION.
+ * `KNOWLEDGE_ASK_READ_COMPOSE_DEFAULT` (workers/content/src/routes/knowledge.ts)
+ * turned the reader on by default for every real caller on 16 Sep 2026 — this
+ * bench never followed, and kept measuring the strictly weaker, reader-off
+ * path nobody actually gets. Found live: "What happened at the Team Assembly
+ * meeting in August?" wanted a second, genuinely relevant source (a Google
+ * Meet notes email covering the same meeting) that scores under the strict
+ * floor (MIN_VECTOR_SCORE) on raw vector similarity alone — exactly the
+ * shape the reader exists to rescue, widening to READER_HALLUCINATION_FLOOR
+ * and letting a real judgment decide instead of a naive cutoff. `--no-read`
+ * opts back into the old, floor-only measurement for a cheaper run. */
+const READ = !process.argv.includes("--no-read")
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
@@ -88,6 +105,7 @@ function productionComposeModel() {
 
 const { retrieve } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
 const { writeAnswer } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts"))
+const { readShortlist } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge-reader.ts"))
 
 /* ------------------------------ the REST doors ----------------------------- */
 
@@ -440,6 +458,20 @@ for (const [i, q] of QUESTIONS.entries()) {
       // after `found` is settled, so a question the base refuses costs nothing
       // — which is also why the four refusals here are free.
       compose: COMPOSE ? (material, sources) => writeAnswer(env, q.q, material, sources) : undefined,
+      // On by default (READ) — see this flag's own header. `retrieve` only
+      // ever reaches this after widening its own floor and building a
+      // shortlist worth reading, exactly as the real door's gate does before
+      // calling `payToRead`; this calls the same `readShortlist` underneath,
+      // unwrapped, the same way `--compose` calls `writeAnswer` unwrapped.
+      // KB_DEBUG_READER=1 prints the titles in the shortlist the reader was
+      // actually shown, before its own judgment — the fastest way to tell "the
+      // reader never saw this passage" from "the reader saw it and said no".
+      read: READ
+        ? (question, shortlist) => {
+            if (process.env.KB_DEBUG_READER) console.log("SHORTLIST:", shortlist.map((p) => p.title))
+            return readShortlist(env, question, shortlist)
+          }
+        : undefined,
     })
   } catch (e) {
     console.log(`${label} FAIL  ${q.q.slice(0, 68)}  — threw: ${String(e).slice(0, 100)}`)
