@@ -1336,13 +1336,17 @@ function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
 
    ── THE RESULT, AND WHY IT IS SPELLED AS THE DEFAULT PLUS ONE ─────────────
 
-   ID · Title · Type · App · Raised · Closed is her four-column ruling of
+   ID · Title · Type · App · Raised · Closed was her four-column ruling of
    2026-09-06 (Title · Type · App · Raised) with the ID column restored ahead
-   of it and the closing date added to the end. Written that way below rather
-   than as six literals, because that is what it IS: the Closed tab is every
-   other tab plus the one fact only it can tell the truth about — and it lands
-   on R82's six-column ceiling exactly, which is the reason nothing more may
-   join `TICKET_COLUMNS_DEFAULT` without dropping one first.
+   of it and the closing date added to the end — and it landed on R82's
+   six-column ceiling exactly, which is why nothing more could join
+   `TICKET_COLUMNS_DEFAULT` without dropping one first.
+
+   AMENDED 18 SEP 2026: "raised separate by and date! not in one together"
+   split Raised into `raisedBy` (who, with their face) and `created` (when),
+   which is what pushed `TICKET_COLUMNS_DEFAULT` itself to six and forced the
+   drop — see `helpTabColumns`'s own header for which column gave way on this
+   tab and why.
 
    ── WHY IT IS A RULE OVER TOKENS AND NOT AN `if (facet === CLOSED)` ───────
 
@@ -1382,7 +1386,14 @@ function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
  * sharing the "Title" header with the name beside it, so a reader scanning the
  * header row sees "ID" over the column that answers "which ticket", the same
  * way every other fact here has its own label. */
-export type TicketColumn = "id" | "title" | "type" | "app" | "created" | "closed"
+/** `"raisedBy"` JOINED THE VOCABULARY 18 SEP 2026 — the client's ruling,
+ * verbatim: "raised separate by and date! not in one together." Every ticket
+ * list used to fold "who" and "when" into one `created` cell (a face+name
+ * stacked over a date, or just a date on this table); now WHO is its own
+ * column, ahead of WHEN, and `created` keeps its old name and its old cell
+ * (the date alone) rather than being renamed — the header it already draws,
+ * "Raised", is exactly right for a column that is now only ever a date. */
+export type TicketColumn = "id" | "title" | "type" | "app" | "raisedBy" | "created" | "closed"
 
 /** LEFT TO RIGHT, ONCE, FOR EVERY TAB. A tab chooses WHICH facts it shows and
  * never in what order they sit — the header row and the body row are both laid
@@ -1395,33 +1406,50 @@ export const TICKET_COLUMN_ORDER: readonly TicketColumn[] = [
   "title",
   "type",
   "app",
+  "raisedBy",
   "created",
   "closed",
 ]
 
-/** THE FIVE EVERY TAB DRAWS: ID, then the client's own four-column order of
- * 2026-09-06 (Title · Type · App · Raised). Until 17 Sep 2026 the reference
- * was not a column at all — it led the TITLE cell instead ("put the ID before
- * the title to the left") — but her later ruling asked for the header itself,
- * so the same black `RecordRef` chip (`shared/web/record-ref.tsx`, the one
- * component that draws one anywhere in either front door — `web/test/
- * one-black-chip.test.ts` still holds that) now sits under a header of its
- * own, first, and the Title cell carries the name alone. */
-export const TICKET_COLUMNS_DEFAULT: readonly TicketColumn[] = ["id", "title", "type", "app", "created"]
+/** THE SIX EVERY ORDINARY TAB DRAWS: ID, then the client's own four-column
+ * order of 2026-09-06 (Title · Type · App · Raised), with "Raised" split into
+ * WHO and WHEN (18 Sep 2026: "raised separate by and date! not in one
+ * together"). Until 17 Sep 2026 the reference was not a column at all — it
+ * led the TITLE cell instead ("put the ID before the title to the left") —
+ * but her later ruling asked for the header itself, so the same black
+ * `RecordRef` chip (`shared/web/record-ref.tsx`, the one component that draws
+ * one anywhere in either front door — `web/test/one-black-chip.test.ts` still
+ * holds that) now sits under a header of its own, first, and the Title cell
+ * carries the name alone. */
+export const TICKET_COLUMNS_DEFAULT: readonly TicketColumn[] = [
+  "id",
+  "title",
+  "type",
+  "app",
+  "raisedBy",
+  "created",
+]
 
-/** WHICH COLUMNS ONE TAB'S TABLE DRAWS. */
+/** WHICH COLUMNS ONE TAB'S TABLE DRAWS.
+ *
+ * THE CLOSED TAB'S OWN BUDGET, RE-DRAWN 18 SEP 2026. Her "raised separate by
+ * and date" ruling widened `TICKET_COLUMNS_DEFAULT` from five to six, which
+ * is exactly R82's ceiling on its own — so a tab that adds `closed` on top of
+ * it (as this one always has: "columns for close: title (with id), type, app,
+ * raised closed") would draw SEVEN. R82's own prescription is to fold the
+ * extra fact onto an existing column's second line, and there is no second
+ * line to fold it onto here — the id chip already leads the title, and the
+ * two dates (raised, closed) are the very columns this ruling just forbade
+ * from sharing a cell. So something is DROPPED rather than folded: `app`,
+ * because it is the one column on this tab that is ALSO a toolbar facet — the
+ * App filter sits right above this table (`helpTabFacets`) — so the fact
+ * survives the subtraction in a way "who raised it" and "when it closed" do
+ * not. `id`, `title`, `type`, `raisedBy`, `created` (Raised) and `closed`:
+ * six, her order, minus the one column a reader can still narrow by from the
+ * toolbar. */
 export function helpTabColumns(facet: HelpFacet): readonly TicketColumn[] {
   return helpTabPinnedStatus(facet) === "resolved"
-    ? // HER REVISED SET, 2026-09-09 (second reading): "columns for close: title
-      // (with id), type, app, raised closed". Spelled as the default plus the
-      // closing date because that is what it is — every other tab's row, plus
-      // the one fact only a resolved-pinned tab can state without lying.
-      // "(with id)" now reads literally: `TICKET_COLUMNS_DEFAULT` carries its
-      // own `id` column (17 Sep 2026 ruling, see the block above this
-      // function), so the Closed tab gets it for free rather than needing a
-      // seventh literal — which is as well, since a seventh would break
-      // R82's six-column ceiling.
-      [...TICKET_COLUMNS_DEFAULT, "closed"]
+    ? [...TICKET_COLUMNS_DEFAULT.filter((c) => c !== "app"), "closed"]
     : TICKET_COLUMNS_DEFAULT
 }
 

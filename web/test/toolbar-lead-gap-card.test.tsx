@@ -71,7 +71,7 @@ import { cleanup, render } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 import ts from "typescript"
 
-import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import { renderFolderTabs, defaultTabsConfig, TabsView } from "@shared/web/screen-engine/tabs-view"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
@@ -244,6 +244,171 @@ describe("R83 amendment -- the card owes no second leading gap above a toolbar i
       paddingRule
     )
     expect(flushZero, "same, for --pinned-lead").not.toMatch(leadRule)
+  })
+})
+
+// ============================================================================
+// R83 EXTENDED, 18 Sep 2026 -- A RECORD'S OWN TAB PANE PAYS THE SAME
+// REMAINDER, NOT THREE STACKED GAPS. Client ruling, verbatim: "on app /
+// tickets the space above the toolbar is huge and inocrrect!!! review
+// app-wide!"
+// ============================================================================
+// `.pinned-strip + [data-slot="card"]` above only reaches a card that is the
+// STRIP's own next sibling. Inside a record's own tab (App > Tickets,
+// Account > Tickets, any `*-detail.tsx` built on `TabsView`'s `renderPanel`),
+// the strip (`STICKY_TABS`, record-chrome.tsx) is a SIBLING OF THE WHOLE
+// PANE (`TabsContent`), never of the card two levels down -- and it never
+// wears `.pinned-strip` either, only a COLLECTION's own strip
+// (`STICKY_FOLDER_TABS`) does. So this shape was invisible to the rule above
+// on both counts, and the nested card paid its own full leading inset on top
+// of the `<Tabs>` root's own flex gap on top of the strip's own
+// `--record-tab-gap` -- three numbers where every other screen pays one.
+//
+// FIXED AT THE SEAM: `TabsView` (shared/web/screen-engine/tabs-view.tsx)
+// marks every `TabsContent` it renders through `renderPanel` with
+// `data-tab-pane`, unconditionally -- so every record-detail screen is
+// covered by construction, never by a per-screen census. `globals.css`
+// reaches a card nested inside that pane by a DESCENDANT selector (the card
+// sits at variable depth: `ModulesPanel` renders it directly, anything built
+// on `PagedPanelBody`/`PagedFind` puts one flow `<div>` in between) narrowed
+// by `:first-child`, so only a pane whose collection genuinely leads is
+// touched -- the same restraint the strip-adjacency rule above already
+// applies to the top-level case.
+describe("R83 extended -- a record's own tab pane pays the same remainder, never three stacked gaps", () => {
+  it("DOM: TabsView marks every renderPanel TabsContent with data-tab-pane, and the descendant + :first-child selector reaches a card whether it is a direct child (ModulesPanel's own shape) or one flow div deep (PagedPanelBody/PagedFind's own shape)", () => {
+    function DirectCardPane() {
+      return (
+        <TabsView
+          config={{
+            ...defaultTabsConfig,
+            tabs: [{ value: "modules", label: "Modules", icon: "", badge: "", badgeVariant: "" }],
+          }}
+          value="modules"
+          renderPanel={() => (
+            <CollectionCard>
+              <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                <div data-slot="toolbar-row-column">the toolbar</div>
+              </div>
+              <div data-testid="rows">the rows</div>
+            </CollectionCard>
+          )}
+        />
+      )
+    }
+    render(<DirectCardPane />)
+
+    const pane = document.querySelector("[data-tab-pane]")
+    expect(pane, "TabsView must mark the renderPanel TabsContent with data-tab-pane").toBeTruthy()
+
+    const directCard = pane!.querySelector('[data-slot="card"]')
+    expect(directCard, "ModulesPanel's own shape: CollectionCard is TabsContent's DIRECT child").toBeTruthy()
+    expect(directCard === pane!.firstElementChild, "the card must be the pane's first child here").toBe(true)
+
+    cleanup()
+
+    function NestedCardPane() {
+      return (
+        <TabsView
+          config={{
+            ...defaultTabsConfig,
+            tabs: [{ value: "tickets", label: "Tickets", icon: "", badge: "", badgeVariant: "" }],
+          }}
+          value="tickets"
+          renderPanel={() => (
+            // PagedFind's own shape (paged-find.tsx): one flow <div> around
+            // the `wrap`-supplied CollectionCard -- `renderFolderTabs(tabs)`
+            // renders null here (no `tabs` prop), so the card is still the
+            // wrapper's only real DOM child.
+            <div className="flex w-full flex-col">
+              <CollectionCard>
+                <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                  <div data-slot="toolbar-row-column">the toolbar</div>
+                </div>
+                <div data-testid="rows">the rows</div>
+              </CollectionCard>
+            </div>
+          )}
+        />
+      )
+    }
+    render(<NestedCardPane />)
+
+    const pane2 = document.querySelector("[data-tab-pane]")
+    const nestedCard = pane2!.querySelector('[data-slot="card"]')
+    expect(nestedCard, "PagedPanelBody's own shape: CollectionCard sits one flow div deep").toBeTruthy()
+    expect(
+      nestedCard === nestedCard!.parentElement?.firstElementChild,
+      "the card must still be the FIRST CHILD of its own immediate parent, whatever the depth"
+    ).toBe(true)
+  })
+
+  it("CSS: globals.css reaches a card nested inside a tab pane by [data-tab-pane] descendant + :first-child, and pays the IDENTICAL strip remainder -toolbar-lead-gap minus -tab-content-gap, never a third number", () => {
+    const css = readFileSync(join(ROOT, "web", "app", "globals.css"), "utf8")
+    const remainder = "calc(var(--toolbar-lead-gap) - var(--tab-content-gap))"
+
+    const leadRule = new RegExp(
+      String.raw`\[data-tab-pane\]\s+\[data-slot="card"\]:first-child\s*\{\s*--pinned-lead:\s*` +
+        escapeRe(remainder) +
+        String.raw`\s*;\s*\}`
+    )
+    const paddingRule = new RegExp(
+      String.raw`\[data-tab-pane\]\s+\[data-slot="card"\]:first-child\s*>\s*\[data-slot="card-content"\]\s*\{\s*padding-top:\s*` +
+        escapeRe(remainder) +
+        String.raw`\s*;\s*\}`
+    )
+
+    expect(
+      css,
+      'web/app/globals.css must set --pinned-lead to the same strip remainder on [data-tab-pane] [data-slot="card"]:first-child, so a PINNED toolbar inside a record tab lands at the identical distance a top-level one does'
+    ).toMatch(leadRule)
+    expect(
+      css,
+      "and the same remainder on that card's own CardContent padding-top, at rest"
+    ).toMatch(paddingRule)
+  })
+
+  it("SOURCE: tabs-view.tsx marks every renderPanel TabsContent with data-tab-pane unconditionally -- so a future record-detail screen is covered by construction, never by being added to a list", () => {
+    const src = readFileSync(join(ROOT, "shared", "web", "screen-engine", "tabs-view.tsx"), "utf8")
+    const stripped = stripComments(src, { keepLength: true })
+    expect(
+      stripped,
+      "the <TabsContent> inside TabsView's renderPanel branch must carry data-tab-pane"
+    ).toMatch(/<TabsContent[^>]*\bdata-tab-pane\b/)
+  })
+
+  it("RED PROOF: a card that is NOT the tab pane's own leading element -- the app-hosted Knowledge tab's own 'Ask' button sits above its gallery -- is correctly left untouched by the :first-child restraint", () => {
+    function AskThenCardPane() {
+      return (
+        <TabsView
+          config={{
+            ...defaultTabsConfig,
+            tabs: [{ value: "knowledge", label: "Knowledge", icon: "", badge: "", badgeVariant: "" }],
+          }}
+          value="knowledge"
+          renderPanel={() => (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-end">
+                <button type="button">Ask</button>
+              </div>
+              <CollectionCard>
+                <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+                  <div data-slot="toolbar-row-column">the toolbar</div>
+                </div>
+              </CollectionCard>
+            </div>
+          )}
+        />
+      )
+    }
+    render(<AskThenCardPane />)
+
+    const pane = document.querySelector("[data-tab-pane]")
+    const card = pane!.querySelector('[data-slot="card"]')
+    expect(card, "the card still renders").toBeTruthy()
+    expect(
+      card === card!.parentElement?.firstElementChild,
+      "the card is not its own parent's first child here -- the Ask button leads -- so :first-child correctly does not match, and this pane keeps its own, separately tracked shape rather than being silently pulled into today's fix"
+    ).toBe(false)
   })
 })
 

@@ -236,11 +236,19 @@ describe("the top close action, at every status the bottom composer used to cove
     expect(visible.length).toBeLessThanOrEqual(3)
   })
 
-  it("draws the standalone Edit pen — client ruling, 17 Sep 2026: \"just the pen\" — never mango (R84 leaves that to Close)", async () => {
+  // AMENDED 18 Sep 2026 — client ruling, verbatim: "edit button is never
+  // black (even when it's only one). f.e. in ticket detail the edit buton is
+  // black." This test used to pin `--btn-inverse-fill` (black) as the
+  // CORRECT colour, reasoning "Close already claims the one mango slot, so
+  // the pen is black"; her ruling corrects that reasoning rather than
+  // confirming it — the pen is quiet (`--btn-secondary-fill`, the kit's own
+  // icon-only answer) on every record screen, black or not.
+  it("draws the standalone Edit pen — client ruling, 17 Sep 2026: \"just the pen\" — quiet, never black and never mango (R84's 18 Sep 2026 amendment)", async () => {
     openTicket("triaged", [message("m1", false)])
     const region = titleRegion()
     const edit = await within(region).findByRole("button", { name: "Edit" })
-    expect(edit.className).toContain("--btn-inverse-fill")
+    expect(edit.className).toContain("--btn-secondary-fill")
+    expect(edit.className).not.toContain("--btn-inverse-fill")
     expect(edit.className).not.toContain("--btn-primary-fill")
     // JUST THE PEN — an icon-only control, no visible label text beside it.
     expect(edit.textContent?.trim()).toBe("")

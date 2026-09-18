@@ -371,8 +371,9 @@ describe("AgentTabStrip through the real AgentDockTabsSlot portal (agent-panel.t
   })
 
   // THE LIVE-PAGE REGRESSION, 17 Sep 2026 — "I still cannot switch or close
-  // tabs." Measured on staging (main 1a1a86c3) with real mouse clicks in
-  // headless Chromium (scratchpad/assistant-clicks.mjs): a genuine
+  // tabs." Measured on staging (main 1a1a86c3) with a headless-Chromium
+  // script driving real mouse clicks against the deployed tab strip — a
+  // throwaway live-measurement script, not a file this repo keeps: a genuine
   // pointerdown+pointerup on the × — no drag, no movement — produces
   // `Element.setPointerCapture` on the tab's own `<li>` (the kit's
   // `onTabPointerDown`, `breadcrumb-folders.tsx`, fires on ANY primary-button

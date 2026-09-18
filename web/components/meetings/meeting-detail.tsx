@@ -46,7 +46,8 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { ArrowSquareOut, FileText, PencilSimple, Power, Video } from "@shared/ui/foundations/icons"
+import { ArrowSquareOut, FileText, Power, Video } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
@@ -400,7 +401,7 @@ export function MeetingDetailScreen({
             {
               value: "calendar",
               label: t("In the calendar"),
-              icon: "calendar",
+              icon: "calendar-blank",
               // NO BADGE, and the rule caught this rather than a reviewer: the
               // mirrored guest list is CAPPED by the calendar read that produced
               // it, so its length is a ceiling and not a count (R16). An
@@ -583,12 +584,12 @@ export function MeetingDetailScreen({
       subtitle={formatDateTime(item.startsAt, lang)}
       actions={
         <>
-          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-          {canEdit && (
-            <Button size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
+          {/* NEVER BLACK OR MANGO (client ruling, 18 Sep 2026: "edit button
+              is never black (even when it's only one)") — this button had
+              carried NO `variant` at all, which is `Button`'s own default,
+              mango, one of the two colours her ruling names. `EditPenButton`
+              is the one shared, always-quiet answer now. */}
+          {canEdit && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
         </>
       }

@@ -105,6 +105,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Envelope, PencilSimple, UserMinus, UserSwitch } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { gateState } from "@shared/web/screen-engine/recipe"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { invalidate, primeCache } from "@shared/web/store"
@@ -408,16 +409,7 @@ export function MemberScreen({
                 "edit, only the pencil icon", client ruling 2026-08-31) — the
                 head's own edit pencil, made VISIBLE per the 2026-09-15 ruling
                 quoted above, never behind a hover state or the overflow. */}
-            {canEditProfile && (
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={() => setEditProfile(true)}
-                aria-label={t("Edit")}
-              >
-                <PencilSimple className="size-3.5" />
-              </Button>
-            )}
+            {canEditProfile && <EditPenButton onClick={() => setEditProfile(true)} label={t("Edit")} />}
             <RecordActionsMenu
               actions={[...accountMenuActions, ...changeRoleMenuActions, ...removeMenuActions]}
             />

@@ -2221,10 +2221,42 @@ const ASIDE_BODY = cn("");
    WHAT THE RAIL LOSES BY IT, honestly: its content box grows from 150 to 157.5
    wide in a 195 column, so a truncating destination label gets 7.5px more room
    — a gain, not a loss. Nothing in `rail.tsx` writes a width, and its rows all
-   fill the column's content box, so there is nothing to re-derive there. */
+   fill the column's content box, so there is nothing to re-derive there.
+
+   HALVED, 18 SEP 2026 — CLIENT RULING, VERBATIM: "reduce the margin between
+   the super far edge of screen and the side navbar, same as reduce it
+   between side navbar and main content. keep spacing equal on both sides -
+   but reduce (i'd say to half of what it is, but i dont see the pixels,
+   just human eye)." Both edges she named are THIS one token: `RAIL_COLUMN`
+   (the rail dock's own `p-[var(--rail-inset)]`, above) pads all four sides
+   of the rail column at once — the LEADING edge is "screen edge to
+   navbar", the TRAILING edge is "navbar to main content" (the content
+   column's own matching `pe-[var(--shell-gutter)]` was removed outright
+   back on 2026-09-06 — see the rail dock's own comment, below — for exactly
+   this reason: one token, not two that happen to agree). So "keep spacing
+   equal on both sides" was already structurally guaranteed before this
+   ruling — a single padding value cannot drift between its own left and
+   right edges — and the only real instruction left is "reduce it, by half."
+
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, 16px root,
+   BEFORE this change: `[data-slot="rail"]` left edge 19px from the
+   viewport (the leading `--rail-inset`); `[data-slot="rail"]` right edge
+   187px against `[data-slot="screen-shell-body"]` left edge 207px, a 20px
+   gap (the trailing `--rail-inset`) — both edges reading the SAME `--space-5`
+   (20px) token, confirming the equality above.
+
+   HALF OF 20 IS 10, AND THE SCALE ALREADY OWNS THAT EXACT RUNG — NO ROUNDING
+   NEEDED. `--space-2h` (0.625rem, 10px at this root) is the identical
+   half-step token `TRAIL_GAP` and `DENSITY_TRAIL`'s own `pt` already reach
+   for elsewhere in this file for an identical "half of the current figure"
+   ruling; reusing it here rather than a `calc()` keeps every half-step on
+   this file's pages the same handful of named tokens. `check-screen-shell.mjs`
+   pins this value and the continued absence of a second content-side gutter,
+   so the two edges cannot drift apart again either by a wrong edit here or by
+   `pe-[var(--shell-gutter)]` quietly coming back on the content column. */
 const DENSITY_RAIL: Record<ScreenDensity, string> = {
-  comfortable: "[--rail-inset:var(--space-5)]",
-  calm: "[--rail-inset:var(--space-5)]",
+  comfortable: "[--rail-inset:var(--space-2h)]",
+  calm: "[--rail-inset:var(--space-2h)]",
 };
 
 /* STEPPED DOWN ONE RUNG WITH `--shell-gutter`, 2026-09-17, TO KEEP THE
@@ -2286,13 +2318,18 @@ const DENSITY_ASIDE: Record<ScreenDensity, string> = {
    edge). See `verify/shell-gutter/` for the rendered before/after on the
    card's and the aside's own rects at 1440x900.
 
-   `--rail-inset` (`DENSITY_RAIL`, above) IS DELIBERATELY LEFT AT
-   `--space-5`. Today's ruling names "the main content and the assistant",
-   not the rail, and this lane's brief scopes it the same way. Leaving the
-   two apart REOPENS the 22.5-against-18.75 mismatch `DENSITY_RAIL`'s own
-   header spent a full ruling closing on 2026-09-06 (now 18.75-against-15) —
-   noted, not fixed, in the CHANGELOG for whoever next touches the rail's own
-   gutter to decide on purpose rather than by drift. */
+   `--rail-inset` (`DENSITY_RAIL`, above) WAS LEFT AT `--space-5` HERE — the
+   17 Sep ruling named "the main content and the assistant", not the rail,
+   and that lane's brief scoped it the same way, reopening the
+   20-against-16 mismatch `DENSITY_RAIL`'s own header spent a full ruling
+   closing on 2026-09-06. CLOSED THE NEXT DAY, 18 SEP 2026, by a ruling that
+   DOES name the rail directly ("the super far edge of screen and the side
+   navbar... side navbar and main content") — see `DENSITY_RAIL`'s own
+   comment for that fix. The two tokens remain independent by design (this
+   ruling never asked them to read the same value, only that `--rail-inset`
+   itself keep its own two edges equal, which it already did structurally)
+   — `--shell-gutter` is `--space-4` (16px), `--rail-inset` is now
+   `--space-2h` (10px), and neither drifting from the other is a defect. */
 const DENSITY_GUTTER: Record<ScreenDensity, string> = {
   comfortable: "[--shell-gutter:var(--space-4)]",
   calm: "[--shell-gutter:var(--space-4)]",
@@ -2328,50 +2365,53 @@ const DENSITY_HEADER: Record<ScreenDensity, string> = {
 };
 
 /* THE TRAIL'S OWN INSET, NOW THAT IT LIVES INSIDE THE CARD — see the `trail`
-   prop's own doc for the 17 Sep AFTERNOON ruling that moved it here. "The
-   card's own inset on the left so the arrows align with the title's left
-   edge" is not a new number: it is `DENSITY_HEADER`'s OWN `px-*` value,
-   copied rather than derived, because the title the arrows must align with
-   is `band`'s content and `band` is padded by `DENSITY_HEADER`. Copied
-   rather than sliced out of `DENSITY_HEADER` itself (Tailwind's `px-`
-   shorthand in that record is not decomposable at runtime without a second
-   parse) — both records read the identical `--space-7` / `--space-6` custom
-   properties, so the two horizontal insets cannot drift independently; a
-   change to either token moves both. No `pt`/`pb` of its own: the trail
-   sits flush with the card's own top edge and `TRAIL_GAP` (below) supplies
-   the one gap between it and whatever follows — see that constant for why
-   the head must move down by EXACTLY the trail's height plus that gap, no
-   more.
+   prop's own doc for the 17 Sep AFTERNOON ruling that moved it here.
 
-   STEPPED DOWN ONE RUNG WITH `DENSITY_HEADER`, 2026-09-17, FOR THE SAME
-   REASON THE COMMENT ABOVE GIVES: this record's own `px` is a COPY of
-   `DENSITY_HEADER`'s, not a slice of it, so the two must be edited together
-   or the trail's arrows stop landing under the title's own left edge. See
-   `DENSITY_HEADER` for the ruling and the old/new numbers.
+   REBASED OFF `DENSITY_BODY`'S OWN TOKEN, 18 SEP 2026 — CLIENT RULING,
+   VERBATIM, MEASURED ON A TICKET RECORD: "pils and title are slightliy
+   wider that the topnavbar. should not be. they shoul be same width and
+   end at the same point in the left." Until today this record COPIED
+   `DENSITY_HEADER`'s own `px-*`, reasoned as "the title the arrows must
+   align with is `band`'s content and `band` is padded by `DENSITY_HEADER`"
+   — true only on a screen that HAS a header band. A record screen has none
+   (`RecordRoute` hands `ScreenShell` no `title`/`header` at all — see the
+   body-hosted-title check's own header, further down this file's checker)
+   — its title is drawn inside `screen-shell-body`, padded by `DENSITY_BODY`,
+   which spends `CARD_CONTENT_INSET_X` (`--space-3`) for its own `px`, a
+   SMALLER figure than `DENSITY_HEADER`'s `--space-6`/`--space-5`. So on
+   exactly the screen shape the trail actually ships on today, the arrows sat
+   `--space-6` minus `--space-3` (measured live: 231px against 223px, an 8px
+   gap) to the right of where the chips and title actually start.
 
-   `pt` ADDED, 2026-09-17 EVENING — S3. Client, verbatim: "Make a bit more
-   space above the breadcrumbs. Reduce the space between the breadcrumbs and
-   the chips. Maybe we could add a divider line." Her pick from the design
-   page: "for the spacing, do s3." S3's own figure for "above the trail" was
-   20 (`--space-5`), ONE FLAT NUMBER, not a density pair — SUPERSEDED THE
-   NEXT DAY, see the paragraph below.
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE this
+   fix: `[data-slot="trail-line-field"]` left edge 231px;
+   `[data-slot="title"]` / `[data-slot="badge"]` left edge 223px (the two
+   already agree with EACH OTHER — this was never a title-vs-chip mismatch,
+   only a trail-vs-both one).
 
-   HALVED, 2026-09-18 — CLIENT RULING, VERBATIM: "for the breadrcumbs /
-   search - half of the margin that now is on top, and exactly same under.
-   no line divider under." Half of S3's 20 is 10, a number the eleven-step
-   integer `--space-*` scale does not carry — `tokens.css`'s own Spacing
-   section (kit ruling 28) already mints exactly this rung on its four-
-   member half-step sub-scale, `--space-2h: 0.625rem` (10, "dense row gap"),
-   so this reaches for the existing half-step rather than inventing a new
-   token or a `calc()`. Still flat, both densities, same reasoning as the
-   ruling it replaces: the client named one number, not a density pair.
-   "Exactly same under" is `TRAIL_GAP`, further down — it reads the
-   identical `--space-2h`, not a fourth opinion about the same air. "No line
-   divider under" retires the `<Separator />` that S3's own third sentence
-   asked for; see `TRAIL_GAP`'s own comment for where it used to sit. */
+   THE FIX IS THE IDENTIFIER, NOT A NEW NUMBER — same standard
+   `CARD_CONTENT_INSET_X`'s own import already set for `DENSITY_BODY`: this
+   record now spends the SAME `CARD_CONTENT_INSET_X` `DENSITY_BODY` spends,
+   rather than a second copy of `DENSITY_HEADER`'s figure, so the trail's
+   left edge and the body's own left edge cannot drift apart again — a
+   change to the one token moves both. `check-screen-shell.mjs` pins the
+   import, not just the value, for exactly that reason.
+
+   A HEADER-BAND SCREEN THAT ALSO PASSES `trail` is NOT solved by this —
+   flagged, not fixed, in the CHANGELOG: such a screen would still have
+   `DENSITY_HEADER`'s own (larger) `px` under the title and this record's
+   (now smaller) `px` under the trail, the mismatch merely reversed. No call
+   site ships that combination today (`trail` ships on record screens only,
+   which never pass `band`), so this is the same kind of noted-not-chased
+   drift `DENSITY_GUTTER`'s own header already logs for `--rail-inset`.
+
+   `pt` IS UNCHANGED — 18 Sep 2026 EVENING'S OWN `--space-2h` (see that
+   ruling's own paragraph, below the `TRAIL_GAP` constant, for the halving
+   this record's `pt` already carries); only `px` is touched by today's
+   ruling. */
 const DENSITY_TRAIL: Record<ScreenDensity, string> = {
-  comfortable: "px-[var(--space-6)] pt-[var(--space-2h)]",
-  calm: "px-[var(--space-5)] pt-[var(--space-2h)]",
+  comfortable: cn(CARD_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
+  calm: cn(CARD_CONTENT_INSET_X, "pt-[var(--space-2h)]"),
 };
 
 /* STEPPED DOWN ONE RUNG, 2026-09-17 — same ruling as `DENSITY_GUTTER` and
@@ -5576,7 +5616,48 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                   "pointer-events-auto",
                   isAsideOpen
                     ? "max-[45rem]:hidden top-1/2 -translate-y-1/2 end-[var(--shell-gutter)]"
-                    : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+                    : cn(
+                        "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
+                        /* SIZED TO THE BAND IT STANDS IN, 18 SEP 2026 — CLIENT
+                           RULING, VERBATIM: "put the open assistant button
+                           completely on the top margin, not liek now that
+                           its slightly overlaping with main content." MEASURED,
+                           `agency-staging`, a ticket record, 1440 viewport:
+                           this handle at `top-[var(--shell-gutter)]` (16px)
+                           and `HANDLE_HIT`'s own `size-[var(--control-height-
+                           button)]` (40px) put its bottom edge at 56px —
+                           9.52px PAST the content card's own top edge
+                           (46.48px = the SAME 16px column padding plus
+                           `--folder-lip`, 30.48, the tab strip's own lip
+                           height above the card). The band this corner
+                           actually has to stand in, top to card, is exactly
+                           that `--folder-lip` — the SAME token `trail-line.tsx`
+                           already sized ITS OWN top-strip control against
+                           ("the box a control may occupy is the difference —
+                           `--folder-lip`, 30.48"), and that file's own answer
+                           is `--control-height-pill` (26), which fits with
+                           2.24px of air on every side. This handle reaches
+                           for the identical, already-proven token rather than
+                           inventing a second number for the same band:
+                           `size-[var(--control-height-pill)]` here wins the
+                           `cn()` merge against `HANDLE_HIT`'s own
+                           `size-[var(--control-height-button)]` (last write
+                           wins, same utility group), dropping this ONE
+                           branch's box to 26px — the OPEN branch above is
+                           untouched (it is a mid-edge grab against the open
+                           column, not a top-strip corner, and the 2026-09-1x
+                           "needs to be bigger" ruling that set 40px stands for
+                           every other use of `HANDLE_HIT`). New bottom edge:
+                           16 + 26 = 42px, 4.48px clear of the card's 46.48px
+                           top — see `check-screen-shell.mjs`'s own pin. The
+                           icon inside does not shrink with it:
+                           `HANDLE_HIT`'s `[&_svg]:size-[var(--icon-button)]`
+                           is 16px, the SAME size `trail-line.tsx`'s own
+                           arrows draw inside the identical 26px pill, so the
+                           mark reads at the one proportion this kit already
+                           uses for a control in this exact band. */
+                        "size-[var(--control-height-pill)]",
+                      ),
                 )}
               />
             )}

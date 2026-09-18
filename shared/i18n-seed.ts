@@ -3404,7 +3404,6 @@ export const SEED: Catalogue = {
   },
   // The ticket detail's total-hours badge (`help-detail.tsx`) — same
   // abbreviation as "{count}h ago" above ("Std."/"h"), a bare number in front.
-  "{hours}h": { de: "{hours} Std.", es: "{hours} h", ca: "{hours} h" },
   /* ── The stages a ticket went through, and how the client says we did ────
    * Team migrations 0066 and 0067, 2026-09-07. Written by hand at the same
    * commit as the English, so the ceiling (R44) never rises: a string shipped
@@ -4300,7 +4299,6 @@ export const SEED: Catalogue = {
   "ID": { de: "ID", es: "ID", ca: "ID" },
   "Icon": { de: "Symbol", es: "Icono", ca: "Icona" },
   "Resolved by": { de: "Erledigt von", es: "Resuelto por", ca: "Resolt per" },
-  "Resolved date": { de: "Erledigungsdatum", es: "Fecha de resolución", ca: "Data de resolució" },
   "Nothing to triage.": { de: "Nichts zu sichten.", es: "Nada que priorizar.", ca: "Res a triar." },
   "Nothing filed under this app yet.": {
     de: "Noch nichts unter dieser App abgelegt.",
@@ -4354,4 +4352,19 @@ export const SEED: Catalogue = {
     es: "A quién mantener informado",
     ca: "A qui mantenir informat",
   },
+
+  /* 18 Sep 2026 — two more strings `npm run lang` found with no seed entry
+     for de/es/ca. "Attach a file" is reply-composer.tsx's paperclip
+     button (aria-label and tooltip both, same string) — the same verb the
+     app already uses everywhere else an attachment is discussed
+     (anhängen/adjuntar/adjuntar, "What they attached" and
+     "Couldn't attach that." above). "On the loop" is
+     help-stakeholders.tsx's chip label for a stakeholder who is NOT the
+     raiser — the origin toggle's other half, next to "Raised by"
+     (Gemeldet von/Solicitado por/Sol·licitat per, seeded above) — and reuses
+     the exact root "Who to keep in the loop" already settled two lines up
+     (auf dem Laufenden / informado / informat) rather than a literal
+     word-for-word "loop". */
+  "Attach a file": { de: "Datei anhängen", es: "Adjuntar un archivo", ca: "Adjuntar un fitxer" },
+  "On the loop": { de: "Auf dem Laufenden", es: "Informado", ca: "Informat" },
 }

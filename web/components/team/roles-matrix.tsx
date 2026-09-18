@@ -382,7 +382,7 @@ const MODULE_ICON_CONCEPT: Partial<Record<string, keyof typeof CONCEPT_ICON>> = 
 }
 
 /** `MODULE_ICON_CONCEPT`, resolved all the way to the kit's own glyph name —
- * `<Icon name>` wants the Phosphor spelling (`"buildings"`), never the
+ * `<Icon name>` wants the Phosphor spelling (`"briefcase"`), never the
  * concept key (`"accounts"`) that names it in `CONCEPT_ICON`; the fallback
  * lives in exactly one place. */
 function moduleIconName(moduleKey: string): IconName {

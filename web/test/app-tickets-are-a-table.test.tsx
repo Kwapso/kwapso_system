@@ -30,6 +30,15 @@
 // `renderRows` List and Queue both call), so the fault was in the ONE cell
 // both bodies share — the Raised column carried only a date, no raiser —
 // and the fix is proved here once rather than twice.
+//
+// AMENDED 18 SEP 2026: "raised separate by and date! not in one together."
+// The Raised cell (face+name+date, all in one) split into two columns —
+// "Raised by" and "Raised" — which would have pushed this row to seven
+// against R82's six-column ceiling; "Resolved date" is what gave way, its
+// date folded back under "Resolved by"'s own name, the identical shape
+// "Raised" itself drew before today's split. Still six columns, still the
+// client's own order, and the header/cell assertions below are rewritten
+// for the new shape rather than patched around it.
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
@@ -177,14 +186,21 @@ function show() {
 describe("an app's Tickets tab draws the list as a table", () => {
   it("names its six columns, and does not name the one it stands inside", () => {
     show()
-    // SIX NOW, NOT FOUR — client, 17 Sep 2026: "On tickets list inside an
-    // app, add columns: Resolved Date, Resolved By." Exactly R82's ceiling;
-    // see `renderRows`'s own header (work-panels.tsx) for the budget line.
-    for (const header of ["Title", "Type", "Stage", "Raised", "Resolved date", "Resolved by"])
+    // SIX — client, 17 Sep 2026: "On tickets list inside an app, add
+    // columns: Resolved Date, Resolved By"; 18 Sep 2026: "raised separate by
+    // and date." See `renderRows`'s own header (work-panels.tsx) for the
+    // budget line — "Resolved date" is what gave way to keep the row at six.
+    for (const header of ["Title", "Type", "Stage", "Raised by", "Raised", "Resolved by"])
       expect(
         screen.getByRole("columnheader", { name: header }),
         `the ${header} column is missing from the app's ticket list`
       ).toBeTruthy()
+    // A "Resolved date" HEADER OF ITS OWN IS GONE — its date rides under
+    // "Resolved by" now, the same fold that keeps the row at six.
+    expect(
+      screen.queryByRole("columnheader", { name: "Resolved date" }),
+      "Resolved date should no longer be its own column — it rides under Resolved by"
+    ).toBeNull()
     // HER FOURTH COLUMN WAS "App", AND IT IS THE RECORD THIS LIST IS NESTED
     // INSIDE. Every cell would repeat the page's own heading — the same
     // subtraction the Dashboard view makes when it drops the "Which app" panel.
@@ -214,10 +230,10 @@ describe("an app's Tickets tab draws the list as a table", () => {
   it("still draws a pill for a ticket with no type, and no chip for one with no number", () => {
     show()
     const second = within(screen.getAllByRole("row")[2])
-    // H2 is untyped AND unresolved, so THREE cells now draw the same em dash
-    // (Type, Resolved date, Resolved by) — one hole would read as broken data
-    // and three, in three different columns, read as three honest absences.
-    expect(second.getAllByText("—")).toHaveLength(3)
+    // H2 is untyped AND unresolved, so TWO cells now draw the same em dash
+    // (Type, Resolved by) — Resolved date is no longer a column of its own
+    // (18 Sep 2026), so an unresolved ticket says "not yet" once, not twice.
+    expect(second.getAllByText("—")).toHaveLength(2)
     expect(
       second.queryByText("BERG-T0412"),
       "the second ticket borrowed the first one's reference"
@@ -229,7 +245,8 @@ describe("an app's Tickets tab draws the list as a table", () => {
     const third = within(screen.getAllByRole("row")[3])
     // `formatDate` through the reader's language — the same seam the Raised
     // column beside it uses, so the two dates on this row cannot disagree
-    // about how a day is spelled.
+    // about how a day is spelled. The date now rides UNDER "Marta" in the
+    // Resolved by cell (18 Sep 2026), not in a column of its own.
     expect(third.getByText(/12/), "the resolved date did not render").toBeTruthy()
     // R54 — the agency's own people are named by their FIRST NAME, and
     // nobody else is: `staffNameFromSnapshot` must have trimmed the stored

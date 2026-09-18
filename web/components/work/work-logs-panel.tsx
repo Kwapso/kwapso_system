@@ -43,7 +43,7 @@ import { StatGrid } from "@shared/ui/components/stat-grid/stat-grid"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { CONCEPT_ICON } from "@/lib/pages"
-import { PencilSimple } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -250,6 +250,8 @@ export function WorkLogsPanel({
   canEdit,
   canLog,
   onActivityChanged,
+  showAddButton = true,
+  addTrigger,
 }: {
   targetTable: "stories" | "help" | "tasks" | "meetings"
   targetId: string
@@ -267,6 +269,24 @@ export function WorkLogsPanel({
    * corrected row writes an activity line on the record it belongs to, and only
    * the host knows what that record's feed is keyed on. */
   onActivityChanged?: () => void
+  /**
+   * Defaults to `true` — every caller except the ticket page draws this
+   * panel's own inline "Log time" toolbar action exactly as before. Client
+   * ruling, 18 Sep 2026, over the TICKET page specifically: "on work logs
+   * … the + button to the right" (of the panel's own TITLE, one level up —
+   * `help-detail.tsx`'s own `TicketSidePanel`). `false` turns this panel's
+   * own button off so there is one "+" and not two; `addTrigger`, below, is
+   * what the title-row one reaches for instead.
+   */
+  showAddButton?: boolean
+  /**
+   * THE HOST'S OWN OPENER — this panel writes "start a new log" into it every
+   * render, so an OUTSIDE control (a title-row "+") can open the SAME dialog
+   * this panel already owns rather than a second one existing beside it. The
+   * same shape `record-attachments.tsx`'s `openRef` takes, for the identical
+   * reason. `null` while `canLog` is false.
+   */
+  addTrigger?: React.RefObject<(() => void) | null>
 }) {
   const { t, lang } = useLanguage()
   const filter = React.useMemo(() => ({ targetTable, targetId }), [targetTable, targetId])
@@ -309,6 +329,10 @@ export function WorkLogsPanel({
 
   const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
   const [adding, setAdding] = React.useState(false)
+  // THE HOST'S OPENER, kept current every render — see `addTrigger`'s own
+  // doc comment. A plain write during render, not an effect: there is
+  // nothing to schedule and nothing to clean up.
+  if (addTrigger) addTrigger.current = canLog ? () => setAdding(true) : null
 
   /** After any write here: both halves of this tab, and the record's own feed. */
   function refresh() {
@@ -412,7 +436,7 @@ export function WorkLogsPanel({
             </Select>
           )
         }
-        actions={canLog && <AddButton label={t("Log time")} onClick={() => setAdding(true)} />}
+        actions={canLog && showAddButton && <AddButton label={t("Log time")} onClick={() => setAdding(true)} />}
       />
 
       {/* Numbers-to-rows rhythm is its own — gap-6, unrelated to R49's
@@ -500,15 +524,7 @@ export function WorkLogsPanel({
                     logs screen: the word "Edit" beside a pencil on every row is one
                     word repeated as many times as there are rows. */}
                 {canEdit && l.endedAt && !l.discarded && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingLog(l)}
-                    className="shrink-0"
-                    aria-label={t("Edit")}
-                  >
-                    <PencilSimple className="size-3.5" />
-                  </Button>
+                  <EditPenButton onClick={() => setEditingLog(l)} label={t("Edit")} />
                 )}
               </li>
             ))}

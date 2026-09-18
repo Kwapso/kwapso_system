@@ -48,7 +48,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R6 | enforced | `glossary-wellformed` | `web/test/rules.test.ts` |
 | R7 | enforced | `forms-persist-drafts` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts` |
 | R8 | enforced | `tab-counts-derived` | `web/test/rules.test.ts` |
-| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`workers/content/test/count-seam.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
+| R16 | enforced | `counted-collections` | `web-portal/test/rules.test.ts`<br>`web/test/rules.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx`<br>`workers/content/test/count-seam.test.ts`<br>`workers/content/test/knowledge.test.ts`<br>`workers/tenancy/test/accounts.test.ts` |
 | R25 | enforced | `savings-caption` | `web/test/rules.test.ts` |
 | R28 | enforced | `catalogued-strings` | `web/test/catalogued-strings.test.ts` |
 | R29 | enforced | `one-page-width` | `web/test/linked-emails.test.ts`<br>`web/test/rules.test.ts` |

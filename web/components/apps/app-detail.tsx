@@ -27,7 +27,8 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { useRemembered } from "@shared/web/remembered"
 import { ModulesPanel } from "@/components/apps/modules-panel"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
 import { useAssignableMembers } from "@/lib/members"
@@ -458,7 +459,7 @@ export function AppDetailScreen({
         // — so this is one of the few tabs where a local length IS the count.
         value: "stakeholders",
         label: t("Stakeholders"),
-        icon: CONCEPT_ICON.contacts,
+        icon: "users-three",
         badge: formatCount(peopleCount),
         badgeVariant: "" as const,
       },
@@ -469,7 +470,7 @@ export function AppDetailScreen({
         // learns an app in.
         value: "modules",
         label: t("Modules"),
-        icon: CONCEPT_ICON.processes,
+        icon: "cube",
         badge: formatCount(modulesTotal),
         badgeVariant: "" as const,
       },
@@ -645,11 +646,7 @@ export function AppDetailScreen({
       actions={
         <>
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-          {canEdit && (
-            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
+          {canEdit && <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
         </>
       }

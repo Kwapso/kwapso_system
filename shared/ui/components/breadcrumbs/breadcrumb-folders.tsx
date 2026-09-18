@@ -291,17 +291,35 @@ import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
    ancestors away. It costs nothing else: `isolation` does not affect
    layout, and the strip already had no `position` for anything to
    conflict with. */
+/* THE OVERLAP IS GONE, 18 SEP 2026 — CLIENT RULING, VERBATIM: "the top tabs
+   folder, need space betwwen tehm. right now they merge altogether." The
+   17 Sep mechanism this replaces (`TAB_OVERLAP_MARGIN` — a negative margin
+   pulling every tab after the first left by exactly `--folder-shoulder`, so
+   consecutive tabs NESTED, Chrome-style, with `restZIndex` deciding who
+   painted on top of the shared pixels) was itself a fix for a SMALL gap
+   (`--space-1`, 4px) reading as tabs overlapping WRONG — smaller than the
+   29.52px shoulder in every direction, so the shapes either floated apart or
+   the following tab's square-cornered box edge landed in front of the
+   previous tab's curve. Today's ruling is not "make the small gap smaller
+   still" (the fix that comment already tried and rejected once) — it is the
+   opposite instruction: a real, clearly visible gap, not the ambiguous
+   almost-touching distance that produced the original defect. `--space-2`
+   (8px) is chosen over `--space-1` (4px) for exactly that reason — more than
+   double 4px, and unambiguously a gap rather than a near-miss, at every strip
+   width this component ships at, measured at 1440 in `verify/tabstrip-parity`.
+   `overlap == shoulder` is retired with it: two tabs never share a pixel at
+   rest any more, so there is nothing at that boundary for `restZIndex` to
+   adjudicate — see that function's own comment, and `measureNesting` in
+   `verify/tabstrip-parity/page.tsx`, both updated to read the GAP instead of
+   the retired overlap. THE ACTIVE TAB'S LIFT AND THE Z-ORDER ARE UNCHANGED —
+   `restZIndex`, `TAB_LIVE`'s `z-[1]`, `isolate` and the per-`<li>` inline
+   `zIndex` all stay exactly as they were: a drag still slides a tab under
+   `onTabPointerMove`'s own `transform`, which still opens its own stacking
+   context, so the numbers this file already writes still have somewhere to
+   matter even though two tabs resting side by side no longer overlap to
+   begin with. */
 const STRIP = cn(
-  // `gap-0` IS NOT A NO-OP — MEASURED, NOT ASSUMED. `BreadcrumbList`'s own
-  // base classes (`breadcrumb.tsx`) include `gap-1.5`, which the strip used
-  // to win against by MERGING IN `gap-1` (tailwind-merge drops the earlier
-  // utility in the same group). Simply REMOVING that override, tried first,
-  // left `gap-1.5`'s 6.75px standing — a real, measured 6.75px of unwanted
-  // positive space eating into every tab's `TAB_OVERLAP_MARGIN` pull (a
-  // strip whose overlap read 26.45px against a 33.21px shoulder, short by
-  // exactly 6.75px). `gap-0` wins the same merge `gap-1` used to and leaves
-  // none of it standing.
-  "flex flex-nowrap items-end isolate gap-0",
+  "flex flex-nowrap items-end isolate gap-[var(--space-2)]",
   // `overflow-y-hidden` — 17 Sep 2026 evening, the same fix `tabs.tsx`'s own
   // `TabsList` took: `overflow-x` alone computes `overflow-y: auto`, and a
   // strip this shape can round 1px tall, which makes it silently vertically
@@ -312,34 +330,6 @@ const STRIP = cn(
   "pt-1 mt-[calc(var(--space-1)*-1)]",
   "mb-[calc(var(--folder-tab-overlap)*-1)]",
 );
-
-/* THE OVERLAP ITSELF — one negative margin, applied per-`<li>` in the
-   `.map` below to every rendered tab AFTER THE FIRST (never the first: it
-   has no earlier shoulder to sit under, and pulling it left would run it off
-   the strip's own start). `--folder-shoulder` (29.52px) is the exact run of
-   the curve a tab's OWN shoulder draws before it lands on the body — see
-   `folder.tsx`'s `SHAPE.shoulder` — so a tab dressed with this margin sits
-   with its rounded top-left corner exactly under where the PREVIOUS tab's
-   shoulder lands, and nothing further: `overlap == shoulder`, not
-   "roughly nested". */
-const TAB_OVERLAP_MARGIN = "ms-[calc(var(--folder-shoulder)*-1)]";
-
-/* …AND THE ROOM IT COSTS THE LABEL. The lip's own leading padding (`TAB`'s
-   `ps-5`, `TAB_ICON_ONLY`'s `ps-[var(--space-3)]`) clears the shoulder CURVE
-   drawn inside this tab's own box — it says nothing about a NEIGHBOUR's
-   shoulder now sitting, physically, on top of this tab's own leading edge.
-   Without extra room the label would start underneath the previous tab's
-   paper, half hidden by it. So every tab after the first adds the same
-   `--folder-shoulder` back, on the INSIDE, to its own leading padding — the
-   margin pulls the box left, the padding pushes the content right by the
-   identical amount, and the visible label lands exactly where it would have
-   sat with no overlap at all. Only the label moves; the SHAPE (the box
-   `FolderShape` measures) is untouched, so the silhouette draws at its usual
-   proportions — see `verify/tabstrip-parity`'s `silhouetteParity` check,
-   which is exactly what would fail if this padding were skipped and the box
-   narrowed instead. */
-const TAB_OVERLAP_PS = "ps-[calc(var(--space-5)_+_var(--folder-shoulder))]";
-const TAB_ICON_ONLY_OVERLAP_PS = "ps-[calc(var(--space-3)_+_var(--folder-shoulder))]";
 
 /* ----------------------------------------------------------------------------
    THE TWO DRAWINGS AND THE ONE GATE BETWEEN THEM.
@@ -2172,21 +2162,18 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
             {rendered.map((entry, i) => {
               /* `i` IS THE STRIP'S OWN VISUAL POSITION, LEFT TO RIGHT —
                  EVERY RENDERED TILE, THE ELISION INCLUDED, NOT `entry.index`
-                 (which skips whatever the fold hid). Two things read it:
-                 `i === 0` is "the first tab in the strip has no earlier
-                 shoulder to sit under", which gates BOTH `TAB_OVERLAP_MARGIN`
-                 (the `<li>`'s own leading pull) and the matching overlap
-                 padding on the tab's inner lip (`TAB_OVERLAP_PS` /
-                 `TAB_ICON_ONLY_OVERLAP_PS`, below) — and `restZIndex(i)` is
-                 this tile's own stacking number, which must be assigned by
-                 where it actually sits, not by its
-                 index into the caller's original array. */
-              const notFirst = i > 0;
+                 (which skips whatever the fold hid). `restZIndex(i)` is this
+                 tile's own stacking number, which must be assigned by where
+                 it actually sits, not by its index into the caller's
+                 original array — unchanged by the 18 Sep gap ruling (see
+                 `STRIP`'s own comment): the lift and the z-order stay, only
+                 the retired overlap's own per-`<li>` margin and padding are
+                 gone. */
               if (entry.kind === "gap") {
                 return (
                   <BreadcrumbItem
                     key="breadcrumb-folders-gap"
-                    className={cn("shrink-0", notFirst && TAB_OVERLAP_MARGIN)}
+                    className="shrink-0"
                     style={{ zIndex: restZIndex(i) }}
                   >
                     <DropdownMenu>
@@ -2198,7 +2185,7 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                         // of; the trigger IS the whole hoverable box, so it
                         // is its own group for `FILL_REST_HOVER`'s
                         // `group-hover:`.
-                        className={cn(TAB, TAB_REST, "group", notFirst && TAB_OVERLAP_PS)}
+                        className={cn(TAB, TAB_REST, "group")}
                       >
                         <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
                         {/* The kit's own elision, reused whole: the glyph is
@@ -2356,7 +2343,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                   style={{ zIndex: stackZ }}
                   className={cn(
                     "shrink-0",
-                    notFirst && TAB_OVERLAP_MARGIN,
                     // UNCONDITIONAL SINCE 17 Sep 2026, WAS `closable &&`
                     // ALONGSIDE `relative` — the silhouette's own hover
                     // (`FILL_REST_HOVER`, that constant's own comment) needs
@@ -2413,7 +2399,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                           "cursor-pointer",
                           closable && TAB_CLOSABLE,
                           item.iconOnly && TAB_ICON_ONLY,
-                          notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                         )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
@@ -2427,7 +2412,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                           TAB_LIVE,
                           closable && TAB_CLOSABLE,
                           item.iconOnly && TAB_ICON_ONLY,
-                          notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                         )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
@@ -2451,7 +2435,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                         "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary",
                         closable && TAB_CLOSABLE,
                         item.iconOnly && TAB_ICON_ONLY,
-                        notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                       )}
                     >
                       <CrumbShape fill={FILL_REST} hoverFill={FILL_REST_HOVER} />
@@ -2477,7 +2460,6 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                         TAB_REST,
                         closable && TAB_CLOSABLE,
                         item.iconOnly && TAB_ICON_ONLY,
-                        notFirst && (item.iconOnly ? TAB_ICON_ONLY_OVERLAP_PS : TAB_OVERLAP_PS),
                         /* THE WEIGHT PREVIEW SURVIVES REACHING FOR THE ×.
                            `TAB_REST`'s hover is written on the link, and the
                            close button is laid OVER the link rather than

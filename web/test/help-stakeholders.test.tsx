@@ -8,10 +8,17 @@
 // nothing else. The picker moved into the ticket edit sheet
 // (help-form-dialog-loop-field.test.tsx proves its new home); this file
 // proves the component the page renders now takes no picker props at all.
+//
+// AMENDED 18 Sep 2026 — client ruling, verbatim: "show them like cards (like
+// settings members) and show what was before, who raised it and on the
+// loop." The row became a card (shared/web/person-card.tsx's `PersonCard`)
+// and now carries a relation label — "Raised by" for the one raiser, "On the
+// loop" for everyone else — never a THIRD fact beyond the face, the name and
+// that one label.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
@@ -58,8 +65,10 @@ describe("HelpStakeholders — the people list", () => {
     // in full, and this proves the component still calls it.
     expect(screen.getByText("Max Mustermann")).toBeTruthy()
 
-    // NO EMAIL LINE, NO ORIGIN BADGE — "the stakeholder faces + names", her
-    // own words, read narrowly: a face and a name, never a third fact.
+    // NO EMAIL LINE, NO ORIGIN BADGE BY ITS RAW NAME — "the stakeholder
+    // faces + names", read narrowly: a face, a name, and now the ONE
+    // relation label the 18 Sep 2026 ruling added — never an email, never
+    // the origin word itself ("admin"/"raiser").
     expect(screen.queryByText("aurora@kwapso.com")).toBeNull()
     expect(screen.queryByText("Admin")).toBeNull()
     expect(screen.queryByText("Raiser")).toBeNull()
@@ -69,10 +78,19 @@ describe("HelpStakeholders — the people list", () => {
     expect(screen.queryByText("You can add members, but no one is ever removed.")).toBeNull()
   })
 
-  it("draws one face (an initial fallback, with no photo) per stakeholder", () => {
+  it("labels the raiser 'Raised by' and everyone else 'On the loop' (18 Sep 2026 ruling)", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
-    const avatars = document.querySelectorAll('[data-slot="avatar"]')
-    expect(avatars.length).toBe(2)
+    const auroraCard = screen.getByText("Aurora").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    const maxCard = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    // AURORA's `origin` is "admin" — on the loop, not the raiser.
+    expect(within(auroraCard).getByText("On the loop")).toBeTruthy()
+    // MAX's `origin` is "raiser".
+    expect(within(maxCard).getByText("Raised by")).toBeTruthy()
+  })
+
+  it("draws one card, and one face (an initial fallback, with no photo), per stakeholder", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(2)
   })
 
   it("takes no picker-related props at all — the component's own contract shrank with the ruling", () => {

@@ -24,6 +24,18 @@
 // `refusePortalCaller` inside the handler. What a client may still do is
 // unchanged: attach their own file, and see what they sent. The line is drawn on
 // somebody ELSE'S file, never on their own.
+//
+// NO LONGER BEHIND THE ⋯ MENU — client ruling, 18 Sep 2026, verbatim: "on
+// tickets, kill this whole files & links in the … button. fyi those are
+// visible in the conversation itself! the customers can attach images &
+// files. so do we." `help-detail.tsx` now mounts this panel directly inside
+// `TicketConversationPanel`'s own tray (the `attachments` slot,
+// ticket-detail-body.tsx), not behind an `EdgePanel` sheet the ⋯ menu used
+// to open. Nothing about THIS file changed for that move except `openRef` —
+// the composer's own attach button reaches this panel's file picker through
+// it, rather than a second upload path existing beside this one.
+
+import * as React from "react"
 
 import type { HelpAttachment } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
@@ -35,6 +47,7 @@ import { helpAttachmentsKey } from "@/lib/live-resources"
 export function HelpAttachmentsPanel({
   ticketId,
   canEdit,
+  openRef,
 }: {
   ticketId: string
   /** `help:read` — the right that gates the doors. A person who can see a ticket
@@ -45,6 +58,10 @@ export function HelpAttachmentsPanel({
    * doors" is a sentence about ADDING and REMOVING your own — not about fixing
    * anybody else's. The owner ruled "never" on that, 27 Aug 2026. */
   canEdit: boolean
+  /** Forwarded, whole, to `RecordAttachments` — see that prop's own doc
+   * comment. The composer's attach button is this panel's one external
+   * caller. */
+  openRef?: React.RefObject<(() => void) | null>
 }) {
   const { t } = useLanguage()
   return (
@@ -56,6 +73,7 @@ export function HelpAttachmentsPanel({
       remove={(attachmentId) => contentApi.removeHelpAttachment(ticketId, attachmentId)}
       emptyTitle={t("Nothing attached to this ticket yet.")}
       removeTitle={(label) => t("Take {label} off this ticket?", { label })}
+      openRef={openRef}
     />
   )
 }

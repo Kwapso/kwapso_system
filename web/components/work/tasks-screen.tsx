@@ -431,12 +431,17 @@ function shapeTasks(tasks: Task[], lang: Language) {
         // THE APP AND ACCOUNT CELLS CARRY A LOGO NOW (client ruling, 2026-09-15:
         // "add the logos to account and app") — the identical node
         // `shape.tsx`'s `shapeAccountsList` draws for the Accounts table's own
-        // Name cell, `<RecordMark picture={…} name={…} />` beside the word. A
-        // row with no app/account still reads "—", exactly as it did in words
-        // alone; `RecordMark` draws nothing when handed no name to initial.
+        // Name cell, `<RecordMark picture={…} name={…} size="choice" />` beside
+        // the word — `choice`, the kit's smallest size, so the mark fits this
+        // table row's own text line rather than setting its height (client
+        // ruling, 18 Sep 2026: "when avatar/icon on list view, make the avatar
+        // smaller. should not be the cause of more height to the overall
+        // row"). A row with no app/account still reads "—", exactly as it did
+        // in words alone; `RecordMark` draws nothing when handed no name to
+        // initial.
         app: t.appName ? (
           <span className="flex items-center gap-2">
-            <RecordMark picture={t.appLogoUrl} name={t.appName} />
+            <RecordMark picture={t.appLogoUrl} name={t.appName} size="choice" />
             <span>{t.appName}</span>
           </span>
         ) : (
@@ -444,7 +449,7 @@ function shapeTasks(tasks: Task[], lang: Language) {
         ),
         client: t.accountName ? (
           <span className="flex items-center gap-2">
-            <RecordMark picture={t.accountLogoUrl} name={t.accountName} />
+            <RecordMark picture={t.accountLogoUrl} name={t.accountName} size="choice" />
             <span>{t.accountName}</span>
           </span>
         ) : (
@@ -595,7 +600,7 @@ const TASK_TABS: { value: TaskView; label: string; icon: string }[] = [
 const EVERYONE_TAB: { value: TaskView; label: string; icon: string } = {
   value: "all",
   label: "Everyone's",
-  icon: "users-three",
+  icon: "asterisk",
 }
 
 /** A tab's own sub-view — the toolbar's `view` slot draws these, R53's

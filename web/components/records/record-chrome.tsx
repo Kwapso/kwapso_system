@@ -828,6 +828,7 @@ export function RecordScreen({
   actions,
   headerExtra,
   children,
+  panelVisible = true,
   audit,
   activity,
   activityHead,
@@ -983,6 +984,24 @@ export function RecordScreen({
    * kit replaces this region with its own register — so a loading/error/empty
    * caller may pass `null` rather than building a panel it knows won't show. */
   children?: React.ReactNode
+  /**
+   * THE PANEL REGION ITSELF — defaults to drawn, exactly as every existing
+   * caller already behaves. `false` is the ticket detail's own opt-out
+   * (client ruling, 18 Sep 2026: "remove the 'overall' container … make each
+   * thing its own container, like tickets dashboard") — the kit's
+   * `RecordDetail` wraps whatever `children` holds in ONE `Card`
+   * (`panelBody`, record-detail.tsx), and a record whose body is already
+   * several of its OWN containers (siblings, not nested inside a second
+   * paper region) has no content left for this region to draw. Forwarded
+   * straight to `RecordChrome`'s own `panelVisible` (`RecordDetail`'s prop,
+   * ch24.6: "permissions hide, they do not disable" — the same law this
+   * region already obeys for a viewer with no rights). A caller that sets
+   * this `false` renders its body as a SIBLING of `<RecordScreen>` instead
+   * of as `children` — passing both is a contradiction this file does not
+   * try to reconcile, since `RecordDetail`'s own `panelBody` never even
+   * reads `content` once `panelVisible` is false.
+   */
+  panelVisible?: boolean
   /**
    * Fed into the kit's own ink footer (record-detail.tsx region 4), Record
    * column — see this file's "the footer" section above. Absent, that column
@@ -1268,6 +1287,7 @@ export function RecordScreen({
         actions={actions}
         hero={headerExtra}
         panel={children}
+        panelVisible={panelVisible}
         /* THE FIX — the kit's own ink footer, fed from this app's real data
            instead of held off (`footerVisible={false}`, this file's old line)
            while a hand-rolled grey box drew a different one below the panel.

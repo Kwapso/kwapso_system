@@ -1348,7 +1348,49 @@ export function AgentPanel({
                 // token" doesn't apply below it, but staying on the named
                 // ladder rather than an arbitrary `gap-[]` keeps this
                 // consistent with every other spacing decision in this file.
-                "[&_[data-slot=agent-chat-turns]]:gap-[var(--space-5)]"
+                "[&_[data-slot=agent-chat-turns]]:gap-[var(--space-5)]",
+                // RULING 5 (18 Sep 2026, verbatim): "assistant still has cetrain
+                // horixotnal scroll to it. kill taht." Measured live on staging with
+                // a throwaway headless-Chromium script (not a file this repo
+                // keeps): the reply thread itself never pushed the document wider
+                // at 375/768/1280 (docScrollWidth <= docClientWidth in every run)
+                // — the seams that DO widen something are the table wrapper's own deliberate
+                // self-scroll (already fine, R-rule) and the confirm panel's
+                // payload lines (fixed at their own seam, use-agent-chat.tsx's
+                // `confirmStepsFrom`, since `RunSteps`' description slot is
+                // kit-owned and wraps nothing). This pair is belt-and-braces
+                // rather than a proof of a live bug: the PANE (this element,
+                // `[data-slot=agent-chat]`) and the THREAD
+                // (`[data-slot=agent-chat-turns]`) both get `overflow-x-hidden`
+                // on top of the `min-w-0` they already carry from the kit, so a
+                // future child that forgets its own wrap rule is clipped here
+                // rather than widening the document.
+                "overflow-x-hidden",
+                "[&_[data-slot=agent-chat-turns]]:overflow-x-hidden",
+                // RULING 6 (18 Sep 2026, verbatim): "for assistant, only the
+                // 'replies' should have the bacvkground. the 'actions' should
+                // sit without any container aorund them." A REPLY is the
+                // model's own words, drawn in the kit's ordinary `bg-card`
+                // bubble (`turnVariants`, agent-chat.tsx — can't hand-edit); an
+                // ACTION is a tool-step chip (`role: "tool"` in AgentChatItem,
+                // mapped above to `role: "assistant"` content because the kit's
+                // turn has only two roles) — and the kit wraps EVERY turn's
+                // content in the identical bubble regardless of which this is,
+                // so today a tool step reads exactly like a reply (measured
+                // live on staging: both "Working it out" and a real answer sat
+                // on `rgb(247, 242, 235)`, `getComputedStyle` on the bubble
+                // div). The container is stripped here, at the ONE seam that
+                // already tells the two apart — the `data-agent-turn-kind=
+                // "action"` marker on the tool row's own content, above — and
+                // `:has()` reaches back up from there to the SAME "first div
+                // inside a turn's own column div" this file already targets for
+                // padding a few lines up, so ONLY the fill and the radius drop:
+                // the padding survives untouched, which is ruling 6's own "same
+                // left inset as the reply text" — an action's words start
+                // exactly where a reply's words would, just on the panel's bare
+                // ground instead of a bubble.
+                "[&_[data-slot=agent-chat-turn]:has([data-agent-turn-kind=action])>div>div:first-of-type]:bg-transparent",
+                "[&_[data-slot=agent-chat-turn]:has([data-agent-turn-kind=action])>div>div:first-of-type]:rounded-none"
               )}
               // ITEM (3 Sep 2026) — no marks on either side any more (see the
               // comment above this function for why speaker identity does
@@ -1397,7 +1439,17 @@ export function AgentPanel({
                       role: "assistant" as const,
                       content:
                         it.thought === undefined ? (
-                          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                          // RULING 6 (18 Sep 2026, verbatim): "only the 'replies'
+                          // should have the background. the 'actions' should sit
+                          // without any container around them." `data-agent-turn-
+                          // kind="action"` is the marker the AgentChat className
+                          // below reaches back up for with `:has()`, to strip the
+                          // bubble's fill off THIS turn without touching a real
+                          // reply's. See that comment for the whole mechanism.
+                          <span
+                            data-agent-turn-kind="action"
+                            className="text-muted-foreground inline-flex items-center gap-1.5 text-xs"
+                          >
                             {mark}
                             {it.actionLabel}
                           </span>
@@ -1416,7 +1468,11 @@ export function AgentPanel({
                           // cap and wrap there. Measured on staging, 14 Sep
                           // 2026: with containment the open notes were squeezed
                           // into a column as wide as the words "Working it out".
-                          <Collapsible>
+                          // Same marker as the plain row above — the thinking
+                          // disclosure is still a TOOL STEP, not a reply, and
+                          // Radix's Collapsible Root forwards an arbitrary
+                          // `data-*` prop straight onto its own DOM node.
+                          <Collapsible data-agent-turn-kind="action">
                             <CollapsibleTrigger className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs whitespace-nowrap">
                               {mark}
                               {it.actionLabel}

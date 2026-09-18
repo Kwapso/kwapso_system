@@ -54,6 +54,7 @@
 
 import * as React from "react"
 
+import { type BadgeDot } from "@shared/ui/components/badge/badge"
 import { ThemeSwatch } from "@shared/ui/compositions/screens/settings"
 import { cn } from "@shared/ui/lib/utils"
 
@@ -68,6 +69,22 @@ export interface AppearancePillOption {
   /** A small colour mark before the word — omitted where there is no colour
    * to show (Size). */
   swatch?: React.ReactNode
+  /** THE STATUS/STAGE TONE DOT — client ruling, 18 Sep 2026, verbatim:
+   * "everywhere where choice component is status/stage add the points."
+   * `Badge variant="status"` draws this same dot (`shared/ui/components/
+   * badge/badge.tsx`'s `BadgeDot`, ten named tones); this row is a bare
+   * `<button>`, never a `Badge`, so the dot is drawn here instead, at the
+   * same size and shape, through `--dot-status`/`--dot-<tone>` (R32 — a
+   * token, never a hex).
+   *
+   * NEVER A SECOND MAP: a caller hands over the tone a status/stage ALREADY
+   * resolves to through its own existing map — `appStageDotTone`
+   * (shared/app-stages.ts) for App stage, the one live caller today — the
+   * same function the record's own LIST already reads for its `Badge`.
+   * Mutually exclusive with `swatch` in practice (a status/stage pill has no
+   * separate colour mark to carry); `swatch` wins if a caller somehow sets
+   * both, drawn first either way. */
+  dot?: BadgeDot | null
   /** THIS ONE PILL is inert — never a real choice, only a truthful account of
    * what is already stored. Added 16 Sep 2026 for a record whose value has
    * fallen out of its own vocabulary (an app stage a migration retired): the
@@ -132,12 +149,30 @@ export function AppearancePillGroup({
               selected && "font-[var(--font-weight-medium)] shadow-[var(--hairline-ink)]",
             )}
           >
-            {option.swatch}
+            {option.swatch ?? (option.dot ? <PillDot tone={option.dot} /> : null)}
             {option.label}
           </button>
         )
       })}
     </div>
+  )
+}
+
+/** THE DOT ITSELF — the same shape `record-picker.tsx`'s own `Swatch` draws
+ * for a `RecordPicker` row's status/stage tone (`--dot-status`, the kit's
+ * one dot size, `rounded-pill`), kept local here rather than imported: this
+ * file is `shared/web/`, and `record-picker.tsx` is app-side (`web/`) —
+ * importing "up" out of `shared/` would invert the dependency every other
+ * file in this tree keeps one direction. `aria-hidden` for the same reason
+ * `Swatch`'s own copy is: the pill's label already says the word the colour
+ * repeats. */
+function PillDot({ tone }: { tone: BadgeDot }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="size-[var(--dot-status)] shrink-0 rounded-pill"
+      style={{ background: `var(--dot-${tone})` }}
+    />
   )
 }
 

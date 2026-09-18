@@ -100,22 +100,38 @@ describe("the Closed tab shows less, and only the Closed tab does", () => {
 
   // ── THE COLUMNS ───────────────────────────────────────────────────────────
 
-  it("Closed draws id, title, type, app, raised and closed — and nothing else", () => {
-    // Her five, in her order, PLUS the ID column restored 17 Sep 2026 ("add
-    // the header ID for the ID") — see TICKET_COLUMN_ORDER's own header
-    // (web/lib/live-resources.ts) for the full account of why it left and
-    // came back. Read as an exact SEQUENCE because the order is half the
-    // ruling: she said them in the order she wants to read them, and this
-    // now lands exactly on R82's six-column ceiling.
-    expect(helpTabColumns(CLOSED)).toEqual(["id", "title", "type", "app", "created", "closed"])
+  it("Closed draws id, title, type, raised by, raised and closed — app gave way", () => {
+    // AMENDED 18 SEP 2026: "raised separate by and date! not in one
+    // together" widened `TICKET_COLUMNS_DEFAULT` from five to six (Raised
+    // split into `raisedBy` and `created`), which is R82's ceiling on its
+    // own — so Closed (default + `closed`) would draw seven. `app` is what
+    // gives way here: it is the one column on this tab that is ALSO a
+    // toolbar facet, so the fact survives losing its own cell in a way
+    // "who raised it" and "when it closed" cannot. See `helpTabColumns`'s
+    // own header (web/lib/live-resources.ts) for the fuller account.
+    expect(helpTabColumns(CLOSED)).toEqual(["id", "title", "type", "raisedBy", "created", "closed"])
   })
 
-  it("Closed is every other tab's row plus the closing date", () => {
+  it("Closed is every other tab's row, minus App, plus the closing date", () => {
     // THE SAME FACT, ASKED THE WAY THE CODE SPELLS IT. The literal above is her
     // sentence and cannot be derived from anything; this is the relationship
     // that sentence turned out to describe, and holding both is what catches a
     // change to `TICKET_COLUMNS_DEFAULT` that silently stops reaching this tab.
-    expect(helpTabColumns(CLOSED)).toEqual([...TICKET_COLUMNS_DEFAULT, "closed"])
+    expect(helpTabColumns(CLOSED)).toEqual([
+      ...TICKET_COLUMNS_DEFAULT.filter((c) => c !== "app"),
+      "closed",
+    ])
+  })
+
+  it("Closed is the only tab missing App from the default set", () => {
+    // THE ONE COLUMN THIS RULING DROPS, PINNED DIRECTLY — the census two
+    // tests up only proves Closed is short one column; this proves WHICH.
+    expect(TICKET_COLUMNS_DEFAULT).toContain("app")
+    expect(helpTabColumns(CLOSED)).not.toContain("app")
+    for (const facet of TABS) {
+      if (facet === CLOSED) continue
+      expect(helpTabColumns(facet), `${facet} lost the App column too`).toContain("app")
+    }
   })
 
   it("the reference is not a column anywhere — it rides inside the title", () => {

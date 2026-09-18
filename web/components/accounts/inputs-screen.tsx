@@ -93,6 +93,7 @@ import { CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
 import { TodoFormDialog, type TodoFormValues } from "@/components/work/todo-form-dialog"
 import { content as contentApi, ApiFailure } from "@/lib/api"
 import { appsKey, inputsKey, listFetch, todosKey, type InputView } from "@/lib/live-resources"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -105,7 +106,10 @@ import type { Language } from "@shared/i18n"
 /** THE THREE TABS, IN THE CLIENT'S OWN ORDER — the coordinator's I1 mock,
  * adopted whole. */
 const INPUT_TABS: { value: InputView; label: string; icon: string }[] = [
-  { value: "waiting", label: "Waiting", icon: "clipboard-text" },
+  // Waiting IS the stage CONCEPT_ICON names — "pending answer from customer",
+  // the client's own definition — so it wears that stage's glyph rather than
+  // the to-dos' clipboard it used to borrow (icon-concepts-agree.test.ts).
+  { value: "waiting", label: "Waiting", icon: CONCEPT_ICON.waiting },
   { value: "overdue", label: "Overdue", icon: "warning" },
   { value: "received", label: "Received", icon: "check-circle" },
 ]

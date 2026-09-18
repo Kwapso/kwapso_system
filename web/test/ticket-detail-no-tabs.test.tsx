@@ -31,7 +31,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { HelpStakeholder, HelpTicket, HelpStatus, Story, TicketStageHistory } from "@shared/types"
+import type { HelpMessage, HelpStakeholder, HelpTicket, HelpStatus, Story, TicketStageHistory } from "@shared/types"
 
 const BASE_TICKET = {
   id: "help-1",
@@ -108,7 +108,10 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-const api = vi.hoisted(() => ({ ticket: null as unknown as HelpTicket }))
+const api = vi.hoisted(() => ({
+  ticket: null as unknown as HelpTicket,
+  replies: [] as unknown as HelpMessage[],
+}))
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
@@ -118,7 +121,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       ...actual.content,
       help: async () => ({ tickets: [api.ticket], total: 1, nextCursor: null, hasMore: false }),
       helpOne: async () => api.ticket,
-      helpThread: async () => ({ replies: [], total: 0 }),
+      helpThread: async () => ({ replies: api.replies, total: api.replies.length }),
       helpStakeholders: async () => ({ stakeholders: [STAKEHOLDER] }),
       helpStages: async () => EMPTY_STAGE_HISTORY,
       stories: async () => ({ stories: RELATED_STORIES, total: RELATED_STORIES.length, nextCursor: null, hasMore: false }),
@@ -164,11 +167,13 @@ window.matchMedia ??= ((query: string) => ({
 })) as unknown as typeof window.matchMedia
 
 import { HelpDetailScreen } from "@/components/tickets/help-detail"
+import { TICKET_PANEL_ANCHOR } from "@/components/tickets/ticket-detail-body"
 
 afterEach(cleanup)
 beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
   window.history.pushState({}, "", "/tickets/help-1")
+  api.replies = []
 })
 
 const openTicket = (status: HelpStatus = "triaged") => {
@@ -208,7 +213,7 @@ describe("the two-column body renders all four panels", () => {
     // ALL FOUR IN ONE RENDER — no tab press got any of them onto the page.
   })
 
-  it("stands each panel on its own paper, raised on the record's own ground (R67)", async () => {
+  it("stands each panel on its own paper, on the bare page ground now (R67, amended 18 Sep 2026)", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
@@ -217,10 +222,28 @@ describe("the two-column body renders all four panels", () => {
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     )
+    // `default` (`--surface-panel`, soft paper), NOT `raised` (`--card`) —
+    // client ruling, 18 Sep 2026: "remove the 'overall' container, make
+    // each thing its own container, like tickets dashboard." `RecordScreen`
+    // no longer wraps this body in its own `--surface-panel` Card
+    // (`panelVisible={false}`), so these four now stand DIRECTLY on the
+    // page — and `--card`/`--background` are the SAME colour in light
+    // (ticket-detail-body.tsx's own header), so `raised` here would be the
+    // exact "container on its own ground" bug R67 exists to catch.
     for (const card of [stories, time, stakeholders, conversation]) {
       expect(card, "every one of the four panels stands on a real Card").toBeTruthy()
-      expect(card!.getAttribute("data-variant")).toBe("raised")
+      expect(card!.getAttribute("data-variant")).toBe("default")
     }
+  })
+
+  it("draws no second, outer panel card around the four of them (18 Sep 2026 container ruling)", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    // The kit's own record panel region carries this attribute
+    // (record-detail.tsx: `data-record-region="panel"`) — `RecordScreen`'s
+    // `panelVisible={false}` means `RecordDetail` never draws that Card at
+    // all, so the attribute must not appear anywhere on the page.
+    expect(document.querySelector('[data-record-region="panel"]')).toBeNull()
   })
 })
 
@@ -288,24 +311,36 @@ describe("related stories show every row, uncapped, with a type chip and a statu
   })
 })
 
-describe("files moved to the ⋯ menu", () => {
-  it("opens the attachments panel as a sheet from 'Files and links'", async () => {
+// AMENDED 18 Sep 2026 — client ruling, verbatim: "kill this whole files &
+// links … button. those are visible in the conversation itself! the
+// customers can attach images & files. so do we." The ⋯ menu item and its
+// EdgePanel sheet are both gone; the SAME `<HelpAttachmentsPanel>` renders
+// inline, inside the Conversation card.
+describe("files are inline in the conversation, not behind the ⋯ menu", () => {
+  it("draws no 'Files and links' item in the ⋯ menu", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const trigger = screen.getByRole("button", { name: "More actions" })
-    // RADIX'S DropdownMenuTrigger OPENS ON POINTER DOWN, not on `click` alone
-    // — a plain `fireEvent.click` never dispatches the pointer events it
-    // listens for in jsdom.
     fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
     fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
     fireEvent.click(trigger)
-    const filesItem = await screen.findByText("Files and links")
-    fireEvent.pointerDown(filesItem, { button: 0, pointerId: 1 })
-    fireEvent.pointerUp(filesItem, { button: 0, pointerId: 1 })
-    fireEvent.click(filesItem)
+    // The heading text below still says "Files and links" — as the inline
+    // tray's own caption — so this asks specifically for a MENU ITEM
+    // (Radix's own role) rather than the bare text, which would find that
+    // caption anywhere on the page and pass for the wrong reason.
+    expect(screen.queryByRole("menuitem", { name: "Files and links" })).toBeNull()
+  })
+
+  it("renders the attachments panel's own empty state inline, inside the conversation card, with no click needed", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
+      '[data-slot="card"]'
+    ) as HTMLElement
     // The attachments panel's own empty-state sentence (help-attachments.tsx),
-    // now inside the slide-in rather than a tab panel.
-    expect(await screen.findByText("Nothing attached to this ticket yet.")).toBeTruthy()
+    // now inside the Conversation card's own tray rather than a tab panel or
+    // a sheet — and nothing was clicked to reach it.
+    expect(await within(conversation).findByText("Nothing attached to this ticket yet.")).toBeTruthy()
   })
 })
 
@@ -324,10 +359,17 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
     expect(calledOn.contains(storiesHeading)).toBe(true)
   })
 
-  it("opens the Files sheet for a ?tab=files deep link, rather than scrolling to nothing", async () => {
+  it("scrolls to the Conversation panel for a ?tab=files deep link, rather than opening a sheet that no longer exists", async () => {
     window.history.pushState({}, "", "/tickets/help-1?tab=files")
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
     openTicket()
     await screen.findByRole("heading", { level: 1 })
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    const thread = document.querySelector('[data-slot="ticket-thread"]') as HTMLElement
+    const calledOn = scrollIntoView.mock.instances[0] as unknown as HTMLElement
+    expect(calledOn.contains(thread)).toBe(true)
+    // The attachments the old sheet held are right there once landed.
     expect(await screen.findByText("Nothing attached to this ticket yet.")).toBeTruthy()
   })
 
@@ -336,5 +378,88 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
     openTicket()
     expect(await screen.findByRole("heading", { level: 1 })).toBeTruthy()
     expect(screen.getByText("Related stories")).toBeTruthy()
+  })
+})
+
+// CLIENT RULING, 18 Sep 2026, VERBATIM: "the ticket detail conversation
+// should have more height, depending on the height of the right column
+// components. they should be, the addition of the three of the right, same
+// as conversation." Proved structurally (jsdom has no layout engine to
+// measure a real height against): the grid carries the two-column,
+// three-row template and `items-stretch`, the conversation cell spans all
+// three rows, and the three right-column panels are direct grid children —
+// no wrapping `flex-col` box left to give them a height of their own for the
+// span to measure.
+describe("the conversation cell spans the right column's three rows (R16 sibling ruling)", () => {
+  it("the grid is two columns × three rows, stretched, with the conversation cell spanning all three", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
+    const grid = conversationAnchor.parentElement as HTMLElement
+    expect(grid.className).toContain("lg:grid-cols-[2fr_1fr]")
+    expect(grid.className).toContain("lg:grid-rows-3")
+    expect(grid.className).toContain("items-stretch")
+    expect(conversationAnchor.className).toContain("lg:row-span-3")
+
+    // THE THREE RIGHT-COLUMN PANELS ARE DIRECT GRID CHILDREN, not nested in
+    // a `flex-col` box of their own — that box is exactly what USED to give
+    // them (and therefore the span) a height independent of the grid.
+    const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
+    const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
+    const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
+    expect(storiesAnchor.parentElement).toBe(grid)
+    expect(timeAnchor.parentElement).toBe(grid)
+    expect(stakeholdersAnchor.parentElement).toBe(grid)
+  })
+
+  it("the conversation card fills its grid cell (lg:h-full) rather than a fixed viewport height", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const conversationCard = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
+      '[data-slot="card"]'
+    ) as HTMLElement
+    expect(conversationCard.className).toContain("lg:h-full")
+  })
+})
+
+// CLIENT RULING, 18 Sep 2026, VERBATIM: "missing the avatars of the senders
+// … client contacts and staff alike."
+describe("every message in the thread carries the sender's face", () => {
+  it("draws an avatar for the raiser's own message and for a staff reply", async () => {
+    api.replies = [
+      {
+        id: "msg-1",
+        ticketId: "help-1",
+        body: "We're looking into it.",
+        taggedUserIds: [],
+        isAgent: false,
+        authorId: "u-2",
+        authorName: "Aurora Weber",
+        authorIsClient: false,
+        createdAt: "2026-08-18T10:00:00.000Z",
+      },
+    ] as unknown as HelpMessage[]
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    await screen.findByText("We're looking into it.")
+    // ONE PER MESSAGE — the description (the raiser) and the one reply
+    // (staff) above.
+    const avatars = document.querySelectorAll('[data-slot="avatar"]')
+    expect(avatars.length).toBe(2)
+  })
+})
+
+// CLIENT RULING, 18 Sep 2026, VERBATIM: "missing the attach button … the
+// customers can attach images & files. so do we."
+describe("the composer carries an attach button, wired to the same file picker", () => {
+  it("draws a Paperclip button beside the send button, and it opens the SAME attachments panel inline below", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const attach = await screen.findByRole("button", { name: "Attach a file" })
+    expect(attach).toBeTruthy()
+    // The panel it reaches is already on the page (inline in the
+    // conversation), proving there is one upload path, not a second one
+    // conjured by this button.
+    expect(screen.getByText("Nothing attached to this ticket yet.")).toBeTruthy()
   })
 })

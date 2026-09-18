@@ -80,7 +80,7 @@ import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view
 import { formatCount } from "@shared/web/format-count"
 import { PagedFind, type FindPage, type FindQuery } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { HELP_STATUS } from "@/components/deep-link/shape"
+import { HELP_STATUS, ticketStatusCell } from "@/components/deep-link/shape"
 import { defaultCollectionConfig, type FilterFacet, type SortOption } from "@shared/web/screen-engine/config"
 import { ticketBoardCard, ticketStatusColumnTitles } from "@/components/tickets/tickets-collection"
 import { ticketTitle } from "@shared/web/ticket-chips"
@@ -1096,12 +1096,15 @@ export function AppTicketsPanel({
      do. It is a picture, not a column, so it costs no header. */
   const renderRows = (rows: HelpTicket[]) => (
     <Table
-      // SIX COLUMNS NOW, NOT FOUR — client, 17 Sep 2026: "On tickets list
-      // inside an app, add columns: Resolved Date, Resolved By." That lands
-      // this row exactly on R82's six-column ceiling (Title · Type · Stage ·
-      // Raised · Resolved date · Resolved by), so nothing here budges for a
-      // seventh without dropping one first — see `TABLE_COLUMN_BUDGET_EXEMPT`
-      // if that day comes. Widened to the kit's six-column specimen with it.
+      // SIX COLUMNS — Title · Type · Stage · Raised by · Raised · Resolved by.
+      // REWORKED 18 Sep 2026: "raised separate by and date! not in one
+      // together" split the old single "Raised" cell (face+name+date) into
+      // two columns, which would have pushed this row to seven against R82's
+      // six-column ceiling. What gave way is "Resolved date" as a COLUMN of
+      // its own — it rides under "Resolved by" now instead (the date stacked
+      // beneath the name), the exact shape "Raised" itself used to draw
+      // before today's split. The budget stays the client's own six: Title,
+      // Type, Stage, Raised by, Raised, Resolved by.
       minWidth="54rem"
       aria-label={t("Tickets")}
     >
@@ -1115,19 +1118,20 @@ export function AppTicketsPanel({
           <TableHead>{t("Title")}</TableHead>
           <TableHead>{t("Type")}</TableHead>
           <TableHead>{t("Stage")}</TableHead>
+          {/* RAISED BY / RAISED — two columns now, not one (18 Sep 2026). Both
+              strings already exist in the catalogue, fully translated, from
+              the ticket detail's own (since-retired) "Raised by"/"Raised on"
+              fact row — reused rather than respelled. */}
+          <TableHead>{t("Raised by")}</TableHead>
           <TableHead>{t("Raised")}</TableHead>
-          {/* RESOLVED DATE — `resolvedAt`, already on the wire (the general
-              Tickets screen's own Closed tab has read it since 2026-09-09;
-              see `TicketRowsTable`'s `closed` column). No door change needed
-              for this one, only a column. */}
-          <TableHead>{t("Resolved date")}</TableHead>
-          {/* RESOLVED BY — genuinely new: `resolverId`/`resolverName`
-              (`shared/types.ts`), read back off `help.resolver_id`/
-              `help.resolver_name` for the first time today
+          {/* RESOLVED BY — `resolverId`/`resolverName` (`shared/types.ts`),
+              read back off `help.resolver_id`/`help.resolver_name`
               (workers/content/src/lib/help.ts's `TICKET_COLS`/`toTicket`).
               Redacted to a client login exactly as `editorName` beside it is
               — SCOPE ch.06, "the portal shows work status but never which
-              staff member is doing it". */}
+              staff member is doing it". CARRIES ITS OWN DATE NOW (18 Sep
+              2026) — see the cell's own comment below for where the
+              standalone "Resolved date" column went. */}
           <TableHead>{t("Resolved by")}</TableHead>
         </TableRow>
       </TableHeader>
@@ -1239,75 +1243,75 @@ export function AppTicketsPanel({
                 {ticket.helpType ?? "—"}
               </Badge>
             </TableCell>
-            {/* THE STAGE, in secondary ink, so the title and the coloured pill
-                are what the eye lands on going down the page. Read through
-                `HELP_STATUS` — the same closed vocabulary this panel's own
-                Stage facet offers — so the word a person filters by and the
-                word they read back are one string. */}
+            {/* THE STAGE, THROUGH THE ONE SHARED DOT CELL (R86, client ruling
+                18 Sep 2026: "when showing status/stage on a list, include the
+                colored dot"). This used to be bare muted text — a text-only
+                status cell of exactly the shape that ruling refuses, the same
+                pairing (`HELP_STATUS` + `helpStatusDotTone`) the ticket
+                detail's own header chip already draws, now through the one
+                function both agree with rather than a second lookup. */}
             <TableCell className="text-muted-foreground">
-              {t(HELP_STATUS[ticket.status])}
+              {ticketStatusCell(ticket.status, t)}
             </TableCell>
-            {/* RAISED — face, name AND date, one cell. Client, 17 Sep 2026,
-                over this panel's own queue body, below: "I am not seeing
-                'raised' on the queue view on triage." The queue draws
-                through this SAME `renderRows`, so the fix is here once: the
-                column used to carry only `createdAt` (a date with no
-                raiser), which is why a client who WAS looking at "Raised"
-                could still say it was missing — half the fact was never on
-                screen, on List or Queue alike.
-                THE SAME R35 FACE "Resolved by" beside it draws — a picture
-                (or an initial tile) beside a name — with the date stacked
-                under it rather than a seventh column: R82 caps a table row
-                at six, and Title · Type · Stage · Raised · Resolved date ·
-                Resolved by is already at that ceiling, so a second Raised
-                column is not available and the fact rides the one it has,
-                the same subtraction R82's own law names for a wave's App.
+            {/* RAISED BY — face and name, its own column now (18 Sep 2026:
+                "raised separate by and date! not in one together"). Client,
+                17 Sep 2026, over this panel's own queue body, below: "I am
+                not seeing 'raised' on the queue view on triage." The queue
+                draws through this SAME `renderRows`, so the fix is here once.
                 RAISERISCLIENT (R54) decides the name's shape, the same rule
                 `help-detail.tsx`'s own raiser line already applies: a
                 colleague is trimmed to a first name, a client contact who
-                raised their own question is named in full. `raiserName`
-                null (never recorded, or redacted for a portal caller) draws
-                the date alone, the same "something rather than a blank
-                cell" every other absent fact here draws. */}
+                raised their own question is named in full. `raiserName` null
+                (never recorded, or redacted for a portal caller) draws the
+                same em dash every other absent fact here draws — the date
+                alone is not a fallback for this cell any more, because it has
+                its own column now (below). */}
             <TableCell className="text-muted-foreground">
               {ticket.raiserName ? (
                 <span className="flex items-center gap-2">
+                  {/* `choice` — a table row's face fits the text line, never
+                      the other way round (client ruling, 18 Sep 2026: "make
+                      the avatar smaller. should not be the cause of more
+                      height to the overall row"). */}
                   <RecordMark
                     picture={memberAvatar(ticket.raiserId)}
                     name={ticket.raiserName}
                     shape="round"
+                    size="choice"
                   />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">
-                      {ticket.raiserIsClient ? ticket.raiserName : staffNameFromSnapshot(ticket.raiserName)}
-                    </span>
-                    <span className="text-caption tabular-nums whitespace-nowrap text-muted-foreground">
-                      {formatDate(ticket.createdAt, lang)}
-                    </span>
+                  <span className="min-w-0 truncate">
+                    {ticket.raiserIsClient ? ticket.raiserName : staffNameFromSnapshot(ticket.raiserName)}
                   </span>
                 </span>
               ) : (
-                <span className="tabular-nums whitespace-nowrap">{formatDate(ticket.createdAt, lang)}</span>
+                "—"
               )}
             </TableCell>
-            {/* RESOLVED DATE — the same em-dash treatment `TicketRowsTable`'s
-                `closed` column gives an unresolved ticket: a blank cell reads
-                as a rendering fault, an em dash reads as "not yet". A reopen
-                NULLs `resolved_at` (the owner's 2026-09-06 ruling — the
-                closure survives in the activity trail instead), so this cell
-                never lies about a ticket that has been closed twice. */}
+            {/* RAISED — the date alone, its own column beside "Raised by"
+                now. The same formatter, the same language, as every other
+                date on this row. */}
             <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-              {ticket.resolvedAt ? formatDate(ticket.resolvedAt, lang) : "—"}
+              {formatDate(ticket.createdAt, lang)}
             </TableCell>
             {/* RESOLVED BY — R35's face, the same shape every staff picker in
                 this app draws a person with: a picture (or an initial tile)
-                beside their name. Staff are named by FIRST NAME ONLY in the
+                beside their name, `choice`-sized for the same reason "Raised
+                by" is above. Staff are named by FIRST NAME ONLY in the
                 agency app (R54) — `staffNameFromSnapshot` is the one seam
-                that trims a stored "First Last" snapshot, the same one the
-                Raised/Type columns' own history would use if they named a
-                person. `null` (never resolved, or redacted for a portal
-                caller) draws the same em dash every other absent fact here
-                draws. */}
+                that trims a stored "First Last" snapshot. `null` (never
+                resolved, or redacted for a portal caller) draws the same em
+                dash every other absent fact here draws.
+                THE RESOLVED DATE RIDES THIS CELL NOW (18 Sep 2026) — see
+                this table's own header comment for where the standalone
+                "Resolved date" column went: splitting Raised into two
+                columns landed this row at seven against R82's six-column
+                ceiling, and folding the date under the name it already sits
+                beside — the exact shape "Raised" itself used to draw before
+                today's split — is what brings it back to six. A reopen NULLs
+                `resolved_at` (the owner's 2026-09-06 ruling — the closure
+                survives in the activity trail instead), so an unresolved
+                ticket's cell never lies about a ticket that has been closed
+                twice; it draws no date at all, not a blank one. */}
             <TableCell className="text-muted-foreground">
               {ticket.resolverName ? (
                 <span className="flex items-center gap-2">
@@ -1315,8 +1319,16 @@ export function AppTicketsPanel({
                     picture={memberAvatar(ticket.resolverId)}
                     name={ticket.resolverName}
                     shape="round"
+                    size="choice"
                   />
-                  <span className="min-w-0 truncate">{staffNameFromSnapshot(ticket.resolverName)}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{staffNameFromSnapshot(ticket.resolverName)}</span>
+                    {ticket.resolvedAt && (
+                      <span className="text-caption tabular-nums whitespace-nowrap text-muted-foreground">
+                        {formatDate(ticket.resolvedAt, lang)}
+                      </span>
+                    )}
+                  </span>
                 </span>
               ) : (
                 "—"
@@ -1785,7 +1797,7 @@ export function TodosPanel({
           {
             value: "open",
             label: t("Open"),
-            icon: "clipboard-text",
+            icon: CONCEPT_ICON.open,
             badge: formatCount(openTotal),
             badgeVariant: "" as const,
           },

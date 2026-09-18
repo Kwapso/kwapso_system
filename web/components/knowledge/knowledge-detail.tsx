@@ -28,7 +28,8 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 
 import { ConnectionsPanel } from "@/components/records/connections-panel"
 import { useRemembered } from "@shared/web/remembered"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import type { Account, AppRow, KnowledgeSource } from "@shared/types"
@@ -375,17 +376,7 @@ export function KnowledgeDetailScreen({
       // (`overviewItems`).
       actions={
         // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon").
-        canEdit && (
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => setEditingOpen(true)}
-            className="shrink-0"
-            aria-label={t("Edit")}
-          >
-            <PencilSimple className="size-3.5" />
-          </Button>
-        )
+        canEdit && <EditPenButton onClick={() => setEditingOpen(true)} label={t("Edit")} />
       }
       // THE ONE DETAIL THAT NEVER PASSED THIS, and the tab is why. Twelve of the
       // thirteen bespoke details already hand `RecordScreen` their feed for the

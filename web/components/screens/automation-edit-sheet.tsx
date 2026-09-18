@@ -132,13 +132,12 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Button } from "@shared/ui/components/button/button"
 import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dialog"
 import { Sheet, SheetContent } from "@shared/ui/components/sheet/sheet"
 import { Field } from "@shared/web/field"
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@shared/ui/components/input/input"
-import { PencilSimple } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { Switch } from "@shared/ui/components/switch/switch"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { Text } from "@shared/ui/components/typography/typography"
@@ -393,9 +392,7 @@ export function AutomationEditSheet({
             </div>
             {mayChange && (
               <div className="ms-auto shrink-0">
-                <Button variant="secondary" size="icon" onClick={() => setMode("edit")} aria-label={t("Edit")}>
-                  <PencilSimple className="size-3.5" />
-                </Button>
+                <EditPenButton onClick={() => setMode("edit")} label={t("Edit")} />
               </div>
             )}
           </div>

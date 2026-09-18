@@ -55,6 +55,7 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
 import { Key, PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
@@ -479,11 +480,7 @@ export function ContactDetailScreen({
       actions={
         <>
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-          {canEdit && (
-            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
+          {canEdit && <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
         </>
       }
@@ -545,7 +542,16 @@ export function ContactDetailScreen({
                         disabled={busy}
                         className="w-full sm:w-80"
                       />
+                      {/* NOT MANGO — this row's own inline action, never the
+                          record's title (R84); it happened to carry no
+                          `variant` at all, which is `Button`'s own default,
+                          mango. Caught by the same 18 Sep 2026 ruling that
+                          named the ticket page's pen: "the edit button is
+                          never black (even when it's only one)" reads on
+                          this glyph too, since a pencil beside "Save" is
+                          still the pen. */}
                       <Button
+                        variant="secondary"
                         size="sm"
                         disabled={busy || company === atCompany}
                         onClick={() => void moveToCompany()}

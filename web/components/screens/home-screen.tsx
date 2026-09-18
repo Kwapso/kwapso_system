@@ -27,7 +27,7 @@ import {
 } from "@shared/ui/components/avatar/avatar"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { List } from "@shared/web/list-compat"
-import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, ChecksRegular, Gear, Timer, UploadSimple, Users } from "@shared/ui/foundations/icons"
+import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, ChecksRegular, Gear, Timer, UploadSimple, UsersThree } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 
 import { PulseBand, pulseIsQuiet, usePulse } from "@/components/screens/pulse"
@@ -177,7 +177,12 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
     // overview at `/t/<teamId>`, which no longer draws a screen; it points at
     // the tab that holds the members gallery and the roles matrix instead, so
     // the card lands on the thing its own description names.
-    { title: t("Team"), desc: t("Members, roles and invites"), icon: Users, href: "/settings?tab=team" },
+    // LANDS ON MEMBERS, AND SAYS SO: `?tab=team` was only ever an alias
+    // (`resolveTeamAlias`, settings-screen.tsx) since the client replaced the
+    // Team tab with Members and Roles (16 Sep 2026), so the card names the tab
+    // it opens and wears that tab's glyph — `TAB_ICONS.members`, the same
+    // `CONCEPT_ICON.members` resolves to (icon-concepts-agree.test.ts).
+    { title: t("Team"), desc: t("Members, roles and invites"), icon: UsersThree, href: "/settings?tab=members" },
     { title: t("Settings"), desc: t("Your account and teams"), icon: Gear, href: "/settings" },
   ]
 

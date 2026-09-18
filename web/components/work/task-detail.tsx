@@ -28,7 +28,8 @@ import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
-import { Check, PencilSimple, ArrowUUpLeft } from "@shared/ui/foundations/icons"
+import { Check, ArrowUUpLeft } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
@@ -253,11 +254,7 @@ export function TaskDetailScreen({
               icon") — the same `size="icon"` + `aria-label` shape every other
               standalone Edit control in this app already draws (RecordActionsMenu's
               own trigger, work-logs-panel.tsx, time-panel.tsx). */}
-          {canEdit && !done && (
-            <Button variant="secondary" size="icon" onClick={() => setEditing(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
+          {canEdit && !done && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
           {canEdit && (
             <Button variant="secondary" onClick={onToggleDone} className="gap-1">
               {done ? <ArrowUUpLeft className="size-3.5" /> : <Check className="size-3.5" />}

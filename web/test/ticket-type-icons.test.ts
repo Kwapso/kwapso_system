@@ -6,8 +6,9 @@
 // Client ruling, 17 Sep 2026, verbatim: "for tickets, we need to find icons
 // for the ticket type." Four glyphs, hand-picked and verified against the
 // kit's own generated exports (shared/ui/foundations/icons/*.svg): Issue →
-// `Bug`, Question → `Question`, Extra → `PlusCircle`, Feedback →
-// `ChatCircleText`.
+// `Bug`, Question → `Question`, Extra → `PlusCircleRegular`, Feedback →
+// `ChatCircleText`. Extra moved off the filled `PlusCircle` on 18 Sep 2026,
+// her ruling verbatim: "for extra, use the regular icon (not filled)".
 
 import { describe, expect, it } from "vitest"
 
@@ -19,7 +20,7 @@ describe("R86 — ticketTypeIconName resolves an icon per ticket type", () => {
     const expected: Record<string, string> = {
       Issue: "bug",
       Question: "question",
-      Extra: "plus-circle",
+      Extra: "plus-circle--regular",
       Feedback: "chat-circle-text",
     }
     // THE FOUR, FROM THE SAME LIST THE LOCK NAMES (shared/ticket-types.ts,
@@ -41,7 +42,7 @@ describe("R86 — ticketTypeIconName resolves an icon per ticket type", () => {
   it("is forgiving the same way ticketTypeKey is — trailing 's', case, whitespace", () => {
     expect(ticketTypeIconName("issues")).toBe("bug")
     expect(ticketTypeIconName("  QUESTION  ")).toBe("question")
-    expect(ticketTypeIconName("Extras")).toBe("plus-circle")
+    expect(ticketTypeIconName("Extras")).toBe("plus-circle--regular")
   })
 
   it("a renamed or retired word, or no type at all, draws no icon — never a guess", () => {

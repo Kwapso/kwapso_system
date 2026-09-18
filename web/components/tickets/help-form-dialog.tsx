@@ -1438,6 +1438,13 @@ export function HelpFormDialog({
           value={values.helpType}
           onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
           options={typeOptions}
+          // CLIENT RULING, 18 Sep 2026 ("on tikects type, need space between
+          // icon and name. also background to the card"): each resting chip
+          // draws on the kit's own option-card ground rather than blending
+          // into the dialog's own canvas — see `RecordPicker`'s own
+          // `optionCard` header for the full argument. Scoped to this row
+          // alone; every other row picker on this form is untouched.
+          optionCard
           searchPlaceholder={t("Search types…")}
           // A ROW CANNOT SAY "nothing matched" — there is no search box in it —
           // so this is the state where the team's own `Ticket type` list is

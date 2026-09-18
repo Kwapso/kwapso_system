@@ -291,6 +291,60 @@
 }
 
 /* ============================================================================
+   A COLLECTION NESTED INSIDE A RECORD'S OWN TAB PANE PAYS THE SAME REMAINDER
+   (R83, extended 18 Sep 2026). CLIENT RULING, VERBATIM: "on app / tickets the
+   space above the toolbar is huge and inocrrect!!! review app-wide!"
+   ============================================================================
+   The rule above only ever reaches a card that is `.pinned-strip`'s own NEXT
+   SIBLING — true for every top-level collection (`renderFolderTabs` then
+   `<CollectionCard>`, one flat column), false for a RECORD's own inner tab.
+   `TabsView`'s `renderPanel` (shared/web/screen-engine/tabs-view.tsx) wraps
+   every panel in a Radix `TabsContent`, a SIBLING of `[role=tablist]` — never
+   the card's — with the card itself nested one or two levels further in
+   (`PagedPanelBody`'s own `<PagedFind>` adds ONE more flow `<div>` around the
+   `wrap`-supplied `<CollectionCard>`; `ModulesPanel` renders it directly, no
+   div at all). Neither shape is `.pinned-strip`'s own next sibling, and the
+   record strip itself never wears `.pinned-strip` either (`STICKY_TABS`,
+   web/components/records/record-chrome.tsx, carries no `PINNED_STRIP_MARK` —
+   only a COLLECTION's own strip, `STICKY_FOLDER_TABS`, does), so this rule
+   never fired inside a record tab on EITHER count. The nested collection paid
+   its own full, un-remediated `CardContent` leading inset (16-32px) ON TOP OF
+   the `<Tabs>` root's own flex `gap-[var(--space-6/7)]` between the tablist
+   and its content (24-32px) ON TOP OF the strip's own `--record-tab-gap`
+   border (20px) — three unrelated numbers stacked where every other screen
+   pays one `--toolbar-lead-gap`.
+
+   FIXED AT THE SEAM, not per record screen: `TabsView` marks every
+   `TabsContent` it renders through `renderPanel` with `data-tab-pane` — the
+   one wrapper every record's own tab pane renders through, regardless of
+   which record screen or which tab (`renderFolderTabs`'s own strip never
+   takes a `renderPanel`, so this marker is exclusive to a record's inner
+   strip). A DESCENDANT selector, not `>` alone: the card sits at variable
+   depth (direct child for `ModulesPanel`, one `<div>` deep for anything built
+   on `PagedPanelBody`), and `:first-child` keeps it scoped to the LEADING
+   position exactly the way the strip-adjacency rule above already is — a
+   second card further down one tab pane would not match. The record's own
+   strip already pays `--record-tab-gap` (`--tab-content-gap`, the identical
+   token, `design-scale.test.ts`'s own "one seam, both strips read it"
+   rot-check) the same way `.pinned-strip` does, so the nested card owes the
+   same REMAINDER, never the whole `--toolbar-lead-gap`.
+
+   NOT EVERY TAB PANE IS REACHED, ON PURPOSE. A pane whose collection is not
+   really first — the app-hosted Knowledge tab draws its own "Ask" button
+   above the gallery, and Settings' hand-rolled Members panel never wears
+   `[data-slot="card"]` at all (`TeamPanel`, a bare `<section>`, carries the
+   toolbar instead) — keeps its current, separately tracked shape; only a pane
+   whose card genuinely leads is in scope here, the same restraint
+   `:first-child` already gives the top-level rule above. */
+[data-tab-pane] [data-slot="card"]:first-child {
+  --pinned-lead: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
+}
+
+[data-tab-pane] [data-slot="card"]:first-child > [data-slot="card-content"] {
+  padding-top: calc(var(--toolbar-lead-gap) - var(--tab-content-gap));
+}
+
+/* ============================================================================
    A CARD LED BY A HEADING PAYS THE WHOLE --toolbar-lead-gap, NOT THE STRIP'S
    REMAINDER (R83, generalised 17 Sep 2026 — the other half of this fix is in
    web/components/deep-link/collection-content.tsx's own knowledge branch).

@@ -188,7 +188,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
-import { RecordMark } from "@shared/web/record-mark"
+import { PersonCard } from "@shared/web/person-card"
 import { useCached, invalidate, primeCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
@@ -729,73 +729,28 @@ export function MembersGallery({
                       className="block"
                     >
                     <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
-                      {/* TWO LETTERS, THROUGH THE TWO SEAMS THAT ALREADY EXIST.
-                          `RecordMark` is the app's one person mark (R35's third
-                          rung: a picture, else a type glyph, else an initial) and
-                          `personInitials` is the app's one two-letter avatar mark
-                          — R54's own note keeps it explicitly out of the
-                          first-name rule, "an initial is a MARK, not a name".
-                          `RecordMark`'s bare `name` fallback is ONE letter, which
-                          is right on a dense list row and wrong on the biggest
-                          thing on the card, so the pair is handed over rather
-                          than a third helper invented. The picture still wins
-                          where a member has one, so the day this data grows a
-                          photograph the same slot carries it.
-
-                          `band`, NOT `tile` — "bigger images" (client,
-                          2026-09-10). It is the fourth of `RecordMark`'s four
-                          NAMED sizes (56, and 72 from `sm:` up) rather than a
-                          `size-*` class written here: that file's own header is
-                          explicit that a size handed in as a class name puts two
-                          Tailwind size rules on one box and is how a fifth and
-                          sixth size arrive without anybody deciding on one. The
-                          card's floor is 12rem and its inset is 32, so 72 sits
-                          inside 160 with room to spare. */}
-                      <RecordMark
+                      {/* THE CELL'S LAYOUT — `PersonCard` (shared/web/person-card.tsx),
+                          extracted 18 Sep 2026 so the ticket's stakeholders panel
+                          could draw the identical shape without a second
+                          hand-copied `<CardContent>` block. The mark's two
+                          seams and `band` over `tile` moved there; the
+                          `<CardTitle>` stays written HERE (R65's own census
+                          reads it off THIS file's `<Card>` block by text, so
+                          building it inside the shared component would be
+                          invisible to it — `person-card.tsx`'s own header has
+                          the whole argument). */}
+                      <PersonCard
                         picture={m.imageUrl}
                         mark={personInitials(m.firstName, m.lastName)}
-                        name={staffFullName(m)}
-                        shape="round"
-                        size="band"
+                        markName={staffFullName(m)}
+                        chip={<Badge>{m.roleTitle}</Badge>}
+                        title={<CardTitle className="text-sm">{staffFullName(m)}</CardTitle>}
+                        secondary={
+                          <span className="text-muted-foreground w-full truncate text-xs">
+                            {m.email}
+                          </span>
+                        }
                       />
-                      {/* NAME AND SURNAME — her 2026-09-09 correction to the
-                          first-name rule of 2026-09-07. Through the one naming
-                          seam (R54), never `first + " " + last` here; the two
-                          rulings and why they do not conflict are written up in
-                          shared/staff-name.ts on `staffFullName` itself.
-
-                          THE KIT'S OWN TITLE PART, not a `<span>` (R65). "Above"
-                          is a claim about position, and a title hand-rolled into
-                          a span has none a census can read — this card was the
-                          proof: a chip-position check over the old markup would
-                          have reported a perfectly ordered card while looking at
-                          nothing at all. `text-sm` carries the wall's own step,
-                          exactly as the span did; the kit's 18/500 is chapter
-                          13's figure for a full card, not for a cell. */}
-                      {/* THE CHIP AND THE NAME ARE ONE BLOCK, AND THE CHIP IS ON
-                          TOP OF IT (R65) — "chip on top of title" (client,
-                          2026-09-10, and the second time she has said it: the
-                          Kanban card got the same instruction on 2026-09-07). The
-                          role is what SORTS a wall of people, so it is read
-                          BEFORE the name it qualifies; under the name it is
-                          qualifying something already read.
-
-                          IMMEDIATELY above it, not at the top of the card. The
-                          kit's own kanban card carries the argument for why, in
-                          the words of the same ruling: above the title a chip is
-                          the title's OVERLINE, and an overline separated from
-                          its title by everything else in the stack stops
-                          introducing it. So the two share one box at `gap-1`
-                          while the card's own stack stays at `gap-2`, and the
-                          FACE still leads the card — which is what "bigger
-                          images" asked for in the same sentence. */}
-                      <span className="flex flex-col items-center gap-1">
-                        <Badge>{m.roleTitle}</Badge>
-                        <CardTitle className="text-sm">{staffFullName(m)}</CardTitle>
-                      </span>
-                      <span className="text-muted-foreground w-full truncate text-xs">
-                        {m.email}
-                      </span>
                     </CardContent>
                     </InAppLink>
                   </Card>

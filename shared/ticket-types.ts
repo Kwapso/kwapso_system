@@ -128,17 +128,23 @@ export function isValidationSprintType(value: string | null | undefined): boolea
 //
 // FOUR GLYPHS, HAND-CHOSEN AND VERIFIED AGAINST THE KIT'S OWN GENERATED
 // EXPORTS (shared/ui/foundations/icons/*.svg — Bug.svg, Question.svg,
-// PlusCircle.svg and ChatCircleText.svg all exist there): Issue reads as a
-// defect, `Bug`; Question is literally itself, `Question`; Extra is
-// something ADDED to the usual scope, `PlusCircle`; Feedback is a message
-// coming back from the client, `ChatCircleText` — distinct from `ChatCircle`
-// (no content mark) and `ChatCircleDots` (mid-typing), the two Phosphor
-// siblings closest in shape, because a chip this small needs a silhouette
-// that reads as "a note", not "a conversation in progress".
+// PlusCircleRegular.svg and ChatCircleText.svg all exist there): Issue reads
+// as a defect, `Bug`; Question is literally itself, `Question`; Extra is
+// something ADDED to the usual scope, `PlusCircleRegular` — REGULAR weight,
+// not filled: her own words, 18 Sep 2026, "for extra, use the regular icon
+// (not filled)", added to the kit at v1.2.116 as a second, coexisting glyph
+// beside the filled `PlusCircle` this map used until today — the same
+// coexisting-weight shape `ChecksRegular` already takes for `tasks`
+// (web/lib/pages.ts, kebab "checks--regular"), kebab `plus-circle--regular`;
+// Feedback is a message coming back from the client, `ChatCircleText` —
+// distinct from `ChatCircle` (no content mark) and `ChatCircleDots`
+// (mid-typing), the two Phosphor siblings closest in shape, because a chip
+// this small needs a silhouette that reads as "a note", not "a conversation
+// in progress".
 const TICKET_TYPE_ICONS = {
   issue: "bug",
   question: "question",
-  extra: "plus-circle",
+  extra: "plus-circle--regular",
   feedback: "chat-circle-text",
 } as const satisfies Record<string, string>
 

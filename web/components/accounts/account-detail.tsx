@@ -65,7 +65,8 @@ import { useRemembered } from "@shared/web/remembered"
 import { useConfirm } from "@shared/web/use-confirm"
 
 import { ClientOrgPanel } from "@/components/accounts/client-org-panel"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { Badge } from "@shared/ui/components/badge/badge"
 
 import type { AccountDetail, AppRow } from "@shared/types"
@@ -554,7 +555,7 @@ export function AccountDetailScreen({
             {
               value: "organisation",
               label: t("Organisation"),
-              icon: CONCEPT_ICON.members,
+              icon: "network",
               badge: "",
               badgeVariant: "" as const,
             },
@@ -698,11 +699,7 @@ export function AccountDetailScreen({
       actions={
         <>
           {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
-          {canEdit && (
-            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
-          )}
+          {canEdit && <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />}
           <RecordActionsMenu actions={overflow} />
         </>
       }

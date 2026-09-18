@@ -2,6 +2,230 @@
 
 ## Unreleased
 
+### Fixed — six client rulings on the record shell (trail inset, search chrome, tab gap, rail gutter, assistant handle, badge ink/links) plus one new icon — v1.2.116
+
+**CLIENT RULINGS, 18 SEP 2026, VERBATIM, ALL KIT-LEVEL.** Six items, each
+measured live on `agency-staging` before it was touched, plus a seventh —
+a missing regular-weight icon — flagged mid-lane and folded into the same
+entry rather than shipped separately.
+
+**1 · THE TRAIL FIELD AND THE TITLE NOW SHARE ONE LEFT EDGE.** "pils and
+title are slightliy wider that the topnavbar. should not be. they shoul be
+same width and end at the same point in the left." `compositions/templates/
+screen-shell.tsx`'s `DENSITY_TRAIL` used to COPY `DENSITY_HEADER`'s own `px`
+(`--space-6`/`--space-5`) on the theory that the title it had to align with
+was always `band`'s content — true on a header-band screen, false on a
+RECORD screen (no `band`; the title is body-hosted, padded by `DENSITY_BODY`'s
+`CARD_CONTENT_INSET_X`, `--space-3`), which is the one shape `trail` actually
+ships on today. MEASURED, a ticket record, 1440 viewport: trail field left
+edge 231px, title/badge left edge 223px — an 8px gap. FIX: `DENSITY_TRAIL`
+now builds its `px` from the SAME imported `CARD_CONTENT_INSET_X` identifier
+`DENSITY_BODY` spends, not a second copy of `DENSITY_HEADER`'s figure — one
+token, not two that used to agree only on a screen with no `trail`+`band`
+combination (none ships today; flagged, not fixed, for the day one does).
+**Files:** `compositions/templates/screen-shell.tsx`. **Checks:**
+`compositions/templates/check-screen-shell.mjs`, new "trail/body
+inset-parity" block, pinning the import and the identifier.
+
+**3 · THE SEARCH-SHAPED CHROME IS GONE FROM THE TRAIL FIELD.** "on the top
+navbar, kill the search icon, makes no sense there. also kill the cmd+k."
+`components/breadcrumbs/trail-line.tsx` drew a `MagnifyingGlass` and a
+static, `aria-hidden` "⌘K" hint since the 17 Sep D2 drawing — neither ever
+wired to anything, both read as a promise of search the field never kept.
+Both are deleted outright: no import, no `data-slot="trail-line-hint"` span,
+no dead prop. The panel-tone pill, the arrows inside it and the crumbs are
+unchanged. **Files:** `components/breadcrumbs/trail-line.tsx`. **Checks:**
+`check-screen-shell.mjs`'s existing trail-spacing block, extended to read
+`trail-line.tsx` too and assert neither shape is back.
+
+**4 · THE WORKSPACE TAB STRIP NOW HAS A REAL GAP, NOT AN OVERLAP.** "the top
+tabs folder, need space betwwen tehm. right now they merge altogether."
+`components/breadcrumbs/breadcrumb-folders.tsx`'s `STRIP` traded its 17 Sep
+`TAB_OVERLAP_MARGIN` (a negative margin nesting every tab after the first
+under its predecessor's shoulder, Chrome-style, `restZIndex` deciding who
+painted on top) for a plain `gap-[var(--space-2)]` (8px) — chosen over
+`--space-1` (4px, the exact figure that produced the ORIGINAL "tabs merging"
+defect the overlap mechanism was built to fix) because it reads unambiguously
+as a gap rather than a near-miss. `TAB_OVERLAP_MARGIN`, `TAB_OVERLAP_PS` and
+`TAB_ICON_ONLY_OVERLAP_PS` are deleted along with every `notFirst &&` call
+site that spent them. The lift and the z-order (`restZIndex`, `TAB_LIVE`'s
+`z-[1]`, `isolate`) are UNCHANGED — still needed the moment a drag's own
+`transform` opens a stacking context, even though two RESTING tabs no longer
+share a pixel to fight over. **Files:**
+`components/breadcrumbs/breadcrumb-folders.tsx`. **Checks:**
+`verify/tabstrip-parity/page.tsx`'s own `measureNesting` is now a GAP proof
+(`actualGapPx` against the live `--space-2` token, plus a no-overlap
+assertion) rather than the retired nesting one; re-sampled live via the
+page's own `window.__tabstripParitySample()` after the fix — every reading
+(silhouette parity, gap, tap-forward, icon-only floor, scrollbar, hover
+fill) reports `passes: true`, gap measured at 9px (the live root's own
+`--space-2`, matching the token exactly). `.claude/launch.json` gained a
+`verify-tabstrip-parity` entry (port 5325) — it had none before this lane.
+No dedicated `check-*.mjs` exists for this component yet (none did before
+this ruling either); the verify page's own instrumentation is the check.
+
+**8 · THE RAIL'S OWN GUTTER IS HALVED ON BOTH EDGES AT ONCE.** "reduce the
+margin between the super far edge of screen and the side navbar, same as
+reduce it between side navbar and main content. keep spacing equal on both
+sides - but reduce (i'd say to half of what it is, but i dont see the
+pixels, just human eye)." Both edges she named were ALREADY one token:
+`RAIL_COLUMN`'s own `p-[var(--rail-inset)]` pads all four sides of the rail
+column at once (the content column's own matching trailing gutter was
+removed outright back on 2026-09-06), so "keep spacing equal" was already
+structurally guaranteed. MEASURED, a ticket record, 1440 viewport, 16px
+root: rail left edge 19px from the viewport; rail right edge 187px against
+the content column's own left edge 207px — a 20px gap on both sides,
+`--space-5`. Half of 20 is 10 — `--space-2h`, the exact existing half-step
+rung, no rounding needed, the SAME token `TRAIL_GAP`/`DENSITY_TRAIL`'s own
+`pt` already reach for elsewhere in this file for an identical "half of the
+current figure" ruling. **Files:** `compositions/templates/screen-shell.tsx`
+(`DENSITY_RAIL`). **Checks:** `check-screen-shell.mjs`, new
+"rail-gutter-halving" block, pinning the halved value, `RAIL_COLUMN`'s
+all-four-sides padding, and the continued absence of a second content-side
+gutter.
+
+**9 · THE ASSISTANT'S OPEN BUTTON NO LONGER OVERLAPS THE CARD.** "put the
+open assistant button completely on the top margin, not liek now that its
+slightly overlaping with main content." The shut `EdgeHandle` for the aside
+sits at `top-[var(--shell-gutter)]` (16px); at `HANDLE_HIT`'s own 40px
+(`--control-height-button`) its bottom edge landed at 56px — 9.52px past
+the content card's own top edge (46.48px = the same 16px plus
+`--folder-lip`, 30.48, the tab strip's own lip height above the card).
+FIX: this ONE branch (the SHUT top-strip corner only — the OPEN mid-edge
+grab and the rail's own handle, both states, are untouched) is sized to
+`--control-height-pill` (26px) via a `cn()` merge win over `HANDLE_HIT`'s
+own size class — the SAME token `trail-line.tsx` already proved fits this
+exact `--folder-lip` band, with the SAME 16px icon (`--icon-button`) at the
+SAME proportion the trail's own arrows already draw. New bottom edge:
+16 + 26 = 42px, 4.48px clear of the card. **Files:**
+`compositions/templates/screen-shell.tsx` (the aside `EdgeHandle`'s shut
+`placement`). **Checks:** `check-screen-shell.mjs`, new
+"assistant-handle-in-the-band" block.
+
+**10 · BADGE TEXT IS ALWAYS INK, AND A LINKED CHIP READS AS A LINK.** "why
+is chip ticket type grey and not black? all text shhould be black. when its
+a link make it underlined (for exmaple the app name)." Two defects in
+`components/badge/badge.tsx`: the `secondary` variant (the ticket-type
+chip's own variant) read `text-ink-secondary`, and the Archived status
+pill's one compound variant repainted its label `text-ink-tertiary` — both
+muted greys, neither consistent with this file's own "charcoal on every
+accent" law for the COLOURED variants. Both now read `text-foreground`; the
+compound variant is deleted outright (the state lives in the dot, never in
+a dimmed label — no variant, base or compound, may dim a label for tone any
+more). Separately, `Badge` gained `asChild` (via `@radix-ui/react-slot`,
+`BreadcrumbLink`'s own pattern) and `href` (renders a real `<a>` with
+neither `asChild` nor a wrapping anchor needed); either one marks the badge
+as a link and draws `LINK_UNDERLINE` (`underline underline-offset-[0.1875rem]`,
+the same 3px offset `.kw-link` uses) — ALWAYS ON, not hover-revealed like
+`BreadcrumbLink`'s own idiom, because a discrete chip has no surrounding
+prose to read a hover-only underline against and has to read as a link on a
+touch device too. **Files:** `components/badge/badge.tsx`. **Checks:**
+`components/badge/check-badge.mjs` (NEW — badge.tsx had no dedicated check
+before this ruling; wired into `npm run check` in `package.json`), pinning:
+no variant (base or compound) reads a muted ink for its label; `secondary`
+reads `text-foreground` specifically; the retired Archived compound variant
+stays gone; `Slot` is imported; `LINK_UNDERLINE` is the always-on form: and
+`isLink`/its application both exist. Proven non-vacuous the manual way
+(reverted `secondary`'s ink to `text-ink-secondary` in a scratch copy,
+confirmed FAIL, restored, confirmed OK). `verify/badge-default-comparison.html`'s
+two swatches that used to mirror the grey secondary ink (`.b-secondary`,
+`.right .b-unqualified`) are corrected to `--foreground`, with a note on
+what changed and why.
+
+**7 · A REGULAR-WEIGHT PLUS-CIRCLE ICON, FOR "EXTRA".** Client ruling: "for
+extra, use the regular icon (not filled)" — the ticket-type "Extra" glyph is
+`PlusCircle`, and the kit only shipped the FILL weight. `ChecksRegular.svg`
+already established the convention (a second file, `<Name>Regular.svg`,
+beside the fill-weight original, for the one glyph that needs both weights
+under two names — Phosphor itself has no "regular" suffix upstream).
+`foundations/icons/PlusCircleRegular.svg` is that second file, Phosphor's
+own `plus-circle` regular-weight path data, fetched from the pinned pack
+(`@phosphor-icons/core@2.1.1`, the same version `check-icon-art.mjs` already
+verifies every glyph against) rather than hand-drawn. `npm run build:icons`
+(`generate-icons.mjs`) regenerated `icons.generated.tsx`/`index.ts` with the
+new `PlusCircleRegular` export (1514 glyphs now, was 1513); `check-icon-art.mjs
+--refresh` recorded its hash against the real upstream art (`new glyphs 1
+PlusCircleRegular`, `art changed 0`, `removed 0`) and a plain re-run confirms
+`check-icon-art: OK` offline. Nothing else changes for it in the kit — which
+app-side chip swaps to the regular glyph is the consuming app's own call, not
+this repo's. **Files:** `foundations/icons/PlusCircleRegular.svg` (new),
+`foundations/icons/icons.generated.tsx`, `foundations/icons/index.ts`,
+`foundations/icons/icon-art.manifest.json`.
+
+### Fixed — the avatar's initials no longer sit on top of a loaded photograph — v1.2.115
+
+**CLIENT REPORT, 18 SEP 2026, VERBATIM.** "look at first screenshot bug, we
+see the avatar AND the initials! should not be, initials only if avatar is
+empty. implement everywhere." Her screenshot: a member card drawing the
+photograph AND the two-letter initials over it at once.
+
+**THE COMPONENT.** `components/avatar/avatar.tsx` — `Avatar` /
+`AvatarImage` / `AvatarFallback`. This is the one seam every caller already
+goes through (45 direct call sites; every composition that draws a person or
+a record's square twin), so the fix lands here once rather than at each of
+them.
+
+**THE CAUSE.** `AvatarFallback` has always hidden itself on exactly one
+condition, `status === "loaded"`, and that was the right condition — the
+bug was never in the fallback. `AvatarImage` only ever REACHED `"loaded"`
+through its own `onLoad` prop firing. A photograph the browser had already
+resolved — loaded or 404'd — before that prop was attached never fires the
+DOM event at all: the fetch answers at nobody, `status` is stuck on
+`"loading"` forever, and the fallback's guard never trips. The photograph
+paints (it did load); the initials, absolutely positioned over it, never
+go away. `components/image/image.tsx` had already measured and fixed the
+identical race for its own `<img>` (its own comment: "A picture already in
+the browser's cache can finish decoding before React attaches onLoad …
+`complete` is the only way to catch that"), and `RecordMark`
+(`kwapso_system/shared/web/record-mark.tsx` — an app-side file, not part of
+this kit, found only by grepping how `web/components/team/members-gallery.tsx`
+draws a member's mark) had independently found and fixed the same race for
+both its success and failure case. `AvatarImage` alone had never carried the
+fix.
+
+**THE FIX.** `AvatarImage` now merges an internal ref with whatever ref a
+call site forwards (`setRefs`, the same merge `Image` already uses) and, in
+the same effect that sets `"loading"`/`"error"` from `src`'s presence, reads
+the node's own `.complete`/`.naturalWidth` immediately after mount:
+`complete && naturalWidth > 0` settles `"loaded"`, `complete &&
+naturalWidth === 0` settles `"error"`, and a fetch still in flight
+(`complete === false`) is untouched, left for the ordinary `onLoad`/
+`onError` handlers to settle when they do fire. Nothing about the mutual
+exclusion itself changed — `AvatarFallback`'s guard and `AvatarImage`'s own
+`status === "error"` unmount were already correct — this closes the ONE way
+`status` could get permanently stuck before either guard ever ran.
+
+**EVERY SIZE, THROUGH THE ONE SEAM.** `sm`/`md`/`lg` (and `shape="square"`,
+the record mark's own twin) all go through the same `AvatarImage`; nothing
+size- or shape-specific was touched, so the fix holds at all three sizes and
+both shapes without a second change.
+
+**OUT OF SCOPE, APP-SIDE.** `RecordMark` itself is not a kit component (it
+lives in `kwapso_system/shared/web/`, not `shared/ui/`) and was not edited
+here — it already renders the picture and the fallback as one ternary
+(`picture && !broken ? <img/> : <>{fallback}</>`), which cannot itself
+render both, so the report's screenshot is either this kit's `Avatar` (now
+fixed) or a stale build predating `RecordMark`'s own 16 Sep fix. Flagged,
+not touched, per the kit/system boundary.
+
+**CHECKS.** `components/avatar/check-avatar.mjs` (new, wired into `npm run
+check`) statically pins three things so none can drift back independently:
+`AvatarFallback` still returns `null` on `status === "loaded"`,
+`AvatarImage` still returns `null` on `status === "error"`, and
+`AvatarImage`'s post-mount `.complete`/`.naturalWidth` read (plus the
+`setRefs` merge it depends on) is still present — deleting any one of the
+three regresses "avatar AND initials" and this check fails red before the
+next screenshot does. Proven non-vacuous the manual way (mutated each of
+the three away in a scratch copy, confirmed FAIL, restored, confirmed OK
+again).
+
+`verify/avatar/` (new) — a standalone page, photo / no photo / broken URL
+(404) at all three sizes, plus a fourth "warm cache" section that primes the
+browser's image cache with the same URL before mounting a fresh `Avatar`
+against it, the shape that exposed the race. `window.__avatarVerify()`
+walks every labelled cell and reports whether the image and the fallback
+are ever both in the DOM at once (the bug) against what each cell expects.
+
 ### Fixed — the trail's spacing halved and de-dividered, arrows moved into the field — v1.2.114
 
 **CLIENT RULINGS, 18 SEP 2026, VERBATIM.** "for the breadrcumbs / search -

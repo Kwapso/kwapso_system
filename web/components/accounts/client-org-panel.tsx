@@ -53,7 +53,8 @@ import {
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, ToolbarRow, type ToolbarSortSlot } from "@/components/deep-link/screen-bits"
@@ -446,11 +447,7 @@ export function ClientOrgPanel({
                 {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
                     "edit, only the pencil icon") — no more `sm:not-sr-only`
                     reveal. */}
-                {canEdit ? (
-                  <Button variant="ghost" size="icon" onClick={() => setEditingDept(d)} aria-label={t("Edit")}>
-                    <PencilSimple className="size-3.5" />
-                  </Button>
-                ) : null}
+                {canEdit ? <EditPenButton onClick={() => setEditingDept(d)} label={t("Edit")} /> : null}
                 {canSwitchOff && d.active ? (
                   <Button
                     variant="ghost"
@@ -545,11 +542,7 @@ export function ClientOrgPanel({
                   {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
                       "edit, only the pencil icon") — no more `sm:not-sr-only`
                       reveal. */}
-                  {canEdit ? (
-                    <Button variant="ghost" size="icon" onClick={() => setEditingRole(r)} aria-label={t("Edit")}>
-                      <PencilSimple className="size-3.5" />
-                    </Button>
-                  ) : null}
+                  {canEdit ? <EditPenButton onClick={() => setEditingRole(r)} label={t("Edit")} /> : null}
                   {canSwitchOff && r.active ? (
                     <Button
                       variant="ghost"
@@ -707,11 +700,7 @@ export function ClientOrgPanel({
                 {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
                     "edit, only the pencil icon") — no more `sm:not-sr-only`
                     reveal. */}
-                {canEdit ? (
-                  <Button variant="ghost" size="icon" onClick={() => setEditingTool(x)} aria-label={t("Edit")}>
-                    <PencilSimple className="size-3.5" />
-                  </Button>
-                ) : null}
+                {canEdit ? <EditPenButton onClick={() => setEditingTool(x)} label={t("Edit")} /> : null}
                 {canSwitchOff && x.active ? (
                   <Button
                     variant="ghost"

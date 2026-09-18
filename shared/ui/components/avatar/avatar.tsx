@@ -221,6 +221,22 @@ export interface AvatarImageProps extends React.ComponentPropsWithoutRef<"img"> 
  * whether the name is already in the row. PATTERN §7 — the best default is no
  * string.
  *
+ * A CACHED OR SERVER-RENDERED PHOTOGRAPH CAN FINISH — OR FAIL — BEFORE ITS OWN
+ * `onLoad`/`onError` EVER ATTACH. The browser starts resolving an `<img src>`
+ * the instant it enters the DOM; for a hydrated tree that is before React has
+ * wired the two handlers below, and for a warm cache it can simply be faster
+ * than the attach. Either way the DOM event fires at nobody, `status` never
+ * reaches `"loaded"`, and `AvatarFallback` — which hides only on that exact
+ * status — never hides: the photograph paints and the initials sit on top of
+ * it, permanently, which is the client's 18 Sep 2026 report ("we see the
+ * avatar AND the initials"). `components/image/image.tsx` already reads the
+ * image's own `complete`/`naturalWidth` after mount to close the identical
+ * race for the success case, and `RecordMark`
+ * (kwapso_system/shared/web/record-mark.tsx, an app-side file, not the kit's)
+ * independently found and fixed the same race for BOTH the success and the
+ * failure case. `innerRef`/`setRefs` below is `Image`'s own merge-ref
+ * pattern, read the same way, so this seam and that one stop drifting.
+ *
  * TEN STATES — see `Avatar`; the image owns loading and error and nothing
  * else.
  * THREE BREAKPOINTS — UNCHANGED. It fills the mark at every width.
@@ -240,20 +256,49 @@ const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
       notify.current = onLoadingStatusChange;
     });
 
+    /* The internal handle `Image` already keeps, merged with whatever ref a
+       call site passed, so both the forwarded ref and this file's own
+       post-mount `complete` check see the same node. */
+    const innerRef = React.useRef<HTMLImageElement | null>(null);
+    const setRefs = React.useCallback(
+      (node: HTMLImageElement | null) => {
+        innerRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) (ref as React.RefObject<HTMLImageElement | null>).current = node;
+      },
+      [ref],
+    );
+
     /* Report "loading" as soon as a source is known, and treat a missing
        source as a failure rather than as a permanent wait — an <img> with no
-       src fires neither load nor error. */
+       src fires neither load nor error. Then, in the SAME effect (so it runs
+       once per `src`, straight after the node it reads is mounted), read the
+       node the browser already has an answer for: `complete` is true the
+       instant a cached or already-resolved fetch is attached to, whether it
+       ended in bytes (`naturalWidth > 0`, "loaded") or a 404 (`naturalWidth
+       === 0`, the same test `RecordMark` and `Image` both use, "error"). A
+       fetch still in flight leaves `complete` false and changes nothing here;
+       the ordinary `onLoad`/`onError` handlers below settle it when it
+       answers. */
     React.useEffect(() => {
       const next: LoadStatus = src ? "loading" : "error";
       setStatus(next);
       notify.current?.(next);
+
+      if (!src) return;
+      const node = innerRef.current;
+      if (node && node.complete) {
+        const settled: LoadStatus = node.naturalWidth > 0 ? "loaded" : "error";
+        setStatus(settled);
+        notify.current?.(settled);
+      }
     }, [src, setStatus]);
 
     if (status === "error") return null;
 
     return (
       <img
-        ref={ref}
+        ref={setRefs}
         data-slot="avatar-image"
         src={src}
         className={cn("size-full object-cover", className)}

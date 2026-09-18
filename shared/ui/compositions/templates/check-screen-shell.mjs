@@ -48,9 +48,12 @@ const CARD_FILE = path.join(HERE, "..", "..", "components", "card", "card.tsx");
 const RECORD_CHROME_FILE = path.join(HERE, "record-chrome.tsx");
 const RECORD_DETAIL_FILE = path.join(HERE, "..", "..", "components", "record-detail", "record-detail.tsx");
 const TITLE_FILE = path.join(HERE, "..", "..", "components", "title", "title.tsx");
+const TRAIL_LINE_FILE = path.join(HERE, "..", "..", "components", "breadcrumbs", "trail-line.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
 const rel = path.relative(process.cwd(), FILE);
+const trailLineSrc = fs.readFileSync(TRAIL_LINE_FILE, "utf8");
+const trailLineRel = path.relative(process.cwd(), TRAIL_LINE_FILE);
 const cardSrc = fs.readFileSync(CARD_FILE, "utf8");
 const cardRel = path.relative(process.cwd(), CARD_FILE);
 const recordChromeSrc = fs.readFileSync(RECORD_CHROME_FILE, "utf8");
@@ -236,10 +239,12 @@ console.log(
 const trailSpacingFindings = [];
 
 const DENSITY_TRAIL_PATTERN =
-  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[var\(--space-6\)\] pt-\[var\(--space-2h\)\]",\s*calm: "px-\[var\(--space-5\)\] pt-\[var\(--space-2h\)\]",\s*\};/;
+  /const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(CARD_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*calm: cn\(CARD_CONTENT_INSET_X, "pt-\[var\(--space-2h\)\]"\),\s*\};/;
 if (!DENSITY_TRAIL_PATTERN.test(src)) {
   trailSpacingFindings.push(
-    `DENSITY_TRAIL in ${rel} does not read the 18 Sep ruling's flat pt-[var(--space-2h)] (10px above the trail, half of S3's 20) at both densities.`,
+    `DENSITY_TRAIL in ${rel} does not read the 18 Sep evening ruling's flat pt-[var(--space-2h)] (10px above the ` +
+      "trail, half of S3's 20) at both densities, built on cn(CARD_CONTENT_INSET_X, ...) — see the 18 Sep MORNING " +
+      "ruling's own check, further down this file, for why px is CARD_CONTENT_INSET_X and not a literal any more.",
   );
 }
 
@@ -300,6 +305,35 @@ if (!bodySlotMatch || !/trail\s*&&\s*!band\s*\?\s*"pt-0 lg:pt-0"\s*:\s*undefined
   );
 }
 
+// THE MAGNIFIER AND THE "⌘K" HINT ARE GONE — 18 SEP 2026, CLIENT RULING,
+// VERBATIM: "on the top navbar, kill the search icon, makes no sense there.
+// also kill the cmd+k." Checked against trail-line.tsx itself (this is the
+// one file that ever drew either): no MagnifyingGlass import, no
+// data-slot="trail-line-hint" span. Working code shapes, not a bare mention
+// of either word — trail-line.tsx's own header is free to keep discussing
+// the retired D2 drawing in prose while explaining why it is gone, the same
+// standard the resize-rot check at the top of this file holds itself to.
+// WORKING CODE SHAPES ONLY — an import or a JSX render, not a bare mention.
+// trail-line.tsx's own header is free to keep discussing the retired D2
+// magnifier in prose (see its own comment above `TRAIL_PILL`) while
+// explaining why it is gone; a substring match on the bare word would fail
+// on that prose the moment it was written, which is backwards.
+if (
+  /^import \{[^}]*\bMagnifyingGlass\b[^}]*\} from "\.\.\/\.\.\/foundations\/icons";$/m.test(trailLineSrc) ||
+  /<MagnifyingGlass\b/.test(trailLineSrc)
+) {
+  trailSpacingFindings.push(
+    `${trailLineRel} still imports or renders MagnifyingGlass — the 18 Sep 2026 ruling ("kill the search icon") ` +
+      "retired the trail field's magnifier and it must stay gone.",
+  );
+}
+if (/data-slot="trail-line-hint"/.test(trailLineSrc)) {
+  trailSpacingFindings.push(
+    `${trailLineRel} still renders a data-slot="trail-line-hint" span — the 18 Sep 2026 ruling ("also kill the ` +
+      'cmd+k") retired the "⌘K" hint and it must stay gone.',
+  );
+}
+
 if (trailSpacingFindings.length > 0) {
   console.error(
     "FAIL screen-shell trail-spacing check (S3/D2, superseded 18 Sep):\n" +
@@ -310,8 +344,9 @@ if (trailSpacingFindings.length > 0) {
 
 console.log(
   "OK screen-shell trail-spacing check: DENSITY_TRAIL pt and TRAIL_GAP both read the SAME --space-2h (10px, half " +
-    "of S3's 20), no <Separator /> renders in the trail slot (and none is imported), and the title slot's leading " +
-    "pt stays pinned to zero (header and body) whenever a trail renders.",
+    "of S3's 20), no <Separator /> renders in the trail slot (and none is imported), the title slot's leading pt " +
+    "stays pinned to zero (header and body) whenever a trail renders, and trail-line.tsx draws neither the " +
+    "magnifier nor the ⌘K hint any more.",
 );
 
 /* ============================================================================
@@ -498,4 +533,178 @@ if (insetFindings.length > 0) {
 console.log(
   "OK screen-shell content-inset check: card.tsx exports CARD_CONTENT_INSET_X (px-[var(--space-3)]), " +
     "CardContent spends it, and DENSITY_BODY imports and spends the SAME identifier at both densities.",
+);
+
+/* ============================================================================
+   THE 18 SEP 2026 MORNING TRAIL/BODY INSET-PARITY CHECK — client, verbatim,
+   measured on a ticket record: "pils and title are slightliy wider that the
+   topnavbar. should not be. they shoul be same width and end at the same
+   point in the left."
+
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE this
+   fix: `[data-slot="trail-line-field"]` left edge 231px;
+   `[data-slot="title"]` / `[data-slot="badge"]` left edge 223px — an 8px
+   gap, `DENSITY_TRAIL`'s old `--space-6` against `DENSITY_BODY`'s
+   `CARD_CONTENT_INSET_X` (`--space-3`), on the one screen shape (a record,
+   `band` null) where `DENSITY_TRAIL` used to copy `DENSITY_HEADER`'s figure
+   instead of the token that actually governs the title it sits above.
+
+   THE FIX IS THE IDENTIFIER — `DENSITY_TRAIL`'s own `px` must be built from
+   the SAME `CARD_CONTENT_INSET_X` import `DENSITY_BODY` already reads
+   (checked above), not a second copy of `DENSITY_HEADER`'s larger figure and
+   not a hand-typed literal that merely matches it today. Checked as an
+   import-plus-usage pair, the same standard the content-inset check above
+   holds `DENSITY_BODY` to, so the trail's left edge and the body's own left
+   edge cannot drift apart independently again. */
+const trailInsetParityFindings = [];
+
+if (!/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: cn\(CARD_CONTENT_INSET_X,/.test(src)) {
+  trailInsetParityFindings.push(
+    `DENSITY_TRAIL in ${rel} does not build its px from cn(CARD_CONTENT_INSET_X, …) — the trail slot's own ` +
+      "left edge must read the SAME identifier DENSITY_BODY's px does (18 Sep morning ruling: the pill and the " +
+      "title must end at the same point on the left), not a copy of DENSITY_HEADER's larger figure.",
+  );
+}
+
+// A REGRESSION SHAPED LIKE THE BUG THIS RULING FIXED: DENSITY_TRAIL going
+// back to a literal px-[var(--space-6/5)] would silently stop matching
+// DENSITY_BODY the next time either figure moved, exactly the "two strings
+// that happen to agree today" failure mode Ruling 2's own check (above)
+// already guards on DENSITY_BODY's side.
+if (/const DENSITY_TRAIL: Record<ScreenDensity, string> = \{\s*comfortable: "px-\[/.test(src)) {
+  trailInsetParityFindings.push(
+    `DENSITY_TRAIL in ${rel} reads a literal "px-[...]" again — the 18 Sep morning ruling replaced it with the ` +
+      "imported CARD_CONTENT_INSET_X specifically so the trail and the body inset cannot drift apart.",
+  );
+}
+
+if (trailInsetParityFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell trail/body inset-parity check (18 Sep morning ruling):\n" +
+      trailInsetParityFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell trail/body inset-parity check: DENSITY_TRAIL builds its px from the same imported " +
+    "CARD_CONTENT_INSET_X identifier DENSITY_BODY spends, so the trail field's left edge and the title/chip left " +
+    "edge cannot drift apart (measured live: 231px vs 223px before the fix, on a ticket record).",
+);
+
+/* ============================================================================
+   THE 18 SEP 2026 RAIL-GUTTER-HALVING CHECK — client, verbatim: "reduce the
+   margin between the super far edge of screen and the side navbar, same as
+   reduce it between side navbar and main content. keep spacing equal on both
+   sides - but reduce (i'd say to half of what it is, but i dont see the
+   pixels, just human eye)."
+
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, 16px root,
+   BEFORE this fix: `[data-slot="rail"]` left edge 19px from the viewport;
+   `[data-slot="rail"]` right edge 187px against `[data-slot="screen-shell-body"]`
+   left edge 207px, a 20px gap — both edges already the SAME `--rail-inset`
+   token (`--space-5`, 20px), because `RAIL_COLUMN`'s own `p-[var(--rail-inset)]`
+   pads all four sides of the rail column at once and the content column's own
+   matching trailing gutter was removed outright back on 2026-09-06 (see
+   `DENSITY_RAIL`'s own comment). Half of 20 is 10 — `--space-2h`, the same
+   half-step token `TRAIL_GAP`/`DENSITY_TRAIL` already reach for elsewhere in
+   this file for an identical "half of the current figure" ruling.
+
+   THREE THINGS PINNED, each guarding a different way the two edges could
+   drift apart again: (1) `DENSITY_RAIL` reads the halved `--space-2h` at
+   both densities: (2) `RAIL_COLUMN` still pads all four sides with the ONE
+   `--rail-inset` token, not a split ps-/pe- pair that could disagree; (3) the
+   content column's own leading padding still zeroes out at `md` when a rail
+   is present (`railNode ? "ps-[var(--shell-gutter)] md:ps-0" : …`), so
+   nothing reintroduces a second, independent gutter on the content side. */
+const railGutterFindings = [];
+
+const DENSITY_RAIL_PATTERN =
+  /const DENSITY_RAIL: Record<ScreenDensity, string> = \{\s*comfortable: "\[--rail-inset:var\(--space-2h\)\]",\s*calm: "\[--rail-inset:var\(--space-2h\)\]",\s*\};/;
+if (!DENSITY_RAIL_PATTERN.test(src)) {
+  railGutterFindings.push(
+    `DENSITY_RAIL in ${rel} does not read the 18 Sep ruling's halved [--rail-inset:var(--space-2h)] (10px, half ` +
+      "of the old --space-5/20px) at both densities.",
+  );
+}
+
+if (!/const RAIL_COLUMN = cn\("p-\[var\(--rail-inset\)\]"\);/.test(src)) {
+  railGutterFindings.push(
+    `RAIL_COLUMN in ${rel} does not pad all four sides with the single p-[var(--rail-inset)] — a split ps-/pe- ` +
+      'pair here could let "screen edge to navbar" and "navbar to main content" disagree again.',
+  );
+}
+
+if (!/railNode \? "ps-\[var\(--shell-gutter\)\] md:ps-0" : "ps-\[var\(--shell-gutter\)\]"/.test(src)) {
+  railGutterFindings.push(
+    `${rel}'s content column does not read railNode ? "ps-[var(--shell-gutter)] md:ps-0" : … any more — a ` +
+      "second leading gutter on the content side (present alongside the rail's own trailing --rail-inset) would " +
+      "double the rail-to-content gap the 2026-09-06 ruling already closed once.",
+  );
+}
+
+if (railGutterFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell rail-gutter-halving check (18 Sep ruling):\n" +
+      railGutterFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell rail-gutter-halving check: DENSITY_RAIL's --rail-inset is the halved --space-2h (10px) at both " +
+    "densities, RAIL_COLUMN still pads all four sides with that one token, and the content column still zeroes " +
+    "its own leading padding at md when a rail is present — so the screen-edge-to-navbar and navbar-to-content " +
+    "gaps stay equal and cannot drift apart independently.",
+);
+
+/* ============================================================================
+   THE 18 SEP 2026 ASSISTANT-HANDLE-IN-THE-BAND CHECK — client, verbatim: "put
+   the open assistant button completely on the top margin, not liek now that
+   its slightly overlaping with main content."
+
+   MEASURED, `agency-staging`, a ticket record, 1440 viewport, BEFORE this
+   fix: the shut aside handle at top 16px (`--shell-gutter`), `HANDLE_HIT`'s
+   own 40px (`--control-height-button`) box put its bottom edge at 56px —
+   9.52px past the content card's own top edge (46.48px). The fix sizes this
+   ONE branch to `--control-height-pill` (26px), the same token
+   `trail-line.tsx` already proved fits the identical `--folder-lip` (30.48px)
+   band; new bottom edge 42px, 4.48px clear of the card. */
+const assistantHandleFindings = [];
+
+if (
+  !/: cn\(\s*"max-md:hidden top-\[var\(--shell-gutter\)\] end-\[var\(--shell-gutter\)\]",[\s\S]{0,3200}?"size-\[var\(--control-height-pill\)\]",\s*\),/.test(
+    src,
+  )
+) {
+  assistantHandleFindings.push(
+    `${rel}'s shut aside handle placement does not size itself to size-[var(--control-height-pill)] — at ` +
+      "HANDLE_HIT's own 40px (--control-height-button) its bottom edge (top-[var(--shell-gutter)] + 40px) runs " +
+      "past the content card's own top edge, which is the 18 Sep overlap ruling.",
+  );
+}
+
+// THE OPEN BRANCH MUST STAY UNTOUCHED — it is a mid-edge grab against the
+// open column, not a top-strip corner, and HANDLE_HIT's own 40px still
+// applies to it (and to the rail's own handle, both states) exactly as
+// before this ruling.
+if (!/isAsideOpen\s*\n\s*\? "max-\[45rem\]:hidden top-1\/2 -translate-y-1\/2 end-\[var\(--shell-gutter\)\]"/.test(src)) {
+  assistantHandleFindings.push(
+    `${rel}'s open aside handle placement changed — it must stay the mid-edge grab at HANDLE_HIT's own 40px; ` +
+      "only the SHUT branch's own top-strip corner is sized down by the 18 Sep ruling.",
+  );
+}
+
+if (assistantHandleFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell assistant-handle-in-the-band check (18 Sep ruling):\n" +
+      assistantHandleFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell assistant-handle-in-the-band check: the shut aside handle sizes itself to " +
+    "--control-height-pill (26px) so its bottom edge stays inside the --folder-lip band above the card, and the " +
+    "open branch's mid-edge grab is untouched.",
 );

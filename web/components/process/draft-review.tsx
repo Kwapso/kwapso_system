@@ -139,7 +139,7 @@ export function DraftReviewDialog({
       {
         value: "roles",
         label: t("Who does it"),
-        icon: "user",
+        icon: "shield-check",
         badge: formatCount(detail.draft.roleCount),
         badgeVariant: "" as const,
       },

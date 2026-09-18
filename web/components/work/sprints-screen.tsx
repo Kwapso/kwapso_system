@@ -539,8 +539,8 @@ export function SprintsScreen({
         badge,
         badgeVariant: "" as const,
       },
-      { value: "calendar", label: t("Calendar"), icon: "calendar", badge, badgeVariant: "" as const },
-      { value: "all", label: t("All sprints"), icon: "list", badge, badgeVariant: "" as const },
+      { value: "calendar", label: t("Calendar"), icon: "calendar-blank", badge, badgeVariant: "" as const },
+      { value: "all", label: t("All sprints"), icon: "asterisk", badge, badgeVariant: "" as const },
     ],
   }
 

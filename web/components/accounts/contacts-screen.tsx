@@ -283,7 +283,7 @@ export function ContactsScreen({
     {
       value: "all",
       label: t("All"),
-      icon: "users",
+      icon: "asterisk",
       badge: formatCount(total),
       badgeVariant: "" as const,
     },
@@ -295,7 +295,7 @@ export function ContactsScreen({
           {
             value: "portal",
             label: t("In portal"),
-            icon: "sign-in",
+            icon: "key",
             badge: formatCount(portalTotal),
             badgeVariant: "" as const,
           },

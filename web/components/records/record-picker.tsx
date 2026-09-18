@@ -139,6 +139,7 @@
 
 import * as React from "react"
 
+import { type BadgeDot } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import {
   Command,
@@ -217,6 +218,30 @@ export type PickerOption = {
    * — the one map that supplies these today — is where that discipline is kept
    * and reasoned. Never drawn as a `RecordMark`: see this type's own header. */
   swatch?: string | null
+  /** A FIFTH KIND OF MARK — THE STATUS/STAGE TONE DOT. Client ruling, 18 Sep
+   * 2026, verbatim: "everywhere where choice component is status/stage add
+   * the points." The SAME dot `Badge variant="status"` draws
+   * (`shared/ui/components/badge/badge.tsx`'s `BadgeDot`, ten named tones),
+   * drawn here because a row chip is a `Button`, never a `Badge` — R35's own
+   * argument for `swatch` one field up applies unchanged: a pictograph in a
+   * `mark` string is refused (UI-CONVENTIONS §5), and status/stage is a
+   * COLOUR, not a face.
+   *
+   * NEVER A SECOND MAP. A caller hands over the tone a status/stage ALREADY
+   * resolves to through its own existing map — `helpStatusDotTone`
+   * (shared/status-tones.ts), `storyStatusDotTone` (same file),
+   * `appStageDotTone` (shared/app-stages.ts), `sprintDotTone`
+   * (shared/sprint-state.ts) — the identical function the record's OWN list
+   * or board already reads for its `Badge`. Inventing a second lookup here
+   * would be exactly the drift R35's own header warns a caller-supplied size
+   * class causes, read for colour instead of size.
+   *
+   * DRAWN THROUGH THE SAME `Swatch` THIS FILE ALREADY EXPORTS, at
+   * `var(--dot-<tone>)` — a token, never a hex (R32) — so a status dot and a
+   * generic colour swatch are one piece of rendering code and cannot draw two
+   * sizes. `swatch` wins if a caller somehow sets both (it never does today):
+   * the free-form CSS value is the more specific of the two. */
+  dot?: BadgeDot | null
   /** A NODE MARK — a Phosphor glyph, drawn directly rather than routed through
    * `RecordMark`'s TEXT-only `mark` prop. Added 2026-09-16 for the story TYPE
    * row (`story-form-dialog.tsx`, client ruling: "assign an icon to each
@@ -395,6 +420,7 @@ export function RecordPicker({
   layout = "control",
   leadValue,
   note,
+  optionCard = false,
 }: {
   /** the id the Field's label points at */
   id?: string
@@ -474,6 +500,26 @@ export function RecordPicker({
    * this component; a `ReactNode` because the reason a screen has for asking is
    * the screen's to compose. */
   note?: React.ReactNode
+  /** ROW MODE — draws every ORDINARY (unchosen, unsuggested) chip on the
+   * kit's own option-card ground, `--surface-panel` (`Card`'s `default`
+   * variant, `shared/ui/components/card/card.tsx`), instead of the row's
+   * usual `secondary` Button fill. Client ruling, 18 Sep 2026, on the ticket
+   * TYPE row (`help-form-dialog.tsx`): "on tikects type, need space between
+   * icon and name. also background to the card." THE GAP WAS ALREADY
+   * `--space-2` — `Button`'s own base is `gap-2`, the same 8px — so what she
+   * was reading as "no space" was CONTRAST: `secondary`'s fill is
+   * `--btn-secondary-fill`, which `record-picker.tsx`'s own `shellClass` note
+   * already states IS `--card`, and a ticket dialog's own canvas is that same
+   * tone — so a resting pill and the sheet it sat on were one colour, and an
+   * icon with nothing behind it read as glued to the word beside it. `false`
+   * (every row before this ruling) is UNCHANGED: CHOSEN (`inverse`, charcoal)
+   * and SUGGESTED (`ghost` + the inset hairline) already carry their own
+   * fill or edge and are never repainted by this prop, in either state. Opt
+   * in per row rather than a change to `RowChip`'s own default, because nine
+   * other row pickers (App, Raised-by, staff, story type…) were never part of
+   * this ruling and their resting pill already reads fine against a form's
+   * OWN background, never a dialog canvas the same tone as `--card`. */
+  optionCard?: boolean
 }) {
   const t = useT()
   const phone = useIsPhone()
@@ -590,9 +636,9 @@ export function RecordPicker({
           somehow had two would be saying the same thing twice in one row. The
           `mt-1.5` is the dot's own optical centring against the first line of a
           two-line option, the same job `mt-0.5` does for the 24px box above. */}
-      {!o.picture && !o.mark && !o.icon && o.swatch && (
+      {!o.picture && !o.mark && !o.icon && (o.swatch || o.dot) && (
         <span className="mt-1.5 flex">
-          <Swatch colour={o.swatch} />
+          <Swatch colour={o.swatch ?? `var(--dot-${o.dot})`} />
         </span>
       )}
       <span className="flex min-w-0 flex-col">
@@ -764,6 +810,7 @@ export function RecordPicker({
               chosen={value === lead.value}
               suggested
               disabled={disabled}
+              card={optionCard}
               onPick={choose}
             />
           )}
@@ -778,7 +825,14 @@ export function RecordPicker({
             <span aria-hidden className="bg-border h-5 w-px shrink-0" />
           )}
           {rest.map((o) => (
-            <RowChip key={o.value} option={o} chosen={value === o.value} disabled={disabled} onPick={choose} />
+            <RowChip
+              key={o.value}
+              option={o}
+              chosen={value === o.value}
+              disabled={disabled}
+              card={optionCard}
+              onPick={choose}
+            />
           ))}
         </div>
         )}
@@ -954,9 +1008,11 @@ export function RecordPicker({
  * it first, and announcing "suggested" on a lead that is also the current answer
  * would be a second, contradictory claim in the same breath.
  *
- * THE FACE COMES FROM THE SAME THREE FIELDS the open list reads, in the same
- * precedence: a picture or a glyph is a `RecordMark`, a colour is a `Swatch`,
- * and a record with neither is its word alone. That is R35 in the layout the
+ * THE FACE COMES FROM THE SAME FIELDS the open list reads, in the same
+ * precedence: a picture or a glyph is a `RecordMark`, a free colour or a
+ * status/stage tone is a `Swatch` (`swatch`/`dot`, one `Swatch` either way —
+ * see `PickerOption.dot`'s own header), and a record with neither is its word
+ * alone. That is R35 in the layout the
  * client picked — the people row on this same card offers colleagues, and a
  * colleague without their face is a name a person has to read rather than
  * recognise.
@@ -971,6 +1027,7 @@ function RowChip({
   chosen,
   suggested = false,
   disabled,
+  card = false,
   onPick,
 }: {
   option: PickerOption
@@ -980,12 +1037,19 @@ function RowChip({
    * settled here and not by the caller. */
   suggested?: boolean
   disabled?: boolean
+  /** `RecordPicker`'s own `optionCard` prop, threaded straight through — see
+   * its header for the ruling and why this is an ordinary-state-only repaint. */
+  card?: boolean
   onPick: (value: string) => void
 }) {
   // Resolved once, above the JSX, so the three branches below read off ONE
   // answer. Writing `chosen ? … : suggested ? … : …` three separate times in
   // three attributes is how a variant and its glyph drift apart.
   const offering = suggested && !chosen
+  // THE ORDINARY-STATE REPAINT, RULING 4 (18 Sep 2026). Only the plain
+  // `secondary` chip gets it — `chosen` and `offering` already carry their own
+  // fill or edge and stay exactly as they were regardless of `card`.
+  const ordinaryCard = card && !chosen && !offering
   return (
     <Button
       type="button"
@@ -998,7 +1062,20 @@ function RowChip({
       // box-shadow (tokens.css §7), so it costs no layout and cannot push the
       // chip a pixel taller than the two beside it — which a 1px border would,
       // and which is the second reason this is a shadow and not a border.
-      className={cn("min-w-0 gap-2", offering && "shadow-[var(--hairline-strong)]")}
+      //
+      // `bg-surface-panel` ONLY on the ordinary chip, ONLY when the caller
+      // opted in — see `RecordPicker`'s own `optionCard` header for the
+      // ruling and why a `secondary` Button's fill reads as invisible on a
+      // ticket dialog's own canvas. `gap-[var(--space-2)]` spells the same
+      // 8px `gap-2` already draws, in the token tokens.css itself names for
+      // this exact job ("chip padding, icon to label"), rather than the
+      // Tailwind step that happens to match it today.
+      className={cn(
+        "min-w-0",
+        card ? "gap-[var(--space-2)]" : "gap-2",
+        offering && "shadow-[var(--hairline-strong)]",
+        ordinaryCard && "bg-surface-panel"
+      )}
     >
       {/* THE SPARK, BEFORE THE FACE. It is a claim about the CHIP ("this one is
           being offered") rather than about the record, so it sits outside the
@@ -1024,8 +1101,8 @@ function RowChip({
           {option.icon}
         </span>
       ) : null}
-      {!option.picture && !option.mark && !option.face && !option.icon && option.swatch && (
-        <Swatch colour={option.swatch} />
+      {!option.picture && !option.mark && !option.face && !option.icon && (option.swatch || option.dot) && (
+        <Swatch colour={option.swatch ?? `var(--dot-${option.dot})`} />
       )}
       <span className="truncate">{option.label}</span>
     </Button>

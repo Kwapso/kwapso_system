@@ -153,6 +153,9 @@ import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
+// R54 — the "Raised by" column's own trim, the same one `work-panels.tsx`'s
+// identical column already applies to a colleague's stored snapshot.
+import { staffNameFromSnapshot } from "@shared/staff-name"
 /* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
    still fills the swatch on each option of the Status facet below (`DOT_TONE_FILL`
    + `helpFacets`), which is a menu of STATUSES and is untouched by the 2026-09-09
@@ -1750,6 +1753,29 @@ export type TicketFace = {
    * missing answer rather than as a broken row — the same treatment `appName`
    * already gets one line up. */
   resolvedAt?: string | null
+  /** WHO RAISED IT (18 Sep 2026: "raised separate by and date! not in one
+   * together") — the `raisedBy` column's face+name. TWO SHAPES, because the
+   * two row types this table draws answer "who raised it" two different ways
+   * and neither is a subset of the other:
+   *
+   *   • `HelpTicket` carries `raiserId`/`raiserName`/`raiserIsClient` — the
+   *     actor whose login created the row, R54-trimmed to a first name for a
+   *     colleague and named in full for a client contact
+   *     (`app-tickets-are-a-table.test.tsx` already proves this pair on the
+   *     app tab's own identical column).
+   *   • `TriageWaiting` — the queue's own door read — carries no such actor;
+   *     it carries `raisedByContactName`/`raisedByContactLogo`, the client
+   *     contact the ticket is FOR, which is the fact the triage card already
+   *     shows as "who asked" (`workers/content/src/lib/triage.ts`).
+   *
+   * Both optional, and the cell prefers the first when it is there (a
+   * `HelpTicket` row) and falls back to the second (a `TriageWaiting` row) —
+   * see the cell's own comment below. */
+  raiserId?: string | null
+  raiserName?: string | null
+  raiserIsClient?: boolean
+  raisedByContactName?: string | null
+  raisedByContactLogo?: string | null
 }
 
 /** ONE TABLE FOR EVERY TAB THAT SHOWS ROWS — client, 2026-09-06: "For the tabs
@@ -1874,6 +1900,13 @@ export function TicketRowsTable<T extends TicketFace>({
     title: t("Title"),
     type: t("Type"),
     app: t("App"),
+    // "Raised by" (who) and "Raised" (when) — two columns, 18 Sep 2026: "raised
+    // separate by and date! not in one together." Both strings already exist
+    // in the catalogue, fully translated, from the ticket detail's own
+    // (since-retired) "Raised by"/"Raised on" fact row — reused rather than
+    // respelled, and `created` keeps the exact word it already drew ("Raised")
+    // rather than growing an "on" this ruling never asked for.
+    raisedBy: t("Raised by"),
     created: t("Raised"),
     closed: t("Closed"),
   }
@@ -2083,9 +2116,50 @@ export function TicketRowsTable<T extends TicketFace>({
                       with an em dash, drawn by the mark's own initial tile
                       falling back to "?" rather than a blank box. */}
                   <span className="flex items-center gap-2">
-                    {w.appName ? <RecordMark picture={w.appLogo} name={w.appName} /> : null}
+                    {/* `choice` — a table row's face fits the text line
+                        (client ruling, 18 Sep 2026: "when avatar/icon on
+                        list view, make the avatar smaller. should not be
+                        the cause of more height to the overall row"). */}
+                    {w.appName ? (
+                      <RecordMark picture={w.appLogo} name={w.appName} size="choice" />
+                    ) : null}
                     <span className="min-w-0 truncate">{w.appName ?? "—"}</span>
                   </span>
+                </TableCell>
+              )}
+              {/* WHO RAISED IT — 18 Sep 2026: "raised separate by and date!
+                  not in one together." Its own column now, ahead of the date
+                  beside it (`created`, below): a `HelpTicket` row (every tab
+                  but the top-level queue) names the ACTOR who raised it,
+                  R54-trimmed exactly as the app tab's identical column is
+                  (`app-tickets-are-a-table.test.tsx`); a `TriageWaiting` row
+                  (the queue) carries no such actor and falls back to the
+                  client CONTACT the ticket is for — the same fact the triage
+                  card already calls "who asked" and never trims (a contact is
+                  never staff). Neither ever both: `TicketFace`'s own header
+                  says why the two shapes cannot collapse into one. */}
+              {columns.includes("raisedBy") && (
+                <TableCell className="text-muted-foreground">
+                  {w.raiserName ? (
+                    <span className="flex items-center gap-2">
+                      <RecordMark name={w.raiserName} shape="round" size="choice" />
+                      <span className="min-w-0 truncate">
+                        {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
+                      </span>
+                    </span>
+                  ) : w.raisedByContactName ? (
+                    <span className="flex items-center gap-2">
+                      <RecordMark
+                        picture={w.raisedByContactLogo}
+                        name={w.raisedByContactName}
+                        shape="round"
+                        size="choice"
+                      />
+                      <span className="min-w-0 truncate">{w.raisedByContactName}</span>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
               )}
               {columns.includes("created") && (
@@ -2093,7 +2167,9 @@ export function TicketRowsTable<T extends TicketFace>({
                   {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
                       formatter and the reader's own language, so one ticket cannot
                       carry two spellings of one day across two views of one
-                      collection. */}
+                      collection. WHO raised it moved to its own column, above
+                      (18 Sep 2026); this cell is the date alone now, same as
+                      it always was. */}
                   {formatDate(w.createdAt, lang)}
                 </TableCell>
               )}

@@ -235,9 +235,10 @@ export function AgentTabStrip({
       // a sibling of the tab's own link, laid over the tab's own box. The
       // `<li>` carries no `onClick`, so the click is silently swallowed
       // before it ever reaches the close button: `onClose` never fires.
-      // Measured on staging (main 1a1a86c3) with real mouse clicks in
-      // headless Chromium (scratchpad/assistant-clicks.mjs): a plain,
-      // no-movement pointerdown+pointerup on the × calls
+      // Measured on staging (main 1a1a86c3) with a headless-Chromium script
+      // driving real mouse clicks against the deployed tab strip — a
+      // throwaway live-measurement script, not a file this repo keeps: a
+      // plain, no-movement pointerdown+pointerup on the × calls
       // `Element.setPointerCapture` on the tab's `<li>` and the tab count
       // never changes.
       //

@@ -63,7 +63,7 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
-import { PaperPlaneTilt } from "@shared/ui/foundations/icons"
+import { PaperPlaneTilt, Paperclip } from "@shared/ui/foundations/icons"
 import { useLanguage } from "@shared/web/language"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
@@ -295,9 +295,16 @@ export function ReplyComposer({
   /** The ticket is already answered. Only the placeholder changes: a reply on a
    * closed ticket appends and touches no status, which is worth saying. */
   answered,
+  /** OPENS THE SAME FILE PICKER `HelpAttachmentsPanel` already has, client
+   * ruling, 18 Sep 2026: "the customers can attach images & files. so do
+   * we… that's why I ask for the attach button on the text input field."
+   * Absent draws no button — a caller with no attachment door of its own
+   * (there is none today) gets a composer identical to before. */
+  onAttach,
 }: {
   send: ReplySend
   answered: boolean
+  onAttach?: () => void
 }) {
   const { t } = useLanguage()
   const { text, setText, held, secondsLeft, start, field } = send
@@ -364,6 +371,33 @@ export function ReplyComposer({
         }}
         className="flex min-w-0 items-center gap-2 rounded-pill bg-card py-2 ps-4 pe-2"
       >
+        {/* ATTACH — a Paperclip beside the field, wired to the SAME file
+            picker `HelpAttachmentsPanel` (now inline below the thread) opens
+            on "Add a file"; `onAttach` is that panel's `openRef`, read
+            through help-detail.tsx. Icon-only and quiet: this is a composer
+            control, not the record's title, so `ghost` per the kit's own
+            "an icon-only control is secondary anyway" note (button.tsx) is
+            the wrong read here specifically — SECONDARY reaches for a fill
+            in the OTHER paper tone, and this pill's own fill (`bg-card`) IS
+            that tone, so a secondary button beside it would repaint the
+            pill's own ground. `ghost` (no fill) reads correctly on top of it. */}
+        {onAttach && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onAttach}
+                aria-label={t("Attach a file")}
+                className="w-[var(--control-height-dense)] shrink-0 px-0"
+              >
+                <Paperclip aria-hidden="true" focusable="false" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("Attach a file")}</TooltipContent>
+          </Tooltip>
+        )}
         <input
           ref={field}
           type="text"

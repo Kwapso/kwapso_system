@@ -617,8 +617,17 @@ export const CONCEPT_ICON = {
   // the door: who we are, said once.
   kwapso: "seal-check",
   team: "building",
-  overview: "squares-four",
-  members: "users",
+  // WAS "squares-four" — a glyph no screen ever drew. Every Overview tab in
+  // the app resolves through `TAB_ICONS.overview` ("info", tabs-view.tsx),
+  // which wins over a recipe's own icon, so this line and the page disagreed
+  // from the Phosphor swap (3 Sep 2026) until web/test/icon-concepts-agree.
+  // test.ts read them side by side. Now says what ships.
+  overview: "info",
+  // WAS "users" — Settings' own Members tab has drawn `TAB_ICONS.members`
+  // ("users-three") since the client put it on the outer strip (16 Sep 2026),
+  // and that table wins over the recipe. One concept, one glyph: this line
+  // follows the tab the client looks at (icon-concepts-agree.test.ts).
+  members: "users-three",
   roles: "shield-check",
   invites: "envelope",
   // RENAMED FROM `dropdowns` ON 11 SEP 2026. The concept it named — the team's
@@ -638,7 +647,12 @@ export const CONCEPT_ICON = {
   // Rates tab gone nothing in the app draws this concept. A vocabulary entry
   // nothing spells is a word the app no longer says.
   // The customer spine's own vocabulary: an account, the people on it, and a login.
-  accounts: "buildings",
+  // WAS "buildings" — stale since the client ruling of 3 Sep 2026 ("Accounts
+  // moves off Buildings, a physical premises, onto Briefcase") landed on the
+  // rail and the Welcome tile only. This line, KNOWLEDGE_KIND_ICON.account
+  // and TAB_ICONS.companies kept the old glyph for a fortnight, unseen
+  // (icon-concepts-agree.test.ts now reads all four together).
+  accounts: "briefcase",
   // WAS "address-book" — client ruling, 17 Sep 2026, verbatim, over the whole
   // rail ("they all look too similar"): "For contacts, use the user circle in
   // the field." Phosphor draws `user-circle` at fill weight (the kit's

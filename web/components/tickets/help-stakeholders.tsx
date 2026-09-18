@@ -16,20 +16,37 @@
 // page is the fact of who is on the loop — a face and a name each — never the
 // control that changes it.
 //
-// THE INTRO SENTENCE AND THE ORIGIN BADGE ARE GONE WITH THE SAME PASS, not
-// separately reasoned: her own words for what should survive were "the
-// stakeholder faces + names" — a face, a name, nothing labelling WHY each
-// person is on the list (raiser / admin / mentioned / added) and no paragraph
-// explaining the mechanism above them. The origin is still on the row's own
-// `HelpStakeholder.origin` for whatever reads it next; this screen simply
-// stopped printing it.
+// CARDS, LIKE SETTINGS MEMBERS — client ruling, 18 Sep 2026, verbatim: "on
+// ticket detail stakeholders, show them like cards (like settings members)
+// and show what was before, who raised it and on the loop." Two changes off
+// one sentence: the row becomes the member-gallery's own card cell
+// (`PersonCard`, extracted to shared/web the same day so this panel does not
+// hand-copy its JSX — "what was before" is the fact list that ruling took
+// away on 17 Sep 2026, not a request to bring it back), and every card now
+// says WHY the person is on the list — "Raised by" for the one raiser, "On
+// the loop" for everyone else (the admins, the mentions, the people added by
+// hand). `origin` already carried that fact; this screen simply stopped
+// reading it out loud until now.
+//
+// THE INTRO SENTENCE IS STILL GONE, not brought back with the relation label:
+// her own words for what should survive were "the stakeholder faces + names"
+// plus, now, who raised it and who is on the loop — never a paragraph above
+// the cards explaining the mechanism.
+//
+// NO LINK ON THE CARD. The members wall's card is a door to a staff profile
+// (`/t/<team>/members/<id>`) because every row on that wall is a team member
+// by construction; a stakeholder can be the ticket's RAISER, and R54 already
+// treats a raiser as sometimes a client contact with no staff profile to open
+// at all. A card that 404s for the one person it is most often drawn for is
+// worse than a card that does not open — so this stays a fact, not a link,
+// matching the panel's row shape before this ruling.
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avatar/avatar"
-
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import type { HelpStakeholder } from "@shared/types"
-import { letterMark } from "@/lib/identity"
+import { nameInitials } from "@/lib/identity"
+import { PersonCard } from "@shared/web/person-card"
 import { useLanguage } from "@shared/web/language"
 import { staffNameFromSnapshot } from "@shared/staff-name"
 
@@ -41,22 +58,37 @@ export function HelpStakeholders({ stakeholders }: { stakeholders: HelpStakehold
   }
 
   return (
-    <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-      {stakeholders.map((s) => (
-        <li key={s.userId} className="flex flex-wrap items-center gap-2 px-3 py-2">
-          <Avatar className="size-8">
-            {s.imageUrl && <AvatarImage src={s.imageUrl} alt="" />}
-            <AvatarFallback>{letterMark(s.name || s.email)}</AvatarFallback>
-          </Avatar>
-          {/* R54. `origin: "raiser"` is the one value here that can be a client
-              contact — every other way onto this list (an admin, a mention, a
-              colleague added by hand) is one of ours. A contact keeps their
-              name; we are named by our first. */}
-          <p className="min-w-0 flex-1 basis-[12rem] truncate text-sm font-medium">
-            {(s.origin === "raiser" ? s.name : staffNameFromSnapshot(s.name)) || s.email}
-          </p>
-        </li>
-      ))}
-    </ul>
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {stakeholders.map((s) => {
+        // R54. `origin: "raiser"` is the one value here that can be a client
+        // contact — every other way onto this list (an admin, a mention, a
+        // colleague added by hand) is one of ours. A contact keeps their
+        // name; we are named by our first.
+        const name = (s.origin === "raiser" ? s.name : staffNameFromSnapshot(s.name)) || s.email
+        return (
+          <Card key={s.userId} data-slot="stakeholder-card" variant="raised">
+            <CardContent className="p-3">
+              {/* `<CardTitle>` STAYS WRITTEN HERE, not built inside
+                  `PersonCard` — R65's own census reads it off THIS file's
+                  `<Card>` block, textually (person-card.tsx's own header
+                  has the argument). */}
+              <PersonCard
+                picture={s.imageUrl}
+                mark={nameInitials(s.name)}
+                markName={name}
+                orientation="horizontal"
+                size="tile"
+                chip={
+                  <span className="text-micro text-muted-foreground uppercase">
+                    {s.origin === "raiser" ? t("Raised by") : t("On the loop")}
+                  </span>
+                }
+                title={<CardTitle className="min-w-0 truncate text-sm">{name}</CardTitle>}
+              />
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
   )
 }

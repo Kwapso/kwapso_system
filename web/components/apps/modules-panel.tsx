@@ -53,7 +53,8 @@ import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
@@ -261,11 +262,7 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
                   {/* ICON-ONLY, on every width now (client ruling, 2026-08-31:
                       "edit, only the pencil icon") — no more `sm:not-sr-only`
                       reveal. */}
-                  {canEdit ? (
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(m)} aria-label={t("Edit")}>
-                      <PencilSimple className="size-3.5" />
-                    </Button>
-                  ) : null}
+                  {canEdit ? <EditPenButton onClick={() => setEditing(m)} label={t("Edit")} /> : null}
                   {canSwitchOff ? (
                     <Button
                       variant="ghost"

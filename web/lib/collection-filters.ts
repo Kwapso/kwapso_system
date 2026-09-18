@@ -44,7 +44,10 @@
 // `paged-sort.test.ts` makes of a sort menu. A facet naming a parameter its door
 // does not parse is a control that quietly answers nothing.
 
+import * as React from "react"
+
 import type { FacetOption as DrawnFacetOption, FilterFacet } from "@shared/web/screen-engine/config"
+import { RecordMark } from "@shared/web/record-mark"
 
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 
@@ -342,6 +345,40 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
       ],
     },
   ],
+}
+
+/** AN ACCOUNT, AS A FACET OPTION — client ruling, 18 Sep 2026, verbatim: "on
+ * filter account i want to see the icons, not only initials." Every facet
+ * that narrows a collection by WHICH ACCOUNT (Tickets, Waves, Apps, Inputs,
+ * Meetings, Knowledge's own "Filed under") is a ROW facet (this file's own
+ * header, "a facet over ROWS … declares none — the screen supplies them"),
+ * so each screen builds its own option list off whatever accounts it already
+ * holds. This is the one place that turns an account into the option's
+ * `mark` (`FacetOption.mark`, config.ts — a pre-drawn node, never a colour or
+ * an icon name), so a screen wires the three fields once instead of copying
+ * the same `<RecordMark picture={…} name={…} size="choice" />` by hand.
+ *
+ * `RecordMark` IS the fix, not a wrapper around one: it already draws the
+ * account's own logo where `logoUrl` is set and falls through to the
+ * account's first letter — never an empty box — where it is not
+ * (`shared/web/record-mark.tsx`). `size="choice"` is the dense mark every
+ * other picker option and marked facet in the app already uses; nothing
+ * here decides a new size. `shape` is left at its `RecordMark` default
+ * (`square`) — the R31 ruling every account already wears elsewhere,
+ * whether it is a company or a sole trader. */
+export type AccountFacetSource = {
+  id: string
+  name: string
+  /** the stored path to the account's own logo, if it has one */
+  logoUrl?: string | null
+}
+
+export function accountFacetOption(a: AccountFacetSource): DrawnFacetOption {
+  return {
+    value: a.id,
+    label: a.name,
+    mark: React.createElement(RecordMark, { picture: a.logoUrl ?? null, name: a.name, size: "choice" }),
+  }
 }
 
 /** ONE COLLECTION'S FACETS, ready for `<PagedFind facets=…>`: the labels through

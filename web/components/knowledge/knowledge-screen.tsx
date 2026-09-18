@@ -66,7 +66,7 @@ import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shap
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
-import { translatedFacets } from "@/lib/collection-filters"
+import { accountFacetOption, translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi } from "@/lib/api"
 import { knowledgeByKindKey, knowledgeKey, totalKey } from "@/lib/live-resources"
 import { sliceKey } from "@/components/work/work-panels"
@@ -104,7 +104,17 @@ export type KnowledgeGalleryScope =
       knowledgeQ: { data: KnowledgeSource[] | undefined; error: unknown }
       knowledgeShapeQ: { data: Omit<React.ComponentProps<typeof KnowledgeShape>, "teamId"> | undefined }
       accountsQ: { data: Account[] | undefined }
-      companiesQ: { data: { id: string; name: string }[] | undefined }
+      // WIDENED FROM `{ id: string; name: string }[]` — R35, the account
+      // wearing its own face on the "Filed under" facet below. The door
+      // behind this cache key was never the problem: `companiesQ`
+      // (use-screen-data.ts) already reads `tenancy.accounts({ type:
+      // "entity" })`, which returns the SAME `Account` rows `accountsQ`
+      // does, `logoUrl` included — this screen's own prop type was the one
+      // place that threw the picture away before the compartment facet ever
+      // saw it. `Account` rather than a second bespoke shape, for the same
+      // reason `accountsQ` above already is one: one type, not a narrower
+      // echo of it per call site.
+      companiesQ: { data: Account[] | undefined }
       /** the exact server total (R16) — every source, whatever kind, whatever
        * compartment. What the "All" tab badges. */
       total: number | undefined
@@ -165,18 +175,23 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
   const knowledgeQ = isApp ? appKnowledgeQ : scope.knowledgeQ
   if (knowledgeQ.error) return <LoadError what="the knowledge base" />
   if (knowledgeQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  // The account NAMES a source is filed under — the list says "Bergman S.A.",
-  // never `account:01J…`. `accountsQ` is gated to the accounts/contacts
+  // THE ACCOUNT a source is filed under — the list says "Bergman S.A.", never
+  // `account:01J…`, and (R35, client ruling 2026-09-09: "for accounts include
+  // icon in select components and filters") wears its own face on the
+  // compartment facet below. `accountsQ` is gated to the accounts/contacts
   // screens, so it is empty on THIS one; `companiesQ` asks the door directly.
-  // Merged with whatever `accountsQ` happens to already hold. TEAM ONLY — the
-  // app scope offers no compartment facet, so it never needs these names.
-  const names =
+  // Merged with whatever `accountsQ` happens to already hold. THE WHOLE ROW,
+  // not just the name — `logoUrl` rides along for free now that this
+  // screen's own `companiesQ` prop type carries it (see its own note above).
+  // TEAM ONLY — the app scope offers no compartment facet, so it never needs
+  // these rows.
+  const accountsFiledUnder =
     scope.kind === "team"
       ? new Map([
-          ...(scope.accountsQ.data ?? []).map((a) => [a.id, a.name] as const),
-          ...(scope.companiesQ.data ?? []).map((a) => [a.id, a.name] as const),
+          ...(scope.accountsQ.data ?? []).map((a) => [a.id, a] as const),
+          ...(scope.companiesQ.data ?? []).map((a) => [a.id, a] as const),
         ])
-      : new Map<string, string>()
+      : new Map<string, Account>()
   const loadedSources = knowledgeQ.data
   const canCreateKnowledge = scope.kind === "team" && can("knowledge", "create")
 
@@ -315,9 +330,15 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
         facets={
           scope.kind === "team"
             ? translatedFacets("knowledge", t, {
+                // EACH ACCOUNT WEARS ITS OWN FACE (R35, client 18 Sep 2026) —
+                // `accountFacetOption` (collection-filters.ts) says why and
+                // how. "The agency" names no record and carries no mark.
                 compartment: [
                   { value: "agency", label: t("The agency") },
-                  ...[...names].map(([id, name]) => ({ value: `account:${id}`, label: name })),
+                  ...[...accountsFiledUnder.values()].map((a) => ({
+                    ...accountFacetOption(a),
+                    value: `account:${a.id}`,
+                  })),
                 ],
               }).filter((f) => f.field !== "kind")
             : translatedFacets("knowledge", t, {}).filter((f) => f.field !== "compartment")

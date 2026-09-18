@@ -8,13 +8,28 @@
 // that.") A status STEPPER (the hero control, `<TicketStages>`) sits above a
 // two-column body (`TicketDetailBody`, ./ticket-detail-body.tsx): the
 // conversation (library TicketThread) on the left, Related stories / Work
-// logs / Stakeholders stacked on the right. Files moved to the ⋯ menu, as a
-// slide-in; the ticket's history (the GENERIC record-activity feed) was
-// never a tab — it is reached from the ink footer's Latest activity column,
-// on the client's 2026-09-06 ruling, and web/components/records/activity-panel.tsx
-// carries that ruling and the argument. Edit + every status move are gated
-// PURELY by help:update. Replies echo instantly (optimistic) and reconcile
-// with the server reply. Host-composed, like role-detail.
+// logs / Stakeholders stacked on the right. The ticket's history (the
+// GENERIC record-activity feed) was never a tab — it is reached from the ink
+// footer's Latest activity column, on the client's 2026-09-06 ruling, and
+// web/components/records/activity-panel.tsx carries that ruling and the
+// argument. Edit + every status move are gated PURELY by help:update.
+// Replies echo instantly (optimistic) and reconcile with the server reply.
+// Host-composed, like role-detail.
+//
+// NO OUTER PANEL CARD — client ruling, 18 Sep 2026: "remove the 'overall'
+// container, make each thing its own container, like tickets dashboard."
+// `<RecordScreen panelVisible={false}>` draws the head only (trail, chips,
+// title, the stage ladder, the actions); the body — `<TicketDetailBody>` and
+// every dialog — is a SIBLING of it now, not its `children`, so there is no
+// second `Card` wrapping the four already-papered panels underneath.
+//
+// NO FILES-AND-LINKS MENU ITEM, no EdgePanel sheet behind it either — the
+// SAME DAY'S later ruling: "kill this whole files & links … button. those
+// are visible in the conversation itself! the customers can attach images &
+// files. so do we." `<HelpAttachmentsPanel>` now renders inline inside
+// `TicketConversationPanel`'s own `attachments` tray, and the reply
+// composer's new Paperclip button opens the SAME panel's file picker
+// (`attachRef`, below) rather than a second upload path.
 
 import * as React from "react"
 
@@ -22,10 +37,12 @@ import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { EdgePanel } from "@shared/ui/components/edge-panel/edge-panel"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
 import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 import { RecordRef } from "@shared/web/record-ref"
+import { EditPenButton } from "@shared/web/edit-pen-button"
+import { AddButton } from "@/components/deep-link/screen-bits"
+import { nameInitials } from "@/lib/identity"
 
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
@@ -34,9 +51,7 @@ import {
   TrayArrowUp,
   Archive,
   Translate,
-  PencilSimple,
   CheckCircle,
-  Paperclip,
 } from "@shared/ui/foundations/icons"
 
 /** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
@@ -63,7 +78,6 @@ import type {
   SelectableValue,
   Story,
   TeamMember,
-  WorkLogSummary,
 } from "@shared/types"
 import { helpStatusDotTone, storyStatusDotTone } from "@shared/status-tones"
 import { storyTypeIconName } from "@shared/story-types"
@@ -99,7 +113,7 @@ import { WorkLogsPanel } from "@/components/work/work-logs-panel"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { recordTimeSummaryKey, totalKey } from "@/lib/live-resources"
+import { totalKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
 import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -120,14 +134,17 @@ import {
  * beside the panel's own JSX, below, for which of them now render nowhere on
  * this page), but the SCROLL TARGET a stale link points at is still a real
  * panel on the page, so it still resolves rather than landing on nothing.
- * `files` is handled separately, above this table, because it opens the ⋯
- * menu's sheet rather than scrolling. */
+ * `files` USED TO open the ⋯ menu's own sheet outside this table; that sheet
+ * is gone (18 Sep 2026, this file's own header) and the attachments it held
+ * now render inline inside Conversation, so `files` resolves there like any
+ * other retired value. */
 const DEEP_LINK_TICKET_PANEL: Partial<Record<string, TicketPanelName>> = {
   conversation: "conversation",
   overview: "stakeholders",
   stories: "stories",
   time: "time",
   stakeholders: "stakeholders",
+  files: "conversation",
 }
 
 /** THE STATUS WORD FOR THE TITLE'S OWN CHIP — client ruling, 17 Sep 2026,
@@ -276,32 +293,25 @@ export function HelpDetailScreen({
   // no tab at all rather than a tab that refuses.
   const canSeeTime = can("work", "read")
   const canEditTime = can("work", "update")
-  // TOTAL HOURS, FOR THE WORK LOGS PANEL'S OWN TITLE (V1: "total hours in the
-  // title"). Same cache key `<WorkLogsPanel>` reads internally
-  // (`recordTimeSummaryKey`, R56 — one door, once, however many components
-  // ask), so this costs nothing extra: the panel's own read and this one
-  // dedupe to a single request.
-  //
-  // GATED ON `have`, LIKE EVERY OTHER SECONDARY PANEL BELOW THE RECORD
-  // (membersQ, activity, selectableQ, stakeholdersQ, above) — the DETERMINISTIC
-  // gate `shared/web/after-paint.ts` asks a caller to prefer over its own
-  // scheduler: this panel needs the record anyway, so it keys on the record
-  // being in hand rather than firing beside the record's own read and costing
-  // the cold-path budget (`web/test/cold-screen-hops.test.tsx`,
-  // `MAX_REQUESTS_BEFORE_FIRST_PAINT`) a request nobody is waiting on yet.
-  const workSummaryQ = useCached<WorkLogSummary>(
-    have && canSeeTime ? recordTimeSummaryKey("help", helpId) : null,
-    () => content.workLogSummary({ targetTable: "help", targetId: helpId })
-  )
-  const workHoursLabel =
-    workSummaryQ.data && workSummaryQ.data.totalSeconds > 0
-      ? t("{hours}h", { hours: Math.round((workSummaryQ.data.totalSeconds / 3600) * 10) / 10 })
-      : ""
+  // THE HOURS NO LONGER RIDE THE PANEL'S OWN TITLE — client ruling, 18 Sep
+  // 2026, verbatim: "on work logs, remove the hours just next to the tile,
+  // for that we have the big count. also the + button to the right." The
+  // "big count" is `<WorkLogsPanel>`'s own `Numbers` stat grid, drawn INSIDE
+  // the panel from the identical `recordTimeSummaryKey` read this screen used
+  // to duplicate for the small title-row figure — so the read that used to
+  // live here (`workSummaryQ`) bought nothing the panel was not already
+  // showing, once the small figure it fed was removed. `workLogAddRef`,
+  // below, is what the title row's new "+" reaches for instead.
+  const workLogAddRef = React.useRef<(() => void) | null>(null)
+  // ATTACH, FROM THE COMPOSER — client ruling, 18 Sep 2026: "the customers
+  // can attach images & files. so do we… that's why I ask for the attach
+  // button on the text input field." `HelpAttachmentsPanel` (now inline
+  // below the thread) writes its own file-picker opener into this ref; the
+  // composer's Paperclip button calls it, so there is one upload path, not
+  // two (`openRef`'s own doc comment, record-attachments.tsx).
+  const attachRef = React.useRef<(() => void) | null>(null)
 
   const [editing, setEditing] = React.useState(false)
-  // THE FILES SHEET — B19's own pattern, one slide-in reached from the ⋯ menu
-  // (`overflow` below), since Files left the tab strip with everything else.
-  const [filesOpen, setFilesOpen] = React.useState(false)
   /* `storiesSheetOpen` STOOD HERE — the flag that opened the FULL
    * `<StoriesPanel>` behind a "Show all" link, because the on-page preview
    * was capped. CLIENT RULING, 17 Sep 2026, reading the deployed page back:
@@ -351,10 +361,10 @@ export function HelpDetailScreen({
   // showing every row costs no second door call and no unbounded list — the
   // bound is the door's own page size, not a client-side slice on top of it.
   //
-  // GATED ON `have`, THE SAME DETERMINISTIC GATE `workSummaryQ` USES ABOVE —
-  // this panel needs the record anyway, so it costs nothing on the cold path
-  // (`web/test/cold-screen-hops.test.tsx`) and everything once the record is
-  // actually on screen.
+  // GATED ON `have`, THE SAME DETERMINISTIC GATE `membersQ`/`activity` USE
+  // ABOVE — this panel needs the record anyway, so it costs nothing on the
+  // cold path (`web/test/cold-screen-hops.test.tsx`) and everything once the
+  // record is actually on screen.
   const storiesPreviewQ = useCached<Story[]>(have ? sliceKey("stories-ticket", helpId) : null, () =>
     content.stories({ ticketId: helpId, view: "all" }).then((r) => {
       primeCache(totalKey("stories-ticket", helpId), r.total)
@@ -388,11 +398,12 @@ export function HelpDetailScreen({
   // ?tab= STILL RESOLVES — IT JUST SCROLLS NOW. The strip this used to switch
   // is gone, so a link built while it existed (the rail, a bookmark, anyone
   // who typed `?tab=stories`) must still land somewhere real rather than on a
-  // 404 of the mind. `conversation`/`overview` land on the head (nothing to
-  // scroll past); `stories`/`time`/`stakeholders` scroll to that panel's own
-  // anchor (`TICKET_PANEL_ANCHOR`, ticket-detail-body.tsx); `files` opens the
-  // sheet the ⋯ menu now holds it behind, since there is no panel left to
-  // scroll to. Read off `window.location.search` directly rather than a
+  // 404 of the mind. `conversation`/`overview`/`files` land on the head or
+  // scroll to Conversation (nothing to scroll past for the first two; the
+  // attachments the third used to open a sheet for now render inline inside
+  // it); `stories`/`time`/`stakeholders` scroll to that panel's own anchor
+  // (`TICKET_PANEL_ANCHOR`, ticket-detail-body.tsx). Read off
+  // `window.location.search` directly rather than a
   // prop threaded down from the shell — this screen owns no query-string
   // wiring of its own, and the shell's `?tab=` plumbing is for the SCREEN
   // it hosts choosing between collections (accounts' companies/contacts),
@@ -410,10 +421,6 @@ export function HelpDetailScreen({
     const requested = new URLSearchParams(window.location.search).get("tab")
     if (!requested) return
     deepLinkHandled.current = true
-    if (requested === "files") {
-      setFilesOpen(true)
-      return
-    }
     const panel = DEEP_LINK_TICKET_PANEL[requested]
     if (!panel) return
     document.getElementById(TICKET_PANEL_ANCHOR[panel])?.scrollIntoView({
@@ -730,6 +737,12 @@ export function HelpDetailScreen({
     // their name whole. `authorIsClient` is the row's own answer — the same
     // `from_client` subselect the portal's redaction already runs.
     author: (r.authorIsClient ? r.authorName : staffNameFromSnapshot(r.authorName)) || "Member",
+    // THE SENDER'S FACE (R35), on the RAW name rather than the R54-shortened
+    // one above — an initial is a mark, not a name (help-stakeholders.tsx's
+    // own note), so it draws from the whole name where one exists, client
+    // contact and staff alike. Client ruling, 18 Sep 2026: "missing the
+    // avatars of the senders."
+    initials: nameInitials(r.authorName),
     time: formatRelative(r.createdAt, t, lang),
     // The reply as the reader asked for it: what was typed, or the translation
     // they pressed for. Never both, and never a stored rewrite of somebody's
@@ -792,10 +805,15 @@ export function HelpDetailScreen({
                           need to show them all" — see `storiesPreviewQ`'s
                           own comment, above).
        · Work logs     → `<WorkLogsPanel>`, unchanged, inside its own panel.
-       · Files and links → B19's own pattern: the ⋯ menu (`overflow`,
-                          below), opened as a sheet.
-       · Stakeholders  → `<HelpStakeholders>`, unchanged, inside its own
-                          panel, with the Overview facts under it.
+       · Files and links → B19's own pattern held until 18 Sep 2026 (the ⋯
+                          menu, opened as a sheet); the client then ruled it
+                          out entirely ("kill this whole files & links …
+                          button … visible in the conversation itself") and
+                          it moved a second time, into the Conversation
+                          panel's own `attachments` tray, below.
+       · Stakeholders  → `<HelpStakeholders>`, card-shaped since 18 Sep 2026
+                          (see that file's own header), with the Overview
+                          facts still under it (removed 17 Sep 2026).
      Activity was never a tab (retired 2026-09-06 · 2026-09-07) and is
      unaffected: it still opens from the footer's Latest activity eyebrow,
      through `activity` on `RecordScreen` below. */
@@ -861,22 +879,15 @@ export function HelpDetailScreen({
       : []),
     // EDIT LEFT THE MENU, 17 Sep 2026 — client ruling, reading the deployed
     // page: "The edit button: put it outside, just the pen." It is now the
-    // standalone `PencilSimple` icon button in the title's own actions row
-    // (`actions`, below), beside Close/the timer/the ⋯ trigger — never inside
-    // it. Nothing else moved: Translate, Files and links and Archive/Restore
-    // are still exactly where they were.
-    // FILES AND LINKS — B19's own pattern, the ⋯ menu opening the panel as a
-    // sheet, "the way other records do." Left the tab strip with everything
-    // else the strip used to hold; unconditional, exactly as the tab was —
-    // VIEWING is `help:read` (the right that put a reader on this screen at
-    // all), and `HelpAttachmentsPanel`'s own `canEdit` is the narrower right
-    // that gates attaching/removing, asked separately below.
-    {
-      key: "files",
-      label: t("Files and links"),
-      icon: <Paperclip className="size-3.5" />,
-      onSelect: () => setFilesOpen(true),
-    },
+    // standalone `EditPenButton` in the title's own actions row (`actions`,
+    // below), beside Close/the timer/the ⋯ trigger — never inside it.
+    // Nothing else moved: Translate and Archive/Restore are still exactly
+    // where they were.
+    // FILES AND LINKS LEFT THE MENU TOO, 18 Sep 2026 — client ruling: "kill
+    // this whole files & links … button. those are visible in the
+    // conversation itself." The sheet this item opened is gone; the panel it
+    // held is inline in the Conversation card now (`attachments`, the
+    // `<TicketDetailBody>` call below).
     // PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in colour
     // because it takes the request out of the everyday lists, and reversible,
     // which the confirm-free restore says out loud.
@@ -965,33 +976,34 @@ export function HelpDetailScreen({
           button: put it outside, just the pen." It left the ⋯ menu (see
           `overflow`'s own comment above) for an icon-only button right here,
           in the title's actions row, opening the same edit sheet the menu
-          item used to. `PencilSimple` is the kit's own edit glyph
-          (CLAUDE.md's action-icon mapping); `aria-label` carries the word a
-          screen reader needs since an icon-only control draws no text of its
-          own.
+          item used to.
 
-          NOT MANGO. `canClose` above already claims the one primary/mango
-          slot this title row is allowed (R84, B1 — "at most one primary and
-          one secondary"); `variant="inverse"` is the kit's own black fill,
-          the same one every other title-row control that is not the primary
-          action wears. */}
-      {canEdit && (
-        <Button
-          variant="inverse"
-          size="icon"
-          onClick={() => setEditing(true)}
-          aria-label={t("Edit")}
-          className="shrink-0"
-        >
-          <PencilSimple aria-hidden="true" focusable="false" />
-        </Button>
-      )}
+          NEVER BLACK, NOT EVEN HERE — client ruling, 18 Sep 2026, verbatim:
+          "edit button is never black (even when it's only one). f.e. in
+          ticket detail the edit button is black." This was the very button
+          she is pointing at: `variant="inverse"` (the kit's black fill), on
+          the reasoning that `canClose` already claims this row's one
+          mango/primary slot so the pen was "just" the secondary. Her ruling
+          corrects that reasoning rather than confirming it — the pen is
+          QUIET on every record screen, whether or not a primary sits beside
+          it, never a colour the primary/secondary pairing hands down to it.
+          `EditPenButton` (shared/web/edit-pen-button.tsx) is the one shared
+          answer, used here and on every other record screen that draws a
+          pen (R84's amendment, RULES.md). */}
+      {canEdit && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
       <RecordActionsMenu actions={overflow} />
     </>
   )
 
   return (
+    <>
     <RecordScreen
+      // NO OUTER PANEL CARD — client ruling, 18 Sep 2026 (this file's own
+      // header): `panelVisible={false}` turns off `RecordDetail`'s own
+      // `Card` around `children`, so this call draws the head only. The
+      // body — `<TicketDetailBody>` and every dialog — is a sibling of this
+      // element now, below, not its `children`.
+      panelVisible={false}
       // NO MARK — client ruling, 2026-09-07, "for type, kill the emojis. this
       // is legacy. in current system we use colors." The square the header band
       // keeps for a glyph (G3) held the team's own emoji for this ticket's
@@ -1177,7 +1189,7 @@ export function HelpDetailScreen({
       // the ladder above it.
       onAddNote={can("help", "create") ? activity.addNote : undefined}
       notePlaceholder={t("Add a note")}
-    >
+    />
       <TicketDetailBody
         conversation={
           <TicketConversationPanel
@@ -1227,6 +1239,12 @@ export function HelpDetailScreen({
                           ? ticket.raiserName
                           : staffNameFromSnapshot(ticket.raiserName)) ||
                         undefined,
+                      // THE RAISER'S FACE (R35) — the same raw-name seam the
+                      // replies below use, off whichever name actually named
+                      // this message above.
+                      initials: nameInitials(
+                        ticket.raisedByContactName || ticket.raiserName
+                      ),
                       body: <RichText html={translation.of(ticket.description)} />,
                     },
                     /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
@@ -1247,6 +1265,7 @@ export function HelpDetailScreen({
                       side: "mine" as const,
                       author: r.author,
                       authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
+                      initials: r.initials,
                       time: r.time,
                       body:
                         typeof r.body === "string" ? (
@@ -1271,31 +1290,70 @@ export function HelpDetailScreen({
                 />
               </>
             }
-            composer={<ReplyComposer send={reply} answered={ticket.status === "resolved"} />}
+            // ATTACHMENTS, INLINE — client ruling, 18 Sep 2026: "kill this
+            // whole files & links … button. those are visible in the
+            // conversation itself." `HelpAttachmentsPanel` is unchanged
+            // (still `records/record-attachments.tsx` under it); only where
+            // it renders moved, off the ⋯ menu's `EdgePanel` and into this
+            // tray. `openRef` hands its file picker to the composer's own
+            // Paperclip button below, so pressing either one opens the SAME
+            // dialog. `max-h-40` + its own scroll: a tray, not a second
+            // scrolling region competing with the thread above it, for a
+            // ticket that has picked up a dozen attachments over its life.
+            attachments={
+              // `bg-card`, NOT `bg-surface-panel` — this tray sits inside
+              // `TicketConversationPanel`, which is `variant="default"`
+              // (`--surface-panel`) since the 18 Sep 2026 container ruling
+              // (ticket-detail-body.tsx's own header); repainting the same
+              // tone here would be the exact "container on the same ground
+              // it stands on" bug R67 exists to catch. `--card` is the
+              // raised alternation, the same tone the composer pill below
+              // already draws.
+              <div className="max-h-40 overflow-y-auto rounded-[var(--radius)] bg-card p-3">
+                <h4 className="text-micro text-muted-foreground mb-2 uppercase">
+                  {t("Files and links")}
+                </h4>
+                <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "update")} openRef={attachRef} />
+              </div>
+            }
+            composer={
+              <ReplyComposer
+                send={reply}
+                answered={ticket.status === "resolved"}
+                onAttach={can("help", "update") ? () => attachRef.current?.() : undefined}
+              />
+            }
           />
         }
         stories={
           // EVERY ROW, NO "Show all" — client ruling, 17 Sep 2026, verbatim:
           // "In the section 'Related Stories' … Remove 'Show All' because
-          // you need to show them all." No `action` slot any more — there is
-          // nothing left behind a link to open. Writing a NEW story against
-          // this ticket still has its own door (`storyOpen`/
-          // `<StoryFormDialog>`, below); it used to live inside the sheet
-          // "Show all" opened (`<StoriesPanel>`'s own `onNew`) and now sits
-          // as a plain button on this panel's title row instead.
+          // you need to show them all." Writing a NEW story against this
+          // ticket still has its own door (`storyOpen`/`<StoryFormDialog>`,
+          // below); it used to live inside the sheet "Show all" opened
+          // (`<StoriesPanel>`'s own `onNew`), then a text button on this
+          // panel's own title row.
+          //
+          // "+" ICON, FAR RIGHT — client ruling, 18 Sep 2026, verbatim: "on
+          // ticket detail, + button to add a story (not this text button) on
+          // the far right." `AddButton` (deep-link/screen-bits.tsx) is the
+          // app's one create-button shape — `variant="inverse" size="icon"`,
+          // R84 — reused rather than a fourth hand-rolled "+" button; its own
+          // `label` doubles as the accessible name AND the tooltip, so
+          // "New story" survives the swap from words to a glyph.
           <TicketSidePanel
             title={t("Related stories")}
             count={formatCount(storiesTotal)}
             action={
+              // R50 — `empty={false}`, deliberately: this "+" sits on the
+              // panel's own TITLE ROW, not a `<ToolbarRow>`, and it is
+              // reachable at zero related stories exactly as it was when it
+              // was a plain text button — a ticket with none yet is the
+              // ordinary case a person presses this to fix. Named in
+              // EMPTY_TOOLBAR_EXEMPT (shared/rules/registry.ts) with this
+              // same reason.
               canWriteWork ? (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-auto shrink-0 p-0 text-xs"
-                  onClick={() => setStoryOpen(true)}
-                >
-                  {t("New story")}
-                </Button>
+                <AddButton label={t("New story")} onClick={() => setStoryOpen(true)} empty={false} />
               ) : undefined
             }
           >
@@ -1346,8 +1404,31 @@ export function HelpDetailScreen({
           // `work:read`, the right the door itself gates on, exactly as the
           // tab was: a role without it sees no panel at all rather than one
           // that refuses.
+          //
+          // NO HOURS ON THE TITLE, "+" FAR RIGHT — client ruling, 18 Sep
+          // 2026, verbatim: "on work logs, remove the hours just next to the
+          // tile (for that we have the big count). also the + button to the
+          // right." Same shape as Related stories, above: `AddButton`
+          // (R84) replaces `<WorkLogsPanel>`'s own inline "Log time"
+          // control on this call site — `showAddButton={false}` turns that
+          // one off so there is one "+" and not two — and reaches its
+          // dialog through `workLogAddRef`, the opener the panel writes
+          // into itself. Every OTHER caller of `WorkLogsPanel` (a story, a
+          // task, a meeting) is untouched: both props default to the old
+          // behaviour.
           canSeeTime ? (
-            <TicketSidePanel title={t("Work logs")} count={workHoursLabel}>
+            <TicketSidePanel
+              title={t("Work logs")}
+              action={
+                // R50 — `empty={false}`, the same deliberate reason as
+                // Related stories' own "+" above: a title-row button, always
+                // reachable, not a toolbar's own create action over rows
+                // that might be zero.
+                canLogTime ? (
+                  <AddButton label={t("Log time")} onClick={() => workLogAddRef.current?.()} empty={false} />
+                ) : undefined
+              }
+            >
               <WorkLogsPanel
                 targetTable="help"
                 targetId={helpId}
@@ -1355,6 +1436,8 @@ export function HelpDetailScreen({
                 canEdit={canEditTime}
                 canLog={canLogTime}
                 onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
+                showAddButton={false}
+                addTrigger={workLogAddRef}
               />
             </TicketSidePanel>
           ) : null
@@ -1382,18 +1465,14 @@ export function HelpDetailScreen({
           onto that panel's own title row, still opening the identical
           `<StoryFormDialog>` below (`storyOpen`). */}
 
-      {/* FILES AND LINKS, BEHIND THE ⋯ MENU — B19's own pattern, "the way
-          other records do": a sheet, not a tab. `help:EDIT` since the door
-          tightened (e36b254) — read kept the button visible and every press
-          a 403. */}
-      <EdgePanel
-        open={filesOpen}
-        onClose={() => setFilesOpen(false)}
-        title={t("Files and links")}
-        closeLabel={t("Close")}
-      >
-        <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "update")} />
-      </EdgePanel>
+      {/* FILES AND LINKS, BEHIND THE ⋯ MENU, STOOD HERE — B19's own pattern,
+          "the way other records do": a sheet, not a tab. CLIENT RULING,
+          18 Sep 2026, retired it outright: "kill this whole files & links …
+          button. those are visible in the conversation itself." The one
+          `<HelpAttachmentsPanel>` on this page now renders inline, inside
+          `TicketConversationPanel`'s own `attachments` tray (the `stories`
+          field's sibling, above, inside `conversation`) — not deleted, only
+          moved a second time, off a sheet and onto the page itself. */}
 
       {/* NEW WORK ON THIS REQUEST. The ticket rides in as `fixedTicket`: the
           request behind the work is a fact about where you are standing, not a
@@ -1489,6 +1568,6 @@ export function HelpDetailScreen({
       />
 
       {archiveDialog}
-    </RecordScreen>
+    </>
   )
 }

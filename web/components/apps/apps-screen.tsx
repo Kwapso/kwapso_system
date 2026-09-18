@@ -564,8 +564,8 @@ export function AppsScreen({
   const tabsConfig = {
     ...defaultTabsConfig,
     tabs: [
-      { value: "active", label: t("Active"), icon: "app-window", badge: activeBadge, badgeVariant: "" as const },
-      { value: "inactive", label: t("Inactive"), icon: "archive", badge: inactiveBadge, badgeVariant: "" as const },
+      { value: "active", label: t("Active"), icon: "check-circle", badge: activeBadge, badgeVariant: "" as const },
+      { value: "inactive", label: t("Inactive"), icon: "prohibit", badge: inactiveBadge, badgeVariant: "" as const },
     ],
   }
 

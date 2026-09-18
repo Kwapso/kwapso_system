@@ -889,7 +889,7 @@ export function MeetingsScreen({
               {
                 value: "week",
                 label: t("This week"),
-                icon: "chat",
+                icon: "calendar-dot",
                 badge: formatCount(weekTotal),
                 badgeVariant: "" as const,
               },
@@ -920,7 +920,7 @@ export function MeetingsScreen({
                 // is a label, nothing else.
                 value: "all",
                 label: t("Everyone's"),
-                icon: "list",
+                icon: "asterisk",
                 badge: formatCount(total),
                 badgeVariant: "" as const,
               },

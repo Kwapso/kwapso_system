@@ -26,7 +26,8 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Alarm, StopCircle, Clock, PencilSimple, Play, Trash } from "@shared/ui/foundations/icons"
+import { Alarm, StopCircle, Clock, Play, Trash } from "@shared/ui/foundations/icons"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { LoadMore } from "@/components/records/load-more"
@@ -423,15 +424,7 @@ export function TimePanel({
                           and the label rides on `aria-label` for anybody who
                           needs it read out. */}
                       {canEdit && l.endedAt && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditing(l)}
-                          className="shrink-0"
-                          aria-label={t("Edit")}
-                        >
-                          <PencilSimple className="size-3.5" />
-                        </Button>
+                        <EditPenButton onClick={() => setEditing(l)} label={t("Edit")} />
                       )}
                     </li>
                   ))}

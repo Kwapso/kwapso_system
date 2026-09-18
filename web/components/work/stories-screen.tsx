@@ -365,6 +365,11 @@ function shapeStories(stories: Story[], waveNames: Map<string, string | null>) {
     rows: stories.map((s) => ({
       id: s.id,
       name: storyLead(s),
+      // THE PLAIN TITLE, FOR A TAB — `name` above is a rendered node (chip +
+      // title), which cannot label the tab a cmd/ctrl/middle-click opens
+      // beside (`rowLabel`, record-table.tsx); the same `nameText`-beside-
+      // `name` pair the Accounts shaper keeps for the identical reason.
+      nameText: s.title,
       // ITS OWN COLUMN NOW, NOT SQUEEZED INTO THE STORY CELL — an icon+word
       // chip is wider than the two-letter tile it replaces, and Category
       // (beside it) already gets its own column for the identical reason.
@@ -447,7 +452,7 @@ const STORY_TABS: { value: StoryView; label: string; icon: string }[] = [
 const EVERYONE_TAB: { value: StoryView; label: string; icon: string } = {
   value: "all",
   label: "Everyone's",
-  icon: "users-three",
+  icon: "asterisk",
 }
 
 type NowSubView = "board" | "table"
@@ -832,6 +837,7 @@ export function StoriesScreen({
         actions={visibleActions(tableRecipe, rights, onAction)}
         onRowClick={(row) => onIntent({ kind: "open", module: "stories", id: String(row.id) })}
         rowPath={(row) => `/t/${teamId}/stories/${String(row.id)}`}
+        rowLabel={(row) => row.nameText}
         useKitPanel
       />
     </CollectionCreateActionProvider>

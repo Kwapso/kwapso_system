@@ -104,6 +104,7 @@ export function RecordAttachments<R extends AttachmentRow>({
   fix,
   emptyTitle,
   removeTitle,
+  openRef,
 }: {
   /** The module's own live-resource key. The registry patches this row-for-row,
    * so the key belongs to the module and never to this file (R15). */
@@ -133,6 +134,18 @@ export function RecordAttachments<R extends AttachmentRow>({
    * record has a name and `t` is in scope. */
   emptyTitle: string
   removeTitle: (label: string) => string
+  /**
+   * A REF THE HOST WRITES AN OPENER INTO, for a control OUTSIDE this
+   * component that still wants to trigger the SAME file picker — added
+   * 18 Sep 2026 for the ticket's reply composer's own attach button (client
+   * ruling: "the customers can attach images & files. so do we… that's why
+   * I ask for the attach button on the text input field"). Reusing this
+   * component's own `fileRef`/`pickFile` is the point: a second, hand-rolled
+   * upload path beside this one is exactly the drift `record-attachments.tsx`'s
+   * own header was written to end (two files that agreed character for
+   * character). `null` while `canEdit` is false — the file input this ref
+   * would open is not even rendered then. */
+  openRef?: React.RefObject<(() => void) | null>
 }) {
   const { t, lang } = useLanguage()
   const listQ = useCached<R[]>(cacheKey, () =>
@@ -143,6 +156,10 @@ export function RecordAttachments<R extends AttachmentRow>({
     })
   )
   const fileRef = React.useRef<HTMLInputElement>(null)
+  // THE HOST'S OWN OPENER, kept current every render (see `openRef`'s own
+  // doc comment). Not a `useEffect`: a ref write has no render to schedule
+  // and no cleanup to run, so committing it during render is the whole job.
+  if (openRef) openRef.current = canEdit ? () => fileRef.current?.click() : null
   const [addingLink, setAddingLink] = React.useState(false)
   const [link, setLink] = React.useState({ label: "", url: "" })
   const [busy, setBusy] = React.useState(false)

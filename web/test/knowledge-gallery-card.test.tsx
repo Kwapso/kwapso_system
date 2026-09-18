@@ -147,7 +147,15 @@ describe('the detail page still offers edit — "It should just be on the detail
     expect(actionsAt, "RecordScreen's own actions slot").toBeGreaterThan(-1)
     const block = src.slice(actionsAt, src.indexOf("activity={", actionsAt))
     expect(block, "gated the same right the card's old pencil was").toMatch(/canEdit\s*&&/)
-    expect(block).toMatch(/aria-label=\{t\("Edit"\)\}/)
+    // AMENDED 18 Sep 2026 — R84's amendment ("edit button is never black
+    // (even when it's only one)"): the hand-rolled `<Button variant=
+    // "secondary" size="icon" aria-label={t("Edit")}>` became the shared
+    // `<EditPenButton onClick={…} label={t("Edit")} />` (shared/web/edit-
+    // pen-button.tsx) — same gate, same click, same accessible name, now
+    // named `label` rather than `aria-label` at this call site (the
+    // component sets `aria-label` internally, from that prop).
+    expect(block).toMatch(/EditPenButton/)
+    expect(block).toMatch(/label=\{t\("Edit"\)\}/)
     expect(block).toMatch(/onClick=\{\(\)\s*=>\s*setEditingOpen\(true\)\}/)
   })
 

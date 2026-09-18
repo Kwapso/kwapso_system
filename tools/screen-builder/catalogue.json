@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.114",
-  "sha": "a8b1ca4c05bd1048c1f74775db5686dfeb72455b",
+  "tag": "v1.2.116",
+  "sha": "71f2f351bdfe08b12551e1824c31c684c25c2314",
   "syncedAt": "2026-09-18"
  },
- "generatedAt": "2026-09-18T06:33:41.070Z",
+ "generatedAt": "2026-09-18T07:29:36.611Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -15,9 +15,9 @@
   "variantGroups": 81,
   "variantOptions": 269,
   "typedEnumProps": 43,
-  "typedBooleanProps": 317,
+  "typedBooleanProps": 318,
   "compositions": 47,
-  "icons": 1513,
+  "icons": 1514,
   "tokens": 367,
   "tokenDeclarations": 567,
   "unresolved": 0
@@ -928,7 +928,7 @@
     {
      "file": "components/badge/badge.tsx",
      "name": "badgeVariants",
-     "line": 67,
+     "line": 68,
      "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums",
      "groups": [
       {
@@ -956,8 +956,8 @@
         },
         {
          "name": "secondary",
-         "classes": "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-ink-secondary",
-         "note": "`.kw-badge` base — the quiet counter. THE FILL IS A CUSTOM PROPERTY WITH A FALLBACK, NOT A BARE TOKEN — see GAPS-RULINGS.md R-4c. `--surface-quiet` reads fine everywhere this badge ships today (panel, card, page); the one case it does NOT — measured, not assumed — is a quiet badge sitting on `--muted` (tokens.css's own \"inactive tabs, idle wells\", an ambient field rather than a card): 1.175 in dark, worse than the panel case already logged in GAPS-CONTRAST.md Tier C. A caller who KNOWS a badge sits on that ground rebinds `--badge-quiet-fill` locally to a darker quiet tone — a FILL shift, same mechanism `tabs.tsx` TAB-C1 uses for the folder tab's two papers — never a border or a shadow. Every existing call site is unaffected: with nothing rebound, this resolves to exactly `--surface-quiet`, unchanged."
+         "classes": "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-foreground",
+         "note": "`.kw-badge` base — the quiet counter. THE FILL IS A CUSTOM PROPERTY WITH A FALLBACK, NOT A BARE TOKEN — see GAPS-RULINGS.md R-4c. `--surface-quiet` reads fine everywhere this badge ships today (panel, card, page); the one case it does NOT — measured, not assumed — is a quiet badge sitting on `--muted` (tokens.css's own \"inactive tabs, idle wells\", an ambient field rather than a card): 1.175 in dark, worse than the panel case already logged in GAPS-CONTRAST.md Tier C. A caller who KNOWS a badge sits on that ground rebinds `--badge-quiet-fill` locally to a darker quiet tone — a FILL shift, same mechanism `tabs.tsx` TAB-C1 uses for the folder tab's two papers — never a border or a shadow. Every existing call site is unaffected: with nothing rebound, this resolves to exactly `--surface-quiet`, unchanged. THE LABEL IS `--foreground`, NOT `--ink-secondary` — CORRECTED 18 SEP 2026, CLIENT RULING, VERBATIM: \"why is chip ticket type grey and not black? all text shhould be black.\" `text-ink-secondary` was this variant's own quiet ink since before this file's own \"charcoal on every accent\" law existed for the COLOURED variants, and nobody had carried that law over to the one UNCOLOURED variant that quietly kept a muted grey label instead. The fix is the same shape every coloured variant already uses — the FILL carries the tone (quiet, here), the LABEL is always ink — so `secondary` reads `text-foreground` like every other variant in this file now does."
         },
         {
          "name": "outline",
@@ -1056,15 +1056,7 @@
       "variant": "secondary",
       "size": "counter"
      },
-     "compound": [
-      {
-       "when": {
-        "variant": "status",
-        "dotTone": "archived"
-       },
-       "classes": "text-ink-tertiary"
-      }
-     ],
+     "compound": [],
      "unresolved": [],
      "usedBy": [
       "Badge"
@@ -1077,6 +1069,12 @@
      "type": "BadgeProps",
      "variantsFrom": [],
      "props": [
+      {
+       "name": "asChild",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Render the caller's own element instead of a `<span>` — an anchor, almost always (a Next `<Link>` wrapping the badge, the same reason `BreadcrumbLink`'s own `asChild` exists: nesting a `<Link>` inside an `<a>` is invalid markup and breaks client-side routing). A badge given `asChild` is treated as a LINK for `LINK_UNDERLINE`, below, whether or not its child is actually an anchor — the prop is the caller's own declaration of intent, the same way `href` is."
+      },
       {
        "name": "loading",
        "optional": true,

@@ -48,6 +48,13 @@ import { sprintTypeIcon } from "@shared/sprint-types"
 import { storyTypeIconName } from "@shared/story-types"
 import { TICKET_TYPE_GROUP, ticketTypeIconName, type TicketTypeIconName } from "@shared/ticket-types"
 import { appStageDotTone } from "@shared/app-stages"
+// THE TICKET STAGE'S OWN DOT (R86, client ruling 18 Sep 2026: "when showing
+// status/stage on a list, include the colored dot") — the same seam
+// `help-detail.tsx`'s own header chip already reads for the identical tone,
+// imported here so a table cell that shows a ticket's STAGE draws through the
+// one function rather than a second lookup that happens to agree with it
+// today. See `ticketStatusCell` below.
+import { helpStatusDotTone } from "@shared/status-tones"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { SprintTypeGlyph } from "@/lib/sprint-type-icon"
 import type {
@@ -194,6 +201,25 @@ export const HELP_STATUS: Record<HelpTicket["status"], string> = {
   resolved: "Resolved",
 }
 
+/** THE ONE CELL RENDERER FOR A TICKET'S STAGE ON A LIST (R86, client ruling
+ * 18 Sep 2026, verbatim: "when showing status/stage on a list, include the
+ * colored dot"). Before this, the app's own Tickets tab (`work-panels.tsx`'s
+ * table) drew the stage as bare muted text — a text-only status cell of
+ * exactly the shape this ruling refuses, one table over from the ticket
+ * detail head's own chip (`help-detail.tsx`), which already draws
+ * `Badge variant="status" dot={helpStatusDotTone(ticket.status)}`. Rather than
+ * a second `<Badge>` respelled at the next table that shows a stage, this is
+ * that same pairing as ONE shared function — the census `HEADING`/`HELP_STATUS`
+ * already stand for. Every table-row stage cell should route through here
+ * rather than through `t(HELP_STATUS[...])` alone. */
+export function ticketStatusCell(status: HelpTicket["status"], t: (s: string) => string) {
+  return (
+    <Badge variant="status" dot={helpStatusDotTone(status)}>
+      {t(HELP_STATUS[status])}
+    </Badge>
+  )
+}
+
 /** Trim a ticket description to a single readable list line. */
 function truncate(text: string, max = 80): string {
   const clean = text.trim().replace(/\s+/g, " ")
@@ -271,7 +297,9 @@ export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
   article: "article",
   // The app's own records borrow the rail's icon for the same concept.
   ticket: "tray",
-  account: "buildings",
+  // WAS "buildings" — the rail moved Accounts to a briefcase on 3 Sep 2026
+  // (client ruling, CONCEPT_ICON.accounts) and this line was not told.
+  account: "briefcase",
   // WAS "address-book" / "check-square" — client ruling, 17 Sep 2026,
   // verbatim, over the whole rail: "For contacts, use the user circle in the
   // field" / "For tasks, use the checks in plural in regular." Kept in step
@@ -377,14 +405,14 @@ void MEETING_TYPE_ICON_CENSUS
 // identical reason: `ticketTypeIconName` (@shared/ticket-types) resolves a
 // NAME at runtime through `iconComponent()`, never a literal `icon: "…"` a
 // source scan can see, so without this the generated `icon-map.ts`
-// (scripts/icon-map.mjs) would never import `Bug`/`Question`/`PlusCircle`/
+// (scripts/icon-map.mjs) would never import `Bug`/`Question`/`PlusCircleRegular`/
 // `ChatCircleText` for THIS reason (any of the four may still be pulled in by
 // an unrelated call elsewhere) — a silent hole, not a build failure. Kept
 // beside the map it census-checks so the two can never drift.
 const TICKET_TYPE_ICON_CENSUS: { icon: TicketTypeIconName }[] = [
   { icon: "bug" },
   { icon: "question" },
-  { icon: "plus-circle" },
+  { icon: "plus-circle--regular" },
   { icon: "chat-circle-text" },
 ]
 void TICKET_TYPE_ICON_CENSUS
@@ -451,7 +479,10 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // initial tile reads "O" rather than a blank box.
       accountCell: (
         <span className="flex items-center gap-2">
-          <RecordMark picture={m.accountLogoUrl} name={accountLabel} />
+          {/* `choice` — a table row's face fits the text line, never the
+              other way round (client ruling, 18 Sep 2026: "when avatar/icon
+              on list view, make the avatar smaller"). */}
+          <RecordMark picture={m.accountLogoUrl} name={accountLabel} size="choice" />
           <span className="min-w-0 truncate">{accountLabel}</span>
         </span>
       ),
@@ -619,7 +650,14 @@ export function shapeAccountsList(
         // (`size="band"`); the table renders both mark+name in one cell.
         name: (
           <span className="flex items-center gap-2">
-            <RecordMark picture={a.logoUrl} name={a.name} />
+            {/* THE SMALLEST SIZE, IN A TABLE ROW (client ruling, 18 Sep 2026:
+                "when avatar/icon on list view, make the avatar smaller. should
+                not be the cause of more height to the overall row"). The kit's
+                own `choice` size (24px, `--avatar-sm`) is what fits a single
+                text line without stretching the row to hold it — the same
+                fix this ruling makes at every table-row face cell in this
+                file, tickets-collection.tsx and work-panels.tsx. */}
+            <RecordMark picture={a.logoUrl} name={a.name} size="choice" />
             <span>{a.active ? a.name : `${a.name} (archived)`}</span>
           </span>
         ),
@@ -647,7 +685,9 @@ export function shapeAccountsList(
           const m = a.accountManagerId ? managerById.get(a.accountManagerId) : undefined
           return m ? (
             <span className="flex items-center gap-2">
-              <RecordMark picture={m.photo} name={m.name} shape="round" />
+              {/* THE SMALLEST SIZE, IN A TABLE ROW — see `name`'s own note a
+                  few lines up (client ruling, 18 Sep 2026). */}
+              <RecordMark picture={m.photo} name={m.name} shape="round" size="choice" />
               {m.name}
             </span>
           ) : (
@@ -762,18 +802,19 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
       // rest get their initial, so this column is initials far more often than
       // photographs and has to look deliberate either way.
       //
-      // THE DEFAULT SIZE (`row`), NOT `choice`, and it is a decision rather than
-      // an omission. `choice` is 24px and record-mark.tsx reserves it in writing
-      // for a checklist's checkbox row and the record picker's candidate stack —
-      // "`row` stays the size for an ordinary collection row read on its own",
-      // which is exactly what a line of this table is. It is also the size the
-      // LIST rows this table replaced were drawing (`shapeAccountsList` above,
-      // through the recipe's `leading: "mark"`), so the same person is the same
-      // size on the screen she was on yesterday. The two marks at `choice` in
-      // this app are both inside dropdowns.
+      // `choice` (24px), NOT `row` — REVERSED 18 Sep 2026. This used to argue
+      // for `row` (36px) as "the size for an ordinary collection row read on
+      // its own", which was correct against the ruling in force that day. The
+      // client's later ruling supersedes it, unhedged, over every table row in
+      // the app: "when avatar/icon on list view, make the avatar smaller.
+      // should not be the cause of more height to the overall row." A face at
+      // `row` sits taller than this table's own text line, so the row's
+      // height is set by the picture rather than by what a person reads;
+      // `choice` is the kit's own smallest size and is what a single text
+      // line already needs.
       person: (
         <span className={REF_LEADS_NAME}>
-          <RecordMark picture={a.logoUrl} name={a.name} />
+          <RecordMark picture={a.logoUrl} name={a.name} size="choice" />
           <span className="min-w-0 truncate">
             {a.active ? a.name : `${a.name} (archived)`}
           </span>
@@ -809,7 +850,10 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
         // any screen this table renders at) and keeps the census honest
         // rather than gamed around.
         <span className="flex flex-wrap items-center gap-2">
-          <RecordMark picture={a.companyLogoUrl ?? null} name={a.companyName} />
+          {/* `choice` — see `person`'s own note above (client ruling, 18 Sep
+              2026): a table row's face fits the text line, never the other
+              way round. */}
+          <RecordMark picture={a.companyLogoUrl ?? null} name={a.companyName} size="choice" />
           <span className="min-w-0 truncate">{a.companyName}</span>
         </span>
       ) : (

@@ -148,7 +148,7 @@ import {
   BreadcrumbSeparator,
 } from "../breadcrumb/breadcrumb";
 import { collapse } from "./breadcrumbs";
-import { CaretLeft, CaretRight, MagnifyingGlass } from "../../foundations/icons";
+import { CaretLeft, CaretRight } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 
 /* ----------------------------------------------------------------------------
@@ -170,20 +170,26 @@ import { cn } from "../../lib/utils";
    current/quiet, `onJump`, the fold at `maxItems`) exactly as before — D2
    changed the SHELL the trail sits in, not the trail itself.
 
-   THE FIELD DOES NOT SEARCH YET. The magnifier and the "⌘K" hint are the
-   drawing's own vocabulary for "this reads as a search field" — neither
-   wires to anything. `⌘K` is a STATIC hint, `aria-hidden`, exactly the way
-   `search-input.tsx`'s own `shortcut` prop is announced to nobody: a
-   reminder of a key the application does not yet bind. Wiring an actual
-   command-palette/search behaviour to this shell is a follow-up, not this
-   ruling.
+   THE MAGNIFIER AND THE "⌘K" HINT ARE GONE, 18 SEP 2026 — CLIENT RULING,
+   VERBATIM: "on the top navbar, kill the search icon, makes no sense there.
+   also kill the cmd+k." D2's own reasoning for the two ("this reads as a
+   search field") never became real search — "the field does not search
+   yet" was true right up to the day it was removed rather than wired up —
+   and the client's own read on the live product was that the glyph and the
+   hint promised a behaviour the field does not have and never gets one:
+   there is no `<input>`, nothing here is typed into, and nothing this field
+   does is a search. Both are deleted outright, not hidden: no
+   `MagnifyingGlass` import, no `trail-line-hint` span, no dead prop left
+   for a future session to wonder about. The field keeps the rest of D2's
+   shape exactly as it was — the panel-tone pill, the arrows inside it
+   leading, the crumbs after them — only the two ornaments that read as
+   "search" are gone.
 
    TOKENS ONLY, NO NEW COLOUR. `--surface-panel` (the pill fill),
-   `--radius-pill` (`rounded-pill`, the shape), `--ink-tertiary` (the
-   magnifier and the hint, both already-spent quiet inks), `--space-2h`/
-   `--space-2` (the pill's own inset and internal gaps, both already on the
-   scale). `--control-height-pill` (26) is reused rather than restated so the
-   pill lines up with the arrows leading it — the same token `ARROW` below
+   `--radius-pill` (`rounded-pill`, the shape), `--space-2h`/`--space-2`
+   (the pill's own inset and internal gaps, both already on the scale).
+   `--control-height-pill` (26) is reused rather than restated so the pill
+   lines up with the arrows leading it — the same token `ARROW` below
    already spends.
 
    THE ARROWS MOVED INSIDE THIS FIELD, 18 SEP 2026 — CLIENT RULING,
@@ -317,14 +323,13 @@ const ARROW = cn(
  *  5. disabled       — an arrow with nowhere to go: `disabled`,
  *                      `--ink-disabled`, no fill, no hover (`enabled:`
  *                      guarded). `steps: []` renders no `Breadcrumb`
- *                      landmark, only the (both disabled) arrows and the
- *                      D2 pill's own chrome (magnifier, hint) around them.
+ *                      landmark, only the (both disabled) arrows inside the
+ *                      pill's own panel-tone chrome.
  *  6. loading        — does not apply. A trail is known before the screen it
  *                      describes; there is nothing here to wait for.
  *  7. empty          — `steps: []` renders both arrows disabled, the pill
- *                      shell still drawn (magnifier, hint), and no
- *                      `Breadcrumb` landmark inside it at all — not an
- *                      empty `<nav>`.
+ *                      shell still drawn, and no `Breadcrumb` landmark
+ *                      inside it at all — not an empty `<nav>`.
  *  8. error          — does not apply. A trail reports nothing.
  *  9. selected       — the crumb at `cursor`: `BreadcrumbPage`, medium
  *                      weight, `aria-current="page"`, `--foreground` (see the
@@ -391,17 +396,14 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
         )}
         {...props}
       >
-        {/* THE PILL — D2's whole shape, now carrying the arrows too. See the
-            header above `TRAIL_PILL` for the 18 Sep ruling that moved them
-            INSIDE this field, still leading, still before the magnifier.
-            The magnifier and the "⌘K" hint are chrome around the SAME
-            `Breadcrumb` this file always drew; see the header above
-            `TRAIL_PILL` for why neither wires to anything yet. Rendered
-            even when `visible.length === 0`, unlike the bare `Breadcrumb`
-            it used to be: an empty search-shaped field still draws its own
-            shell (`search-input.tsx`'s own resting state does the same),
-            it just has no landmark inside it — the "no `Breadcrumb`
-            landmark when `steps: []`" rule (state 7, above) is unchanged,
+        {/* THE PILL — D2's whole shape, now carrying the arrows too and, as
+            of 18 Sep 2026, neither the magnifier nor the "⌘K" hint — see the
+            header above `TRAIL_PILL` for both rulings. Rendered even when
+            `visible.length === 0`, unlike the bare `Breadcrumb` it used to
+            be: an empty pill still draws its own shell (`search-input.tsx`'s
+            own resting state does the same), it just has no landmark inside
+            it — the "no `Breadcrumb` landmark when `steps: []`" rule
+            (state 7, above) is unchanged,
             it now governs only the landmark, not the pill. */}
         <div data-slot="trail-line-field" className={TRAIL_PILL}>
           <div className="flex shrink-0 items-center gap-[var(--space-1)]">
@@ -426,12 +428,6 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
               <CaretRight size={16} aria-hidden="true" />
             </button>
           </div>
-
-          <MagnifyingGlass
-            size={14}
-            aria-hidden="true"
-            className="shrink-0 text-ink-tertiary"
-          />
 
           {visible.length === 0 ? null : (
             <Breadcrumb label={label} className="min-w-0 flex-1 overflow-hidden">
@@ -473,21 +469,6 @@ const TrailLine = React.forwardRef<HTMLDivElement, TrailLineProps>(
               </BreadcrumbList>
             </Breadcrumb>
           )}
-
-          {/* THE "⌘K" HINT — a static reminder, not a control. `aria-hidden`
-              exactly as `search-input.tsx`'s own `shortcut` chip is, and the
-              same badge-on-`--hair-faint` shape that file already spends, so
-              a reader who has seen one search field has seen this hint too. */}
-          <span
-            data-slot="trail-line-hint"
-            aria-hidden="true"
-            className={cn(
-              "ms-auto shrink-0 rounded-pill bg-hair-faint px-2 py-1",
-              "text-badge font-[var(--font-weight-medium)] text-ink-tertiary",
-            )}
-          >
-            ⌘K
-          </span>
         </div>
       </div>
     );

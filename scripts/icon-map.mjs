@@ -62,6 +62,20 @@ export function vocabulary() {
   table(read(join(ROOT, "web", "lib", "pages.ts")), "CONCEPT_ICON")
   table(read(join(ROOT, "web", "components", "deep-link", "shape.tsx")), "export const KNOWLEDGE_KIND_ICON")
 
+  // THE MODULE ICON PICKER'S ALLOW-LIST (shared/module-icons.ts) — an ARRAY of
+  // names a person chooses from, not a `key: "name"` table and not under any
+  // root the walk below reads. Until 18 Sep 2026 two of its names were in the
+  // map only because CONCEPT_ICON happened to use them too; the day
+  // CONCEPT_ICON moved on, the picker's own test went red for a glyph the
+  // map had silently dropped.
+  const list = (src, marker) => {
+    const at = src.indexOf(marker)
+    if (at === -1) return
+    const body = src.slice(at, src.indexOf("]", at))
+    for (const m of body.matchAll(/"([a-z][a-z0-9-]*)"/g)) names.add(m[1])
+  }
+  list(read(join(ROOT, "shared", "module-icons.ts")), "export const MODULE_ICON_NAMES")
+
   for (const f of sourceFiles([join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")], {
     extensions: [".ts", ".tsx"],
     relativeTo: ROOT,

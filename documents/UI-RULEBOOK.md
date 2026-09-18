@@ -39,8 +39,8 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L27)
 - [3. Detail screens](#3-detail-screens) (D1 to D20)
-- [4. Collections](#4-collections) (K1 to K46)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B19)
+- [4. Collections](#4-collections) (K1 to K47)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B20)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F17)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -894,6 +894,23 @@ the trail's own tinted field, rather than sitting outside it as a separate pair.
 divider above; the trail-inside-the-card placement and the back/forward mechanism from the
 morning/afternoon rulings are untouched.**
 
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — the trail field and the title share one left
+edge, and the search icon and the ⌘K hint are gone from the field entirely.** Two further
+rulings, the same session, read together:
+
+- *"look at first screenshot. pils and title are slightliy wider that the topnavbar. should
+  not be. they shoul be same width and end at the same point in the left"* — the chip row
+  and the record/collection title sit flush with the trail field's own left inset; the
+  content card's head band reads the same left edge the trail field already draws from,
+  rather than a wider measure of its own, so the trail field, the chips and the title all
+  start and end at one shared left point.
+- *"on the top navbar, kill the search icon, makes no sense there. also kill the cmd+k"* —
+  T1's search-bar-like field shell drops its leading search glyph and its ⌘K hint outright;
+  the field keeps the back/forward arrows in the tinted background T1 already moved inside
+  it, and reads as the trail line it is, not a search input.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+
 ### L14: the assistant column's width is a drag, snapping to three sizes
 
 **The rule.** *"Is it possible that we can, while using the app, adjust the width of the
@@ -1093,6 +1110,18 @@ without it, measured in real Chromium. Proved in `verify/tabstrip-parity/`: the 
 overlap equals the shoulder on every consecutive pair, across three strip shapes, and
 `elementFromPoint` at the shared pixel returns the tab that ought to win.
 
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — superseded: tabs separated by a gap, not nested by
+the shoulder.** The client's ruling, verbatim: *"the top tabs folder, need space betwwen
+tehm. right now they merge altogether."* The deliberate shoulder overlap the fix above
+shipped — the next tab's rounded corner sitting under the previous tab's shoulder, Chrome's
+own model — reads as the tabs merging into one shape rather than as separate tabs, so it is
+retired: every tab strip in the app draws a visible gap between consecutive tabs instead,
+with no overlapping shoulder. The z-index ordering this rule settled (the active tab always
+outranking a shifted neighbour, `<li>`-level, `isolation: isolate` on the strip) is
+untouched — only the shoulder-nesting geometry is gone.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Recreate the drag behavior on
@@ -1131,6 +1160,29 @@ in its own `overflow-x: auto` container. `web/test/rules.test.ts` asserts `scrol
 **AMENDED 17 Sep 2026 — The tab strip's own scrollbar, not the body.** Measured on staging at 1280 and 1440px viewport widths: the page body carries no overflow. The horizontal scroll the client saw is the tab strip's own internal scrollbar (`overflow-x: auto` on the strip itself, never on the body). Kit v1.2.103 hides the scrollbar on WebKit (Safari) too, where it was still visible; Chromium already hides it. The page body measured no overflow at any tested width and remains correct.
 
 **Mark:** Root cause on staging is now measured (17 Sep 2026); no further action needed.
+
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — the assistant column still scrolls sideways; kill
+it there too.** The client's ruling, verbatim: *"assistant still has cetrain horixotnal
+scroll to it. kill taht."* The 17 Sep amendment above measured the page body and the tab
+strip's own scrollbar and found neither at fault; the assistant column itself is a third
+surface the same `SCROLL_FLOOR_EXEMPT` discipline now reaches — every row inside the
+assistant panel (the conversation thread, a reply, an action row) sits inside its own
+bounded width or its own `overflow-x: auto` viewport, never wider than the column that
+holds it, with no `min-w-max` outside the registry.
+
+**Status: ruled, in build, 18 Sep 2026 (assistant app lane).**
+
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — only a reply carries a background; an action sits
+bare.** The client's ruling, verbatim: *"for assistant, only the "replies" should have the
+bacvkground. the "actions" should sit without any container aorund them."* The assistant
+conversation draws two kinds of rows: a **reply** (the assistant's own written answer) keeps
+its container — the raised card background this book uses for a message; an **action** (a
+tool call, a confirm, a step the assistant took) sits directly on the assistant column's own
+ground, with no card, no border and no fill of its own, the same "a block earns a container
+only when it holds a collection of rows" reading [N6](#n6-one-cue-per-boundary-and-the-container-is-earned)
+already applies elsewhere — a single action row is not a collection.
+
+**Status: ruled, in build, 18 Sep 2026 (assistant app lane).**
 
 ### L22: activating "+" selects the newest unused conversation
 
@@ -1725,6 +1777,12 @@ session, quoted in full under "Colour scheme" in
 built" line above for every lifecycle named here; the app-status ladder's own rungs (the
 paragraph above) are not among them and stay pending.
 
+**Cross-reference, 18 Sep 2026 ~06:40 (Round 17).** The client's ruling that a chip's own
+text is always black ink, and a linked chip underlined, landed in
+[K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status)'s own amendment,
+not here — recorded there because it is a chip-text ruling and this rule governs the dot's
+own tone, not the label ink beside it.
+
 ---
 
 ### D18: the thread and the reply composer share one column with spacing between them
@@ -1820,6 +1878,62 @@ that story's status ([K39](#k39-in-any-collection-the-one-coloured-chip-is-the-r
 every related story rather than a capped preview.
 
 **Status: ruled, in build, 17 Sep 2026.**
+
+**AMENDED A THIRD TIME, 18 Sep 2026 ~06:00 — work log count, stakeholder cards, the story
+add button, work-log hours, the conversation's attach button and input container, and the
+container structure itself.** Seven further rulings, the same batch, read together:
+
+- *"on ticket detail - for worklog, rmeove the entries count"* — the Work logs panel's own
+  entries count is removed; the count stays visible only where the big total already lives,
+  never repeated beside the panel heading.
+- *"on ticket detail stakeholders, show them like cards (like settings members) and show
+  what was before, who raised it and on the loop"* — the Stakeholders panel, stripped down
+  to a bare list of names by this rule's first amendment, now draws each stakeholder as a
+  member card, the same shape Settings › Team › Members already uses, and restores what
+  that stripping removed — who raised the ticket and who is on the loop — carried on the
+  cards themselves rather than as the removed prose sentence.
+- *"on ticket detail, + button to add a story (not this text button) on the far right"* —
+  Related Stories' own add affordance becomes a plain `+` icon button
+  ([B3](#b3-the-add-button-is-a-plus-glyph-with-no-text-everywhere)), at the panel's far
+  right, replacing the labelled text button.
+- *"on work logs, remove the hours just next to the tile (>for that we have the big count).
+  also the + button to the right"* — the Work logs panel drops the hours figure sitting next
+  to its own title, redundant with the big count the first bullet above keeps, and gains the
+  same far-right `+` icon button as Related Stories.
+- *"on tickets detail "conversation" i am missing the attach button and the "container"
+  background for the text input field, also missing the avatars of the senders"* —
+  `TicketConversationPanel`'s reply composer gains an attach button and a card background
+  behind the text input, and every message in the thread carries its sender's own face
+  ([G5](#g5-a-record-never-appears-without-its-face)).
+- *"on ticket detail the conversation shoudl have more height, depending on the height of
+  the right column components. they should be, the addition of the three of the right, same
+  as conversation"* — the conversation panel's own height is no longer fixed; it matches the
+  SUM of the three stacked side panels' heights (Related stories, Work logs, Stakeholders),
+  so the two-thirds/one-third split this rule already draws keeps its columns level however
+  tall the side stack grows.
+- *"the ticket detail is completely worng in temrs of containers. what you have now is one
+  big container and smalle runderneath. why did you do 2 levels? no. lets change that.
+  remove the "overall" container, make each thing it's own container (like tickets
+  dashaboard)"* — the single outer card wrapping the whole two-column body is removed; the
+  stage ladder, the conversation panel and each of the three side panels draw as its OWN
+  standalone container, the same flat, no-nesting shape
+  [K37](#k37-the-toolbar-sits-inside-the-content-card-and-never-in-a-container-of-its-own-tickets-dashboard-drops-its-toolbar-an-apps-dashboard-row-gains-a-third-card-raised-by)
+  already settled for the tickets dashboard, never a container inside a container.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED A FOURTH TIME, 18 Sep 2026 ~06:40 (Round 17) — Files and links is retired from the
+⋯ menu outright; attachments live in the conversation.** The client's ruling, verbatim: *"on
+tickets, kill this whole files&links in the ... button. fyi those are visible in the
+ocnversation itself! the customers cann attach fimages & files. so do we. tahts why i ask of
+the attach button on the text input field."* The third amendment's own attach button and
+container background on `TicketConversationPanel`'s reply composer is the reason this one
+gives: since every file either side attaches now renders inline in the conversation thread,
+the "Files and links" entry the first amendment moved into the ⋯ menu (B19's own pattern) is
+removed from that menu entirely — not re-homed a second time. A ticket's attachments have
+exactly one place they are read: the conversation.
+
+**Status: ruled, in build, 18 Sep 2026.**
 
 ---
 
@@ -3360,6 +3474,17 @@ remainder rather than zero. `web/test/toolbar-lead-gap-card.test.tsx` proves the
 exact `calc()` on both properties, and every `renderFolderTabs(` call site the rule
 reaches, off the disk rather than a hand-typed list.
 
+**AMENDED A THIRD TIME, 18 Sep 2026 — reviewed app-wide.** The client's ruling, verbatim:
+*"on app / tickets the space above the toolbar is huge and inocrrect!!! review
+app-wide!"* An app's own record tabs (Tickets inside an app, and any sibling record-tab
+toolbar reached through `renderFolderTabs(`) still show the gap this rule already fixed on
+the general collection screens — the same `--toolbar-lead-gap` above / `--toolbar-content-
+gap` below treatment is being reviewed across every `renderFolderTabs(` call site app-wide,
+not only the ones this rule's own census already covered, so a record's own tab strip
+cannot drift back to the pre-fix spacing.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
 ### K34: the Accounts collection strip is Active · Inactive · All, defaulting to Active
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"For account status, let's keep
@@ -3627,6 +3752,45 @@ already names, and a create dialog carries no second entrance to it.
 
 **Law.** [R86](../RULES.md) (`status-owns-the-chip`).
 
+**AMENDED 18 Sep 2026 — the dot reaches every status/stage picker and every list cell, and
+the ticket-type option cards get their spacing and fill fixed.** Four of the client's
+rulings, the same 18 Sep 2026 ~06:00 batch, read together:
+
+- *"everywhere where choico component is status/stage add the points."* Any choice/select
+  control whose field is a status or a stage — not only the rendered chip this rule already
+  governs — draws the same solid dot
+  ([D17](#d17-a-status-colour-means-one-thing-everywhere-dots-are-always-solid-and-a-department-is-told-apart-by-an-icon-never-a-hue))
+  beside each option's label, so a picker and the chip it sets never disagree about whether
+  the colour is there.
+- *"when showing status/stage on a list, include the colored dot."* Every list row or table
+  cell drawing a status or stage value carries its dot, not only the collection's own chip
+  position — a status/stage value is never plain text or an icon alone.
+- *"on tikects type, need space between icon and name. also background to the card"* — the
+  ticket-type option cards (the create dialog's type picker) gain a gap between the type
+  icon and its name, and a card background behind each option, rather than an icon and a
+  label sitting bare on the page ground.
+- *"for extra, use the regular icon (not filled)"* — the Extra ticket type's icon
+  (`PlusCircle` in `ticketTypeIconName`) draws at the REGULAR Phosphor weight, never filled,
+  matching the other three type icons.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — a chip's own text is always black ink, and a
+linked chip is underlined.** The client's ruling, verbatim: *"why is chip ticket type grey
+and not black? all text shhould be black. when its a link make it underlined (for exmaple
+the app name)."* This rule already retired the coloured dot from a non-status chip like
+ticket type ([K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status)
+above); the chip's own LABEL text was left at a muted ink by mistake, reading as disabled or
+secondary rather than as an ordinary category label. Every chip's text renders at the app's
+one ink tone ([D17](#d17-a-status-colour-means-one-thing-everywhere-dots-are-always-solid-and-a-department-is-told-apart-by-an-icon-never-a-hue)'s
+`#1A1918`, never a grey step), whether the chip carries a status dot or an icon. The one
+exception is a chip that IS a link to another record — the ruling's own example, an app's
+name on a ticket carrying that app's chip — which draws its text underlined, still in black
+ink, so a reader can tell "this text opens something" apart from an ordinary category label
+without reaching for a second colour.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+
 ---
 
 ### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
@@ -3699,6 +3863,16 @@ tickets list, general and in-app alike.
 
 **Law.** None registered.
 
+**AMENDED 18 Sep 2026 — Raised by and Raised on are two separate columns.** The client's
+ruling, verbatim: *"raised separate by and date! not in one together."* The reference stays
+its own leading ID column, ahead of Title, as this rule already sets — Raised by and Raised
+on ([D19](#d19-raised-on-is-a-fact-under-raised-by-with-the-exact-date-and-how-many-days-ago-in-brackets-never-its-own-chip))
+no longer share one combined cell on a tickets list view either: each gets its own column,
+so a row's raiser and its raised date can be scanned, sorted and read independently rather
+than as one run-on fact.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
 ### K43: an app's own Tickets tab carries a Queue view for triage, and it draws the standing empty state when there is nothing to triage
 
 **The rule.** The client's ruling, 17 Sep 2026, verbatim: *"Inside app tickets, I also
@@ -3723,6 +3897,15 @@ every other ticket view already carries, so a row waiting to be triaged says who
 and when without opening the record.
 
 **Status: ruled, in build, 17 Sep 2026.**
+
+**AMENDED A SECOND TIME, 18 Sep 2026 — the queue view's Raised fact splits too.** The
+client's ruling, verbatim: *"raised separate by and date! not in one together."* The Raised
+by / Raised on fact this rule's own 17 Sep amendment added to the Queue view follows K42's
+same split — raiser and raised date draw as two separate facts rather than one combined
+line, on the triage queue as everywhere else a ticket lists Raised by and Raised on
+together.
+
+**Status: ruled, in build, 18 Sep 2026.**
 
 ### K44: a tickets list inside an app carries Resolved Date and Resolved By
 
@@ -3773,6 +3956,20 @@ kit's own icon set ([R39](../RULES.md), `kit-supplies-the-ui`), rather than one 
 silently or left to a fallback glyph.
 
 **Status: ruled, in build, 17 Sep 2026.**
+
+**Law.** None registered.
+
+### K47: a list row's face is small, and never taller than the row
+
+**The rule.** The client's ruling, 18 Sep 2026 ~06:00, verbatim: *"when avatar/icon on list
+view, make the avatar smaller. shoudl not be the cause of more height to the oevrall row."*
+A list row's leading face — [G5](#g5-a-record-never-appears-without-its-face)'s
+picture/glyph/initial — draws at a smaller size on a LIST row specifically, sized so it
+never sets the row's own height; the row's height is whatever its title-plus-meta-line
+([K1](#k1-a-collection-row-is-a-title-plus-one-meta-line-and-nothing-else)) already needs,
+and the face fits inside that, never the other way round.
+
+**Status: ruled, in build, 18 Sep 2026.**
 
 **Law.** None registered.
 
@@ -4530,6 +4727,31 @@ band, stays visible at all times, and toggles enabled/disabled based on `latestI
 **Law.** [R84](../RULES.md) (`mango-in-title-only`), as the title-action ceiling; the
 action placement is a structural change to the detail screen layout.
 
+**Cross-reference, 18 Sep 2026 ~06:40 (Round 17).** The ticket detail's own ⋯ menu — the
+pattern this rule's own title bar shares its title component with — no longer carries "Files
+and links" at all; [D20](#d20-a-tickets-own-detail-is-one-page-no-tabs-the-stage-ladder-above-a-two-column-body-conversation-two-thirds-stories-work-logs-stakeholders-stacked-beside-it)'s
+own fourth amendment retires that entry outright, because every attachment now renders
+inline in the conversation thread. Recorded there, not here, because it is a menu-contents
+ruling and this rule is about the Close button's own placement and styling.
+
+### B20: the edit pencil is never black, even when it is the only button
+
+**The rule.** The client's ruling, 18 Sep 2026 ~06:00, verbatim: *"edit button is never
+black (even when it's only one). f.e. in ticket detail the edit buton is black."*
+[B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) sends every
+button outside a screen's own title component to black `variant="inverse"` by default — the
+icon-only edit pencil this book's [D20](#d20-a-tickets-own-detail-is-one-page-no-tabs-the-stage-ladder-above-a-two-column-body-conversation-two-thirds-stories-work-logs-stakeholders-stacked-beside-it)
+amendment moved outside the ticket detail's own title is the named exception: an edit action
+never renders in that black fill, whether or not another button sits beside it. Its own
+icon-only treatment beyond "not black" is otherwise unspecified by this ruling and is a
+build decision for whoever implements it.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** [R84](../RULES.md) (`mango-in-title-only`) governs the general black-everywhere-
+else case this rule carves an exception out of; the exception itself is not yet separately
+registered.
+
 ---
 
 ## 6. Forms and dialogs
@@ -5141,6 +5363,19 @@ the head drops with them. The rail's own gutter is deliberately untouched — th
 names "the main content and the assistant," not the rail — so `--rail-inset` stays at
 `--space-5` on purpose, a flag for whoever next touches it rather than an oversight.
 
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — the rail's own gutter is touched too, and both
+gaps step down together.** The client's ruling, verbatim: *"reduce the margin between the
+super far edge of screen and the side navbar, same as reduce it between side navbar and
+main content. keep spacing equa on both sides - but reduce (i'd say to half of what it is,
+but i dont see the pixels, just human eye)."* The flag the 17 Sep amendment left for whoever
+next touched `--rail-inset` is picked up here: the gap between the viewport's own edge and
+the rail, and the gap between the rail and the main content, are read together and kept
+equal — the same requirement S2 already holds for the content/aside pair — and both step
+down by roughly half their current measure, read by eye rather than to an exact pixel figure
+she named. `--rail-inset` moves off `--space-5` for the first time since this rule shipped.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
+
 ### S3: card padding is `p-4`, panel padding is `p-6`
 
 `CollectionCard` already uses `p-4` (`screen-bits.tsx:35`). Detail panels use `p-6`, which
@@ -5733,6 +5968,27 @@ records that lead with a glyph on their own screen.
 
 **Law.** [R35](../RULES.md) (`records-carry-their-face`).
 
+**AMENDED 18 Sep 2026 — initials draw only when there is no image.** The client's ruling,
+verbatim, over a screenshot of a member card showing a photo with the initials overlaid on
+top of it: *"look at first screenshot bug, we see the avatar AND the initials! should not
+be, initials only if avatar is empty. implement everywhere."* `RecordMark`'s own fallback
+order already reads picture → glyph → initial, but a shipped card drew BOTH the picture and
+the initials at once rather than treating the list as an either/or — the initials render
+only in the branch where no picture resolves, everywhere `RecordMark` draws a face.
+
+**Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED A SECOND TIME, 18 Sep 2026 ~06:40 (Round 17) — the account filter shows the
+fallback chain, not initials alone.** The client's ruling, verbatim: *"on filter account i
+want to see the icons, not only initials."* The account filter's own option list was reading
+straight to step 3 of this rule's own fallback order — picture, then type glyph, then
+initial — skipping the account's own logo where it has one; the filter now draws the same
+three-step chain every other picker and row already honours, so an account with a logo shows
+it there too, and only an account with neither a logo nor a resolvable glyph falls back to
+its initial.
+
+**Status: ruled, in build, 18 Sep 2026 (filter icons lane).**
+
 ### G6: an image fills its box; it is never shrunk to fit inside one
 
 **The rule.** The client, 2026-09-09, blanket and unhedged: *"everywhere for images: do
@@ -6003,6 +6259,15 @@ bordered screen, and that is the twisted feeling arriving as geometry.
 hairline, and a separator between blocks is `gap-6`. `shadow-*` is used **once**
 (`web/components/assistant/agent-host.tsx:45`), on the floating assistant button, which is the one
 thing on screen that genuinely hovers. No other shadow ships.
+
+**AMENDED 18 Sep 2026 ~06:40 (Round 17) — the button sits entirely inside the top margin,
+never overlapping the content below it.** The client's ruling, verbatim: *"put the open
+assistant button completely on the top margin, not liek now that its slightly overlaping
+with main content."* `agent-host.tsx`'s floating button is repositioned so its whole
+silhouette, including its shadow, sits within the top gutter band above the content card —
+never partially over the card or the main content column below it.
+
+**Status: ruled, in build, 18 Sep 2026 (kit v1.2.116).**
 
 ### N7: five gaps, and each one means something
 
@@ -6679,15 +6944,15 @@ should give it its own line and cross-reference.
 
 ## Rule index
 
-**201 rules.**
+**203 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L27 (27) |
 | 3. Detail screens | D1 to D20 (20) |
-| 4. Collections | K1 to K46 (46) |
-| 5. Buttons and actions | B1 to B19 (19) |
+| 4. Collections | K1 to K47 (47) |
+| 5. Buttons and actions | B1 to B20 (20) |
 | 6. Forms and dialogs | F1 to F17 (17) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |

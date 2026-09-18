@@ -196,8 +196,8 @@ export function StepsPanel({
               // (it counts `<TabsView` per FILE) has nothing to catch here.
               tabs: [
                 { value: "list", label: t("List"), icon: "list", badge: "", badgeVariant: "" as const },
-                { value: "flow", label: t("Flow"), icon: "git-branch", badge: "", badgeVariant: "" as const },
-                { value: "compare", label: t("Compare"), icon: "arrows-left-right", badge: "", badgeVariant: "" as const },
+                { value: "flow", label: t("Flow"), icon: "flow-arrow", badge: "", badgeVariant: "" as const },
+                { value: "compare", label: t("Compare"), icon: "columns", badge: "", badgeVariant: "" as const },
               ],
             }}
             value={stepView}

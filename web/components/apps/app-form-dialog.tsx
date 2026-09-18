@@ -37,7 +37,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
-import { APP_STAGES, appStageMark } from "@shared/app-stages"
+import { APP_STAGES, appStageDotTone, appStageMark } from "@shared/app-stages"
 import { AppearancePillGroup } from "@shared/web/appearance-pill-group"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
@@ -383,10 +383,15 @@ export function AppFormDialog({
           same day moved the icon vocabulary to Sprint type ("it's the sprint
           types that have an icon") and left App stage's own status HELD
           pending a fresh definition ("hold this until we define what the
-          status is from the apps") — so this picker offers plain words, no
-          `swatch`, until that ruling lands. `AppearancePillGroup` (shared/web/
-          appearance-pill-group.tsx) is the row the Appearance settings pills
-          already draw; its `swatch` slot is simply unused here now.
+          status is from the apps"). THAT DEFINITION LANDED 18 Sep 2026:
+          "everywhere where choice component is status/stage add the points"
+          — so each pill now carries `dot: appStageDotTone(s.value)`, the
+          SAME tone map the apps board's own `Badge` already reads for this
+          exact stage (`apps-screen.tsx`), never a second one. `AppearancePillGroup`
+          (shared/web/appearance-pill-group.tsx) is the row the Appearance
+          settings pills already draw; its `dot` slot is this picker's own
+          reason to exist, the same way the Background pills use its
+          `swatch` slot for a spine fill.
           NO "NOT SAID" PILL — the coordinator's own follow-up, 16 Sep 2026,
           the client's "kill the Nobody-style empties" instinct read for a
           stage: a stage is never blank. A new app defaults to `APP_STAGES[0]`
@@ -406,9 +411,10 @@ export function AppFormDialog({
             ...stages.map((s) => ({
               value: s.value,
               label: t(s.value),
+              dot: appStageDotTone(s.value),
             })),
             ...(values.stage && !stages.some((s) => s.value === values.stage)
-              ? [{ value: values.stage, label: t(values.stage), disabled: true }]
+              ? [{ value: values.stage, label: t(values.stage), dot: appStageDotTone(values.stage), disabled: true }]
               : []),
           ]}
           value={values.stage}

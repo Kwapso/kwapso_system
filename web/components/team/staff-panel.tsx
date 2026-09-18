@@ -27,8 +27,9 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+import { Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/team/staff-profile-dialog"
 import { OverviewList } from "@/components/records/overview-list"
@@ -180,14 +181,10 @@ export function StaffPanel({
               icon") — the label survives as the accessible name, whichever of
               the two verbs applies. */}
           {mayWrite && (
-            <Button
-              variant="secondary"
-              size="icon"
+            <EditPenButton
               onClick={() => onEditOpenChange(true)}
-              aria-label={profile?.active ? t("Edit profile") : t("Write a profile")}
-            >
-              <PencilSimple className="size-3.5" />
-            </Button>
+              label={profile?.active ? t("Edit profile") : t("Write a profile")}
+            />
           )}
           {/* WHEN SOMEBODY LEAVES. Red because it takes the profile out of the
               everyday picture, and reversible — which the confirm-free restore

@@ -140,7 +140,10 @@ export const TAB_ICONS: Record<string, IconName> = {
   map: "network",
   // the record kinds, matching CONCEPT_ICON in web/lib/pages.ts word for word
   apps: "app-window",
-  companies: "buildings",
+  // A contact's companies ARE its accounts (contact-detail.tsx passes
+  // `CONCEPT_ICON.accounts` for this very tab), so the tab wears the accounts
+  // glyph — a briefcase since the client's 3 Sep 2026 ruling. WAS "buildings".
+  companies: "briefcase",
   // WAS "address-book" — client ruling, 17 Sep 2026, verbatim, over the whole
   // rail: "For contacts, use the user circle in the field."
   contacts: "user-circle",
@@ -198,7 +201,12 @@ export const TAB_ICONS: Record<string, IconName> = {
   // the task strip's own List/Completed pair and the to-do panel's Open/Done.
   // Same idea, same glyph, decided once — `open` is deliberately the same
   // clipboard the task strip had chosen for itself, so nothing moves by adding it.
-  open: "clipboard-text",
+  // WAS "clipboard-text" — the to-dos' Open tab wearing the to-dos glyph.
+  // "Open" is a STAGE OF WORK in CONCEPT_ICON (pages.ts: open / ready /
+  // waiting / closed, one line each with the reasoning), and the Tickets
+  // strip draws that stage as an hourglass; one word, one glyph, so this
+  // follows it (icon-concepts-agree.test.ts).
+  open: "hourglass-high",
   done: "check",
   all: "asterisk",
   active: "check-circle",
@@ -645,7 +653,25 @@ export function TabsView({
       </TabsList>
       {renderPanel &&
         config.tabs.map((t) => (
-          <TabsContent key={t.value} value={t.value}>
+          // `data-tab-pane` — R83, extended 18 Sep 2026: THE ONE WRAPPER EVERY
+          // RECORD'S OWN TAB PANE RENDERS THROUGH, regardless of which record
+          // screen or which tab. `renderFolderTabs`'s collection strip never
+          // hands `renderPanel` (this file's own header: "A COLLECTION'S OWN
+          // TAB STRIP, AND NOTHING ELSE"), so this branch — and therefore this
+          // marker — is exclusive to a RECORD's inner strip (`STICKY_TABS`,
+          // record-chrome.tsx). That strip pays its own `--record-tab-gap`
+          // (`--tab-content-gap`, the same token `.pinned-strip` reads) as a
+          // border on `[role=tablist]`, but is never itself `.pinned-strip`
+          // and is never the panel's own DOM sibling — it sits beside this
+          // `TabsContent`, not beside whatever card the panel nests two levels
+          // down (`PagedPanelBody`'s own wrapping `<div>` around the
+          // `wrap`-supplied `<CollectionCard>`). `.pinned-strip + [data-slot=
+          // "card"]` (web/app/globals.css) therefore never reaches a record
+          // tab's own collection — wrong marker AND wrong adjacency — and the
+          // card pays its full, un-remediated leading inset on top of the
+          // strip's own gap and this root's flex `gap`. See globals.css's own
+          // `[data-tab-pane]` rule for the fix this marker feeds.
+          <TabsContent key={t.value} value={t.value} data-tab-pane="">
             {renderPanel(t)}
           </TabsContent>
         ))}

@@ -28,6 +28,7 @@ import { renderFolderTabs, defaultTabsConfig } from "@shared/web/screen-engine/t
 import { useRemembered } from "@shared/web/remembered"
 import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { EditPenButton } from "@shared/web/edit-pen-button"
 
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -93,8 +94,8 @@ export function KwapsoScreen({
   const tabsConfig = {
     ...defaultTabsConfig,
     tabs: [
-      { value: "details", label: t("Details"), icon: CONCEPT_ICON.kwapso, badge: "", badgeVariant: "" as const },
-      { value: "team", label: t("The team"), icon: CONCEPT_ICON.members, badge: "", badgeVariant: "" as const },
+      { value: "details", label: t("Details"), icon: "scroll", badge: "", badgeVariant: "" as const },
+      { value: "team", label: t("The team"), icon: CONCEPT_ICON.team, badge: "", badgeVariant: "" as const },
       { value: "brand", label: t("Brand library"), icon: CONCEPT_ICON.brand, badge: "", badgeVariant: "" as const },
     ],
   }
@@ -114,9 +115,7 @@ export function KwapsoScreen({
         {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
         {can("teams", "update") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
-              <PencilSimple className="size-3.5" />
-            </Button>
+            <EditPenButton onClick={() => setEditOpen(true)} label={t("Edit")} />
             {/* HOUSEKEEPING (R61's gear, R70's page) — the installation's own
                 nightly work: the clear-out, the growth alarm, the fault report
                 and the watchdog that notices when the other three have stopped.

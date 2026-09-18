@@ -429,7 +429,7 @@ export function AccountsScreen({
       badge: formatCount(inactiveTotalQ.data),
       badgeVariant: "" as const,
     },
-    { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
+    { value: "all", label: t("All"), icon: "asterisk", badge: accountsBadge, badgeVariant: "" as const },
   ]
   const canCreateAccount = can("accounts", "create")
 

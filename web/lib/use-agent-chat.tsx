@@ -212,8 +212,19 @@ export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
   return calls.map((c) => ({
     label: c.summary,
     state: "pending" as const,
+    // RULING 5 (18 Sep 2026): "assistant still has cetrain horixotnal scroll
+    // to it. kill taht." `RunSteps` (shared/ui/components/run-steps/run-
+    // steps.tsx, can't hand-edit) drops `description` into a bare `<span>`
+    // with no wrap rule of its own — fine for an ordinary sentence, but
+    // `confirm-payload.ts`'s own `describePayload` can hand back a value with
+    // no whitespace at all (an id it couldn't name, a token past its 160-char
+    // clip with nowhere to break), which is exactly the "long unbroken token"
+    // shape the reply thread already guards against (agent-markdown.tsx's
+    // `PROSE_RHYTHM`). `overflow-wrap` is an inherited property, so setting it
+    // once on this wrapper reaches every line span below it without needing
+    // the kit to grow a prop.
     description: c.details?.length ? (
-      <span data-details className="flex flex-col gap-1">
+      <span data-details className="flex flex-col gap-1 break-words [overflow-wrap:anywhere]">
         {c.details.map((line, i) => (
           <span key={i}>{line}</span>
         ))}

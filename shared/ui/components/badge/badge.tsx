@@ -60,6 +60,7 @@
    ========================================================================= */
 
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
@@ -120,8 +121,19 @@ const badgeVariants = cva(
          * uses for the folder tab's two papers — never a border or a shadow.
          * Every existing call site is unaffected: with nothing rebound, this
          * resolves to exactly `--surface-quiet`, unchanged.
+         *
+         * THE LABEL IS `--foreground`, NOT `--ink-secondary` — CORRECTED
+         * 18 SEP 2026, CLIENT RULING, VERBATIM: "why is chip ticket type
+         * grey and not black? all text shhould be black." `text-ink-secondary`
+         * was this variant's own quiet ink since before this file's own
+         * "charcoal on every accent" law existed for the COLOURED variants,
+         * and nobody had carried that law over to the one UNCOLOURED variant
+         * that quietly kept a muted grey label instead. The fix is the same
+         * shape every coloured variant already uses — the FILL carries the
+         * tone (quiet, here), the LABEL is always ink — so `secondary` reads
+         * `text-foreground` like every other variant in this file now does.
          */
-        secondary: "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-ink-secondary",
+        secondary: "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-foreground",
         /* The one uncoloured variant, and so the one that carries an edge.
            No `border` property — review 1A · fix 2 — so the edge is the
            artifact's own inset hairline. ch02's carve-out names fields,
@@ -186,11 +198,16 @@ const badgeVariants = cva(
         blue: "",
       },
     },
-    compoundVariants: [
-      /* CH11 draws the Archived pill's label in tertiary ink — the one status
-         whose words go quiet along with its dot. */
-      { variant: "status", dotTone: "archived", class: "text-ink-tertiary" },
-    ],
+    /* NO COMPOUND VARIANTS ANY MORE — RETIRED 18 SEP 2026, THE SAME RULING
+       THAT FIXED `secondary`'s LABEL, ABOVE. This file used to carry exactly
+       one: the Archived status pill's own label repainted to `--ink-tertiary`
+       ("the one status whose words go quiet along with its dot"). The
+       client's own new law — "all text shhould be black", read together with
+       the file's already-standing "the state lives in the dot" rule — leaves
+       no variant, archived included, permitted to dim its LABEL for tone;
+       only the dot may. Deleted outright rather than left inert: this file's
+       own standard for a retired rule is no dead body left for a future
+       session to trip on (see the badge check's own regression guard). */
     defaultVariants: {
       /* RULED 2026-08-22, by looking at it side by side (verify/
          badge-default-comparison.html): an unqualified <Badge> is QUIET, not
@@ -214,6 +231,22 @@ const badgeVariants = cva(
  * badge with a dot needs the identical 8px the pill was quietly the only one
  * offering. */
 const GAP_WITH_DOT = "gap-2";
+
+/** THE LINK UNDERLINE — 18 SEP 2026, CLIENT RULING, VERBATIM: "when its a
+ * link make it underlined (for exmaple the app name)." Unlike
+ * `BreadcrumbLink`'s own `.kw-link` idiom (`no-underline` at rest,
+ * `hover:underline`) — right for a link sitting in a sentence, where an
+ * always-on underline under every crumb would be noise — a badge is a
+ * discrete pill with no surrounding prose to read it against, and the
+ * client's own example is exactly that: an app-name CHIP that has to read as
+ * a link at a glance, including on a touch device with no hover state to
+ * reveal one. So this underline is ALWAYS ON, not hover-revealed, the moment
+ * a badge counts as a link — `asChild` or `href`, see `BadgeProps`' own
+ * doc — and `underline-offset-[0.1875rem]` is `BreadcrumbLink`'s own figure
+ * (3px), reused rather than re-picked so a reader who has learned what an
+ * underline offset means on one link component sees the identical rhythm on
+ * this one. */
+const LINK_UNDERLINE = "underline underline-offset-[0.1875rem]";
 
 /** The ten dot tones — one per `--dot-*` token, and no mango (never a status).
  * The first six are a LIFECYCLE (shipped/building/review/blocked/archived/
@@ -254,6 +287,25 @@ export interface BadgeProps
   extends React.ComponentPropsWithoutRef<"span">,
     Omit<VariantProps<typeof badgeVariants>, "dotTone"> {
   /**
+   * Render the caller's own element instead of a `<span>` — an anchor,
+   * almost always (a Next `<Link>` wrapping the badge, the same reason
+   * `BreadcrumbLink`'s own `asChild` exists: nesting a `<Link>` inside an
+   * `<a>` is invalid markup and breaks client-side routing). A badge given
+   * `asChild` is treated as a LINK for `LINK_UNDERLINE`, below, whether or
+   * not its child is actually an anchor — the prop is the caller's own
+   * declaration of intent, the same way `href` is.
+   */
+  asChild?: boolean;
+  /**
+   * A badge that IS a link — `.kw-tag--app`, ruling 04's app-name chip, the
+   * example the 18 Sep underline ruling names by name. Given `href` with no
+   * `asChild`, the badge renders as a real `<a>` rather than a `<span>`; the
+   * two props are never both required (an app router's own `<Link asChild>`
+   * still passes `href` down to the `<a>` it wraps), only one of them is
+   * ever REQUIRED for the badge to count as a link — see `LINK_UNDERLINE`.
+   */
+  href?: string;
+  /**
    * CH11's 7px status dot (`--dot-status`), drawn before the label. The dot
    * names the state and the label says it in words — ruling 26, so a call
    * site should never pass `dot` without a text label. Ruling 04's portal
@@ -293,12 +345,24 @@ export interface BadgeProps
  * A status-coloured chip.
  *
  * TEN STATES
- *  1. default        — variant fill + variant ink.
- *  2. hover          — does not apply. A badge is a label, not a control. If a
- *                      call site wraps one in a button, the button owns hover.
- *  3. focus-visible  — does not apply for the same reason. Where a call site
- *                      does make it focusable, tokens.css §8 rings it globally
- *                      and this file must not add a ring.
+ *  1. default        — variant fill + variant ink. A LINK badge (`asChild`
+ *                      or `href`, see `BadgeProps`' own doc) also draws
+ *                      `LINK_UNDERLINE` at every state, not only this one —
+ *                      18 Sep 2026 ruling, "when its a link make it
+ *                      underlined" — because it is what says "this pill is
+ *                      a link" without a hover to reveal it.
+ *  2. hover          — does not apply to a plain badge — it is a label, not
+ *                      a control, and if a call site wraps one in a button
+ *                      the button owns hover. A LINK badge is the one
+ *                      exception: it is a real `<a>` (or the caller's own
+ *                      anchor, via `asChild`), so the browser's ordinary
+ *                      link hover applies to it same as any other anchor;
+ *                      this file adds no hover state of its own on top.
+ *  3. focus-visible  — does not apply to a plain badge, for the reason
+ *                      state 2 gives; a LINK badge is focusable exactly
+ *                      because it is a real anchor, and tokens.css §8 rings
+ *                      it globally — this file still adds no ring of its
+ *                      own.
  *  4. active/pressed — does not apply.
  *  5. disabled       — does not apply. A label cannot be disabled; an inactive
  *                      record uses `variant="secondary"`, which is a meaning,
@@ -323,7 +387,7 @@ export interface BadgeProps
  * RTL — safe. `px-*` is padding-inline, the dot leads by flex order, and
  * nothing is positioned by side.
  */
-const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
+const Badge = React.forwardRef<HTMLSpanElement | HTMLAnchorElement, BadgeProps>(
   (
     {
       className,
@@ -339,6 +403,8 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
       formatCount,
       loading = false,
       hideWhenEmpty = true,
+      asChild = false,
+      href,
       children,
       ...props
     },
@@ -360,12 +426,27 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
       }
     }
 
+    /* WHICH ELEMENT, AND WHETHER IT COUNTS AS A LINK — both read off the
+       same two props. `asChild` wins the element choice when both are given
+       (the app-router `<Link asChild>` shape `BadgeProps.href`'s own doc
+       names); either one alone is enough to count as a link for
+       `LINK_UNDERLINE`, because both are the caller's own declaration that
+       this badge points somewhere. */
+    const Comp: React.ElementType = asChild ? Slot : href !== undefined ? "a" : "span";
+    const isLink = asChild || href !== undefined;
+
     return (
-      <span
-        ref={ref}
+      <Comp
+        ref={ref as React.Ref<HTMLAnchorElement>}
         data-slot="badge"
         data-dot={dot}
-        className={cn(badgeVariants({ variant, size, dotTone: dot }), dot ? GAP_WITH_DOT : undefined, className)}
+        {...(href !== undefined ? { href } : undefined)}
+        className={cn(
+          badgeVariants({ variant, size, dotTone: dot }),
+          dot ? GAP_WITH_DOT : undefined,
+          isLink ? LINK_UNDERLINE : undefined,
+          className,
+        )}
         {...props}
       >
         {dot ? (
@@ -373,18 +454,20 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
              never carries the meaning alone (ruling 26); the label says it. */
           <span
             aria-hidden="true"
-            /* NAMED so the ONE compound variant that has to repaint it can
-               reach it (7 Sep 2026). `building`'s dot is `--foreground` on
-               paper and must be charcoal on this pill's mango — two answers
-               for one tone, and the pill is the exceptional half. Without a
-               slot the variant could only reach `span`, which would also
-               catch anything a caller nests in `label`. */
+            /* NAMED so a future compound variant could repaint it without
+               also catching anything a caller nests in `label` (7 Sep 2026).
+               No compound variant reaches for it today — the one this file
+               used to carry (the LABEL's own archived-tertiary repaint) was
+               retired 18 Sep 2026, see `badgeVariants`' own comment — but the
+               slot stays: it is what let that mechanism exist at all, and a
+               future dot-only exception (unlike the retired label one) would
+               still need it. */
             data-slot="badge-dot"
             className={cn("size-[var(--dot-status)] shrink-0 rounded-pill", DOT_FILL[dot])}
           />
         ) : null}
         {label}
-      </span>
+      </Comp>
     );
   },
 );
