@@ -24,6 +24,7 @@ import { resolveOrdering } from "@shared/workers/sorting"
 import {
   countWorkLogs,
   editWorkLog,
+  getWorkLog,
   listWorkLogs,
   logTime,
   requireTarget,
@@ -82,6 +83,25 @@ async function logPage(
     countWorkLogs(cfg, guard, filter),
   ])
   return pagedJson("logs", { ...page, total: counts.total }, { totalSeconds: counts.totalSeconds })
+}
+
+/** WHAT A MUTATION ANSWERS WITH: the row it just touched, never the team's
+ * whole timesheet — the same fix as `help.ts`'s `ticketMutationReply`. Neither
+ * `logTime` nor `editWorkLog` used to surface the row's own id at all; this
+ * always re-reads it, so both doors do now. No `totalSeconds` sidecar: census
+ * of every UI caller of these two doors (2026-09-18) — work-logs-panel.tsx's
+ * `correct`/`log` and time-panel.tsx's `logManually`/`correct` all call and
+ * then `refresh()`/`refreshTime()`, never reading the reply at all, so there is
+ * no query to even skip conditionally here (unlike tickets/tasks, this door's
+ * `total` has no natural "whole view" filter to be honest about either — the
+ * reply is the one row, and says so). */
+async function logMutationReply(
+  cfg: Parameters<typeof listWorkLogs>[0],
+  guard: Parameters<typeof listWorkLogs>[1],
+  id: string
+): Promise<Response> {
+  const log = await getWorkLog(cfg, guard, id)
+  return pagedJson("logs", { rows: log ? [log] : [], total: log ? 1 : 0, hasMore: false, nextCursor: null }, { id })
 }
 
 /** GET /api/content/work-logs — time, newest first (or by whatever `sort` asks). */
@@ -240,7 +260,7 @@ export async function postLogTime(request: Request, env: Env): Promise<Response>
     billable: body.billable !== false,
   })
   await publishChange(env, guard.teamId, "work_logs", id, "add", accountId ?? undefined)
-  return logPage(cfg, guard, logFilterFrom(new URL(request.url)), null)
+  return logMutationReply(cfg, guard, id)
 }
 
 /** POST /api/content/work-logs/update — correct a row (work:EDIT, a step above
@@ -264,7 +284,7 @@ export async function postUpdateWorkLog(request: Request, env: Env): Promise<Res
     billable: typeof body.billable === "boolean" ? body.billable : undefined,
   })
   await publishChange(env, guard.teamId, "work_logs", id, "edit", accountId ?? undefined)
-  return logPage(cfg, guard, logFilterFrom(new URL(request.url)), null)
+  return logMutationReply(cfg, guard, id)
 }
 
 /** POST /api/content/work-logs/runaway — the Monday morning answer (work:create).

@@ -139,27 +139,35 @@ async function ticketPage(
  * a one-row array merges into it precisely as correctly as a fifty-row one:
  * only the ROWS shrink, from the team's newest fifty to the one this call
  * changed. `id` rides beside it unconditionally now — the id-carrying half of
- * the old `createdId` parameter, no longer withheld from an update. */
+ * the old `createdId` parameter, no longer withheld from an update.
+ *
+ * `withFacets` defaults OFF: a write reply does not need the sub-tab strip's
+ * `byType`/`byStatus`/`byAccount` breakdown unless a caller actually primes a
+ * badge cache from it. Census of every UI caller of this door (2026-09-18):
+ * `editTicket` (update, via help-detail.tsx) and `absorb()` (status + triage-
+ * read, via triage-queue.tsx) both prime `help-by-type`/`help-by-status`/
+ * `help-by-account` off exactly these fields — those three pass `true`. create
+ * (app-detail.tsx reads only `id`), archive (help-detail.tsx reads only
+ * `tickets`) and rank (no UI caller at all, MCP-only) read none of it. */
 async function ticketMutationReply(
   cfg: Parameters<typeof listTickets>[0],
   guard: Parameters<typeof listTickets>[1],
   scope: AccountScope,
   filter: TicketFilter,
-  id: string
+  id: string,
+  withFacets = false
 ): Promise<Response> {
   const [ticket, counts, facets] = await Promise.all([
     getTicket(cfg, guard, scope, id),
     countTickets(cfg, guard, scope, filter),
-    countTicketFacets(cfg, guard, scope, filter),
+    withFacets ? countTicketFacets(cfg, guard, scope, filter) : null,
   ])
   return pagedJson(
     "tickets",
     { rows: ticket ? [ticket] : [], total: counts.total, hasMore: false, nextCursor: null },
     {
       mineTotal: counts.mineTotal,
-      byType: facets.byType,
-      byStatus: facets.byStatus,
-      byAccount: facets.byAccount,
+      ...(facets ? { byType: facets.byType, byStatus: facets.byStatus, byAccount: facets.byAccount } : {}),
       id,
     }
   )
@@ -346,7 +354,9 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const scope = await callerScope(cfg, guard)
   const accountId = await updateTicket(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id)
+  // withFacets: help-detail.tsx's editTicket primes help-by-type/status/account
+  // off this reply's byType/byStatus/byAccount.
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id, true)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -378,7 +388,9 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
   if (moved) await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  // withFacets: triage-queue.tsx's absorb() primes help-by-type/status/account
+  // off this reply's byType/byStatus/byAccount.
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id, true)
 }
 
 /** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every
@@ -619,7 +631,7 @@ export async function postHelpRank(request: Request, env: Env): Promise<Response
   // R17: dropped back where it started → zero rows moved → no history, no ping.
   const { moved, accountId } = await setTicketRank(cfg, guard, scope, actor, id, afterId, beforeId)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id)
 }
 
 /** POST /api/content/help/archive — put a ticket away, or take it back out
@@ -644,7 +656,7 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
   // R17: archiving an archived ticket moves zero rows — no second history line.
   const { moved, accountId } = await setTicketArchived(cfg, guard, scope, actor, id, body.archived)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id)
 }
 
 /* ── `POST /api/content/help/validate` WAS HERE (retired 7 Sep 2026) ────────
@@ -687,7 +699,9 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
   // R17: already read, already scheduled, already started → zero rows moved.
   const { moved, accountId } = await markTriaged(cfg, guard, scope, actor, id)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+  // withFacets: triage-queue.tsx's absorb() primes help-by-type/status/account
+  // off this reply's byType/byStatus/byAccount.
+  return ticketMutationReply(cfg, guard, scope, EVERYDAY_LIST, id, true)
 }
 
 /** GET /api/content/help/dashboard — the Tickets screen's Dashboard tab, in one

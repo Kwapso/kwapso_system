@@ -65,7 +65,7 @@ import type {
 } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { primeCache, removeFromPage, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 import { AddButton, CollectionCard, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
@@ -1764,7 +1764,9 @@ export function TodosPanel({
   async function cancel(id: string) {
     try {
       await contentApi.cancelTodo(id)
-      invalidate(key)
+      // Cancelling always takes the to-do OUT of the open pile this panel is
+      // showing — spliced out directly rather than invalidated into a refetch.
+      removeFromPage(key, "id", id)
       toast.success(t("Withdrawn."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't withdraw that."))
