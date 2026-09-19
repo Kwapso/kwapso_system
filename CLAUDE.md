@@ -686,10 +686,12 @@ Start with **[README.md](README.md)** (the doc map), then:
   worker to propagate; `curl -X POST https://agency-staging.kwapso.app/api/tenancy/admin/migrate-teams -H "x-admin-key: $(security find-generic-password -s kwapso-admin-key -w)"`; then
   run the chain again. `teamsChecked: 0` means too early, not done. Afterwards prove
   the change on D1 rather than trusting the ledger.
-- **Deploy credentials:** `cf-exec` does not exist on this machine. In the SAME shell
-  command as the deploy, export `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
-  from `credentials/kwapso_cloudflare_universal_token.json` (keys `account_id` and
-  `kwapso_cloudflare_universal_token`). Never print either value.
+- **Deploy credentials:** `cf-exec` does not exist on this machine. Credentials moved
+  off a JSON file into `~/.config/cloudflare/accounts.json` + the macOS Keychain on
+  2026-08-31 (`scripts/lib/cf-credentials.mjs` has the full account/token resolution
+  this folder maps to, Keychain service `cf-token-kwapso`); in the SAME shell command
+  as the deploy, export `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from that
+  source. Never print either value.
 - **A green deploy proves nothing.** After every staging deploy compare the md5 of a
   local `web/out/_next/static/chunks/*.js` chunk with the served one. "Ready for
   review" means live on staging with the bundle proven, never "passes check".

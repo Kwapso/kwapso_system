@@ -78,15 +78,24 @@ test about one half of a two-part contract reads as coverage of the whole.**
 envs do not inherit an `assets` block). **Adding a top-level module page is two
 edits, not one.**
 
-**version-watch heals the stale tab, it doesn't prevent reloads.** Because there
-is no service worker, a long-lived tab holds the **old shell + its hashed
-chunks** across a deploy. `web/components/shell/version-watch.tsx` handles the two
-failure modes: (1) a `ChunkLoadError` from a now-missing chunk → reload **once**
-(a `sessionStorage` timestamp, `version_watch_reloaded_at`, and a 30-second
-cooldown stop a reload loop); (2) on focus/return, fetch `/` and compare the
-`main-app-<hash>.js` fingerprint, if it moved, offer a **gentle "reload" toast**,
-never a surprise reload mid-task. Don't mistake this for cache-busting: it heals
-an *already-stale* tab; it does not make cross-route navigation soft.
+**version-watch heals the stale tab, and (since T3656) never under a person's
+hands.** Because there is no service worker, a long-lived tab holds the **old
+shell + its hashed chunks** across a deploy. `web/components/shell/version-watch.tsx`
+handles two failure modes, and — earned twice now — they are NOT one seam:
+(1) a `ChunkLoadError` a render-phase crash surfaces (the ErrorBoundary,
+`healStaleShell`) → the tree already failed to draw a frame, so reload
+**immediately**, once (a `sessionStorage` timestamp, `version_watch_reloaded_at`,
+and a 30-second cooldown stop a loop); (2) the SAME error caught OUTSIDE the
+render phase — a bare `import()` in an event handler, a script tag, version-watch's
+own `window` listeners (`healStaleShellGently`) — is a screen that is NOT
+broken, so it never reloads a visible tab: it ARMS the reload instead (a toast,
+then the real `location.reload()` the next time the tab goes hidden), and only
+reloads on the spot if the tab is already hidden when the error lands. Focus/
+return polling is a third, gentler case still: fetch `/` and compare the
+`main-app-<hash>.js` fingerprint, and if it moved, offer the same "reload" toast
+— never a surprise reload mid-task, which used to be true for (2) in name only.
+Don't mistake any of this for cache-busting: it heals an *already-stale* tab; it
+does not make cross-route navigation soft.
 
 **…and (1) arrives through the ErrorBoundary, not through `window.onerror`.**
 Fixed 2026-08-18, and the trap is worth stating because the code looked right for
@@ -97,10 +106,41 @@ never heard the failure they exist for, and `web/components/shell/error-boundary
 showed a crash card reading "Loading chunk 67631 failed." at a manager. The heal
 is therefore invited in from `componentDidCatch` (`healStaleShell`, exported from
 version-watch, one seam, one cooldown), and the boundary renders "A new version
-of the app is ready." instead of the stack for that one class. The window
-listeners stay: a bare `import()` in an event handler does reach them. Locked by
-`web/test/stale-shell-heals.test.tsx`. **The client portal has no version-watch
-at all** — the same stale tab there still ends at a crash card (UI-GAPS).
+of the app is ready." instead of the stack for that one class. Locked by
+`web/test/stale-shell-heals.test.tsx`.
+
+**…and the window listeners reusing that SAME immediate reload was T3656/B0293**
+("the tickets page sometimes reloads by itself with a yellow animation" — the
+mango `MarkLoader` boot mark, replayed by a real, unprompted `location.reload()`).
+A missing chunk reached through `onError`/`onRejection` is NOT a crash — the
+screen the person is looking at is still standing, mid-reply on a ticket — but
+`healStaleShell`'s unconditional reload could not tell the difference, and on a
+day with five or six staging deploys while lanes had /tickets open creating test
+tickets, it yanked a working screen out from under whoever's old tab reached for
+a chunk a newer deploy had already replaced. `healStaleShellGently` is the two
+listeners' own heal now: reload immediately only if the tab is already hidden,
+otherwise arm a deferred reload (a toast, then the real reload on the tab's next
+`visibilitychange` to hidden). Locked by `web/test/version-watch-gentle-reload.test.tsx`.
+**The client portal has no version-watch at all** — the same stale tab there
+still ends at a crash card (UI-GAPS).
+
+**T3656's OTHER half was the overscroll, not the code.** Neither `html`/`body`
+nor the kit's `TabsList` set `overscroll-behavior`, so the browser's own
+fallback for "nothing left to scroll" ran free: pull-to-refresh on a phone (a
+real vertical overscroll past the top of the tickets queue — the longest-
+scrolled screen on this team), and Chrome's two-finger swipe back/forward on a
+Mac trackpad (the horizontal twin, past the end of a status strip —
+Dashboard/Triage/Ready/Open/Waiting/Closed/All — T3824 records Ishita
+"falling back to Chrome's swipe-back gesture to get around" this same call).
+Both end in a real `document` reload and the same mango boot mark. A
+`page.goBack()` proof — the navigation the completed gesture performs — showed
+the shell's own `popstate` handling is soft and not a second bug:
+`history.back()` inside an in-app session never reloads here, so the fix is the
+overscroll alone. `web/app/globals.css` now sets `overscroll-behavior: contain`
+on `html, body` together (closes the document-level fallback, both axes) and on
+the kit's own `[data-slot="tabs-list"]` (so an end-of-scroll drag on a status
+strip never reaches the document's edge to chain from in the first place).
+Locked by `web/test/overscroll-contain.test.ts`.
 
 **The AI co-pilot is mounted at the ROOT, and its open state persists.** The
 assistant panel is the one surface that spans *all* screens, so it lives in a single

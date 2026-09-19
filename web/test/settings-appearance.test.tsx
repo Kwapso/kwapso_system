@@ -101,6 +101,39 @@ describe("Settings › Appearance carries no hint sentence (R81, client ruling 2
   })
 })
 
+describe("Settings › Appearance's grid columns can shrink below their content (T3662, mobile sweep 2026-09-19)", () => {
+  // Below `lg` the panel's `grid` has ONE implicit column, so the preview
+  // and the controls column share ONE track — and a grid item's default
+  // `min-width` is `auto` (its max-content size), never 0. The preview box
+  // carries `aspect-[16/10]` with `min-h-[22rem]`; with no `min-w-0` on its
+  // column, the browser transfers that height floor through the ratio into
+  // a ~563px min-content WIDTH, the shared track grows to fit it, and the
+  // language/size/appearance/background column on the other row — sharing
+  // the same track — is dragged out to that same width and clipped by the
+  // shell's own `overflow-hidden`. Measured live on staging at a 375px
+  // viewport (agency-staging.kwapso.app/settings, alaap@kwapso.com): the
+  // track rendered 634px wide and the language pill row's own available
+  // width was 1014px, both cut off with no scroll to reach "Català" or
+  // anything past it. jsdom does not run real layout (no aspect-ratio, no
+  // grid track sizing), so this cannot reproduce the pixel overflow itself —
+  // it instead locks the one class that prevents it, the same way every
+  // other constrained box already surviving in this screen's ancestor chain
+  // carries it.
+  it("both grid-item columns carry min-w-0", () => {
+    renderPanel()
+    const preview = document.querySelector('[data-slot="appearance-preview-column"]')
+    const controls = document.querySelector('[data-slot="appearance-controls-column"]')
+    expect(preview, "the preview column exists").toBeTruthy()
+    expect(controls, "the controls column exists").toBeTruthy()
+    expect(preview?.className, "preview column must allow shrinking below its aspect-ratio content").toMatch(
+      /\bmin-w-0\b/
+    )
+    expect(controls?.className, "controls column must allow shrinking below the preview's forced track width").toMatch(
+      /\bmin-w-0\b/
+    )
+  })
+})
+
 describe("Settings › Appearance languages show their own name only (client ruling 2026-09-17)", () => {
   it("German's pill carries no English word beside it, painted through the full panel", () => {
     renderPanel()

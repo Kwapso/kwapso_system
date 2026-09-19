@@ -26,7 +26,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R24 | enforced | `money-taint-outbound` | `web/test/rules.test.ts`<br>`workers/data-ops/test/money-taint.test.ts` |
 | R26 | enforced | `vector-fence` | `workers/content/test/vector-fence.test.ts` |
 | R36 | enforced | `offered-rights` | `web/test/rules.test.ts` |
-| R37 | enforced | `in-app-anchors` | `web/test/shell-nav.test.ts` |
+| R37 | enforced | `in-app-anchors` | `web/test/overscroll-contain.test.ts`<br>`web/test/shell-nav.test.ts` |
 | R40 | enforced | `reachable-bytes` | `web/test/reachable-bytes.test.ts` |
 | R41 | enforced | `picked-files-are-sent` | `web/test/picked-files-are-sent.test.ts`<br>`workers/content/test/reply-attachments.test.ts` |
 | R42 | enforced | `declared-readers` | `workers/content/test/source-readers.test.ts` |
