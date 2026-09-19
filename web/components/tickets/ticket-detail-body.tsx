@@ -145,7 +145,44 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * two-tree LG/below-LG split (round 19 re-fix), and round 23's
  * composer-pinned-outside-every-card construction — correct about WHERE on
  * the screen something had to be pinned, wrong about WHICH element the
- * client meant by "the footer." */
+ * client meant by "the footer."
+ *
+ * ROUND 25 — THE BELOW-`lg` SQUEEZE, 19 Sep 2026. Round 24 shipped and
+ * looked right everywhere it was proved live (1800×978, 1991×842 assistant
+ * open, 1440×900, 1280×800) — but `${SCRATCH}/reproof15-results.json` state
+ * F (760×900, rail collapsed) caught what those five states could not: the
+ * conversation card measured a TRUE 0px height
+ * (`conversationCardRect.top === conversationCardRect.bottom`), so the
+ * thread and composer were both invisible below `lg`, band and side panels
+ * unaffected. Root cause was the below-`lg` STACK itself, not the band or
+ * the card: that stack was `flex h-full min-h-0 flex-col gap-6` holding the
+ * three side-panel divs (each natural-height, no flex classes of their own)
+ * THEN the conversation cell at `flex-1 min-h-0` — a real flex sibling
+ * fight. `flex-1` sets `flex-basis: 0%`, so once the panels' own combined
+ * natural height (measured ~700px) exceeded the stack's `h-full` budget,
+ * CSS flex-shrink distributed the deficit PROPORTIONAL TO EACH ITEM'S OWN
+ * BASIS — the panels (large basis) barely shrank, the conversation (zero
+ * basis) absorbed the entire deficit and rendered at exactly 0. Fixed by
+ * construction, not by tuning a shrink factor: the below-`lg` wrapper is
+ * ordinary NORMAL FLOW now (no `h-full`/`min-h-0`, so it has no fixed
+ * budget to fight over), sized to its own content, inside the ONE scrolling
+ * region this component already wraps everything in — and the conversation
+ * cell below `lg` takes `min-h-[60vh]` instead of `flex-1 min-h-0`, a floor
+ * rather than a share, so `TicketConversationPanel`'s own unconditional
+ * `h-full` always has a real, positive height to resolve against. PROVED
+ * FIRST by DOM/inline-style injection against the live (still-buggy)
+ * staging page, before this source edit (`${SCRATCH}/
+ * reproof16-belowlg-fix-results.json`): conversation card height went from
+ * a measured 0px to 721.64px at both 760×900 rail collapsed and 900×800,
+ * the composer became reachable after scrolling the one region at both
+ * (`composerReachableAfterScroll_PASS: true`), and the band's own distance
+ * to the screen body's bottom edge held exactly unchanged through the
+ * injection (96px at 760×900 — the pre-existing, unrelated mobile-chrome
+ * reservation footer-on-the-edge.test.ts already documents — 0px at
+ * 900×800). 1440×900 and 1991×842 assistant-open are `lg` and untouched by
+ * a below-`lg`-only fix — measured unchanged at 367.33px and 309.33px
+ * conversation card height respectively, band 0px both, matching this
+ * file's own round-24 proof (`${SCRATCH}/reproof15-results.json`). */
 
 /** Tailwind's `lg` breakpoint (`64rem`, 1024px — confirmed against the
  * built CSS this session, `min-width:64rem`), the ONE number this
@@ -202,16 +239,27 @@ export function TicketDetailBody({
   const isAtLeastLg = useIsAtLeastLg()
 
   // TWO DIFFERENT CELLS, NOT ONE CLASS REUSED — at `lg` this is a GRID cell,
-  // already at 100% of the row's own height, so it takes `h-full min-h-0`;
-  // below `lg` it is a STACK ITEM sharing the column with the side panels'
-  // own natural height, so it takes `flex-1 min-h-0` (grow to fill what
-  // they leave) instead — `h-full` there would claim 100% of the stack's
-  // own height on top of the side panels' natural height, overflowing the
-  // stack rather than sharing it with them.
+  // already at 100% of the row's own height, so it takes `h-full min-h-0`
+  // and the CARD inside it fills that definite height, capping its own
+  // thread to an inner scroll. Below `lg` it is a NORMAL-FLOW BLOCK now
+  // (ROUND 25, 19 Sep 2026 — see this file's own header), never `flex-1
+  // min-h-0`: that shape made the conversation a FLEX SIBLING of the three
+  // side-panel divs inside a `h-full` stack, and `flex-1`'s own
+  // `flex-basis: 0%` means it is handed ZERO share of the stack's own
+  // shrink budget once the panels' combined natural height (proved on
+  // staging at 760×900 to be ~700px) exceeds what the stack's `h-full` had
+  // to give — the panels barely shrink (their basis is their own large
+  // content height) and the conversation is squeezed to a true 0px, thread
+  // and composer both gone. Below `lg` it now takes `min-h-[60vh]` instead:
+  // a SENSIBLE FLOOR, never a flex share fought over, so `TicketConversationPanel`'s
+  // own `h-full` (unconditional, see that component below) resolves against
+  // a real, positive height and the card always renders at least that tall
+  // — proved by live injection against staging (this file's own header
+  // carries the measured numbers).
   const conversation = (
     <div
       id={TICKET_PANEL_ANCHOR.conversation}
-      className={isAtLeastLg ? "min-w-0 h-full min-h-0" : "min-w-0 flex-1 min-h-0"}
+      className={isAtLeastLg ? "min-w-0 h-full min-h-0" : "min-w-0 min-h-[60vh]"}
     >
       <TicketConversationPanel thread={thread} composer={composer} />
     </div>
@@ -241,7 +289,15 @@ export function TicketDetailBody({
             <div className="flex min-w-0 flex-col gap-6 h-full min-h-0 overflow-y-auto">{sidePanels}</div>
           </div>
         ) : (
-          <div className="flex min-w-0 h-full min-h-0 flex-col gap-6">
+          // NORMAL FLOW, NOT A BOUNDED STACK (ROUND 25) — no `h-full`/
+          // `min-h-0` here: this block's own height is its CONTENT height
+          // (the side panels' natural height plus the conversation's own
+          // `min-h-[60vh]` floor), and the ONE scrolling region this whole
+          // tree already sits inside (this component's other child, `flex-1
+          // min-h-0 overflow-y-auto`, one level up) is what scrolls that
+          // content when it outgrows the viewport — never a `flex-1` fight
+          // between these two siblings for a budget that does not exist here.
+          <div className="flex min-w-0 flex-col gap-6">
             {sidePanels}
             {conversation}
           </div>

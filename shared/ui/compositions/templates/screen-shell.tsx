@@ -2217,8 +2217,47 @@ const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
 
    One owner. The dock ends the column; this region fills it. Measured after:
    the aside body's foot and the card's foot are both 881.25 at a 900px
-   window, as its head and the card's head are both 47.33. */
-const ASIDE_BODY = cn("");
+   window, as its head and the card's head are both 47.33.
+
+   `--badge-quiet-fill` REBOUND HERE, 19 SEP 2026 — CHANGELOG v1.2.135, A
+   LIVE-PROOF FOLLOW-UP TO v1.2.134. `verify/reproof15` (state B, 1991x842,
+   the assistant DOCKED — above 45rem, so `screen-shell-aside`'s own
+   `max-[45rem]:` surface never applies) measured AgentChat's quota pill
+   reading `rgb(255, 254, 249)` against a `nearestAncestorBackgroundColor`
+   of the SAME `rgb(255, 254, 249)` — a 1.000 collision, not the inherited
+   `[--badge-quiet-fill:var(--spine-chip-fill)]` SCREEN hands it and this
+   block's own OLD comment (above) says the docked column relies on. Live,
+   the docked column's nearest painted ground is `--background` itself, not
+   `--spine-fill` — this body paints nothing, and whatever is actually
+   behind it on the real route measures as the page, off-beige.
+
+   NOT FIXED BY REPOINTING `--spine-paper-chip` IN tokens.css, ON PURPOSE.
+   That was the first fix tried here and it was WRONG: `verify/badge` §8's
+   own `rail-paper` probe stands a Badge directly on `bg-[var(--spine-fill)]`
+   (paper) reading `--spine-chip-fill`, and `--spine-paper-chip`'s CURRENT
+   value (`--kw-off-beige`) is what clears that ground at 1.103. Repointing
+   it to `--surface-panel` — the fix this docked column actually needs
+   against off-beige — would have made the rail's own chip `--surface-panel`
+   AGAINST `--spine-fill`, which on paper is `--surface-panel`'s OWN value:
+   a NEW 1.000 collision on the rail, trading one defect for another the
+   same shared token cannot hold at once. `--spine-chip-fill` stays exactly
+   what it was, same principle `--spine-ink-member-fill`'s own tokens.css
+   note already states for a different rebind ("this file does not repoint
+   a shared token on the strength of a decision made about one of its
+   users").
+
+   SO THE FIX IS SCOPED HERE INSTEAD, the same shape as the narrow sheet's
+   own rebind four hundred lines down (`max-[45rem]:[--badge-quiet-fill:
+   var(--surface-panel)]`) — `--surface-panel` is ALREADY the kit's own
+   "one paper off the page" step (`--surface-lift`'s own note: 1.103 light /
+   1.111 dark, "the kit's own page/panel step") and reads 1.103 against
+   `--background` light, 1.079 dark — both clear `verify/badge`'s own 1.05
+   floor. Unconditional (not `min-[45rem]:`-gated) so it also holds under
+   the narrow sheet, where it restates rather than fights the identical
+   value the outer wrapper already sets. `verify/badge` §8 gained its own
+   `aside-paper-docked` probe the same day, proving this pair rather than
+   asserting it. */
+const ASIDE_BODY = cn("[--badge-quiet-fill:var(--surface-panel)]");
 
 /* How much air each door spends. Structure is identical; only the inset moves.
 
@@ -5514,11 +5553,21 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                      paints NOTHING on a desktop by design — `ASIDE_BODY` is
                      "paper on the ground, painting nothing", because up there
                      it stands beside the card on the same ground, and `SCREEN`
-                     already hands it `--badge-quiet-fill:var(--spine-chip-
-                     fill)` for exactly that reason. A transparent box over the
-                     card is not a sheet, it is the conversation and the
-                     card's own rows printed on top of each other; measured at
-                     380 before this line existed and it is exactly that.
+                     hands it `--badge-quiet-fill:var(--spine-chip-fill)` for
+                     exactly that reason. A transparent box over the card is
+                     not a sheet, it is the conversation and the card's own
+                     rows printed on top of each other; measured at 380 before
+                     this line existed and it is exactly that.
+                     THAT INHERITED VALUE IS NO LONGER THE LAST WORD, AS OF
+                     v1.2.135 — SEE `ASIDE_BODY`'S OWN COMMENT. Live, the
+                     column's nearest painted ground measured as the PAGE
+                     (`--background`), not `--spine-fill`, and on the paper
+                     spine `--spine-chip-fill` collided with exactly that —
+                     `ASIDE_BODY` now carries its own
+                     `[--badge-quiet-fill:var(--surface-panel)]`, unconditional,
+                     which wins over this SCREEN-level inheritance the same
+                     way the narrow sheet's own rebind two hundred lines down
+                     already did.
                      `bg-popover` / `text-popover-foreground` / `shadow-xl`
                      are the three `Sheet` itself spends (the kit's drawer
                      surface: `--popover` under `--shadow-overlay`), taken

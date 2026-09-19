@@ -284,16 +284,46 @@ describe("R89 — footer-on-the-edge", () => {
     const branchEnd = body.indexOf(")}", belowLgBranchAt)
     const belowLgBranch = body.slice(belowLgBranchAt, branchEnd)
 
-    expect(belowLgBranch.includes("flex-col"), "the below-lg branch's own scroll-region child must be a flex column (stacked)").toBe(true)
-    expect(belowLgBranch.includes("h-full"), "the below-lg stack must itself be bounded (h-full min-h-0) so the conversation's own flex-1 has a real budget").toBe(true)
-    const sideAt = belowLgBranch.indexOf("sidePanels")
-    const threadAt = belowLgBranch.indexOf("conversation")
+    expect(belowLgBranch.includes("flex-col"), "the below-lg branch's own scroll-region child must be a flex column (stacked, for the gap-6 token only)").toBe(true)
+    // The JSX CHILD EXPRESSIONS, braces and all — never the bare words,
+    // which round 25's own explanatory comment (prose, ahead of the real
+    // markup) also happens to use, and a bare substring search cannot tell
+    // apart from the actual `{sidePanels}`/`{conversation}` children.
+    const sideAt = belowLgBranch.indexOf("{sidePanels}")
+    const threadAt = belowLgBranch.indexOf("{conversation}")
     expect(sideAt, "the below-lg branch must render the side panels").toBeGreaterThan(-1)
     expect(threadAt, "the below-lg branch must render the conversation").toBeGreaterThan(-1)
     expect(sideAt, "the side panels must come before the conversation below lg — her own complaint, inverted").toBeLessThan(threadAt)
   })
 
-  it("the conversation cell takes h-full min-h-0 at lg but flex-1 min-h-0 below lg — a grid cell is not a stack item", () => {
+  // ROUND 25, 19 Sep 2026 — `reproof15-results.json` state F (760×900, rail
+  // collapsed) caught what round 24's five other states could not: the
+  // below-lg wrapper was `h-full min-h-0`, a BOUNDED stack, with the
+  // conversation cell as a `flex-1 min-h-0` sibling of the three
+  // natural-height side-panel divs — a real flex-shrink fight. Once the
+  // panels' own combined natural height exceeded the stack's budget,
+  // `flex-1`'s zero flex-basis meant the conversation absorbed the ENTIRE
+  // deficit and measured a true 0px height (proved live,
+  // `conversationCardRect.top === conversationCardRect.bottom`). Fixed by
+  // removing the budget entirely below lg (normal flow, content-sized,
+  // scrolled by the ONE region this whole tree already sits inside) and
+  // giving the conversation cell a floor (`min-h-[60vh]`) instead of a flex
+  // share.
+  it("below lg, the stack carries no height budget to fight over — no h-full/min-h-0/flex-1 on the wrapper or its side-panel children", () => {
+    const fnAt = body.indexOf("export function TicketDetailBody")
+    const belowLgBranchAt = body.indexOf(") : (", body.indexOf("isAtLeastLg ? (", fnAt))
+    const branchEnd = body.indexOf(")}", belowLgBranchAt)
+    const belowLgBranch = body.slice(belowLgBranchAt, branchEnd)
+
+    const wrapperTagStart = belowLgBranch.indexOf("<div")
+    const wrapperTagEnd = belowLgBranch.indexOf(">", wrapperTagStart)
+    const wrapperTag = belowLgBranch.slice(wrapperTagStart, wrapperTagEnd)
+    expect(wrapperTag.includes("h-full"), "the below-lg wrapper must NOT carry h-full — that was the bounded budget the conversation cell lost the fight over").toBe(false)
+    expect(wrapperTag.includes("min-h-0"), "the below-lg wrapper must NOT carry min-h-0 either — it is normal flow now, sized to its own content").toBe(false)
+    expect(wrapperTag.includes("flex-1"), "the below-lg wrapper itself must NOT carry flex-1 — it is not a flex item competing for space, it is the scroll region's one normal-flow child").toBe(false)
+  })
+
+  it("the conversation cell takes h-full min-h-0 at lg (a bounded grid cell) but min-h-[60vh] below lg (a content floor, never a flex share)", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     const conversationConstAt = body.indexOf("const conversation = (", fnAt)
     expect(conversationConstAt, "TicketDetailBody must build one shared `conversation` const").toBeGreaterThan(-1)
@@ -303,8 +333,11 @@ describe("R89 — footer-on-the-edge", () => {
       true
     )
     expect(constBody.includes("h-full min-h-0"), "the lg branch of the anchor's className must be h-full min-h-0").toBe(true)
-    expect(constBody.includes("flex-1 min-h-0"), "the below-lg branch of the anchor's className must be flex-1 min-h-0 (a stack item sharing the column with the side panels), never h-full (which would claim 100% on top of their own natural height)").toBe(
+    expect(constBody.includes("min-h-[60vh]"), "the below-lg branch of the anchor's className must be a min-h-[60vh] FLOOR — a sensible minimum the card is sized against, never squeezed to zero").toBe(
       true
+    )
+    expect(constBody.includes("flex-1 min-h-0"), "flex-1 min-h-0 must NOT appear on the conversation cell any more — that was the sibling-fight shape round 25 replaced (it lost every fight to the side panels' own natural height and measured 0px live at 760x900)").toBe(
+      false
     )
   })
 

@@ -953,6 +953,29 @@
      `--spine-ink-fill` already records. */
   --spine-ink-member-fill:   var(--kw-unlit-secondary);
 
+  /* AUDITED AND LEFT ALONE AGAIN, 19 SEP 2026 — CHANGELOG v1.2.135, A LIVE-
+     PROOF FOLLOW-UP TO v1.2.134. `verify/reproof15` found the docked
+     assistant's quota pill (a Badge inside `AgentChat`, above 45rem so
+     `screen-shell.tsx`'s narrow-sheet rebind never applies) painting the
+     identical `rgb(255, 254, 249)` as its nearest ancestor — `--spine-paper-
+     chip` (`--kw-off-beige`) colliding with the docked column's real ground,
+     which measured as `--background` itself, not `--spine-fill`.
+     THE FIX IS NOT HERE. Repointing `--spine-paper-chip` at `--surface-panel`
+     (the step off-beige actually needs) would fix that one collision and
+     open a NEW one: `verify/badge` §8's `rail-paper` probe stands a Badge on
+     `bg-[var(--spine-fill)]` reading `--spine-chip-fill`, and on paper
+     `--spine-fill` IS `--surface-panel`'s own value — the rail's chip would
+     measure 1.000 against the rail. One shared token cannot clear both
+     grounds with one value, so this file does not choose between two call
+     sites that never asked the same question — same standard the comment
+     nine lines up already holds `--spine-chip-fill` to. The fix is scoped to
+     the one surface that actually collided: `screen-shell.tsx`'s `ASIDE_BODY`
+     now carries its own `[--badge-quiet-fill:var(--surface-panel)]`, which
+     wins over this token's inheritance without touching what the rail
+     already reads correctly. See `ASIDE_BODY`'s own comment for the measured
+     numbers (1.103 light / 1.079 dark, both over `verify/badge`'s 1.05
+     floor) and `verify/badge` §8's `aside-paper-docked` probe for the proof. */
+
   /* RULED, 2026-09-03 — THE BREADCRUMB'S RESTING TAB COLLIDES WITH ITS OWN
      GROUND ON TWO OF THE THREE SPINES, NOT JUST THE ONE THAT SURFACED IT.
      The fix the client chose while the spine was still called `quiet`
