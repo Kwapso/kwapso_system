@@ -424,15 +424,32 @@ const CLIENT_RIGHTS = {
   ok("the client role exists, with its rights rewritten from scratch", true)
 }
 
-/** Find-or-create, by name, over the paged account list. */
+/** Find-or-create, by name, over the paged account list.
+ *
+ * ASKED WITH THE SAME `type` THE ROW WAS MADE WITH — the door's own partition,
+ * not the combined read. `accountsWhere` (lib/accounts.ts) now drops an
+ * `individual` from the plain, no-`type` list the moment it carries a LIVE
+ * `account_links` row (Aurora, 19 Sep 2026: "why am i seeing contacts under
+ * accounts? thats wrong"), so a rerun's plain-list lookup for the contact
+ * stopped finding her the moment she was linked to her company — found on the
+ * FIRST run, invisible ever after, so this function minted a second row with
+ * the same name and email and the grant two steps down refused it as a
+ * duplicate login. `type=individual` is the search the Contacts screen's own
+ * dialog already uses for exactly this ("someone we ALREADY hold" — see the
+ * door's own comment), and it is a no-op for `type=entity`: the exclusion only
+ * ever matches an individual row, so MINE and THEIRS ask the same question
+ * they always did. */
 async function account(name, fields) {
-  const found = (await allPages(agency, `/api/tenancy/accounts?q=${encodeURIComponent(name)}`, "accounts", staffCookie))
-    .find((a) => a.name === name)
+  const type = fields.accountType === "individual" ? "individual" : "entity"
+  const found = (
+    await allPages(agency, `/api/tenancy/accounts?type=${type}&q=${encodeURIComponent(name)}`, "accounts", staffCookie)
+  ).find((a) => a.name === name)
   if (found) return found.id
   const made = await agencyPost("/api/tenancy/accounts", { name, ...fields }, staffCookie)
   if (!made.ok) stop(`could not create ${name}`, JSON.stringify(made.body).slice(0, 200))
-  const again = (await allPages(agency, `/api/tenancy/accounts?q=${encodeURIComponent(name)}`, "accounts", staffCookie))
-    .find((a) => a.name === name)
+  const again = (
+    await allPages(agency, `/api/tenancy/accounts?type=${type}&q=${encodeURIComponent(name)}`, "accounts", staffCookie)
+  ).find((a) => a.name === name)
   if (!again?.id) stop(`created ${name} but could not read it back`, JSON.stringify(made.body).slice(0, 200))
   return again.id
 }
@@ -489,7 +506,8 @@ ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
   // green anyway whenever the runner piped its output (the pipe's exit code is
   // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
   const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
-  if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
+  let alreadyGranted = (logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)
+  if (!alreadyGranted) {
     const made = await agencyPost(
       "/api/tenancy/portal-users",
       // THE ROLE IS NAMED, not left to be found. The door takes an explicit
@@ -503,9 +521,21 @@ ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
       { accountId: MINE, personAccountId: CONTACT, roleId: CLIENT_ROLE_ID },
       staffCookie
     )
-    if (!made.ok) stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
+    // IDEMPOTENT BY CONSTRUCTION, not just by the pre-check above. The door's
+    // own refusal (`grantPortalAccess`, lib/accounts.ts: "one live grant per
+    // person is what pins them to one fence") asks by the PLATFORM USER, not by
+    // this run's `CONTACT` id — so a live grant minted under a stale contact row
+    // from before `account()` asked `type=individual` (see its own comment) is
+    // still the same person, still already a client, and a 409 `duplicate` here
+    // means the state this step wants already holds. Anything else is a real
+    // setup failure and still stops the run.
+    if (!made.ok) {
+      if (made.body?.error !== "duplicate")
+        stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
+      alreadyGranted = true
+    }
   }
-  ok("the contact holds a client login on their company", true)
+  ok(`the contact holds a client login on their company${alreadyGranted ? " (already granted)" : ""}`, true)
 }
 
 // The client joins the team on the client role, exactly as a real one does: an
