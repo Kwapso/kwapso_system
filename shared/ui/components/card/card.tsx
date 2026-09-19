@@ -144,27 +144,86 @@ const cardVariants = cva(
          * `.kw-card` — soft paper. The default because it is the tone that is
          * VISIBLE on the page: `--background` and `--card` are both off-beige,
          * so a `--card` box on the page draws nothing at all.
+         *
+         * `--badge-quiet-fill` REBOUND, 19 SEP 2026 — CLIENT RULING, VERBATIM:
+         * "chips and pills always must have the background card or shape
+         * wherever they are." Her own example is this exact card: the ticket
+         * page's Related-stories row, a `default` Card, where the STATUS chip
+         * drew no visible fill because nothing rebound `--badge-quiet-fill`
+         * here and the ambient value inherited from whatever ancestor last
+         * set it (often `screen-shell.tsx`'s own `BODY`, itself soft paper)
+         * happened to equal THIS card's own soft-paper ground — a `Badge`
+         * painting the identical colour it sits on, 1.000, no card at all.
+         * Off-beige — `--surface-raised`, the OTHER paper tone from this
+         * card's own soft paper, the same alternation `--btn-secondary-fill`
+         * already draws for a control inside this same card (tokens.css §8's
+         * `.bg-surface-panel` rule) — breaks the inheritance chain at the
+         * exact level a nested card is mounted at, so a Badge is guaranteed
+         * its own card the moment it lands inside one,
+         * regardless of what any ancestor already rebound. See
+         * CHANGELOG v1.2.132.
          */
-        default: "bg-surface-panel",
+        default: "bg-surface-panel [--badge-quiet-fill:var(--surface-raised)]",
         /**
          * `.kw-card--raised` — off-beige over soft paper, plus `--shadow-rest`
          * (`shadow-sm` is re-pointed at it in the tokens bridge). This is the
          * "raised card" the binding law names, and it only reads as raised
          * when it sits inside a `--surface-panel` band.
+         *
+         * `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling as
+         * `default`, above. Soft paper — `--surface-panel`, the OTHER paper
+         * tone from this card's own off-beige — is the identical value
+         * `screen-shell.tsx`'s `CARD`/`BODY` and `collection-frame.tsx`
+         * already spend for a Badge standing on THIS exact tone; reused
+         * rather than re-picked so a status chip reads one rung of contrast
+         * everywhere the kit paints off-beige, card or shell alike.
          */
-        raised: "bg-card shadow-sm",
-        /** `.kw-card--brand` — mango, CHARCOAL ink. One per view. */
-        brand: "bg-surface-brand text-ink-on-accent",
+        raised: "bg-card shadow-sm [--badge-quiet-fill:var(--surface-panel)]",
+        /**
+         * `.kw-card--brand` — mango, CHARCOAL ink. One per view.
+         *
+         * `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling. Off-beige,
+         * not a paper alternation this time: mango has no "other paper tone"
+         * of its own, so this reuses the rail's own answer to the identical
+         * question — `[data-spine="mango"]`'s `--spine-chip-fill: var(--kw-
+         * off-beige)` (tokens.css §7b), "the rail (mango) → its own pill
+         * tone". One brand ground, one chip tone, wherever it is painted.
+         * `--surface-brand-chip` is the role token tokens.css now carries for
+         * this exact value (added alongside this fix, next to `--surface-
+         * brand` — the palette law forbids a component reaching past it for
+         * the raw `--kw-off-beige` directly).
+         */
+        brand: "bg-surface-brand text-ink-on-accent [--badge-quiet-fill:var(--surface-brand-chip)]",
         /** `.kw-card--inverse` — charcoal, off-beige ink. Chapter 13's own
          *  instruction: "Use charcoal for the last block on a page — a sum, a
-         *  decision, a next step." */
-        inverse: "bg-surface-inverse text-ink-on-inverse",
+         *  decision, a next step."
+         *
+         * `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling.
+         * `--surface-record-footer-well` (`--kw-unlit-secondary`, ONE value
+         * in both palettes — see tokens.css §3) is the kit's own already-
+         * measured answer for a chip-sized fill on an inverse/charcoal
+         * ground: `record-detail.tsx`'s ink footer rebinds `--card` /
+         * `--surface-raised` / `--background` to the exact same token for
+         * the exact same reason, "the well under a mark, a pill or a field".
+         * Reused rather than re-picked, so an inverse Card and the record
+         * footer's own inverse band agree on what a chip looks like there.
+         */
+        inverse: "bg-surface-inverse text-ink-on-inverse [--badge-quiet-fill:var(--surface-record-footer-well)]",
         /**
          * Chapter 13's "Well" — secondary detail nested INSIDE a card. Same
          * radius, no edge, no shadow. Added, not required; commission §2
          * rule 3 permits additions and the kit draws it. The drawn fill is a
          * 4.5% charcoal wash and `--accent` is the palette's 5% wash; the
          * gap is logged rather than a new token invented (GAPS-F CRD-4).
+         *
+         * NO `--badge-quiet-fill` REBIND HERE, DELIBERATELY. A well is a wash
+         * OVER its parent card's own paper, not a paper of its own — chapter
+         * 13 draws it nested inside a card that has already answered this
+         * question for itself (the `default`/`raised`/`brand`/`inverse`
+         * rebind above it in the tree), and a second rebind here would only
+         * ever repeat or fight that one. A Badge inside a well reads the
+         * enclosing card's own value, which is what a well being "the same
+         * radius, no edge, no shadow" as its card already promises.
          */
         well: "bg-accent",
       },

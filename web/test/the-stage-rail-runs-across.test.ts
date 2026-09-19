@@ -79,17 +79,25 @@ describe("the ticket's stage rail", () => {
     ).toMatch(/import\s*\{[^}]*\bformatStageMoment\b[^}]*\}\s*from\s*"@shared\/web\/format"/)
   })
 
-  it("stage-rail: no stage word is printed under a rung — the fill already says which stage it is", () => {
-    // AMENDED 17 Sep 2026, SAME RULING — "don't put the [stage word] here. We
-    // can see the colors." `stageLabel` (the function that used to write
-    // "New"/"Triaged"/"Scheduled"… under each rung) is gone outright, not
-    // merely unused/renamed.
+  it("stage-rail: the stage word is printed above the date on every rung, restored 19 Sep 2026", () => {
+    // AMENDED 19 Sep 2026 — this test used to assert the OPPOSITE
+    // (`stageLabel` must not exist), on the 17 Sep ruling "don't put the
+    // [stage word] here. We can see the colors." That ruling is superseded
+    // (ticket-stages.tsx's own header, "AND THEN BACK"), verbatim: "on the
+    // stages in tickets, above the date i need te sateg name!" `stageLabel`
+    // is back, reading the shared `HELP_STATUS` vocabulary rather than
+    // repeating it, plus the one retired word that map cannot carry.
     expect(
       source,
-      `${RAIL} must not define a stageLabel helper — the client ruled the printed stage word out ` +
-        `entirely ("don't put the [stage word] here. We can see the colors."), and the done/current/` +
-        `later fill is what says which stage a rung is now`
-    ).not.toMatch(/function\s+stageLabel\s*\(/)
+      `${RAIL} must define a stageLabel helper again — the client asked for the stage name back, ` +
+        `above the date, on every rung ("above the date i need te sateg name!", 19 Sep 2026)`
+    ).toMatch(/function\s+stageLabel\s*\(/)
+
+    expect(
+      source,
+      `${RAIL}'s label must actually render stageLabel(rung.status, t) — a helper that exists but is ` +
+        `never called would print nothing, which is the same bug as not having it`
+    ).toMatch(/stageLabel\(\s*rung\.status\s*,\s*t\s*\)/)
   })
 
   it("stage-rail: the rail scrolls sideways in its own box, and the record does not", () => {

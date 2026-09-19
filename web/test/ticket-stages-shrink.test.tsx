@@ -6,14 +6,23 @@
 // minutes, and don't put the [stage word] here. We can see the colors. My
 // whole goal is that this component is just smaller."
 //
-// WHAT THIS FILE PROVES, over a real render: no stage word reaches the DOM
-// (`stageLabel` is deleted, not merely unused — see ticket-stages.tsx's own
-// header), the date line collapses to the new one-line
-// `formatStageMoment` shape (month, day, year only outside the current
-// calendar year, hour alone in 24-hour with no minutes), the working-day
-// count and "Still here" text are gone with the old two-line drawing, and the
-// wrapper carries the smaller-dot rebind (`--control-height-pill: 1.25rem`,
-// the kit's own next size down from the 26px "pill" geometry).
+// THE STAGE-WORD HALF OF THAT RULING WAS SUPERSEDED 19 SEP 2026 —
+// ticket-stages.tsx's own header, "AND THEN BACK", carries her later words in
+// full ("on the stages in tickets, above the date i need te sateg name!").
+// The other three subtractions this ruling made were never touched by that
+// later ask and still hold: the dots are still the smaller mark, the date is
+// still one line, and there is still no "Stages" title (that one is its own,
+// separate 18 Sep ruling). So this file keeps proving those three and drops
+// only the "no stage word" assertion — `web/test/ticket-stages-word-
+// returns.test.tsx` is where the word's return is proved, over every rung.
+//
+// WHAT THIS FILE PROVES, over a real render: the date line collapses to the
+// one-line `formatStageMoment` shape (month, day, year only outside the
+// current calendar year, hour alone in 24-hour with no minutes), the
+// working-day count and "Still here" text are gone with the old two-line
+// drawing, and the wrapper carries the smaller-dot rebind
+// (`--control-height-pill: 1.25rem`, the kit's own next size down from the
+// 26px "pill" geometry).
 //
 // WHAT THIS FILE DOES NOT PROVE: a pixel height on real staging. The
 // project's own measuring ritual (CLAUDE.md, "measure on staging, not in the
@@ -25,11 +34,11 @@
 // the action that gate exists to stop). So the before/after HEIGHT comparison
 // the brief asked for is not in this suite; it needs a session with Keychain
 // access to run the real Playwright recipe and report the two numbers. This
-// suite proves the shape the shrink is supposed to produce instead — no stage
-// words, one date line, the smaller rebind — which is what a height
+// suite proves the shape the shrink is supposed to produce instead — one
+// date line, no title, the smaller rebind — which is what a height
 // difference would actually be caused BY.
 
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStatus, TicketStageHistory } from "@shared/types"
@@ -60,17 +69,12 @@ beforeEach(() => {
   history.value = null as unknown as TicketStageHistory
 })
 
-// EVERY WORD `stageLabel` USED TO PRINT — the retired stage included, since
-// `HelpStatusEver` still carries it in real history rows. If any of these
-// reaches the DOM the removal regressed.
-const RETIRED_STAGE_WORDS = ["Waiting on you", "New", "Triaged", "Scheduled", "In progress", "Ready", "Resolved"]
-
 function renderLadder(status: HelpStatus, h: TicketStageHistory) {
   history.value = h
   return render(<TicketStages ticketId="help-1" status={status} />)
 }
 
-describe("the ladder shrink, 17 Sep 2026 — no stage word, one date line, a smaller mark", () => {
+describe("the ladder shrink, 17 Sep 2026 — one date line, a smaller mark, no title (the stage word itself returned 19 Sep 2026, proved in ticket-stages-word-returns.test.tsx)", () => {
   it("prints no visible 'Stages' title any more, 18 Sep 2026 — the name survives as an aria-label", async () => {
     renderLadder("new", {
       recorded: false,
@@ -84,27 +88,6 @@ describe("the ladder shrink, 17 Sep 2026 — no stage word, one date line, a sma
     // DOM reads "Stages" as text.
     expect(await screen.findByRole("group", { name: "Stages" })).toBeTruthy()
     expect(screen.queryByText("Stages")).toBeNull()
-  })
-
-  it("prints no stage word anywhere on the ladder, once the history has loaded", async () => {
-    renderLadder("in_progress", {
-      recorded: true,
-      fromCreation: true,
-      events: [],
-      spans: [
-        { status: "new", from: "2026-09-01T09:00:00.000Z", to: "2026-09-02T14:00:00.000Z", workingDays: 1 },
-        { status: "triaged", from: "2026-09-02T14:00:00.000Z", to: "2026-09-16T14:00:00.000Z", workingDays: 10 },
-        { status: "in_progress", from: "2026-09-16T14:00:00.000Z", to: null, workingDays: 0 },
-      ],
-      reopens: null,
-    })
-    // Wait for the async stage history to land — the date line only appears
-    // once a span is attached to its rung.
-    await screen.findByText(/Sep 16/)
-    const region = screen.getByRole("group", { name: "Stages" })
-    for (const word of RETIRED_STAGE_WORDS) {
-      expect(within(region).queryByText(word), `"${word}" must not print on the ladder any more`).toBeNull()
-    }
   })
 
   it("draws the recorded moment as one line — month, day, no year (current year), hour only, 24h", async () => {

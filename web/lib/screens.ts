@@ -478,14 +478,25 @@ const accountsListRecipe: ScreenRecipe = {
  * `/contacts/<id>` address for a record that already has one.
  *
  * A flat list, not grouped by company: `contacts-screen.tsx`'s own
- * `module === "contacts"` dispatch renders this recipe through the plain
- * `RecordTable`. A per-company GROUPED arrangement was built once
- * (`ContactsByCompany`, host-composed from `ScreenRenderer` + a `<section>`
- * per group) but never wired to a live screen after the tab it used to live on
- * was promoted to this page — deleted 14 Sep 2026 as unreached dead code
- * (`web/test/orphan-components.test.ts`'s census, widened the same day to stop
- * counting a component's own unit test as a mount), UI-GAPS.md #24 closed as
- * abandoned rather than left as a live TODO nothing points at. */
+ * `module === "contacts"` dispatch renders this recipe through a host-composed
+ * `RecordTable`/gallery pair (R53), the same two-body shape `accounts.list`
+ * one entry up is vestigial for. A per-company GROUPED arrangement was built
+ * once (`ContactsByCompany`, host-composed from `ScreenRenderer` + a
+ * `<section>` per group) but never wired to a live screen after the tab it
+ * used to live on was promoted to this page — deleted 14 Sep 2026 as unreached
+ * dead code (`web/test/orphan-components.test.ts`'s census, widened the same
+ * day to stop counting a component's own unit test as a mount), UI-GAPS.md
+ * #24 closed as abandoned rather than left as a live TODO nothing points at.
+ *
+ * NO LONGER THE ONE SCREEN WITH NO CREATE ACT AT ALL — client, verbatim: "on
+ * contacts, add the view gallery and the button to add." `contacts-screen.tsx`
+ * now offers its own "New contact" door (an account picker, since this screen
+ * has no company already on screen to imply one), through
+ * `CollectionCreateActionProvider`, exactly the register every other
+ * create-capable collection in the app reads its empty state from — so the
+ * custom `emptyDescription` that used to point at Accounts is retired with it;
+ * the frame's own default register ("Whatever you add shows up here") is
+ * true here now, same as `accounts.list`. */
 const contactsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
@@ -501,13 +512,6 @@ const contactsListRecipe: ScreenRecipe = {
   collection: listCollection("No contacts yet.", "Search contacts…", [], {
     paged: true,
     icon: "contacts",
-    // THE ONE SCREEN IN THE APP WITH NO CREATE ACT AT ALL, and until now the
-    // only thing it said about that was silence: a contact is added by linking
-    // a person to the company they work at, from that company's own record
-    // (see contacts-screen.tsx's header for the ruling). The route was written
-    // down in a source comment and on no screen, so the empty body drew a
-    // title, a sentence about the portal, and nothing to press.
-    emptyDescription: "A contact is a person at one of your accounts. Open the company under Accounts and add them from its own screen.",
   }),
 }
 

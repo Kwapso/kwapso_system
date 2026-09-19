@@ -109,6 +109,27 @@
 // `:has()` never matches). The below-lg pinned `<CardFooter>` needed no
 // separate check: `data-slot="ticket-detail-body"` marks BOTH of
 // `TicketDetailBody`'s own trees, so the same rule already reaches it.
+//
+// ROUND 23 RE-FIX, 19 SEP 2026 — THE COMPOSER IS PINNED AT THE BOTTOM OF
+// THE SCREEN AT EVERY WIDTH AND HEIGHT; EVERYTHING ELSE SCROLLS ABOVE IT.
+// Aurora, over a screenshot at 1991×842 with the assistant panel OPEN —
+// every earlier amendment's own proof widths tested the assistant closed,
+// or open at a ~900px-tall viewport, never open AND short: "THE PROBLEM IS
+// WHERE THE FOOTER IS!!! SHOULD BE AT THE VERY BOTTOM!" Rather than chase
+// the flex chain onto a fifth combination, this round makes the composer's
+// own position invariant to it: `TicketDetailBody`'s two per-width trees
+// (`useIsAtLeastLg()`, unchanged) now differ ONLY in the DOM order of the
+// ONE scrolling region above the composer — the composer itself is pulled
+// fully OUTSIDE that region, a single `<CardFooter>` common to both trees,
+// the root's own last child, `flex-none` so it never shares the scroll
+// region's budget, and `sticky bottom-0` as a second, independent
+// mechanism: if the flex chain above it ever resolves wrong again, sticky
+// positioning (which answers to the nearest SCROLLING ancestor,
+// `[data-slot="screen-shell-body"]`, not to this file's own arithmetic)
+// still keeps it on screen. `TicketConversationPanel` — the component that
+// used to bundle the thread and the composer inside one `Card` at `lg` —
+// is retired: the thread's own footer-less card is now built identically
+// in both trees.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -225,134 +246,136 @@ describe("R89 — footer-on-the-edge", () => {
     expect(useAt, "TicketDetailBody must call useIsAtLeastLg() to pick its own branch").toBeGreaterThan(-1)
   })
 
-  it("at lg, TicketDetailBody's own root fills the remaining screen height with a 2fr/1fr grid, unchanged", () => {
+  it("TicketDetailBody's own root is a flex column whose exactly two children are the scrolling region and the pinned composer", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     expect(fnAt).toBeGreaterThan(-1)
     const at = body.indexOf('data-slot="ticket-detail-body"', fnAt)
     expect(at, 'TicketDetailBody must mark its own root data-slot="ticket-detail-body" — R89 reads this file by it').toBeGreaterThan(
       -1
     )
-    // The LG branch's own root — the FIRST such marker after the function
-    // start, since the JS branch means there are now two, one per tree.
     const rootTag = body.slice(at, body.indexOf(">", at))
-    expect(rootTag.includes("grid"), "the lg tree's own root must be a grid").toBe(true)
-    expect(rootTag.includes("grid-cols-[2fr_1fr]"), "the lg tree's own root must split 2fr/1fr — no lg: prefix needed, JS already gated this branch to lg").toBe(
-      true
-    )
-    expect(rootTag.includes("flex-1"), "the lg tree's own root must grow (flex-1) against app-shell's own flex column").toBe(true)
-    expect(rootTag.includes("min-h-0"), "the lg tree's own root must allow itself to shrink below its own content height (min-h-0)").toBe(
+    expect(rootTag.includes("flex-col"), "the root must be a flex column").toBe(true)
+    expect(rootTag.includes("flex-1"), "the root must grow (flex-1) against app-shell's own flex column").toBe(true)
+    expect(rootTag.includes("min-h-0"), "the root must allow itself to shrink below its own content height (min-h-0)").toBe(
       true
     )
 
-    const convAt = body.indexOf("TICKET_PANEL_ANCHOR.conversation", at)
-    expect(convAt, "the conversation anchor div must still exist in the lg tree").toBeGreaterThan(-1)
-    const convTag = body.slice(body.lastIndexOf("<div", convAt), body.indexOf(">", convAt) + 1)
-    expect(convTag.includes("h-full"), "the lg conversation cell must carry h-full").toBe(true)
-    expect(convTag.includes("min-h-0"), "the lg conversation cell must carry min-h-0").toBe(true)
-
-    // The side column — ONE cell, not three separate grid rows (see this
-    // file's own header for why three auto tracks cannot stretch the way one
-    // can) — must scroll independently once its three panels are taller than
-    // the row.
-    const sideAt = body.indexOf("overflow-y-auto", at)
-    expect(sideAt, "the lg side-panel column must be independently scrollable (overflow-y-auto)").toBeGreaterThan(-1)
-    const sideTag = body.slice(body.lastIndexOf("<div", sideAt), body.indexOf(">", sideAt) + 1)
-    expect(sideTag.includes("h-full"), "the lg side-panel column must match the conversation cell's own height (h-full)").toBe(
-      true
-    )
-    expect(sideTag.includes("flex-col"), "the lg side-panel column must stack its three panels in a flex column").toBe(true)
-  })
-
-  it("below lg, the side panels and the thread share ONE scrolling region, and the composer is the root's own pinned last child", () => {
-    // R89 BELOW-LG RE-FIX, 19 Sep 2026. Proven live this session
-    // (`${SCRATCH}/footer-below-lg-inject.json`) that TWO separate
-    // `flex-1 min-h-0` regions crush to zero on a tight budget (a real
-    // ticket's head alone ate ~74% of the space available at 760×900) — so
-    // this is ONE region, never two competing ones.
-    const fnAt = body.indexOf("export function TicketDetailBody")
-    const lgReturnAt = body.indexOf("if (isAtLeastLg)", fnAt)
-    expect(lgReturnAt, "TicketDetailBody must branch on isAtLeastLg").toBeGreaterThan(-1)
-    const belowLgAt = body.indexOf("return (", body.indexOf("}", lgReturnAt))
-    expect(belowLgAt, "must render a second, below-lg return").toBeGreaterThan(lgReturnAt)
-    const belowLgTree = body.slice(belowLgAt, body.indexOf("\n}\n", belowLgAt))
-
-    const rootAt = belowLgTree.indexOf('data-slot="ticket-detail-body"')
-    expect(rootAt, "the below-lg tree must also carry data-slot=\"ticket-detail-body\"").toBeGreaterThan(-1)
-    const rootTag = belowLgTree.slice(rootAt, belowLgTree.indexOf(">", rootAt))
-    expect(rootTag.includes("flex-col"), "the below-lg root must be a flex column").toBe(true)
-    expect(rootTag.includes("flex-1") && rootTag.includes("min-h-0"), "the below-lg root must fill the remaining screen height too, unconditionally now").toBe(
-      true
-    )
-
-    // ONE scrolling wrapper, holding stories, then time, then stakeholders,
-    // then the conversation anchor LAST — her own "above the content"
-    // complaint, answered by DOM order.
-    const scrollAt = belowLgTree.indexOf("overflow-y-auto")
-    expect(scrollAt, "the below-lg tree must have exactly one scrolling wrapper").toBeGreaterThan(-1)
-    const storiesAt = belowLgTree.indexOf("TICKET_PANEL_ANCHOR.stories")
-    const timeAt = belowLgTree.indexOf("TICKET_PANEL_ANCHOR.time")
-    const stakeholdersAt = belowLgTree.indexOf("TICKET_PANEL_ANCHOR.stakeholders")
-    const convAt = belowLgTree.indexOf("TICKET_PANEL_ANCHOR.conversation")
-    expect(scrollAt, "the scrolling wrapper must open before the side panels").toBeLessThan(storiesAt)
-    expect(storiesAt).toBeLessThan(timeAt)
-    expect(timeAt).toBeLessThan(stakeholdersAt)
+    // ROUND 23 — the composer no longer lives inside either per-width tree:
+    // it is the ROOT's own last child, common to both. Found positionally,
+    // once, after the root's own opening tag, by the `<CardFooter` JSX tag
+    // that opens a real `className={cn(` prop expression — not a bare
+    // `<CardFooter`, because this file's own doc comments (above, prose)
+    // also contain the literal substring "`<CardFooter>`" and sit between
+    // the root's opening tag and the real element.
+    const footerAt = body.indexOf("<CardFooter\n", at)
+    expect(footerAt, "the root's own composer CardFooter must exist").toBeGreaterThan(-1)
+    const footerTag = body.slice(footerAt, body.indexOf(">", body.indexOf("className={cn(", footerAt)))
+    expect(footerTag.includes("sticky"), "the composer must carry sticky — the belt-and-braces half of round 23's fix").toBe(true)
+    // NOT a plain "bottom-0" — measured live this session, sticky's offset
+    // anchors to the nearest scrolling ancestor's PADDING edge, so
+    // `bottom-0` clamps the footer 24px short of the pane's true bottom at
+    // `lg` (the exact padding app-shell.tsx's own `has-[...]` growth hack
+    // exists to let the flow position grow past). The negative offset
+    // cancels that padding so the two agree.
     expect(
-      stakeholdersAt,
-      "the conversation anchor must come AFTER all three side panels below lg — her own complaint, inverted"
-    ).toBeLessThan(convAt)
-
-    // The composer — the kit's own <CardFooter>, never a hand-rolled
-    // look-alike — must be the LAST real element in the below-lg tree,
-    // shrink-0 (flex-none) so it never shares the scrolling wrapper's
-    // flex-1 budget.
-    const footerAt = belowLgTree.lastIndexOf("<CardFooter")
-    expect(footerAt, "the below-lg tree must render the composer through the kit's own CardFooter").toBeGreaterThan(convAt)
-    const footerTag = belowLgTree.slice(footerAt, belowLgTree.indexOf(">", footerAt))
-    expect(footerTag.includes("shrink-0"), "the pinned CardFooter must be shrink-0 (flex-none) — never a share of the scrolling budget").toBe(
+      footerTag.includes("bottom-[calc(-1*var(--space-5))]") && footerTag.includes("lg:bottom-[calc(-1*var(--space-6))]"),
+      "the composer's sticky offset must be the NEGATIVE padding-compensated bottom, not bottom-0 — see this file's own header for the live-measured 24px gap bottom-0 leaves at lg"
+    ).toBe(true)
+    expect(footerTag.includes("bottom-0"), "bottom-0 must NOT reappear — it silently reintroduces the 24px gap this round fixed").toBe(false)
+    expect(footerTag.includes("flex-none"), "the composer must be flex-none — never a share of the scroll region's budget").toBe(
       true
     )
+    expect(footerTag.includes("w-full"), "the composer must be w-full — full width of the content column").toBe(true)
     expect(
       footerTag.includes("bg-surface-panel"),
-      "the pinned CardFooter must carry its own bg-surface-panel fill — outside any Card, it has no ground to inherit"
+      "the composer must carry its own bg-surface-panel fill — outside any Card, it has no ground to inherit"
     ).toBe(true)
-    // Nothing may render after this CardFooter inside the below-lg root —
-    // D21's own "last child" test, restated positionally for this branch.
-    const afterFooter = belowLgTree
-      .slice(belowLgTree.indexOf("</CardFooter>", footerAt) + "</CardFooter>".length)
+
+    // Nothing may render after this CardFooter inside the root — D21's own
+    // "last child" rule, restated positionally for the root itself.
+    const fnEnd = body.indexOf("\n}\n", fnAt)
+    const afterFooter = body
+      .slice(body.indexOf("</CardFooter>", footerAt) + "</CardFooter>".length, fnEnd)
       .replace(/<\/div>\s*\)\s*$/, "")
       .trim()
-    expect(afterFooter, "nothing may render after the pinned CardFooter in the below-lg tree").toBe("")
+    expect(afterFooter, "nothing may render after the pinned CardFooter in TicketDetailBody's own root").toBe("")
   })
 
-  it("TicketConversationPanel's own Card fills its (lg-only) cell and CardFooter is its last child (D21)", () => {
-    const at = body.indexOf("function TicketConversationPanel")
-    expect(at).toBeGreaterThan(-1)
-    const closeCard = body.indexOf("</Card>", at)
-    expect(closeCard, "TicketConversationPanel must render a closing </Card>").toBeGreaterThan(-1)
-    const fn = body.slice(at, closeCard)
-    // R89 BELOW-LG RE-FIX, 19 Sep 2026: this component is LG-ONLY now (the
-    // below-lg tree builds its own footer-less thread card instead, and
-    // pins the SAME composer element outside it) — so its own Card needs
-    // no `lg:` prefix and no below-lg floor (`min-h-[420px]`) any more; a
-    // floor for a case this component no longer renders is dead weight.
-    expect(fn.includes("h-full"), "TicketConversationPanel's own Card must carry h-full").toBe(true)
-    expect(fn.includes("min-h-[420px]"), "TicketConversationPanel's own Card must NOT keep a below-lg floor it no longer needs").toBe(
-      false
-    )
-    const contentAt = fn.indexOf("<CardContent")
-    const footerAt = fn.indexOf("<CardFooter")
-    expect(contentAt, "must render <CardContent").toBeGreaterThan(-1)
-    expect(footerAt, "must render <CardFooter").toBeGreaterThan(-1)
-    expect(contentAt, "CardContent (the thread) must come before CardFooter (the composer)").toBeLessThan(footerAt)
-    // CardFooter must be the LAST thing before </Card> — nothing rendered
-    // after it inside the card (D21's own red proof, restated positionally
-    // for this one call site).
+  it("TicketConversationPanel is retired — the composer no longer nests inside any per-width Card", () => {
+    // ROUND 23, 19 Sep 2026. The component that used to bundle the thread's
+    // CardContent and the composer's CardFooter inside one Card at `lg` has
+    // zero remaining reason to exist once the composer is pulled fully
+    // outside the scrolling region at every width.
     expect(
-      fn.slice(footerAt + "<CardFooter".length, fn.lastIndexOf("</CardFooter>") + "</CardFooter>".length).length,
-      "there is exactly one CardFooter to close"
-    ).toBeGreaterThan(0)
-    const afterFooter = fn.slice(fn.lastIndexOf("</CardFooter>") + "</CardFooter>".length).trim()
-    expect(afterFooter, "nothing may render between CardFooter and the Card's own closing tag").toBe("")
+      body.includes("function TicketConversationPanel"),
+      "TicketConversationPanel must be retired, not merely unused — the thread's own footer-less card is built inline in both trees now"
+    ).toBe(false)
+  })
+
+  it("at lg, the scroll region is a 2fr/1fr grid pairing the thread (first/left) with the side panels (second/right)", () => {
+    const fnAt = body.indexOf("export function TicketDetailBody")
+    const isAtLeastLgAt = body.indexOf("isAtLeastLg ?", fnAt)
+    expect(isAtLeastLgAt, "TicketDetailBody must branch its scroll region on isAtLeastLg").toBeGreaterThan(-1)
+    const lgBranchEnd = body.indexOf(") : (", isAtLeastLgAt)
+    expect(lgBranchEnd, "must render a ternary with a below-lg branch after it").toBeGreaterThan(isAtLeastLgAt)
+    const lgBranch = body.slice(isAtLeastLgAt, lgBranchEnd)
+
+    expect(lgBranch.includes("grid"), "the lg branch's own scroll-region child must be a grid").toBe(true)
+    expect(lgBranch.includes("grid-cols-[2fr_1fr]"), "the lg branch must split 2fr/1fr — no lg: prefix needed, JS already gated this branch to lg").toBe(
+      true
+    )
+
+    const threadAt = lgBranch.indexOf("threadCard")
+    const sideAt = lgBranch.indexOf("sidePanels")
+    expect(threadAt, "the lg branch must render the thread card").toBeGreaterThan(-1)
+    expect(sideAt, "the lg branch must render the side panels").toBeGreaterThan(-1)
+    expect(threadAt, "the thread must come first/left in the 2fr/1fr grid").toBeLessThan(sideAt)
+  })
+
+  it("below lg, the scroll region stacks the side panels THEN the thread — her own 'above the content' complaint, answered by DOM order", () => {
+    // R89 BELOW-LG RE-FIX, 19 SEP 2026. Proven live that session
+    // (`${SCRATCH}/footer-below-lg-inject.json`) that TWO separate
+    // `flex-1 min-h-0` regions crush to zero on a tight budget — round 23
+    // keeps this branch's own DOM order unchanged; only the composer's
+    // position (proved in the root-level test above) moved.
+    const fnAt = body.indexOf("export function TicketDetailBody")
+    const belowLgBranchAt = body.indexOf(") : (", body.indexOf("isAtLeastLg ?", fnAt))
+    expect(belowLgBranchAt, "must render a below-lg branch").toBeGreaterThan(-1)
+    const branchEnd = body.indexOf(")}", belowLgBranchAt)
+    const belowLgBranch = body.slice(belowLgBranchAt, branchEnd)
+
+    expect(belowLgBranch.includes("flex-col"), "the below-lg branch's own scroll-region child must be a flex column (stacked)").toBe(true)
+    const sideAt = belowLgBranch.indexOf("sidePanels")
+    const threadAt = belowLgBranch.indexOf("threadCard")
+    expect(sideAt, "the below-lg branch must render the side panels").toBeGreaterThan(-1)
+    expect(threadAt, "the below-lg branch must render the thread card").toBeGreaterThan(-1)
+    expect(sideAt, "the side panels must come before the thread below lg — her own complaint, inverted").toBeLessThan(threadAt)
+  })
+
+  it("the ONE scrolling region wrapping both per-width branches is flex-1 min-h-0 overflow-y-auto, and is the root's ONLY other child besides the composer", () => {
+    const fnAt = body.indexOf("export function TicketDetailBody")
+    const returnAt = body.indexOf("return (", fnAt)
+    const rootAt = body.indexOf('data-slot="ticket-detail-body"', returnAt)
+    const scrollAt = body.indexOf("overflow-y-auto", rootAt)
+    expect(scrollAt, "TicketDetailBody's own root must wrap a single overflow-y-auto scroll region").toBeGreaterThan(-1)
+    const scrollTagStart = body.lastIndexOf("<div", scrollAt)
+    const scrollTag = body.slice(scrollTagStart, body.indexOf(">", scrollAt))
+    expect(scrollTag.includes("flex-1"), "the scroll region must be flex-1").toBe(true)
+    expect(scrollTag.includes("min-h-0"), "the scroll region must be min-h-0").toBe(true)
+    expect(scrollTag.includes("overflow-y-auto"), "the scroll region must be overflow-y-auto").toBe(true)
+
+    // Exactly one scroll region and one CardFooter between the root's own
+    // opening tag and TicketDetailBody's closing brace — proves the root
+    // has no third child sneaking in.
+    const fnEnd = body.indexOf("\n}\n", fnAt)
+    const rootBody = body.slice(body.indexOf(">", rootAt), fnEnd)
+    const scrollCount = (rootBody.match(/overflow-y-auto/g) || []).length
+    // `<CardFooter\n` — not a bare `<CardFooter` — for the same reason as
+    // the test above: this file's own doc comments mention
+    // "`<CardFooter>`" as prose inside the function body too.
+    const footerCount = (rootBody.match(/<CardFooter\n/g) || []).length
+    expect(scrollCount, "exactly one overflow-y-auto scroll region in the root").toBe(1)
+    expect(footerCount, "exactly one CardFooter (the composer) in the root").toBe(1)
   })
 
   it("the reply composer pill is full width and matches the kit's own Input background, by construction", () => {

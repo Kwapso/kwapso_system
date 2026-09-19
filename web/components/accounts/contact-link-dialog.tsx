@@ -37,6 +37,13 @@ import {
 import { Field } from "@shared/web/field"
 import { Label } from "@shared/ui/components/label/label"
 import { Input } from "@shared/ui/components/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { Plus } from "@shared/ui/foundations/icons"
@@ -46,7 +53,8 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
+import { sortedOptions } from "@shared/web/sorted-options"
 
 const personField = { ...defaultFieldConfig, label: "Person", required: true }
 const relationshipField = { ...defaultFieldConfig, label: "Relationship", required: false }
@@ -80,7 +88,7 @@ export function ContactLinkDialog({
   onSubmit: (values: ContactLinkValues) => Promise<void>
   draftKey?: string
 }) {
-  const t = useT()
+  const { t } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, EMPTY, open)
   const [busy, setBusy] = React.useState(false)
 
@@ -175,6 +183,13 @@ export type ContactCreateValues = {
   phone: string
   relationship: string
   isMainStakeholder: boolean
+  /** WHICH COMPANY THIS PERSON WORKS AT — only ever asked when the caller has
+   * not already implied one. An account's own Contacts tab (account-detail.tsx)
+   * names the company in its own screen and never reads this field; the
+   * Contacts screen's own "New contact" door (contacts-screen.tsx) has no
+   * account on screen to imply, so IT hands `accounts` below and this fills
+   * in. `""` on every other caller. */
+  accountId: string
 }
 
 const CREATE_EMPTY: ContactCreateValues = {
@@ -183,11 +198,19 @@ const CREATE_EMPTY: ContactCreateValues = {
   phone: "",
   relationship: "",
   isMainStakeholder: false,
+  accountId: "",
 }
 
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }
 const emailField = { ...defaultFieldConfig, label: "Email", required: false }
 const phoneField = { ...defaultFieldConfig, label: "Phone", required: false }
+const accountField = { ...defaultFieldConfig, label: "Account", required: true }
+
+/** ONE COMPANY, AS THE PICKER'S OWN OPTION SOURCE — the Contacts screen's own
+ * companies read (`companiesKey`, `type: "entity"`), handed straight through
+ * rather than reshaped, so `sortedOptions`/`face=` below read off the same
+ * three fields every other account-facing picker in the app already does. */
+export type ContactAccountOption = { id: string; name: string; logoUrl?: string | null }
 
 /**
  * Create a person and make them a contact of this company, in one form.
@@ -207,24 +230,35 @@ export function ContactCreateDialog({
   open,
   onOpenChange,
   accountName,
+  accounts,
   onSubmit,
   draftKey,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** the company they'll be a contact of — named in the copy so it's unmistakable. */
-  accountName: string
+  /** IMPLIED CALLER (an account's own Contacts tab): the company they'll be a
+   * contact of, named in the copy so it's unmistakable. Exactly one of
+   * `accountName`/`accounts` is given by any real caller — see `accounts`. */
+  accountName?: string
+  /** UNIMPLIED CALLER (the Contacts screen's own "New contact" door): the
+   * companies to choose from, since there is no account already on screen.
+   * Present ⇒ this dialog draws its own Account picker (R90: faces on every
+   * option, R75: A→Z) and requires a pick before submit. */
+  accounts?: ContactAccountOption[]
   onSubmit: (values: ContactCreateValues) => Promise<void>
   draftKey?: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, CREATE_EMPTY, open)
   const [busy, setBusy] = React.useState(false)
   const set = (patch: Partial<ContactCreateValues>) => setValues((v) => ({ ...v, ...patch }))
+  const accountRequired = !!accounts
+  const chosenAccount = accounts?.find((a) => a.id === values.accountId)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!values.name.trim()) return
+    if (accountRequired && !values.accountId) return
     setBusy(true)
     try {
       await onSubmit(values)
@@ -248,23 +282,60 @@ export function ContactCreateDialog({
       title={<DialogTitle>{t("New contact")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          {/* ONE entry with a hole in it, not a fragment plus a name. The sentence
-              used to end on "of" and have the company appended after it, which
-              some languages cannot do — Hindi, Japanese,
-              Korean, Chinese and five others put the possessed noun before the
-              possessor, so there is nothing for a translator to end on. A
-              placeholder can be moved; a dangling preposition cannot. */}
-          {t("Add someone new to your accounts and make them a contact of {name}.", {
-            name: accountName,
-          })}
+          {accountRequired ? (
+            // THE CONTACTS SCREEN'S OWN DOOR — no company is already on
+            // screen to name, so the sentence asks for one instead of
+            // naming one, and the Account field right below is the answer.
+            t("Add someone new to your accounts and choose the company they work for.")
+          ) : (
+            /* ONE entry with a hole in it, not a fragment plus a name. The sentence
+                used to end on "of" and have the company appended after it, which
+                some languages cannot do — Hindi, Japanese,
+                Korean, Chinese and five others put the possessed noun before the
+                possessor, so there is nothing for a translator to end on. A
+                placeholder can be moved; a dangling preposition cannot. */
+            t("Add someone new to your accounts and make them a contact of {name}.", {
+              name: accountName ?? "",
+            })
+          )}
         </DialogDescription>
       }
       submit={{
         busy: busy,
-        disabled: !values.name.trim(),
+        disabled: !values.name.trim() || (accountRequired && !values.accountId),
         icon: <Plus className="size-4" />,
       }}
     >
+      {/* THE ACCOUNT PICKER — only when the caller has not already implied
+          one (see `accounts` above). R90 (faces-in-choices): every option
+          carries the company's own face, the same `RecordMark`/`Avatar` shape
+          every other account picker in the app draws, and the TRIGGER's own
+          chosen value wears it too. R75 (alphabetical-options):
+          `sortedOptions` is the one `.map()` this census reads. */}
+      {accounts && (
+        <Field config={accountField} htmlFor="new-contact-account" className={fieldSpacing}>
+          <Select
+            value={values.accountId}
+            onValueChange={(v) => set({ accountId: v })}
+            disabled={busy}
+          >
+            <SelectTrigger
+              id="new-contact-account"
+              face={chosenAccount ? { src: chosenAccount.logoUrl ?? undefined, name: chosenAccount.name } : undefined}
+            >
+              <SelectValue placeholder={t("Choose an account")} />
+            </SelectTrigger>
+            <SelectContent>
+              {sortedOptions(accounts, lang, (a) => a.name).map((a) => (
+                <SelectItem key={a.id} value={a.id} face={{ src: a.logoUrl ?? undefined, name: a.name }}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
+
       <Field config={nameField} htmlFor="new-contact-name" className={fieldSpacing}>
         <Input
           id="new-contact-name"

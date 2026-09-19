@@ -1124,7 +1124,9 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                    --ink-secondary                the second tier
                    --border / --hair              the hair itself
                    --hairline / -under / -strong  the shapes that carry it
-                   --card / --surface-raised / --background / --pill-fill
+                   --card / --surface-raised / --background /
+                   --badge-quiet-fill (renamed from --pill-fill, 19 Sep
+                   2026 — CHANGELOG v1.2.132)
                                                   the well under a mark, a
                                                   pill or a field
                    --focus                        ruling 24's one ring, on the
@@ -1157,7 +1159,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                   "--card": "var(--surface-record-footer-well)",
                   "--surface-raised": "var(--surface-record-footer-well)",
                   "--background": "var(--surface-record-footer-well)",
-                  "--pill-fill": "var(--surface-record-footer-well)",
+                  "--badge-quiet-fill": "var(--surface-record-footer-well)",
                   "--focus": "var(--ink-on-record-footer)",
                 } as React.CSSProperties
               }

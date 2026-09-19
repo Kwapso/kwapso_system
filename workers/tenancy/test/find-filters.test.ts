@@ -72,10 +72,21 @@ function inTheDatabase(where: string): string[] {
     .sort()
 }
 
+/** Companion clause to `accountsWhere`'s own contact-link exclusion (Aurora, 19
+ * Sep 2026, "why am i seeing ocntacts under accounts?"): an individual carrying
+ * a LIVE `account_links` row is someone's contact, not a plain "book" row, once
+ * the read is not itself asking `type: "individual"` (the Contacts screen's own
+ * question). Written independently, in raw SQL, the same way `inTheDatabase`
+ * itself is — so proving the door agrees with it stays an independent check,
+ * never a reading of the door's own WHERE back to itself. The harness's two
+ * linked people are Marta (Bergman, Bergman Marine) and Diego (Delaval). */
+const NOT_SOMEONE_ELSES_CONTACT =
+  "NOT (account_type = 'individual' AND EXISTS (SELECT 1 FROM account_links l WHERE l.person_account_id = accounts.id AND l.deactivated_at IS NULL))"
+
 describe("an accounts filter narrows the rows AND the count", () => {
   it("unfiltered, it is the whole book — archived rows included", async () => {
     const all = await findAccounts({})
-    expect(all).toEqual(inTheDatabase("1 = 1"))
+    expect(all).toEqual(inTheDatabase(NOT_SOMEONE_ELSES_CONTACT))
     expect(all, "deactivate-never-delete: a put-away account is still listable").toContain("A_GONE_CO")
   })
 
@@ -87,8 +98,12 @@ describe("an accounts filter narrows the rows AND the count", () => {
   })
 
   it("archived: either pile on its own", async () => {
-    expect(await findAccounts({ archived: "yes" })).toEqual(inTheDatabase("deactivated_at IS NOT NULL"))
-    expect(await findAccounts({ archived: "no" })).toEqual(inTheDatabase("deactivated_at IS NULL"))
+    expect(await findAccounts({ archived: "yes" })).toEqual(
+      inTheDatabase(`deactivated_at IS NOT NULL AND ${NOT_SOMEONE_ELSES_CONTACT}`)
+    )
+    expect(await findAccounts({ archived: "no" })).toEqual(
+      inTheDatabase(`deactivated_at IS NULL AND ${NOT_SOMEONE_ELSES_CONTACT}`)
+    )
   })
 
   it("they compose — a search AND two filters is still one question", async () => {
@@ -124,9 +139,16 @@ describe("an accounts filter narrows the rows AND the count", () => {
 
 describe("the Portal column answers per row, honestly, and only to a caller who may ask", () => {
   /** Both people, off whatever page `listAccounts` hands back — the fixture
-   * is small enough that neither ever falls past page one. */
+   * is small enough that neither ever falls past page one.
+   *
+   * `type: "individual"` ON PURPOSE. Marta is LINKED to Bergman (and Bergman
+   * Marine), so the unfiltered list no longer carries her since the 19 Sep
+   * 2026 fix (`accounts.ts`'s own comment on `accountsWhere`) — this column's
+   * behaviour is a different question, asked through the same `type:
+   * "individual"` shape the Contacts screen and `ContactLinkDialog` use, which
+   * still returns every individual, linked or not. */
   async function portalStates(sight: Parameters<typeof listAccounts>[3]) {
-    const page = await listAccounts(cfg, guard, staff, sight)
+    const page = await listAccounts(cfg, guard, staff, sight, { type: "individual" })
     const byId = new Map(page.rows.map((r) => [r.id, r.hasPortalLogin]))
     return { marta: byId.get(IDS.victimPerson), nadia: byId.get(IDS.clientPerson) }
   }
@@ -153,14 +175,18 @@ describe("the Portal column answers per row, honestly, and only to a caller who 
   })
 
   it("the EXPORT answers the same three ways — one seam, two doors", async () => {
-    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE)
+    // `type: "individual"` here too — see `portalStates`'s own comment above.
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { type: "individual" })
     const byId = new Map(rows.map((r) => [r.id, r.hasPortalLogin]))
     expect(byId.get(IDS.victimPerson)).toBe(true)
     expect(byId.get(IDS.clientPerson)).toBe(false)
-    const { rows: withheld } = await listAccountsForExport(cfg, guard, staff, {
-      mayListPeople: true,
-      maySeeLogins: false,
-    })
+    const { rows: withheld } = await listAccountsForExport(
+      cfg,
+      guard,
+      staff,
+      { mayListPeople: true, maySeeLogins: false },
+      { type: "individual" }
+    )
     expect(withheld.every((r) => r.hasPortalLogin === null)).toBe(true)
   })
 })

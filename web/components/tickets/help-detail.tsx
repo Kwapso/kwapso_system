@@ -916,28 +916,69 @@ export function HelpDetailScreen({
       />
     )
 
-  const replies = (repliesQ.data ?? []).map((r) => ({
-    id: r.id,
-    // R54: a thread in the agency app has BOTH sides on it. A colleague is named
-    // by their first name; a contact who replied about their own question keeps
-    // their name whole. `authorIsClient` is the row's own answer — the same
-    // `from_client` subselect the portal's redaction already runs.
-    author: (r.authorIsClient ? r.authorName : staffNameFromSnapshot(r.authorName)) || "Member",
-    // THE SENDER'S FACE (R35), on the RAW name rather than the R54-shortened
-    // one above — an initial is a mark, not a name (help-stakeholders.tsx's
-    // own note), so it draws from the whole name where one exists, client
-    // contact and staff alike. Client ruling, 18 Sep 2026: "missing the
-    // avatars of the senders."
-    initials: nameInitials(r.authorName),
-    time: formatRelative(r.createdAt, t, lang),
-    // The reply as the reader asked for it: what was typed, or the translation
-    // they pressed for. Never both, and never a stored rewrite of somebody's
-    // words — `of` is a lookup, not a save.
-    body: translation.of(r.body),
-    aiDrafted: r.isAgent,
-    // team migration 0105 — see `messageFilesFor`'s own header, above.
-    ...messageFilesFor(r.attachments),
-  }))
+  // RUNS — Aurora's ruling, 19 Sep 2026, verbatim: "on 'chat' in tickets put
+  // the name and time under the message" and "and when 2 messages from the
+  // same person, only after the last message." A run is a maximal span of
+  // CONSECUTIVE replies whose `authorId` is the same (the id, never the
+  // display name — two contacts can share one) computed straight off the
+  // thread array `repliesQ.data` holds (`HelpMessage.authorId`); it breaks
+  // only when the author changes and NEVER on a time gap, which is her own
+  // qualifier ("the same person"). Only the LAST reply of a run carries a
+  // byline (its own name + its own `createdAt`, which IS the run's last
+  // time because `isLastOfRun` is true on that reply and no other) and the
+  // "AI drafted" meta; earlier replies in the run carry none of it, which
+  // also makes the kit's own `hasAvatar` (ticket-thread.tsx) draw the
+  // avatar once, on that last bubble, for free.
+  //
+  // WHERE THE BYLINE RENDERS IS NOT THIS BLOCK'S TO DECIDE. Aurora's crop
+  // asks for it UNDER the bubble; the kit's `TicketThread` draws the
+  // author/authorMeta/time header ABOVE the bubble on purpose
+  // (shared/ui/components/ticket-thread/ticket-thread.tsx lines 493–523,
+  // inside the same `flex-col gap-1` wrapper and BEFORE `message.body` at
+  // 541–548), with no prop to move it. The one slot the kit draws AFTER the
+  // bubble (`receipt`, lines 601–609) is hardcoded `self-end` regardless of
+  // `side`, so it cannot carry the client-side (`theirs`) left alignment her
+  // crop also asks for. Moving the header below the bubble, and letting it
+  // follow `side`, is a `ticket-thread.tsx` change (a `bylinePlacement` prop,
+  // or reusing `receipt`'s slot with `side`-aware alignment instead of a
+  // fixed `self-end`) — not a call-site one. Likewise the tighter run gap:
+  // every message sits in ONE `gap-[var(--space-2h)]` column
+  // (ticket-thread.tsx line 448) with no per-message margin the call site
+  // can narrow. Both need a kit change; this file cannot make one (shared/ui
+  // is out of bounds here, and the checkout is in use by another lane), so
+  // neither is attempted below — logged for Aurora.
+  const repliesData = repliesQ.data ?? []
+  const replies = repliesData.map((r, index) => {
+    const next = repliesData[index + 1]
+    const isLastOfRun = !next || next.authorId !== r.authorId
+    return {
+      id: r.id,
+      // R54: a thread in the agency app has BOTH sides on it. A colleague is named
+      // by their first name; a contact who replied about their own question keeps
+      // their name whole. `authorIsClient` is the row's own answer — the same
+      // `from_client` subselect the portal's redaction already runs.
+      author: isLastOfRun
+        ? (r.authorIsClient ? r.authorName : staffNameFromSnapshot(r.authorName)) || "Member"
+        : undefined,
+      authorMeta: isLastOfRun && r.isAgent ? t("AI drafted") : undefined,
+      // THE SENDER'S FACE (R35), on the RAW name rather than the R54-shortened
+      // one above — an initial is a mark, not a name (help-stakeholders.tsx's
+      // own note), so it draws from the whole name where one exists, client
+      // contact and staff alike. Client ruling, 18 Sep 2026: "missing the
+      // avatars of the senders." Undefined off every reply but a run's own
+      // last, so the kit draws the avatar once per run.
+      initials: isLastOfRun ? nameInitials(r.authorName) : undefined,
+      time: isLastOfRun ? formatRelative(r.createdAt, t, lang) : undefined,
+      // The reply as the reader asked for it: what was typed, or the translation
+      // they pressed for. Never both, and never a stored rewrite of somebody's
+      // words — `of` is a lookup, not a save.
+      body: translation.of(r.body),
+      // team migration 0105 — see `messageFilesFor`'s own header, above.
+      // Attachments stay on THIS reply regardless of run position — a file
+      // rides with the message that carried it, never with the run's byline.
+      ...messageFilesFor(r.attachments),
+    }
+  })
 
   /* `overviewItems`/`<OverviewList>` STOOD HERE — the fact rows below the
    * Stakeholders panel's own pills (Type, App, Raised by, Raised on, Title,
@@ -1434,14 +1475,13 @@ export function HelpDetailScreen({
     />
       <TicketDetailBody
         // `thread`/`composer` TWO SEPARATE PROPS, NOT ONE PRE-BUILT
-        // `<TicketConversationPanel>` — R89 below-lg re-fix, 19 Sep 2026.
-        // `TicketDetailBody` itself now decides, per width, whether the
-        // composer sits inside `TicketConversationPanel`'s own `CardFooter`
-        // (lg+, unchanged) or as its own pinned band outside any scrolling
-        // region (below lg) — see that file's own header for the whole
-        // account (why a CSS-only `lg:`/`max-lg:` split cannot do this: the
-        // composer is one stateful control, and it cannot live in two DOM
-        // positions at once without becoming two).
+        // `<TicketConversationPanel>` (that component is retired, R89 round
+        // 23, 19 Sep 2026). `TicketDetailBody` now pins the composer as its
+        // own last child, outside any scrolling region, at EVERY width —
+        // see that file's own header for the whole account (a real
+        // `matchMedia` hook still picks the grid-vs-stack DOM order inside
+        // the scrolling region above it, but the composer's own position no
+        // longer varies with it).
         thread={
           <>
             {/* READ IT IN YOUR OWN LANGUAGE — above the conversation,
@@ -1470,6 +1510,13 @@ export function HelpDetailScreen({
                     duplicate pill she asked removed. `sourceScreen` stays — it is
                     not a pill, and it says something the chip line does not. */}
                 <TicketThread
+                  // Aurora, 19 Sep 2026, verbatim: "on 'chat' in tickets put
+                  // the name and time under the message." Kit v1.2.133 adds
+                  // this prop for exactly that; the run half (byline only on
+                  // a run's last reply, and a tighter gap for the ones
+                  // before it) is already carried by `replies` above and by
+                  // the kit's own `data-run`-keyed gap rule.
+                  bylinePlacement="below"
                   banner={
                     ticket.sourceScreen ? (
                       <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
@@ -1513,7 +1560,9 @@ export function HelpDetailScreen({
                       id: r.id,
                       side: "mine" as const,
                       author: r.author,
-                      authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
+                      // Already gated to a run's own last reply above — see
+                      // the RUNS comment on `replies`.
+                      authorMeta: r.authorMeta,
                       initials: r.initials,
                       time: r.time,
                       body:

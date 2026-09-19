@@ -1835,7 +1835,8 @@ function MemberChip({
      light-ink are unchanged. `--spine-member-fill` is a dedicated token for
      exactly that (tokens.css §4/§7b) rather than a repoint of `--spine-chip-
      fill`, because that token also re-binds `--btn-secondary-fill` /
-     `--pill-fill` for anything else a route renders inside the rail column
+     `--badge-quiet-fill` (renamed from `--pill-fill`, 19 Sep 2026 —
+     CHANGELOG v1.2.132) for anything else a route renders inside the rail column
      (`screen-shell.tsx`'s `RAIL_COLUMN`) — blackening it would have changed a
      button the client never saw. `--spine-member-ink` above moves WITH this
      fill, not with `--spine-ink`: on mango the fill is now the same charcoal

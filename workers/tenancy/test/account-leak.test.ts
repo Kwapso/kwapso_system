@@ -876,7 +876,15 @@ describe("account leak tests: a caller pinned to one account cannot reach anothe
     const list = await call(req("GET /api/tenancy/accounts"), IDS.burglarUser)
     expect(list.status).toBe(200)
     expect(list.text).toContain(IDS.burglarAccount)
-    expect(list.text).toContain(IDS.burglarPerson)
+    // Diego is Delaval's own CONTACT (`account_links`, `burglarLink`, "Owner"),
+    // not a peer account beside it any more (Aurora, 19 Sep 2026: a linked
+    // individual belongs to the Contacts question, `type=individual`, never
+    // to the plain Accounts one — `workers/tenancy/src/lib/accounts.ts`'s
+    // `accountsWhere`). The fence still hands him back on THAT question,
+    // which is the "not a wall" half this test is really about.
+    const contacts = await call(req("GET /api/tenancy/accounts", undefined, "?type=individual"), IDS.burglarUser)
+    expect(contacts.status).toBe(200)
+    expect(contacts.text).toContain(IDS.burglarPerson)
     // …including the HISTORY of their own company. A fence that answered "0 = 1"
     // to everything would pass every burglary above and be a wall.
     const mine = await call(

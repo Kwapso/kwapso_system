@@ -39,8 +39,8 @@ the concrete implementation, and its evidence.
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L32)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K52)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B21)
+- [4. Collections](#4-collections) (K1 to K54)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B23)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1542,6 +1542,10 @@ breakpoint reads the ticket screen's own width, not the assistant's.
 **Status: ruled, in build, 19 Sep 2026.**
 
 **AMENDED 19 Sep 2026 (~01:50) — the fix still did not hold; the page container now grows into the pane's bottom padding only when a ticket body is present.** The client's ruling, verbatim, over a fresh screenshot at 1784×981 with the rail collapsed, ticket T3824, two-column layout, the composer ending ~70px above the screen bottom: *"look at screenshpto! thats the footer not being on the very vottom! fix this at once"* The previous amendments applied height constraints and flex logic, but did not account for the shell's own PADDING at the page container's level — `px-4` on mobile, `px-6` at wider viewports — which meant the container's own bottom edge still sat 16 or 24 pixels above the screen body's true edge. The fix is one CSS rule: the page container (`app-shell.tsx`) now carries `has-[[data-slot=ticket-detail-body]] pb-0`, so when a ticket body is mounted the container consumes the shell's bottom padding itself, its own inner bottom edge coinciding exactly with the screen body's bottom edge — nothing more. The composer sits at the container's own `CardFooter` inset from that edge, as it always did. Proved live at 1784px and 1440px (verified: container bottom == screen body bottom on both widths); other pages remain pixel-identical because the selector is narrow.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**AMENDED 19 Sep 2026 (Round 23) — rebuilt as one flex column with the composer as its own sticky last child.** The client's ruling, over a fresh screenshot at 1991×842 with the assistant open, first: *"you useless! tell me whats wrong in this image!!!!"*, then: *"NONONO THE PROBLEM IS WHERE THE FOOTER IS!!! SHOULD BE AT THE VERY BOTTOM!"* Every prior amendment patched the container chain that FED the composer's position; none of them made the composer's own position independent of what sat above it. The ticket body is rebuilt as one flex column: a single scrolling region holding everything else (the stage ladder, the two-column body, the thread), and the composer as that column's last child — `flex-none`, `position: sticky` — pinned to the bottom of the screen, never a participant in the scroll above it, at every width and every height. Proven live with a 3,439px-tall thread inside a 218px window with the assistant panel open, the shortest, most adversarial case this rule has been tested against. The sticky offset compensates the pane's own bottom padding through a token, rather than a selector naming one screen's container as the earlier `pb-0` fix did.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
@@ -4299,6 +4303,18 @@ a Badge at all — are moved onto the same component.
 
 **Status: ruled, in build, 19 Sep 2026 (kit v1.2.128).**
 
+**AMENDED 19 Sep 2026 (Round 23) — the chip fill resolved to its ground on the Related-stories
+card too; the fix is now every surface, not one.** Read off the same screenshot as
+[L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width)'s
+Round 23 amendment above, the "Change"/"Done" chips inside the ticket's Related-stories card
+sat bare on the card ground — the identical failure the 19 Sep (Round 22) amendment closed for
+the status variant on ONE surface. Kit v1.2.132 rebinds the chip fill token on every surface a
+chip can sit on — card, panel, dark ground, rail — one step away from whatever ground it is
+drawn against, rather than patched surface by surface as each one surfaces a complaint.
+Contrast verified across 14 ground×palette combinations.
+
+**Status: ruled, in build, 19 Sep 2026 (kit v1.2.132).**
+
 ---
 
 ### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
@@ -4583,6 +4599,45 @@ standing search glyph, is the only one, matching every other search box in the a
 **Proven:** 1440px desktop (Knowledge label + insets = 104px measured; logo path = 68px; rail width = 104px). No regressions at mobile (`icon` nav only, no labels).
 
 **Status: ruled, in build, 19 Sep 2026.**
+
+**Law.** None registered — a kit-only fix.
+
+### K53: the ticket stage line shows the stage name under each mark, above the date
+
+**The rule.** Aurora's ruling, 19 Sep 2026, verbatim: *"on the stages in tickets, above the
+date i need te sateg name!"* Supersedes, for the stage word alone, the 17 Sep clause in
+[K38](#k38-the-todays-tasks-progress-strip-and-the-ticket-stage-ladder-beside-it-stand-on-the-bare-page--no-container-behind-either)'s
+second amendment — *"don't put the [stage] here"* — nothing else in that amendment changes:
+the dots stay at their smaller size, the date stays one line.
+
+**The shape.** The kit's `StatusStepper`
+(`shared/ui/components/status-stepper/status-stepper.tsx`) carries a `label` slot per step;
+`ticket-stages.tsx` passes each stage's own name back into it, drawn under the mark and above
+the date line — the reverse of what K38 collapsed to colour-only. The one stage this app used
+to leave unnamed (closed without a resolution) gets a real label for the first time rather than
+staying blank now that names render again: **"Waiting on you."**
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**Law.** None registered — a kit-only fix.
+
+### K54: a message's byline sits under the bubble, and a run from one author carries it once, after the last message
+
+**The rule.** Aurora's ruling, 19 Sep 2026, two sentences the same round: *"on 'chat' in
+tickets put the name and time under the message"* and *"and ehn 2 messages from the same
+person, only after the last ,essage."* A message bubble's author and time move to directly
+under the bubble, at the bubble's own side; when a run of consecutive messages shares one
+author, the byline draws once — after the LAST message in that run — rather than once per
+bubble, with a tighter gap between the bubbles inside the run than between two different
+authors' messages.
+
+**The shape.** kit v1.2.133 gives the thread's message component a `bylinePlacement="below"`
+mode: author · time renders under the bubble instead of beside/above it, keyed to the bubble's
+own side (left for the other party, right for this account). A run detector groups consecutive
+same-author messages and suppresses the byline on every bubble but the run's last, tightening
+the inter-bubble gap inside a run relative to the gap between two different authors.
+
+**Status: ruled, in build, 19 Sep 2026 (kit v1.2.133).**
 
 **Law.** None registered — a kit-only fix.
 
@@ -5388,6 +5443,41 @@ addable at the end" shape, and the already-add-only rule (nothing on a ticket is
 stays: a locked pill carries no "×".
 
 **Status: ruled, in build, 18 Sep 2026.**
+
+**Law.** None registered.
+
+### B22: the Accounts door excludes individuals who are a company's own contact
+
+**The rule.** Aurora's ruling, 19 Sep 2026, verbatim: *"why am i seeing ocntacts under
+accounts? thats wrong>"* An individual linked to a company as that company's contact
+(`account_links`) is not also a row on the Accounts door — that person belongs on Contacts,
+and inside the company's own record, not as a peer account in its own right. The Accounts
+count and its CSV export narrow the same way, so neither disagrees with what the screen shows.
+
+**The residual.** A standalone individual — one carrying no `account_links` row to any company
+— still appears in a `type: "individual"` read, because the link dialog (picking who to attach
+to a company) needs the full individual roster to choose from; this is the one place the
+exclusion does not apply, named rather than silently inconsistent.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**Law.** None registered.
+
+### B23: Contacts gets a Gallery/List toggle and its own add door
+
+**The rule.** Aurora's ruling, 19 Sep 2026, verbatim: *"on contacts, add the view gallery and
+the button to add."* The Contacts screen gains a Gallery/List view switch, List resting by
+default, and a real add door.
+
+**The shape.** Gallery tiles draw as `PersonCard`, each carrying the contact's own account chip
+and status dot — the same face-and-status discipline the rest of the app already carries.
+"New contact" opens through the existing contact create dialog, its Account picker showing
+faces, A→Z ([R75](../RULES.md)). The header's own add button draws only when the collection is
+not empty — [R88](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-)'s
+empty-state single door standing otherwise: the empty state's own "Add the first" is the only
+door when there is nothing yet.
+
+**Status: ruled, in build, 19 Sep 2026.**
 
 **Law.** None registered.
 
@@ -7744,15 +7834,15 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**218 rules.**
+**222 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
 | 2. Page layout and width | L1 to L32 (32) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K52 (52) |
-| 5. Buttons and actions | B1 to B21 (21) |
+| 4. Collections | K1 to K54 (54) |
+| 5. Buttons and actions | B1 to B23 (23) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |

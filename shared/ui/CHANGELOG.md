@@ -2,6 +2,137 @@
 
 ## Unreleased
 
+### Added — `TicketThread` can draw a message's author · org · time line below its bubble instead of above, and a byline-less message in a run sits closer to the next one — v1.2.133
+
+**THE REQUEST, VERBATIM.** Aurora: *"on 'chat' in tickets put the name and
+time under the message"* and *"when 2 messages from the same person, only
+after the last message."*
+
+**THE SPLIT.** The app side is done outside this repo —
+`kwapso_system/web/components/tickets/help-detail.tsx` groups the ticket's
+messages into runs by `authorId` and hands `author`/`time`/`initials` only
+to the LAST message of each run. This release is the kit's own half.
+
+**THE FIX.** `ticket-thread.tsx` gains `bylinePlacement?: "above" |
+"below"`, defaulting to `"above"` — the kit's own ch27.10 drawing, and
+leaving the prop unset renders byte-identically to today. `"below"` moves
+the same author · org · time line (unchanged typography) to follow the
+bubble and any attachments instead of leading them, aligned to the bubble's
+own side (`justify-end` for `mine`, the same rule the header already used).
+Separately, a message that renders with no byline — by construction, an
+earlier message of a run — now sits closer to the message after it: the
+column drops its flat `gap-[var(--space-2h)]` for a `data-run="continued"`
+attribute plus two margin rules, `[&>*+*]:mt-[var(--space-2h)]` for the full
+run-boundary gap and `[&>[data-run=continued]+*]:mt-[var(--space-1)]` for
+the tightened one — no per-message magic number, and scoped to `"below"`
+only so an existing `"above"` thread (internal chat, comments, the
+assistant) never grows an attribute it did not have before.
+
+**VERIFIED.** `verify/ticket-thread-below` renders the exact A, A, B
+scenario (Aiko's two-message run, then Devon's reply) with
+`bylinePlacement="below"`. `components/ticket-thread/check-ticket-
+thread.mjs` (new, wired into `npm run check`) pins it: the prop's default
+and its byte-identical fallback class string, the run-gap margin rules by
+their literal selector, and — mounted through vite SSR + `react-dom/server`,
+not grepped — that in the A, A, B render only bubbles 2 and 3 carry a
+byline, each one follows its own bubble in DOM order, bubble 1 alone
+carries `data-run="continued"`, bubble 3's byline aligns to its own
+(`mine`) trailing edge, and omitting `bylinePlacement` renders identically
+to `"above"` with no `data-run` anywhere.
+
+### Fixed — a status chip's fill contrasts with its own ground everywhere it sits, not only on the page — v1.2.132
+
+**THE RULING.** Aurora, 19 Sep 2026, verbatim: *"chips and pills always must
+have the background card or shape wherever they are. In this case, I'm
+talking inside ticket-related stories. The type of ticket and the status
+need the card to have a background."* Her own comparison was the ticket
+page's Related-stories row: the TYPE chip (`variant="secondary"`) already
+carried a visible quiet-fill card; the STATUS chip beside it
+(`variant="status"`, dot-led) did not.
+
+**WHY.** `badge.tsx`'s own `status` variant had already moved off `--pill-
+fill` onto the rebindable `--badge-quiet-fill` (v1.2.128, "Badge's status
+variant draws a visible fill, everywhere"), and that half held — but the
+token it reads is only as good as what rebinds it, and as of that release
+nothing did. `screen-shell.tsx`, `collection-frame.tsx`, `record-detail.tsx`
+and `toolbar-row.tsx` (the last only in a comment, not in working code) each
+carried a local rebind aimed at the OLD `--pill-fill` property, tuned per
+surface — every one of them a no-op the moment `Badge` stopped reading that
+property. `card.tsx` carried no rebind of its own at all, which is the exact
+defect the report describes: a `default` Card nested inside `screen-shell
+.tsx`'s `BODY` — itself already rebinding the (dead) property to soft
+paper — inherits nothing, so both chips fell through to `Badge`'s own flat
+`--surface-quiet` fallback; on `screen-shell.tsx`'s "the page itself is
+off-beige and every panel on it is soft paper" ladder that flat value
+happens to read close enough to a nested `default` Card's own soft-paper
+ground to disappear in exactly the case she reported.
+
+**THE FIX.** One surface-relative token, `--badge-quiet-fill`, whose default
+(unchanged) is `--surface-quiet` — the tone one step off the page — and
+every surface composition that paints a different ground now rebinds it one
+step away from ITSELF, mirroring the identical relation `--btn-secondary-
+fill` already draws for the same grounds:
+- `card.tsx` — `default` (soft paper) → `--surface-raised` (off-beige);
+  `raised` (off-beige) → `--surface-panel` (soft paper); `brand` (mango) →
+  the new role token `--surface-brand-chip` (`tokens.css`, off-beige,
+  palette-independent — mango needs no dark half); `inverse` (charcoal) →
+  `--surface-record-footer-well` (`--kw-unlit-secondary`, the kit's own
+  already-measured answer for a chip on an inverse ground). `well` carries
+  no rebind of its own — a wash over its parent card's own paper, not a
+  paper of its own.
+- `screen-shell.tsx` — `SCREEN` (the spine) → `--spine-chip-fill`, which is
+  already spine-aware (paper/ink/mango, tokens.css §7b), so this one line
+  also answers "the rail (mango) → its own pill tone" with no separate edit
+  in `rail.tsx`; `CARD` and `BODY` (the raised level) → `--surface-panel`.
+- `collection-frame.tsx` — `tone: "page"`, `tone: "panel"` and
+  `collectionPanelVariants`' own base class list, each renamed from their
+  old `--pill-fill` rebind, same values.
+- `record-detail.tsx` — the ink footer's own well (an inline style, not a
+  class) renamed from `"--pill-fill"` to `"--badge-quiet-fill"`, same value
+  (`--surface-record-footer-well`).
+- `toolbar-row.tsx` — `ground: "page"` and `ground: "panel"` GAINED a rebind
+  they never had: the file's own comment claimed `tokens.css` §8 rebound
+  `--pill-fill` off the same class-keyed list `--btn-secondary-fill` uses,
+  and it never did (§8 rebinds exactly `--btn-secondary-fill` and
+  `--surface-lift`) — corrected, and each `ground` step now carries its own
+  explicit `[--badge-quiet-fill:…]`.
+
+**MEASURED**, `verify/badge`'s new section 8 (`window.__badgeSurfaceVerify()`,
+loaded once at `?t=light` and once at `?t=dark` — real `getComputedStyle`
+reads, not eyeballed against a Browser pane too small to judge an 8% fill
+difference): a status and a secondary Badge, in 7 grounds each (the bare
+page, a `default` Card, a `raised` Card nested in a soft-paper panel, an
+`inverse` Card, and the rail on all three spines), both palettes, 28 readings
+total. Every one clears the WCAG-luminance floor this file sets at 1.05:
+
+| context | light | dark |
+| --- | --- | --- |
+| page | 1.339 | 1.587 |
+| card, `default` | 1.103 | 1.111 |
+| card, `raised`, in a panel | 1.103 | 1.111 |
+| card, `inverse` | 1.499 | 11.596 |
+| rail, `data-spine="paper"` | 1.103 | 1.175 |
+| rail, `data-spine="ink"` | 1.132 | 1.111 |
+| rail, `data-spine="mango"` | 1.44 | 1.44 |
+
+(status and secondary read identically in every cell — both variants now
+share the one token.)
+
+**Files:** `components/badge/badge.tsx` (header note only — the fix itself
+shipped in v1.2.128; this release closes the five-file follow-up that note
+logged as owed), `components/card/card.tsx`, `compositions/templates/
+screen-shell.tsx`, `compositions/templates/rail.tsx` (doc only),
+`components/collection-frame/collection-frame.tsx`,
+`components/record-detail/record-detail.tsx`, `components/toolbar-row/
+toolbar-row.tsx`, `foundations/tokens/tokens.css` (`--surface-brand-chip`,
+new — the palette law forbids a component reaching past it for the raw
+`--kw-off-beige`), `foundations/tokens/tokens.json` (regenerated).
+**Verify:** `verify/badge/page.tsx` section 8, `window.__badgeSurfaceVerify()`.
+**Checks:** `check-badge.mjs` §1b already pinned `status`'s own token read;
+`check-screen-shell.mjs`'s new badge-quiet-fill rebind check pins all seven
+files' rebinds (and the absence of the old `--pill-fill` ones) in one place.
+`npm run check` exit 0.
+
 ### Fixed — the rail's width takes the larger of the label and the brand mark, so the mark never shrinks — v1.2.131
 
 **THE RULING.** v1.2.130 sized `--rail-width` to "Knowledge" alone, which

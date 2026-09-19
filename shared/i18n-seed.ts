@@ -3488,7 +3488,6 @@ export const SEED: Catalogue = {
   "A calm, light background that lets the work stand out.": { de: "Ein ruhiger, heller Hintergrund, der die Arbeit hervorhebt.", es: "Un fondo claro y tranquilo que hace destacar el trabajo.", ca: "Un fons clar i tranquil que fa destacar la feina." },
   "A colleague": { de: "Ein Kollege", es: "Un compañero", ca: "Un company" },
   "A company or a person you work with. Everything else hangs off one.": { de: "Ein Unternehmen oder eine Person, mit der Sie zusammenarbeiten. Alles andere hängt daran.", es: "Una empresa o una persona con la que trabajas. Todo lo demás cuelga de ahí.", ca: "Una empresa o una persona amb qui treballes. Tota la resta penja d'aquí." },
-  "A contact is a person at one of your accounts. Open the company under Accounts and add them from its own screen.": { de: "Ein Kontakt ist eine Person bei einem Ihrer Kunden. Öffnen Sie das Unternehmen unter Kunden und fügen Sie die Person von dessen eigener Seite hinzu.", es: "Un contacto es una persona de una de tus cuentas. Abre la empresa en Cuentas y añádelo desde su propia página.", ca: "Un contacte és una persona d'un dels teus comptes. Obre l'empresa a Comptes i afegeix-lo des de la seva pròpia pàgina." },
   "A dark background of its own, whatever your light or dark setting is.": { de: "Ein eigener dunkler Hintergrund, unabhängig von Ihrer Hell-/Dunkel-Einstellung.", es: "Un fondo oscuro propio, sea cual sea tu ajuste de claro u oscuro.", ca: "Un fons fosc propi, sigui quin sigui el teu ajust de clar o fosc." },
   "A member joins by accepting an invite. Send one from Invites and they appear here once they accept.": { de: "Ein Mitglied tritt bei, indem es eine Einladung annimmt. Senden Sie eine über Einladungen, und die Person erscheint hier, sobald sie annimmt.", es: "Un miembro se une aceptando una invitación. Envía una desde Invitaciones y aparecerá aquí en cuanto la acepte.", ca: "Un membre s'uneix acceptant una invitació. Envia'n una des d'Invitacions i apareixerà aquí quan l'accepti." },
   "A role carries what an hour of it costs them, which is what turns a process map's minutes into money.": { de: "Eine Rolle gibt an, was eine Stunde davon kostet, und das wandelt die Minuten der Prozesskarte in Geld um.", es: "Un rol indica cuánto cuesta una hora de él, lo que convierte los minutos del mapa de proceso en dinero.", ca: "Un rol indica quant costa una hora d'aquest, el que converteix els minuts del mapa de procés en diners." },
@@ -4408,5 +4407,38 @@ export const SEED: Catalogue = {
     de: "Wählen Sie, wer es gemeldet hat",
     es: "Elige quién lo planteó",
     ca: "Tria qui ho va plantejar",
+  },
+
+  /* 19 Sep 2026 (Round 23) — three more strings `npm run lang` found with no
+     seed entry for de/es/ca. "Waiting on you" is ticket-stages.tsx's own
+     label for the one stage that used to render with no name at all (K53) —
+     closed-without-resolution, the stage the app is waiting on the raiser's
+     own reply for; it reuses the existing stage-name register "Waiting"/
+     "Wartend"/"En espera" already seeded above, made specific to the
+     addressee the way F11/K53's own ruling reads it. "Add someone new to
+     your accounts and choose the company they work for." is the Contacts
+     screen's own new create-dialog copy (B23) — the exact sibling of
+     "Add someone new to your accounts and make them a contact of {name}."
+     seeded above, minus the pre-chosen company: the same opening clause,
+     unchanged, with the ending swapped for choosing the account rather than
+     confirming one already picked. "Choose an account" is that same
+     dialog's Account-picker placeholder, the bare noun-phrase form next to
+     "Choose an app first"/"Choose a part of your system" above rather than
+     the imperative-with-a-fact "Choose an account first." seeded nearby,
+     which is a different field on a different form. */
+  "Waiting on you": {
+    de: "Wartet auf Ihre Antwort",
+    es: "Esperando tu respuesta",
+    ca: "Esperant la teva resposta",
+  },
+  "Add someone new to your accounts and choose the company they work for.": {
+    de: "Fügen Sie eine neue Person zu Ihren Kunden hinzu und wählen Sie das Unternehmen, für das sie arbeitet.",
+    es: "Añade a alguien nuevo a tus cuentas y elige la empresa para la que trabaja.",
+    ca: "Afegeix algú nou als teus comptes i tria l'empresa per a la qual treballa.",
+  },
+  "Choose an account": {
+    de: "Wählen Sie einen Kunden",
+    es: "Elige una cuenta",
+    ca: "Tria un compte",
   },
 }

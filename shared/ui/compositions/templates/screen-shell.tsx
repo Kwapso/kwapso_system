@@ -732,22 +732,37 @@
    26.04, verbatim: "The page itself is off-beige and every panel on it is
    soft paper: never the other way round."
 
-   The CARD re-resolves `--btn-secondary-fill` and `--pill-fill` to SOFT
-   PAPER, which is ruling 01 ("a filled paper button in the other tone, so a
-   band and its buttons are never the same tone"). The band is the card's
-   off-beige, so its Export pill has to be soft paper or it is a 1.000 against
-   the band it stands on. The panel flips them back on its own; neither call
-   site has to know which. **This rebinding used to live on the SCREEN; it
-   moved down onto the CARD on 2026-09-02 with the off-beige it belongs to,
-   and the value a call site sees inside the card is byte-for-byte the one it
-   saw before.**
+   The CARD re-resolves `--btn-secondary-fill` and `--badge-quiet-fill` to
+   SOFT PAPER, which is ruling 01 ("a filled paper button in the other tone,
+   so a band and its buttons are never the same tone"). The band is the
+   card's off-beige, so its Export pill has to be soft paper or it is a 1.000
+   against the band it stands on. The panel flips them back on its own;
+   neither call site has to know which. **This rebinding used to live on the
+   SCREEN; it moved down onto the CARD on 2026-09-02 with the off-beige it
+   belongs to, and the value a call site sees inside the card is byte-for-byte
+   the one it saw before.**
+
+   RENAMED FROM `--pill-fill` TO `--badge-quiet-fill`, 19 SEP 2026 — CLIENT
+   RULING, VERBATIM: "chips and pills always must have the background card or
+   shape wherever they are." `Badge`'s own `status` variant stopped reading
+   `--pill-fill` that same ruling (`badge.tsx`'s own header law, "A STATUS
+   CHIP IS A CHIP") and now reads the SAME rebindable property `secondary`
+   already did, `--badge-quiet-fill`. This declaration used to feed only the
+   status pill and is now the one property BOTH text-bearing Badge variants
+   read, so a status chip and a type chip standing on this same ground take
+   the identical fill — see CHANGELOG v1.2.132. The VALUE is unchanged: only
+   the property name moved.
 
    THE GROUND re-resolves them the other way, to the paper one rung off THE
    SPINE — `--spine-chip-fill` — which is exactly what the rail column used to
    do for itself. It is on the ground now because the ground is the spine, so
    the member chip at the foot of the rail, a control in the aside and
    anything else standing on the ground all read on both spines without
-   naming a colour. One declaration where there were two.
+   naming a colour. One declaration where there were two. THE MANGO SPINE'S
+   OWN CHIP FILL — `--spine-chip-fill` resolves to `--kw-off-beige` under
+   `[data-spine="mango"]` (tokens.css §7b) — rides along automatically: this
+   is "the rail (mango) → its own pill tone" the 19 Sep 2026 ruling asks for,
+   with no separate rebind needed in `rail.tsx` itself.
 
    NARROW — REWRITTEN 2026-09-04 ON A CLIENT RULING, AND ON THREE MEASURED
    NUMBERS. THE PARAGRAPH THIS REPLACES IS QUOTED IN FULL BELOW, BECAUSE IT
@@ -1906,7 +1921,12 @@ const SCREEN = cn(
   "relative isolate flex h-full w-full min-w-0 overflow-hidden",
   "bg-[var(--spine-fill)] text-[var(--spine-ink)]",
   "[--btn-secondary-fill:var(--spine-chip-fill)]",
-  "[--pill-fill:var(--spine-chip-fill)]",
+  /* RENAMED FROM `--pill-fill`, 19 SEP 2026 — see this file's own header
+     law ("THE GROUND re-resolves them the other way…") for the ruling and
+     CHANGELOG v1.2.132. Same value, `--spine-chip-fill`, which is already
+     spine-aware (paper/ink/mango, tokens.css §7b) — so this one line also
+     answers "the rail (mango) → its own pill tone". */
+  "[--badge-quiet-fill:var(--spine-chip-fill)]",
 );
 
 /* ----------------------------------------------------------------------------
@@ -1955,7 +1975,9 @@ const CARD = cn(
   "bg-[var(--surface-raised)] text-foreground",
   "shadow-[var(--shadow-lifted)]",
   "[--btn-secondary-fill:var(--surface-panel)]",
-  "[--pill-fill:var(--surface-panel)]",
+  /* RENAMED FROM `--pill-fill`, 19 SEP 2026 — see this file's own header
+     law and CHANGELOG v1.2.132. Same value. */
+  "[--badge-quiet-fill:var(--surface-panel)]",
 );
 
 /* THE SQUARE IS CONDITIONAL, AND THE BLOCK ABOVE ALREADY SAID SO.
@@ -2111,12 +2133,15 @@ const TRAIL_GAP = "mb-[var(--space-4)]";
    With the named class the shell's whole content region is a `page` ground,
    so §8 supplies `--btn-secondary-fill` AND `--surface-lift` — which is what
    makes a raised part the shell was handed (an `Alert`, a `StatusStepper`)
-   stop painting this region's own colour. `--pill-fill` is still written by
+   stop painting this region's own colour. `--badge-quiet-fill` (renamed
+   from `--pill-fill`, 19 Sep 2026 — CHANGELOG v1.2.132) is still written by
    hand: it is not one of §8's relational tokens, and adding it there is a
-   change to the status pill's own token that nobody has asked for. */
+   change to every card and panel's own badge fill that nobody has asked
+   for — see `card.tsx`'s own per-variant rebinds for where a NESTED card
+   answers this same question for itself instead of inheriting this one. */
 const BODY = cn(
   "min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-raised",
-  "[--pill-fill:var(--surface-panel)]",
+  "[--badge-quiet-fill:var(--surface-panel)]",
 );
 
 /* ----------------------------------------------------------------------------

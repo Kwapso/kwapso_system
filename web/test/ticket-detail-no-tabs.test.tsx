@@ -455,65 +455,55 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
   })
 })
 
-// SUPERSEDED, R89 "footer-on-the-edge", 18 Sep 2026 — the CLIENT RULING this
+// SUPERSEDED TWICE, R89 "footer-on-the-edge" — the CLIENT RULING this
 // describe block originally proved ("the addition of the three of the
-// right, same as conversation") was answered, that same afternoon, by a
-// LATER and different ruling read against the deployed page: "On ticket
-// detail, the footer should be at the very bottom. The position is still
-// fucking wrong. Fix it once and for all." A conversation card sized to the
-// right column's own content sum is not "at the very bottom" of the SCREEN
-// — measured live on staging (T0001) it closed 414px past the visible
-// screen body at 1440×900, because nothing tied its height to the screen's
-// own available space. `ticket-detail-body.tsx`'s own header carries the
-// full account of both rulings and why the second replaces the first's
-// CONSTRUCTION (not its right-column ANCHORS, which are unchanged below).
+// right, same as conversation") was answered, 18 Sep 2026, by a LATER and
+// different ruling read against the deployed page: "On ticket detail, the
+// footer should be at the very bottom. The position is still fucking
+// wrong. Fix it once and for all." That construction (a `grid-cols-
+// [2fr_1fr]` row, `items-stretch`, both cells `h-full min-h-0`, the side
+// column independently `overflow-y-auto`) held through the round-19
+// below-lg re-fix and was proved at every width THAT round tested.
 //
-// THE NEW SHAPE, proved structurally (jsdom has no layout engine to measure
-// a real height against): the grid is now a `flex-1 min-h-0` flex
-// item of `app-shell.tsx`'s own flex-column page container, ONE row
-// (`grid-cols-[2fr_1fr]`, no `grid-rows` override), `items-stretch`
-// stretching both cells to that row's full, real height. The conversation
-// cell keeps its `min-h-0 h-full` from the earlier construction
-// unchanged; the three right-column panels moved from three separate
-// auto-placed grid cells into ONE cell — a `flex flex-col gap-6
-// overflow-y-auto` wrapper around the same three anchors — because a
-// single grid track can stretch to fill leftover space where three separate
-// `auto` tracks would only ever split it, and "the side cards scroll
-// independently if they are taller" (this law's own text) needs a real
-// scroller, not a track.
-//
-// NO `lg:` PREFIX ON ANY OF THESE CLASSES ANY MORE — R89 BELOW-LG RE-FIX,
-// 19 Sep 2026. `TicketDetailBody` now renders this exact shape only inside
-// its OWN `isAtLeastLg` branch (`ticket-detail-body.tsx`'s own
-// `useIsAtLeastLg`, a real `matchMedia` hook, not a CSS class the browser
-// resolves) — so the classes below need no `lg:` gate of their own; this
-// file's own `window.matchMedia` override (top of file) is what makes
-// jsdom pick this branch to test it at all.
-describe("the conversation cell and the side-panel column fill the grid's own full, real height (R89)", () => {
-  it("the grid is one row, a flex-1 min-h-0 item of the page's own flex column, both cells stretched", async () => {
+// ROUND 23, 19 Sep 2026, REPLACES IT AGAIN — Aurora, over a screenshot at
+// 1991×842 with the assistant panel open (a combination none of the
+// earlier rounds' own proof widths had measured): "THE PROBLEM IS WHERE
+// THE FOOTER IS!!! SHOULD BE AT THE VERY BOTTOM!" Rather than keep
+// bounding the conversation card's own height against a `flex-1 min-h-0`
+// chain that kept re-breaking on each new width/height/assistant-state
+// combination, `TicketDetailBody` now pulls the composer fully OUTSIDE any
+// scrolling region — its own root's last child, `sticky` (with a
+// negative, padding-compensated `bottom` offset — a plain `bottom-0`
+// measured a live 24px gap, since sticky anchors to the scrollport's own
+// padding edge) as a second, independent guarantee — and the grid this
+// describe block once
+// asserted `h-full`/`items-stretch`/independent-scroll for is now a
+// NATURAL-HEIGHT grid (`items-start`, no `h-full` on either cell) nested
+// ONE level inside the ticket body's own single scrolling region, which
+// scrolls the grid AND the side column TOGETHER rather than letting the
+// side column scroll independently of it. `ticket-detail-body.tsx`'s own
+// header carries the full account.
+describe("at lg, the scroll region's own grid pairs the thread with the side panels (R89 round 23)", () => {
+  it("the conversation anchor's grandparent is TicketDetailBody's own root; its parent is the one scroll region; the grid sits one level inside that", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
-    expect(grid.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(grid.className).toContain("grid-cols-[2fr_1fr]")
-    // NO ROW TEMPLATE ANY MORE — ONE row, stretched to the grid's own real
-    // height by the flex-fill below, never split three ways again.
-    expect(grid.className).not.toMatch(/grid-rows-/)
-    expect(grid.className).toContain("items-stretch")
-    // THE GRID ITSELF IS THE FLEX-GROW ITEM NOW — app-shell.tsx's own
-    // h-full flex column hands it whatever space RecordScreen's head
-    // leaves behind.
-    expect(grid.className).toContain("flex-1")
-    expect(grid.className).toContain("min-h-0")
 
-    expect(conversationAnchor.className).not.toMatch(/row-span-/)
-    expect(conversationAnchor.className).toContain("min-h-0")
-    expect(conversationAnchor.className).toContain("h-full")
+    const scrollRegion = grid.parentElement as HTMLElement
+    expect(scrollRegion.className).toContain("overflow-y-auto")
+    expect(scrollRegion.className).toContain("flex-1")
+    expect(scrollRegion.className).toContain("min-h-0")
 
-    // THE THREE RIGHT-COLUMN PANELS SHARE ONE SCROLLABLE CELL NOW — not
-    // direct grid children any more, which is exactly what lets that cell
-    // stretch to the row's OWN height instead of the panels' own sum.
+    const ticketBodyRoot = scrollRegion.parentElement as HTMLElement
+    expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
+    expect(ticketBodyRoot.firstElementChild).toBe(scrollRegion)
+
+    // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL — not three separate
+    // grid rows, and no longer independently scrollable: round 23 scrolls
+    // the grid and the side column TOGETHER, inside the one scroll region
+    // above, rather than giving the side column its own second scroller.
     const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
     const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
@@ -522,22 +512,36 @@ describe("the conversation cell and the side-panel column fill the grid's own fu
     expect(timeAnchor.parentElement).toBe(sideColumn)
     expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
     expect(sideColumn.className).toContain("flex-col")
-    expect(sideColumn.className).toContain("h-full")
-    expect(sideColumn.className).toContain("min-h-0")
-    // INDEPENDENT SCROLL — "the side cards scroll independently if they are
-    // taller" (R89's own text), so a long Related stories/Work logs/
-    // Stakeholders stack never pushes the conversation card's footer down
-    // with it.
-    expect(sideColumn.className).toContain("overflow-y-auto")
+    expect(sideColumn.className).not.toMatch(/\boverflow-y-auto\b/)
   })
 
-  it("the conversation card fills its grid cell (h-full) rather than a fixed viewport height", async () => {
+  it("the conversation card holds only its own scrolling thread — no CardFooter nests inside it any more", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationCard = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     ) as HTMLElement
-    expect(conversationCard.className).toContain("h-full")
+    expect(conversationCard.querySelector('[data-slot="card-footer"]')).toBeNull()
+  })
+
+  it("the composer is the ticket body's own pinned last child, outside the grid and its scroll region entirely", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
+    const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
+    expect(composerFooter.getAttribute("data-slot")).toBe("card-footer")
+    const ticketBodyRoot = composerFooter.parentElement as HTMLElement
+    expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
+    expect(ticketBodyRoot.lastElementChild).toBe(composerFooter)
+    expect(composerFooter.className).toContain("sticky")
+    // NOT bottom-0 — see ticket-detail-body.tsx's own header: sticky's
+    // offset anchors to the scrollport's PADDING edge, so bottom-0
+    // measured a 24px gap live at lg; the negative, padding-compensated
+    // offset is what actually reaches the pane's true bottom edge.
+    expect(composerFooter.className).toContain("bottom-[calc(-1*var(--space-5))]")
+    expect(composerFooter.className).toContain("lg:bottom-[calc(-1*var(--space-6))]")
+    expect(composerFooter.className).toContain("flex-none")
+    expect(composerFooter.className).toContain("w-full")
   })
 })
 

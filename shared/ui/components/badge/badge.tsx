@@ -102,14 +102,20 @@
      named the CARD, not the colour, and this file's own "mango is never a
      status" law is a dot law, not a fill law; only the neutral ground under
      the dot moved. `--pill-fill`/`--pill-label` stay defined in
-     `tokens.css` (other kit surfaces still reference `--pill-fill` when
-     rebinding it FOR this variant's old behaviour — `screen-shell.tsx`,
-     `collection-frame.tsx`, `record-detail.tsx`, `rail.tsx` and
-     `toolbar-row.tsx` each carry a local `[--pill-fill:…]` override tuned
-     for the status pill specifically; every one of those is now a no-op for
-     `Badge`, since nothing here reads that property any more — logged, not
-     silently fixed, as a follow-up those five files owe on their own
-     commission, outside this ruling's own scope).
+     `tokens.css` for any caller that still reads them directly.
+
+     THE FIVE FILES' FOLLOW-UP IS CLOSED — CHANGELOG v1.2.132. The no-op
+     `[--pill-fill:…]` overrides this paragraph used to list as owed
+     (`screen-shell.tsx`, `collection-frame.tsx`, `record-detail.tsx` and
+     `toolbar-row.tsx`) are now `[--badge-quiet-fill:…]`, tuned per surface;
+     `rail.tsx` needed no edit of its own, since it inherits the rebind
+     `screen-shell.tsx`'s `SCREEN` already carries down to it. `card.tsx`
+     also gained its own per-variant rebind, one for each of `default`,
+     `raised`, `brand` and `inverse` — the case this ruling actually
+     reported (a `default` Card nested inside a `BODY` that had already
+     rebound the token to the SAME value) needed a rebind at the CARD level,
+     not only at the shell levels that already had one. See each file's own
+     comment beside its rebind for the value and why.
    · THE ICON SLOT'S COLOUR IS FORCED, NOT LEFT TO THE CALL SITE — CLIENT
      RULING, 18 SEP 2026, over a screenshot of a ticket head: "type icon is
      still gray." `[icon-led-chip]`'s own `data-slot="badge-icon"` wrapper

@@ -217,6 +217,53 @@
 // tabs.test.tsx`'s own assertions moved from `getByText("Stages")` (which a
 // live DOM read now correctly returns nothing for) to `getByRole("group", {
 // name: "Stages" })`, which the aria-label still satisfies.
+//
+// ── AND THEN BACK, 19 SEP 2026 — THE STAGE NAME RETURNS ─────────────────────
+//
+// The section above this one carries the ruling this reverses, quoted in
+// full because a reversal with the original words cut out reads as an
+// argument nobody actually had: 17 Sep 2026, straight after placing the
+// ladder above the tabs, the client said "in the ticket stages, remove the
+// stages. Make the dots smaller, and the date should take only one line.
+// Unless it's a different year, just put the month, the day, and the hour in
+// 24-hour format. Only put the hour, not the minutes, and don't put the
+// [stage word] here. We can see the colors. My whole goal is that this
+// component is just smaller." `stageLabel` was deleted outright on that
+// ruling, not merely unused, and the comment in its place said so.
+//
+// TWO DAYS LATER SHE ASKED FOR IT BACK, verbatim, 19 Sep 2026: "on the
+// stages in tickets, above the date i need te sateg name!" ("the stage
+// name.") This supersedes the 17 Sep subtraction — not a misreading of it,
+// a later ruling on the same component overriding an earlier one, the same
+// shape this file's own history already carries twice above (the placement
+// ruling on 6 Sep read wrong and corrected on 9 Sep; the vertical rail
+// chosen and then rejected for the horizontal one the same week). "We can
+// see the colors" was true and is still true; it turned out not to be
+// enough on its own — a client reading the ladder at a glance wants the
+// word, not only the position, and now gets both.
+//
+// THE WORD IS RESTORED THROUGH THE SHARED VOCABULARY, NOT RETYPED. The
+// original `stageLabel` (see `git log` on this file) wrote every live
+// stage's word out as an English literal beside `HELP_STATUS`
+// (web/components/deep-link/shape.tsx) because that map is keyed by the
+// DATABASE word for the six LIVE stages only and does not hold the retired
+// one. That reasoning still holds, so `stageLabel` below still exists as its
+// own small function — but it now READS `HELP_STATUS` for the six live
+// words rather than repeating them, and adds back only the one word that
+// map cannot carry: `t("Waiting on you")` for `awaiting_validation`, the
+// same sentence `shared/types.ts`'s own comment on `RETIRED_HELP_STATUSES`
+// says a person reading their own ticket's history is owed "for ever." One
+// vocabulary, read from its one source, plus the one exception that source
+// cannot hold.
+//
+// WHERE IT GOES: ABOVE THE DATE, ON EVERY RUNG — her own words. A reached
+// rung draws its name then its date, a rung still ahead draws its name
+// alone, in the disabled ink the kit's `steps` rail already paints a later
+// stage with (`status-stepper.tsx`'s own `state === "later" ? "text-ink-
+// tertiary"`) — nothing new to draw, because the kit's label wrapper already
+// colours whatever `ReactNode` a caller hands it by the stage's position,
+// and the name is now that node's first line rather than the only thing it
+// contains.
 
 import * as React from "react"
 
@@ -225,25 +272,28 @@ import { StatusStepper, type StatusStage } from "@shared/ui/components/status-st
 
 import { HELP_STATUSES, RETIRED_HELP_STATUSES } from "@shared/types"
 import type { HelpStatus, HelpStatusEver, TicketStageHistory, TicketStageSpan } from "@shared/types"
+import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi } from "@/lib/api"
 import { formatStageMoment } from "@shared/web/format"
 import { helpStagesKey } from "@/lib/live-resources"
 import { useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 
-/* `stageLabel(status, t)` STOOD HERE — the word under each rung ("New",
- * "Triaged", "Scheduled"…), written out as literals for the reason its own
- * comment gave: the app's other status map (`HELP_STATUS`,
- * web/components/deep-link/shape.tsx) is keyed by DATABASE words, so
- * `t(HELP_STATUS[s])` would look up keys the catalogue does not hold.
- *
- * IT IS GONE, NOT RENAMED — client ruling, 17 Sep 2026, verbatim (read beside
- * "the dots smaller" and "the date … one line"): "don't put the [word] here.
- * We can see the colors." The done/current/later fills already say which
- * stage the ticket is on and which are still ahead; a second, printed name
- * for the same fact was exactly the redundancy her "just smaller" goal was
- * naming. The rung still carries its DATE (`formatStageMoment`, below) — the
- * one thing that fill and position could never say by themselves. */
+/** THE WORD UNDER EACH RUNG ("New", "Triaged", "Scheduled"…) — restored
+ * 19 Sep 2026 (see this file's header, "AND THEN BACK"), after the 17 Sep
+ * ruling deleted it outright. `HELP_STATUS` (web/components/deep-link/
+ * shape.tsx) is keyed by `HelpStatus`, the LIVE six, because that map is what
+ * a ticket's CURRENT stage chip reads and a ticket can only be current at a
+ * live stage — so it holds no case for `awaiting_validation`. This function
+ * is the one place that gap is closed: the live six read straight off that
+ * shared map (one vocabulary, not a second copy of it) and the one retired
+ * word is added back by hand, the same sentence `shared/types.ts`'s own
+ * comment on `RETIRED_HELP_STATUSES` promises a person reading their own
+ * ticket's history — "Waiting on you," for ever. */
+function stageLabel(status: HelpStatusEver, t: (s: string) => string): string {
+  if (status === "awaiting_validation") return t("Waiting on you")
+  return t(HELP_STATUS[status])
+}
 
 /** EVERY RUNG THIS COMPONENT MAY DRAW, IN THE ORDER A TICKET CLIMBS THEM.
  *
@@ -355,14 +405,20 @@ function buildRungs(
 }
 
 /** THE WIDTH ONE STAGE IS NEVER SQUEEZED BELOW, and therefore the width the
- * whole rail scrolls past. NARROWED 17 Sep 2026 alongside the rest of this
- * component's shrink: with no printed stage word left (see this file's
- * header), the widest thing a column has to say is its own date line —
+ * whole rail scrolls past. WIDENED BACK 19 Sep 2026 alongside the name's
+ * return (this file's header, "AND THEN BACK"): the 17 Sep narrowing to 96px
+ * was sized for a column with no printed word in it, and that premise is
+ * gone. Read off the longest thing a column now has to say, the same way the
+ * ORIGINAL value here was: the widest stage name the ladder holds is
+ * "Waiting on you" (the retired stage, which a real ticket that passed
+ * through it still carries) and the widest fact line is a date —
  * `"Dec 1, 2025 · 14h"` at the outside, the one case a moment falls outside
- * the current year — and that lands inside 96px at the caption step. Below
- * it the date starts being cut; above it six stages still fit across an
- * ordinary record column with no scrollbar at all. */
-const STAGE_COLUMN = "6rem"
+ * the current year — both landing inside 120px at the caption step, which is
+ * this number again. Below it a name or a date starts being cut; above it
+ * six stages still fit across an ordinary record column with no scrollbar at
+ * all — checked at 1280 with the rail expanded against "In progress", the
+ * longest LIVE name, in this pass's own verification. */
+const STAGE_COLUMN = "7.5rem"
 
 /** THE MARK, ONE KIT SIZE DOWN — client ruling, 17 Sep 2026, verbatim: "make
  * the dots smaller … my whole goal is that this component is just smaller."
@@ -394,15 +450,24 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
     id: rung.key,
     // ONE BLOCK PER LINE INSIDE THE KIT'S OWN LABEL. The kit's label span is
     // `block w-full truncate`, so a `block` child inherits the width and gets
-    // its OWN ellipsis. NO STAGE WORD ANY MORE (this file's own header) — the
-    // date is the only line left, through `formatStageMoment`
+    // its OWN ellipsis — the column clips the name and the date separately
+    // instead of one cutting the other short. THE NAME IS BACK, ABOVE THE
+    // DATE, ON EVERY RUNG (this file's header, "AND THEN BACK", 19 Sep 2026)
+    // — it carries no colour class of its own, so it inherits the kit's own
+    // done/current/later ink straight off `status-stepper.tsx`'s wrapping
+    // `status-stepper-label` span (`text-ink-tertiary` later, `text-
+    // foreground` done, bold current): the same "later is disabled ink, not
+    // hidden" skin the mark already wears, applied to the word for free. The
+    // date stays the second line, unchanged, through `formatStageMoment`
     // (shared/web/format.ts), one line, month/day/(year)/hour, no minutes.
     label: (
       <>
+        <span className="block truncate">{stageLabel(rung.status, t)}</span>
         {rung.reopened ? (
-          // The one thing here that is not the date. It stays a Badge — this
-          // is the moment the ticket came back, and her sentence ("reopen on
-          // y") is the reason the rail has these rungs at all.
+          // The one thing here that is not the name or the date. It stays a
+          // Badge — this is the moment the ticket came back, and her
+          // sentence ("reopen on y") is the reason the rail has these rungs
+          // at all.
           <span className="block">
             <Badge variant="warning" size="pill">
               {t("Reopened")}

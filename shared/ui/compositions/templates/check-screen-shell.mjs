@@ -50,6 +50,8 @@ const RECORD_DETAIL_FILE = path.join(HERE, "..", "..", "components", "record-det
 const TITLE_FILE = path.join(HERE, "..", "..", "components", "title", "title.tsx");
 const TRAIL_LINE_FILE = path.join(HERE, "..", "..", "components", "breadcrumbs", "trail-line.tsx");
 const RAIL_FILE = path.join(HERE, "rail.tsx");
+const COLLECTION_FRAME_FILE = path.join(HERE, "..", "..", "components", "collection-frame", "collection-frame.tsx");
+const TOOLBAR_ROW_FILE = path.join(HERE, "..", "..", "components", "toolbar-row", "toolbar-row.tsx");
 
 const src = fs.readFileSync(FILE, "utf8");
 const rel = path.relative(process.cwd(), FILE);
@@ -65,6 +67,10 @@ const recordDetailSrc = fs.readFileSync(RECORD_DETAIL_FILE, "utf8");
 const recordDetailRel = path.relative(process.cwd(), RECORD_DETAIL_FILE);
 const titleSrc = fs.readFileSync(TITLE_FILE, "utf8");
 const titleRel = path.relative(process.cwd(), TITLE_FILE);
+const collectionFrameSrc = fs.readFileSync(COLLECTION_FRAME_FILE, "utf8");
+const collectionFrameRel = path.relative(process.cwd(), COLLECTION_FRAME_FILE);
+const toolbarRowSrc = fs.readFileSync(TOOLBAR_ROW_FILE, "utf8");
+const toolbarRowRel = path.relative(process.cwd(), TOOLBAR_ROW_FILE);
 
 // Each pattern is a working CODE SHAPE the resize feature needs — a
 // declaration, a prop signature, or a call-site — not a bare identifier, so
@@ -1283,4 +1289,143 @@ console.log(
     "the classes are unconditional, not gated on isCollapsed) with its own scrollbar hidden — measured live in " +
     "verify/rail-foot at 1024x768: last row fully visible after scrolling, zero intersection with rail-member, " +
     "in both the expanded and collapsed rail.",
+);
+
+/* ============================================================================
+   THE 2026-09-19 A-STATUS-CHIP-IS-A-CHIP REBIND CHECK — CLIENT RULING,
+   VERBATIM: "chips and pills always must have the background card or shape
+   wherever they are. In this case, I'm talking inside ticket-related
+   stories. The type of ticket and the status need the card to have a
+   background." `badge.tsx` closed its own half of this ruling (`status` now
+   reads `--badge-quiet-fill`, `check-badge.mjs` §1b pins it) but the token it
+   reads is only as good as what rebinds it, and nothing did: `screen-shell
+   .tsx`, `collection-frame.tsx`, `record-detail.tsx` and `toolbar-row.tsx`
+   each carried a local `[--pill-fill:…]` (or, for `toolbar-row.tsx`, a
+   comment CLAIMING a rebind that tokens.css §8 never actually carried) tuned
+   for the status pill's OLD property name — a no-op the moment `Badge`
+   stopped reading it. `card.tsx` carried none at all, which is the exact
+   defect her report describes: a `default` Card nested inside a `BODY` that
+   had already rebound the (old) token to the SAME soft-paper value as the
+   card's own ground.
+
+   EVERY CHECK BELOW IS POSITIVE (the new property, at the SAME value the old
+   one carried) AND NEGATIVE (the old bracket rebind is gone), the same two-
+   sided shape `check-badge.mjs` §1b already holds itself to — a rename that
+   only added the new line and left the old one behind would still leave two
+   properties disagreeing about a ground nobody asks Badge to read any more. */
+const badgeQuietFillFindings = [];
+
+// screen-shell.tsx — SCREEN (the spine), CARD and BODY (the raised level).
+if (!/\[--badge-quiet-fill:var\(--spine-chip-fill\)\]/.test(src)) {
+  badgeQuietFillFindings.push(
+    `${rel}'s SCREEN constant does not rebind [--badge-quiet-fill:var(--spine-chip-fill)] — a Badge standing ` +
+      "directly on the spine (the rail's own member chip aside, anything else a route renders on the ground) " +
+      "would read no rebind at all and fall through to Badge's own flat --surface-quiet fallback, which is not " +
+      "spine-aware (paper/ink/mango each want a different chip tone — tokens.css §7b).",
+  );
+}
+const screenShellBadgeQuietFillCount = (src.match(/\[--badge-quiet-fill:var\(--surface-panel\)\]/g) ?? []).length;
+if (screenShellBadgeQuietFillCount < 2) {
+  badgeQuietFillFindings.push(
+    `${rel} does not carry [--badge-quiet-fill:var(--surface-panel)] on both CARD and BODY (found ` +
+      `${screenShellBadgeQuietFillCount}) — both levels stand on --surface-raised and both used to rebind ` +
+      "--pill-fill to soft paper for exactly this reason (ruling 01, this file's own header law).",
+  );
+}
+if (/\[--pill-fill:/.test(src)) {
+  badgeQuietFillFindings.push(
+    `${rel} still carries a [--pill-fill:…] rebind — the 19 Sep 2026 ruling retired --pill-fill as the property ` +
+      "Badge's status variant reads; every local rebind aimed at it is a no-op and must read --badge-quiet-fill " +
+      "instead.",
+  );
+}
+
+// card.tsx — one rebind per variant that paints its own ground, matching
+// this file's own per-variant doc comment for the value and the reasoning.
+const CARD_VARIANT_REBINDS = [
+  ["default", /default:\s*"bg-surface-panel \[--badge-quiet-fill:var\(--surface-raised\)\]",/],
+  ["raised", /raised:\s*"bg-card shadow-sm \[--badge-quiet-fill:var\(--surface-panel\)\]",/],
+  ["brand", /brand:\s*"bg-surface-brand text-ink-on-accent \[--badge-quiet-fill:var\(--surface-brand-chip\)\]",/],
+  [
+    "inverse",
+    /inverse:\s*"bg-surface-inverse text-ink-on-inverse \[--badge-quiet-fill:var\(--surface-record-footer-well\)\]",/,
+  ],
+];
+for (const [name, pattern] of CARD_VARIANT_REBINDS) {
+  if (!pattern.test(cardSrc)) {
+    badgeQuietFillFindings.push(
+      `${cardRel}'s ${name} variant does not carry its own [--badge-quiet-fill:…] rebind — the 19 Sep 2026 ` +
+        "ruling's own reported case (a default Card nested inside a BODY that had already rebound the token to " +
+        "the SAME value as the card's own ground) needs the rebind AT THE CARD, not only at the shell levels " +
+        "above it, or a nested card keeps inheriting whatever its ancestor last set.",
+    );
+  }
+}
+if (/\[--pill-fill:/.test(cardSrc)) {
+  badgeQuietFillFindings.push(`${cardRel} carries a [--pill-fill:…] rebind — see the screen-shell.tsx finding above for why this must read --badge-quiet-fill.`);
+}
+
+// collection-frame.tsx — tone: "page", tone: "panel" and the panel itself.
+const collectionFrameBadgeQuietFillCount = (collectionFrameSrc.match(/\[--badge-quiet-fill:var\(--surface-(?:panel|page)\)\]/g) ?? []).length;
+if (collectionFrameBadgeQuietFillCount < 3) {
+  badgeQuietFillFindings.push(
+    `${collectionFrameRel} does not carry three [--badge-quiet-fill:…] rebinds (tone: "page", tone: "panel" and ` +
+      `collectionPanelVariants' own base class list — found ${collectionFrameBadgeQuietFillCount}) — all three used ` +
+      "to rebind --pill-fill for the identical reason --btn-secondary-fill sits beside each of them.",
+  );
+}
+if (/\[--pill-fill:/.test(collectionFrameSrc)) {
+  badgeQuietFillFindings.push(`${collectionFrameRel} carries a [--pill-fill:…] rebind — see the screen-shell.tsx finding above.`);
+}
+
+// record-detail.tsx — the ink footer's own well, an object literal rather
+// than a bracket class (inline style, not Tailwind), so it is checked as a
+// quoted property key.
+if (!/"--badge-quiet-fill":\s*"var\(--surface-record-footer-well\)",/.test(recordDetailSrc)) {
+  badgeQuietFillFindings.push(
+    `${recordDetailRel}'s ink footer does not rebind "--badge-quiet-fill": "var(--surface-record-footer-well)" — ` +
+      "a status or secondary Badge inside the footer's own well would fall through to a property nothing on this " +
+      "inverse ground sets any more.",
+  );
+}
+if (/"--pill-fill":/.test(recordDetailSrc)) {
+  badgeQuietFillFindings.push(`${recordDetailRel} still sets "--pill-fill" as an inline style property — rename it to "--badge-quiet-fill" (see the finding above).`);
+}
+
+// toolbar-row.tsx — ground: "page" and ground: "panel" each need their OWN
+// rebind: unlike --btn-secondary-fill, --badge-quiet-fill is not one of
+// tokens.css §8's class-keyed tokens (this file's own corrected comment
+// explains why), so nothing rebinds it here for free off the bg- class alone.
+if (!/page:\s*\["bg-surface-panel",\s*"\[--badge-quiet-fill:var\(--surface-raised\)\]"\],/.test(toolbarRowSrc)) {
+  badgeQuietFillFindings.push(
+    `${toolbarRowRel}'s ground: "page" does not carry its own [--badge-quiet-fill:var(--surface-raised)] — this ` +
+      "token is not in tokens.css §8's class-keyed list (only --btn-secondary-fill and --surface-lift are), so a " +
+      "Badge standing on this row reads no rebind at all without one written here directly.",
+  );
+}
+if (!/panel:\s*\["bg-surface-raised",\s*"\[--badge-quiet-fill:var\(--surface-panel\)\]"\],/.test(toolbarRowSrc)) {
+  badgeQuietFillFindings.push(
+    `${toolbarRowRel}'s ground: "panel" does not carry its own [--badge-quiet-fill:var(--surface-panel)] — same ` +
+      "reason as ground: \"page\", above.",
+  );
+}
+if (/tokens\.css rebinds `--btn-secondary-fill` and `--pill-fill` off a LIST/.test(toolbarRowSrc)) {
+  badgeQuietFillFindings.push(
+    `${toolbarRowRel} still claims tokens.css §8 rebinds --pill-fill off its class-keyed list — it never did ` +
+      "(only --btn-secondary-fill and --surface-lift are in that list); the comment was corrected 19 Sep 2026 and " +
+      "must not regress.",
+  );
+}
+
+if (badgeQuietFillFindings.length > 0) {
+  console.error("FAIL badge-quiet-fill rebind check:\n" + badgeQuietFillFindings.map((f) => `  - ${f}`).join("\n"));
+  process.exit(1);
+}
+
+console.log(
+  "OK badge-quiet-fill rebind check: screen-shell.tsx's SCREEN/CARD/BODY, card.tsx's default/raised/brand/" +
+    "inverse variants, collection-frame.tsx's tone: page/panel and its panel, record-detail.tsx's ink-footer " +
+    "well, and toolbar-row.tsx's ground: page/panel all rebind --badge-quiet-fill to the surface one rung away " +
+    "from their own ground — the 19 Sep 2026 ruling's five-file follow-up, plus the card.tsx rebind the ruling " +
+    "actually reported — and no file still carries the old, now-inert --pill-fill rebind.",
 );

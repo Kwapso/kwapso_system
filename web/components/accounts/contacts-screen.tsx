@@ -114,28 +114,55 @@
 // row itself now withholds as `null` (R21's own argument, restated for a
 // boolean instead of a name) — the header draws no control, same as those two.
 
+import * as React from "react"
+
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Plus, SquaresFour, ListBullets } from "@shared/ui/foundations/icons"
+
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
+import {
+  CollectionCreateActionProvider,
+  CollectionFrame,
+} from "@shared/web/screen-engine/collection-frame"
 import { type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
+import { PersonCard } from "@shared/web/person-card"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
-import { LoadError, CollectionCard } from "@/components/deep-link/screen-bits"
+import { AddButton, LoadError, CollectionCard } from "@/components/deep-link/screen-bits"
+import { InAppLink } from "@/components/shell/in-app-link"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { RecordTable, visibleActions, type TableColumn } from "@/components/records/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { shapeContactsTable } from "@/components/deep-link/shape"
-import { tenancy } from "@/lib/api"
-import { accountsKey, totalKey } from "@/lib/live-resources"
+import { nameInitials } from "@/lib/identity"
+import {
+  ContactCreateDialog,
+  type ContactAccountOption,
+  type ContactCreateValues,
+} from "@/components/accounts/contact-link-dialog"
+import { ApiFailure, tenancy } from "@/lib/api"
+import { accountsKey, companiesKey, listFetch, totalKey } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
-import type { Language } from "@shared/i18n"
+import type { Language, Vars } from "@shared/i18n"
 import type { Account } from "@shared/types"
-import { primeCache, useCachedValue } from "@shared/web/store"
+import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+
+// `Vars` OPTIONAL, matching `useLanguage()`'s own `t` (shared/web/language.tsx)
+// — every real caller hands this screen that exact function, and
+// `createNewContact` below fills a placeholder ("{name} is now in your
+// accounts, but …", the same sentence `account-detail.tsx`'s own
+// `createContact` already sends through it).
+type Translate = (english: string, vars?: Vars) => string
 
 /** WHAT THE TABLE SHOWS — her three, in her order ("add column role after
  * account"). The English is the catalogue's key and is translated on the way to
@@ -218,6 +245,99 @@ function contactColumnHeaders(columns: ReturnType<typeof contactColumns>): Table
   })
 }
 
+/** One shaped contacts row, read by BOTH bodies below — `shapeContactsTable`'s
+ * own contract (`web/components/deep-link/shape.tsx`), widened with `logoUrl`
+ * (the RAW picture, for the gallery card's own bigger face — `person`/
+ * `accountCell` above are already sized and composed for a TABLE row and are
+ * the wrong node to stretch, the same distinction `ShapedAccountRow`/
+ * `shapeAccountsList` draw one screen over). */
+type ShapedContactRow = Record<string, unknown> & {
+  id: string
+  name: string
+  account: string
+  accountCell: React.ReactNode
+  status: React.ReactNode
+  logoUrl: string | null
+}
+
+/** THE CARD'S FLOOR — the same measured 12rem `accounts-screen.tsx`'s own
+ * gallery wall and `members-gallery.tsx` already use: a contact tile is the
+ * identical CLASS (a mark, a name, one chip line under it), so the widest
+ * line on one is the widest kind of line on the other. */
+const GALLERY_MIN_CARD = "12rem"
+
+/** THE WALL — a contact is a PERSON (R35): a face (photo or initials), the
+ * name, the account they work at as a plain chip ABOVE the title (R65: "chip
+ * on top of title"), and the status dot BELOW it — the same `PersonCard` cell
+ * `members-gallery.tsx` and `help-stakeholders.tsx` already draw, never a
+ * second hand-built tile. THE ACCOUNT CHIP IS PLAIN, NEVER COLOURED (R86: the
+ * one coloured chip on a record is its STATUS, and nothing else here may
+ * borrow the colour) — the same bare `<Badge>` (no `variant="status"`)
+ * `members-gallery.tsx` already draws for a member's own role chip; the
+ * status dot `shapeContactsTable` already built (`row.status`, client ruling
+ * 17 Sep 2026: "contact live green") is reused as-is for the coloured half.
+ *
+ * A LOWERCASE FUNCTION, DELIBERATELY, NOT A SECOND COMPONENT — see
+ * `accountGalleryBody`'s own header, one screen over
+ * (`accounts-screen.tsx`), for the whole argument: R48's own wall census
+ * attributes a `<CardGrid>` to its nearest CAPITALISED enclosing function,
+ * and falls back to the WHOLE FILE'S room when there is none — which is
+ * exactly this file's room, since `ContactsScreen`'s own `<PagedFind>` is a
+ * few lines down and this wall genuinely is searched and paged through it. */
+function contactGalleryBody({
+  teamId,
+  rows,
+  config,
+  narrowedOutside,
+  t,
+}: {
+  teamId: string
+  rows: ShapedContactRow[]
+  config: CollectionConfig
+  narrowedOutside?: boolean
+  t: Translate
+}): React.ReactNode {
+  return (
+    <CollectionFrame
+      config={config}
+      data={rows}
+      // INERT ON A PAGED COLLECTION (R14) — same as `accountGalleryBody`'s
+      // identical line, required all the same.
+      searchKeys={["name"]}
+      memoryKey="contacts-gallery"
+      narrowedOutside={narrowedOutside}
+      renderItems={(page) => (
+        <CardGrid
+          fluid
+          minItemWidth={GALLERY_MIN_CARD}
+          label={t("Contacts")}
+          empty={page.length === 0}
+        >
+          {page.map((row) => (
+            <Card key={row.id} variant="raised" className="hover:bg-accent motion-hover">
+              {/* A REAL ANCHOR (R37), same shape as `accountGalleryBody`'s own
+                  card — cmd/ctrl-click and a middle-click open it beside,
+                  without leaving this tab (`InAppLink`'s own click grammar). */}
+              <InAppLink href={`/t/${teamId}/accounts/${row.id}`} className="block">
+                <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                  <PersonCard
+                    picture={row.logoUrl}
+                    mark={nameInitials(row.name)}
+                    markName={row.name}
+                    chip={<Badge>{row.account}</Badge>}
+                    title={<CardTitle className="text-sm">{row.name}</CardTitle>}
+                    secondary={row.status}
+                  />
+                </CardContent>
+              </InAppLink>
+            </Card>
+          ))}
+        </CardGrid>
+      )}
+    />
+  )
+}
+
 export function ContactsScreen({
   teamId,
   t,
@@ -233,7 +353,7 @@ export function ContactsScreen({
   onIntent,
 }: {
   teamId: string
-  t: (english: string) => string
+  t: Translate
   /** For `shapeContactsTable`'s own `translator(lang)` — a pure shaper, no
    * hook to call `useLanguage()` from, the same reason `accounts-screen.tsx`
    * already hands `shapeAccountsList` the same prop. */
@@ -260,6 +380,91 @@ export function ContactsScreen({
   // A HOOK, so it is called before the error branch below returns.
   const portalTotal = useCachedValue<number>(totalKey("accounts-individual-portal", teamId))
 
+  // THE VIEW TOGGLE (R53) — gallery or list, the same two-body shape
+  // `accounts-screen.tsx` already offers, one screen over. Local state, not
+  // the URL: nothing else on the app needs to know which body Contacts is
+  // showing, the identical reasoning `AccountsScreen`'s own `view` carries.
+  // DEFAULT "list", unlike Accounts' own gallery-first default — her ruling
+  // for Accounts named gallery first by name ("the one on first load"); no
+  // such ruling exists for Contacts, so the table this screen already drew
+  // stays the resting view and gallery is the new, added choice.
+  const [view, setView] = React.useState<"gallery" | "list">("list")
+
+  // THE NEW CONTACT DOOR — client, verbatim: "on contacts, add the view
+  // gallery and the button to add." `contacts:create` is the module this
+  // screen already gates its reads on; the door itself
+  // (`tenancy.createAccount` + `tenancy.linkPerson`) is the SAME two-write
+  // seam `account-detail.tsx`'s own `createContact` already uses from an
+  // account's own Contacts tab — reused here, not reinvented, because
+  // linking a person to a company is one capability with two doors into it.
+  const canCreatePerson = rights.contacts?.create === true
+  const [newContactOpen, setNewContactOpen] = React.useState(false)
+
+  // THE ACCOUNT PICKER'S OWN OPTIONS — every COMPANY, the same
+  // `companiesKey`/`type: "entity"` read every other account-facing picker in
+  // the app already shares (R56: one door, once), asked only while the
+  // dialog is open (the same `open ? … : null` gate `account-form-dialog.tsx`
+  // reads its own vocabulary through) — a screen that never opens the dialog
+  // this session never pays for the read. UNLIKE the Contacts screen's own
+  // `accountsQ` (individuals, paged, page one only), this is every company,
+  // because the picker has to offer Confia even when she is not on page one
+  // (`account-names.ts`'s own header has the identical argument for the same
+  // read).
+  const companiesQ = useCached<Account[]>(newContactOpen ? companiesKey(teamId) : null, () =>
+    tenancy.accounts({ type: "entity" }).then((r) => r.accounts)
+  )
+  const accountOptions: ContactAccountOption[] = (companiesQ.data ?? []).map((a) => ({
+    id: a.id,
+    name: a.name,
+    logoUrl: a.logoUrl,
+  }))
+
+  // THE TWO WRITES, ONE ERRAND — the identical shape `account-detail.tsx`'s
+  // own `createContact` takes (that file's header has the whole argument for
+  // why it is two doors and not one, and what happens when the second
+  // fails): make the person (`accountType: "individual"`, parented under the
+  // company she just picked, since a contact still sits IN the tree her
+  // company owns) then LINK her to that company (`contacts:create`'s own
+  // door) so she shows up on both this screen and that company's own
+  // Contacts tab. THE LIST IS RE-PULLED, NOT MERELY PATCHED — the same
+  // `primeCache(accountsKey(teamId), await listFetch.accounts(teamId))` seam
+  // `use-screen-actions.ts`'s own `createAccount` already takes for the
+  // identical reason: a paged list can't hand back "the new row appended",
+  // only "page one, freshly asked".
+  async function createNewContact(values: ContactCreateValues) {
+    const name = values.name.trim()
+    const { id } = await tenancy.createAccount({
+      accountType: "individual",
+      name,
+      parentAccountId: values.accountId,
+      email: values.email.trim() || undefined,
+      phone: values.phone.trim() || undefined,
+    })
+    try {
+      await tenancy.linkPerson({
+        accountId: values.accountId,
+        personAccountId: id,
+        relationship: values.relationship.trim() || undefined,
+        isMainStakeholder: values.isMainStakeholder,
+      })
+    } catch (err) {
+      primeCache(accountsKey(teamId), await listFetch.accounts(teamId))
+      toast.error(
+        err instanceof ApiFailure
+          ? t("{name} is now in your accounts, but not a contact here: {reason} Use Add contact to finish.", {
+              name,
+              reason: err.message,
+            })
+          : t("{name} is now in your accounts, but we couldn't make them a contact here. Use Add contact to finish.", {
+              name,
+            })
+      )
+      return
+    }
+    primeCache(accountsKey(teamId), await listFetch.accounts(teamId))
+    toast.success(t("Contact added."))
+  }
+
   if (accountsQ.error) return <LoadError what="contacts" />
   // WAS A WHOLE-SCREEN EARLY RETURN (2026-09-03 audit — "nine screens blank
   // their entire toolbar while loading"): unmounted the heading and the
@@ -267,6 +472,21 @@ export function ContactsScreen({
   // Fixed the shared way — see processes-screen.tsx's identical note.
   const contactsLoading = accountsQ.data === undefined
   const loaded = (accountsQ.data ?? []).filter((a) => a.accountType === "individual")
+  // THE RESTING COLLECTION'S OWN EMPTINESS — read here, once, rather than
+  // trusted to `<PagedFind>`'s own `actions` slot. UNLIKE every OTHER screen
+  // in the app, this one's `fixed` (below) is NEVER `undefined` — it is
+  // always at least `{type: "individual"}`, the page's own baseline
+  // question — so `<PagedFind>`'s internal `active`/`genuinelyEmpty` (built
+  // from the SAME always-non-empty `fixed`) can never tell a brand-new
+  // team's real zero apart from an ordinary search, and its toolbar
+  // (actions included) never fully stands down for this screen the way it
+  // does for Accounts' own "All" tab. So the header's own "New contact"
+  // button is gated HERE, on the fact this screen actually knows, rather
+  // than on a slot whose suppression this screen structurally defeats — R88
+  // still holds: the header button is withdrawn on a genuinely empty
+  // collection, and the frame's OWN inner empty register (`reallyNarrowed`,
+  // below) is the one door left.
+  const contactsRestingEmpty = loaded.length === 0 && !contactsLoading
   // WHO CAN SIGN IN IS ITS OWN GRANT, so the tab that asks the question is drawn
   // only for a role that holds it. The DOOR is what actually decides — without
   // `portal_users:read` the filter comes back empty and the count comes back
@@ -349,26 +569,49 @@ export function ContactsScreen({
           }
           // THE CANONICAL SHAPE (client, 31 Aug 2026 — the same reference
           // Accounts' own strip draws from): the tab strip sits INSIDE the same
-          // zero-gap join as the card below it. Contacts has no create button
-          // of its own (a person is added by linking one to a company, from
-          // that company's own record), so this row is the tabs alone —
-          // exactly as Tickets' own row is when it has nothing to put beside
-          // them either. `tabs` is a `FolderTabStrip`, so there is nowhere in
-          // its shape for a button to have gone anyway.
+          // zero-gap join as the card below it.
           //
-          // AND THE ABSENCE IS CHECKED NOW, not just explained here. A screen
-          // with no create act owes the reader the route that DOES exist, so
-          // `contacts.list` carries its own `emptyDescription` naming Accounts
-          // and web/test/cold-account.test.tsx (F6) fails if that sentence is
-          // ever dropped back to the frame's default — which promises an "Add
-          // the first" this screen deliberately does not have. Give Contacts a
-          // create button one day and that test is where it tells you the
-          // sentence has to change with it.
+          // THE NEW CONTACT DOOR NOW LIVES IN `actions` BELOW, not here — this
+          // `tabs` prop is a `FolderTabStrip` and has nowhere in its own shape
+          // for a button to sit. `contacts.list`'s own `emptyDescription` (used
+          // to name Accounts, the only route in while this screen had no
+          // create act of its own) is retired the same change: the empty
+          // register now draws THIS screen's own "Add the first" through
+          // `CollectionCreateActionProvider` below, the identical register
+          // every other create-capable collection in the app already reads
+          // from (R62).
           tabs={{
             config: { ...defaultTabsConfig, tabs: contactsTabs },
             value: contactsTab,
             onValueChange: (v) => go(sectionPath, v === "all" ? {} : { tab: v }),
           }}
+          // THE VIEW TOGGLE (R53) — gallery or list, `accounts-screen.tsx`'s
+          // own two icons and words, matched so the two switches read as one
+          // control wherever a reader meets either of them.
+          view={{
+            views: [
+              { value: "gallery", label: t("Gallery"), icon: <SquaresFour className="size-4" /> },
+              { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+            ],
+            value: view,
+            onValueChange: (v) => setView(v === "gallery" ? "gallery" : "list"),
+          }}
+          // THE NEW CONTACT DOOR — withdrawn on a genuinely empty collection
+          // (R50/R88: the empty state's own "Add the first" is the ONE
+          // door, never a second header button beside it), gated on
+          // `contactsRestingEmpty` rather than left to `<PagedFind>`'s own
+          // slot suppression — see that constant's own header for why this
+          // screen's permanent `fixed` defeats it.
+          actions={() => (
+            <>
+              {canCreatePerson && !contactsRestingEmpty && (
+                <AddButton
+                  label={t("New contact")}
+                  onClick={() => setNewContactOpen(true)}
+                />
+              )}
+            </>
+          )}
           wrap={(inner) => <CollectionCard>{inner}</CollectionCard>}
         >
           {(found) => {
@@ -400,42 +643,97 @@ export function ContactsScreen({
               { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
               data.rows ?? []
             )
+            const config = tableRecipe.collection as CollectionConfig
+            const shaped = (data.rows ?? []) as unknown as ShapedContactRow[]
+            // NEVER `found.active` — unlike every OTHER `<PagedFind>` in the
+            // app, this screen's own `fixed` is NEVER `undefined` (it is
+            // always at least `{type: "individual"}`, this page's own
+            // baseline question), so `found.active` is permanently `true`
+            // and would tell the frame's empty register "a search is on"
+            // even on a brand-new team with zero contacts — withdrawing the
+            // "New contact" door this screen just gained, permanently, and
+            // renaming "No contacts yet." to "Nothing matched." on the one
+            // screen that was never searched. `found.emptyText` is the
+            // signal actually built from what the READER asked (the search
+            // box, a facet, a non-default sort — `Found.emptyText`'s own
+            // doc: "the empty-state line to use while a FIND is on"), never
+            // from this screen's own permanent narrowing, so its presence is
+            // the honest test. The In portal tab is folded in beside it: it
+            // narrows by a real reader choice too (six of 110 sign in), so a
+            // reader who presses it and finds nobody should read "Nothing
+            // matched", not be invited to add a new person from a tab about
+            // who already has a login.
+            const reallyNarrowed = found.emptyText !== undefined || contactsTab === "portal"
             return (
-              <>
-                {/* No `useKitPanel`: `CollectionCard` above (drawn by `wrap`) is
-                    the ONE box — the "broken combination" screen-bits.tsx warns
-                    against is a card drawn twice. */}
-                <RecordTable
-                  columns={contactColumnHeaders(columns)}
-                  rows={data.rows ?? []}
-                  config={tableRecipe.collection as CollectionConfig}
-                  order={found.order}
-                  actions={visibleActions(tableRecipe, rights, onAction)}
-                  /* R62 — the door above owns the search. */
-                  narrowedOutside={found.active}
-                  onRowClick={(row) =>
-                    // The SAME intent the recipe engine emitted for these rows
-                    // before the table replaced it: the deep-link host maps
-                    // module "contacts" to `/accounts/<id>`, because a person
-                    // is a row of the accounts table and has one address.
-                    onIntent({ kind: "open", module: "contacts", id: String(row.id) })
-                  }
-                  /* THE SAME SUBSTITUTION `onIntent`'s "open" case makes — a
-                     contact opens at ITS ACCOUNT's address, never a second
-                     `/contacts/<id>` URL for a record that already has one. */
-                  rowPath={(row) => `/t/${teamId}/accounts/${String(row.id)}`}
-                  rowLabel={(row) => String(row.name ?? row.id)}
-                />
+              <CollectionCreateActionProvider
+                action={
+                  canCreatePerson
+                    ? {
+                        label: t("New contact"),
+                        icon: <Plus className="size-4" />,
+                        onCreate: () => setNewContactOpen(true),
+                      }
+                    : null
+                }
+              >
+                {view === "list" ? (
+                  // No `useKitPanel`: `CollectionCard` above (drawn by `wrap`)
+                  // is the ONE box — the "broken combination" screen-bits.tsx
+                  // warns against is a card drawn twice.
+                  <RecordTable
+                    columns={contactColumnHeaders(columns)}
+                    rows={shaped}
+                    config={config}
+                    order={found.order}
+                    actions={visibleActions(tableRecipe, rights, onAction)}
+                    /* R62 — the door above owns the search. */
+                    narrowedOutside={reallyNarrowed}
+                    onRowClick={(row) =>
+                      // The SAME intent the recipe engine emitted for these rows
+                      // before the table replaced it: the deep-link host maps
+                      // module "contacts" to `/accounts/<id>`, because a person
+                      // is a row of the accounts table and has one address.
+                      onIntent({ kind: "open", module: "contacts", id: String(row.id) })
+                    }
+                    /* THE SAME SUBSTITUTION `onIntent`'s "open" case makes — a
+                       contact opens at ITS ACCOUNT's address, never a second
+                       `/contacts/<id>` URL for a record that already has one. */
+                    rowPath={(row) => `/t/${teamId}/accounts/${String(row.id)}`}
+                    rowLabel={(row) => String(row.name ?? row.id)}
+                  />
+                ) : (
+                  contactGalleryBody({
+                    teamId,
+                    rows: shaped,
+                    config,
+                    narrowedOutside: reallyNarrowed,
+                    t,
+                  })
+                )}
                 <LoadMore
                   listKey={found.listKey ?? accountsKey(teamId)}
                   label={t("Load more contacts")}
                   fetchPage={found.fetchPage}
                 />
-              </>
+              </CollectionCreateActionProvider>
             )
           }}
         </PagedFind>
       </div>
+      {/* THE NEW CONTACT DOOR'S OWN DIALOG — the SAME `ContactCreateDialog`
+          an account's own Contacts tab opens (`account-detail.tsx`), handed
+          `accounts` here (never `accountName`) because this screen has no
+          company already on screen to imply one — the dialog draws its own
+          Account picker instead (R90/R75). Its own draft key, team-scoped,
+          so a half-typed new contact here never collides with one started
+          from an account's own tab. */}
+      <ContactCreateDialog
+        open={newContactOpen}
+        onOpenChange={setNewContactOpen}
+        accounts={accountOptions}
+        draftKey={`contacts:new-contact:${teamId}`}
+        onSubmit={createNewContact}
+      />
     </CountedAbove>
   )
 }

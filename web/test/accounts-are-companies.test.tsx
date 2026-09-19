@@ -263,7 +263,10 @@ describe("making a new contact under a company", () => {
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
 
-    // Exactly the five: three that make the person, two that make the link. No
+    // Exactly the six: three that make the person, two that make the link,
+    // plus `accountId` — always "" here, because this call carries
+    // `accountName` (an account already on screen), never `accounts` (the
+    // Contacts screen's own unimplied door, contacts-screen.tsx). No
     // `accountType` — a value the code fills in is not one the form carries
     // around looking like a choice.
     expect(onSubmit.mock.calls[0][0]).toEqual({
@@ -272,6 +275,7 @@ describe("making a new contact under a company", () => {
       phone: "",
       relationship: "Operations",
       isMainStakeholder: false,
+      accountId: "",
     })
     expect(Object.keys(onSubmit.mock.calls[0][0])).not.toContain("accountType")
   })

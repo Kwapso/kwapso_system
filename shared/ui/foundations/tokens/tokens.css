@@ -285,6 +285,19 @@
   --ink-on-inverse-secondary: #d5d1c9;
   --ink-on-accent-secondary:  #5E5030;
   --surface-brand:        var(--kw-mango);
+  /* THE CHIP ON A BRAND GROUND — ADDED 19 SEP 2026, CHANGELOG v1.2.132, "A
+     STATUS CHIP IS A CHIP". `card.tsx`'s own `brand` variant needs a role
+     token for the fill it hands `--badge-quiet-fill` (a Badge nested in a
+     mango card), and a component file may not reach past this layer for the
+     raw `--kw-off-beige` — the palette law's own rule ("every colour
+     resolves through a token"), enforced by `foundations/rules/
+     conformance.mjs`. Off-beige, undefined in either dark block, for the
+     same reason `--surface-brand` above is undefined in them too: mango does
+     not move between palettes (§7b's own note), so nothing painted relative
+     to it needs to either. Byte-identical to `[data-spine="mango"]`'s own
+     `--spine-chip-fill: var(--kw-off-beige)` (§7b) — "the rail (mango) →
+     its own pill tone" is one answer, reused rather than re-picked. */
+  --surface-brand-chip:   var(--kw-off-beige);
   --surface-idle:         var(--muted);
   --ink-secondary:        #4a4946;
   --ink-disabled:         #a8a59f;               /* disabled means disabled and

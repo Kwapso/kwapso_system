@@ -565,7 +565,16 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   screenshot: at every width the composer is the last thing on the screen and sits on its own
   bottom edge; below `lg` there is exactly ONE scrolling region — the side cards, then the
   thread, in that order — with the composer pinned OUTSIDE it; above `lg` the two-column layout
-  applies; and the assistant opening does not change the breakpoint. (`footer-on-the-edge`)
+  applies; and the assistant opening does not change the breakpoint. AMENDED A FIFTH TIME 19 Sep
+  2026 (Round 23): even that still did not hold at every width/height/assistant-state
+  combination. The client's ruling, over a screenshot at 1991×842 with the assistant open:
+  "THE PROBLEM IS WHERE THE FOOTER IS!!! SHOULD BE AT THE VERY BOTTOM!" Rebuilt once more, this
+  time by construction rather than by chasing the flex chain: the composer is pulled outside the
+  scrolling region entirely, one `<CardFooter>` instance, `flex-none`, common to both the `lg`
+  and below-`lg` trees, plus `position: sticky` with a negative, padding-compensated `bottom`
+  offset so its stuck threshold meets the pane's real bottom edge rather than stopping short of
+  it. **The law now reads, final form: the composer is pinned at the bottom of the screen at
+  every width and height; everything else scrolls above it.** (`footer-on-the-edge`)
 - **Faces in choices (R90).** Aurora, verbatim, about the new Raised-by `Select` on the ticket
   form and page: "every time there is an avatar, I want to also see it in the choice component,
   so I also want to see the avatars here." A picker's own row is not exempt from the face law

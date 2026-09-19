@@ -883,6 +883,13 @@ export function shapeContactsTable(contacts: Account[], lang: Language = "en"): 
         ) : (
           <Badge variant="status" dot="archived">{t("No portal")}</Badge>
         ),
+      // THE RAW PICTURE, for the gallery card's own bigger face
+      // (`contacts-screen.tsx`'s own `contactGalleryBody`, `PersonCard`'s
+      // `size="band"` default) — `person` above is already sized and composed
+      // for a TABLE row (`size="choice"`, mark+name in one span) and is the
+      // wrong node to stretch. The identical reasoning `shapeAccountsList`'s
+      // own `logoUrl` field carries one screen over.
+      logoUrl: a.logoUrl,
     })),
   }
 }

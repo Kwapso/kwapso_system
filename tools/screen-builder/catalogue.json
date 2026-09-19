@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.131",
-  "sha": "2f9bfb13b9f24ae3c8c139bbc1e28a897886b6d1",
+  "tag": "v1.2.133",
+  "sha": "3ba6dcf50bbdaedf666a7e0991e752f1c7906e03",
   "syncedAt": "2026-09-19"
  },
- "generatedAt": "2026-09-19T10:06:52.919Z",
+ "generatedAt": "2026-09-19T13:33:54.637Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 370,
-  "tokenDeclarations": 570,
+  "tokens": 371,
+  "tokenDeclarations": 571,
   "unresolved": 0
  },
  "components": [
@@ -928,7 +928,7 @@
     {
      "file": "components/badge/badge.tsx",
      "name": "badgeVariants",
-     "line": 143,
+     "line": 149,
      "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums gap-2",
      "groups": [
       {
@@ -1694,28 +1694,28 @@
        "options": [
         {
          "name": "default",
-         "classes": "bg-surface-panel",
-         "note": "`.kw-card` — soft paper. The default because it is the tone that is VISIBLE on the page: `--background` and `--card` are both off-beige, so a `--card` box on the page draws nothing at all."
+         "classes": "bg-surface-panel [--badge-quiet-fill:var(--surface-raised)]",
+         "note": "`.kw-card` — soft paper. The default because it is the tone that is VISIBLE on the page: `--background` and `--card` are both off-beige, so a `--card` box on the page draws nothing at all. `--badge-quiet-fill` REBOUND, 19 SEP 2026 — CLIENT RULING, VERBATIM: \"chips and pills always must have the background card or shape wherever they are.\" Her own example is this exact card: the ticket page's Related-stories row, a `default` Card, where the STATUS chip drew no visible fill because nothing rebound `--badge-quiet-fill` here and the ambient value inherited from whatever ancestor last set it (often `screen-shell.tsx`'s own `BODY`, itself soft paper) happened to equal THIS card's own soft-paper ground — a `Badge` painting the identical colour it sits on, 1.000, no card at all. Off-beige — `--surface-raised`, the OTHER paper tone from this card's own soft paper, the same alternation `--btn-secondary-fill` already draws for a control inside this same card (tokens.css §8's `.bg-surface-panel` rule) — breaks the inheritance chain at the exact level a nested card is mounted at, so a Badge is guaranteed its own card the moment it lands inside one, regardless of what any ancestor already rebound. See CHANGELOG v1.2.132."
         },
         {
          "name": "raised",
-         "classes": "bg-card shadow-sm",
-         "note": "`.kw-card--raised` — off-beige over soft paper, plus `--shadow-rest` (`shadow-sm` is re-pointed at it in the tokens bridge). This is the \"raised card\" the binding law names, and it only reads as raised when it sits inside a `--surface-panel` band."
+         "classes": "bg-card shadow-sm [--badge-quiet-fill:var(--surface-panel)]",
+         "note": "`.kw-card--raised` — off-beige over soft paper, plus `--shadow-rest` (`shadow-sm` is re-pointed at it in the tokens bridge). This is the \"raised card\" the binding law names, and it only reads as raised when it sits inside a `--surface-panel` band. `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling as `default`, above. Soft paper — `--surface-panel`, the OTHER paper tone from this card's own off-beige — is the identical value `screen-shell.tsx`'s `CARD`/`BODY` and `collection-frame.tsx` already spend for a Badge standing on THIS exact tone; reused rather than re-picked so a status chip reads one rung of contrast everywhere the kit paints off-beige, card or shell alike."
         },
         {
          "name": "brand",
-         "classes": "bg-surface-brand text-ink-on-accent",
-         "note": "`.kw-card--brand` — mango, CHARCOAL ink. One per view."
+         "classes": "bg-surface-brand text-ink-on-accent [--badge-quiet-fill:var(--surface-brand-chip)]",
+         "note": "`.kw-card--brand` — mango, CHARCOAL ink. One per view. `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling. Off-beige, not a paper alternation this time: mango has no \"other paper tone\" of its own, so this reuses the rail's own answer to the identical question — `[data-spine=\"mango\"]`'s `--spine-chip-fill: var(--kw- off-beige)` (tokens.css §7b), \"the rail (mango) → its own pill tone\". One brand ground, one chip tone, wherever it is painted. `--surface-brand-chip` is the role token tokens.css now carries for this exact value (added alongside this fix, next to `--surface- brand` — the palette law forbids a component reaching past it for the raw `--kw-off-beige` directly)."
         },
         {
          "name": "inverse",
-         "classes": "bg-surface-inverse text-ink-on-inverse",
-         "note": "`.kw-card--inverse` — charcoal, off-beige ink. Chapter 13's own instruction: \"Use charcoal for the last block on a page — a sum, a decision, a next step.\""
+         "classes": "bg-surface-inverse text-ink-on-inverse [--badge-quiet-fill:var(--surface-record-footer-well)]",
+         "note": "`.kw-card--inverse` — charcoal, off-beige ink. Chapter 13's own instruction: \"Use charcoal for the last block on a page — a sum, a decision, a next step.\" `--badge-quiet-fill` REBOUND, 19 SEP 2026 — same ruling. `--surface-record-footer-well` (`--kw-unlit-secondary`, ONE value in both palettes — see tokens.css §3) is the kit's own already- measured answer for a chip-sized fill on an inverse/charcoal ground: `record-detail.tsx`'s ink footer rebinds `--card` / `--surface-raised` / `--background` to the exact same token for the exact same reason, \"the well under a mark, a pill or a field\". Reused rather than re-picked, so an inverse Card and the record footer's own inverse band agree on what a chip looks like there."
         },
         {
          "name": "well",
          "classes": "bg-accent",
-         "note": "Chapter 13's \"Well\" — secondary detail nested INSIDE a card. Same radius, no edge, no shadow. Added, not required; commission §2 rule 3 permits additions and the kit draws it. The drawn fill is a 4.5% charcoal wash and `--accent` is the palette's 5% wash; the gap is logged rather than a new token invented (GAPS-F CRD-4)."
+         "note": "Chapter 13's \"Well\" — secondary detail nested INSIDE a card. Same radius, no edge, no shadow. Added, not required; commission §2 rule 3 permits additions and the kit draws it. The drawn fill is a 4.5% charcoal wash and `--accent` is the palette's 5% wash; the gap is logged rather than a new token invented (GAPS-F CRD-4). NO `--badge-quiet-fill` REBIND HERE, DELIBERATELY. A well is a wash OVER its parent card's own paper, not a paper of its own — chapter 13 draws it nested inside a card that has already answered this question for itself (the `default`/`raised`/`brand`/`inverse` rebind above it in the tree), and a second rebind here would only ever repeat or fight that one. A Badge inside a well reads the enclosing card's own value, which is what a well being \"the same radius, no edge, no shadow\" as its card already promises."
         }
        ]
       }
@@ -2452,12 +2452,12 @@
        "options": [
         {
          "name": "page",
-         "classes": "bg-background [--btn-secondary-fill:var(--surface-panel)] [--pill-fill:var(--surface-panel)]",
+         "classes": "bg-background [--btn-secondary-fill:var(--surface-panel)] [--badge-quiet-fill:var(--surface-panel)]",
          "note": "THE DEFAULT SINCE THE K1 REVERSAL. Off-beige — the body pane's own tone, and the ground CH27.1 draws the soft-paper collection panel against. 26.04: \"The page itself is off-beige and every panel on it is soft paper: never the other way round.\" Measured against the panel at #F7F2EB: 1.103 light, 1.111 dark."
         },
         {
          "name": "panel",
-         "classes": "bg-surface-panel [--btn-secondary-fill:var(--surface-page)] [--pill-fill:var(--surface-page)]",
+         "classes": "bg-surface-panel [--btn-secondary-fill:var(--surface-page)] [--badge-quiet-fill:var(--surface-page)]",
          "note": "Soft paper. WAS the default, under ruling K1, and it is now the broken combination rather than the settled one: a soft-paper panel on a soft-paper ground measures 1.000 in both palettes and the panel has nothing to be seen against. Kept as a value, because removing it would change a public prop's accepted set. Do not reach for it: a frame that needs a soft-paper ground is a frame drawn on a screen card, and what it wants is the body pane between them — `ScreenShell`."
         },
         {
@@ -2512,8 +2512,8 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionPanelVariants",
-     "line": 536,
-     "base": "relative z-[2] flex min-w-0 flex-col rounded-[var(--radius)] bg-surface-panel text-foreground [--btn-secondary-fill:var(--surface-page)] [--pill-fill:var(--surface-page)]",
+     "line": 540,
+     "base": "relative z-[2] flex min-w-0 flex-col rounded-[var(--radius)] bg-surface-panel text-foreground [--btn-secondary-fill:var(--surface-page)] [--badge-quiet-fill:var(--surface-page)]",
      "groups": [
       {
        "name": "density",
@@ -8300,16 +8300,16 @@
         {
          "name": "bare",
          "classes": "",
-         "note": "SOMETHING ELSE ALREADY PAINTED. No fill, no radius, no trailing gap — the host owns all three, which is what `CollectionFrame` does with its own soft-paper panel and its `gap-5`. The default, because a row that paints nothing cannot paint the wrong thing."
+         "note": "SOMETHING ELSE ALREADY PAINTED. No fill, no radius, no trailing gap — the host owns all three, which is what `CollectionFrame` does with its own soft-paper panel and its `gap-5`. The default, because a row that paints nothing cannot paint the wrong thing. No `--badge-quiet-fill` rebind either, for the same reason: the row's own ground is the parent's, so a Badge inside it should read whatever the parent already declared, not a value this row invents for a ground it does not paint."
         },
         {
          "name": "page",
-         "classes": "bg-surface-panel",
+         "classes": "bg-surface-panel [--badge-quiet-fill:var(--surface-raised)]",
          "note": "STANDING ON OFF-BEIGE — a page, a body pane, a screen's own ground. The row takes soft paper, which is 26.04 read at this level: \"The page itself is off-beige and every panel on it is soft paper: never the other way round.\" Controls inside then rebind to off-beige."
         },
         {
          "name": "panel",
-         "classes": "bg-surface-raised",
+         "classes": "bg-surface-raised [--badge-quiet-fill:var(--surface-panel)]",
          "note": "STANDING ON SOFT PAPER — a screen card, a panel, a sheet. The row takes off-beige, and the controls inside rebind to soft paper. This is the value the consuming app's own row arrived at by hand after two rounds of client feedback, which is the relation working."
         }
        ]

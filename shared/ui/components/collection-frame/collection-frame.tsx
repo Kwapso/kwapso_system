@@ -452,7 +452,9 @@ const collectionFrameVariants = cva(
         page: [
           "bg-background",
           "[--btn-secondary-fill:var(--surface-panel)]",
-          "[--pill-fill:var(--surface-panel)]",
+          /* RENAMED FROM `--pill-fill`, 19 Sep 2026 — CHANGELOG v1.2.132.
+             Same value. */
+          "[--badge-quiet-fill:var(--surface-panel)]",
         ],
         /**
          * Soft paper. WAS the default, under ruling K1, and it is now the
@@ -468,7 +470,9 @@ const collectionFrameVariants = cva(
         panel: [
           "bg-surface-panel",
           "[--btn-secondary-fill:var(--surface-page)]",
-          "[--pill-fill:var(--surface-page)]",
+          /* RENAMED FROM `--pill-fill`, 19 Sep 2026 — CHANGELOG v1.2.132.
+             Same value. */
+          "[--badge-quiet-fill:var(--surface-page)]",
         ],
         /**
          * No fill at all, for a frame nested inside a band that already has
@@ -544,7 +548,9 @@ const collectionPanelVariants = cva(
        lines said the opposite, and the toolbar's buttons were soft paper on
        off-beige, which is the sentence backwards. */
     "[--btn-secondary-fill:var(--surface-page)]",
-    "[--pill-fill:var(--surface-page)]",
+    /* RENAMED FROM `--pill-fill`, 19 Sep 2026 — CHANGELOG v1.2.132. Same
+       value. */
+    "[--badge-quiet-fill:var(--surface-page)]",
   ],
   {
     variants: {

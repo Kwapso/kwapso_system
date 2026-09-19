@@ -145,8 +145,8 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
 })
 
-describe("the composer is the conversation card's own footer, not a third padded child", () => {
-  it("the thread scrolls inside CardContent; the composer sits outside it, in CardFooter, as the card's last child", async () => {
+describe("the composer is pinned outside the conversation card entirely, never scrolled with the thread (R89 round 23)", () => {
+  it("the thread scrolls inside CardContent, inside its own Card with no footer; the composer sits outside that Card, as the ticket body's own last child", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
 
     // V1 draws every panel at once — no tab click needed to reach either.
@@ -162,39 +162,47 @@ describe("the composer is the conversation card's own footer, not a third padded
     // DOM node of its own, so the first real ancestor IS the scroller.
     const scroller = thread.parentElement as HTMLElement
     expect(scroller.getAttribute("data-slot")).toBe("card-content")
-    expect(scroller.className).toContain("overflow-y-auto")
-    expect(scroller.className).toContain("min-h-0")
+
+    // ROUND 23 — the thread's own Card holds ONLY that CardContent now; no
+    // CardFooter nests inside it at any width. TicketConversationPanel (the
+    // component that used to bundle the two) is retired.
+    const threadCard = scroller.parentElement as HTMLElement
+    expect(threadCard.getAttribute("data-slot")).toBe("card")
+    expect(Array.from(threadCard.children)).toEqual([scroller])
 
     // THE COMPOSER IS OUTSIDE IT — never scrolled away with the transcript,
     // the client's own "she can keep reading while it counts" now read as a
-    // pinned send row.
-    expect(scroller.contains(composerForm)).toBe(false)
-
-    // THE COMPOSER'S HOME IS THE KIT'S OWN `CardFooter` — ReplyComposer's
-    // root (`<div className="flex min-w-0 flex-col gap-4">`) is CardFooter's
+    // pinned send row. ReplyComposer's own root
+    // (`<div className="flex min-w-0 flex-col gap-4">`) is CardFooter's
     // direct DOM child.
     const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
     expect(composerFooter.getAttribute("data-slot")).toBe("card-footer")
-    expect(composerFooter.className).toContain("shrink-0")
+    expect(composerFooter.className).toContain("flex-none")
+    expect(composerFooter.className).toContain("sticky")
+    // NOT bottom-0 — measured live, sticky's offset anchors to the nearest
+    // scrolling ancestor's PADDING edge, so a plain bottom-0 clamps the
+    // footer short of the pane's true bottom at lg; the negative,
+    // padding-compensated offset is what actually reaches it.
+    expect(composerFooter.className).toContain("bottom-[calc(-1*var(--space-5))]")
+    expect(composerFooter.className).toContain("lg:bottom-[calc(-1*var(--space-6))]")
+    expect(threadCard.contains(composerFooter)).toBe(false)
 
-    // ONE SHARED PARENT — the conversation `Card` itself — holds both
-    // regions as DIRECT children, CardContent then CardFooter, so the
-    // composer really is the card's LAST child rather than nested one
-    // level deeper than the scroller.
-    const card = scroller.parentElement as HTMLElement
-    expect(card.getAttribute("data-slot")).toBe("card")
-    expect(card).toBe(composerFooter.parentElement)
-    expect(card.className).toContain("flex-col")
-    expect(Array.from(card.children)).toEqual([scroller, composerFooter])
-    expect(card.lastElementChild).toBe(composerFooter)
+    // THE COMPOSER'S PARENT IS `TicketDetailBody`'s OWN ROOT
+    // (`data-slot="ticket-detail-body"`), NOT the thread's card and not the
+    // scrolling region that wraps the grid/stack — it stands as a sibling
+    // of that scrolling region, the root's own last child.
+    const ticketBodyRoot = composerFooter.parentElement as HTMLElement
+    expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
+    expect(ticketBodyRoot.lastElementChild).toBe(composerFooter)
+    expect(ticketBodyRoot.contains(scroller)).toBe(true)
 
-    // THE HAIRLINE, NOT A FLEX GAP, IS WHAT NOW SEPARATES THEM — CardFooter's
-    // own chapter-13 rule (card.tsx), not a pixel or a token gap re-invented
-    // on this screen.
+    // THE HAIRLINE, NOT A FLEX GAP, IS WHAT SEPARATES THE COMPOSER FROM
+    // WHATEVER SCROLLS ABOVE IT — CardFooter's own chapter-13 rule
+    // (card.tsx), not a pixel or a token gap re-invented on this screen.
     expect(composerFooter.className).toMatch(/shadow-\[var\(--hairline-over\)\]/)
   })
 
-  it("draws no second fill inside the card — CardContent and CardFooter both paint nothing of their own, over Card's own --surface-panel", async () => {
+  it("draws no second fill inside the thread's card, and the composer carries its own bg-surface-panel standing outside any Card", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
     const thread = await waitFor(() => {
       const el = document.querySelector('[data-slot="ticket-thread"]') as HTMLElement | null
@@ -204,14 +212,15 @@ describe("the composer is the conversation card's own footer, not a third padded
     const scroller = thread.parentElement as HTMLElement
     const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
     const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
-    const card = scroller.parentElement as HTMLElement
+    const threadCard = scroller.parentElement as HTMLElement
 
-    expect(card.getAttribute("data-variant")).toBe("default")
-    // Neither region repaints the card's own `--surface-panel` fill — no
-    // `bg-*` utility of their own, which is what makes "the panel tone" on
-    // the footer automatic rather than a class somebody has to remember.
+    expect(threadCard.getAttribute("data-variant")).toBe("default")
+    // The thread's own scroller repaints nothing of its own — the card's
+    // `--surface-panel` fill is the only ground inside it.
     expect(scroller.className).not.toMatch(/\bbg-/)
-    expect(composerFooter.className).not.toMatch(/\bbg-/)
+    // The composer, standing OUTSIDE any Card at every width now, carries
+    // its own bg-surface-panel fill rather than inheriting one.
+    expect(composerFooter.className).toContain("bg-surface-panel")
   })
 })
 

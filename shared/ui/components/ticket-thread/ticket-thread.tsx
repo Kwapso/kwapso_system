@@ -160,6 +160,18 @@ export interface ThreadMessage {
   daySeparator?: React.ReactNode;
 }
 
+/**
+ * Where the author · org · time line sits relative to the bubble.
+ * `"above"` is the kit's own drawing (ch27.10) and the default — passing
+ * nothing here changes nothing. `"below"` moves that same line to follow
+ * the bubble, aligned to the bubble's own side, for a caller drawing chat
+ * "runs": several bubbles from one speaker with the byline only on the
+ * last, and the earlier ones sitting closer together (see `ThreadMessage`
+ * above — pass `author`/`time`/`initials` only on the last message of a
+ * run to get both the placement and the tightened gap).
+ */
+export type ThreadBylinePlacement = "above" | "below";
+
 const BUBBLE_BASE = [
   // `.kw-msg__bubble` — the box radius, 12/16 inset, caption at normal leading.
   "rounded-[var(--radius)] px-4 py-3",
@@ -180,6 +192,12 @@ export interface TicketThreadProps
   extends Omit<React.ComponentPropsWithoutRef<"div">, "children" | "onSubmit"> {
   /** The conversation, oldest first. An empty array draws the empty register. */
   messages: readonly ThreadMessage[];
+  /**
+   * Where each message's author · org · time line sits. Defaults to
+   * `"above"`, the kit's own ch27.10 drawing — leaving this unset changes
+   * nothing about today's output.
+   */
+  bylinePlacement?: ThreadBylinePlacement;
   /**
    * A band above the composer — an approval strip, a status line, a notice
    * that the conversation is closed. A node, so whatever the composition puts
@@ -341,6 +359,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
     {
       className,
       messages,
+      bylinePlacement = "above",
       banner,
       composer = true,
       value,
@@ -445,7 +464,18 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
           role="log"
           aria-label={label}
           aria-live="polite"
-          className="flex flex-col gap-[var(--space-2h)]"
+          className={
+            bylinePlacement === "below"
+              ? cn(
+                  "flex flex-col",
+                  // Full gap between runs; a message with no byline (an
+                  // earlier message of a run, by construction — see
+                  // `ThreadMessage.author`) sits closer to the one after it.
+                  "[&>*+*]:mt-[var(--space-2h)]",
+                  "[&>[data-run=continued]+*]:mt-[var(--space-1)]",
+                )
+              : "flex flex-col gap-[var(--space-2h)]"
+          }
         >
           {messages.map((message, index) => {
             const side: ThreadSide = message.side ?? "theirs";
@@ -453,6 +483,42 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
             const key = message.id ?? String(index);
             const hasAvatar =
               message.initials !== undefined || message.image !== undefined;
+            const hasByline =
+              message.author !== undefined ||
+              message.authorMeta !== undefined ||
+              message.time !== undefined ||
+              Boolean(message.internal);
+            const below = bylinePlacement === "below";
+
+            // Author, org and time. Ch27.10 draws all three at the caption
+            // and badge steps; `bylinePlacement` only moves the whole line
+            // above or below the bubble, never its own typography.
+            const byline = hasByline ? (
+              <span
+                data-slot={below ? "thread-byline" : undefined}
+                className={cn(
+                  "flex flex-wrap items-baseline gap-2 text-badge",
+                  mine && "justify-end",
+                )}
+              >
+                {message.author !== undefined && message.author !== null ? (
+                  <span className="text-caption font-[var(--font-weight-medium)]">
+                    {message.author}
+                  </span>
+                ) : null}
+                {message.authorMeta !== undefined && message.authorMeta !== null ? (
+                  <span className="text-ink-tertiary">{message.authorMeta}</span>
+                ) : null}
+                {/* Quiet, not coloured: an internal note is a scope,
+                    not a status, and the words carry it. */}
+                {message.internal ? <Badge>{internalLabel}</Badge> : null}
+                {message.time !== undefined && message.time !== null ? (
+                  <span className="tabular-nums text-ink-tertiary">
+                    {message.time}
+                  </span>
+                ) : null}
+              </span>
+            ) : null;
 
             return (
               <React.Fragment key={key}>
@@ -470,6 +536,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                 <div
                   data-slot="thread-message"
                   data-side={side}
+                  data-run={below && !hasByline ? "continued" : undefined}
                   /* `.kw-msg` — 8 between the avatar and the bubble, bottom
                      aligned, 62% maximum. `flex-row-reverse` puts the avatar
                      outside on the sender's own side and mirrors with the
@@ -491,36 +558,9 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                   ) : null}
 
                   <div className="flex min-w-0 flex-col gap-1">
-                    {/* Author, org and time — ch27.10 draws all three above
-                        the bubble, at the caption and badge steps. */}
-                    {message.author !== undefined ||
-                    message.authorMeta !== undefined ||
-                    message.time !== undefined ||
-                    message.internal ? (
-                      <span
-                        className={cn(
-                          "flex flex-wrap items-baseline gap-2 text-badge",
-                          mine && "justify-end",
-                        )}
-                      >
-                        {message.author !== undefined && message.author !== null ? (
-                          <span className="text-caption font-[var(--font-weight-medium)]">
-                            {message.author}
-                          </span>
-                        ) : null}
-                        {message.authorMeta !== undefined && message.authorMeta !== null ? (
-                          <span className="text-ink-tertiary">{message.authorMeta}</span>
-                        ) : null}
-                        {/* Quiet, not coloured: an internal note is a scope,
-                            not a status, and the words carry it. */}
-                        {message.internal ? <Badge>{internalLabel}</Badge> : null}
-                        {message.time !== undefined && message.time !== null ? (
-                          <span className="tabular-nums text-ink-tertiary">
-                            {message.time}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : null}
+                    {/* `bylinePlacement="above"` (the default, ch27.10's own
+                        drawing): the line sits above the bubble. */}
+                    {below ? null : byline}
 
                     {/* Ruling 36 — images sit as their OWN bubble, same side
                         as the sender. Its inset steps down so the block reads
@@ -593,6 +633,10 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                         })}
                       </span>
                     ) : null}
+
+                    {/* `bylinePlacement="below"`: the same line follows the
+                        bubble (and any attachments), aligned to its side. */}
+                    {below ? byline : null}
                   </div>
                 </div>
 

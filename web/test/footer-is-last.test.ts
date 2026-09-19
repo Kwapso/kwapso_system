@@ -227,8 +227,12 @@ describe("D21 — a footer is at the bottom", () => {
     expect(found.length, "the post-fix fixture's CardFooter is the card's own last child").toBe(0)
   })
 
-  // ROT PROOF — the real, unmodified file passes this census today.
-  it("ticket-detail-body.tsx's own real TicketConversationPanel passes clean", () => {
+  // ROT PROOF — the real, unmodified file passes this census today. The
+  // composer's own CardFooter is TicketDetailBody's own root's last child
+  // now (round 23, R89) rather than nested inside a per-width
+  // TicketConversationPanel (retired) — the census is generic over tag
+  // names, so this proof still holds regardless of which component wraps it.
+  it("ticket-detail-body.tsx's own real composer CardFooter passes clean", () => {
     const offenders = findOffenders().filter((o) => o.rel === "components/tickets/ticket-detail-body.tsx")
     expect(offenders, JSON.stringify(offenders)).toEqual([])
   })

@@ -56,7 +56,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R32 | enforced | `closed-palette` | `web/test/rules.test.ts` |
 | R33 | enforced | `wrapped-strings` | `web/test/wrapped-strings.test.ts` |
 | R34 | enforced | `glossary-in-copy` | `web/test/rules.test.ts` |
-| R35 | enforced | `records-carry-their-face` | `web/test/rules.test.ts`<br>`web/test/ticket-raised-by-avatar-and-app-link.test.tsx`<br>`workers/content/test/ticket-work-engine.test.ts` |
+| R35 | enforced | `records-carry-their-face` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/rules.test.ts`<br>`web/test/ticket-raised-by-avatar-and-app-link.test.tsx`<br>`workers/content/test/ticket-work-engine.test.ts` |
 | R38 | enforced | `details-ask-the-door` | `web/test/rules.test.ts` |
 | R39 | enforced | `kit-supplies-the-ui` | `web/test/rules.test.ts` |
 | R44 | enforced | `translation-ceiling` | `web/test/translation-ceiling.test.ts` |
@@ -64,10 +64,10 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R46 | enforced | `component-coverage` | `web/test/rules.test.ts` |
 | R48 | enforced | `toolbar-shows-search` | `web/test/rules.test.ts`<br>`web/test/tickets-dashboard-no-toolbar.test.tsx` |
 | R49 | enforced | `toolbar-content-gap` | `web/test/rules.test.ts` |
-| R50 | enforced | `empty-toolbar` | `web/test/rules.test.ts` |
+| R50 | enforced | `empty-toolbar` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/rules.test.ts` |
 | R51 | enforced | `aside-collapse` | `web/test/rules.test.ts` |
 | R52 | enforced | `record-title-treatment` | `web/test/rules.test.ts` |
-| R53 | enforced | `toolbar-slot-set` | `web/test/rules.test.ts` |
+| R53 | enforced | `toolbar-slot-set` | `web/test/contacts-screen-gallery.test.tsx`<br>`web/test/rules.test.ts` |
 | R54 | enforced | `staff-names-are-first-names` | `web/test/staff-names-are-first-names.test.ts` |
 | R57 | enforced | `component-folders` | `web/test/component-folders.test.ts` |
 | R59 | enforced | `forms-are-not-overlays` | `web/test/rules.test.ts` |
@@ -94,7 +94,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R86 | enforced | `status-owns-the-chip` | `web-portal/test/ticket-row-type-icon.test.tsx`<br>`web/test/contacts-are-a-table.test.tsx`<br>`web/test/status-owns-the-chip.test.ts`<br>`web/test/ticket-type-icons.test.ts` |
 | R87 | enforced | `title-length` | `web/test/title-length.test.ts` |
 | R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts` |
-| R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx` |
+| R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx`<br>`web/test/ticket-thread-composer-gap.test.tsx` |
 | R90 | enforced | `faces-in-choices` | `web/test/faces-in-choices.test.ts` |
 
 ## Workflow (2)

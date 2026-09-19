@@ -279,24 +279,39 @@ const toolbarRowVariants = cva(
        * this toolbar" has one.
        *
        * NAMED UTILITY CLASSES, AND THAT IS LOAD-BEARING RATHER THAN TIDY.
-       * tokens.css rebinds `--btn-secondary-fill` and `--pill-fill` off a LIST
-       * OF CLASS NAMES (`.bg-background, .bg-card, .bg-surface-raised,
-       * .bg-surface-page` on one side, `.bg-surface-panel, .bg-secondary` on
-       * the other), so a secondary control is always the other tone from
-       * whatever it stands on and no component needs a prop for it. The
-       * consuming app painted this identical row with
-       * `bg-[var(--surface-raised)]` — the same colour, a different class —
-       * and every button in its toolbar lost its background, twice reported
-       * ("the buttons in the toolbar are missing the background") before it
-       * was traced. The arbitrary form silently freezes every ground-aware
-       * token beneath it.
+       * tokens.css rebinds `--btn-secondary-fill` off a LIST OF CLASS NAMES
+       * (`.bg-background, .bg-card, .bg-surface-raised, .bg-surface-page` on
+       * one side, `.bg-surface-panel, .bg-secondary` on the other), so a
+       * secondary control is always the other tone from whatever it stands
+       * on and no component needs a prop for it. The consuming app painted
+       * this identical row with `bg-[var(--surface-raised)]` — the same
+       * colour, a different class — and every button in its toolbar lost its
+       * background, twice reported ("the buttons in the toolbar are missing
+       * the background") before it was traced. The arbitrary form silently
+       * freezes every ground-aware token beneath it.
+       *
+       * `--badge-quiet-fill` IS NOT ONE OF §8's CLASS-KEYED TOKENS — CORRECTED
+       * 19 SEP 2026, CHANGELOG v1.2.132. This comment used to claim `--pill-
+       * fill` rode along with `--btn-secondary-fill` in that same §8 list; it
+       * never did (§8 rebinds exactly `--btn-secondary-fill` and `--surface-
+       * lift`), so a status or secondary Badge dropped into this row read
+       * nothing but the flat page-level fallback regardless of `ground`. Each
+       * `ground` step below now carries its own explicit
+       * `[--badge-quiet-fill:…]`, the same "other paper tone" relation
+       * `--btn-secondary-fill` already draws for its own two grounds — see
+       * `screen-shell.tsx`'s `CARD`/`BODY` and `collection-frame.tsx` for the
+       * same rebind, one file over.
        */
       ground: {
         /**
          * SOMETHING ELSE ALREADY PAINTED. No fill, no radius, no trailing
          * gap — the host owns all three, which is what `CollectionFrame` does
          * with its own soft-paper panel and its `gap-5`. The default, because
-         * a row that paints nothing cannot paint the wrong thing.
+         * a row that paints nothing cannot paint the wrong thing. No
+         * `--badge-quiet-fill` rebind either, for the same reason: the row's
+         * own ground is the parent's, so a Badge inside it should read
+         * whatever the parent already declared, not a value this row
+         * invents for a ground it does not paint.
          */
         bare: "",
         /**
@@ -305,14 +320,14 @@ const toolbarRowVariants = cva(
          * page itself is off-beige and every panel on it is soft paper: never
          * the other way round." Controls inside then rebind to off-beige.
          */
-        page: "bg-surface-panel",
+        page: ["bg-surface-panel", "[--badge-quiet-fill:var(--surface-raised)]"],
         /**
          * STANDING ON SOFT PAPER — a screen card, a panel, a sheet. The row
          * takes off-beige, and the controls inside rebind to soft paper. This
          * is the value the consuming app's own row arrived at by hand after
          * two rounds of client feedback, which is the relation working.
          */
-        panel: "bg-surface-raised",
+        panel: ["bg-surface-raised", "[--badge-quiet-fill:var(--surface-panel)]"],
       },
     },
     defaultVariants: { ground: "bare" },

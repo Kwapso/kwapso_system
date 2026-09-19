@@ -16,7 +16,12 @@
 //   F1  the landing screen never names a first act
 //   F2  two import targets, and the generic importer, are reachable from nowhere
 //   F3  sixteen collections share one empty sentence and it is untrue on most
-//   F4  Contacts has no create route at all and its empty state points elsewhere
+//   F4  (RETIRED — see below) Contacts had no create route at all and its
+//       empty state pointed elsewhere; contacts-screen.tsx now offers its own
+//       "New contact" door (an account picker, gallery+list, R53/R88), so the
+//       finding this described no longer holds and the assertion it earned is
+//       gone with it — folded into the ordinary F5/F6 coverage every other
+//       create-capable collection already gets.
 
 // The portal's own half of the same walk (F12 — a search box and a lone "+"
 // over an empty collection) is in web-portal/test/cold-portal.test.tsx: the two
@@ -266,13 +271,6 @@ describe("F3 · an empty collection's sentence is true of that collection", () =
     expect(screen.queryByText(/Whatever you add shows up here/i)).toBeNull()
   })
 
-  it("F4 · Contacts names the route that actually exists, since it has no create act", () => {
-    const contacts = BASE_RECIPES["contacts.list"]?.collection
-    expect(contacts, "the contacts list recipe is gone").toBeTruthy()
-    expect(contacts?.emptyDescription, "Contacts' empty state has no sentence of its own").toBeTruthy()
-    expect(contacts?.emptyDescription).toMatch(/Accounts/)
-  })
-
   it("keeps the portal sentence on the one collection it is true of", () => {
     expect(BASE_RECIPES["tickets.list"]?.collection?.emptyDescription).toMatch(/portal/i)
     // …and nowhere else. Every other collection that carries its own sentence
@@ -319,15 +317,18 @@ describe("F3 · an empty collection's sentence is true of that collection", () =
 // broken in the way this file exists to catch.
 
 /** What the host publishes above each of these collections today. `false` is
- * never an oversight — Members and Contacts have no create act at all (a member
- * arrives by accepting an invite; a contact is added from her company's own
- * screen), and TEN STATES #10 says the control is then ABSENT, never dimmed. */
+ * never an oversight — Members has no create act at all (a member arrives by
+ * accepting an invite), and TEN STATES #10 says the control is then ABSENT,
+ * never dimmed. Contacts MOVED off this list, 19 Sep 2026 ("on contacts, add
+ * the view gallery and the button to add") — its own "New contact" door
+ * (contacts-screen.tsx, an account picker since no company is implied here)
+ * now offers exactly the act every other `true` row below already does. */
 const COLLECTIONS: [key: string, title: string, hasCreateAction: boolean][] = [
   ["accounts.list", "No accounts yet.", true],
   ["roles.list", "No roles yet.", true],
   ["invites.list", "No invites yet.", true],
   ["meetings.list", "Nothing in Meetings yet.", true],
-  ["contacts.list", "No contacts yet.", false],
+  ["contacts.list", "No contacts yet.", true],
   ["members.list", "No members yet.", false],
 ]
 
@@ -422,25 +423,27 @@ describe("F5 · a real collection screen with nothing in it", () => {
 
 // THE DELIBERATE CHOICE, MADE READABLE BY SOMETHING OTHER THAN A HUMAN.
 //
-// Contacts publishes no create action on purpose — a contact is a person AT a
-// company, so she is added from that company's own record, and a "New contact"
-// button here would either create an orphan or open a form whose first question
-// is "which company?", which is the Accounts screen with extra steps. Members
-// is the same shape for a different reason: a member arrives by accepting an
-// invite, and there is no door that makes one directly.
+// Members is the one collection left with no create act at all: a member
+// arrives by accepting an invite, and there is no door that makes one
+// directly. (Contacts used to be the other one — "a contact is a person AT a
+// company, so she is added from that company's own record" — until the
+// client's ruling, 19 Sep 2026, "on contacts, add the view gallery and the
+// button to add": `contacts-screen.tsx` now opens its own "New contact" door,
+// with an account picker in place of the implied company, so it moved out of
+// `ACTLESS` below into the ordinary F5 coverage every other create-capable
+// collection gets.)
 //
-// Both reasons were written down in 2026 as CODE COMMENTS
-// (contacts-screen.tsx's own note, collection-content.tsx's members branch),
-// and a comment is read by people who are already looking at that file. What
-// nothing checked was the PAIR: the moment a collection has no act, its empty
-// state must say where the act actually is, because the frame's own default
-// sentence — "Whatever you add shows up here" — promises one that does not
-// exist on this screen.
+// The reason was written down in 2026 as a CODE COMMENT
+// (collection-content.tsx's members branch), and a comment is read by people
+// who are already looking at that file. What nothing checked was the PAIR:
+// the moment a collection has no act, its empty state must say where the act
+// actually is, because the frame's own default sentence — "Whatever you add
+// shows up here" — promises one that does not exist on this screen.
 //
 // So this is the rule rather than the instance: no create act ⇒ its own
-// sentence. It goes red if somebody gives Contacts a button and leaves the
-// sentence pointing at Accounts, and red the other way if somebody deletes the
-// sentence and lets the generic promise back in.
+// sentence. It goes red if somebody takes Members' button away without giving
+// it a sentence, and red the other way if somebody deletes the sentence and
+// lets the generic promise back in.
 
 describe("F6 · no create act means the screen says where the act is", () => {
   const ACTLESS = COLLECTIONS.filter(([, , hasCreateAction]) => !hasCreateAction)
