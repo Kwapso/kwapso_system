@@ -75,6 +75,17 @@ const STAKEHOLDER: HelpStakeholder = {
   origin: "admin",
 } as unknown as HelpStakeholder
 
+// THE RAISER — origin: "raiser", so the Raised-by tile itself renders
+// (`(raiser || raisedByContactId)` in help-stakeholders.tsx) and the round-26
+// horizontal-card describe block below has something to find.
+const RAISER: HelpStakeholder = {
+  userId: "u-raiser",
+  name: "Marta Bergman",
+  email: "marta@bergman.example",
+  imageUrl: null,
+  origin: "raiser",
+} as unknown as HelpStakeholder
+
 // TWO RELATED STORIES — enough to prove "no cap" means something (V1 capped
 // at five; two is not a cap-proving number on its own, but the type/status
 // chip assertions below need only one, and a second row is what proves nothing
@@ -114,6 +125,11 @@ vi.mock("next/navigation", () => ({
 const api = vi.hoisted(() => ({
   ticket: null as unknown as HelpTicket,
   replies: [] as unknown as HelpMessage[],
+  // Defaults to STAKEHOLDER alone (no "raiser" origin) so the Raised-by tile
+  // stays OFF for every test that doesn't opt in — the pre-existing "fact
+  // list is gone" test below relies on "Raised by" not rendering at all.
+  // Only the round-26 horizontal-card describe block overrides this.
+  stakeholders: null as unknown as unknown[],
 }))
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -125,7 +141,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       help: async () => ({ tickets: [api.ticket], total: 1, nextCursor: null, hasMore: false }),
       helpOne: async () => api.ticket,
       helpThread: async () => ({ replies: api.replies, total: api.replies.length }),
-      helpStakeholders: async () => ({ stakeholders: [STAKEHOLDER] }),
+      helpStakeholders: async () => ({ stakeholders: api.stakeholders }),
       helpStages: async () => EMPTY_STAGE_HISTORY,
       stories: async () => ({ stories: RELATED_STORIES, total: RELATED_STORIES.length, nextCursor: null, hasMore: false }),
       sprints: async () => ({ sprints: [], total: 0 }),
@@ -227,6 +243,7 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
   window.history.pushState({}, "", "/tickets/help-1")
   api.replies = []
+  api.stakeholders = [STAKEHOLDER]
 })
 
 const openTicket = (status: HelpStatus = "triaged") => {
@@ -544,6 +561,8 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     const ticketBodyRoot = band.parentElement as HTMLElement
     expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(ticketBodyRoot.lastElementChild).toBe(band)
+    // ROUND 26 — the panel gap above the band (R89), by token.
+    expect(ticketBodyRoot.className).toContain("gap-6")
     expect(band.className).toContain("sticky")
     // NOT bottom-0 — see ticket-detail-body.tsx's own header: sticky's
     // offset anchors to the scrollport's PADDING edge, so bottom-0
@@ -557,6 +576,39 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     // and nowhere else on the page (RecordScreen's own copy is switched off).
     expect(band.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
     expect(document.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
+  })
+})
+
+// CLIENT RULING, 19 Sep 2026, VERBATIM: "for stakeholder, raised by, use a
+// horizontal card (avatar on the left, raised by + name on the right one on
+// top of the other)." Supersedes the 18 Sep "keep Raised by as one tile"
+// VERTICAL shape — see help-stakeholders.tsx's own header for the full
+// account. `help-stakeholders.test.tsx` proves the component in isolation;
+// this describe block proves it renders horizontally on the real page too.
+describe("the raised-by tile is a horizontal card (19 Sep 2026 ruling)", () => {
+  it("draws the raiser's face on the left, 'Raised by' over the name on the right", async () => {
+    api.stakeholders = [STAKEHOLDER, RAISER]
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const chipEl = await screen.findByText("Raised by")
+    // `PersonCard`'s own horizontal branch (shared/web/person-card.tsx) wraps
+    // chip+title in a column marked `items-start` — the vertical/band branch
+    // this tile drew until 19 Sep marks the same column `items-center`
+    // instead, so this is the one class that tells the two shapes apart.
+    const column = chipEl.parentElement as HTMLElement
+    expect(column.className).toContain("items-start")
+    expect(column.className).not.toContain("items-center")
+    // Scoped to the column itself — "Marta Bergman" also appears as the
+    // thread's own message-sender name, elsewhere on the page.
+    const nameEl = within(column).getByText("Marta Bergman")
+    expect(column.contains(nameEl), "the name sits under the chip, in the same column").toBe(true)
+    // Chip above name, top line over bottom line.
+    const children = Array.from(column.children)
+    const chipIndex = children.indexOf(chipEl)
+    const nameIndex = children.findIndex((c) => c.contains(nameEl))
+    expect(chipIndex).toBeGreaterThan(-1)
+    expect(nameIndex).toBeGreaterThan(-1)
+    expect(chipIndex).toBeLessThan(nameIndex)
   })
 })
 

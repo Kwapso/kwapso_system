@@ -139,6 +139,22 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * `web/test/footer-on-the-edge.test.ts` (R89), by `app-shell.tsx`'s own
  * `has-[…]` rule, and by nothing else.
  *
+ * ROUND 26, THE MARGIN CORRECTION, 19 Sep 2026. Aurora, reading the round-24/25
+ * page back, verbatim: "ok, now the footer is at the bottom, but there's a law
+ * about how much margin there must be above!!! add the space!!" The band's own
+ * flush bottom edge was already correct and stays exactly 0px; what was
+ * missing was the ordinary space ABOVE it — the same panel gap every other
+ * pair of stacked panels on this screen already carries
+ * (`documents/UI-RULEBOOK.md` S1/N7, "between panels on a screen: gap-6", the
+ * `--space-6` step, 24px at the 16px root). This component's own root — a
+ * flex column whose only two children are the scrolling region and the band
+ * — now carries `gap-6` itself, so the gap sits in NORMAL FLOW between the
+ * two children, by TOKEN, never a hand-numbered offset: it applies whether
+ * the band is in its own natural flow position or `sticky`-held at the
+ * pane's true bottom edge, and it never touches the band's own bottom-edge
+ * mechanics (unchanged from round 24). See `web/test/footer-on-the-edge.test.ts`'s
+ * own new assertion.
+ *
  * THE EARLIER CONSTRUCTIONS, KEPT FOR THE RECORD (superseded, not deleted —
  * see this file's git history): the "sum of three" shape (matching the two
  * columns to each other, never claiming the screen's own bottom edge), the
@@ -274,7 +290,10 @@ export function TicketDetailBody({
   )
 
   return (
-    <div data-slot="ticket-detail-body" className="flex min-w-0 flex-1 min-h-0 flex-col">
+    <div
+      data-slot="ticket-detail-body"
+      className="flex min-w-0 flex-1 min-h-0 flex-col gap-6"
+    >
       {/* THE ONE SCROLLING REGION — everything except the band. Bounded by
           construction: `flex-1 min-h-0 overflow-y-auto` against the root's
           own definite height, so its own content (the grid or the stack)

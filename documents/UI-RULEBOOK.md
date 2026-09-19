@@ -37,7 +37,7 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L32)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L33)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
 - [4. Collections](#4-collections) (K1 to K54)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B23)
@@ -1557,6 +1557,10 @@ breakpoint reads the ticket screen's own width, not the assistant's.
 
 **Status: redefined, in build, 19 Sep 2026.**
 
+**AMENDED 19 Sep 2026 ~10:55 (Round 25)** — the dark band now observes the gap above it from the panel-spacing law. The kit's own footer background keeps a `gap-6` (24px at 16px root) above it through the ticket detail's flex container logic, so the band holds visual separation from the conversation and side card regions above it, never overlapping or sitting flush.
+
+**Status: amended, in build, 19 Sep 2026.**
+
 ---
 
 ### L32: any choice over a person, a contact, an account or an app shows the same face the lists show
@@ -1595,6 +1599,18 @@ mechanism (the TYPE, not a prop). A static census, `web/test/faces-in-choices.te
 a choice over a record by its own options array's field names (`personName`/`contactId`/
 `memberId`/`accountId`/`avatar`/`photo`/`initials`) and fails when a `<SelectItem>` inside one
 carries no `face=`.
+
+---
+
+### L33: at lg the conversation card stretches to match the side column's stack height; below lg it keeps its floor
+
+**The rule.** Aurora's ruling, 19 Sep 2026 ~10:55, verbatim: *"i want that the conversation has more heugh - use the heig set by the ocmponents on the left column."* On the ticket detail, at the `lg` breakpoint and above, the conversation card (the thread + composer) grows to match the height of the side column's own stack of cards (the stage ladder, stakeholders, assignees, etc.) — the two scrolling independently side by side when either overflows its own container. Below `lg` the card keeps its own floor of 420px (`min-h-[420px]`), as the current layout already does.
+
+**The shape.** At `lg` the conversation cell is `flex-1 min-h-0`, making it claim all remaining vertical space after the top card's content settles, and the card itself is `h-full`, growing its own content to fill that space. The thread inside it is `overflow-y-auto` with a `min-h-0` floor on its container, so it scrolls when taller than the column. The composer is the card's own `CardFooter`, the last child, sitting at the card's own foot as D21 already proves. Below `lg` a media query releases both constraints (`lg:min-h-0` on the cell and container), returning the card to its natural height plus the 420px floor.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**Law.** None registered.
 
 ---
 
@@ -5432,19 +5448,21 @@ build decision for whoever implements it.
 else case this rule carves an exception out of; the exception itself is not yet separately
 registered.
 
-### B21: raised by is a dropdown; who to keep in the loop is one horizontal row, the full roster
+### B21: raised by is a horizontal person card; who to keep in the loop is one horizontal row, the full roster
 
 **The rule.** The client's ruling, 18 Sep 2026, verbatim: *"On ticket raised by, there should
 be a dropdown, and who to keep in the loop should be horizonta[l]."* Two fields on the ticket
-form, two separate changes.
+form, two separate changes. AMENDED 19 Sep 2026 ~10:55: the "dropdown" is now a horizontal person card with the avatar on the left and the contact's name (prefixed with the label "Raised by") stacked on the right, still opening the contacts picker on click.
 
 **Raised by.** Supersedes her own 7 Sep 2026 ruling on the same field ("the raise by, no
 dropdown but visible all chips") — said here rather than left to be discovered as a silent
 contradiction. The data and the default are unchanged: the same contact options, the same
 default (the picked contact, else the account's main one), the same door fence refusing any id
-that is not a live contact of this client. Only the control changed, from a row of chip pills
-to the kit's own `Select`. Team members are not offered here — a colleague is a different
-table from a contact, and offering one would need a real schema decision, not a control swap.
+that is not a live contact of this client. The control is now a horizontal card: `<Avatar>`
+on the left (the contact's photo or initials), and on the right the name stacked under the
+label "Raised by", opening the same contact picker dialog on click. Team members are not
+offered here — a colleague is a different table from a contact, and offering one would need
+a real schema decision, not a control swap.
 
 **On the loop.** Already a horizontal, wrapping row of pills (`StaffPillPicker`); what changes
 is who it draws. Before, a person already on the loop was filtered OUT of the row while
@@ -5452,7 +5470,7 @@ somebody else was being added, so mid-add nobody could see who was already on it
 always shows the FULL roster, with everyone already on the loop drawn pressed and locked
 rather than dropped from the row — the same "row of chips, current members shown, more
 addable at the end" shape, and the already-add-only rule (nothing on a ticket is ever removed)
-stays: a locked pill carries no "×".
+stays: a locked pill carries no "×". **On the loop: unchanged in 19 Sep 2026 amendment.**
 
 **Status: ruled, in build, 18 Sep 2026.**
 
@@ -7846,12 +7864,12 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**222 rules.**
+**223 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L32 (32) |
+| 2. Page layout and width | L1 to L33 (33) |
 | 3. Detail screens | D1 to D23 (23) |
 | 4. Collections | K1 to K54 (54) |
 | 5. Buttons and actions | B1 to B23 (23) |

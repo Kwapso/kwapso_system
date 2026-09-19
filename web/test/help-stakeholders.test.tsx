@@ -121,6 +121,30 @@ describe("HelpStakeholders — Raised by, one tile", () => {
     expect(screen.queryByText("Raiser")).toBeNull()
   })
 
+  // CLIENT RULING, 19 Sep 2026, verbatim: "for stakeholder, raised by, use a
+  // horizontal card (avatar on the left, raised by + name on the right one
+  // on top of the other)." Supersedes the 18 Sep vertical/band shape —
+  // see this file's own header and help-stakeholders.tsx's for the account.
+  it("draws the tile as a horizontal PersonCard — avatar on the left, the chip over the name on the right", () => {
+    render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
+    const chipEl = screen.getByText("Raised by")
+    // `PersonCard`'s own horizontal branch (shared/web/person-card.tsx) wraps
+    // chip+title in a column marked `items-start`; the vertical/band branch
+    // marks the same column `items-center` — the one class that tells the
+    // two shapes apart without reaching into PersonCard's own internals.
+    const column = chipEl.parentElement as HTMLElement
+    expect(column.className).toContain("items-start")
+    expect(column.className).not.toContain("items-center")
+    const nameEl = screen.getByText("Max Mustermann")
+    expect(column.contains(nameEl), "the name sits in the same column as the chip, under it").toBe(true)
+    const children = Array.from(column.children)
+    const chipIndex = children.indexOf(chipEl)
+    const nameIndex = children.findIndex((c) => c.contains(nameEl))
+    expect(chipIndex).toBeGreaterThan(-1)
+    expect(nameIndex).toBeGreaterThan(-1)
+    expect(chipIndex, "the chip ('Raised by') sits above the name — top line over bottom line").toBeLessThan(nameIndex)
+  })
+
   it("draws exactly one Raised-by tile, never one per admitted/mentioned/added stakeholder", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
     expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(1)

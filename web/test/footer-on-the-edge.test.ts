@@ -65,6 +65,17 @@
 // (18 Sep 2026 evening) are BOTH UNCHANGED and still load-bearing — see
 // this file's own git history for their full accounts — so both are still
 // censused below, unmodified, alongside the new round-24 shape.
+//
+// ROUND 26, THE MARGIN CORRECTION, 19 Sep 2026 — Aurora, reading the round-24
+// page back, verbatim: "ok, now the footer is at the bottom, but there's a
+// law about how much margin there must be above!!! add the space!!" The
+// band's own flush bottom edge (round 24, unchanged) was already correct;
+// what was missing was the ordinary panel gap ABOVE it — the same `gap-6`
+// (24px at the 16px root, `documents/UI-RULEBOOK.md` S1/N7, "between panels
+// on a screen: gap-6") every other pair of stacked panels already carries.
+// `ticket-detail-body.tsx`'s own root now carries `gap-6` itself, between
+// its two children (the scrolling region and the band) — by TOKEN, never a
+// hand-numbered offset — asserted below alongside the existing root census.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -204,6 +215,10 @@ describe("R89 — footer-on-the-edge", () => {
     expect(rootTag.includes("min-h-0"), "the root must allow itself to shrink below its own content height (min-h-0)").toBe(
       true
     )
+    expect(
+      rootTag.includes("gap-6"),
+      "the root must carry gap-6 — round 26's panel gap between the scrolling region and the band, the same token every other pair of stacked panels uses"
+    ).toBe(true)
 
     // THE BAND — this component's own last child now, marked
     // data-slot="ticket-footer-band", never a bare <CardFooter> (round 23's

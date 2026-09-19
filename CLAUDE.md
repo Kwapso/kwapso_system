@@ -539,7 +539,7 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   count and action together, and draws only the panel's own `CollectionEmptyState`; every
   `<AddButton>` outside a `<ToolbarRow>`'s own gated slot must sit inside one, or be named in a
   reasoned, rot-checked `EMPTY_STATE_SINGLE_DOOR_EXEMPT` line. (`empty-state-single-door`)
-- **A record screen's footer sits at the screen's own bottom edge (R89).** The client's ruling,
+- **A record screen's footer sits at the screen's own bottom edge, with the panel gap above it (R89).** The client's ruling,
   18 Sep 2026, verbatim: "On ticket detail, the footer should be at the very bottom. The
   position is still fucking wrong. Fix it once and for all," and, over a screenshot: "This
   composer should have a background color that makes it easy to identify, and also it should be
@@ -603,6 +603,19 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   (0px) at every width `md:` and above; below `md`, the app's own pre-existing, unrelated
   `pb-24 md:pb-0` mobile reservation (identical on the untouched round-23 composer) leaves a 96px
   gap against the pane's raw border box, not a regression this round introduced.
+  **AMENDED A SEVENTH TIME, ROUND 26, 19 Sep 2026 — the panel gap above the band.** Aurora,
+  reading the round-24 page back, verbatim: "ok, now the footer is at the bottom, but there's a
+  law about how much margin there must be above!!! add the space!!" The band's own flush bottom
+  edge (round 24) was already correct and stays exactly 0px; what was missing was the ordinary
+  space ABOVE it — the same `gap-6` (24px at the 16px root, `documents/UI-RULEBOOK.md`'s own
+  S1/N7, "between panels on a screen: gap-6") every other pair of stacked panels on this screen
+  already carries. `TicketDetailBody`'s own root (`data-slot="ticket-detail-body"`) — a flex
+  column whose only two children are the scrolling region and the band — now carries `gap-6`
+  itself, so the gap sits in NORMAL FLOW between the two children, by TOKEN rather than a
+  hand-numbered offset, and never touches the band's own `sticky` flush-bottom mechanics. **THE
+  LAW NOW ALSO READS: the band's own top edge carries the standard panel gap (`gap-6`, 24px)
+  above it, exactly the gap between any other two stacked panels on the screen, while its bottom
+  edge stays flush at 0px.**
   (`footer-on-the-edge`)
 - **Faces in choices (R90).** Aurora, verbatim, about the new Raised-by `Select` on the ticket
   form and page: "every time there is an avatar, I want to also see it in the choice component,

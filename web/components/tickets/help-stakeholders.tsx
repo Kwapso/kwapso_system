@@ -40,6 +40,21 @@
 // `band`-sized square without becoming the wall the client's OWN "3 should
 // fit in one row" ruling was reacting against in the first place).
 //
+// RAISED BY IS HORIZONTAL TOO NOW — client ruling, 19 Sep 2026, verbatim: "for
+// stakeholder, raised by, use a horizontal card (avatar on the left, raised
+// by + name on the right one on top of the other)." This SUPERSEDES the
+// 18 Sep "keep Raised by as one tile" VERTICAL/band shape above — the tile
+// stays ONE card (still the one editable door onto `raised_by_contact_id`),
+// only its own orientation changes: `PersonCard orientation="horizontal"`,
+// avatar left, a column beside it carrying the "Raised by" chip over the
+// name — `PersonCard`'s own horizontal branch (`shared/web/person-card.tsx`)
+// already stacks `chip` then `title` in that column (the SAME two props this
+// tile already passed for the vertical shape), so no new prop was needed
+// here or on `PersonCard` itself; only the orientation and the wrapping
+// `CardContent`'s own centering classes (built for the vertical/centered
+// shape) changed, to a left-aligned column that lets the horizontal card
+// fill the panel's own width.
+//
 // THE LOOP ROW STAYS READ-ONLY, ON PURPOSE. It would be easy to read "a row of
 // chips" as "a row of REMOVABLE chips" — the shape a tag input usually takes —
 // but that shape does not exist here: `help_stakeholders` has no delete route,
@@ -203,8 +218,8 @@ export function HelpStakeholders({
           <CardContent
             className={
               canOpenEditor && !editingRaiser
-                ? "relative flex flex-col items-center gap-2 p-4 text-center cursor-pointer"
-                : "relative flex flex-col items-center gap-2 p-4 text-center"
+                ? "relative flex flex-col gap-2 p-4 cursor-pointer"
+                : "relative flex flex-col gap-2 p-4"
             }
             // A PLAIN CLICK HANDLER, NOT `role="button"` — the card already
             // nests a real interactive control (the edit pen, and the Select
@@ -253,6 +268,7 @@ export function HelpStakeholders({
               </Select>
             ) : (
               <PersonCard
+                orientation="horizontal"
                 picture={raiserPicture}
                 mark={nameInitials(raiserName ?? "")}
                 markName={raiserName ?? undefined}
