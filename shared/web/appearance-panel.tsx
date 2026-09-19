@@ -483,7 +483,22 @@ export function AppearancePanel({
         </div>
       )}
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-        <div className="flex flex-col gap-2 lg:sticky lg:top-4">
+        {/* T3662 (mobile sweep, 2026-09-19): below `lg` this grid has ONE
+            implicit column, so both children share ONE track — and a grid
+            item's default `min-width` is `auto` (its max-content size), not
+            0. `AppearanceTabPreview`'s box carries `aspect-[16/10]` with
+            `min-h-[22rem]`: with no `min-w-0` here, the UA transfers that
+            floor through the ratio into a ~563px min-content WIDTH, the
+            track grows to fit it, and the language/size/appearance/
+            background column on row two — the OTHER grid item, sharing the
+            same track — is dragged out to that same width and clipped by
+            the shell's own `overflow-hidden`. `min-w-0` is the standard
+            escape from flex/grid's auto min-size floor; every other
+            constrained box in this screen's own ancestor chain already
+            carries it. Measured live on staging at 375px: the track was
+            634px wide and the language pill row's own available width was
+            1014px, both cut off with no scroll to reach the rest. */}
+        <div data-slot="appearance-preview-column" className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4">
           {/* NO CAPTION BELOW THE FRAME ANY MORE — R81/2026-09-17: "too many
               descriptions everywhere ... delete these live preview updates
               as you press a control." The picture is `AppearanceTabPreview`
@@ -492,7 +507,7 @@ export function AppearancePanel({
               "THE PREVIEW ITSELF STANDS ON PAPER, TALLER, MORE POPULATED". */}
           <AppearanceTabPreview theme={previewTheme} spine={pendingSpine} scale={previewScaleStep(pendingScale)} />
         </div>
-        <div className="flex flex-col gap-5">
+        <div data-slot="appearance-controls-column" className="flex min-w-0 flex-col gap-5">
           {/* LANGUAGE, FIRST — her correction, verbatim in the header above:
               "Language · Size · Appearance · Background", inside this one
               column, not a full-width band over the grid. Staged now, like
