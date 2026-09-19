@@ -688,6 +688,47 @@ body {
   max-width: 100vw;
 }
 
+/* ── T3656/B0293 — "the tickets page sometimes reloads by itself with a
+   yellow animation" — THE OVERSCROLL HALF, both axes ═══════════════════════
+
+   Neither `html` nor `body` said anything about `overscroll-behavior` before
+   this, on either axis, so the BROWSER's own fallback for "nothing left to
+   scroll" was free to run: on a phone, continuing a vertical drag past the
+   very top of a long page (the tickets queue, scrolled through more and
+   longer than any other screen on this team) is Chrome's own native
+   pull-to-refresh — a real `document` reload. On a Mac trackpad, the
+   horizontal twin is Chrome's two-finger swipe back/forward — exactly what
+   T3824 records Ishita doing to "get around" this same call ("was falling
+   back to Chrome's swipe-back gesture"), on the one screen full of
+   horizontally-scrolling status strips (Dashboard/Triage/Ready/Open/Waiting/
+   Closed/All). A `page.goBack()` proof (the same navigation that gesture
+   performs once it completes) showed the shell's own `popstate` handling is
+   soft and NOT the bug — history.back() inside this app's own session never
+   reloads — so the gesture never even needs to finish for the DAMAGE to be
+   done: reaching the document's own overscroll boundary is what invites the
+   browser's native gesture recognizer in, whether or not `history.back()`
+   would have been soft. Either way the result is the same: a real reload,
+   replaying the mango `MarkLoader` boot mark — "sometimes" (however the drag
+   or the flick lands), "yellow animation" (the boot mark), and it is not
+   really a Tickets bug, just the screen everyone scrolls through longest.
+   `contain` (not `none`): the page's own scroll still bounces/rubber-bands
+   normally, only the CHAIN past the document's own edge into the browser
+   chrome is what stops. */
+html,
+body {
+  overscroll-behavior: contain;
+}
+
+/* THE STRIP ITSELF, so an end-of-scroll drag on a tab row never reaches the
+   document's own edge to chain from in the first place — belt to the rule
+   above's braces. `[data-slot="tabs-list"]` is the kit's own attribute
+   (`shared/ui/components/tabs/tabs.tsx`), so this covers every `TabsList` in
+   the app (R2/R3/R8's one shared tab strip, Tickets' own status row among
+   them) without a second, hand-kept list of selectors to fall behind it. */
+[data-slot="tabs-list"] {
+  overscroll-behavior: contain;
+}
+
 /* ── The living mango field: IT COMES FROM THE KIT NOW ─────────────────────
  *
  * This file used to carry it — a `.ambient::before/::after` pair, two sets of

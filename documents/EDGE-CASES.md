@@ -124,6 +124,24 @@ otherwise arm a deferred reload (a toast, then the real reload on the tab's next
 **The client portal has no version-watch at all** — the same stale tab there
 still ends at a crash card (UI-GAPS).
 
+**T3656's OTHER half was the overscroll, not the code.** Neither `html`/`body`
+nor the kit's `TabsList` set `overscroll-behavior`, so the browser's own
+fallback for "nothing left to scroll" ran free: pull-to-refresh on a phone (a
+real vertical overscroll past the top of the tickets queue — the longest-
+scrolled screen on this team), and Chrome's two-finger swipe back/forward on a
+Mac trackpad (the horizontal twin, past the end of a status strip —
+Dashboard/Triage/Ready/Open/Waiting/Closed/All — T3824 records Ishita
+"falling back to Chrome's swipe-back gesture to get around" this same call).
+Both end in a real `document` reload and the same mango boot mark. A
+`page.goBack()` proof — the navigation the completed gesture performs — showed
+the shell's own `popstate` handling is soft and not a second bug:
+`history.back()` inside an in-app session never reloads here, so the fix is the
+overscroll alone. `web/app/globals.css` now sets `overscroll-behavior: contain`
+on `html, body` together (closes the document-level fallback, both axes) and on
+the kit's own `[data-slot="tabs-list"]` (so an end-of-scroll drag on a status
+strip never reaches the document's edge to chain from in the first place).
+Locked by `web/test/overscroll-contain.test.ts`.
+
 **The AI co-pilot is mounted at the ROOT, and its open state persists.** The
 assistant panel is the one surface that spans *all* screens, so it lives in a single
 root-mounted host (`web/components/assistant/agent-host.tsx`, rendered once in
