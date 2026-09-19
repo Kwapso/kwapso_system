@@ -76,6 +76,29 @@
 // `ticket-detail-body.tsx`'s own root now carries `gap-6` itself, between
 // its two children (the scrolling region and the band) — by TOKEN, never a
 // hand-numbered offset — asserted below alongside the existing root census.
+//
+// ROUND 27, THE SIDE COLUMN NEVER SCROLLS, 19 Sep 2026 — Aurora, over the
+// live page: "there should be no scrolling to see all right column items —
+// expand the height!" / "scroll only on conversation when taller than
+// right column." Round 24's `lg` grid forced the ROW to fill the whole
+// scrolling region (`h-full min-h-0` on the grid AND on the side column,
+// `overflow-y-auto` on the side column) — so a short ticket showed the side
+// column scrolling inside its own little box while the conversation card
+// sat mostly empty beside it. Backwards: the side column's three cards are
+// what a person needs to see in FULL every time; the conversation is what
+// varies wildly. Rebuilt by construction: the grid and the side column both
+// drop `h-full`/`min-h-0` (grid) and `h-full`/`min-h-0`/`overflow-y-auto`
+// (side column) — content-sized now, like any ordinary block, so the row
+// resolves to the side column's own natural height. The conversation CELL
+// drops `h-full` for `relative min-h-0` — no height class of its own, sized
+// only by the grid's own `items-stretch`. And `TicketConversationPanel`'s
+// `Card` takes a new `fill="absolute"` at `lg` (`position: absolute; inset:
+// 0`, see that component's own header) — taken OUT of flow so the cell
+// contributes ZERO intrinsic height back to the grid's own auto-track
+// sizing, which is what keeps a long thread from dragging the row (and the
+// side column with it) taller. `ticket-detail-body.tsx`'s own header
+// carries the full account and the live proof numbers
+// (`${SCRATCH}/row-proof.json`).
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -261,7 +284,15 @@ describe("R89 — footer-on-the-edge", () => {
     expect(fnBody.includes("<CardContent"), "the thread must render inside CardContent").toBe(true)
     expect(fnBody.includes("<CardFooter"), "the composer must render inside CardFooter, the card's own last child").toBe(true)
     expect(fnBody.indexOf("<CardContent")).toBeLessThan(fnBody.indexOf("<CardFooter"))
-    expect(fnBody.includes("h-full min-h-0"), "the Card must be bounded (h-full min-h-0) so its own CardContent can actually cap and scroll the thread, rather than growing unbounded").toBe(
+    // ROUND 27 — the Card's OWN sizing is now a `fill` prop, not one
+    // hand-typed className: `"block"` (default, below lg) still resolves
+    // to the original `h-full min-h-0`; `"absolute"` (lg) resolves to
+    // `absolute inset-0`, taken out of flow so the card contributes no
+    // intrinsic height back to its grid cell (`ticket-detail-body.tsx`'s
+    // own header has the full account).
+    expect(fnBody.includes('fill?: "absolute" | "block"'), "TicketConversationPanel must declare a fill prop, round 27").toBe(true)
+    expect(fnBody.includes("absolute inset-0"), "the absolute branch must be absolute inset-0").toBe(true)
+    expect(fnBody.includes("h-full min-h-0"), "the block branch (below lg) must still be h-full min-h-0, unchanged").toBe(
       true
     )
     expect(fnBody.includes("overflow-y-auto"), "CardContent must be the one true scroller (min-h-0 overflow-y-auto)").toBe(true)
@@ -272,7 +303,7 @@ describe("R89 — footer-on-the-edge", () => {
     expect(callCount, "TicketConversationPanel must be called exactly once, by the shared `conversation` const both branches render").toBe(1)
   })
 
-  it("at lg, the scroll region is a bounded 2fr/1fr grid pairing the conversation (first/left) with the side panels (second/right)", () => {
+  it("at lg, the scroll region is a CONTENT-SIZED 2fr/1fr grid pairing the conversation (first/left) with the side panels (second/right) — round 27, no h-full/min-h-0 on the grid", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     const isAtLeastLgAt = body.indexOf("isAtLeastLg ? (", fnAt)
     expect(isAtLeastLgAt, "TicketDetailBody must branch its scroll region on isAtLeastLg").toBeGreaterThan(-1)
@@ -282,14 +313,39 @@ describe("R89 — footer-on-the-edge", () => {
 
     expect(lgBranch.includes("grid"), "the lg branch's own scroll-region child must be a grid").toBe(true)
     expect(lgBranch.includes("grid-cols-[2fr_1fr]"), "the lg branch must split 2fr/1fr").toBe(true)
-    expect(lgBranch.includes("items-stretch"), "the lg branch's grid must stretch its cells to the row's own height — bounded, not natural-height (round 24 needs the conversation cell definite)").toBe(true)
-    expect(lgBranch.includes("h-full"), "the lg branch's grid must carry h-full so its cells resolve to a real height").toBe(true)
+    expect(lgBranch.includes("items-stretch"), "the lg branch's grid must stretch its cells to the row's own height").toBe(true)
+    // ROUND 27 — an explicit-height grid with one `auto` row would let
+    // `align-content`'s own default `stretch` hand that row the FULL
+    // container height regardless of content, which is exactly what forced
+    // the side column's own internal scrollbar (the bug this round fixes).
+    // The grid's own tag — not the whole branch string, which also
+    // contains the side wrapper's className a few lines down — must not
+    // carry either class.
+    const gridTagStart = lgBranch.indexOf("<div")
+    const gridTagEnd = lgBranch.indexOf(">", gridTagStart)
+    const gridTag = lgBranch.slice(gridTagStart, gridTagEnd)
+    expect(gridTag.includes("h-full"), "the grid's own tag must NOT carry h-full any more (round 27)").toBe(false)
+    expect(gridTag.includes("min-h-0"), "the grid's own tag must NOT carry min-h-0 any more (round 27) — content-sized, like any ordinary block").toBe(false)
 
     const threadAt = lgBranch.indexOf("conversation")
     const sideAt = lgBranch.indexOf("sidePanels")
     expect(threadAt, "the lg branch must render the conversation").toBeGreaterThan(-1)
     expect(sideAt, "the lg branch must render the side panels").toBeGreaterThan(-1)
     expect(threadAt, "the conversation must come first/left in the 2fr/1fr grid").toBeLessThan(sideAt)
+
+    // THE SIDE WRAPPER — natural height, never scrolling (round 27, the
+    // whole point of this round: "there should be no scrolling to see all
+    // right column items").
+    const sidePanelsAt = lgBranch.indexOf("{sidePanels}")
+    expect(sidePanelsAt, "the lg branch must render {sidePanels}").toBeGreaterThan(-1)
+    const sideWrapperTagStart = lgBranch.lastIndexOf("<div", sidePanelsAt)
+    const sideWrapperTagEnd = lgBranch.indexOf(">", sideWrapperTagStart)
+    const sideWrapperTag = lgBranch.slice(sideWrapperTagStart, sideWrapperTagEnd)
+    expect(sideWrapperTag.includes("flex-col"), "the side wrapper must still be a flex column").toBe(true)
+    expect(sideWrapperTag.includes("gap-6"), "the side wrapper must still carry the panel gap between its three cards").toBe(true)
+    expect(sideWrapperTag.includes("h-full"), "the side wrapper must NOT carry h-full any more — natural height, round 27").toBe(false)
+    expect(sideWrapperTag.includes("min-h-0"), "the side wrapper must NOT carry min-h-0 any more, round 27").toBe(false)
+    expect(sideWrapperTag.includes("overflow-y-auto"), "the side wrapper must NOT carry overflow-y-auto any more — it never scrolls, round 27's whole point").toBe(false)
   })
 
   it("below lg, the scroll region stacks the side panels THEN the conversation — her own 'above the content' complaint, answered by DOM order", () => {
@@ -338,22 +394,38 @@ describe("R89 — footer-on-the-edge", () => {
     expect(wrapperTag.includes("flex-1"), "the below-lg wrapper itself must NOT carry flex-1 — it is not a flex item competing for space, it is the scroll region's one normal-flow child").toBe(false)
   })
 
-  it("the conversation cell takes h-full min-h-0 at lg (a bounded grid cell) but min-h-[60vh] below lg (a content floor, never a flex share)", () => {
+  it("the conversation cell takes relative min-h-0 at lg (round 27 — stretched by the grid, no height class of its own) but min-h-[60vh] below lg (a content floor, never a flex share)", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     const conversationConstAt = body.indexOf("const conversation = (", fnAt)
     expect(conversationConstAt, "TicketDetailBody must build one shared `conversation` const").toBeGreaterThan(-1)
-    const conversationConstEnd = body.indexOf("const sidePanels = (", conversationConstAt)
+    // Stop at the const's OWN closing paren, not at `const sidePanels = (` —
+    // the comment block between the two (round 27's own side-column note)
+    // says "h-full" in PROSE, which would otherwise leak into a substring
+    // check meant to read the actual JSX only.
+    const conversationConstEnd = body.indexOf("\n  )\n", conversationConstAt)
+    expect(conversationConstEnd, "must find the conversation const's own closing paren").toBeGreaterThan(conversationConstAt)
     const constBody = body.slice(conversationConstAt, conversationConstEnd)
     expect(constBody.includes("isAtLeastLg"), "the conversation anchor's own className must branch on isAtLeastLg, not reuse one string for both cell shapes").toBe(
       true
     )
-    expect(constBody.includes("h-full min-h-0"), "the lg branch of the anchor's className must be h-full min-h-0").toBe(true)
+    // ROUND 27 — `relative min-h-0`, NOT `h-full min-h-0`: the cell carries
+    // no height class of its own at all, because it is `items-stretch` on
+    // the grid (unchanged) that resolves its height, to whatever the row
+    // resolved to (the side column's own natural height). `relative` is
+    // what lets the Card inside it (`fill="absolute"`) resolve `inset-0`
+    // against THIS cell's own bounds.
+    expect(constBody.includes("min-w-0 relative min-h-0"), "the lg branch of the anchor's className must be min-w-0 relative min-h-0").toBe(true)
+    expect(constBody.includes("h-full"), "h-full must NOT appear on the conversation cell any more — round 27, it contributes no height of its own so the row can resolve to the side column's").toBe(
+      false
+    )
     expect(constBody.includes("min-h-[60vh]"), "the below-lg branch of the anchor's className must be a min-h-[60vh] FLOOR — a sensible minimum the card is sized against, never squeezed to zero").toBe(
       true
     )
     expect(constBody.includes("flex-1 min-h-0"), "flex-1 min-h-0 must NOT appear on the conversation cell any more — that was the sibling-fight shape round 25 replaced (it lost every fight to the side panels' own natural height and measured 0px live at 760x900)").toBe(
       false
     )
+    // ROUND 27 — the fill prop wiring: absolute at lg, block below it.
+    expect(constBody.includes('fill={isAtLeastLg ? "absolute" : "block"}'), "TicketConversationPanel must be called with fill branching on isAtLeastLg").toBe(true)
   })
 
   it("the ONE scrolling region wrapping both per-width branches is flex-1 min-h-0 overflow-y-auto, and is the root's other child besides the band", () => {

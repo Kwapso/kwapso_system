@@ -472,36 +472,53 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
   })
 })
 
-// SUPERSEDED THREE TIMES, R89 "footer-on-the-edge" — see the two earlier
+// SUPERSEDED FOUR TIMES, R89 "footer-on-the-edge" — see the earlier
 // accounts kept in this file's own git history (the original "addition of
-// the three of the right" grid, and round 23's composer-pinned-outside-
-// every-card construction).
+// the three of the right" grid, round 23's composer-pinned-outside-
+// every-card construction, and round 24's h-full/overflow-y-auto-on-both-
+// cells grid, replaced below).
 //
-// ROUND 24, 19 Sep 2026, THE CORRECTION — Aurora, over her own screenshot:
-// "the black section, the footer, should be at the very bottom / why is
-// the write text space full width?? rewind here / THE FUKING FOOTERRR!"
-// Round 23 read "the footer" as the composer; she meant THE BLACK BAND
-// (Latest activity + Record). The band is now the ticket body's own
-// pinned last child (`RecordFooterBand`, a second call to the kit's
-// `RecordDetail`), and the composer is back INSIDE the conversation card's
-// own `CardFooter` — "rewind here," exactly the round-22 shape — at every
-// width, because the band is what now guarantees "always visible at the
-// bottom." The grid is bounded again too (`items-stretch`, `h-full
-// min-h-0` on both cells), not round 23's natural-height one: the
-// conversation card's own `CardContent` is what now caps and scrolls the
-// thread, so the scrolling region above the band never has to grow
-// unbounded. `ticket-detail-body.tsx`'s own header carries the full
-// account.
-describe("at lg, the scroll region's own grid pairs the conversation with the side panels (R89 round 24)", () => {
-  it("the conversation anchor's grandparent is TicketDetailBody's own root; its parent is the one scroll region; the grid sits one level inside that, bounded (h-full min-h-0, items-stretch)", async () => {
+// ROUND 27, 19 Sep 2026, THE SIDE COLUMN NEVER SCROLLS — Aurora, over the
+// live page: "there should be no scrolling to see all right column items —
+// expand the height!" / "scroll only on conversation when taller than
+// right column." Round 24's grid (`h-full min-h-0` on the grid AND the
+// side column, `overflow-y-auto` on the side column) forced the row to
+// fill the whole scrolling region regardless of content, so a short ticket
+// showed the side column scrolling in its own little box while the
+// conversation card sat mostly empty beside it — backwards. Now: the grid
+// itself carries NEITHER `h-full` NOR `min-h-0` (content-sized, like any
+// ordinary block); the side column carries NEITHER `h-full` NOR
+// `overflow-y-auto` (natural height, never scrolling — proof lives in
+// `ticket-detail-body.tsx`'s own header); the conversation CELL carries
+// `relative min-h-0`, no height class of its own — `items-stretch`
+// resolves it to whatever the row resolved to (the side column's own
+// height); and the conversation CARD is pulled out of flow
+// (`fill="absolute"`, `position: absolute; inset: 0`) so it contributes
+// ZERO intrinsic height to the row, the one piece that keeps a forty-
+// message thread from dragging the whole row (and the side column with
+// it) taller. `ticket-detail-body.tsx`'s own header carries the full
+// account and the live proof numbers (`${SCRATCH}/row-proof.json`).
+describe("at lg, the scroll region's own grid pairs the conversation with the side panels (R89 round 27)", () => {
+  it("the grid and the side column are content-sized (no h-full/min-h-0/overflow-y-auto); the conversation cell is relative min-h-0, stretched by the grid to the side column's own height", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
     expect(grid.className).toContain("grid-cols-[2fr_1fr]")
     expect(grid.className).toContain("items-stretch")
-    expect(grid.className).toContain("h-full")
-    expect(grid.className).toContain("min-h-0")
+    // ROUND 27 — an explicit-height grid with one `auto` row would let
+    // `align-content`'s own default `stretch` hand that row the FULL
+    // container height regardless of content, which is what forced the
+    // side column's own internal scrollbar. The grid is content-sized now.
+    expect(grid.className).not.toContain("h-full")
+    expect(grid.className).not.toContain("min-h-0")
+
+    // THE CONVERSATION CELL — no height class of its own; `relative` is
+    // what lets its own Card resolve `inset-0` against ITS bounds once
+    // `items-stretch` has sized the cell to the row.
+    expect(conversationAnchor.className).toContain("relative")
+    expect(conversationAnchor.className).toContain("min-h-0")
+    expect(conversationAnchor.className).not.toContain("h-full")
 
     const scrollRegion = grid.parentElement as HTMLElement
     expect(scrollRegion.className).toContain("overflow-y-auto")
@@ -512,8 +529,8 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(ticketBodyRoot.firstElementChild).toBe(scrollRegion)
 
-    // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL, independently
-    // scrollable again (round 24 restores the round-19 shape here).
+    // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL, NATURAL HEIGHT,
+    // NEVER SCROLLING (round 27 — the whole point of this round).
     const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
     const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
@@ -522,11 +539,13 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     expect(timeAnchor.parentElement).toBe(sideColumn)
     expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
     expect(sideColumn.className).toContain("flex-col")
-    expect(sideColumn.className).toContain("h-full")
-    expect(sideColumn.className).toContain("overflow-y-auto")
+    expect(sideColumn.className).toContain("gap-6")
+    expect(sideColumn.className).not.toContain("h-full")
+    expect(sideColumn.className).not.toContain("min-h-0")
+    expect(sideColumn.className).not.toContain("overflow-y-auto")
   })
 
-  it("the conversation card holds the composer again, as its own CardFooter — 'rewind here'", async () => {
+  it("the conversation card holds the composer again, as its own CardFooter, absolutely positioned to fill its cell — 'rewind here', by construction now", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationCard = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
@@ -535,8 +554,13 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     const footer = conversationCard.querySelector('[data-slot="card-footer"]')
     expect(footer, "the composer's own CardFooter must nest inside the conversation card again").toBeTruthy()
     expect(conversationCard.lastElementChild).toBe(footer)
-    expect(conversationCard.className).toContain("h-full")
+    // ROUND 27 — `fill="absolute"` at lg: taken out of flow so the CELL
+    // (not the card) is what the grid stretches, and the card itself
+    // contributes no intrinsic height back to the row.
+    expect(conversationCard.className).toContain("absolute")
+    expect(conversationCard.className).toContain("inset-0")
     expect(conversationCard.className).toContain("min-h-0")
+    expect(conversationCard.className).not.toContain("h-full")
   })
 
   it("the composer form's own width equals the card's inner width, never the page's", async () => {

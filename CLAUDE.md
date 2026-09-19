@@ -615,7 +615,31 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   hand-numbered offset, and never touches the band's own `sticky` flush-bottom mechanics. **THE
   LAW NOW ALSO READS: the band's own top edge carries the standard panel gap (`gap-6`, 24px)
   above it, exactly the gap between any other two stacked panels on the screen, while its bottom
-  edge stays flush at 0px.**
+  edge stays flush at 0px.** **AMENDED AN EIGHTH TIME, ROUND 27, 19 Sep 2026 — the side column
+  never scrolls.** Aurora, over the live page, verbatim: "there should be no scrolling to see all
+  right column items — expand the height!" / "scroll only on conversation when taller than right
+  column." Round 24's own `lg` grid (`h-full min-h-0` on the grid AND the side column,
+  `overflow-y-auto` on the side column) forced the row to fill the whole scrolling region
+  regardless of content, so a short ticket showed the side column scrolling in its own little box
+  while the conversation card sat mostly empty beside it — backwards: the side column's three
+  cards are what a person needs to see in full every time, the conversation is what varies
+  wildly. Rebuilt by construction: the grid and the side column both drop their own
+  `h-full`/`min-h-0` (and, on the side column, `overflow-y-auto`) — content-sized now, so the row
+  resolves to the side column's own natural height; the conversation cell drops `h-full` for
+  `relative min-h-0` — no height class of its own, sized only by the grid's own `items-stretch`;
+  and `TicketConversationPanel`'s own `Card` takes a new `fill="absolute"` at `lg` (`position:
+  absolute; inset: 0`) — taken out of flow so the cell contributes zero intrinsic height back to
+  the grid's own auto-track sizing, the one piece that keeps a long thread from dragging the row
+  (and the side column with it) taller. Proved first by live DOM/style injection against T0001
+  (`${SCRATCH}/row-proof.json`) at 1800×978, 1991×842 assistant open, 1440×900 and 1280×800: the
+  side column's own `scrollHeight === clientHeight` (never scrolls) and its bottom matching its
+  last card's bottom at all four; the conversation card's height matching the side column's own
+  height exactly at all four; a 40-bubble stress injection at 1991×842 leaving the row height
+  unchanged with the thread still scrolling inside the card; three injected extra side cards at
+  1440×900 (side column taller than the screen) making the scrolling region above the band scroll
+  the whole page while the band stayed flush with its own round-26 panel gap unchanged above it.
+  **THE LAW NOW ALSO READS: at lg the row is as tall as the side column, which never scrolls; the
+  conversation matches it and scrolls inside only when taller.**
   (`footer-on-the-edge`)
 - **Faces in choices (R90).** Aurora, verbatim, about the new Raised-by `Select` on the ticket
   form and page: "every time there is an avatar, I want to also see it in the choice component,

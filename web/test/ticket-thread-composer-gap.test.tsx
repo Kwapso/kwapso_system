@@ -145,8 +145,8 @@ beforeEach(() => {
   perms.can.mockReset().mockReturnValue(true)
 })
 
-describe("the composer is back inside the conversation card's own CardFooter, at every width (R89 round 24 — 'rewind here')", () => {
-  it("the thread scrolls inside CardContent, inside a Card bounded (h-full min-h-0) so CardContent can actually cap it; the composer is that Card's own last child", async () => {
+describe("the composer is back inside the conversation card's own CardFooter, at every width (R89 round 24 — 'rewind here'; card sizing amended round 27)", () => {
+  it("the thread scrolls inside CardContent, inside a Card bounded (absolute inset-0 at lg, round 27) so CardContent can actually cap it; the composer is that Card's own last child", async () => {
     render(<HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />)
 
     // V1 draws every panel at once — no tab click needed to reach either.
@@ -168,11 +168,17 @@ describe("the composer is back inside the conversation card's own CardFooter, at
     // ROUND 24 ("rewind here") — TicketConversationPanel is UN-RETIRED:
     // the composer's own CardFooter is this Card's LAST child again, at
     // every width, because the BAND (not the composer) now guarantees
-    // "always visible at the bottom."
+    // "always visible at the bottom." ROUND 27 changed HOW the card fills
+    // its cell at lg: `fill="absolute"` (`position: absolute; inset: 0`),
+    // taken out of flow so the card contributes no intrinsic height back to
+    // the grid row — the row now resolves to the side column's own natural
+    // height instead (see ticket-detail-body.tsx's own header).
     const threadCard = scroller.parentElement as HTMLElement
     expect(threadCard.getAttribute("data-slot")).toBe("card")
-    expect(threadCard.className).toContain("h-full")
+    expect(threadCard.className).toContain("absolute")
+    expect(threadCard.className).toContain("inset-0")
     expect(threadCard.className).toContain("min-h-0")
+    expect(threadCard.className).not.toContain("h-full")
 
     const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
     expect(composerFooter.getAttribute("data-slot")).toBe("card-footer")

@@ -155,6 +155,56 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * mechanics (unchanged from round 24). See `web/test/footer-on-the-edge.test.ts`'s
  * own new assertion.
  *
+ * ROUND 27 — THE SIDE COLUMN NEVER SCROLLS, 19 Sep 2026. Aurora, over the live
+ * page, verbatim: "there should be no scrolling to see all right column items
+ * — expand the height!" and "scroll only on conversation when taller than
+ * right column." Round 24 had made the `lg` grid row fill the WHOLE scrolling
+ * region (`h-full min-h-0` on the grid, then the same on the side column,
+ * `overflow-y-auto` so its own three cards would not be clipped once they
+ * outgrew that forced height) — so a normal ticket with a short thread showed
+ * the side column scrolling inside its own little box while empty space sat
+ * below the conversation card beside it. Backwards: the CONVERSATION is the
+ * one whose content varies wildly (a two-line ticket vs. a forty-message
+ * thread); the side column's three cards are what a person actually needs to
+ * see in full, every time, with nothing to page through. Rebuilt by
+ * construction, not by swapping which side gets the scrollbar: the SIDE
+ * COLUMN wrapper drops `h-full`/`min-h-0`/`overflow-y-auto` entirely — an
+ * ordinary block at its own natural content height, never scrolling because
+ * it is never asked to fit inside anything shorter than itself. The GRID
+ * container drops its own `h-full`/`min-h-0` too (load-bearing: an
+ * explicit-height grid with one `auto` row lets `align-content`'s default
+ * `stretch` hand that row the FULL container height regardless of content,
+ * which is what forced the side column's own internal scroll in the first
+ * place) — height `auto`, sized like any ordinary block to its tallest
+ * content, which is now the side column. The CONVERSATION CELL
+ * (`#ticket-panel-conversation`) drops `h-full` for `relative` — no height
+ * class of its own at all, because `items-stretch` (already on the grid) is
+ * what resolves it, to whatever the row resolved to. And
+ * `TicketConversationPanel`'s own `Card` takes a new `fill="absolute"` at
+ * `lg` (`position: absolute; inset: 0`, see that component's own header) —
+ * taken OUT of normal flow so the cell it sits in contributes ZERO intrinsic
+ * height to the grid's auto-track sizing, which is the one piece that makes
+ * the whole chain non-circular: without it, a forty-message thread would
+ * push the CELL taller, which would push the ROW taller, which is exactly
+ * the "conversation drags the side column down with it" bug this round
+ * exists to avoid. The thread still scrolls — inside the now-absolutely
+ * positioned card, via its own `CardContent`'s `min-h-0 flex-1
+ * overflow-y-auto`, unchanged — only now against a height the SIDE COLUMN
+ * set, never the other way round. PROVED FIRST by DOM/style injection
+ * against the live page (`${SCRATCH}/row-proof.json`, mirroring this exact
+ * construction) at 1800×978, 1991×842 assistant open, 1440×900 and
+ * 1280×800: side column `scrollHeight === clientHeight` (never scrolls) and
+ * its own bottom exactly matching its last card's bottom (0px) at all four;
+ * conversation card height matching the side column's own height exactly
+ * (0px diff) at all four; a 40-bubble stress injection at 1991×842 leaving
+ * the row height UNCHANGED (810.89px before and after) with the thread
+ * still scrolling inside the card; three injected extra side cards at
+ * 1440×900 (side column grown to 1620.38px, taller than the 900px screen)
+ * making the ONE scrolling region above the band scroll the whole page
+ * (`regionScrolls: true`) while the band stayed flush (0px vs. the screen
+ * body) with its own round-26 panel gap unchanged (24px, measured after
+ * scrolling the region to its own end) above it.
+ *
  * THE EARLIER CONSTRUCTIONS, KEPT FOR THE RECORD (superseded, not deleted —
  * see this file's git history): the "sum of three" shape (matching the two
  * columns to each other, never claiming the screen's own bottom edge), the
@@ -255,9 +305,14 @@ export function TicketDetailBody({
   const isAtLeastLg = useIsAtLeastLg()
 
   // TWO DIFFERENT CELLS, NOT ONE CLASS REUSED — at `lg` this is a GRID cell,
-  // already at 100% of the row's own height, so it takes `h-full min-h-0`
-  // and the CARD inside it fills that definite height, capping its own
-  // thread to an inner scroll. Below `lg` it is a NORMAL-FLOW BLOCK now
+  // ROUND 27 (see this file's own header): `relative min-h-0`, NEVER
+  // `h-full`. The cell itself carries no height class at all — it is the
+  // grid's `items-stretch` that resolves its height, to whatever the ROW
+  // resolves to, and the row resolves to the SIDE COLUMN's own natural
+  // height (below), because this cell's only child (`TicketConversationPanel`'s
+  // `Card`, `fill="absolute"` at `lg`) is taken out of flow (`position:
+  // absolute; inset: 0`) and so contributes ZERO intrinsic height to the
+  // grid's own auto-track sizing. Below `lg` it is a NORMAL-FLOW BLOCK
   // (ROUND 25, 19 Sep 2026 — see this file's own header), never `flex-1
   // min-h-0`: that shape made the conversation a FLEX SIBLING of the three
   // side-panel divs inside a `h-full` stack, and `flex-1`'s own
@@ -268,19 +323,26 @@ export function TicketDetailBody({
   // content height) and the conversation is squeezed to a true 0px, thread
   // and composer both gone. Below `lg` it now takes `min-h-[60vh]` instead:
   // a SENSIBLE FLOOR, never a flex share fought over, so `TicketConversationPanel`'s
-  // own `h-full` (unconditional, see that component below) resolves against
-  // a real, positive height and the card always renders at least that tall
-  // — proved by live injection against staging (this file's own header
+  // own `h-full` (`fill="block"` below `lg`) resolves against a real,
+  // positive height and the card always renders at least that tall —
+  // proved by live injection against staging (this file's own header
   // carries the measured numbers).
   const conversation = (
     <div
       id={TICKET_PANEL_ANCHOR.conversation}
-      className={isAtLeastLg ? "min-w-0 h-full min-h-0" : "min-w-0 min-h-[60vh]"}
+      className={isAtLeastLg ? "min-w-0 relative min-h-0" : "min-w-0 min-h-[60vh]"}
     >
-      <TicketConversationPanel thread={thread} composer={composer} />
+      <TicketConversationPanel thread={thread} composer={composer} fill={isAtLeastLg ? "absolute" : "block"} />
     </div>
   )
 
+  // THE SIDE COLUMN — ROUND 27: NATURAL HEIGHT, NEVER SCROLLS. No
+  // `h-full`/`min-h-0`/`overflow-y-auto` here (that was the bug — see this
+  // file's own header). Every one of `TicketSidePanel`'s three cards
+  // renders at its own content height, this wrapper's own height is the
+  // sum of them plus the `gap-6` between, and THAT is what the grid row
+  // resolves to (`items-stretch` on the grid stretches the conversation
+  // cell — which contributes no height of its own — to match it exactly).
   const sidePanels = (
     <>
       <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
@@ -303,9 +365,17 @@ export function TicketDetailBody({
           sticky element riding on an UNBOUNDED region rides down with it). */}
       <div className="min-w-0 flex-1 min-h-0 overflow-y-auto">
         {isAtLeastLg ? (
-          <div className="grid min-w-0 h-full min-h-0 grid-cols-[2fr_1fr] items-stretch gap-6">
+          // ROUND 27 — no `h-full`/`min-h-0` on the grid itself either: an
+          // explicit-height grid container with one `auto` row would let
+          // `align-content`'s own default `stretch` distribute the FULL
+          // container height onto that one row regardless of content — the
+          // exact reason the side column used to need its own internal
+          // scrollbar. Height `auto` here (content-sized, like any ordinary
+          // block) is what lets the row resolve to the side column's real
+          // content height instead.
+          <div className="grid min-w-0 grid-cols-[2fr_1fr] items-stretch gap-6">
             {conversation}
-            <div className="flex min-w-0 flex-col gap-6 h-full min-h-0 overflow-y-auto">{sidePanels}</div>
+            <div className="flex min-w-0 flex-col gap-6">{sidePanels}</div>
           </div>
         ) : (
           // NORMAL FLOW, NOT A BOUNDED STACK (ROUND 25) — no `h-full`/
@@ -400,14 +470,21 @@ export function TicketSidePanel({
  * the composer's `w-full` is 100% of THIS card's own inner width, never the
  * page's.
  *
- * `h-full min-h-0`, UNCONDITIONAL, NO `lg:` PREFIX — this component mounts
- * inside a cell that is ALREADY a real, definite height (the grid row at
- * `lg`, the stack's own `flex-1 min-h-0` item below it), so it only ever
- * has to fill what its own cell already resolved. `min-h-0` is what lets
- * `h-full` resolve SMALLER than the thread's own natural height instead of
- * being floored by it — without it a flex/grid item's default `min-height:
- * auto` would let this card grow past its cell, which is exactly the
- * unbounded-scroll shape this round's own header warns against.
+ * `fill` PICKS THE CARD'S OWN SIZING, ROUND 27 (R89, see `TicketDetailBody`'s
+ * own header) — NOT a `lg:` PREFIX ON ONE CLASS STRING, because the two
+ * shapes are opposite mechanisms, not two breakpoints of the same one.
+ * `"block"` (below `lg`) is the ORIGINAL shape: `h-full min-h-0`, resolving
+ * against the cell's own `min-h-[60vh]` floor, an ordinary in-flow box.
+ * `"absolute"` (`lg`) is new: `position: absolute; inset: 0`, taken OUT of
+ * normal flow so this card contributes ZERO intrinsic height to its own
+ * cell — which is the mechanism that lets the grid ROW resolve to the SIDE
+ * COLUMN's natural height rather than to whatever this card's own thread
+ * happens to be tall enough to demand. Either way `min-h-0` is what lets
+ * the resolved height (`h-full`'s 100%, or `inset-0`'s exact fill) size
+ * SMALLER than the thread's own natural height instead of being floored by
+ * it — without it a flex item's default `min-height: auto` would let this
+ * card grow past its own bound, which is exactly the unbounded-scroll shape
+ * this file's own header warns against.
  *
  * THE COMPOSER IS THE CARD'S `CardFooter`, NOT A THIRD FLEX CHILD OF A
  * PADDED `CardContent` — client ruling, 18 Sep 2026, verbatim: "the footer
@@ -422,12 +499,23 @@ export function TicketSidePanel({
 export function TicketConversationPanel({
   thread,
   composer,
+  fill = "block",
 }: {
   thread: React.ReactNode
   composer: React.ReactNode
+  /** See this component's own header, ROUND 27 (R89). `"absolute"` at `lg`
+   * (`TicketDetailBody`'s own conversation cell is `relative`), `"block"`
+   * below it (the default — every other caller, if there ever is one,
+   * keeps the original in-flow shape). */
+  fill?: "absolute" | "block"
 }) {
   return (
-    <Card variant="default" className="flex h-full min-h-0 flex-col">
+    <Card
+      variant="default"
+      className={
+        fill === "absolute" ? "absolute inset-0 flex min-h-0 flex-col" : "flex h-full min-h-0 flex-col"
+      }
+    >
       <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
       <CardFooter className="shrink-0 w-full p-4">{composer}</CardFooter>
     </Card>
