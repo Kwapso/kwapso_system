@@ -34,6 +34,9 @@ import { softNavigate } from "@/lib/nav"
 import { cursorKey, totalKey } from "@/lib/live-resources"
 import { LoadMore } from "@/components/records/load-more"
 import { sliceKey, type PanelHost } from "@/components/work/work-panels"
+import { ticketStatusCell } from "@/components/deep-link/shape"
+import { ticketTypeIconName } from "@shared/ticket-types"
+import { Icon } from "@shared/web/screen-engine/icon"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
@@ -376,8 +379,34 @@ export function ContactTicketsPanel({
                 <RecordRef value={ticket.ref} />
                 <span className="min-w-0 truncate">{richTextPlain(ticket.description)}</span>
               </p>
-              <p className="text-muted-foreground truncate text-xs">
-                {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
+              {/* THE TYPE AND STATUS, AS REAL BADGES (chips-are-badges check C,
+                  Aurora's 19 Sep 2026 ruling: "the type of ticket and the
+                  status need the card to have a background") — this line used
+                  to fold both into the same joined, unstyled caption as the
+                  date; `ticketStatusCell` is the one shared status-Badge
+                  function every other table-row status cell already routes
+                  through (`web/components/deep-link/shape.tsx`), so this row
+                  never re-invents it. The date stays plain text: it is not a
+                  categorical field and was never a chip in this app (R86). */}
+              <p className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+                {ticket.helpType && (
+                  <Badge
+                    variant="secondary"
+                    size="pill"
+                    className="shrink-0"
+                    icon={
+                      ticketTypeIconName(ticket.helpType) ? (
+                        <Icon name={ticketTypeIconName(ticket.helpType)!} className="size-3.5 shrink-0" />
+                      ) : undefined
+                    }
+                  >
+                    {ticket.helpType}
+                  </Badge>
+                )}
+                {ticketStatusCell(ticket.status, t)}
+                {ticket.createdAt && (
+                  <span className="text-muted-foreground truncate">{formatDate(ticket.createdAt, lang)}</span>
+                )}
               </p>
             </div>
             <CaretRight className="text-muted-foreground size-4 shrink-0" />

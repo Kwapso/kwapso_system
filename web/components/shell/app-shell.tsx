@@ -2134,10 +2134,64 @@ export function AppShell({
          * that ALSO deliberately fills this budget with its own
          * `flex-1 min-h-0` chain — today, only the ticket page — changes
          * behaviour at all: for the first time that chain has a real
-         * number to divide instead of a floor it never has to respect. */}
+         * number to divide instead of a floor it never has to respect.
+         *
+         * `has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-5))]
+         * lg:has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-6))]`
+         * — R89, ROUND 22 (19 Sep 2026), THE LAST 24PX. `h-full` above floors
+         * this div to `[data-slot="screen-shell-body"]`'s own CONTENT-box
+         * height — which is its real, resolved height MINUS that vendored
+         * pane's own `padding-bottom` (`DENSITY_BODY`, screen-shell.tsx:
+         * `py-[var(--space-5)] lg:py-[var(--space-6)]`, comfortable density,
+         * this shell's own default). That padding is exactly right for every
+         * ordinary screen — it is the pane's own bottom margin, the same
+         * figure `pt` pays at the top (zeroed here only when a trail is
+         * absent, above) — and it is precisely the "page inset under it" R89
+         * now forbids for ONE screen: the ticket record body, whose own
+         * `flex-1 min-h-0` chain (`TicketDetailBody`, both the `lg` grid and
+         * the below-`lg` column — `data-slot="ticket-detail-body"` marks
+         * both, see that file) is the one thing this div wraps that
+         * DELIBERATELY fills every pixel it is given, all the way to a real
+         * card's own footer. Measured live before this line existed
+         * (`${SCRATCH}/r22-footer-dump-out.json`, this session): at
+         * 1784×981 (rail collapsed) the conversation card's `CardFooter`
+         * closed at y=941 while `screen-shell-body` itself closed at y=965 —
+         * a 24px gap that was never the card's own inset (`CardFooter`'s own
+         * `lg:pb-[var(--space-7)]`, 32px, already spent INSIDE that 941) but
+         * this pane's own reserved bottom margin, sitting empty below a card
+         * that had nothing left to grow into.
+         *
+         * `shared/ui/` IS VENDORED AND PINNED (R39) — `screen-shell-body`'s
+         * own padding cannot be hand-edited at its source, and `ScreenShell`
+         * exposes no prop to zero it for one screen. So this div — the one
+         * box between that pane and the ticket body that this app DOES own
+         * — grows INTO the reserved margin instead: `:has()` reaches DOWN
+         * for the ticket body's own marker (present in both of
+         * `TicketDetailBody`'s trees), and where it is found this div's
+         * height becomes "100% of the pane's content box, PLUS the exact
+         * padding token that content box excluded" — the pane's real,
+         * full border-box height, to the pixel, never a px more (proved
+         * live the same session, `${SCRATCH}/r22-footer-inject-out.json`:
+         * container bottom 965.00 against `screen-shell-body` bottom
+         * 965.00, both widths). Every `flex-1 min-h-0` descendant of THIS
+         * div — the ones `FOOTER_TO_BOTTOM`/`HEAD_ONLY` above already claim
+         * — inherits that real number and distributes the freed 20/24px
+         * exactly where R89 asks it to: the card's footer, never the head.
+         * A screen with no ticket body never matches `:has()`, so its own
+         * `h-full` is untouched — proved live on `/accounts` and the
+         * tickets dashboard the same session, `screen-shell-body` and their
+         * own last card's bottom edge identical with and without this rule.
+         *
+         * THE TWO TOKENS, NOT ONE, MATCH `DENSITY_BODY`'S OWN PAIR — below
+         * `lg` the pane's own `pb` is `--space-5` (20px), not `--space-6`;
+         * writing one figure for both would under-fill the phone/tablet
+         * case by 4px, small enough to go unnoticed and wrong on exactly
+         * the width R89's own below-`lg` re-fix was about. */}
         <div
           className={cn(
             "mx-auto flex w-full max-w-none min-w-0 h-full flex-col overflow-x-clip pb-24 md:pb-0",
+            "has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-5))]",
+            "lg:has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-6))]",
             !hasTrail && "pt-[var(--space-6)] lg:pt-[var(--space-7)]"
           )}
         >

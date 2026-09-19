@@ -143,7 +143,7 @@ describe("R86/17-Sep (morning) — the date chip is gone; the Overview fact carr
     expect(chips.map((c) => c.textContent)).toEqual(["BERG-T0412", "In progress", "Bug", "Dispatch"])
   })
 
-  it("the status chip is the one coloured chip on the row (R86) — a dot, not a fill", async () => {
+  it("the status chip is the one coloured chip on the row (R86) — the tone lives in the dot", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const region = titleRegion()

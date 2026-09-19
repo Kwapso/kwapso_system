@@ -197,8 +197,19 @@ globalThis.ResizeObserver ??= class {
 
 // `EdgePanel` (the Files sheet, the Related-stories "Show all" sheet) reads
 // this to size itself against the viewport — undefined in jsdom otherwise.
-window.matchMedia ??= ((query: string) => ({
-  matches: false,
+//
+// R89 BELOW-LG RE-FIX, 19 Sep 2026 — an UNCONDITIONAL assignment now,
+// not `??=`: `web/test/setup.ts` already stubs `matchMedia` globally
+// (honest jsdom default, `matches: false` for every query), so this line's
+// own `??=` had been a no-op since that global landed. `TicketDetailBody`
+// now picks its LG-vs-below-lg TREE with a real `matchMedia` breakpoint
+// hook (`ticket-detail-body.tsx`'s own `useIsAtLeastLg`), never a `lg:`
+// class left for the browser to resolve, so this file's whole assertion
+// set — written against the desktop, 2fr/1fr shape — needs that ONE query
+// (`64rem`, matching Tailwind's own `lg:`) answered `true`; every other
+// query (reduced-motion, `EdgePanel`'s own read) keeps the honest `false`.
+window.matchMedia = ((query: string) => ({
+  matches: query === "(min-width: 64rem)",
   media: query,
   onchange: null,
   addListener: () => {},
@@ -458,18 +469,26 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
 // CONSTRUCTION (not its right-column ANCHORS, which are unchanged below).
 //
 // THE NEW SHAPE, proved structurally (jsdom has no layout engine to measure
-// a real height against): the grid is now a `lg:flex-1 lg:min-h-0` flex
+// a real height against): the grid is now a `flex-1 min-h-0` flex
 // item of `app-shell.tsx`'s own flex-column page container, ONE row
-// (`lg:grid-cols-[2fr_1fr]`, no `grid-rows` override), `items-stretch`
+// (`grid-cols-[2fr_1fr]`, no `grid-rows` override), `items-stretch`
 // stretching both cells to that row's full, real height. The conversation
-// cell keeps its `lg:min-h-0 lg:h-full` from the earlier construction
+// cell keeps its `min-h-0 h-full` from the earlier construction
 // unchanged; the three right-column panels moved from three separate
 // auto-placed grid cells into ONE cell — a `flex flex-col gap-6
-// lg:overflow-y-auto` wrapper around the same three anchors — because a
+// overflow-y-auto` wrapper around the same three anchors — because a
 // single grid track can stretch to fill leftover space where three separate
 // `auto` tracks would only ever split it, and "the side cards scroll
 // independently if they are taller" (this law's own text) needs a real
 // scroller, not a track.
+//
+// NO `lg:` PREFIX ON ANY OF THESE CLASSES ANY MORE — R89 BELOW-LG RE-FIX,
+// 19 Sep 2026. `TicketDetailBody` now renders this exact shape only inside
+// its OWN `isAtLeastLg` branch (`ticket-detail-body.tsx`'s own
+// `useIsAtLeastLg`, a real `matchMedia` hook, not a CSS class the browser
+// resolves) — so the classes below need no `lg:` gate of their own; this
+// file's own `window.matchMedia` override (top of file) is what makes
+// jsdom pick this branch to test it at all.
 describe("the conversation cell and the side-panel column fill the grid's own full, real height (R89)", () => {
   it("the grid is one row, a flex-1 min-h-0 item of the page's own flex column, both cells stretched", async () => {
     openTicket()
@@ -477,20 +496,20 @@ describe("the conversation cell and the side-panel column fill the grid's own fu
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
     expect(grid.getAttribute("data-slot")).toBe("ticket-detail-body")
-    expect(grid.className).toContain("lg:grid-cols-[2fr_1fr]")
+    expect(grid.className).toContain("grid-cols-[2fr_1fr]")
     // NO ROW TEMPLATE ANY MORE — ONE row, stretched to the grid's own real
     // height by the flex-fill below, never split three ways again.
-    expect(grid.className).not.toMatch(/lg:grid-rows-/)
+    expect(grid.className).not.toMatch(/grid-rows-/)
     expect(grid.className).toContain("items-stretch")
     // THE GRID ITSELF IS THE FLEX-GROW ITEM NOW — app-shell.tsx's own
-    // min-h-full flex column hands it whatever space RecordScreen's head
+    // h-full flex column hands it whatever space RecordScreen's head
     // leaves behind.
-    expect(grid.className).toContain("lg:flex-1")
-    expect(grid.className).toContain("lg:min-h-0")
+    expect(grid.className).toContain("flex-1")
+    expect(grid.className).toContain("min-h-0")
 
-    expect(conversationAnchor.className).not.toMatch(/lg:row-span-/)
-    expect(conversationAnchor.className).toContain("lg:min-h-0")
-    expect(conversationAnchor.className).toContain("lg:h-full")
+    expect(conversationAnchor.className).not.toMatch(/row-span-/)
+    expect(conversationAnchor.className).toContain("min-h-0")
+    expect(conversationAnchor.className).toContain("h-full")
 
     // THE THREE RIGHT-COLUMN PANELS SHARE ONE SCROLLABLE CELL NOW — not
     // direct grid children any more, which is exactly what lets that cell
@@ -503,22 +522,22 @@ describe("the conversation cell and the side-panel column fill the grid's own fu
     expect(timeAnchor.parentElement).toBe(sideColumn)
     expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
     expect(sideColumn.className).toContain("flex-col")
-    expect(sideColumn.className).toContain("lg:h-full")
-    expect(sideColumn.className).toContain("lg:min-h-0")
+    expect(sideColumn.className).toContain("h-full")
+    expect(sideColumn.className).toContain("min-h-0")
     // INDEPENDENT SCROLL — "the side cards scroll independently if they are
     // taller" (R89's own text), so a long Related stories/Work logs/
     // Stakeholders stack never pushes the conversation card's footer down
     // with it.
-    expect(sideColumn.className).toContain("lg:overflow-y-auto")
+    expect(sideColumn.className).toContain("overflow-y-auto")
   })
 
-  it("the conversation card fills its grid cell (lg:h-full) rather than a fixed viewport height", async () => {
+  it("the conversation card fills its grid cell (h-full) rather than a fixed viewport height", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationCard = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     ) as HTMLElement
-    expect(conversationCard.className).toContain("lg:h-full")
+    expect(conversationCard.className).toContain("h-full")
   })
 })
 

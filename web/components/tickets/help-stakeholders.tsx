@@ -85,7 +85,14 @@
 import * as React from "react"
 
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  type SelectFace,
+} from "@shared/ui/components/select/select"
 import type { HelpStakeholder } from "@shared/types"
 import { nameInitials } from "@/lib/identity"
 import { PersonCard } from "@shared/web/person-card"
@@ -165,6 +172,23 @@ export function HelpStakeholders({
 
   const canOpenEditor = canEditRaisedBy && !!accountId && !!onChangeRaisedBy
 
+  // THE TRIGGER'S OWN FACE (kit v1.2.127's `face` slot). Aurora, verbatim:
+  // "every time there is an avatar, I want to also see it in the choice
+  // component, so I also want to see the avatars here." Radix cannot clone
+  // an option's own mark into the trigger, so the caller hands it the
+  // SELECTED contact's face directly — looked up in the same
+  // `contactChoices` the options below are drawn from, falling back to the
+  // tile's own already-derived `raiserPicture`/`raiserName` for the one case
+  // that list cannot answer: the ticket's `raisedByContactId` naming a
+  // contact this bounded read did not happen to include.
+  const selectedRaiserContact = contactChoices.find((l) => l.personAccountId === raisedByContactId)
+  const raisedByTriggerFace: SelectFace | undefined = raisedByContactId
+    ? {
+        src: (selectedRaiserContact?.personLogoUrl ?? raiserPicture) ?? undefined,
+        name: selectedRaiserContact?.personName ?? raiserName ?? undefined,
+      }
+    : undefined
+
   if (stakeholders.length === 0 && !raisedByContactId) {
     return <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
   }
@@ -211,7 +235,7 @@ export function HelpStakeholders({
                 }}
                 disabled={savingRaiser}
               >
-                <SelectTrigger aria-label={t("Raised by")} className="w-full">
+                <SelectTrigger aria-label={t("Raised by")} className="w-full" face={raisedByTriggerFace}>
                   <SelectValue placeholder={t("Choose who raised it")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -219,8 +243,7 @@ export function HelpStakeholders({
                     <SelectItem
                       key={l.personAccountId}
                       value={l.personAccountId}
-                      image={l.personLogoUrl ?? undefined}
-                      imageAlt=""
+                      face={{ src: l.personLogoUrl ?? undefined, name: l.personName }}
                     >
                       {l.personName}
                       {l.isMainStakeholder ? ` — ${t("Main contact")}` : ""}

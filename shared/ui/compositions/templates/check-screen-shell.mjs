@@ -665,11 +665,12 @@ console.log(
 const railGutterFindings = [];
 
 const DENSITY_RAIL_PATTERN =
-  /const DENSITY_RAIL: Record<ScreenDensity, string> = \{\s*comfortable: "\[--rail-inset:var\(--space-2h\)\]",\s*calm: "\[--rail-inset:var\(--space-2h\)\]",\s*\};/;
+  /const DENSITY_RAIL: Record<ScreenDensity, string> = \{\s*comfortable: `\[--rail-inset:var\(--space-2h\)\] \[--rail-width:\$\{DENSITY_RAIL_WIDTH_CALC\}\]`,\s*calm: `\[--rail-inset:var\(--space-2h\)\] \[--rail-width:\$\{DENSITY_RAIL_WIDTH_CALC\}\]`,\s*\};/;
 if (!DENSITY_RAIL_PATTERN.test(src)) {
   railGutterFindings.push(
     `DENSITY_RAIL in ${rel} does not read the 18 Sep ruling's halved [--rail-inset:var(--space-2h)] (10px, half ` +
-      "of the old --space-5/20px) at both densities.",
+      "of the old --space-5/20px) at both densities, built from the one shared DENSITY_RAIL_WIDTH_CALC template " +
+      "so the two densities cannot disagree on --rail-width either.",
   );
 }
 
@@ -701,6 +702,150 @@ console.log(
     "densities, RAIL_COLUMN still pads all four sides with that one token, and the content column still zeroes " +
     "its own leading padding at md when a rail is present — so the screen-edge-to-navbar and navbar-to-content " +
     "gaps stay equal and cannot drift apart independently.",
+);
+
+/* ============================================================================
+   THE 19 SEP 2026 RAIL-WIDTH-FROM-LABEL CHECK — Aurora, verbatim: "can we
+   make sidebar less wide? assume knowledge will be the longest word there."
+
+   `RAIL_WIDTH` used to be a flat literal, `"13rem"`, with nothing tying it
+   to what the rail draws. It is now `"var(--rail-width)"`, a `calc()` of
+   the row's own tokens (`--rail-inset` twice, `--space-3` twice,
+   `--icon-button`, `--space-2`) plus `--rail-label-ch` (tokens.css) —
+   "Knowledge" measured once, at the row's own `--text-sm`/medium/0em
+   cascade, and pinned as a rem. FOUR THINGS PINNED, each guarding a
+   different way the derivation could quietly rot back into a bare number:
+   (1) `RAIL_WIDTH` itself reads the custom property, not a literal; (2) the
+   rail dock reads `w-[var(--rail-width)]`, not `w-[13rem]`; (3) no bare
+   `13rem`/`208px` remains anywhere in this file as a rail measure (the one
+   exception, `verify/shell-chat/before-shell.tsx`'s own frozen `RAIL_WIDTH`,
+   is a different file entirely and is not read here); (4) `tokens.css`
+   still carries the pinned `--rail-label-ch` the calc depends on. A fifth
+   guard lives in `rail.tsx`'s own check, further down this file: the
+   label/heading/member spans this width was sized against still carry
+   `truncate`, so a label LONGER than "Knowledge" degrades instead of
+   forcing the column wider again. */
+const railWidthFindings = [];
+
+if (!/export const RAIL_WIDTH = "var\(--rail-width\)";/.test(src)) {
+  railWidthFindings.push(
+    `${rel}'s RAIL_WIDTH is not "var(--rail-width)" — a re-introduced literal (e.g. "13rem") would silently stop ` +
+      "tracking the label/token derivation DENSITY_RAIL computes.",
+  );
+}
+
+if (!/"flex w-\[var\(--rail-width\)\] min-h-0 flex-none flex-col"/.test(src)) {
+  railWidthFindings.push(
+    `${rel}'s rail dock does not read w-[var(--rail-width)] on [data-slot="screen-shell-rail"] — the column would ` +
+      "stop tracking RAIL_WIDTH's own value even if the exported constant were still correct.",
+  );
+}
+
+if (/w-\[13rem\]|w-\[208px\]/.test(src)) {
+  railWidthFindings.push(
+    `${rel} still contains a bare w-[13rem] or w-[208px] — the rail's expanded width must come from ` +
+      "var(--rail-width) everywhere it is read, not from a re-typed literal beside it.",
+  );
+}
+
+const railWidthTokensPath = path.join(HERE, "..", "..", "foundations", "tokens", "tokens.css");
+const railWidthTokensSrc = fs.readFileSync(railWidthTokensPath, "utf8");
+if (!/--rail-label-ch:\s*4\.5rem;/.test(railWidthTokensSrc)) {
+  railWidthFindings.push(
+    "tokens.css does not pin --rail-label-ch: 4.5rem — the measured-and-rounded 'Knowledge' width DENSITY_RAIL's " +
+      "--rail-width calc depends on.",
+  );
+}
+
+/* THE 19 SEP 2026 CORRECTION, SAME DAY — the label alone under-sized the
+   rail against the brand mark (`--icon-28`'s logotype, `rail.tsx`'s
+   `MARK_STEP`) and pushed it into its own `max-w-full` shrink, undoing
+   Aurora's "make the logo bigger" rulings. `--rail-width` is now `max()` of
+   the label's own floor and the mark's natural-width floor — pinned so
+   neither floor can quietly drop back to a single sum. */
+if (!/--brand-lockup-w:\s*8\.75rem;/.test(railWidthTokensSrc)) {
+  railWidthFindings.push(
+    "tokens.css does not pin --brand-lockup-w: 8.75rem — the mark's own natural-width floor DENSITY_RAIL's " +
+      "--rail-width max() depends on, so the rail can no longer shrink the brand mark to fit a narrow label.",
+  );
+}
+
+if (
+  !/const DENSITY_RAIL_WIDTH_CALC = `max\(\$\{RAIL_WIDTH_LABEL_FLOOR\},\$\{RAIL_WIDTH_MARK_FLOOR\}\)`;/.test(src)
+) {
+  railWidthFindings.push(
+    `${rel}'s DENSITY_RAIL_WIDTH_CALC is not max(RAIL_WIDTH_LABEL_FLOOR, RAIL_WIDTH_MARK_FLOOR) — a --rail-width ` +
+      "built from the label sum alone would re-open the brand-mark shrink this check exists to prevent.",
+  );
+}
+
+if (!/var\(--brand-lockup-w\)/.test(src)) {
+  railWidthFindings.push(
+    `${rel} does not read var(--brand-lockup-w) anywhere — RAIL_WIDTH_MARK_FLOOR would not be sizing the rail to ` +
+      "the mark's own natural width.",
+  );
+}
+
+if (railWidthFindings.length > 0) {
+  console.error(
+    "FAIL screen-shell rail-width-from-label check (19 Sep ruling, corrected same day):\n" +
+      railWidthFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK screen-shell rail-width-from-label check: RAIL_WIDTH reads var(--rail-width), the rail dock's own column " +
+    "reads w-[var(--rail-width)], no bare 13rem/208px rail literal remains, --rail-width is max() of the label's " +
+    "own floor and the brand mark's natural-width floor, and tokens.css still pins the measured --rail-label-ch " +
+    "and --brand-lockup-w both floors are built from.",
+);
+
+/* THE FIFTH GUARD, ON rail.tsx ITSELF — --rail-width is sized to fit exactly
+   "Knowledge" (Aurora's own worst case). Any label ACTUALLY longer than that
+   — another language's word, an application's own vocabulary — must degrade
+   by ellipsis, never by reflowing the row or pushing the rail wider again.
+   So every text run --rail-width was sized against (the destination's own
+   label, the group heading, the member chip's name) must keep `truncate`
+   inside a `min-w-0` ancestor — the pairing Tailwind's own overflow model
+   requires (a flex child needs `min-w-0` before `truncate`'s `overflow:
+   hidden` has a constrained box to clip against at all). */
+const railTruncateFindings = [];
+
+if (!/<span className="min-w-0 flex-1 truncate">\{item\.label\}<\/span>/.test(railSrc)) {
+  railTruncateFindings.push(
+    `${railRel}'s nav item label no longer reads <span className="min-w-0 flex-1 truncate">{item.label}</span> — ` +
+      "a label longer than the --rail-width the kit derives from \"Knowledge\" would reflow the row instead of " +
+      "eliding.",
+  );
+}
+
+if (!/<span className="min-w-0 truncate">\{group\.heading\}<\/span>/.test(railSrc)) {
+  railTruncateFindings.push(
+    `${railRel}'s group heading no longer reads <span className="min-w-0 truncate">{group.heading}</span>.`,
+  );
+}
+
+if (
+  !/className="min-w-0 flex-1 truncate font-\[var\(--font-weight-medium\)\] text-\[var\(--spine-member-ink\)\]"/.test(
+    railSrc,
+  )
+) {
+  railTruncateFindings.push(`${railRel}'s member chip name no longer truncates inside a min-w-0 box.`);
+}
+
+if (railTruncateFindings.length > 0) {
+  console.error(
+    "FAIL rail truncate-under-narrower-width check (19 Sep ruling):\n" +
+      railTruncateFindings.map((f) => `  - ${f}`).join("\n"),
+  );
+  process.exit(1);
+}
+
+console.log(
+  "OK rail truncate-under-narrower-width check: the nav item label, the group heading and the member chip's name " +
+    "all still truncate inside a min-w-0 box, so a label longer than \"Knowledge\" elides instead of forcing " +
+    "--rail-width wider or reflowing the row.",
 );
 
 /* ============================================================================
@@ -999,4 +1144,143 @@ console.log(
     "ROW_EXPANDED's own height token, not the smaller --avatar-md), the collapsed rail root widens to match, and " +
     "the retired --avatar-md row sizing stays gone — measured live before/after: 30px/37.5px row height and " +
     "37.5px/45px row rhythm collapsing to one 37.5px/45px pair in both rail states.",
+);
+
+/* ============================================================================
+   THE 2026-09-19 ASIDE-SCRIM-COVERS-THE-WHOLE-OVERLAY-RANGE CHECK. A
+   narrow-sweep audit (1440/1024/760, every screen) found the aside's overlay
+   and its scrim answering to two DIFFERENT numbers: the dock itself becomes
+   an overlay below `lg` (`max-lg:absolute max-lg:inset-y-0 max-lg:end-0`,
+   argued at length above that block), but the scrim only painted below
+   `45rem` (720px) — the SHEET's own, unrelated breakpoint. Between 720 and
+   1024 the overlay sat on the card, and on open dialogs, with nothing behind
+   it dimmed and nothing blocking a click through to them (evidence: a
+   raise-ticket dialog painted UNDER the assistant overlay at 760 wide).
+
+   Fixed by construction rather than by adding a second number: the scrim now
+   mounts on the exact same `max-lg:` condition the dock's own overlay switch
+   uses, and it is `fixed inset-0` rather than `absolute inset-0` so it covers
+   the true viewport regardless of how narrow the dock's own box is between
+   720 and 1024 (the dock only earns `start-0` — full-bleed — below `45rem`,
+   which is the sheet's own geometry and is untouched by this fix). Measured
+   live in `verify/shell-chrome` (`?aside=open`) before shipping this check:
+   at 760/900/1000 wide the scrim is `position: fixed`, `display: block`,
+   `getBoundingClientRect()` exactly the viewport, `pointer-events: auto`,
+   backed by the same `charcoal 28%` `--scrim-drawer` token, and a click on it
+   flips the dock's `data-state` to `shut`; at 1024 the scrim is `display:
+   none` and the dock is back to `position: relative` (docked, not an
+   overlay). Below `45rem` the rect is unchanged from before this fix — the
+   dock box already spanned the viewport there, so `fixed inset-0` and the
+   old `absolute inset-0` resolve to the same rectangle. */
+const scrimFindings = [];
+
+const SCRIM_BLOCK = /data-slot="screen-shell-aside-scrim"[\s\S]{0,300}?className=\{cn\(\s*([\s\S]*?)\)\}/;
+const scrimMatch = src.match(SCRIM_BLOCK);
+
+if (!scrimMatch) {
+  scrimFindings.push(
+    `${rel} does not have a data-slot="screen-shell-aside-scrim" element with a cn(...) className to check.`,
+  );
+} else {
+  const scrimClasses = scrimMatch[1];
+
+  if (!/"hidden max-lg:block"/.test(scrimClasses)) {
+    scrimFindings.push(
+      `${rel}'s aside scrim does not mount on "hidden max-lg:block" — the scrim must answer to the SAME ` +
+        "breakpoint the dock's own overlay switch uses (max-lg:absolute, argued on the dock above), not a " +
+        "second, independently-chosen number.",
+    );
+  }
+
+  if (/max-\[45rem\]:block/.test(scrimClasses)) {
+    scrimFindings.push(
+      `${rel}'s aside scrim still reads max-[45rem]:block — that is the SHEET's own breakpoint, not the ` +
+        "overlay's, and gating the scrim to it reopens the 720-1024 gap where the overlay sits over the card " +
+        "and any open dialog with nothing dimmed and nothing blocking a click through to them.",
+    );
+  }
+
+  if (!/"fixed inset-0"/.test(scrimClasses)) {
+    scrimFindings.push(
+      `${rel}'s aside scrim is not "fixed inset-0" — an "absolute inset-0" scrim is confined to the dock's own ` +
+        "box, which is only as wide as the column between 45rem and lg (it earns start-0/full-bleed only below " +
+        "45rem), so it would dim a strip rather than \"everything behind\" the overlay.",
+    );
+  }
+}
+
+if (!/max-lg:absolute max-lg:inset-y-0 max-lg:end-0 max-lg:z-\[3\]/.test(src)) {
+  scrimFindings.push(
+    `${rel}'s aside dock no longer reads max-lg:absolute max-lg:inset-y-0 max-lg:end-0 max-lg:z-[3] — this is ` +
+      "the one constant (`lg`) the scrim check above assumes the scrim is matching; if this dock expression " +
+      "changes breakpoint, the scrim's own max-lg: must move with it.",
+  );
+}
+
+if (scrimFindings.length > 0) {
+  console.error("FAIL aside-scrim overlay-range check:\n" + scrimFindings.map((f) => `  - ${f}`).join("\n"));
+  process.exit(1);
+}
+
+console.log(
+  "OK aside-scrim overlay-range check: the scrim mounts on max-lg:, the same constant the dock's own " +
+    "docking-to-overlay switch uses, is fixed inset-0 so it covers the true viewport (not just the dock's own " +
+    "box) everywhere between 720 and 1024, and the old max-[45rem]: gate is gone.",
+);
+
+/* ============================================================================
+   THE 2026-09-19 RAIL-NAV-SCROLLS-ABOVE-THE-FOOT CHECK. The same narrow-sweep
+   audit's second finding: at 1024x768 a rail with more entries than fit
+   showed its last row half hidden behind the profile card. `verify/rail-
+   foot`'s own long register, measured live at 1024x768 in both rail states
+   before this check was written: `rail-nav` already read `min-h-0 flex-1
+   overflow-y-auto` (the 2026-09-02 fix for the same class of bug — the foot
+   travelling with the list — argued at length in rail.tsx above), and
+   scrolling it to its end put the last row fully inside the viewport with
+   zero rect intersection against `rail-member`. The one thing that had not
+   shipped is pinned here: the platform's own scrollbar, which nothing else
+   in this column draws, hidden with the same pair `tabs.tsx`'s strip and
+   `breadcrumb-folders.tsx`'s trail already use — a paint change, not an
+   `overflow` one, so wheel/touch/keyboard scrolling are untouched. */
+const railNavFindings = [];
+
+const RAIL_NAV_BLOCK = /data-slot="rail-nav"[\s\S]{0,120}?className=\{cn\(\s*([\s\S]*?)\)\}/;
+const railNavMatch = railSrc.match(RAIL_NAV_BLOCK);
+
+if (!railNavMatch) {
+  railNavFindings.push(
+    `${railRel} does not have a data-slot="rail-nav" element with a cn(...) className to check.`,
+  );
+} else {
+  const railNavClasses = railNavMatch[1];
+
+  if (!/\bmin-h-0\b/.test(railNavClasses) || !/\bflex-1\b/.test(railNavClasses) || !/\boverflow-y-auto\b/.test(railNavClasses)) {
+    railNavFindings.push(
+      `${railRel}'s rail-nav does not read min-h-0, flex-1 and overflow-y-auto together — without all three the ` +
+        "nav floors at its content height (flex's own min-height:auto default) and cannot scroll, so a rail with " +
+        "more entries than fit pushes the foot (the collapse toggle and the profile card) off the bottom instead " +
+        "of scrolling under it, and the last row can sit behind the card.",
+    );
+  }
+
+  if (!/\[scrollbar-width:none\]/.test(railNavClasses) || !/\[&::-webkit-scrollbar\]:hidden/.test(railNavClasses)) {
+    railNavFindings.push(
+      `${railRel}'s rail-nav does not hide its own scrollbar ([scrollbar-width:none] [&::-webkit-scrollbar]:` +
+        "hidden, the kit's own pair from tabs.tsx/breadcrumb-folders.tsx) — this column draws no other bar " +
+        "(background-color: transparent, measured in verify/rail-foot), so the platform's default bar reads as " +
+        "a second edge over the last row.",
+    );
+  }
+}
+
+if (railNavFindings.length > 0) {
+  console.error("FAIL rail-nav scroll-above-the-foot check:\n" + railNavFindings.map((f) => `  - ${f}`).join("\n"));
+  process.exit(1);
+}
+
+console.log(
+  "OK rail-nav scroll-above-the-foot check: rail-nav reads min-h-0 flex-1 overflow-y-auto (both rail states — " +
+    "the classes are unconditional, not gated on isCollapsed) with its own scrollbar hidden — measured live in " +
+    "verify/rail-foot at 1024x768: last row fully visible after scrolling, zero intersection with rail-member, " +
+    "in both the expanded and collapsed rail.",
 );

@@ -164,7 +164,6 @@ import { richTextPlain } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import {
-  TicketConversationPanel,
   TicketDetailBody,
   TicketSidePanel,
   TICKET_PANEL_ANCHOR,
@@ -1434,11 +1433,18 @@ export function HelpDetailScreen({
       notePlaceholder={t("Add a note")}
     />
       <TicketDetailBody
-        conversation={
-          <TicketConversationPanel
-            thread={
-              <>
-                {/* READ IT IN YOUR OWN LANGUAGE — above the conversation,
+        // `thread`/`composer` TWO SEPARATE PROPS, NOT ONE PRE-BUILT
+        // `<TicketConversationPanel>` — R89 below-lg re-fix, 19 Sep 2026.
+        // `TicketDetailBody` itself now decides, per width, whether the
+        // composer sits inside `TicketConversationPanel`'s own `CardFooter`
+        // (lg+, unchanged) or as its own pinned band outside any scrolling
+        // region (below lg) — see that file's own header for the whole
+        // account (why a CSS-only `lg:`/`max-lg:` split cannot do this: the
+        // composer is one stateful control, and it cannot live in two DOM
+        // positions at once without becoming two).
+        thread={
+          <>
+            {/* READ IT IN YOUR OWN LANGUAGE — above the conversation,
                     because the conversation is what it acts on. Inline rather
                     than in the three-dot menu: this is a thing somebody
                     presses while reading and presses back a moment later, and
@@ -1536,25 +1542,23 @@ export function HelpDetailScreen({
                      sides, the receipts — is still entirely the kit's. */
                   composer={false}
                 />
-              </>
-            }
-            // THE "FILES AND LINKS" TRAY (`attachments` prop, `<HelpAttachmentsPanel>`,
-            // a Paperclip button here calling its `openRef`) STOOD HERE for one
-            // day, 18 Sep 2026 — see this file's own header for the correction
-            // that pulled it ("wtf is his files inside the ocnversation …
-            // thats not what i meant") and named per-message attachments as
-            // what she actually wanted instead. `TicketConversationPanel`
-            // still takes no `attachments` prop (ticket-detail-body.tsx's own
-            // header says why — that tray stays PARKED, not re-mounted); what
-            // she asked for lives on the messages themselves now (`replies`'
-            // own `attachments`/`media`, fed above) and on the composer's own
-            // Paperclip (`reply-composer.tsx`), which needs no prop from here
-            // at all — it stages and uploads through `useReplySend`'s own
-            // `uploadFile`/`removeUploadedFile`, wired above.
-            composer={
-              <ReplyComposer send={reply} answered={ticket.status === "resolved"} />
-            }
-          />
+          </>
+        }
+        // THE "FILES AND LINKS" TRAY (`attachments` prop, `<HelpAttachmentsPanel>`,
+        // a Paperclip button here calling its `openRef`) STOOD HERE for one
+        // day, 18 Sep 2026 — see ticket-detail-body.tsx's own header for the
+        // correction that pulled it ("wtf is his files inside the ocnversation
+        // … thats not what i meant") and named per-message attachments as
+        // what she actually wanted instead. Neither `TicketConversationPanel`
+        // nor this prop takes an `attachments` slot — that tray stays PARKED,
+        // not re-mounted; what she asked for lives on the messages themselves
+        // now (`replies`' own `attachments`/`media`, fed above) and on the
+        // composer's own Paperclip (`reply-composer.tsx`), which needs no
+        // prop from here at all — it stages and uploads through
+        // `useReplySend`'s own `uploadFile`/`removeUploadedFile`, wired
+        // above.
+        composer={
+          <ReplyComposer send={reply} answered={ticket.status === "resolved"} />
         }
         stories={
           // EVERY ROW, NO "Show all" — client ruling, 17 Sep 2026, verbatim:
@@ -1642,9 +1646,20 @@ export function HelpDetailScreen({
                       >
                         {s.storyType ?? "—"}
                       </Badge>
-                      {/* THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot,
-                          never a fill: `variant="status" dot={…}` is the
-                          app's one status-chip shape. */}
+                      {/* THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot
+                          AND a fill: `variant="status" dot={…}` is the
+                          app's one status-chip shape. Kit ruling, 19 Sep
+                          2026, verbatim: "chips and pills always must have
+                          the background card or shape wherever they are …
+                          the type of ticket and the status need the card
+                          to have a background." `status` used to read
+                          `--pill-fill`, which resolved to `--card` and went
+                          invisible on this very row (byte-identical to
+                          `--background` in light); it now draws the same
+                          visible chip surface `secondary` (the type chip,
+                          above) already does. The DOT still carries the
+                          tone — this only ever changed the ground under
+                          it. Kit v1.2.128. */}
                       <Badge variant="status" dot={storyStatusDotTone(s.status)} className="shrink-0">
                         {t(STORY_STATUS_LABEL[s.status])}
                       </Badge>

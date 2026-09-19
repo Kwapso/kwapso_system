@@ -35,6 +35,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  type SelectFace,
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -428,6 +429,18 @@ export function WorkLogsPanel({
       .workLogs({ filter: personFilter ? filteredFilter : filter, cursor: c })
       .then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
 
+  /** THE "LOGGED BY" TRIGGER'S OWN FACE (kit v1.2.127's `face` slot). Aurora,
+   * verbatim: "every time there is an avatar, I want to also see it in the
+   * choice component". `WorkLogSummary.people` (shared/types.ts) carries
+   * `userId`/`userName` only — no `imageUrl` — so this draws INITIALS on the
+   * kit's default tone rather than a photograph; a real picture here needs
+   * the summary door widened to carry one, out of scope for this pass.
+   * "Everyone" is not a person and draws no face. */
+  const loggedByPerson = personFilter ? summaryQ.data?.people.find((p) => p.userId === personFilter) : undefined
+  const loggedByFace: SelectFace | undefined = loggedByPerson
+    ? { name: staffNameFromSnapshot(loggedByPerson.userName) || t("Someone who has left") }
+    : undefined
+
   return (
     <div className="flex flex-col">
       {/* The same control every other collection tab in the app puts above
@@ -445,7 +458,7 @@ export function WorkLogsPanel({
         search={
           summaryQ.data && summaryQ.data.people.length > 1 && (
             <Select value={personFilter || "all"} onValueChange={(v) => setPersonFilter(v === "all" ? "" : v)}>
-              <SelectTrigger className="h-9 w-full sm:w-48" aria-label={t("Filter by who logged it")}>
+              <SelectTrigger className="h-9 w-full sm:w-48" aria-label={t("Filter by who logged it")} face={loggedByFace}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -455,7 +468,11 @@ export function WorkLogsPanel({
                   lang,
                   (p) => staffNameFromSnapshot(p.userName) || t("Someone who has left")
                 ).map((p) => (
-                  <SelectItem key={p.userId} value={p.userId}>
+                  <SelectItem
+                    key={p.userId}
+                    value={p.userId}
+                    face={{ name: staffNameFromSnapshot(p.userName) || t("Someone who has left") }}
+                  >
                     {staffNameFromSnapshot(p.userName) || t("Someone who has left")}
                   </SelectItem>
                 ))}

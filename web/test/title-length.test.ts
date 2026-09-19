@@ -265,7 +265,15 @@ describe("the render seam — every one-line title renderer truncates through th
     expect(src, "the function must still be named clampRecordHeading — the seam both call sites import")
       .toMatch(/export function clampRecordHeading/)
     expect(src, "R87 supersedes the old line-clamp-2 with a one-line truncate").toMatch(
-      /className="min-w-0 truncate"/
+      // `block ` ADDED 19 Sep 2026 (this file's own header account, and
+      // record-heading.tsx's own comment above `clampRecordHeading`): a bare
+      // `<span>` is `display:inline`, and CSS never applies `overflow`/
+      // `text-overflow` to a non-replaced inline box — so `truncate`'s own
+      // clip-and-ellipsis were silent no-ops until this class was added, and
+      // the title painted past its column at full width instead of
+      // truncating. The one-line law this suite polices did not change;
+      // what changed is that the ONE LINE now actually clips.
+      /className="block min-w-0 truncate"/
     )
     // The old TWO-LINE class must be gone from the rendered node, not merely
     // joined by the new one — checked on the className literal itself, not

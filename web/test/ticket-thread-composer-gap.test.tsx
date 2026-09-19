@@ -116,6 +116,28 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver
 
+// R89 BELOW-LG RE-FIX, 19 Sep 2026 — `TicketDetailBody` now picks its own
+// LG-vs-below-lg TREE with a real `matchMedia` breakpoint hook
+// (`ticket-detail-body.tsx`'s own `useIsAtLeastLg`), never a `lg:` class
+// left for the browser to resolve — so `web/test/setup.ts`'s own global
+// stub (`matches: false` for every query, jsdom's honest default) would
+// silently render the BELOW-LG tree here instead of the desktop one this
+// file's whole assertion set is written against. Overridden to answer the
+// ONE query this app's `lg` breakpoint actually asks (`64rem`, matching
+// Tailwind's own `lg:`); every other query (the kit's reduced-motion
+// check, `EdgePanel`'s own viewport read) keeps the setup file's honest
+// `false`.
+window.matchMedia = ((query: string) => ({
+  matches: query === "(min-width: 64rem)",
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof window.matchMedia
+
 import { HelpDetailScreen } from "@/components/tickets/help-detail"
 
 afterEach(cleanup)

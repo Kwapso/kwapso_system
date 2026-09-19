@@ -56,7 +56,14 @@ import {
 } from "@shared/ui/components/dialog/dialog"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/ui/components/select/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  type SelectFace,
+} from "@shared/ui/components/select/select"
 import { Field } from "@shared/web/field"
 import { FactRow } from "@shared/web/fact-row"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -1046,6 +1053,18 @@ export function HelpFormDialog({
    * what somebody picked, else the main contact, else nothing. */
   const raisedByValue =
     values.raisedByContactId !== NONE ? values.raisedByContactId : (mainContactId ?? NONE)
+  /** THE TRIGGER'S OWN FACE (kit v1.2.127's `face` slot). Aurora, verbatim:
+   * "every time there is an avatar, I want to also see it in the choice
+   * component, so I also want to see the avatars here." Radix cannot clone
+   * an option's own mark into the trigger (see `SelectItem`'s own kit-side
+   * note), so the caller looks the chosen contact up in the same
+   * `contactOptions` the list is built from and hands its face across.
+   * `undefined` while nothing is chosen — the trigger draws no mark, exactly
+   * as before this prop existed. */
+  const raisedByFace: SelectFace | undefined = (() => {
+    const chosen = contactOptions.find((c) => c.value === raisedByValue)
+    return chosen ? { src: chosen.picture ?? undefined, name: chosen.label } : undefined
+  })()
   /** Demanded once there is somebody to name — see `contactField`. A ticket with
    * no client, or a client with no contacts on file, has no possible answer and
    * is not asked for one. */
@@ -1600,7 +1619,7 @@ export function HelpFormDialog({
           onValueChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
           disabled={busy || !chosenAccountId || contactOptions.length === 0}
         >
-          <SelectTrigger id="help-contact">
+          <SelectTrigger id="help-contact" face={raisedByFace}>
             <SelectValue
               placeholder={chosenAccountId ? t("No contacts yet.") : t("Choose an account first.")}
             />
@@ -1611,7 +1630,7 @@ export function HelpFormDialog({
                 sorting the row's own options can never move the
                 preselection. */}
             {sortedOptions(contactOptions, lang, (c) => c.label).map((c) => (
-              <SelectItem key={c.value} value={c.value} image={c.picture ?? undefined} imageAlt="">
+              <SelectItem key={c.value} value={c.value} face={{ src: c.picture ?? undefined, name: c.label }}>
                 {c.hint ? `${c.label} — ${c.hint}` : c.label}
               </SelectItem>
             ))}

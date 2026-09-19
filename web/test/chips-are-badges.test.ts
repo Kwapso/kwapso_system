@@ -16,7 +16,7 @@
 // beside the label text, never through the `dot` prop"). Neither shape is
 // caught by the kit fix, because neither one asks the kit for anything.
 //
-// TWO CENSUSES, ONE REGISTRY:
+// THREE CENSUSES, ONE REGISTRY:
 //
 //   A · AN AD-HOC CHIP — a `<span>`/`<div>` outside Badge, carrying both an
 //       icon-shaped element and a label, styled as a pill
@@ -26,12 +26,36 @@
 //       </Badge>` instead of `<Badge icon={Icon}>{label}</Badge>`. This is
 //       a call site that reached for the kit and then re-invented the one
 //       thing it already does for a caller.
+//   C · A STATUS/TYPE FIELD DRAWN BARE IN A PREVIEW ROW — Aurora's ruling,
+//       19 Sep 2026, verbatim, over the ticket detail's Related stories
+//       card: "chips and pills always must have the background card or
+//       shape wherever they are. In this case, I'm talking inside
+//       ticket-related stories. The type of ticket and the status need the
+//       card to have a background." Check A/B only ever look at something
+//       ALREADY chip-shaped (a pill wrapper, or a Badge). This check closes
+//       the case check A and B both miss by construction — a compact
+//       "preview row" (a `.map()` callback rendering one record among many,
+//       the shape every related-record panel, board card and search result
+//       row uses) that draws a status/type FIELD as bare JSX text with no
+//       chip wrapper at all, often folded through a label map first
+//       (`{t(STORY_STATUS_LABEL[s.status])}`). Matched on the raw text of
+//       the JSX expression, the same "read the source" posture
+//       `classAttrText` already takes for check A, because the field access
+//       usually sits a call or two beneath the label map rather than bare.
+//       Narrow field list on purpose — `status`, `storyType`, `ticketType`/
+//       `helpType` and `stage` are the app's closed status/type vocabularies
+//       (D17, R86); `type` alone is too common a word elsewhere in this
+//       codebase (event types, source types, import types) to key on
+//       without drowning in unrelated hits.
 //
-// Both are offenders under the same rule and share one exemption list
+// All three are offenders under the same rule and share one exemption list
 // (`CHIP_BADGE_EXEMPT`, `shared/rules/registry.ts`) — a reasoned entry is
 // for a NON-CHIP the census cannot tell apart from one by shape alone (a
-// selection control, a toolbar pill), never for a chip that is merely
-// inconvenient to convert.
+// selection control, a toolbar pill, or — check C's own case — a real table
+// cell whose column IS the status/type word sitting beside its own dot
+// rather than a chip; UI-RULEBOOK.md's "the dot reaches every status/stage
+// picker and every list cell" ruling asks that cell for a DOT, never a
+// pill), never for a chip that is merely inconvenient to convert.
 //
 // SCOPE — `web/components/**`, `web-portal/**`, `shared/web/**`, the same
 // three roots `motion-is-the-kits.test.ts` walks for the identical reason:
@@ -65,7 +89,21 @@ const ROOTS = [
  * them — false generality is not the same law as this one. */
 const ICON_TAG = /^(Icon|[A-Za-z]*Glyph)$/
 
-type Offender = { key: string; rel: string; line: number; kind: "A" | "B"; detail: string }
+/** Check C's closed field list — see the file header for why it stays
+ * narrow. Matched against the raw text of a JSX expression, so it finds the
+ * property access whether it sits bare (`s.status`) or a call or two
+ * underneath a label map (`t(STORY_STATUS_LABEL[s.status])`). */
+const ROW_FIELD_ACCESS = /\.(status|storyType|ticketType|helpType|stage)\b/i
+
+/** Tags that take a status/type field out of check C's reach — a real chip
+ * (`Badge`, already governed), a selection control (`select`/`option`, a
+ * different law entirely) or a genuine table cell (`td`, the ruling's own
+ * named exception: a list/table CELL shows the word beside its dot, never a
+ * pill — UI-RULEBOOK.md, "the dot reaches every status/stage picker and
+ * every list cell"). */
+const ROW_FIELD_EXEMPT_ANCESTOR = ["Badge", "select", "option"]
+
+type Offender = { key: string; rel: string; line: number; kind: "A" | "B" | "C"; detail: string }
 
 function enclosingFunctionName(node: ts.Node, sf: ts.SourceFile): string {
   for (let cur: ts.Node | undefined = node; cur; cur = cur.parent) {
@@ -112,6 +150,75 @@ function isBlankText(child: ts.JsxChild): boolean {
   return ts.isJsxText(child) && child.text.trim() === ""
 }
 
+/** True when `fn` is the callback argument of a `.map(` call — the shape
+ * every "preview row" (a related-record panel, a board card, a search
+ * result) renders through: one function, called once per record. */
+function isMapCallback(fn: ts.Node): boolean {
+  const parent = fn.parent
+  return (
+    !!parent &&
+    ts.isCallExpression(parent) &&
+    ts.isPropertyAccessExpression(parent.expression) &&
+    parent.expression.name.text === "map" &&
+    parent.arguments[0] === fn
+  )
+}
+
+/** Walks up from `node` to see whether it sits inside a `.map()` row
+ * renderer at all — check C's scope. A record's own DETAIL head (never
+ * mapped, always one record) is out of reach by construction; that shape is
+ * `status-owns-the-chip.test.ts`'s territory, not this one's. */
+function isInsideRowRenderer(node: ts.Node): boolean {
+  for (let cur: ts.Node | undefined = node; cur; cur = cur.parent) {
+    if ((ts.isArrowFunction(cur) || ts.isFunctionExpression(cur)) && isMapCallback(cur)) return true
+  }
+  return false
+}
+
+/** Walks up from `node` for the nearest enclosing JSX element carrying one
+ * of `tags` — used both for check C's exempt ancestors (`Badge`, a
+ * selection control) and for the genuine-table-cell carve-out (`td`). */
+function isInsideTag(node: ts.Node, tags: string[]): boolean {
+  for (let cur: ts.Node | undefined = node; cur; cur = cur.parent) {
+    if (ts.isJsxElement(cur) && tags.includes(tagName(cur.openingElement))) return true
+  }
+  return false
+}
+
+/** True when `node` itself renders JSX somewhere beneath it. Check C reads
+ * the OUTER JsxExpression wrapping a field access, and a big conditional
+ * (`cond ? (<Badge>…</Badge>) : (<span>…</span>)`) or an inline `.map(…)`
+ * matches the field regex on its own full text while the actual chip (or
+ * lack of one) lives on a NESTED JsxExpression a few levels down — one the
+ * same walk visits independently, because `ts.forEachChild` still recurses
+ * into whatever this node returns false for. Flagging the outer wrapper too
+ * would double-report the exact same offender, or worse, flag a wrapper
+ * that already renders a real Badge inside it. */
+function containsJsx(node: ts.Node): boolean {
+  if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) return true
+  let found = false
+  node.forEachChild((child) => {
+    if (found) return
+    if (containsJsx(child)) found = true
+  })
+  return found
+}
+
+/** True when `expr` is a call to some OTHER named helper — `ticketStatusCell
+ * (ticket.status, t)`, the shape `work-panels.tsx`'s own status cell
+ * already uses. A call site handing a field to a function it did not write
+ * inline has delegated the rendering decision entirely; if that helper
+ * draws a bare status/type field, the same walk finds it at the helper's
+ * OWN definition site instead (still inside `web/components` and `shared/
+ * web`, so nothing is hidden by delegating twice). Only `t(...)`, this
+ * app's translate call, is trusted to wrap a field directly, because that
+ * is the exact shape most of the app's own status labels already take
+ * (`t(STORY_STATUS_LABEL[s.status])`) and a translate call renders nothing
+ * on its own. */
+function isOpaqueHelperCall(expr: ts.Expression): boolean {
+  return ts.isCallExpression(expr) && ts.isIdentifier(expr.expression) && expr.expression.text !== "t"
+}
+
 function findOffendersInFile(sf: ts.SourceFile, rel: string): Offender[] {
   const offenders: Offender[] = []
 
@@ -154,6 +261,36 @@ function findOffendersInFile(sf: ts.SourceFile, rel: string): Offender[] {
               ` own header names as the bug this ruling closes`,
           })
         }
+      }
+    }
+
+    // ── CHECK C — a status/type field drawn bare in a preview row ────────
+    if (
+      ts.isJsxExpression(node) &&
+      node.expression &&
+      node.parent &&
+      (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+    ) {
+      const text = node.expression.getText(sf)
+      if (
+        ROW_FIELD_ACCESS.test(text) &&
+        isInsideRowRenderer(node) &&
+        !isInsideTag(node, ROW_FIELD_EXEMPT_ANCESTOR) &&
+        !isInsideTag(node, ["td"]) &&
+        !containsJsx(node.expression) &&
+        !isOpaqueHelperCall(node.expression)
+      ) {
+        offenders.push({
+          key: `${rel}#${enclosingFunctionName(node, sf)}`,
+          rel,
+          line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+          kind: "C",
+          detail:
+            `a status/type field ("${text.trim()}") renders bare in a preview row, with no <Badge> around it — ` +
+            `every chip carries the kit's fill (Aurora, 19 Sep 2026: "chips and pills always must have the ` +
+            `background card or shape wherever they are ... the type of ticket and the status need the card to ` +
+            `have a background")`,
+        })
       }
     }
     ts.forEachChild(node, visit)
@@ -202,8 +339,9 @@ describe("every chip/pill is the kit's Badge (client ruling, 18 Sep 2026)", () =
       unexempt,
       unexempt.join("\n") +
         '\n\nRoute it through <Badge icon={<Icon .../>}>label</Badge>, or name the key above in ' +
-        "CHIP_BADGE_EXEMPT (shared/rules/registry.ts) with the real reason — a selection control or a toolbar " +
-        "pill, never a chip that is merely inconvenient to convert.",
+        "CHIP_BADGE_EXEMPT (shared/rules/registry.ts) with the real reason — a selection control, a toolbar " +
+        "pill, or (check C only) a genuine table cell whose column IS the status word beside its own dot — " +
+        "never a chip that is merely inconvenient to convert.",
     ).toEqual([])
 
     const stale = Object.keys(CHIP_BADGE_EXEMPT).filter((k) => !used.has(k))
@@ -250,6 +388,84 @@ describe("every chip/pill is the kit's Badge (client ruling, 18 Sep 2026)", () =
     const offenders = findOffendersInFile(sf, "fixture-b-before.tsx")
     expect(offenders.length).toBe(1)
     expect(offenders[0].kind).toBe("B")
+  })
+
+  // THE RED PROOF — check C, the shape the ticket detail's Related stories
+  // panel drew before Aurora's 19 Sep 2026 ruling: a preview row mapped over
+  // stories, its status folded through a label map and dropped in bare —
+  // no Badge, no fill, no card.
+  it("check C catches a status/type field drawn bare in a preview row's markup", () => {
+    const before = `
+      function relatedStories(list) {
+        return (
+          <ul>
+            {list.map((s) => (
+              <li key={s.id}>
+                <span>{s.title}</span>
+                <span>{s.storyType ?? "—"}</span>
+                <span>{t(STORY_STATUS_LABEL[s.status])}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-c-before.tsx", before, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const offenders = findOffendersInFile(sf, "fixture-c-before.tsx")
+    expect(offenders.every((o) => o.kind === "C")).toBe(true)
+    expect(offenders.length).toBe(2)
+  })
+
+  // THE GREEN PROOF — the same row, fixed: both fields through real Badges.
+  it("check C draws nothing once the row's status/type fields are real Badges", () => {
+    const after = `
+      function relatedStories(list) {
+        return (
+          <ul>
+            {list.map((s) => (
+              <li key={s.id}>
+                <span>{s.title}</span>
+                <Badge variant="secondary" size="pill" icon={<Icon name={storyTypeIconName(s.storyType)} />}>
+                  {s.storyType ?? "—"}
+                </Badge>
+                <Badge variant="status" dot={storyStatusDotTone(s.status)}>
+                  {t(STORY_STATUS_LABEL[s.status])}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-c-after.tsx", after, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    expect(findOffendersInFile(sf, "fixture-c-after.tsx")).toEqual([])
+  })
+
+  // THE NAMED CARVE-OUT — a genuine table cell whose column IS the status
+  // word, beside its own dot, is not a chip: UI-RULEBOOK.md's "the dot
+  // reaches every status/stage picker and every list cell" ruling asks that
+  // cell for a dot, never a pill, so check C leaves `<td>` alone.
+  it("a real <td> status cell, same bare-field shape, is out of check C's reach by construction", () => {
+    const tableCell = `
+      function statusCell(rows) {
+        return (
+          <table>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <StatusDot tone={r.status} />
+                    {t(STATUS_LABEL[r.status])}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+    `
+    const sf = ts.createSourceFile("fixture-td.tsx", tableCell, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    expect(findOffendersInFile(sf, "fixture-td.tsx")).toEqual([])
   })
 
   // THE GREEN PROOF — the fixed shape both cells above actually draw now:

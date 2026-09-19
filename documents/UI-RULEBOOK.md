@@ -37,9 +37,9 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L31)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L32)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K51)
+- [4. Collections](#4-collections) (K1 to K52)
 - [5. Buttons and actions](#5-buttons-and-actions) (B1 to B21)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
@@ -1524,6 +1524,66 @@ the surface it sits on, never narrower than its own container.
 height-fill/full-bleed shape a card's own position on the screen still needed.
 `web/test/footer-on-the-edge.test.ts`.
 
+**AMENDED 19 Sep 2026 (Round 22) — the fix above did not hold at every width; the layout is now
+one definition for all of them.** The client's ruling, verbatim, over a fresh screenshot: *"No,
+this is still wrong. The footer is currently under the stages and above the content. This is so
+wrong. I cannot believe you're so stupid and you cannot fix this."* The 18 Sep fix reached the
+screen's true bottom edge at the width it was tested on; at another width the side column (the
+stage ladder among its cards) still ran taller than the thread, pushing the composer down below
+it rather than pinning it to the screen's own edge. The rule is now stated once, for every
+width, rather than patched per screenshot: **at every width the composer is the last thing on
+the screen and sits on its own bottom edge.** Below the `lg` breakpoint there is exactly ONE
+scrolling region — the side cards, then the thread, in that order — with the composer pinned
+OUTSIDE that region, never inside it. Above `lg` the two-column layout applies, side column and
+thread scrolling independently as this rule already describes. Opening the assistant panel
+narrows the content column but never changes which of the two layouts is showing — the
+breakpoint reads the ticket screen's own width, not the assistant's.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**AMENDED 19 Sep 2026 (~01:50) — the fix still did not hold; the page container now grows into the pane's bottom padding only when a ticket body is present.** The client's ruling, verbatim, over a fresh screenshot at 1784×981 with the rail collapsed, ticket T3824, two-column layout, the composer ending ~70px above the screen bottom: *"look at screenshpto! thats the footer not being on the very vottom! fix this at once"* The previous amendments applied height constraints and flex logic, but did not account for the shell's own PADDING at the page container's level — `px-4` on mobile, `px-6` at wider viewports — which meant the container's own bottom edge still sat 16 or 24 pixels above the screen body's true edge. The fix is one CSS rule: the page container (`app-shell.tsx`) now carries `has-[[data-slot=ticket-detail-body]] pb-0`, so when a ticket body is mounted the container consumes the shell's bottom padding itself, its own inner bottom edge coinciding exactly with the screen body's bottom edge — nothing more. The composer sits at the container's own `CardFooter` inset from that edge, as it always did. Proved live at 1784px and 1440px (verified: container bottom == screen body bottom on both widths); other pages remain pixel-identical because the selector is narrow.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+---
+
+### L32: any choice over a person, a contact, an account or an app shows the same face the lists show
+
+**The rule.** Aurora, verbatim, about the new Raised-by `Select` on the ticket form and page:
+*"every time there is an avatar, I want to also see it in the choice component, so I also want
+to see the avatars here."* A picker's own row is not exempt from the face law the rest of the
+app already carries ([R35](#), "a record never appears without its face"): the photograph where
+a record has one, initials on the record's own tone where it does not — and, new here, it shows
+in the TRIGGER's own chosen value too, not only the open list.
+
+**Why the trigger needed its own fix.** `SelectItem` already carried an `image` prop, but it
+rendered a bare `<img>` with no fallback — the exact silhouette mismatch RULES.md §4.4 already
+named for a picker's mark disagreeing with the record's own. And nothing drew a mark in the
+trigger at all: Radix clones the chosen option's `ItemText` children into the closed field, and
+an `<img>` cloned there would have been a second, unasked-for drawing inside the 44px pill — so
+the mark was deliberately kept OUTSIDE `ItemText`, which is exactly what kept it out of the
+trigger too.
+
+**The shape.** kwapso-design v1.2.127 gave `SelectItem` and `SelectTrigger` a shared `face`
+prop — `{ src, name, tone, shape }` — both rendered through one `SelectFaceMark` helper over the
+kit's own `Avatar`/`AvatarImage`/`AvatarFallback` primitive (a real photo-or-initials fallback,
+never a bare image). The trigger's face is handed in by the call site, because it already knows
+which option is selected (it is what supplies the placeholder text); the mark is keyed on its
+own identity so a stale `Avatar` load-status left over from a PRIOR photo selection can never
+bleed into a new no-photo one. Wired in this app: the ticket form's and the ticket page's
+"Raised by" contact pickers, and the work-logs panel's "Logged by" staff filter (initials only —
+the door behind that one carries no photo field yet, an open, named gap rather than a silent
+workaround).
+
+**Status: ruled and in build, 19 Sep 2026.**
+
+**Law.** [R90](../RULES.md) (`faces-in-choices`) — scoped to the kit's `<Select>`, since R35
+already holds `RecordPicker`/`PickerOption` to this account through a different, structural
+mechanism (the TYPE, not a prop). A static census, `web/test/faces-in-choices.test.ts`, detects
+a choice over a record by its own options array's field names (`personName`/`contactId`/
+`memberId`/`accountId`/`avatar`/`photo`/`initials`) and fails when a `<SelectItem>` inside one
+carries no `face=`.
+
 ---
 
 ### D1: a detail screen has exactly four regions, in this order
@@ -2271,6 +2331,23 @@ and the edit pen, are named as the next screens onto it, not rebuilt in this rou
 
 **Law.** None registered — a structural fold over an existing action row, the same weight this
 book gives R83's own toolbar-gap census before it graduated to a law.
+
+**AMENDED 19 Sep 2026 (Round 22) — the fold is not a ticket-only rule; it is every screen's own
+head, at the same breakpoint.** The client's ruling, verbatim: *"Yes, but this is not only for
+tickets. This is for everywhere in the app on smaller screens."* This rule's fold was wired to
+the ticket head alone; `HeadActionsFoldMenu`'s own container query now governs every record
+head in the app, not one screen's own instance of it. The threshold itself is restated as one
+number rather than a per-screen guess: **44rem**, sized to the actions row plus a **20rem title
+floor** — below it the actions fold into the "…" menu the way this rule already describes, and
+the heading itself, which previously only wrapped, now actually truncates (`block truncate`)
+rather than pushing the fold point wider than 44rem on a long title. A sweep of every screen at
+three widths — 1440px with the assistant open, 1024px, and 760px — found the fold holding
+everywhere, and two unrelated gaps beside it: no scrim renders under the assistant overlay
+between 721 and 1023px wide (kit v1.2.129), and the rail's last item sits behind the profile
+card at a 768px-tall viewport (kit v1.2.129). Everything else on the sweep was clean.
+
+**Status: ruled, in build, 19 Sep 2026 (kit v1.2.129) — the two sweep findings above are open,
+not yet fixed.**
 
 ---
 
@@ -4206,6 +4283,22 @@ colour, confirmed fixed on the next pass. Shipped in the kit (`badge.tsx`, v1.2.
 
 **Status: ruled, in build, 18 Sep 2026 (kit v1.2.119).**
 
+**AMENDED 19 Sep 2026 (Round 22) — the status Badge's own fill resolved to the page colour, so
+the one chip this rule requires a background on had none.** The client's ruling, verbatim:
+*"chips and pills always must have the background card or shape wherever they are. In this
+case, I'm talking inside ticket-related stories. The type of ticket and the status need the
+card to have a background"* — read over a story's own ticket-type and status chips, both
+apparently bare text on the page ground. The type chip already carried its background from the
+fixes above; the STATUS chip did not, and not because a call site skipped the Badge component
+this whole rule governs — it used `variant="status"` correctly, but that variant's own fill
+token resolved to the same value as the surface behind it, so the "background" was there and
+invisible. Kit v1.2.128 gives the status variant its own chip-surface fill, distinct from the
+page and card grounds around it, closing the gap without touching a single call site. The
+contact ticket rows named in the same sweep — plain coloured text standing in for a chip, never
+a Badge at all — are moved onto the same component.
+
+**Status: ruled, in build, 19 Sep 2026 (kit v1.2.128).**
+
 ---
 
 ### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
@@ -4476,6 +4569,20 @@ icon is switched off on the new-tab page's search field — the trailing icon, t
 standing search glyph, is the only one, matching every other search box in the app.
 
 **Status: ruled, not yet built — kit v1.2.125.**
+
+**Law.** None registered — a kit-only fix.
+
+---
+
+### K52: the expanded rail's width is derived from the widest thing it holds
+
+**The rule.** The client's ruling, 19 Sep 2026, verbatim: *"can we make sidebar less wide? assume knowelegde willbe the lngest word there"* The expanded navigation rail's width is not a hand-set constant; it is a token computed from the widest content it can hold — the longest nav label in the app's own language. In English that is "Knowledge" at the nav font size (measured 72px at the 16px reference → `--rail-label-ch`), plus the icon step, gap, and row padding and rail inset on either side. If the logotype (the icon-28 brand mark plus insets on mobile) is wider, the rail takes that width instead, using `max()` to ensure the logo never shrinks. A label longer than "Knowledge" is truncated with an ellipsis. The collapsed rail's width is unchanged.
+
+**The shape.** kit v1.2.130/131: the expanded rail width is `--rail-width`, computed at the theme level from `--rail-label-ch` and the rail's own `--inset-x` and `--icon-width`, through a `max()` with the logotype's measured width. The app's own nav labels sit in `web/lib/pages.ts` and are read by the kit's own width computation at theme generation time, so no hardcoded constant survives a label change — if somebody edits a nav label in the future, the rail recomputes and the app gets the new width on its own. Was 13rem (208px) before the change.
+
+**Proven:** 1440px desktop (Knowledge label + insets = 104px measured; logo path = 68px; rail width = 104px). No regressions at mobile (`icon` nav only, no labels).
+
+**Status: ruled, in build, 19 Sep 2026.**
 
 **Law.** None registered — a kit-only fix.
 
@@ -7609,30 +7716,42 @@ templates the app actually sends, rather than hand-summarised copy, so nothing o
 from what a person receives. Not yet re-shown for her sign-off — the row stays open until she
 sees the regenerated page.
 
-**STILL PARKED, 18 Sep 2026 (Round 21) — Main Page Views.** Open, unchanged, since at least
-round five (16 Sep 2026). Asked again this round, the client's ruling, verbatim: *"continue
-parked."* No artifact shown, no pick made; carried forward exactly as it was.
+**STILL PARKED, 19 Sep 2026 (Round 22) — Main Page Views.** Open, unchanged, since at least
+round five (16 Sep 2026). Asked again this round, the client's ruling, verbatim: *"Continue
+parked."* No artifact shown, no pick made; carried forward exactly as it was — the same answer
+as Round 21 (18 Sep 2026): *"continue parked."*
 
-**ANSWERED, WRITE PENDING HER SIGN-OFF, 18 Sep 2026 (Round 21) — the five untyped Smoke-team
-stories.** Was: "DECISION PENDING — five untyped stories," open since round eight (16 Sep
-2026). Asked what to do about the stories that carry no type, the client's ruling, verbatim:
-*"explain this better. I still don't get what you mean and what I have to do here — if you
-are referring to the fact that some stories don't have a type, read the content and assign it
-yourself."* Five proposals, one per story, read off its own content and handed back for her
-sign-off; the write itself waits on her permission and is not built against this ruling alone.
+**CLOSED, 19 Sep 2026 (Round 22) — the five untyped Smoke-team stories.** Was: "ANSWERED, WRITE
+PENDING HER SIGN-OFF, 18 Sep 2026 (Round 21) — five untyped stories," open since round eight
+(16 Sep 2026). The five proposals, read off each story's own content, were handed back for her
+sign-off; her ruling this round, verbatim: *"You do it."* Written on the Kwapso staging team:
+B0307 Data, B0315 Feature, B0128 Feature, B0025 Change, B0026 Tech.
+
+**VALIDATED IN ROUND 22, 19 Sep 2026.** Six items confirmed live on staging this round: the
+assistant tab strip fits its own pane
+([K50](#k50-the-assistant-tab-strip-fits-its-own-pane-no-clipped-tab--never-pushed-out-of-view)),
+the assistant composer holds one row at rest
+([K48](#k48-the-assistant-composer-holds-one-row-at-rest-at-every-pane-width)), the rail's brand
+mark ([K49](#k49-the-rails-brand-mark-steps-up-one-more-rung-still-centred-on-the-strip-row)),
+the empty-state single door
+([D22](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-)), the new-tab
+search field's one icon
+([K51](#k51-the-new-tab-search-field-carries-one-icon-not-two)), and the imported title's
+length (F18's I1 amendment, [F18](#f18-a-title-fits-one-line-on-a-macbook-air)) — her ruling on
+the last of these, verbatim: *"Validated."*
 
 ---
 
 ## Rule index
 
-**216 rules.**
+**218 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L31 (31) |
+| 2. Page layout and width | L1 to L32 (32) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K51 (51) |
+| 4. Collections | K1 to K52 (52) |
 | 5. Buttons and actions | B1 to B21 (21) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
@@ -7678,6 +7797,7 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | R85 | [W15](#w15-every-rail-destination-is-named-in-one-word) |
 | R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | R87 | [F18](#f18-a-title-fits-one-line-on-a-macbook-air) |
 | R88 | [D22](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-) | R89 | [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) |
+| R90 | [L32](#l32-any-choice-over-a-person-a-contact-an-account-or-an-app-shows-the-same-face-the-lists-show) | | |
 
 ### The seven files that carry most of it
 

@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-89 laws, 87 resolved to at least one check file, 2 unresolved.
+90 laws, 88 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (27)
 
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (53)
+## UI (54)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -95,6 +95,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R87 | enforced | `title-length` | `web/test/title-length.test.ts` |
 | R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts` |
 | R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx` |
+| R90 | enforced | `faces-in-choices` | `web/test/faces-in-choices.test.ts` |
 
 ## Workflow (2)
 

@@ -1159,6 +1159,84 @@
      statements has to go, and it is not this one. */
   --measure-body: 66ch;
 
+  /* ---- THE RAIL'S WIDEST LABEL, PINNED — 19 Sep 2026, Aurora, verbatim:
+     "can we make sidebar less wide? assume knowledge will be the longest
+     word there." The rail (`compositions/templates/rail.tsx`) was a flat
+     208px (`RAIL_WIDTH`, `13rem`) with no relationship to what it actually
+     holds; this is the measurement that lets `screen-shell.tsx` derive
+     `--rail-width` from tokens instead of a number picked by eye.
+
+     MEASURED, NOT GUESSED. "Knowledge" set at the nav item's own cascade —
+     `--text-sm` (14px), `--text-sm--letter-spacing` (0em), in `--font-sans`
+     (Saans, the real `@font-face`, not the system fallback) — at the 16px
+     reference root every measurement in this system is authored against
+     (ruling 28, see `RAIL_WIDTH`'s own former comment). MEDIUM weight
+     (`--font-weight-medium`, 500), not the row's resting light 300: a rail
+     row renders medium the instant it is ACTIVE (`ACTIVE_TREATMENT`,
+     rail.tsx) or merely HOVERED (`ROW_IDLE`'s `hover:font-[var(--font-
+     weight-medium)]`, same file) — sizing to the light weight would fit at
+     rest and reflow the instant a reader's cursor arrived. Read with
+     `document.fonts.load()` awaited first, in `verify/rail-foot` (browser,
+     both DOM `getBoundingClientRect` and `CanvasRenderingContext2D
+     .measureText` agreed): 71.484375px raw.
+
+     ROUNDED UP to 72px — the nearest grain the space ladder above actually
+     steps in (`--space-1`, 4px; every ladder rung from `--space-1` through
+     `--space-4h` is a whole multiple of 2, and 72 is one of `--space-1`'s
+     own multiples) — rather than carried as a fractional pixel a stylesheet
+     cannot hold cleanly. 72px is 4.5rem at this token's own 16px reference.
+
+     `--rail-width` (`screen-shell.tsx`'s `DENSITY_RAIL`) is built FROM this
+     plus the row's own tokens — `--rail-inset` twice (leading and trailing
+     column padding), `--space-3` twice (the row's own `px-[var(--space-3)]`
+     on both sides), `--icon-button` (the leading icon slot every row
+     reserves once any entry in the rail has an icon) and `--space-2` (the
+     icon-to-label gap) — so nothing about the rail's width is a literal
+     pixel any more. See that file for the full calc.
+
+     CORRECTED, SAME DAY — THIS IS ONE OF TWO FLOORS, NOT THE ONLY ONE. The
+     first cut of `--rail-width` took this sum alone, and it under-sized the
+     rail against the brand mark: `--icon-28`'s logotype (see `--brand-
+     lockup-w`, immediately below) is wider than this label's own total, so a
+     rail sized only to "Knowledge" pushed the mark into its own `max-w-full`
+     shrink — undoing Aurora's own 18 Sep ruling that the logo be "a bit
+     bigger". `--rail-width` (`screen-shell.tsx`) now takes the LARGER of
+     this label's total and the mark's, so the mark is never the thing that
+     gives. */
+  --rail-label-ch: 4.5rem;   /* 72 — "Knowledge", Saans medium, --text-sm */
+
+  /* ---- THE RAIL'S BRAND MARK, AT ITS NATURAL WIDTH, PINNED — 19 Sep 2026,
+     correcting the same day's rail-width change above. The mark (`rail.tsx`'s
+     `MARK_STEP`, `--icon-28`) must render at its own natural size, never
+     through `max-w-full`'s shrink — that shrink is a genuine fallback for a
+     caller who wants a narrower auth column (`brand.tsx`'s own header), not
+     an outcome the RAIL is allowed to force on a mark Aurora explicitly asked
+     to be bigger, twice, live on staging ("make the logo bigger", then "I
+     want the logo to be bigger … just a bit" — see `rail.tsx`'s `MARK_STEP`).
+
+     THE NUMBER IS `brand.tsx`'s OWN, NOT A NEW ONE. That file derives the
+     lockup's width as `var(--brand-step) * var(--brand-ratio)`, where
+     `--brand-ratio` for the `logotype` cut is `4.9986` — "a MEASURED FACT
+     about the artwork, printed by `assets/build-assets.mjs`" (`brand.tsx`'s
+     own words, § "THE LADDER IS A WIDTH"). `rail.tsx` sets `--brand-step:
+     var(--icon-28)` (1.75rem) for both rail states. So the lockup's natural
+     width is 1.75rem × 4.9986 = 8.74755rem (139.96px at the 16px reference).
+
+     `--brand-ratio` ITSELF CANNOT BE READ HERE. It is set as a class on the
+     mark's own element (`RATIO[cut]`, `brand.tsx`), a DESCENDANT of the rail
+     column `--rail-width` is computed on — a custom property only inherits
+     DOWNWARD, so an ancestor's `calc()` cannot reach down into it. The
+     multiplication is done once, here, with the same 4.9986 `brand.tsx`
+     prints, and ROUNDED UP to 8.75rem (140px) — the nearest grain the space
+     ladder steps in, the same treatment `--rail-label-ch` gets above and for
+     the same reason: a hair of positive clearance rather than an exact-zero
+     fit that the next subpixel rounding difference could tip over. IF
+     `--icon-28` OR THE MEASURED 4.9986 RATIO EVER CHANGE, THIS TOKEN IS OWED
+     A RE-DERIVATION — it is not itself computed from either, because neither
+     is reachable from this scope; `screen-shell.tsx`'s own `DENSITY_RAIL`
+     comment repeats this warning where the value is actually spent. */
+  --brand-lockup-w: 8.75rem;   /* 140 — --icon-28 (28) × 4.9986, rounded up */
+
   /* ---- Control heights (kit ruling 28) ---------------------------------
      "32 dense · 38 field inside a row · 40 control · 44 touch row, with 56
      kept for the table row."                                              */

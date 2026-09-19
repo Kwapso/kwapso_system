@@ -25,6 +25,23 @@ import * as React from "react"
  * predates the 50-character ceiling) — a single line is a STRICTER bound than
  * two, so nothing the 1 Sep fix protected against stopped being protected.
  *
+ * STILL ONE LINE, 19 Sep 2026 — read against Aurora's own narrower ruling the
+ * same day, on the ticket head fold: "…the title is capped at 50 characters
+ * and wraps to at most two lines." That sentence is NOT wired here.
+ * `title-length.test.ts` and `record-heading-clamps.test.tsx` both assert
+ * this span carries `.truncate` and NOT `.line-clamp-2` — a checked Law of
+ * the Base (R87), not a style preference this file can quietly trade for a
+ * different one. What the 19 Sep ticket-head defect actually needed —
+ * "nothing ever covers the title" — turned out not to need two lines at
+ * all: the cover was `display:inline` silently dropping this span's own
+ * `overflow`/`text-overflow` (CSS never applies either to a non-replaced
+ * inline box), not a shortage of lines to wrap into. Fixed below by adding
+ * `block`, so the ONE line this function has always promised actually clips
+ * and ellipsizes at its column's real width instead of painting past it. If
+ * a two-line title is still wanted somewhere, that is a new R87 amendment —
+ * this function, `title-length.test.ts` and `record-heading-clamps.test.tsx`
+ * would all need to move together, in one change a reviewer can see move.
+ *
  * THE RULE IT OBEYS: a truncated name stays reachable in full. Two ways, both
  * here rather than argued per screen — the record's own body still renders the
  * whole text (a ticket's description is the conversation's first message), and
@@ -48,11 +65,32 @@ import * as React from "react"
  *
  * `truncate` is a plain Tailwind utility (`overflow:hidden; text-overflow:
  * ellipsis; white-space:nowrap`) — no colour (R32), no radius (R31), no page
- * width (R29) and no UI package (R39). */
+ * width (R29) and no UI package (R39).
+ *
+ * `block`, ADDED 19 Sep 2026 — THE ACTUAL FAULT BEHIND "THE BUTTONS COVER THE
+ * TITLE". A bare `<span>` is `display:inline` by default, and CSS does not
+ * apply `overflow`/`text-overflow` to a non-replaced inline box at all (the
+ * UA is required to ignore both — https://www.w3.org/TR/css-overflow-3/,
+ * "this property applies to block containers, flex containers, and grid
+ * containers"; an inline span is none of the three). So `truncate`'s
+ * `white-space:nowrap` alone was taking effect — the text never wrapped —
+ * while `overflow:hidden`/`text-overflow:ellipsis` were silently no-ops: the
+ * span kept its own max-content width (its FULL, untruncated text, ~980px
+ * for an ordinary ticket title) and painted straight past the 320–430px
+ * column `TITLE_ACTIONS_SPLIT` below hands it, ink-overlapping whatever sat
+ * in normal flow to its right — the head's own Close/Start timer/Edit/"…"
+ * row. Confirmed live (three states, `page.addStyleTag`, before this edit):
+ * forcing `display:block` on this exact span was the whole fix — every
+ * other layer (`min-w-0 flex-1 max-w-[80%]` on the title column,
+ * `shrink-0` on the actions column, both already in `TITLE_ACTIONS_SPLIT`
+ * below) was already correct and needed no change. `block` fills the
+ * column's own width (a block box with no explicit width takes 100% of its
+ * containing block), which is exactly the width `overflow`/`text-overflow`
+ * need to have something to measure against. */
 export function clampRecordHeading(title: React.ReactNode): React.ReactNode {
   if (typeof title !== "string") return title
   return (
-    <span className="min-w-0 truncate" title={title}>
+    <span className="block min-w-0 truncate" title={title}>
       {title}
     </span>
   )

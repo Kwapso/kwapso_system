@@ -260,8 +260,21 @@
    ─────────────────────────────────────────────────────────────────────────
    GEOMETRY, AND WHERE THE CHAPTER'S NUMBERS WENT
    ─────────────────────────────────────────────────────────────────────────
-   · WIDTH — "Fixed 208px" (26.02). The shell owns it (`RAIL_WIDTH`, 13rem);
-     this file writes no width in its expanded form and fills the column.
+   · WIDTH — "Fixed 208px" (26.02), UNTIL 19 SEP 2026. Aurora, verbatim: "can
+     we make sidebar less wide? assume knowledge will be the longest word
+     there." The shell still owns it (`RAIL_WIDTH`, `screen-shell.tsx`) —
+     this file still writes no width in its expanded form and fills the
+     column — but `RAIL_WIDTH` is no longer the literal `13rem`: it reads
+     `--rail-width`, `max()` of two `calc()` floors built from THIS file's
+     own row/brand tokens (`--rail-inset`, `--space-3`, `--icon-button`,
+     `--space-2`, `--brand-lockup-w`) plus `--rail-label-ch` (tokens.css) —
+     "Knowledge", Aurora's own longest word, measured once at this row's
+     `--text-sm`/medium and pinned. CORRECTED THE SAME DAY: the label alone
+     under-sized the rail against `MARK_STEP` (below) and pushed the mark
+     into its own `max-w-full` shrink, undoing the "bigger" rulings that same
+     token's own comment records — so the mark's natural width is now the
+     SECOND floor and the rail takes whichever of the two is larger. See
+     `DENSITY_RAIL` in `screen-shell.tsx` for the full derivation.
    · RADIUS — `rounded-pill`, both states. See the reversal above (the
      expanded row was briefly square, then reversed live, repeatedly, by the
      client). The COLLAPSED row has always kept 999: 27.8 and 27.1's tablet
@@ -599,6 +612,14 @@ const ROW_COLLAPSED = cn(
  *
  * The COLLAPSED isotype takes the same step, so the two states of the same
  * mark stand at the same height. See the file header.
+ *
+ * THIS STEP NOW ALSO SETS A FLOOR ON THE RAIL'S OWN WIDTH, 19 SEP 2026.
+ * `--icon-28 × 4.9986` (139.96 at the 16px reference) is pinned in
+ * tokens.css as `--brand-lockup-w`, rounded up, and `screen-shell.tsx`'s
+ * `--rail-width` takes the larger of that and the widest label's own floor —
+ * so a rail narrowed to fit "Knowledge" can never shrink THIS mark through
+ * its own `max-w-full` fallback again. If `MARK_STEP` ever moves off
+ * `--icon-28`, `--brand-lockup-w` is owed the same move.
  */
 const MARK_STEP = "[--brand-step:var(--icon-28)]";
 
@@ -1548,12 +1569,30 @@ const Rail = React.forwardRef<HTMLDivElement, RailProps>(
             margin and the equal padding cancel each other exactly, so the
             entries' content box is the byte-for-byte one they already sat in
             and every gap in this column is unchanged; only the clip moved out
-            of the ring's way. */}
+            of the ring's way.
+
+            RE-MEASURED 2026-09-19, AGAINST A NARROW-SWEEP SCREENSHOT OF THE
+            LIVE APP AT 1024x768 CLAIMING THE LAST ROW SAT HALF UNDER THE
+            FOOT. `verify/rail-foot`'s own 40-row register, at the identical
+            1024x768, both rail states, scroll-to-end and re-read: last row
+            fully inside the viewport, zero intersection with `rail-member`'s
+            rect, every time — this scroller and the flex geometry above it
+            were already the 2026-09-02 fix and did not move. What DID
+            change: the scroll region drew the platform's own scrollbar,
+            which nothing else in this rail's own column draws (the ground is
+            `background-color: rgba(0,0,0,0)`, measured above) and which a
+            reader could mistake for a second edge sitting on top of the last
+            row — `[scrollbar-width:none]` / `[&::-webkit-scrollbar]:hidden`
+            is the kit's own established pair for exactly this (`tabs.tsx`'s
+            strip, `breadcrumb-folders.tsx`'s trail), reused here rather than
+            invented; wheel/touch/keyboard scrolling are a paint change away,
+            untouched. */}
         <nav
           data-slot="rail-nav"
           aria-label={label}
           className={cn(
             "flex min-h-0 min-w-0 flex-1 flex-col gap-[var(--space-5)] overflow-y-auto",
+            "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             "-m-[calc(var(--focus-offset)_+_var(--focus-width))]",
             "p-[calc(var(--focus-offset)_+_var(--focus-width))]",
             isCollapsed && "items-center gap-[var(--space-3)]",

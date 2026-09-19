@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.126",
-  "sha": "b2afca297ce9d95acb60b1a842a3a6285cf1c2e1",
-  "syncedAt": "2026-09-18"
+  "tag": "v1.2.131",
+  "sha": "2f9bfb13b9f24ae3c8c139bbc1e28a897886b6d1",
+  "syncedAt": "2026-09-19"
  },
- "generatedAt": "2026-09-18T19:30:42.472Z",
+ "generatedAt": "2026-09-19T10:06:52.919Z",
  "counts": {
   "components": 120,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 319,
   "compositions": 47,
   "icons": 1514,
-  "tokens": 368,
-  "tokenDeclarations": 568,
+  "tokens": 370,
+  "tokenDeclarations": 570,
   "unresolved": 0
  },
  "components": [
@@ -928,7 +928,7 @@
     {
      "file": "components/badge/badge.tsx",
      "name": "badgeVariants",
-     "line": 112,
+     "line": 143,
      "base": "inline-flex shrink-0 items-center justify-center rounded-pill whitespace-nowrap text-badge leading-none font-medium tabular-nums gap-2",
      "groups": [
       {
@@ -991,8 +991,8 @@
         },
         {
          "name": "status",
-         "classes": "bg-[var(--pill-fill)] text-[var(--pill-label)]",
-         "note": "CH11's status pill ground — `--pill-fill` / `--pill-label`, the neutral pair that flips with the palette. The state lives in the `dot`; the fill never carries it. Usually paired with `size=\"pill\"`; the fill is legal at either size."
+         "classes": "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-[var(--pill-label)]",
+         "note": "CH11's status pill — RULED 19 SEP 2026 (see this file's own header law, \"A STATUS CHIP IS A CHIP\"): the fill is now the SAME quiet chip surface `secondary` draws — `--badge-quiet-fill`, falling back to `--surface-quiet` — not `--pill-fill` (ch11's original \"the other paper tone from the panel\", which resolves to `--card` and goes invisible wherever a status chip sits on a card or the page itself, both off-beige in light). One rebindable property, shared with `secondary`, so a caller that already knows to rebind `--badge-quiet-fill` for one gets the identical fix for the other with nothing new to learn. THE LABEL IS UNCHANGED — `--pill-label` still resolves to `--foreground`, the same charcoal-on-every- accent law every other variant already follows — and so is the DOT: this is a fill swap only, never a tone change. Usually paired with `size=\"pill\"`; the fill is legal at either size."
         }
        ]
       },
@@ -6322,7 +6322,7 @@
     {
      "file": "components/select/select.tsx",
      "name": "selectTriggerVariants",
-     "line": 90,
+     "line": 177,
      "base": "flex w-full min-w-0 appearance-none items-center justify-between gap-2 h-[var(--control-height-input)] px-[var(--space-4h)] rounded-pill bg-background text-foreground text-sm font-[var(--font-weight-light)] whitespace-nowrap cursor-pointer [&>span]:min-w-0 [&>span]:truncate [&>span]:text-start data-[placeholder]:text-muted-foreground transition-[box-shadow,background-color] duration-[var(--duration-colour)] ease-kwapso disabled:cursor-not-allowed disabled:shadow-[inset_0_0_0_0.0625rem_var(--border)] disabled:bg-hair-faint disabled:text-ink-disabled disabled:[&_svg]:text-ink-disabled",
      "groups": [
       {

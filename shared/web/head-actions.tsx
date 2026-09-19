@@ -31,13 +31,40 @@
 // buttons (a primary/secondary pill, "Close" ≈ 96px, "Start timer" ≈ 143px at
 // the kit's `px-5`/40-tall standing size) and two icon-only 40px squares (the
 // edit pen, the overflow trigger). Summed with three 10px gaps that is ≈349px
-// (21.8rem) — over Tailwind's `xs` container step (20rem/320px) and under
-// `sm` (24rem/384px), so `@min-[24rem]` is the nearest width that never clips
-// a control mid-word, with ~35px of slack for a longer translated label
-// ("Iniciar temporizador" and the like). Written as the literal bracket value
-// per the kit's own convention above, not derived from a shared constant —
-// Tailwind's static scanner reads the SOURCE TEXT of a class, so a computed
-// template literal would not compile to a real utility.
+// (21.8rem), matching the ≈334px this file's own live proof measured on
+// T0001's actual English row — over Tailwind's `xs` container step
+// (20rem/320px) and under `sm` (24rem/384px), so `24rem` (384px) is the
+// nearest width that never clips a control mid-word, with ~35–50px of slack
+// for a longer translated label ("Iniciar temporizador" and the like).
+//
+// `@min-[44rem]`, RAISED FROM `@min-[24rem]` — 19 Sep 2026, Aurora's ruling on
+// the ticket head overlay: "the title is capped at 50 characters and wraps
+// to at most two lines; nothing ever covers the title." 24rem was sized for
+// the ACTIONS row alone — it says nothing about how much of the band is left
+// for the title once the actions fit. Live-measured on the real defect
+// (1024×768 rail expanded, T0001): at a 761px band the actions claimed
+// 333.67px, leaving the title exactly 411.33px — comfortable — but at a
+// narrower band the SAME 24rem threshold would have kept the wide row
+// visible down to the moment the actions alone stopped fitting, handing the
+// title a sliver on its way there (a few tens of px, not a readable column).
+// The fold now answers a second question the old one didn't: not just "do
+// the actions fit", but "is there ALSO still a readable title column left".
+// `20rem` (320px) is that column's own floor — the same `xs` container step
+// the old comment already used as its lower landmark, chosen for the same
+// reason: a title narrower than that is reading as a sliver, not a name. So
+// the new threshold is the old one (24rem — the actions' own footprint, with
+// its translation slack, unchanged) PLUS the 20rem title floor: `44rem`
+// (704px). Below it, the wide row hides and `HeadActionsFoldMenu` (below)
+// draws instead, guaranteeing that whenever four buttons are asked to stand
+// beside a title, the title is left at least 20rem to stand in.
+// Confirmed live, three states, BEFORE this edit (`page.addStyleTag` +
+// runtime class swap, not a guess): folds correctly at 760px (rail
+// collapsed, 689px band, under 704px) and stays open at 1024px/1440px (761px/
+// 781px bands, over 704px) — see this lane's own report for the numbers.
+// Written as the literal bracket value per the kit's own convention above,
+// not derived from a shared constant — Tailwind's static scanner reads the
+// SOURCE TEXT of a class, so a computed template literal would not compile
+// to a real utility.
 //
 // TWO RENDERS OF THE SAME ACTIONS, NOT ONE NODE PHYSICALLY MOVED — the same
 // trick `ToolbarRow`'s own fold uses (that file's own "TWO RENDERS OF THE
@@ -101,7 +128,7 @@ export type HeadActionItem = {
  * `RecordActionsMenu` for whatever is already an overflow item — and wraps
  * only the OUTER box in this class. `hidden` below the breakpoint, `flex`
  * above it: the inverse of `HeadActionsFoldMenu`'s own wrapper, below. */
-export const HEAD_ACTIONS_ROW_CLASS = "hidden @min-[24rem]:flex items-center gap-[var(--space-2h)]"
+export const HEAD_ACTIONS_ROW_CLASS = "hidden @min-[44rem]:flex items-center gap-[var(--space-2h)]"
 
 /** THE CHIP ROW'S OWN TRIGGER — rendered as part of whatever a caller hands
  * `RecordScreen`'s `chips` prop, after its own chips, so it becomes the ROW'S
@@ -135,7 +162,7 @@ export function HeadActionsFoldMenu({
   const ordinary = visible.filter((a) => !a.destructive)
   const destructive = visible.filter((a) => a.destructive)
   return (
-    <span data-slot="head-actions-fold" className="ml-auto flex @min-[24rem]:hidden">
+    <span data-slot="head-actions-fold" className="ml-auto flex @min-[44rem]:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="shrink-0" aria-label={label}>

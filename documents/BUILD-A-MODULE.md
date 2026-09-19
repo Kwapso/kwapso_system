@@ -1192,6 +1192,22 @@ again, which is the only property that matters here.
   background at the full width of its own container. Built on `app-shell.tsx`'s
   existing floor (`flex-col` + `min-h-full`) and your detail body's own `flex-grow`
   item, so no extra bottom margin.
+- **R90 `faces-in-choices`** — if your module offers a kit `<Select>` over
+  people, contacts, accounts or apps (an assignee, an owner, a raiser, a
+  member, an app), every `<SelectItem>` carries `face={{ src, name, tone,
+  shape }}` (kit v1.2.127) — the SAME photo-or-initials mark the record's own
+  row draws, never the legacy `image` prop's bare `<img>` with no fallback.
+  Give the `<SelectTrigger>` the selected option's own `face` too (looked up
+  in the same options array), because Radix cannot clone an item's mark into
+  the trigger on its own — the call site already knows the selection, since
+  it is what supplies `SelectValue`'s placeholder. `web/test/
+  faces-in-choices.test.ts` detects an identity choice by its options array's
+  field names (`personName`/`contactId`/`memberId`/`accountId`/`avatar`/
+  `photo`/`initials`); a real reason for skipping one goes in
+  `FACES_IN_CHOICES_EXEMPT` (`shared/rules/registry.ts`), keyed by the
+  options array's own expression, never a line number. `RecordPicker` is
+  OUT of this law's population — R35 already holds it to the same account
+  through its own `picture`/`mark`/`face` type fields.
 
 **The words** (the ones that catch every new module, every time)
 

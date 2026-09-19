@@ -79,6 +79,37 @@
      same formal slot `dot` already has, so a call site never has to
      hand-roll an `<Icon/>` + `<span>` pair again — see `BadgeProps.icon`'s
      own doc.
+   · A STATUS CHIP IS A CHIP — CLIENT RULING, 19 SEP 2026, VERBATIM: "chips
+     and pills always must have the background card or shape wherever they
+     are. In this case, I'm talking inside ticket-related stories. The type
+     of ticket and the status need the card to have a background." Her own
+     comparison is the ticket page's Related stories row: the TYPE chip
+     (`variant="secondary"`) already carries a visible quiet-fill card; the
+     STATUS chip beside it (`variant="status"`, dot-led) did not, because
+     `--pill-fill` — the token ch11 drew for it, "the OTHER paper tone from
+     the panel" — resolves to `--card`, and `--card` is byte-identical to
+     `--background` in light (both `--kw-off-beige`; `card.tsx`'s own doc
+     says so for the exact same reason `default` there is NOT `bg-card`).
+     Anywhere a status chip sits on the page itself, or on a `raised` card,
+     or on any nested card whose own ground a caller forgot to re-rebind
+     `--pill-fill` against, the chip fill and its ground are the same
+     colour: no card, no shape, exactly her report. RULING: `status` no
+     longer reads `--pill-fill` — it reads the SAME rebindable property
+     `secondary` already does, `--badge-quiet-fill` (fallback
+     `--surface-quiet`), so a status chip is guaranteed the identical
+     visible chip surface a type chip already has, in every context, with
+     no per-caller rebind required. THE DOT AND ITS TONE ARE UNTOUCHED — she
+     named the CARD, not the colour, and this file's own "mango is never a
+     status" law is a dot law, not a fill law; only the neutral ground under
+     the dot moved. `--pill-fill`/`--pill-label` stay defined in
+     `tokens.css` (other kit surfaces still reference `--pill-fill` when
+     rebinding it FOR this variant's old behaviour — `screen-shell.tsx`,
+     `collection-frame.tsx`, `record-detail.tsx`, `rail.tsx` and
+     `toolbar-row.tsx` each carry a local `[--pill-fill:…]` override tuned
+     for the status pill specifically; every one of those is now a no-op for
+     `Badge`, since nothing here reads that property any more — logged, not
+     silently fixed, as a follow-up those five files owe on their own
+     commission, outside this ruling's own scope).
    · THE ICON SLOT'S COLOUR IS FORCED, NOT LEFT TO THE CALL SITE — CLIENT
      RULING, 18 SEP 2026, over a screenshot of a ticket head: "type icon is
      still gray." `[icon-led-chip]`'s own `data-slot="badge-icon"` wrapper
@@ -218,12 +249,22 @@ const badgeVariants = cva(
         /** `.kw-tag--sky` — the informational tone. Charcoal label, as every accent. */
         info: "bg-info text-ink-on-accent",
         /**
-         * CH11's status pill ground — `--pill-fill` / `--pill-label`, the
-         * neutral pair that flips with the palette. The state lives in the
-         * `dot`; the fill never carries it. Usually paired with
-         * `size="pill"`; the fill is legal at either size.
+         * CH11's status pill — RULED 19 SEP 2026 (see this file's own header
+         * law, "A STATUS CHIP IS A CHIP"): the fill is now the SAME quiet
+         * chip surface `secondary` draws — `--badge-quiet-fill`, falling
+         * back to `--surface-quiet` — not `--pill-fill` (ch11's original
+         * "the other paper tone from the panel", which resolves to `--card`
+         * and goes invisible wherever a status chip sits on a card or the
+         * page itself, both off-beige in light). One rebindable property,
+         * shared with `secondary`, so a caller that already knows to rebind
+         * `--badge-quiet-fill` for one gets the identical fix for the other
+         * with nothing new to learn. THE LABEL IS UNCHANGED — `--pill-label`
+         * still resolves to `--foreground`, the same charcoal-on-every-
+         * accent law every other variant already follows — and so is the
+         * DOT: this is a fill swap only, never a tone change. Usually
+         * paired with `size="pill"`; the fill is legal at either size.
          */
-        status: "bg-[var(--pill-fill)] text-[var(--pill-label)]",
+        status: "bg-[var(--badge-quiet-fill,var(--surface-quiet))] text-[var(--pill-label)]",
       },
       /* The dot's tone, mirrored into cva so the two status special cases
          above can key on it. The dot itself is drawn in JSX below — a class

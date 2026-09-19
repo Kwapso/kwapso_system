@@ -2,6 +2,317 @@
 
 ## Unreleased
 
+### Fixed — the rail's width takes the larger of the label and the brand mark, so the mark never shrinks — v1.2.131
+
+**THE RULING.** v1.2.130 sized `--rail-width` to "Knowledge" alone, which
+under-sized the rail against the brand mark: the logotype at `--icon-28`
+(`rail.tsx`'s `MARK_STEP`) is wider than the label's own floor, so the rail
+was pushing the mark into its own `max-w-full` shrink (90×18 instead of its
+natural ~131×26 at the kit's 15px root) — undoing Aurora's own 18 Sep 2026
+rulings that the logo be bigger ("make the logo bigger", then "I want the
+logo to be bigger … just a bit").
+
+**THE FIX.** `--rail-width` is now `max()` of two `calc()` floors sharing the
+same leading/trailing insets (`2 × --rail-inset + 2 × --space-3`): the label
+floor (unchanged from v1.2.130 — `--icon-button + --space-2 + --rail-label-ch`)
+and a new mark floor, `--brand-lockup-w` (`tokens.css`, `8.75rem`/140px at the
+16px reference) — `brand.tsx`'s own `--icon-28 × 4.9986` arithmetic
+(the logotype cut's measured aspect ratio, printed by `assets/build-assets.mjs`),
+done once here because `--brand-ratio` is set on the mark's own element, a
+descendant `--rail-width`'s scope cannot read upward into, and rounded up to
+the space ladder's own grain. The mark floor wins: rail width is now
+8.75rem + 2.75rem = **11.5rem / 184px at the 16px reference** (still below
+the old flat 13rem/208px), 172.45px at the kit's own 15px harness root.
+
+**MEASURED**, `verify/rail-foot` (`?rail=open`, 1440×900): the mark renders
+at its full natural size — 131.2×26.2 at the 15px root, 139.95×27.98 at the
+16px reference — with no `max-w-full` shrink (`railDock.scrollWidth ===
+clientWidth`, zero horizontal overflow anywhere in the document); "Knowledge"
+still clears its own row with `ellipsized: false`, now with generous room to
+spare since the mark floor is the wider of the two.
+
+**Files:** `foundations/tokens/tokens.css` (`--brand-lockup-w`, new),
+`compositions/templates/screen-shell.tsx` (`DENSITY_RAIL`'s calc, now
+`max(RAIL_WIDTH_LABEL_FLOOR, RAIL_WIDTH_MARK_FLOOR)`), `compositions/templates/
+rail.tsx` (doc only — the WIDTH bullet and `MARK_STEP`'s own comment).
+**Checks:** `check-screen-shell.mjs`'s rail-width-from-label section pins the
+`max()` shape, `var(--brand-lockup-w)`, and the pinned `8.75rem` token value.
+
+### Changed — the rail is derived from its widest label instead of a flat 208px — v1.2.130
+
+**THE RULING.** Aurora, verbatim: *"can we make sidebar less wide? assume
+knowledge will be the longest word there."*
+
+**WHY.** `RAIL_WIDTH` (`screen-shell.tsx`) had been a flat `"13rem"` (208px)
+since the rail's own file was written — the kit's own "Fixed 208px" (26.02),
+never re-derived from what the column actually holds. Nothing sized it to
+its content, so "less wide" was air to give back, not a redesign.
+
+**THE FIX.** `--rail-width` (`screen-shell.tsx`'s `DENSITY_RAIL`) is now a
+`calc()` of the rail row's own tokens — `--rail-inset` twice (the column's
+own leading/trailing padding), `--space-3` twice (the row's own leading/
+trailing padding), `--icon-button` (the icon slot every row reserves once
+any destination carries one) and `--space-2` (the icon-to-label gap) — plus
+`--rail-label-ch` (`tokens.css`, beside `--measure-body`): "Knowledge",
+Aurora's own worst case, measured once in the real face (`document.fonts`
+awaited, both `getBoundingClientRect` and `canvas.measureText` agreeing) at
+the row's own `--text-sm` / `--font-weight-medium` / `0em` tracking — MEDIUM,
+not the row's resting light weight, because a row renders medium the instant
+it is active or merely hovered (`ACTIVE_TREATMENT` / `ROW_IDLE`'s own hover
+rule, `rail.tsx`) and sizing to the lighter weight would fit at rest and
+reflow on the first hover. Raw measurement: 71.484375px at the 16px reference
+root (ruling 28). Rounded UP to 72px (4.5rem) — the nearest grain the space
+ladder itself steps in (`--space-1`, 4px) — rather than carried as a
+fractional pixel. Sum at the 16px reference: 10 + 10 + 12 + 12 + 16 + 8 + 72
+= 140px (8.75rem), down from 208px. `RAIL_WIDTH` now reads
+`"var(--rail-width)"` instead of restating the literal, and the rail dock's
+own column reads `w-[var(--rail-width)]` in place of the old `w-[13rem]`.
+
+**WHAT WAS ALREADY TRUE AND STAYS TRUE.** Every text run this width is sized
+against already carried `truncate` inside a `min-w-0` box — the nav item's
+own label, the group heading, and the member chip's name — so nothing needed
+adding there; a label genuinely longer than "Knowledge" (another language's
+word, an application's own vocabulary) still elides with an ellipsis instead
+of reflowing the row or forcing the column wider. The brand mark (`Logotype`,
+`--icon-28`) is wider than the new column at its natural size and degrades
+through its own existing `max-w-full` — proportionally, no distortion, no
+clipping — which `brand.tsx`'s own header already documents as the intended
+fallback for a column narrower than the lockup's natural width. The three
+section headings ("MY WORK" 55.06px, "BUILD" 33.08px, "ACCOUNTS" 62.98px at
+the kit's 15px harness root) and the member chip's name ("Member"/"Smoke")
+all fit inside the new width with room to spare — measured, not assumed.
+
+**MEASURED**, `verify/rail-foot` (`?rail=open`, 1440×900, the kit's own 15px
+harness root — where `--rail-width` resolves to 131.25px, down from 195):
+the active "Knowledge" row's label renders at its full, un-elided 67px
+intrinsic width inside a 67.5px available box (0.5px clearance, positive by
+construction); `scrollWidth === clientWidth` on the label (no ellipsis
+engaged); forcing a much longer label onto the same row (`"Knowledgeability
+Documentation Repository"`) truncates cleanly with the row and rail-dock
+widths unchanged (112.5px / 131.25px, no reflow, no horizontal overflow).
+
+**Files:** `foundations/tokens/tokens.css` (`--rail-label-ch`, new),
+`compositions/templates/screen-shell.tsx` (`RAIL_WIDTH`, `DENSITY_RAIL`, the
+rail dock's width class), `compositions/templates/rail.tsx` (doc only — the
+GEOMETRY section's WIDTH bullet), `verify/rail-foot/page.tsx` (one entry in
+the long register relabelled "Knowledge", carrying an icon like its real-app
+neighbours, plus a `railWidthCheck` probe field). **Checks:**
+`compositions/templates/check-screen-shell.mjs` gets two new sections —
+"rail-width-from-label" (pins `RAIL_WIDTH = "var(--rail-width)"`, the rail
+dock's `w-[var(--rail-width)]`, the absence of any bare `w-[13rem]`/
+`w-[208px]`, and `tokens.css`'s pinned `--rail-label-ch: 4.5rem`) and "rail
+truncate-under-narrower-width" (pins `truncate` on the nav label, the group
+heading and the member name) — and the existing rail-gutter-halving check's
+`DENSITY_RAIL` pattern is updated for the new `--rail-width` term.
+
+### Fixed — the assistant overlay has no scrim between 721 and 1023px wide — v1.2.129
+
+**THE RULING.** A sweep of every screen at 1440/1024/760 wide found the
+assistant column drawing as a see-through overlay on top of the card, and on
+top of any open dialog, on tablet-width screens — no dimming, and nothing
+stopping a click from passing through it to whatever was underneath
+(evidence: a raise-ticket dialog painted under the open assistant at 760
+wide, and the accounts screen's rail-expanded state at 1024).
+
+**WHY.** The assistant column stops docking in the page's flow and becomes
+an overlay below `lg` (1024px) — that switch happens once, in
+`screen-shell.tsx`'s aside dock (`max-lg:absolute max-lg:inset-y-0
+max-lg:end-0`). Its darkening scrim, though, answered to a different,
+unrelated number: `max-[45rem]:block` (720px), the SHEET's own breakpoint for
+turning the column into a full-bleed bottom sheet on a phone. Between 720 and
+1024 the column was already an overlay and the scrim simply was not there.
+
+**THE FIX.** The scrim now mounts on `max-lg:block` — the identical
+constant, `lg`, that the dock's own overlay switch uses, so the two cannot
+answer two different questions about the same thing again. It is also
+`fixed inset-0` rather than `absolute inset-0`, because the dock's own box is
+only as wide as the column itself between 720 and 1024 (it only stretches
+edge-to-edge below 720, which is untouched by this fix) — `fixed` anchors it
+to the real viewport instead, so it dims and blocks clicks on everything
+behind the overlay at every width the overlay exists, not only on a phone.
+Below 720 the rendered rectangle is unchanged: the dock box already spanned
+the viewport there, so the old and new positioning resolve to the same rect.
+
+**Files:** `compositions/templates/screen-shell.tsx` (the aside scrim's own
+`className` and its doc comment). **Checks:** `compositions/templates/
+check-screen-shell.mjs` gets a new "aside-scrim overlay-range" section:
+the scrim must read `hidden max-lg:block` and `fixed inset-0`, must not read
+`max-[45rem]:block`, and the dock's own `max-lg:absolute max-lg:inset-y-0
+max-lg:end-0 max-lg:z-[3]` expression it is pinned against must still be
+there. Measured live in `verify/shell-chrome` (`?aside=open`) at 760, 900
+and 1000 wide before this shipped: the scrim is `position: fixed`,
+`display: block`, its rect is exactly the viewport, `pointer-events: auto`,
+and a click on it closes the assistant; at 1024 the scrim is `display: none`
+and the dock is back to `position: relative` (docked).
+
+### Fixed — the rail's nav list scrolls cleanly above the profile card — v1.2.129
+
+**THE RULING.** The same sweep found a rail with more destinations than fit
+its column, at 1024x768, drawing its last item half hidden behind the
+bottom profile card.
+
+**WHAT WAS ALREADY TRUE.** `rail.tsx`'s nav region already read `min-h-0
+flex-1 overflow-y-auto` — the 2026-09-02 fix for the same class of bug (the
+profile card and collapse toggle travelling with the list on scroll,
+argued at length in that file). Measured live in `verify/rail-foot`'s own
+long-register harness at the identical 1024x768, both rail states: the nav
+already scrolled, and scrolling it to its end put the last row fully inside
+the viewport with zero rect overlap against the profile card. That geometry
+did not move today.
+
+**THE FIX.** What the scroll region did not yet do is hide its own
+scrollbar. This rail column draws no other bar (its background is fully
+transparent), so the platform's default scrollbar reads as a second edge
+sitting over the last row — which is what a narrow-sweep screenshot at that
+exact width and height can look like "half hidden behind the card" even
+though every row is reachable. `rail-nav` now hides it with the kit's own
+existing pair for exactly this, reused rather than invented:
+`[scrollbar-width:none] [&::-webkit-scrollbar]:hidden` (`tabs.tsx`'s tab
+strip and `breadcrumb-folders.tsx`'s trail already carry the identical two
+classes). Wheel, touch and keyboard scrolling are unchanged — this is a
+paint change, not an `overflow` change — and the fix is unconditional, so
+the collapsed icon rail gets it too.
+
+**Files:** `compositions/templates/rail.tsx` (`rail-nav`'s own `className`
+and its doc comment). **Checks:** `compositions/templates/
+check-screen-shell.mjs` gets a new "rail-nav scroll-above-the-foot" section:
+`rail-nav` must read `min-h-0`, `flex-1` and `overflow-y-auto` together, and
+must also read `[scrollbar-width:none]` and `[&::-webkit-scrollbar]:hidden`.
+
+### Fixed — `Badge`'s `status` variant draws a visible fill, everywhere — v1.2.128
+
+**THE RULING, VERBATIM, 19 SEP 2026.** Aurora: "chips and pills always must
+have the background card or shape wherever they are. In this case, I'm
+talking inside ticket-related stories. The type of ticket and the status
+need the card to have a background."
+
+**BEFORE.** The ticket page's Related stories row draws two chips per story:
+the TYPE (`variant="secondary"`, icon-led) and the STATUS (`variant="status"`,
+dot-led) beside it. The type chip already carried a visible quiet-fill card
+(18 Sep's own label fix, this file's own history above). The status chip did
+not: `variant="status"` read `bg-[var(--pill-fill)]`, and `--pill-fill`
+resolves to `--card` — byte-identical to `--background` in light (both
+`--kw-off-beige`; `components/card/card.tsx`'s own doc gives the same reason
+its `default` variant reaches for `bg-surface-panel` instead of `bg-card`: a
+`--card` box on the page draws nothing at all). A status chip sitting on the
+page, or on a `raised` card, or on any nested card a caller forgot to
+re-rebind `--pill-fill` against, painted no fill whatsoever — exactly her
+report, and not scoped to Related stories alone: `variant="status"` is the
+app's one universal lifecycle-chip shape (ticket, story, sprint, wave,
+account, contact, app-stage, automation, task priority — grep `variant=
+"status"` in the app repo for the full list), so the defect rode along with
+every one of them wherever their own container happened to land on
+`--background`/`--card`.
+
+**AFTER.** `status` no longer reads `--pill-fill`. It reads the exact fill
+`secondary` already draws — `bg-[var(--badge-quiet-fill,var(--surface-quiet))]`
+— the same rebindable custom property, same fallback, same mechanism a
+caller already reaches for when a *secondary* chip needs a darker ground
+(this file's own header law, above). A status chip now carries the identical
+visible chip surface a type chip does, in every context, with nothing new
+for a caller to learn. **The label and the dot are untouched** — `text-
+[var(--pill-label)]` still resolves to `--foreground`, and no `dotTone`'s
+colour moved; she named the card, not the ink, and this file's own "mango is
+never a status" law governs the dot, not the ground under it.
+
+**Files:** `components/badge/badge.tsx` (the `status` variant's own class
+string, and a new header-law bullet, "A STATUS CHIP IS A CHIP", recording
+the ruling in full). **Checks:** `components/badge/check-badge.mjs` gets a
+new section 1b, the same shape as section 1's own positive pin for
+`secondary`: `status` must read `bg-[var(--badge-quiet-fill,var(--surface-
+quiet))]`, and a regression back to `bg-[var(--pill-fill)]` fails red by
+name.
+
+**WHAT THIS DOES NOT TOUCH.** `--pill-fill`/`--pill-label` stay defined in
+`tokens.css` — nothing here retires them, unlike the `--pill-fill-building`/
+`--pill-label-building` pair ruling 26's reversal removed outright. Five
+other kit files carry a local `[--pill-fill:…]` rebind tuned specifically
+for the status pill's old fill mechanism — `compositions/templates/
+screen-shell.tsx`, `compositions/templates/rail.tsx`, `components/
+collection-frame/collection-frame.tsx`, `components/record-detail/
+record-detail.tsx` and `components/toolbar-row/toolbar-row.tsx` — and every
+one of those rebinds is now a no-op for `Badge`, since nothing in this file
+reads `--pill-fill` any more. Logged here rather than silently left for a
+future session to trip on; fixing those five (rebinding `--badge-quiet-fill`
+instead, where their own context still wants a non-default chip surface) is
+each file's own commission and out of scope for this ruling, which named one
+component. **A dot-only chip (no text label) is a different shape entirely
+and is unaffected**: every dot-only usage in the kit (`kanban.tsx`'s
+column-header dot, `comments.tsx`, `form.tsx`, `screen-renderer.tsx`,
+`agent-chat.tsx`, `copilot-overlay.tsx`, `calendar-view.tsx`) draws a bare
+`<span className="size-[var(--dot-status)] … bg-[var(--dot-*)]">` directly,
+never through `Badge` at all — `Badge` itself never renders a bare dot with
+no label (`hideWhenEmpty` returns `null` with no `children`/`count`), so
+this fix, scoped to `variant="status"`'s own fill, cannot reach them either
+way.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso_system; the app's
+`web/components/tickets/help-detail.tsx` Related-stories comment ("never a
+fill: `variant="status" dot={…}`") is now wrong and wants updating to say
+what is true today, and any app test that pinned "status variant has no
+fill" wants the same correction.
+
+### Added — `Select`'s options AND trigger draw the same face a list row does — v1.2.127
+
+**THE RULING, VERBATIM.** Aurora: "every time there is an avatar, I want to
+also see it in the choice component, so I also want to see the avatars
+here" — about the new Raised-by `Select` on the ticket form and page, but
+stated as a law of the house: any choice over people, contacts, accounts or
+apps shows the same face the lists show — the photo when there is one,
+initials on the record's tone when there is none — in the options AND in
+the trigger's chosen value.
+
+**THE GAP THIS CLOSES.** `SelectItem` already carried an `image` prop, but
+it rendered a bare `<img>` with no fallback path — the exact silhouette
+mismatch `RULES.md §4.4` already named for a picker's mark disagreeing with
+the record's own (`Avatar`'s `AvatarImage` has covered a broken photo since
+it was written; the picker's `<img>` never did). And nothing at all drew a
+mark in the TRIGGER's own chosen value — Radix clones `ItemText`'s children
+into the trigger, and an `<img>` cloned there would have been a second,
+unasked-for drawing in the 44 field, which is why the mark was deliberately
+kept a sibling of `ItemText` in the first place (see `SelectItem`'s own
+note). So the trigger simply never carried a face until now.
+
+**THE FIX.** A new `face` prop — `{ src?, name?, tone?, shape? }` — on both
+`SelectItem` and `SelectTrigger`, both rendered through one shared
+`SelectFaceMark` helper so the two can never draw two different fallbacks
+of the same record. It renders through the real `Avatar`/`AvatarImage`/
+`AvatarFallback` primitive at `size="sm"` (24, ruling 30's small rung — the
+exact size the old `image` prop already drew at), never a bare `<img>`.
+`SelectTrigger.face` exists because Radix cannot clone the option's own
+mark into the trigger (see above): the call site already knows which
+option is selected — it is what supplies `SelectValue`'s `placeholder` — so
+it passes that option's face alongside it. The trigger takes
+`justify-start` and the chevron takes `ms-auto` BY CONSTRUCTION when `face`
+is given, the kit's own move (not a call site's, per `hideChevron`'s
+existing doc on a second leading child) so the face and the chevron can
+never crowd each other. The pre-existing `image` prop keeps rendering
+unchanged — nothing that has not moved to `face` regresses.
+
+**A REAL BUG THE VERIFY PAGE FOUND.** `Avatar`'s load status
+(`idle`/`loading`/`loaded`/`error`) lives on the component instance and
+nothing resets it when a LATER render hands the same instance a different
+`src` (or none) — every other call site in this kit gives each record its
+own `Avatar` instance, so this never mattered before. The trigger's face is
+the first case where ONE instance's `src` changes across renders (selecting
+a no-photo option right after a photo one, without the trigger ever
+unmounting): measured live in `verify/select-faces`, the trigger's mark
+went BLANK — `status` was still `"loaded"` from the previous photograph, so
+`AvatarFallback` kept hiding the new selection's initials behind a photo
+that was no longer there. Fixed by keying `SelectFaceMark`'s `Avatar` on
+the face's own identity (`img:<src>` / `initials:<name>`), forcing a fresh
+instance — and a fresh `status` — exactly when the face itself changes.
+
+**PINNED.** `components/select/check-select.mjs` (new, wired into `npm run
+check`) reads `select.tsx`'s own source: both props declared, both
+rendered through `SelectFaceMark`, `SelectFaceMark` itself rendering the
+real `Avatar`/`AvatarImage`/`AvatarFallback` trio (not a bare `<img>`), the
+legacy `image` prop still rendering, and the chevron's `ms-auto` guard.
+`verify/select-faces/page.tsx` is the DOM-measured counterpart — photo /
+initials / none, in both the options and the trigger, read live in a
+browser via `window.__selectFacesVerify()` — and is where the stale-status
+bug above was actually caught.
+
 ### Fixed — a real click on the "+" (and on any non-active tab) never reached it — v1.2.126
 
 **THE DEFECT, IN PLAIN WORDS.** A real click on the workspace trail's "New

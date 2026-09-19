@@ -85,8 +85,11 @@ describe("the knowledge gallery grid — fluid, reusing the wall's own 12rem tok
   // 12rem floor is 192px at that same root. A container narrower than the
   // real one only UNDERSTATES the column count, so each width below is a
   // conservative (not generous) stand-in for the real content column at
-  // that viewport, after the rail (`RAIL_WIDTH`, screen-shell.tsx, 13rem)
-  // and the card's own insets are spent:
+  // that viewport, after the rail (`RAIL_WIDTH`, screen-shell.tsx — derived
+  // from tokens since kit v1.2.130, 8.75rem/140px at the 16px reference,
+  // down from a flat 13rem/208px; narrower than before, so the true content
+  // column only gained room these figures don't credit it with) and the
+  // card's own insets are spent:
   //   ≥1280 viewport → ≥900px of grid width left over
   //   tablet (~768)  → ~700px
   //   phone (~390)   → ~360px, and a wide phone (~428) → ~400px

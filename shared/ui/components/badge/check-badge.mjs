@@ -14,6 +14,15 @@
    or an icno, for all chips / pills." See section 4, below, for the two
    defects this second ruling reports and how each is checked.
 
+   EXTENDED AGAIN 19 SEP 2026, A THIRD RULING, VERBATIM: "chips and pills
+   always must have the background card or shape wherever they are. In this
+   case, I'm talking inside ticket-related stories. The type of ticket and
+   the status need the card to have a background." The type chip (18 Sep's
+   own fix) already had one; the STATUS chip beside it did not — it read
+   `--pill-fill`, which resolves to `--card`, byte-identical to
+   `--background` in light, so it drew no visible fill wherever it sat on
+   the page or a raised card. See section 1b, below.
+
    TWO DEFECTS, ONE CHIP. The ticket-type badge is `variant="secondary"` —
    the quiet counter — and that variant's own label read `text-ink-secondary`
    (a muted grey, `#4a4946` on paper) while every COLOURED variant in this
@@ -102,6 +111,39 @@ if (!/secondary: "bg-\[var\(--badge-quiet-fill,var\(--surface-quiet\)\)\] text-f
   findings.push(
     `${rel}'s secondary variant does not read text-foreground for its label — the exact chip the client reported ` +
       '("ticket type grey and not black") is this variant.',
+  );
+}
+
+/* ============================================================================
+   1b · A STATUS CHIP IS A CHIP — 19 SEP 2026 CLIENT RULING, VERBATIM: "chips
+   and pills always must have the background card or shape wherever they are.
+   In this case, I'm talking inside ticket-related stories. The type of
+   ticket and the status need the card to have a background." `status` used
+   to read `--pill-fill` (ch11's "other paper tone from the panel"), which
+   resolves to `--card` — byte-identical to `--background` in light, so a
+   status chip on the page or on a raised card drew no visible fill at all,
+   exactly her report. PINNED POSITIVELY, the same shape as secondary's own
+   pin above: `status` now reads the SAME rebindable chip-surface property
+   secondary does — `--badge-quiet-fill`, falling back to `--surface-quiet`
+   — not `--pill-fill`, so a caller never has to learn a second property to
+   fix the same defect twice. The LABEL half is untouched (`--pill-label`,
+   which already resolves to `--foreground`) — this ruling named the card,
+   not the ink or the dot.
+   ========================================================================= */
+if (!/status: "bg-\[var\(--badge-quiet-fill,var\(--surface-quiet\)\)\] text-\[var\(--pill-label\)\]",/.test(src)) {
+  findings.push(
+    `${rel}'s status variant does not read bg-[var(--badge-quiet-fill,var(--surface-quiet))] — the same chip-` +
+      'surface fill secondary draws — for its background. The 19 Sep 2026 ruling ("chips and pills always must ' +
+      'have the background card or shape wherever they are") requires status to carry the identical visible fill ' +
+      "secondary already has, not the old --pill-fill (which resolves to --card, invisible against --background " +
+      "or a raised card in light).",
+  );
+}
+if (/status: "bg-\[var\(--pill-fill\)\]/.test(src)) {
+  findings.push(
+    `${rel}'s status variant still reads bg-[var(--pill-fill)] — the exact token the 19 Sep 2026 ruling retired ` +
+      "for this variant because it resolves to --card, which goes invisible against --background or a raised " +
+      "card in light (both --kw-off-beige).",
   );
 }
 
@@ -431,7 +473,9 @@ if (findings.length > 0) {
 
 console.log(
   "OK badge check: no variant (base or compound) reads a muted ink for its label — secondary reads " +
-    "text-foreground and the retired Archived tertiary-label compound variant stays gone — a linked badge " +
+    "text-foreground and the retired Archived tertiary-label compound variant stays gone — status reads the " +
+    "same chip-surface fill as secondary (--badge-quiet-fill, falling back to --surface-quiet) instead of the " +
+    "now-retired --pill-fill — a linked badge " +
     "(asChild or href) always draws LINK_UNDERLINE — the leading-mark gap (LEADING_MARK_GAP, gap-2) is spent " +
     "unconditionally in badgeVariants' own base class list rather than behind a dot-only ternary — every variant " +
     "carries an explicit bg- declaration — the icon prop gives an icon-led chip a real Badge slot — and that " +

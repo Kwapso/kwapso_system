@@ -64,11 +64,98 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { cva } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "../avatar/avatar";
 import {
   CheckFat,
   CaretDown,
   CaretUp,
 } from "../../foundations/icons";
+
+/* ----------------------------------------------------------------------------
+   Two initials, cut on code points so a name outside the basic plane is not
+   cut through the middle of one. Copied — not imported — from `comments.tsx`
+   and `detail-view.tsx`, which each already carry the identical function for
+   the identical reason; this file follows the kit's own precedent (a shared
+   `lib/utils` helper was considered and rejected the same way twice already)
+   rather than introducing a fourth pattern. `Avatar` cuts to two again on its
+   own, so this is belt and braces, same as those two call sites say of
+   themselves.
+   ------------------------------------------------------------------------- */
+function initialsOf(name: string | undefined): string {
+  if (!name) return "";
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return Array.from(words[0]).slice(0, 2).join("");
+  return [words[0], words[words.length - 1]].map((word) => Array.from(word)[0] ?? "").join("");
+}
+
+/**
+ * A FACE — a person's, a contact's, an account's or an app's — the one shape
+ * every choice over one of those draws from now on (the client, verbatim:
+ * "every time there is an avatar, I want to also see it in the choice
+ * component, so I also want to see the avatars here"). It renders through
+ * `Avatar` itself — photo or initials fallback, never a bare `<img>` — so a
+ * picker can never show a silhouette the record's own row does not.
+ */
+export interface SelectFace {
+  /** The photograph. Falls back to the initials silently when missing or
+   * broken — `Avatar`'s own contract, not reimplemented here. */
+  src?: string | null;
+  /** The record's name. Cut to two initials the same way every other choice
+   * in this kit does (see `initialsOf` above); also the mark's own
+   * `aria-hidden` fallback text. */
+  name?: string;
+  /** The `Avatar` variant carrying the record's own tone when there is no
+   * photograph — `default` unless the record's own row draws another. */
+  tone?: "default" | "inverse" | "brand" | "quiet";
+  /** Square for a thing, pill for a person — ruling 30. Defaults to `pill`,
+   * which is right for the common case (a person, a contact, a staff
+   * member); an account or an app passes `square`. */
+  shape?: "pill" | "square";
+}
+
+/**
+ * The face slot both `SelectItem` and `SelectTrigger` render through — one
+ * function, so an option's mark and the trigger's own chosen-value mark can
+ * never draw two different sizes or two different fallbacks of the same
+ * record. `size="sm"` (24, `--avatar-sm`) is the kit's own small rung of
+ * ruling 30's ladder and the exact size the old bare `image` prop already
+ * drew at; this only swaps the bare `<img>` for the primitive that knows how
+ * to fall back.
+ */
+function SelectFaceMark({ face }: { face: SelectFace }) {
+  return (
+    <Avatar
+      /* `Avatar`'s own load state (`idle`/`loading`/`loaded`/`error`) lives
+         on the component instance, not on `src` — it is set once by
+         `AvatarImage`'s effect and nothing resets it when a LATER render
+         hands the same instance a different `src`, or no `src` at all.
+         Every other call site in this kit gives each record its own Avatar
+         instance (a distinct list row, a distinct comment), so the state
+         never had a reason to go stale. THE TRIGGER's face is the one place
+         that is not true: one instance, and a value change can swap it from
+         a photo option to a no-photo one without ever unmounting. Measured
+         live in `verify/select-faces`: selecting "Owen Tate" (no photo)
+         right after "Priya Raman" (a photo) left the trigger's mark BLANK —
+         `status` was still `"loaded"` from Priya's photograph, so
+         `AvatarFallback` kept hiding Owen's initials behind a photograph
+         that was no longer there. Keying on the face's own identity forces
+         a fresh instance — and a fresh `status` — exactly when the face
+         itself changes, closing the race the same way a changed `key`
+         forces a fresh img in `record-mark.tsx` (RecordMark.tsx's own
+         header, this kit's app-side sibling). */
+      key={face.src ? `img:${face.src}` : `initials:${face.name ?? ""}`}
+      size="sm"
+      shape={face.shape ?? "pill"}
+      variant={face.tone ?? "default"}
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      {face.src ? <AvatarImage src={face.src} alt="" /> : null}
+      <AvatarFallback>{initialsOf(face.name)}</AvatarFallback>
+    </Avatar>
+  );
+}
 
 /* ----------------------------------------------------------------------------
    Root, group and value are Radix's, unskinned.
@@ -196,6 +283,23 @@ export interface SelectTriggerProps
    * child in — `ViewSwitch`'s leading view icon — says `justify-start` itself.
    */
   hideChevron?: boolean;
+  /**
+   * The trigger's OWN face — the same mark the chosen option draws in the
+   * list. Radix clones `ItemText`'s children into the trigger to render the
+   * chosen value (see `SelectItem`'s own note on why the mark sits outside
+   * `ItemText` and is therefore never cloned along with it), so the trigger
+   * cannot pick this up on its own; the call site already knows which option
+   * is selected — it is what supplies `SelectValue`'s `placeholder` — so it
+   * passes that option's face here too. `undefined` draws nothing, exactly as
+   * before this prop existed.
+   *
+   * Built `justify-start` BY CONSTRUCTION when given, the same move
+   * `hideChevron`'s own doc above describes a call site making by hand for a
+   * second child — this one is the kit's, not a call site's, so the kit makes
+   * it. The chevron takes `ms-auto` in the same case, so it still lands at
+   * the trailing edge regardless.
+   */
+  face?: SelectFace;
 }
 
 /**
@@ -254,32 +358,41 @@ export interface SelectTriggerProps
 const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, children, error, hideChevron = false, "aria-invalid": ariaInvalid, ...props }, ref) => {
-  const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");
+>(
+  (
+    { className, children, error, hideChevron = false, face, "aria-invalid": ariaInvalid, ...props },
+    ref,
+  ) => {
+    const invalid = error ?? (ariaInvalid === true || ariaInvalid === "true");
 
-  return (
-    <SelectPrimitive.Trigger
-      ref={ref}
-      data-slot="select-trigger"
-      aria-invalid={invalid || undefined}
-      className={cn(
-        selectTriggerVariants({ state: invalid ? "error" : "default" }),
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      {hideChevron ? null : (
-        <SelectPrimitive.Icon asChild>
-          {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
-              draws it. The colour is set by the cva so the disabled skin can
-              reach it. */}
-          <CaretDown className="size-[var(--icon-button)] shrink-0" />
-        </SelectPrimitive.Icon>
-      )}
-    </SelectPrimitive.Trigger>
-  );
-});
+    return (
+      <SelectPrimitive.Trigger
+        ref={ref}
+        data-slot="select-trigger"
+        aria-invalid={invalid || undefined}
+        className={cn(
+          selectTriggerVariants({ state: invalid ? "error" : "default" }),
+          face ? "justify-start" : undefined,
+          className,
+        )}
+        {...props}
+      >
+        {face ? <SelectFaceMark face={face} /> : null}
+        {children}
+        {hideChevron ? null : (
+          <SelectPrimitive.Icon asChild>
+            {/* `--icon-button` (16) on `--ink-secondary`, as `.kw-selectwrap__chevron`
+                draws it. The colour is set by the cva so the disabled skin can
+                reach it. `ms-auto` only when `face` claimed `justify-start`
+                above — without it the base `justify-between` already pins the
+                chevron to the end on its own. */}
+            <CaretDown className={cn("size-[var(--icon-button)] shrink-0", face ? "ms-auto" : undefined)} />
+          </SelectPrimitive.Icon>
+        )}
+      </SelectPrimitive.Trigger>
+    );
+  },
+);
 
 SelectTrigger.displayName = "SelectTrigger";
 
@@ -462,6 +575,17 @@ export interface SelectItemProps
    * decorative and a screen reader must not read the name twice.
    */
   imageAlt?: string;
+  /**
+   * A face leading the label — the SAME `Avatar` primitive the record's own
+   * list row draws: a photograph when `face.src` is given, the record's own
+   * initials otherwise, never a bare `<img>` with no fallback. This is the
+   * law for every choice over a person, a contact, an account or an app (the
+   * client, verbatim: "every time there is an avatar, I want to also see it
+   * in the choice component"). Takes priority over `image` when both are
+   * given — a row carries one mark; `image` is kept working unchanged for
+   * every call site that has not moved to `face` yet.
+   */
+  face?: SelectFace;
 }
 
 /**
@@ -518,7 +642,7 @@ export interface SelectItemProps
 const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
   SelectItemProps
->(({ className, children, icon, image, imageAlt = "", ...props }, ref) => (
+>(({ className, children, icon, image, imageAlt = "", face, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     data-slot="select-item"
@@ -536,6 +660,8 @@ const SelectItem = React.forwardRef<
       >
         {icon}
       </span>
+    ) : face ? (
+      <SelectFaceMark face={face} />
     ) : image ? (
       <img
         src={image}

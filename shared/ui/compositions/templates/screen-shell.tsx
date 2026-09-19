@@ -391,9 +391,11 @@
    `MainScreen` and `DetailScreen` each built their own until the COLLAPSE at
    the top of this header; the shell builds it now, from the slots that block
    names, and the band's paper argument is untouched by that.)
-   The density insets are the same numbers; `RAIL_WIDTH` is the same
-   13rem; `rail={null}` still means no rail, `rail=undefined` still means the
-   kit's specimen; and the rail COLUMN is still dropped whole below the
+   The density insets are the same numbers; `RAIL_WIDTH` is unchanged by THIS
+   pass (see `DENSITY_RAIL`, below, for the 19 Sep 2026 change that derives it
+   from tokens instead of a literal `13rem`); `rail={null}` still means no
+   rail, `rail=undefined` still means the kit's specimen; and the rail COLUMN
+   is still dropped whole below the
    breakpoint (since 2026-09-04 a menu control stands in its place there —
    see NARROW — but no route's call has changed shape for it).
 
@@ -964,15 +966,23 @@ import { StatStrip, type StatStripFigure } from "./stat-strip";
 import { SHAPE_HEADING_SIZE, type ScreenDensity, type ShapeState } from "../states/states";
 
 /**
- * The rail's fixed measure. The kit states it in words — "Fixed 208px,
- * collapsible to an icon rail" (26.02) — and 208 is 13rem against the 16px
- * reference every measurement in this system is authored against (ruling 28).
+ * THE RAIL'S MEASURE, NO LONGER A LITERAL. Until 19 Sep 2026 this was a flat
+ * `"13rem"` — 208px, the kit's own "Fixed 208px, collapsible to an icon
+ * rail" (26.02) — with no relationship to what the rail actually draws.
+ * Aurora, verbatim: "can we make sidebar less wide? assume knowledge will be
+ * the longest word there."
+ *
+ * `--rail-width` (below, `DENSITY_RAIL`) is a `calc()` of the row's own
+ * tokens plus `--rail-label-ch` — "Knowledge" measured once, in the real
+ * face, at the row's own size/weight/tracking, and pinned in tokens.css with
+ * its derivation. This constant now just NAMES that custom property rather
+ * than re-stating a number a reader would have to trust was still current.
  *
  * Exported because an application that draws its own rail content needs to
  * know the column it is being drawn into, and reading it off the class string
  * is not an interface.
  */
-export const RAIL_WIDTH = "13rem";
+export const RAIL_WIDTH = "var(--rail-width)";
 
 /**
  * THE ASSISTANT COLUMN'S ONE FIXED MEASURE. 380px at the 16px reference —
@@ -2268,9 +2278,132 @@ const ASIDE_BODY = cn("");
    pins this value and the continued absence of a second content-side gutter,
    so the two edges cannot drift apart again either by a wrong edit here or by
    `pe-[var(--shell-gutter)]` quietly coming back on the content column. */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   `--rail-width` — 19 SEP 2026, AURORA, VERBATIM: "can we make sidebar less
+   wide? assume knowledge will be the longest word there."
+   ═══════════════════════════════════════════════════════════════════════
+
+   THE RAIL WAS A NUMBER, NOT A DERIVATION. `RAIL_WIDTH` (above) had been a
+   flat `13rem` (208px) since the rail's own file was written — the kit's own
+   "Fixed 208px" (26.02), never re-derived from what the column actually
+   holds. Live rect measured before this change: an expanded rail's items
+   were ending well inside a column with nothing sizing it to their content,
+   so "less wide" was air to give back, not a redesign.
+
+   THE FORMULA IS THE ROW'S OWN BOX, READ BACK AS A SUM. `rail.tsx`'s
+   `ROW_EXPANDED` draws every destination as `px-[var(--space-3)]` around an
+   optional `--icon-button` icon slot, a `--space-2` gap, and the label —
+   inside `RAIL_COLUMN`'s own `p-[var(--rail-inset)]`, which pads the WHOLE
+   column on all four sides (see the rail-gutter-halving block above). So the
+   column's content width, right down to the last token, is:
+
+       2 × --rail-inset   (the column's own leading + trailing padding)
+     + 2 × --space-3      (the row's own leading + trailing padding)
+     + --icon-button      (the icon slot every row reserves once any
+                            destination in the rail carries an icon —
+                            `reserveIcon`, rail.tsx)
+     + --space-2          (the icon-to-label gap)
+     + --rail-label-ch    (the widest label the rail is sized to hold)
+
+   `--rail-label-ch` (tokens.css, beside `--measure-body`) is "Knowledge" —
+   Aurora's own worst case — measured ONCE in the real face at the row's own
+   `--text-sm` / `--font-weight-medium` (the ACTIVE and HOVER weight, which
+   is the wider of the row's two — sizing to the resting `--font-weight-
+   light` would fit at rest and reflow the moment a reader's cursor or the
+   router made the row current) and pinned as a rem, rounded up to the
+   nearest grain the space ladder itself steps in. See that token's own
+   comment for the exact measurement and the rounding.
+
+   THE SUM AT THE 16PX REFERENCE (ruling 28): 10 + 10 + 12 + 12 + 16 + 8 + 72
+   = 140px = 8.75rem — down from 208px, and every term of it a token, so a
+   future change to any one of them (the icon step, the row's padding, the
+   column's gutter, or a longer pinned label) re-derives the rail instead of
+   leaving a stale literal beside a comment explaining why it used to be
+   right. Nothing here is written in px: `calc()` below spells the same sum
+   in custom properties and the browser does the arithmetic.
+
+   WHY THE CALC LIVES HERE AND NOT IN tokens.css. `--rail-inset` is not a
+   global token — it is SCOPED, set on this same `[data-slot="screen-shell-
+   card"]` element by `DENSITY_RAIL` itself (the block immediately above),
+   because the two densities are free to diverge on it even though they
+   do not today. A `--rail-width` written in tokens.css would read a
+   `--rail-inset` that does not exist at `:root` and fail silently (an
+   invalid `var()` inside `calc()` makes the WHOLE property invalid, not a
+   default). Computing it in the same scope `--rail-inset` is set in is the
+   only placement where the dependency is real rather than assumed — and it
+   costs nothing to keep the two densities equal, exactly as `--rail-inset`
+   itself already is.
+
+   EVERY READER OF THE RAIL'S WIDTH NOW READS THIS TOKEN. `RAIL_WIDTH`
+   (above) is `"var(--rail-width)"`, not a re-stated literal; the rail dock's
+   own width class (below, the `[data-slot="screen-shell-rail"]` column, a
+   literal thirteen-rem before this change) reads `w-[var(--rail-width)]`
+   instead. `verify/shell-chat/before-shell.tsx`
+   is deliberately NOT touched — it is a frozen "before" snapshot for an
+   unrelated A/B comparison and its own `RAIL_WIDTH = "13rem"` is the point
+   of it staying still.
+
+   ─────────────────────────────────────────────────────────────────────────
+   CORRECTED, SAME DAY — THE LABEL IS A FLOOR, NOT THE ONLY ONE. THE MARK
+   MUST NEVER SHRINK.
+   ─────────────────────────────────────────────────────────────────────────
+   The sum above sizes the rail to "Knowledge" alone, and that under-sizes it
+   against the brand mark: `rail.tsx`'s `MARK_STEP` is `--icon-28`, and the
+   logotype cut's own measured aspect (`--brand-ratio: 4.9986`, `brand.tsx`)
+   makes its natural width 1.75rem × 4.9986 = 8.74755rem (139.96px at the
+   16px reference) — WIDER than the label total (140px) once you add back
+   the SAME leading/trailing insets the mark sits inside (`rail-brand`'s own
+   `px-[var(--space-3)]`, inside `RAIL_COLUMN`'s `p-[var(--rail-inset)]` —
+   structurally identical to a row's, see `rail.tsx`'s `rail-brand` block).
+   A rail sized only to the label pushed the mark into its own `max-w-full`
+   shrink (`brand.tsx`) — a real fallback for a caller who WANTS a narrower
+   mark, but not an outcome the rail may force on Aurora's own 18 Sep 2026
+   ruling that the mark be bigger, twice, live on staging ("make the logo
+   bigger", then "I want the logo to be bigger … just a bit" — `rail.tsx`'s
+   `MARK_STEP`).
+
+   SO `--rail-width` IS THE LARGER OF TWO FLOORS, NOT ONE SUM. Both floors
+   share the identical leading/trailing inset — `2 × --rail-inset + 2 ×
+   --space-3`, because the label sits inside a row's own padding and the mark
+   sits inside `rail-brand`'s identically-shaped padding, both inside the
+   SAME column padding — so the two floors differ only in what they add
+   after it:
+
+       LABEL FLOOR = insets + --icon-button + --space-2 + --rail-label-ch
+       MARK  FLOOR = insets + --brand-lockup-w
+
+   `--brand-lockup-w` (tokens.css, beside `--rail-label-ch`) is the mark's
+   own natural width, `brand.tsx`'s own `--icon-28 × 4.9986` arithmetic done
+   once because `--brand-ratio` is set on the mark's own element — a
+   DESCENDANT of this scope — and a custom property never inherits upward,
+   so it cannot be read here and multiplied fresh. See that token's own
+   comment for the exact number and why a future change to `--icon-28` or
+   the measured ratio owes this token a re-derivation.
+
+   `max()` IS CSS'S OWN, NOT REBUILT IN JS. Both floors are still `calc()`
+   expressions of tokens — nothing here is a literal pixel — and the browser
+   picks the larger at paint time, on whichever density is active, so a
+   density that ever diverges its `--rail-inset` or `--space-3` still
+   compares correctly without this file re-deriving anything.
+
+   MEASURED, `verify/rail-foot`, AT THE KIT'S OWN 15px HARNESS ROOT: the mark
+   floor wins (172.45px against the label floor's 131.25px), the mark renders
+   at 131.2×26.2 — its natural, UN-shrunk size at this root, matching its own
+   unrounded `--icon-28 × 4.9986` arithmetic to within rounding (no
+   `max-w-full` engagement: `railDock.scrollWidth === clientWidth`, no
+   horizontal overflow anywhere in the document) — and "Knowledge" still
+   clears its own row (`ellipsized: false`). AT THE 16PX REFERENCE: rail
+   183.95px (≈184px/11.5rem, matching the derivation exactly), mark
+   139.95×27.98 — both still below the old flat 208px/13rem. */
+const RAIL_WIDTH_INSETS =
+  "var(--rail-inset)_+_var(--rail-inset)_+_var(--space-3)_+_var(--space-3)";
+const RAIL_WIDTH_LABEL_FLOOR = `calc(${RAIL_WIDTH_INSETS}_+_var(--icon-button)_+_var(--space-2)_+_var(--rail-label-ch))`;
+const RAIL_WIDTH_MARK_FLOOR = `calc(${RAIL_WIDTH_INSETS}_+_var(--brand-lockup-w))`;
+const DENSITY_RAIL_WIDTH_CALC = `max(${RAIL_WIDTH_LABEL_FLOOR},${RAIL_WIDTH_MARK_FLOOR})`;
 const DENSITY_RAIL: Record<ScreenDensity, string> = {
-  comfortable: "[--rail-inset:var(--space-2h)]",
-  calm: "[--rail-inset:var(--space-2h)]",
+  comfortable: `[--rail-inset:var(--space-2h)] [--rail-width:${DENSITY_RAIL_WIDTH_CALC}]`,
+  calm: `[--rail-inset:var(--space-2h)] [--rail-width:${DENSITY_RAIL_WIDTH_CALC}]`,
 };
 
 /* STEPPED DOWN ONE RUNG WITH `--shell-gutter`, 2026-09-17, TO KEEP THE
@@ -4072,10 +4205,12 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
               data-level="rail"
               aria-label={railLabel}
               className={cn(
-                "flex w-[13rem] min-h-0 flex-none flex-col",
+                "flex w-[var(--rail-width)] min-h-0 flex-none flex-col",
                 /* THE ICON RAIL. 26.02: the rail is "collapsible to an icon
-                   rail", and a 32-wide column of glyphs inside a 208 column is
-                   not one. The rail publishes `data-rail-collapsed` on its own
+                   rail", and a 32-wide column of glyphs inside the expanded
+                   `--rail-width` column (208 until 19 Sep 2026, derived from
+                   tokens since — see `DENSITY_RAIL`) is not one. The rail
+                   publishes `data-rail-collapsed` on its own
                    root and the column takes its content's width instead — a CSS
                    relationship, so the collapsed state stays the rail's single
                    source of truth and this shell grows no prop for it. THE
@@ -5101,17 +5236,52 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 and out over `--duration-exit`, matched to the panel beside
                 it; this file names no duration and no curve, per law 6.1.
 
-                `hidden` / `max-[45rem]:block` IS A PAIR RATHER THAN A `max-`
+                `hidden` / `max-lg:block` IS A PAIR RATHER THAN A `max-`
                 PREFIX, AND IT IS THE ONE PLACE IN THIS DOCK WHERE THAT IS
                 RIGHT. Everywhere else the default is the desktop's and the
                 narrow rule is the exception, so `max-*` keeps the desktop
                 cascade literally untouched. This element has no desktop
-                behaviour to preserve — it is NEW, and above 45rem it must not
-                exist at all — so the safe default is `display: none` and the
-                exception is the one width that wants it. Written the other
-                way round (`max-[45rem]:block` alone) a future change to the
+                behaviour to preserve — it is NEW, and at `lg` and above it
+                must not exist at all — so the safe default is `display: none`
+                and the exception is every width that wants it. Written the
+                other way round (`max-lg:block` alone) a future change to the
                 media query would leave a full-screen charcoal wash on every
                 desktop.
+
+                `max-lg`, NOT `max-[45rem]`, AND THAT IS THE 2026-09-19 FIX
+                ITSELF. The scrim used to mount only below `45rem` (720px),
+                which is the SHEET's own breakpoint (`NARROW_BOTTOM`, argued
+                at length on the dock above) but is NOT the breakpoint that
+                decides whether this column is an overlay at all — that
+                question is answered once, by the dock's own `max-lg:absolute
+                max-lg:inset-y-0 max-lg:end-0` a few hundred lines up ("IT
+                OVERLAYS BELOW `lg`"). Between 720 and 1024 (a real tablet —
+                the iPad-width case that dock's own header measures) the
+                column was already an undocked overlay sitting on top of the
+                card, and open dialogs, with no dimming and no click-
+                blocking, because the scrim that should have been there was
+                still gated to a narrower, unrelated number (narrow-sweep
+                evidence: a raise-ticket dialog painted UNDER the assistant
+                overlay at 760 wide with nothing between them). One switch has
+                exactly one condition to name — "is the aside an overlay right
+                now" — and this scrim and the dock now both spell it the same
+                way, `max-lg:`, so the two cannot drift out of step again the
+                way `45rem` and `lg` just did.
+
+                `fixed inset-0`, NOT `absolute inset-0`, FOR THE SAME REASON.
+                The dock's own box is only ever as wide as the column between
+                `45rem` and `lg` (it earns `start-0` — full-bleed — only below
+                `45rem`, and that stays exactly as it was: the sheet's own
+                geometry, untouched by this fix). An `absolute inset-0` scrim
+                nested in that narrower box would only dim the column's own
+                strip, not "everything behind" the client's sentence asked
+                for. `fixed` anchors to the viewport regardless of the dock's
+                own width — nothing between here and the document root sets a
+                `transform`/`filter`/`perspective`/`contain`, so there is no
+                nearer containing block to intercept it — and below `45rem`,
+                where the dock box already spans the viewport, `fixed inset-0`
+                and the old `absolute inset-0` resolve to the identical
+                rectangle, so the phone case does not move by a pixel.
 
                 IT DISMISSES ON TAP, AND THAT IS LOAD-BEARING RATHER THAN
                 CONVENIENT. Because the dock is lifted over the phone's top
@@ -5155,8 +5325,8 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 aria-hidden="true"
                 onClick={toggleAside}
                 className={cn(
-                  "hidden max-[45rem]:block",
-                  "absolute inset-0",
+                  "hidden max-lg:block",
+                  "fixed inset-0",
                   "bg-scrim-drawer",
                   "motion-scrim",
                   isAsideOpen && "pointer-events-auto",

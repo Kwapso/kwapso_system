@@ -71,135 +71,229 @@ export const TICKET_PANEL_ANCHOR = {
 
 export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
 
-/** THE GRID, AND NOTHING INSIDE IT. What each region holds is the caller's —
- * this component's one job is the two-column split and the anchors a deep
- * link scrolls to.
+/** THE SPLIT, AND NOTHING INSIDE IT. What each region holds is the caller's —
+ * this component's one job is the layout and the anchors a deep link scrolls
+ * to.
  *
  * R89 "footer-on-the-edge", 18 Sep 2026, VERBATIM, SUPERSEDING THE SAME
  * DAY'S EARLIER "sum of three" CONSTRUCTION BELOW: "On ticket detail, the
  * footer should be at the very bottom. The position is still fucking wrong.
- * Fix it once and for all." Measured live on staging (T0001, headless
- * Playwright, `${SCRATCH}/footer-measure.json`) BEFORE this fix: the screen
- * body (`[data-slot="screen-shell-body"]`) closed at y=884 at 1440×900, and
- * the conversation card's own footer closed at y=1298 — 414px past the
- * visible screen, because the earlier construction (below) sized the
- * conversation card to the SUM of the three side panels' own content
- * height, never to the screen's actual available height. A footer at the
- * bottom of a card that is itself floating in the middle of a scrolled page
- * is not a footer "at the very bottom" in the sense she means it — the
- * screen's own bottom edge.
+ * Fix it once and for all." That landing (fully told in this file's git
+ * history and in `shared/rules/registry.ts`'s own R89 entry) made the LG
+ * two-column layout correct — measured live, the conversation card's
+ * footer sits 24px above the screen body's own bottom edge at 1440×900,
+ * 1280×800 and 1024×768.
  *
- * THE FIX IS BY CONSTRUCTION, THE SAME STANDARD EVERY OTHER LAW IN THIS
- * BASE HOLDS TO: no magic pixel offset, no viewport-relative guess. This
- * component's own root is a FLEX ITEM of `app-shell.tsx`'s own R29 page
- * container (`className="mx-auto flex w-full max-w-none min-w-0 h-full
- * flex-col …"`, the ONE thing that div wraps besides `<LiveStatus/>`) — a
- * `flex-col` box sitting on the screen body's own visible height
- * (`[data-slot="screen-shell-body"]`, `min-h-0 flex-1 overflow-y-auto`,
- * ScreenShell's own scroller).
+ * BELOW-LG RE-FIX, 19 SEP 2026, ANSWERING A SECOND, NARROWER RULING —
+ * Aurora, verbatim, told the LG fix was still wrong: "No, this is still
+ * wrong. The footer is currently under the stages and above the content.
+ * … I cannot believe you're so stupid and you cannot fix this." She was
+ * not looking at a regression of the LG fix — she was looking at a width
+ * the LG fix never touched. Below `lg` the old grid collapsed to ONE
+ * column and stacked its two children in DOM order: the conversation
+ * (thread + composer together, one `<Card>`) FIRST, the three side panels
+ * SECOND — so the composer sat right under the stage ladder, with "the
+ * content" (Related stories / Work logs / Stakeholders) rendering AFTER
+ * it. That is exactly her sentence, and it was true at every width under
+ * 1024px, confirmed live (`${SCRATCH}/footer-below-lg-before.json`): at
+ * 760×900 (rail collapsed) the conversation card closed at y=1266 — 434px
+ * past the visible screen body (y=832) — and the side panels started at
+ * y=1290, AFTER it.
  *
- * RE-PROVEN LIVE, 18 SEP 2026 EVENING, AND CORRECTED IN TWO PLACES THIS
- * PARAGRAPH USED TO GET WRONG. The FIRST landing of this law claimed
- * `min-h-full` on `app-shell.tsx`'s page container was already enough and
- * needed no edit — false: `min-height` is only ever a FLOOR a `height:auto`
- * block can grow PAST, and the instant real content (a ticket with an
- * actual conversation, not an empty fixture) is taller than that floor,
- * there is no leftover space left for any descendant's `flex-grow` to
- * consume — every `flex-1 min-h-0` box downstream, this grid included, just
- * rendered at its own natural content size, because nothing above them was
- * ever DEFINITE. Measured before this correction: the page container stood
- * 1312px tall against a 785px pane. `app-shell.tsx` now uses `h-full`
- * (`height: 100%`, a real, definite number, not a floor) — see that file's
- * own note for why this is safe for every OTHER screen (nothing here sets
- * `overflow`, so taller content still paints past the box and
- * `screen-shell-body` still scrolls all of it, proved against the tickets
- * dashboard and an account detail page, pixel-identical before/after).
+ * A FACT THIS RE-FIX ESTABLISHED THAT THE ORIGINAL TASK ASSUMED WRONG, SO
+ * IT DOES NOT COST THE NEXT READER THE SAME RE-DISCOVERY: `lg:` HERE IS A
+ * VIEWPORT BREAKPOINT, NOT A CONTAINER QUERY. Opening the assistant panel
+ * narrows the CONTENT column (measured live: 805px wide at a 1440px
+ * viewport with the assistant open) but the VIEWPORT is still 1440px, and
+ * neither this file, `app-shell.tsx` nor `screen-shell.tsx` puts
+ * `container-type` anywhere upstream of this component — so Tailwind's
+ * `lg:` variant, a plain `@media (min-width: 1024px)` rule, stays ACTIVE
+ * the whole time. Proven live (`${SCRATCH}/footer-below-lg-before.json`,
+ * `"1440x900-assistant-open"`): the two-column layout is untouched with
+ * the assistant open, footer 24px above the screen body's bottom, same as
+ * with it closed. So is 1024×768 — 1024 is the breakpoint's own
+ * `min-width`, still "lg". The genuinely narrow states are real
+ * sub-1024px viewports (a phone, or a desktop window narrowed by hand);
+ * 760×900 is this law's own proof width for that reason, not the
+ * assistant panel.
  *
- * SECOND: with the column finally definite, `RecordScreen`'s own head
- * (`RecordChrome`, rendered above this grid as a SIBLING because
- * `help-detail.tsx` passes `panelVisible={false}`) was ALSO carrying
- * `flex-1 min-h-0` — so the column's real height split 50/50 between the
- * head and this grid, never "everything the head doesn't need". Fixed in
- * `web/components/records/record-chrome.tsx` (`HEAD_ONLY`, read off
- * `panelVisible` directly): the head now takes exactly its own content
- * height, and this grid's `lg:flex-1` claims everything left over — which
- * is what "fills exactly what `<RecordScreen>`'s head leaves behind" always
- * meant, just not what the first landing's CSS actually did.
+ * WHY A REAL JS BREAKPOINT DECIDES THE TREE, NOT A `max-lg:`/`lg:` CLASS
+ * PAIR ON ONE TREE. The first draft tried exactly that (a single grid that
+ * collapses to one column, `order-*` walking the two columns back to their
+ * LG positions, `flex-1 min-h-0` unconditional so the column fills the
+ * screen at every width) — and it broke on the FIRST live proof against a
+ * real ticket (`${SCRATCH}/footer-below-lg-inject.json`, 760×900): the
+ * head (chips, title, stage ladder) alone measured ~434px of a 585px
+ * budget at that width, leaving ~151px for TWO separate `flex-1` regions
+ * (the side panels and the conversation) to fight over — and a flex item
+ * with `flex-basis: 0` and `min-height: 0` shrinks toward its basis, not
+ * its content, the instant there is no surplus to grow into. The
+ * conversation measured a real, live, on-screen height of 0. Two SEPARATE
+ * `flex-1` regions is the wrong shape for a tight budget; ONE shared
+ * scrolling region (side panels, then the thread, stacked — never
+ * competing for space, always reachable by scrolling however small the
+ * budget) is the right one, per Option B this task's own brief named. But
+ * that shape needs the composer OUTSIDE that one scrolling region, pinned
+ * as its own `flex-none` band — and the composer is ONE stateful control
+ * (`reply-composer.tsx`'s own `field` ref, its held-reply countdown, its
+ * attach-tile grid), so it cannot ALSO stay nested inside
+ * `TicketConversationPanel`'s `CardFooter` for the LG case without being
+ * two mounted instances of the same control, sharing one ref, one hidden
+ * from the other by CSS — the exact bug class `shared/web/head-
+ * actions.tsx`'s own "TWO RENDERS OF THE SAME ACTIONS" pattern is safe for
+ * (plain, stateless content) and this composer is not (an interactive
+ * control with a DOM ref). So the tree itself has to differ by width, and
+ * `web/lib/use-is-phone.ts` already banked the house answer for exactly
+ * this shape — "a phone gets a sheet instead of a popover," a real
+ * decision, not a resize — reused here at this file's own `lg` threshold
+ * (`useSyncExternalStore` + `matchMedia`, so the FIRST client render
+ * already knows, no flash of the wrong tree) rather than adding a fourth
+ * copy of the same three lines to a shared file this lane does not own.
  *
- * ONE ROW NOW, NOT THREE — the grid's own tracks have to be able to
- * STRETCH to fill that definite height, and CSS Grid's default
- * `align-content: normal` behaves as `stretch` for a SINGLE track but
- * would split the leftover space three ways across three separate `auto`
- * tracks, which is not "the side cards scroll independently" this law also
- * asks for. So the right column collapsed from three grid cells (Related
- * stories / Work logs / Stakeholders each auto-placed into its own row) to
- * ONE cell holding a `flex flex-col gap-6 overflow-y-auto` wrapper around
- * the same three panels — the identical `gap-6` the grid's own column-gap
- * already spent between the two columns, not a new number. `items-stretch`
- * (the grid default, stated rather than left implicit) then stretches BOTH
- * column cells to the row's own full height: the conversation cell
- * (`lg:h-full lg:min-h-0`, unchanged) and the side wrapper
- * (`lg:h-full lg:min-h-0 lg:overflow-y-auto`) end up the SAME height,
- * exactly matching the ground `screen-shell-body` sits on — and the side
- * wrapper scrolls its own three cards independently the moment they are
- * TALLER than that height, rather than pushing the conversation card's
- * footer down with them the way the old row-span-3 sum did.
+ * AT LG (`isAtLeastLg`): BYTE-IDENTICAL TO THE FIRST R89 LANDING. A grid,
+ * `lg:grid-cols-[2fr_1fr]` — well, plain `grid-cols-[2fr_1fr]` now, since
+ * JS already decided this branch only mounts at `lg` — the conversation
+ * cell on the left holding the ONE `TicketConversationPanel` (thread AND
+ * composer, `CardFooter` last), the side column on the right, both
+ * `h-full min-h-0`, the side column `overflow-y-auto`. Nothing here
+ * changed from the working LG proof.
+ *
+ * BELOW LG (`!isAtLeastLg`): `flex flex-col`, filling the SAME
+ * `flex-1 min-h-0` budget the LG grid already claimed against
+ * `app-shell.tsx`'s own R29 page column (`h-full flex-col`, unchanged,
+ * needed no edit). ONE scrolling region (`flex-1 min-h-0 overflow-y-auto`)
+ * holds the side panels FIRST (her own "above the content" complaint,
+ * answered by DOM order) and the conversation's THREAD second — a plain
+ * `<Card><CardContent>{thread}</CardContent></Card>`, no footer inside it,
+ * so nothing about it competes for the composer's own space. The composer
+ * itself is the kit's own `<CardFooter>` — the SAME component
+ * `TicketConversationPanel` uses at LG, never a hand-rolled look-alike —
+ * rendered as this flex column's `flex-none` LAST child, given the fill
+ * `TicketConversationPanel`'s own `Card` would have supplied
+ * (`bg-surface-panel`) since it no longer sits inside one. D21
+ * (`footer-is-last.test.ts`) is satisfied the same way it always is: this
+ * `<CardFooter>` IS the last real child of its own enclosing box.
+ * `TICKET_PANEL_ANCHOR`'s three ids stay singular either way — exactly one
+ * tree renders at a time, so there is never a duplicate id for
+ * `help-detail.tsx`'s own `getElementById` deep-link scroll to trip on.
+ *
+ * NEITHER `reply-composer.tsx` NOR `TicketConversationPanel` (below)
+ * changed for this re-fix — the composer's own markup, and its one LG
+ * home inside `CardFooter`, are untouched; only WHICH TREE this component
+ * builds, and where the SAME composer element lands in it, did.
  *
  * `data-slot="ticket-detail-body"` is this file's own marker — read by
- * `web/test/rules.test.ts` (R89) and by nothing else; it draws no CSS of
- * its own and is not a new global selector to keep in step with anything.
- *
- * BELOW `lg` NOTHING HERE CHANGED: the grid collapses to one column, the
- * flex-fill classes are all `lg:`-gated, and the page scrolls as a whole
- * exactly as it did before this law, because there is no second column's
- * height to match on a phone.
+ * `web/test/footer-on-the-edge.test.ts` (R89) and by nothing else; it draws
+ * no CSS of its own and is not a new global selector to keep in step with
+ * anything.
  *
  * THE EARLIER "SUM OF THREE" CONSTRUCTION, KEPT FOR THE RECORD (superseded,
- * not deleted, because a later reader asking "why isn't this `grid-rows-3`"
- * deserves the same measured answer the first ruling got): the client's
- * ruling that morning, verbatim, "the ticket detail conversation should
- * have more height, depending on the height of the right column
- * components. they should be, the addition of the three of the right, same
- * as conversation" — first tried as `lg:grid-rows-3` (three EQUAL `1fr`
- * tracks), which measured wrong (the spanning conversation cell dragged all
- * three tracks up to a third of ITS OWN height each, 114px of dead space
- * between the right column's real bottom and the conversation's), then
- * fixed with `lg:grid-rows-[auto_auto_auto]` + `row-span-3` so the
- * conversation's height became the right column's own sum. That
- * construction was correct FOR THE RULING IT ANSWERED — it never claimed to
- * reach the screen's own bottom edge, only to match the two columns to each
- * other — and R89 is a different, later ruling entirely: "at the very
- * bottom" names the SCREEN, not the sidebar. */
+ * not deleted — see this file's git history for the client's own morning
+ * ruling it answered and why `lg:grid-rows-3` measured wrong before
+ * `row-span-3` fixed it): that construction was correct for the ruling it
+ * answered (matching the two columns to EACH OTHER) and was never claiming
+ * to reach the screen's own bottom edge — R89, first the LG landing and now
+ * this below-lg one, is the later, different ruling that does. */
+
+/** Tailwind's `lg` breakpoint (`64rem`, 1024px — confirmed against the
+ * built CSS this session, `min-width:64rem`), the ONE number this
+ * component's tree-level decision has to agree with the `lg:`/`grid-cols`
+ * classes drawn below. `rem` here is the INITIAL font size by spec (16px),
+ * never the root element's — `use-is-phone.ts`'s own note on
+ * `COLUMNS_QUERY` explains why that is what keeps a media query safe
+ * against this app's own `data-scale` root-font override. Not exported: a
+ * second file with its own reason to ask "are we at `lg`" gets its own
+ * threshold constant, the same way `use-is-phone.ts` keeps `PHONE_QUERY`
+ * and `COLUMNS_QUERY` private rather than daisy-chaining every caller onto
+ * one shared number. */
+const LG_QUERY = "(min-width: 64rem)"
+
+function queryLg(): MediaQueryList | null {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null
+  return window.matchMedia(LG_QUERY)
+}
+
+function subscribeLg(onChange: () => void): () => void {
+  const mq = queryLg()
+  mq?.addEventListener("change", onChange)
+  return () => mq?.removeEventListener("change", onChange)
+}
+
+/** Is the viewport at least `lg`? `false` on the server and on the very
+ * first client render (the static export has no `window`; jsdom has one
+ * with no `matchMedia`) — the SAME conservative default
+ * `useIsPhone`/`useShellColumns` already bank, so a person on a genuinely
+ * narrow screen never sees a one-frame flash of the two-column tree before
+ * it corrects. */
+function useIsAtLeastLg(): boolean {
+  return React.useSyncExternalStore(subscribeLg, () => queryLg()?.matches ?? false, () => false)
+}
+
 export function TicketDetailBody({
-  conversation,
+  thread,
+  composer,
   stories,
   time,
   stakeholders,
 }: {
-  conversation: React.ReactNode
+  thread: React.ReactNode
+  composer: React.ReactNode
   stories: React.ReactNode
   time: React.ReactNode
   stakeholders: React.ReactNode
 }) {
-  return (
-    <div
-      data-slot="ticket-detail-body"
-      className="grid min-w-0 grid-cols-1 items-stretch gap-6 lg:grid-cols-[2fr_1fr] lg:flex-1 lg:min-h-0"
-    >
-      <div id={TICKET_PANEL_ANCHOR.conversation} className="min-w-0 lg:h-full lg:min-h-0">
-        {conversation}
+  const isAtLeastLg = useIsAtLeastLg()
+
+  if (isAtLeastLg) {
+    return (
+      <div
+        data-slot="ticket-detail-body"
+        className="grid min-w-0 flex-1 min-h-0 grid-cols-[2fr_1fr] items-stretch gap-6"
+      >
+        <div id={TICKET_PANEL_ANCHOR.conversation} className="min-w-0 h-full min-h-0">
+          <TicketConversationPanel thread={thread} composer={composer} />
+        </div>
+        {/* ONE CELL, HOLDING ITS OWN SCROLLER — the three anchors stay exactly
+            where a deep link (`help-detail.tsx`'s own scroll effect) already
+            expects them. */}
+        <div className="flex min-w-0 flex-col gap-6 h-full min-h-0 overflow-y-auto">
+          <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
+          <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
+          <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
+        </div>
       </div>
-      {/* ONE GRID CELL, HOLDING ITS OWN SCROLLER — see the header above for
-          why three separate auto-placed rows cannot stretch to the grid's
-          own full height the way a single cell can. The three anchors stay
-          exactly where a deep link (`help-detail.tsx`'s own scroll effect)
-          already expects them, nested inside the scroller rather than
-          removed. */}
-      <div className="flex min-w-0 flex-col gap-6 lg:h-full lg:min-h-0 lg:overflow-y-auto">
+    )
+  }
+
+  return (
+    <div data-slot="ticket-detail-body" className="flex min-w-0 flex-1 min-h-0 flex-col">
+      {/* ONE SCROLLING REGION — side panels, then the thread, NEVER competing
+          two separate flex-1 boxes (see the header above for the live proof
+          that shape crushes to zero on a tight budget). However small this
+          region's own share of the column turns out to be, everything in
+          it stays reachable by scrolling it, nothing is silently dropped
+          to zero. */}
+      <div className="flex min-w-0 flex-1 min-h-0 flex-col gap-6 overflow-y-auto">
         <div id={TICKET_PANEL_ANCHOR.stories}>{stories}</div>
         <div id={TICKET_PANEL_ANCHOR.time}>{time}</div>
         <div id={TICKET_PANEL_ANCHOR.stakeholders}>{stakeholders}</div>
+        <div id={TICKET_PANEL_ANCHOR.conversation}>
+          <Card variant="default">
+            <CardContent className="p-4">{thread}</CardContent>
+          </Card>
+        </div>
       </div>
+      {/* THE COMPOSER, PINNED — the kit's own `CardFooter`, the identical
+          component `TicketConversationPanel` uses at `lg`, as this flex
+          column's `flex-none` LAST child (D21). `bg-surface-panel` is the
+          fill `TicketConversationPanel`'s own `Card` would have supplied
+          around it; standing outside any `Card` here, it has to carry that
+          fill itself so the composer's own `bg-card` pill still reads
+          against the panel tone rather than the page's. No radius: this
+          band spans the screen's own full width, flush with its bottom
+          edge, the same shape a fixed app toolbar takes rather than a
+          card's own rounded foot. */}
+      <CardFooter className="shrink-0 bg-surface-panel p-4">{composer}</CardFooter>
     </div>
   )
 }
@@ -253,26 +347,21 @@ export function TicketSidePanel({
  * height, the same shape a chat panel always takes once it no longer owns
  * the whole page's scroll.
  *
- * `lg:h-full`, NOT A FIXED VIEWPORT HEIGHT AT THAT WIDTH — R16's sibling
- * ruling on this same file (18 Sep 2026, `TicketDetailBody`'s own header):
- * the card's height is now the GRID's to decide (it spans the right
- * column's three rows), so `h-[min(78vh,760px)]` would fight the stretch
- * rather than express it. Below `lg` there is no second column to stretch
- * against, so the old viewport-relative height stays exactly as it was.
- *
- * `lg:min-h-0` RELEASES `min-h-[420px]` AT `lg` TOO — R89 RE-PROOF, 18 Sep
- * 2026 evening. `min-h-[420px]` is a BELOW-`lg` floor (so a short viewport
- * never crushes the card thinner than a usable chat panel while it is
- * stacked full-width above the side column) — measured live once the grid
- * actually had a real height to give this card (`${SCRATCH}/
- * check-sel2.json`): with a heavy head + audit footer above it, the grid's
- * own real budget can measure LESS than 420px, and `min-height` always
- * wins over a smaller `height` regardless of which utility the cascade
- * would otherwise prefer — so the card sat pinned at exactly 420px, 48px
- * past the grid's own row, the same "min-height floor outlives the
- * breakpoint it was written for" shape `tickets-dashboard.tsx` already
- * names and releases with `lg:min-h-0` on its own stacked panels. Same
- * fix, same reason, here.
+ * `h-full min-h-0`, UNCONDITIONAL, NO `lg:` PREFIX — R89 BELOW-LG RE-FIX,
+ * 19 SEP 2026. This component is the LG-ONLY conversation card now —
+ * `TicketDetailBody`'s own header explains why the below-lg case builds a
+ * separate, footer-less thread card instead of reusing this one — so it
+ * only ever mounts inside a grid cell that is ALREADY a real, definite
+ * height (`h-full` of the LG grid row); the earlier `lg:`-gated pair
+ * (`lg:h-full lg:min-h-0`, answering a below-lg case this component no
+ * longer has to cover) and the viewport-relative guess before that
+ * (`h-[min(78vh,760px)]`, and the `min-h-[420px]` floor that used to
+ * protect the below-lg STACKED case against it) are both gone — a floor
+ * for a case this component no longer renders is dead weight, not
+ * caution. `min-h-0` stays (unconditional too): a grid item's own
+ * `min-height: auto` defaults to its content's min size, which would stop
+ * `h-full` resolving SMALLER than the thread's natural height and break
+ * `CardContent`'s own `overflow-y-auto` below.
  *
  * THE COMPOSER IS THE CARD'S `CardFooter` NOW, NOT A THIRD FLEX CHILD OF A
  * PADDED `CardContent` — client ruling, 18 Sep 2026, verbatim: "the footer
@@ -319,7 +408,7 @@ export function TicketConversationPanel({
   composer: React.ReactNode
 }) {
   return (
-    <Card variant="default" className="flex h-[min(78vh,760px)] min-h-[420px] flex-col lg:h-full lg:min-h-0">
+    <Card variant="default" className="flex h-full min-h-0 flex-col">
       <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
       <CardFooter className="shrink-0 p-4">{composer}</CardFooter>
     </Card>
