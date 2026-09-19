@@ -455,41 +455,36 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
   })
 })
 
-// SUPERSEDED TWICE, R89 "footer-on-the-edge" — the CLIENT RULING this
-// describe block originally proved ("the addition of the three of the
-// right, same as conversation") was answered, 18 Sep 2026, by a LATER and
-// different ruling read against the deployed page: "On ticket detail, the
-// footer should be at the very bottom. The position is still fucking
-// wrong. Fix it once and for all." That construction (a `grid-cols-
-// [2fr_1fr]` row, `items-stretch`, both cells `h-full min-h-0`, the side
-// column independently `overflow-y-auto`) held through the round-19
-// below-lg re-fix and was proved at every width THAT round tested.
+// SUPERSEDED THREE TIMES, R89 "footer-on-the-edge" — see the two earlier
+// accounts kept in this file's own git history (the original "addition of
+// the three of the right" grid, and round 23's composer-pinned-outside-
+// every-card construction).
 //
-// ROUND 23, 19 Sep 2026, REPLACES IT AGAIN — Aurora, over a screenshot at
-// 1991×842 with the assistant panel open (a combination none of the
-// earlier rounds' own proof widths had measured): "THE PROBLEM IS WHERE
-// THE FOOTER IS!!! SHOULD BE AT THE VERY BOTTOM!" Rather than keep
-// bounding the conversation card's own height against a `flex-1 min-h-0`
-// chain that kept re-breaking on each new width/height/assistant-state
-// combination, `TicketDetailBody` now pulls the composer fully OUTSIDE any
-// scrolling region — its own root's last child, `sticky` (with a
-// negative, padding-compensated `bottom` offset — a plain `bottom-0`
-// measured a live 24px gap, since sticky anchors to the scrollport's own
-// padding edge) as a second, independent guarantee — and the grid this
-// describe block once
-// asserted `h-full`/`items-stretch`/independent-scroll for is now a
-// NATURAL-HEIGHT grid (`items-start`, no `h-full` on either cell) nested
-// ONE level inside the ticket body's own single scrolling region, which
-// scrolls the grid AND the side column TOGETHER rather than letting the
-// side column scroll independently of it. `ticket-detail-body.tsx`'s own
-// header carries the full account.
-describe("at lg, the scroll region's own grid pairs the thread with the side panels (R89 round 23)", () => {
-  it("the conversation anchor's grandparent is TicketDetailBody's own root; its parent is the one scroll region; the grid sits one level inside that", async () => {
+// ROUND 24, 19 Sep 2026, THE CORRECTION — Aurora, over her own screenshot:
+// "the black section, the footer, should be at the very bottom / why is
+// the write text space full width?? rewind here / THE FUKING FOOTERRR!"
+// Round 23 read "the footer" as the composer; she meant THE BLACK BAND
+// (Latest activity + Record). The band is now the ticket body's own
+// pinned last child (`RecordFooterBand`, a second call to the kit's
+// `RecordDetail`), and the composer is back INSIDE the conversation card's
+// own `CardFooter` — "rewind here," exactly the round-22 shape — at every
+// width, because the band is what now guarantees "always visible at the
+// bottom." The grid is bounded again too (`items-stretch`, `h-full
+// min-h-0` on both cells), not round 23's natural-height one: the
+// conversation card's own `CardContent` is what now caps and scrolls the
+// thread, so the scrolling region above the band never has to grow
+// unbounded. `ticket-detail-body.tsx`'s own header carries the full
+// account.
+describe("at lg, the scroll region's own grid pairs the conversation with the side panels (R89 round 24)", () => {
+  it("the conversation anchor's grandparent is TicketDetailBody's own root; its parent is the one scroll region; the grid sits one level inside that, bounded (h-full min-h-0, items-stretch)", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationAnchor = document.getElementById(TICKET_PANEL_ANCHOR.conversation) as HTMLElement
     const grid = conversationAnchor.parentElement as HTMLElement
     expect(grid.className).toContain("grid-cols-[2fr_1fr]")
+    expect(grid.className).toContain("items-stretch")
+    expect(grid.className).toContain("h-full")
+    expect(grid.className).toContain("min-h-0")
 
     const scrollRegion = grid.parentElement as HTMLElement
     expect(scrollRegion.className).toContain("overflow-y-auto")
@@ -500,10 +495,8 @@ describe("at lg, the scroll region's own grid pairs the thread with the side pan
     expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(ticketBodyRoot.firstElementChild).toBe(scrollRegion)
 
-    // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL — not three separate
-    // grid rows, and no longer independently scrollable: round 23 scrolls
-    // the grid and the side column TOGETHER, inside the one scroll region
-    // above, rather than giving the side column its own second scroller.
+    // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL, independently
+    // scrollable again (round 24 restores the round-19 shape here).
     const storiesAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stories) as HTMLElement
     const timeAnchor = document.getElementById(TICKET_PANEL_ANCHOR.time) as HTMLElement
     const stakeholdersAnchor = document.getElementById(TICKET_PANEL_ANCHOR.stakeholders) as HTMLElement
@@ -512,36 +505,58 @@ describe("at lg, the scroll region's own grid pairs the thread with the side pan
     expect(timeAnchor.parentElement).toBe(sideColumn)
     expect(stakeholdersAnchor.parentElement).toBe(sideColumn)
     expect(sideColumn.className).toContain("flex-col")
-    expect(sideColumn.className).not.toMatch(/\boverflow-y-auto\b/)
+    expect(sideColumn.className).toContain("h-full")
+    expect(sideColumn.className).toContain("overflow-y-auto")
   })
 
-  it("the conversation card holds only its own scrolling thread — no CardFooter nests inside it any more", async () => {
+  it("the conversation card holds the composer again, as its own CardFooter — 'rewind here'", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const conversationCard = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'
     ) as HTMLElement
-    expect(conversationCard.querySelector('[data-slot="card-footer"]')).toBeNull()
+    const footer = conversationCard.querySelector('[data-slot="card-footer"]')
+    expect(footer, "the composer's own CardFooter must nest inside the conversation card again").toBeTruthy()
+    expect(conversationCard.lastElementChild).toBe(footer)
+    expect(conversationCard.className).toContain("h-full")
+    expect(conversationCard.className).toContain("min-h-0")
   })
 
-  it("the composer is the ticket body's own pinned last child, outside the grid and its scroll region entirely", async () => {
+  it("the composer form's own width equals the card's inner width, never the page's", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const composerForm = document.querySelector('[data-slot="reply-composer"]') as HTMLElement
+    expect(composerForm.className).toContain("w-full")
     const composerFooter = composerForm.parentElement!.parentElement as HTMLElement
     expect(composerFooter.getAttribute("data-slot")).toBe("card-footer")
-    const ticketBodyRoot = composerFooter.parentElement as HTMLElement
+    const conversationCard = composerFooter.parentElement as HTMLElement
+    expect(conversationCard.getAttribute("data-slot")).toBe("card")
+    // The composer's own CardFooter is NOT the ticket body's root any
+    // more — that is the band's own place now (below).
+    expect(conversationCard.contains(composerFooter)).toBe(true)
+  })
+
+  it("the band (Latest activity + Record) is the ticket body's own pinned last child, outside the grid and its scroll region entirely", async () => {
+    openTicket()
+    await screen.findByRole("heading", { level: 1 })
+    const band = document.querySelector('[data-slot="ticket-footer-band"]') as HTMLElement
+    expect(band, "the ticket body must render its own pinned band").toBeTruthy()
+    const ticketBodyRoot = band.parentElement as HTMLElement
     expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
-    expect(ticketBodyRoot.lastElementChild).toBe(composerFooter)
-    expect(composerFooter.className).toContain("sticky")
+    expect(ticketBodyRoot.lastElementChild).toBe(band)
+    expect(band.className).toContain("sticky")
     // NOT bottom-0 — see ticket-detail-body.tsx's own header: sticky's
     // offset anchors to the scrollport's PADDING edge, so bottom-0
     // measured a 24px gap live at lg; the negative, padding-compensated
     // offset is what actually reaches the pane's true bottom edge.
-    expect(composerFooter.className).toContain("bottom-[calc(-1*var(--space-5))]")
-    expect(composerFooter.className).toContain("lg:bottom-[calc(-1*var(--space-6))]")
-    expect(composerFooter.className).toContain("flex-none")
-    expect(composerFooter.className).toContain("w-full")
+    expect(band.className).toContain("bottom-[calc(-1*var(--space-5))]")
+    expect(band.className).toContain("lg:bottom-[calc(-1*var(--space-6))]")
+    expect(band.className).toContain("flex-none")
+    expect(band.className).toContain("w-full")
+    // THE REAL FOOTER CARD (kit's own ink footer, CH27.8) lives inside it —
+    // and nowhere else on the page (RecordScreen's own copy is switched off).
+    expect(band.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
+    expect(document.querySelectorAll('[data-record-region="footer"]').length).toBe(1)
   })
 })
 

@@ -11,12 +11,10 @@
 //
 // V1 IS THIS FILE'S WHOLE JOB, AND NOTHING ELSE. The stage ladder is not
 // drawn here — it still rides `RecordScreen`'s `headerExtra` slot, above
-// this component entirely (see help-detail.tsx, which never changed that
-// wiring: the ladder was already above the strip, and it is now above a
-// body that has no strip left to be above). This file is the body under it:
-// a two-column layout at `lg` — the conversation (2/3) beside three stacked
-// panels (1/3) — that stacks to one column on a phone, the client's own
-// "right column stacks under the conversation."
+// this component entirely (see help-detail.tsx). This file is the body
+// under it: a two-column layout at `lg` — the conversation (2/3) beside
+// three stacked panels (1/3) — that stacks to one column on a phone, the
+// client's own "right column stacks under the conversation."
 //
 // R67, READ AGAINST THE NEW GROUND — client ruling, 18 Sep 2026, verbatim:
 // "the ticket detail is completely wrong in terms of containers. what you
@@ -56,7 +54,6 @@
 import * as React from "react"
 
 import { Card, CardContent, CardFooter } from "@shared/ui/components/card/card"
-import { cn } from "@shared/ui/lib/utils"
 
 /** Stable DOM anchors for the four panels a ticket's page draws, so a link
  * built before the tab strip existed — `?tab=stories`, the rail, anywhere
@@ -76,116 +73,79 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * this component's one job is the layout and the anchors a deep link scrolls
  * to.
  *
- * R89 "footer-on-the-edge" — THE COMPOSER IS PINNED AT THE BOTTOM OF THE
- * SCREEN AT EVERY WIDTH AND HEIGHT; EVERYTHING ELSE SCROLLS ABOVE IT. This
- * is the law's THIRD and current construction (round 23, 19 Sep 2026),
- * superseding both the two-tree LG/below-LG split (round-19 re-fix, kept
- * below for the record) and the height-chasing `app-shell.tsx` calc it
- * still leans on for the page's own bottom edge.
+ * R89 "footer-on-the-edge" — ROUND 24, THE CORRECTION, 19 Sep 2026. Every
+ * earlier round (kept in this file's own git history) chased "the footer"
+ * meaning the ticket's REPLY COMPOSER. Aurora, this round, over her own
+ * screenshot, verbatim: "the black section, the footer, should be at the
+ * very bottom / why is the write text space full width?? rewind here / THE
+ * FUKING FOOTERRR!" THE FOOTER IS THE BLACK BAND — the dark card holding
+ * LATEST ACTIVITY (the recent rows + "Add a note") and RECORD (Created by /
+ * Last edited by), the kit's own CH27.8 ink footer — never the composer.
+ * Round 23's whole construction pinned the WRONG element and is reversed:
  *
- * WHAT BROKE THE PREVIOUS CONSTRUCTION: it bounded the CONVERSATION CARD's
- * own height (`h-full min-h-0` at lg, a fixed viewport slice below it) and
- * trusted that bound to always resolve to a real, on-screen number. Aurora,
- * over a screenshot at 1991×842 with the assistant panel OPEN — a width and
- * height this law's own proofs had never measured together (every earlier
- * proof was either a closed assistant at ~900px tall, or an open assistant
- * at 900px tall, never open AND short): "THE PROBLEM IS WHERE THE FOOTER
- * IS!!! SHOULD BE AT THE VERY BOTTOM!" The height chain is real and mostly
- * correct, but it is also long — six or seven `flex-1 min-h-0` links deep,
- * through a vendored shell this file cannot edit (R39) — and a construction
- * that DEPENDS on every one of those links resolving correctly, forever, at
- * every width/height/assistant-state combination nobody has proved yet, is
- * exactly the shape that keeps re-breaking on a new combination each time
- * she looks. This round stops trying to bound the chain and instead makes
- * the ONE thing she cares about — the composer, visible, at the bottom —
- * true BY CONSTRUCTION, with a second, independent mechanism (`position:
- * sticky; bottom: 0`) standing behind the flex chain as belt-and-braces: if
- * the chain above it ever miscalculates again, the composer still cannot
- * leave the viewport, because sticky positioning answers to the nearest
- * SCROLLING ancestor (`[data-slot="screen-shell-body"]`, the vendored
- * shell's own pane) rather than to this file's own flex arithmetic.
+ *  1. THE BAND is this component's own LAST child, `flex-none`, full
+ *     content width, pinned at the screen's true bottom edge, always
+ *     visible — built by `RecordFooterBand` (`@/components/records/
+ *     record-chrome`, its own header has the full account of why a SECOND
+ *     call to the kit's `RecordDetail`, not a moved prop, is what answers a
+ *     DOM-order question `RecordScreen`'s own single call could not).
+ *     `help-detail.tsx` passes it in as `footer`, built from the SAME
+ *     `audit`/`activity`/`onAddNote` data it already fed `RecordScreen`
+ *     (now `footerVisible={false}` there, so the SAME footer never draws
+ *     twice).
+ *  2. THE COMPOSER IS BACK INSIDE THE CONVERSATION CARD'S OWN FOOTER —
+ *     "rewind here" — `TicketConversationPanel` (below) is UN-retired,
+ *     exactly its round-22 shape (`git show d1167183`): `Card` →
+ *     `CardContent` (the thread, scrolling) → `CardFooter` (the composer,
+ *     `Card`'s own last child, D21). The composer no longer needs a second,
+ *     below-`lg` home outside any card — the BAND is what now guarantees
+ *     "always visible at the bottom," so the one card shape serves every
+ *     width, which is also what answers "why is the write text space full
+ *     width??": the composer's own `w-full` is 100% of the CARD's own inner
+ *     width now, not the page's.
  *
- * THE SHAPE, NOW ONE TREE FOR THE COMPOSER'S OWN POSITION (the grid/stack
- * choice below it still varies by width, for the DOM-order reason the next
- * paragraph keeps): `data-slot="ticket-detail-body"` is a `flex flex-col
- * flex-1 min-h-0` column, exactly two children. The FIRST is the one
- * scrolling region (`flex-1 min-h-0 overflow-y-auto`) — everything that
- * is not the composer lives inside it: at `lg` a `grid-cols-[2fr_1fr]`
- * pairing the conversation thread (a plain `<Card><CardContent>`, no
- * footer inside it any more) with the three side panels; below `lg` the
- * same three side panels THEN the thread, stacked — her own "above the
- * content" complaint from the round-19 re-fix, still answered by DOM
- * order, unchanged by this round. The SECOND, and only other, child is the
- * composer's own `<CardFooter>` — `flex-none` (never a share of the
- * scroll region's budget), `w-full` (full width of the content column,
- * her screenshot-4 ruling, unchanged), `sticky` with a NEGATIVE `bottom`
- * offset (the belt-and-braces above, corrected live: `position: sticky`
- * anchors its offset to the nearest scrolling ancestor's PADDING edge —
- * `[data-slot="screen-shell-body"]`'s own `DENSITY_BODY` bottom padding,
- * `--space-5`/`--space-6` — never its border edge, so a plain `bottom-0`
- * measured live as a 24px GAP under the composer at `lg`: sticky was
- * clamping the footer back UP by exactly the padding the app-shell.tsx
- * `has-[...]` growth hack exists to let the flow position grow PAST.
- * `bottom-[calc(-1*var(--space-5))] lg:bottom-[calc(-1*var(--space-6))]`
- * cancels that padding so sticky's own "stuck" threshold coincides with
- * the pane's true border-box bottom instead of stopping short of it —
- * proved live, this session, both numbers: 24px gap with plain `bottom-0`,
- * 0px with the negative offset, at 1991×842/1440×842/1784×981 with the
- * assistant open), carrying `bg-surface-panel` itself because it no
- * longer sits inside any `Card` that would supply it. ONE composer
- * element, in ONE DOM position, at every width — the two-tree split this
- * file used to need existed ONLY because the composer used to live inside
- * `TicketConversationPanel`'s own `CardFooter` at `lg` and outside it
- * below `lg`, two different homes for one stateful control
- * (`reply-composer.tsx`'s own `field` ref, its held-reply countdown, its
- * attach-tile grid) that cannot mount twice. With the composer pulled
- * fully outside the scrolling region for every width, that reason is
- * gone, and `TicketConversationPanel` — the component that used to hold
- * both `CardContent` (thread) and `CardFooter` (composer) together — is
- * gone with it: the thread's own card is built inline, identically, in
- * both branches of the scroll region.
+ * BOUNDED BY CONSTRUCTION, NOT BY `position: sticky` ALONE — proved live
+ * this round (40 injected thread bubbles + 6 activity rows, 1991×842 and
+ * 1440×842 with the assistant open): a sticky band riding on top of an
+ * UNBOUNDED scrolling region rides down WITH it the instant that region's
+ * content outgrows the viewport — `ticketBody.clientHeight` measured 7px
+ * and the band landed 72–168px below the fold before this fix, because the
+ * thread's own scroller had no real height cap (`scrollHeight ===
+ * clientHeight`, i.e. it was never actually scrolling — just growing).
+ * `data-slot="ticket-detail-body"` is a `flex flex-col flex-1 min-h-0`
+ * column with EXACTLY two children, every link `min-h-0` so the chain can
+ * never grow past its own real budget: (1) the ONE scrolling region
+ * (`flex-1 min-h-0 overflow-y-auto`) — the grid (2fr/1fr) at `lg`, the
+ * side-panels-then-thread stack below it — and (2) the band, `flex-none`,
+ * last. Inside the scrolling region, `TicketConversationPanel`'s own `Card`
+ * takes `h-full min-h-0` from ITS cell (the grid cell at `lg`, a `flex-1
+ * min-h-0` stack item below it), so the thread's `CardContent` — `flex-1
+ * min-h-0 overflow-y-auto` — is what actually caps and scrolls, never the
+ * page and never the band's own position. `position: sticky` with the SAME
+ * negative, padding-compensated `bottom` offset round 23 proved
+ * (`bottom-[calc(-1*var(--space-5))] lg:bottom-[calc(-1*var(--space-6))]`,
+ * cancelling `[data-slot="screen-shell-body"]`'s own `DENSITY_BODY` bottom
+ * padding) stays on the band as BELT-AND-BRACES ONLY — a second, redundant
+ * guarantee for the case the flex chain above it ever miscalculates again,
+ * never the PRIMARY mechanism this round leans on.
  *
- * THE JS BREAKPOINT HOOK (`useIsAtLeastLg`, below) SURVIVES, NARROWED TO
- * ONE JOB: choosing which of the two scroll-region trees to render, purely
- * for DOM order (side panels before the thread below `lg`, the thread
- * first at `lg` so it lands in the grid's own first, 2fr column) — the
- * same "phone gets a different tree, not a resized one" shape
- * `web/lib/use-is-phone.ts` already banks. It is no longer load-bearing
- * for the composer's OWN position, which is now identical in both
- * branches (outside the hook's condition entirely) — so a bug in the hook
- * can no longer strand the composer the way the LG/below-LG split used to.
- *
- * WHY NOT ALSO COLLAPSE THE GRID/STACK CHOICE TO ONE CSS-ONLY TREE: the
- * round-19 re-fix's own note (kept below) proved a single shared grid with
- * `order-*` reordering crushes to zero on a tight vertical budget when TWO
- * separate `flex-1` regions compete for it. That failure mode does not
- * apply here any more — there is only ONE `flex-1` region in this
- * component now (the scroll wrapper; the composer is `flex-none`) — but
- * reordering via CSS `order` would also decouple visual order from DOM
- * order at `lg`, which is a real (if solvable) accessibility question this
- * round did not need to open. Keeping the hook costs one already-proven,
- * already-tested branch; the win is not worth reopening that question
- * today.
+ * `app-shell.tsx`'s own `has-[[data-slot=ticket-detail-body]]:h-[calc(…)]`
+ * growth rule (round 22b) is unchanged and still load-bearing: it is what
+ * lets THIS component's own flex-1 chain reach the vendored pane's true
+ * border-box bottom rather than stopping short by its bottom padding,
+ * whatever is pinned inside this root.
  *
  * `data-slot="ticket-detail-body"` is this file's own marker — read by
  * `web/test/footer-on-the-edge.test.ts` (R89), by `app-shell.tsx`'s own
- * `has-[[data-slot=ticket-detail-body]]` rule (which still matters: it is
- * what lets this component's flex-1 chain reach the vendored pane's real,
- * full border-box height instead of stopping short by its bottom padding —
- * a real gap under the composer even with sticky in place, since sticky
- * only rescues the composer from leaving the viewport, it does not by
- * itself close a gap a shorter flex chain would leave beneath it) — and by
- * nothing else; it draws no CSS of its own and is not a new global
- * selector to keep in step with anything.
+ * `has-[…]` rule, and by nothing else.
  *
- * THE EARLIER TWO CONSTRUCTIONS, KEPT FOR THE RECORD (superseded, not
- * deleted — see this file's git history for the full account of each):
- * the "sum of three" shape (a morning ruling about matching the two
- * columns to EACH OTHER, never claiming to reach the screen's own bottom
- * edge) and the two-tree LG/below-LG split this round replaces (which DID
- * reach the bottom edge, at every width and height it was proved against —
- * proving a new one every time was exactly the problem this round's
- * belt-and-braces answers). */
+ * THE EARLIER CONSTRUCTIONS, KEPT FOR THE RECORD (superseded, not deleted —
+ * see this file's git history): the "sum of three" shape (matching the two
+ * columns to each other, never claiming the screen's own bottom edge), the
+ * two-tree LG/below-LG split (round 19 re-fix), and round 23's
+ * composer-pinned-outside-every-card construction — correct about WHERE on
+ * the screen something had to be pinned, wrong about WHICH element the
+ * client meant by "the footer." */
 
 /** Tailwind's `lg` breakpoint (`64rem`, 1024px — confirmed against the
  * built CSS this session, `min-width:64rem`), the ONE number this
@@ -227,23 +187,33 @@ export function TicketDetailBody({
   stories,
   time,
   stakeholders,
+  footer,
 }: {
   thread: React.ReactNode
   composer: React.ReactNode
   stories: React.ReactNode
   time: React.ReactNode
   stakeholders: React.ReactNode
+  /** THE BLACK BAND — built by `RecordFooterBand`
+   * (`@/components/records/record-chrome`), this component's own LAST
+   * child. See this file's own header for the whole round-24 account. */
+  footer: React.ReactNode
 }) {
   const isAtLeastLg = useIsAtLeastLg()
 
-  // THE THREAD'S OWN CARD — no footer inside it any more, at either width.
-  // Built once, used by both scroll-region branches below, so the two never
-  // drift into two different shapes for the one thing they share.
-  const threadCard = (
-    <div id={TICKET_PANEL_ANCHOR.conversation} className="min-w-0">
-      <Card variant="default">
-        <CardContent className="p-4">{thread}</CardContent>
-      </Card>
+  // TWO DIFFERENT CELLS, NOT ONE CLASS REUSED — at `lg` this is a GRID cell,
+  // already at 100% of the row's own height, so it takes `h-full min-h-0`;
+  // below `lg` it is a STACK ITEM sharing the column with the side panels'
+  // own natural height, so it takes `flex-1 min-h-0` (grow to fill what
+  // they leave) instead — `h-full` there would claim 100% of the stack's
+  // own height on top of the side panels' natural height, overflowing the
+  // stack rather than sharing it with them.
+  const conversation = (
+    <div
+      id={TICKET_PANEL_ANCHOR.conversation}
+      className={isAtLeastLg ? "min-w-0 h-full min-h-0" : "min-w-0 flex-1 min-h-0"}
+    >
+      <TicketConversationPanel thread={thread} composer={composer} />
     </div>
   )
 
@@ -257,67 +227,40 @@ export function TicketDetailBody({
 
   return (
     <div data-slot="ticket-detail-body" className="flex min-w-0 flex-1 min-h-0 flex-col">
-      {/* THE ONE SCROLLING REGION — everything except the composer. At `lg`
-          a 2fr/1fr grid (the thread first/left, the side panels second/
-          right); below `lg` the side panels THEN the thread, stacked (her
-          own "above the content" complaint, answered by DOM order). Either
-          way this is the column's only `flex-1 min-h-0` item, so there is
-          nothing left for it to compete with for vertical space — the
-          crush-to-zero failure the round-19 re-fix documented needed TWO
-          separate `flex-1` regions, and there is only ever one here. */}
+      {/* THE ONE SCROLLING REGION — everything except the band. Bounded by
+          construction: `flex-1 min-h-0 overflow-y-auto` against the root's
+          own definite height, so its own content (the grid or the stack)
+          can never grow past it — that boundedness is what keeps the band
+          below pinned at the true bottom without depending on `sticky`
+          alone (see this file's own header for the live proof that a
+          sticky element riding on an UNBOUNDED region rides down with it). */}
       <div className="min-w-0 flex-1 min-h-0 overflow-y-auto">
         {isAtLeastLg ? (
-          <div className="grid min-w-0 grid-cols-[2fr_1fr] items-start gap-6">
-            {threadCard}
-            <div className="flex min-w-0 flex-col gap-6">{sidePanels}</div>
+          <div className="grid min-w-0 h-full min-h-0 grid-cols-[2fr_1fr] items-stretch gap-6">
+            {conversation}
+            <div className="flex min-w-0 flex-col gap-6 h-full min-h-0 overflow-y-auto">{sidePanels}</div>
           </div>
         ) : (
-          <div className="flex min-w-0 flex-col gap-6">
+          <div className="flex min-w-0 h-full min-h-0 flex-col gap-6">
             {sidePanels}
-            {threadCard}
+            {conversation}
           </div>
         )}
       </div>
-      {/* THE COMPOSER — pinned at the bottom of the screen at every width
-          and height; everything else scrolls above it (R89, round 23). The
-          kit's own `<CardFooter>`, ONE instance, ONE DOM position, outside
-          the scrolling region entirely so nothing it holds can ever push
-          the composer down with it. `flex-none` (never a share of the
-          scroll region's budget); `w-full` (full width of the content
-          column, her screenshot-4 ruling); `sticky` is the belt-and-braces
-          this round adds — if the flex-1/min-h-0 chain above this
-          component (app-shell.tsx → record-chrome.tsx → this file,
-          six-plus links deep through a vendored shell this file cannot
-          edit, R39) ever resolves wrong again on some new width/height/
-          assistant-state combination nobody has proved yet, the composer
-          still cannot leave the viewport: sticky answers to the nearest
-          SCROLLING ancestor (`[data-slot="screen-shell-body"]`, the kit's
-          own pane), not to this file's own arithmetic. The `bottom` offset
-          is NEGATIVE, not `bottom-0` — measured live, `bottom-0` clamps
-          sticky to that pane's own PADDING edge (`DENSITY_BODY`'s bottom
-          padding, `--space-5`/`--space-6`), a 24px gap at `lg`, because
-          sticky's offset anchors to the padding box while app-shell.tsx's
-          `has-[...]` rule grows the flow position PAST it, into the
-          pane's true border-box bottom; `calc(-1*var(--space-5|6))`
-          cancels that padding so the two agree. `z-[1]` only matters in
-          the failure case above — ordinarily this element sits in normal
-          flow, below the scroll region, painting over nothing.
-          `bg-surface-panel` is the
-          fill a wrapping `Card` used to supply; standing outside any
-          `Card` now (at every width, not just below `lg`), it carries that
-          fill itself so the composer's own `bg-card` pill still reads
-          against the panel tone rather than the page's. No radius: this
-          band spans the screen's own full width, flush with its bottom
-          edge, the same shape a fixed app toolbar takes rather than a
-          card's own rounded foot. */}
-      <CardFooter
-        className={cn(
-          "sticky z-[1] flex-none w-full bg-surface-panel p-4",
-          "bottom-[calc(-1*var(--space-5))] lg:bottom-[calc(-1*var(--space-6))]"
-        )}
+      {/* THE BAND — LATEST ACTIVITY + RECORD, the kit's own ink footer,
+          this component's `flex-none` LAST child, full content width.
+          `sticky` with the round-23 negative, padding-compensated offset
+          stays as BELT-AND-BRACES ONLY (never the primary mechanism — the
+          scrolling region above is bounded by construction instead), so
+          if the flex chain above it ever resolves wrong on some future
+          width/height/assistant-state combination, the band still cannot
+          leave the viewport. */}
+      <div
+        data-slot="ticket-footer-band"
+        className="flex-none sticky z-[1] w-full bottom-[calc(-1*var(--space-5))] lg:bottom-[calc(-1*var(--space-6))]"
       >
-        {composer}
-      </CardFooter>
+        {footer}
+      </div>
     </div>
   )
 }
@@ -362,13 +305,56 @@ export function TicketSidePanel({
   )
 }
 
-/* `TicketConversationPanel` — the component that used to hold BOTH the
- * thread's `CardContent` and the composer's `CardFooter` inside one `Card`
- * at `lg` — is RETIRED, round 23 (19 Sep 2026), not renamed. R89's current
- * construction (see `TicketDetailBody`'s own header, above) pulls the
- * composer fully outside the thread's card at every width, so there is no
- * width at which anything still wants a card that bundles the two
- * together; the thread's own card is now built inline, identically, in
- * both scroll-region branches of `TicketDetailBody`. An exported component
- * with zero remaining call sites is exactly the "too much code" this
- * base's first prime directive exists to catch. */
+/** THE CONVERSATION, ON ITS OWN PAPER TOO — R67's own sentence, "each panel
+ * stands on paper; the conversation panel too." `thread`/`composer` are two
+ * children rather than one: the thread scrolls inside this card, the
+ * composer never does — the client's "she can keep reading the ticket while
+ * it counts" (reply-composer.tsx's own header) now means a card that pins
+ * the send row while only the transcript above it grows past its own
+ * height, the same shape a chat panel always takes once it no longer owns
+ * the whole page's scroll.
+ *
+ * UN-RETIRED, R89 ROUND 24, 19 SEP 2026 — Aurora, verbatim: "rewind here."
+ * This is exactly the round-22 shape (`git show d1167183`), restored rather
+ * than rebuilt: the composer went to live OUTSIDE every card in round 23,
+ * chasing "the footer" as if it meant the composer; round 24 corrects that
+ * — the composer is back at the conversation card's own foot, at every
+ * width, because `TicketDetailBody`'s own BAND (not the composer) is what
+ * now guarantees "always visible at the bottom." One card shape for every
+ * width also answers Aurora's "why is the write text space full width??":
+ * the composer's `w-full` is 100% of THIS card's own inner width, never the
+ * page's.
+ *
+ * `h-full min-h-0`, UNCONDITIONAL, NO `lg:` PREFIX — this component mounts
+ * inside a cell that is ALREADY a real, definite height (the grid row at
+ * `lg`, the stack's own `flex-1 min-h-0` item below it), so it only ever
+ * has to fill what its own cell already resolved. `min-h-0` is what lets
+ * `h-full` resolve SMALLER than the thread's own natural height instead of
+ * being floored by it — without it a flex/grid item's default `min-height:
+ * auto` would let this card grow past its cell, which is exactly the
+ * unbounded-scroll shape this round's own header warns against.
+ *
+ * THE COMPOSER IS THE CARD'S `CardFooter`, NOT A THIRD FLEX CHILD OF A
+ * PADDED `CardContent` — client ruling, 18 Sep 2026, verbatim: "the footer
+ * is not on the footer position!! fix that!" `CardContent` holds only the
+ * scrolling THREAD; `CardFooter` — the kit's own footer band,
+ * hairline-separated from the body, no fill of its own — holds the
+ * composer as the LAST child of `Card` (D21). Neither `CardContent` nor
+ * `CardFooter` paints a background, so the only fill in the shell is
+ * `Card`'s own (`variant="default"`, `--surface-panel`) — "the panel tone"
+ * the ruling asks the footer to carry falls out of the shell, not a class
+ * added here. */
+export function TicketConversationPanel({
+  thread,
+  composer,
+}: {
+  thread: React.ReactNode
+  composer: React.ReactNode
+}) {
+  return (
+    <Card variant="default" className="flex h-full min-h-0 flex-col">
+      <CardContent className="min-h-0 flex-1 overflow-y-auto p-4">{thread}</CardContent>
+      <CardFooter className="shrink-0 w-full p-4">{composer}</CardFooter>
+    </Card>
+  )
+}

@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+### Fixed — the docked assistant's narrow-width sheet is the one surface v1.2.132 missed — v1.2.134
+
+**THE REPORT.** A live proof, 19 Sep 2026, on top of v1.2.132's "chips and
+pills always must have the background card or shape wherever they are":
+one surface was left out — the assistant pane's own "1996 credits left"
+`Badge` painted the identical colour as its ground, luminance delta 0.
+
+**WHY v1.2.132 DID NOT CATCH IT.** That release rebound `--badge-quiet-fill`
+on `screen-shell.tsx`'s `SCREEN`, to `--spine-chip-fill` — correct for the
+docked aside at every width `≥45rem`, because above that breakpoint the
+aside column "paints NOTHING … it stands beside the card on the same
+ground" (the file's own words), so it correctly inherits the spine's chip
+tone with no rebind of its own. Below `45rem` the same column stops being
+flat on the spine and becomes a bottom sheet with its own paint —
+`bg-popover`, `Sheet`'s own drawer surface — and nothing rebound the token
+to match. A Badge in there kept reading `SCREEN`'s `--spine-chip-fill`,
+inherited straight through a ground that, at that width, is no longer the
+spine at all.
+
+**THE FIX.** `screen-shell.tsx`'s `screen-shell-aside` panel gains
+`max-[45rem]:[--badge-quiet-fill:var(--surface-panel)]`, scoped to the same
+breakpoint as the `bg-popover` it follows so it never fights the correct
+`--spine-chip-fill` answer above `45rem`. The value is not invented:
+`--popover` resolves to the identical colour tokens.css already gives
+`--card`/`--surface-raised` in both palettes (ch12, "the same colour
+again"), and tokens.css §8 already treats `.bg-popover` as that exact tier
+for `--btn-secondary-fill` — so this reuses `card.tsx`'s `raised` variant's
+own answer to the same question, off-beige over soft paper:
+`--surface-panel`. `--badge-quiet-fill` is still not one of §8's
+class-keyed tokens (unchanged since v1.2.132), so it is written by hand
+here, the same way it is on every other surface that fix touched.
+
+**MEASURED**, `verify/badge` section 8's new `aside-popover` context
+(`window.__badgeSurfaceVerify()`, real `getComputedStyle` reads at both
+`?t=light` and `?t=dark`): status and secondary Badge both clear the
+1.05 floor, and read identically to the existing "card, `raised`, in a
+panel" row — the same ground/fill pair, reused rather than re-picked:
+
+| context | light | dark |
+| --- | --- | --- |
+| aside, narrow (`bg-popover`) | 1.103 | 1.111 |
+
+**Files:** `compositions/templates/screen-shell.tsx`, `verify/badge/page.tsx`
+(new `aside-popover` surface context, section 8).
+
 ### Added — `TicketThread` can draw a message's author · org · time line below its bubble instead of above, and a byline-less message in a run sits closer to the next one — v1.2.133
 
 **THE REQUEST, VERBATIM.** Aurora: *"on 'chat' in tickets put the name and

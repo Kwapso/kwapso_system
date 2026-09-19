@@ -129,6 +129,7 @@ import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
   RecordScreen,
+  RecordFooterBand,
   type RecordAction,
 } from "@/components/records/record-chrome"
 import { useFollowNewest } from "@shared/web/follow-newest"
@@ -1276,6 +1277,15 @@ export function HelpDetailScreen({
       // body — `<TicketDetailBody>` and every dialog — is a sibling of this
       // element now, below, not its `children`.
       panelVisible={false}
+      // THE INK FOOTER DRAWS OUT THERE TOO, NOT HERE — R89 round 24, 19 Sep
+      // 2026 ("rewind here … THE FUKING FOOTERRR!"). This call's own copy
+      // of the footer (region 4 of `RecordDetail`) renders right after the
+      // stage ladder and before `<TicketDetailBody>` — DOM order this
+      // single call cannot change, since the body is a SIBLING rendered
+      // after it. Turned off here; `<RecordFooterBand>` below builds the
+      // SAME card, from the SAME `audit`/`activity`/`onAddNote` data, and
+      // `<TicketDetailBody>` pins it as its own true last child instead.
+      footerVisible={false}
       // NO MARK — client ruling, 2026-09-07, "for type, kill the emojis. this
       // is legacy. in current system we use colors." The square the header band
       // keeps for a glyph (G3) held the team's own emoji for this ticket's
@@ -1474,11 +1484,33 @@ export function HelpDetailScreen({
       notePlaceholder={t("Add a note")}
     />
       <TicketDetailBody
+        // THE BAND — R89 round 24, 19 Sep 2026. The SAME data the
+        // `<RecordScreen>` call above already shapes for its own (now
+        // switched-off, `footerVisible={false}`) copy of the footer, built
+        // here into the real one instead — see `ticket-detail-body.tsx`'s
+        // own header and `RecordFooterBand`'s (record-chrome.tsx) for the
+        // full account of why a second call to the kit's composition, not
+        // a moved prop, is what answers this DOM-order question.
+        footer={
+          <RecordFooterBand
+            audit={{
+              createdByName: ticket.raiserName,
+              createdAt: ticket.createdAt,
+              editedByName: ticket.editorName,
+              updatedAt: ticket.updatedAt,
+              createdByIsClient: ticket.raiserIsClient,
+              editedByIsClient: ticket.editorIsClient,
+            }}
+            activity={activity}
+            onAddNote={can("help", "create") ? activity.addNote : undefined}
+            notePlaceholder={t("Add a note")}
+          />
+        }
         // `thread`/`composer` TWO SEPARATE PROPS, NOT ONE PRE-BUILT
-        // `<TicketConversationPanel>` (that component is retired, R89 round
-        // 23, 19 Sep 2026). `TicketDetailBody` now pins the composer as its
-        // own last child, outside any scrolling region, at EVERY width —
-        // see that file's own header for the whole account (a real
+        // `<TicketConversationPanel>`. R89 round 24, 19 Sep 2026 ("rewind
+        // here"): the composer is back inside the conversation card's own
+        // `CardFooter`, exactly the round-22 shape, at every width — see
+        // that file's own header for the whole account (a real
         // `matchMedia` hook still picks the grid-vs-stack DOM order inside
         // the scrolling region above it, but the composer's own position no
         // longer varies with it).

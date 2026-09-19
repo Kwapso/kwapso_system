@@ -1549,6 +1549,14 @@ breakpoint reads the ticket screen's own width, not the assistant's.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
+**AMENDED 19 Sep 2026 (~07:20) — the whole series of amendments chased the wrong element. The law is now redefined to name THE DARK BAND, not the reply composer.** Aurora's ruling, verbatim and dated: *"wtf did yuo do!! / the blackmsection, the foote, shoudl be at the very bottom / why is the write text space full widht?? rewind here / THE FUKING FOOTERRR! / befoe acting,confirm you understood the problem and what will yuo do / also conut how many times i told yuo to fix tihs"* — then: *"go ahead."* 
+
+**The outcome.** For a week, "the footer" on the ticket detail meant two different surfaces to different people: to the developer, the `<CardFooter>` wrapping `ReplyComposer`; to Aurora, the dark band at the very bottom of the ticket page (the kit's `ink` footer well, holding Latest activity + Record, and drawing the background-color the kit calls `--footer-background`). The term had no definition here until 18 Sep 2026, and the two amendments that followed — [Round 22](#amended-19-sep-2026-round-22) and [~01:50](#amended-19-sep-2026-~0150) — followed the wrong target. She said it seven times in sequence, gradually restating it: 18 Sep D21 ("the footer is not on the footer position"); round 21 ("fix it once and for all", referring to a screenshot of the landing); round 22 ("the footer is currently under the stages and above the content"); the 1784px screenshot ("look at screenshpto! thats the footer not being on the very vottom!"); "tell me what's wrong in this image" (round 23); "NONONO THE PROBLEM IS WHERE THE FOOTER IS" (same round); today (19 Sep ~07:20). **She was right every time. The "footer" she was pointing at was the dark band, not the reply composer.** Both are now defined, separately.
+
+**The law now reads: the DARK BAND is the page's footer — the last element, full width, pinned at the bottom of the screen at every width and height. The conversation card and the side cards scroll above it. The reply composer, where it sits inside a card, draws at the card's own width (never full page width), as a card's own footer always does.** Mark the [four prior amendments](#amended-19-sep-2026-round-22) to this row as having chased the wrong element, for the record.
+
+**Status: redefined, in build, 19 Sep 2026.**
+
 ---
 
 ### L32: any choice over a person, a contact, an account or an app shows the same face the lists show
@@ -2278,6 +2286,10 @@ it opens empty, because the one call site this census can see today
 the day this law was written.
 
 **Status: ruled, in build, 18 Sep 2026.**
+
+**AMENDED 19 Sep 2026 (~07:20) — this rule defines the CARD-level footer (the reply composer's position within its own card), distinct from the SCREEN-level footer (the dark band).** Aurora's ruling at ~07:20: *"wtf did yuo do!! / the blackmsection, the foote, shoudl be at the very bottom / why is the write text space full widht?? rewind here / THE FUKING FOOTERRR!"* [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) confused the two: her own ruling, 18 Sep D21, was about a footer's position WITHIN its own card (no element after it, DOM order only). That rule still holds. But she was asking about a different footer — the screen's own dark band, pinned at the page's bottom edge. Both are now named: this row (D21) defines the CARD-LEVEL footer (the reply composer's ordering); [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) defines the SCREEN-LEVEL footer (the dark band at the very bottom).
+
+**Status: clarified, in build, 19 Sep 2026.**
 
 **Law.** None registered in `RULES.md`'s numbered list — a structural UI census on an
 existing component seam, the same weight this book gives R83's own toolbar-gap census

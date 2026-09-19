@@ -5513,16 +5513,37 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                      AND WITHOUT IT THE WHOLE FEATURE IS A BUG. This column
                      paints NOTHING on a desktop by design — `ASIDE_BODY` is
                      "paper on the ground, painting nothing", because up there
-                     it stands beside the card on the same ground. A
-                     transparent box over the card is not a sheet, it is the
-                     conversation and the card's own rows printed on top of
-                     each other; measured at 380 before this line existed and
-                     it is exactly that. `bg-popover` /
-                     `text-popover-foreground` / `shadow-xl` are the three
-                     `Sheet` itself spends (the kit's drawer surface:
-                     `--popover` under `--shadow-overlay`), taken from there
-                     rather than chosen here, so the assistant and every other
-                     drawer on the phone are one material.
+                     it stands beside the card on the same ground, and `SCREEN`
+                     already hands it `--badge-quiet-fill:var(--spine-chip-
+                     fill)` for exactly that reason. A transparent box over the
+                     card is not a sheet, it is the conversation and the
+                     card's own rows printed on top of each other; measured at
+                     380 before this line existed and it is exactly that.
+                     `bg-popover` / `text-popover-foreground` / `shadow-xl`
+                     are the three `Sheet` itself spends (the kit's drawer
+                     surface: `--popover` under `--shadow-overlay`), taken
+                     from there rather than chosen here, so the assistant and
+                     every other drawer on the phone are one material.
+
+                     `--badge-quiet-fill` REBOUND HERE TOO, 19 SEP 2026 —
+                     CHANGELOG v1.2.134, a live-proof follow-up to v1.2.132.
+                     BELOW 45rem THE GROUND STOPS BEING THE SPINE. The column
+                     switches from "flat on the spine" to this sheet's own
+                     `--popover` fill, but nothing switched the chip token
+                     with it — a Badge in here kept reading the SCREEN's
+                     `--spine-chip-fill`, inherited straight through a ground
+                     that no longer IS the spine. `--popover` is the identical
+                     value tokens.css gives `--card`/`--surface-raised` in
+                     both palettes (ch12: "the same colour again"), and §8
+                     already treats `.bg-popover` as that tier for
+                     `--btn-secondary-fill` — so this rebind reuses `card.tsx`
+                     `raised`'s own answer to the same question, off-beige
+                     over soft paper: `--surface-panel`. `--badge-quiet-fill`
+                     is still not one of §8's class-keyed tokens (BODY's own
+                     note, above), so it is written by hand here, scoped to
+                     the same `max-[45rem]:` breakpoint as the fill it
+                     follows — unscoped, it would override the correct
+                     spine-chip-fill this column reads above 45rem.
 
                      `.motion-edge-panel-narrow` IS THE TRAVEL, AND IT IS A
                      CLASS THAT DOES NOTHING ABOVE 45rem — the whole rule
@@ -5586,6 +5607,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                   "max-[45rem]:px-[var(--aside-inset)]",
                   "max-[45rem]:rounded-t-[var(--radius)]",
                   "max-[45rem]:bg-popover max-[45rem]:text-popover-foreground max-[45rem]:shadow-xl",
+                  "max-[45rem]:[--badge-quiet-fill:var(--surface-panel)]",
                   "max-[45rem]:data-[state=closed]:pointer-events-none",
                   "motion-edge-panel-narrow",
                 )}

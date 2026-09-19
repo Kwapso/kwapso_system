@@ -48,8 +48,9 @@ import { DotsThree } from "@shared/ui/foundations/icons"
 
 import { RecordChrome } from "@shared/ui/compositions/templates/record-chrome"
 import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/states"
-import type { RecordDetailAuditEntry } from "@shared/ui/components/record-detail/record-detail"
+import { RecordDetail, type RecordDetailAuditEntry } from "@shared/ui/components/record-detail/record-detail"
 import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activity-feed"
+import { cn } from "@shared/ui/lib/utils"
 
 import { ActivityRail, hasActivityDoor, type RailActivity } from "@/components/records/activity-rail"
 import { InAppLink } from "@/components/shell/in-app-link"
@@ -862,6 +863,7 @@ export function RecordScreen({
   headerExtra,
   children,
   panelVisible = true,
+  footerVisible = true,
   audit,
   activity,
   activityHead,
@@ -1035,6 +1037,23 @@ export function RecordScreen({
    * reads `content` once `panelVisible` is false.
    */
   panelVisible?: boolean
+  /**
+   * THE INK FOOTER'S OWN ON/OFF SWITCH — round 24 of R89, 19 Sep 2026.
+   * Forwarded straight to `RecordChrome`'s own `footerVisible`
+   * (`RecordDetail`'s prop), default `true` exactly as every existing
+   * caller already behaves. A ticket passes `false` here: the footer's
+   * DATA (`audit`/`activity`/`onAddNote` below) still gets shaped by this
+   * file's own helpers, but `RecordDetail`'s own copy of the card — drawn
+   * right after `hero` and before wherever `children` lands — is never the
+   * one the client sees, because it cannot be interleaved between the
+   * ticket's own scrolling body and the band `TicketDetailBody` pins at
+   * the screen's true bottom (`RecordFooterBand`, this file, below — the
+   * SAME kit composition, called a second time with nothing but the
+   * footer's own props). See `RecordFooterBand`'s own header for the full
+   * account of why a second call, not a moved prop, is what a DOM-order
+   * problem needs.
+   */
+  footerVisible?: boolean
   /**
    * Fed into the kit's own ink footer (record-detail.tsx region 4), Record
    * column — see this file's "the footer" section above. Absent, that column
@@ -1332,6 +1351,7 @@ export function RecordScreen({
            `footerVisible` is left to `RecordDetail`'s own default (true): the
            card draws only when `audit`/`activity` actually put something in one
            of its two columns. */
+        footerVisible={footerVisible}
         audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
         activity={activity ? footerActivityItems(activity.items) : undefined}
         /* THE DOOR TO THE FULL HISTORY, ON THE EYEBROW'S OWN LINE — wired ONCE
@@ -1432,6 +1452,94 @@ export function RecordScreen({
   )
 }
 
+/** THE INK FOOTER, STANDALONE — R89 round 24, 19 Sep 2026 (Aurora, verbatim:
+ * "the black section, the footer, should be at the very bottom … THE FUKING
+ * FOOTERRR!"). `RecordScreen` above already draws this exact card — the
+ * kit's own CH27.8 composition, `audit`/`activity` shaped by this file's own
+ * `recordAuditEntries`/`footerActivityItems` — but only as region 4 of ONE
+ * `<RecordDetail>` call that also draws the band/hero/panel before it, in
+ * one fixed DOM order. A ticket's own body (`TicketDetailBody`) is a
+ * SIBLING of `<RecordScreen>`, not its `children` (`panelVisible={false}`,
+ * R67's "remove the overall container"), so there is no prop on
+ * `RecordScreen` that could move ITS OWN footer past a sibling rendered
+ * after it — the two are different React elements, and DOM order between
+ * siblings is decided by where each one is CALLED, not by a prop on either.
+ *
+ * So a ticket calls `<RecordScreen footerVisible={false} …>` (turning off
+ * that copy) and renders THIS component itself, inside `TicketDetailBody`,
+ * as the true last element of the page. It is the IDENTICAL kit
+ * composition, `RecordDetail`, called a second time with nothing but the
+ * footer's own props — no `title`/band props, no `hero`, no `tabs`,
+ * `panelVisible={false}`. Reading `record-detail.tsx`'s own render:
+ * `hasBand` is false (every band prop undefined), `hasHero` is false (no
+ * `stages`/`hero`), `visibleTabs` is empty, and `panelBody` returns `null`
+ * the instant `panelVisible` is false — so region 4, the ink footer card,
+ * is the ONLY thing left standing. Never a hand-rolled dark `<div>`: this is
+ * the kit's own `bg-surface-record-footer` card, the same two-column
+ * `ActivityFeed`/Record grid, the same add-a-note field, CH27.8's whole
+ * composition and its tokens, reused rather than redrawn (R39 — the kit
+ * supplies the UI and nothing else does).
+ *
+ * THE FLUSH BOTTOM EDGE, R31's OWN NAMED EXCEPTION — "a sheet that meets
+ * the bottom of the screen" takes `rounded-t-[var(--radius)]` only, never a
+ * bottom radius the screen's own edge would clip anyway, and a ticket's
+ * band sits exactly there (`TicketDetailBody` pins it flush with the pane's
+ * true bottom border). `RecordDetail`'s own footer `Card` carries the kit's
+ * ordinary four-corner radius — there is no prop to narrow it to one edge,
+ * and the card is drawn inline inside the vendored component (R39, never
+ * hand-edited) — so the crop happens from OUTSIDE it instead: this
+ * wrapper is `overflow-hidden rounded-t-[var(--radius)]` with no bottom
+ * radius of its own, which clips the card's own bottom corners square
+ * without a single line inside `shared/ui/` changing. */
+export function RecordFooterBand({
+  audit,
+  activity,
+  onAddNote,
+  notePlaceholder,
+  activityHead,
+  className,
+}: {
+  audit?: RecordAudit
+  activity?: RailActivity
+  onAddNote?: (value: string) => void
+  notePlaceholder?: string
+  activityHead?: React.ReactNode
+  className?: string
+}) {
+  const { t, lang } = useLanguage()
+  return (
+    <div className={cn("min-w-0 overflow-hidden rounded-t-[var(--radius)]", className)}>
+      {/* R52's own census matches every `<RecordDetail>` call site in the
+          app and requires `RECORD_TITLE_TREATMENT` on all of them, so the
+          two paths' title sizing cannot drift apart again — it does not
+          ask whether the call actually draws a title. This call never
+          does (no `title`/band props at all, `hasBand` reads false), so
+          every selector `RECORD_TITLE_TREATMENT` carries
+          (`[&_[data-slot=title-heading]]`, `[&_[data-slot=title]]`) matches
+          nothing here — inert, not a real title treatment, carried only to
+          satisfy the census rather than to do anything. */}
+      <RecordDetail
+        className={RECORD_TITLE_TREATMENT}
+        panelVisible={false}
+        audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
+        activity={activity ? footerActivityItems(activity.items) : undefined}
+        activityLabel={t("Latest activity")}
+        activityAction={
+          !hasActivityDoor(activity) ? undefined : (
+            <ActivityRail
+              activity={activity}
+              onAddNote={onAddNote}
+              notePlaceholder={notePlaceholder}
+              head={activityHead}
+            />
+          )
+        }
+        onAddNote={onAddNote}
+        notePlaceholder={notePlaceholder}
+      />
+    </div>
+  )
+}
 
 /** THE TWO NUMBERS BOTH RULES BELOW SHARE, AS CUSTOM PROPERTIES RATHER THAN
  * LITERALS. Round two (below) escaped the tab strip with a flat `-mt-[170px]`

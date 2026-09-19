@@ -573,8 +573,37 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   scrolling region entirely, one `<CardFooter>` instance, `flex-none`, common to both the `lg`
   and below-`lg` trees, plus `position: sticky` with a negative, padding-compensated `bottom`
   offset so its stuck threshold meets the pane's real bottom edge rather than stopping short of
-  it. **The law now reads, final form: the composer is pinned at the bottom of the screen at
-  every width and height; everything else scrolls above it.** (`footer-on-the-edge`)
+  it. **The law read, final form (round 23): the composer is pinned at the bottom of the screen at
+  every width and height; everything else scrolls above it.** AMENDED A SIXTH TIME 19 Sep 2026
+  (Round 24) — round 23 had pinned the WRONG ELEMENT. Aurora, over her own screenshot, verbatim:
+  "the black section, the footer, should be at the very bottom / why is the write text space full
+  width?? rewind here / THE FUKING FOOTERRR!" She meant the BLACK BAND — the kit's own ink footer
+  (LATEST ACTIVITY + RECORD), which had been rendering correctly last inside its own small region
+  the whole time, but in the wrong place entirely: right after the stage ladder and before the
+  ticket's own scrolling body, because `RecordScreen`'s one `<RecordDetail>` call draws its four
+  regions in one fixed order and the ticket's body is a sibling rendered after that call. **THE
+  LAW NOW READS, FINAL FORM: the ticket's dark band (Latest activity + Record) is the page's
+  footer — the last element, pinned at the bottom of the screen at every width and height; the
+  conversation and side cards scroll above it; the reply composer sits at the conversation card's
+  foot, inside the card, at every width.** Fixed with a SECOND call to the kit's own
+  `RecordDetail` (`record-chrome.tsx`'s `RecordFooterBand`, footer props only — no title/hero/
+  tabs, `panelVisible={false}`, so every other region reads empty and only the footer card
+  renders) rather than a moved prop, because DOM order between two siblings is decided by where
+  each is called; `RecordScreen` gets a new `footerVisible={false}` so its own copy never draws
+  twice. `TicketConversationPanel` — retired in round 23 — is UN-RETIRED, exactly its round-22
+  shape (thread scrolls in `CardContent`, composer is `CardFooter`, `Card`'s own last child, D21),
+  at every width now, since the BAND is what guarantees "always visible at the bottom." Proved by
+  CONSTRUCTION, not `sticky` alone: live injection (40 thread bubbles + 6 activity rows) found a
+  sticky band riding on an unbounded scrolling region rides down WITH it once that region's
+  content outgrows the viewport — fixed by binding every link in the chain (`h-full`/`flex-1
+  min-h-0` on the conversation cell, `h-full min-h-0` on the Card, `min-h-0 overflow-y-auto` on
+  its `CardContent`) so the region is bounded first; `sticky` stays only as belt-and-braces.
+  Proved live at 1800×978, 1991×842 (assistant open), 1440×900, 1280×800 and 760×900 (rail
+  collapsed), plus the stress injection at 1991×842/1440×842: band flush with the pane's bottom
+  (0px) at every width `md:` and above; below `md`, the app's own pre-existing, unrelated
+  `pb-24 md:pb-0` mobile reservation (identical on the untouched round-23 composer) leaves a 96px
+  gap against the pane's raw border box, not a regression this round introduced.
+  (`footer-on-the-edge`)
 - **Faces in choices (R90).** Aurora, verbatim, about the new Raised-by `Select` on the ticket
   form and page: "every time there is an avatar, I want to also see it in the choice component,
   so I also want to see the avatars here." A picker's own row is not exempt from the face law
