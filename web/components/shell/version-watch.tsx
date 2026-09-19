@@ -62,28 +62,108 @@ export function isStaleShellError(err: unknown, message?: string): boolean {
   )
 }
 
-/** Heal a stale shell by replacing it: reload ONCE. Returns true when a reload
- * is on its way, so a caller can say "a new version is ready" instead of
- * "something broke". Refuses within the cooldown — if the fresh shell hit the
- * same wall, reloading again would only spin. */
-export function healStaleShell(err: unknown, message?: string): boolean {
-  if (!isStaleShellError(err, message)) return false
+function withinReloadCooldown(): boolean {
   const last = Number(sessionStorage.getItem(RELOAD_MARK) ?? 0)
-  if (Date.now() - last < RELOAD_COOLDOWN_MS) return false
+  return Date.now() - last < RELOAD_COOLDOWN_MS
+}
+
+function reloadNow(): void {
   sessionStorage.setItem(RELOAD_MARK, String(Date.now()))
   location.reload()
+}
+
+/** Heal a stale shell by replacing it IMMEDIATELY: reload ONCE. For the
+ * render-phase crash only (ErrorBoundary's `componentDidCatch`) — the tree
+ * already failed to draw a frame, so there is nothing under anybody's hands to
+ * lose. Returns true when a reload is on its way, so a caller can say "a new
+ * version is ready" instead of "something broke". Refuses within the
+ * cooldown — if the fresh shell hit the same wall, reloading again would only
+ * spin. */
+export function healStaleShell(err: unknown, message?: string): boolean {
+  if (!isStaleShellError(err, message)) return false
+  if (withinReloadCooldown()) return false
+  reloadNow()
+  return true
+}
+
+/** One arm per tab — see `healStaleShellGently`'s own header. Module state
+ * rather than component state: `VersionWatch` is root-mounted for the whole
+ * tab (EDGE-CASES §1), but the arm has to survive even if that ever changed.
+ * The listener itself is kept alongside the flag (not just a boolean) so a
+ * test can tear it down between cases — a jsdom `document` is one shared
+ * EventTarget for the whole file, and a pending listener a case never fired
+ * would otherwise answer the NEXT case's own `visibilitychange` too. */
+let deferredReloadArmed = false
+let pendingHiddenListener: (() => void) | null = null
+
+/** TEST-ONLY: let a fresh test case re-arm cleanly, tearing down a listener a
+ * prior case armed and never fired. */
+export function resetDeferredReloadForTest(): void {
+  deferredReloadArmed = false
+  if (pendingHiddenListener) document.removeEventListener("visibilitychange", pendingHiddenListener)
+  pendingHiddenListener = null
+}
+
+/** Heal a stale shell caught OUTSIDE the render phase — a bare `import()` in
+ * an event handler or a script tag, which is what `VersionWatch`'s own window
+ * listeners exist for (a lazy ROUTE's rejection is consumed by React and never
+ * reaches here — that is `healStaleShell`'s job, from the ErrorBoundary). The
+ * screen here is NOT broken: whoever is looking at it may be mid-reply, so
+ * this never yanks the tab out from under them.
+ *
+ * Earned 19 Sep 2026: a day with five or six staging deploys, lanes creating
+ * test tickets on /tickets every few minutes, and the owner's report — "the
+ * tickets page sometimes reloads by itself with a yellow animation" (T3656).
+ * `healStaleShell`'s own unconditional `location.reload()`, reached through
+ * this file's `onError`/`onRejection` listeners, is exactly that: a
+ * background stale-chunk rejection replacing a screen that was working fine.
+ *
+ * If the tab is already HIDDEN nobody is looking, and this reloads
+ * immediately — same discipline as `healStaleShell`. If it's VISIBLE, the
+ * reload is ARMED instead: a toast says a new version is ready (the same
+ * copy `checkForUpdate`'s own toast below already uses), and the tab reloads
+ * for real the moment it next goes hidden. One arm per tab, and the same
+ * cooldown mark once it actually fires, so it still can't loop. */
+export function healStaleShellGently(
+  err: unknown,
+  message: string | undefined,
+  t: (s: string) => string = (s) => s
+): boolean {
+  if (!isStaleShellError(err, message)) return false
+  if (withinReloadCooldown()) return false
+  if (document.visibilityState === "hidden") {
+    reloadNow()
+    return true
+  }
+  if (!deferredReloadArmed) {
+    deferredReloadArmed = true
+    const onHidden = () => {
+      if (document.visibilityState !== "hidden") return
+      document.removeEventListener("visibilitychange", onHidden)
+      pendingHiddenListener = null
+      reloadNow()
+    }
+    pendingHiddenListener = onHidden
+    document.addEventListener("visibilitychange", onHidden)
+    toast("A new version is available.", {
+      duration: Infinity,
+      action: { label: t("Reload"), onClick: reloadNow },
+    })
+  }
   return true
 }
 
 export function VersionWatch() {
   const t = useT()
   React.useEffect(() => {
-    // (a) Heal a stale shell that hits a missing chunk: reload once. These two
-    // catch the cases that DO reach the window — a bare `import()` in an event
-    // handler, a script tag — while the ErrorBoundary catches the render-phase
-    // one through the same seam.
-    const onError = (ev: ErrorEvent) => void healStaleShell(ev.error, ev.message)
-    const onRejection = (ev: PromiseRejectionEvent) => void healStaleShell(ev.reason)
+    // (a) Heal a stale shell that hits a missing chunk. These two catch the
+    // cases that DO reach the window — a bare `import()` in an event handler,
+    // a script tag — while the ErrorBoundary catches the render-phase one
+    // through `healStaleShell` itself. The screen here is still standing, so
+    // the GENTLE heal (never reload under a person's hands) is the one these
+    // two use.
+    const onError = (ev: ErrorEvent) => void healStaleShellGently(ev.error, ev.message, t)
+    const onRejection = (ev: PromiseRejectionEvent) => void healStaleShellGently(ev.reason, undefined, t)
 
     // (b) Notice a newer build on return-to-tab and offer a reload.
     const bootId = buildIdFrom(document.documentElement.outerHTML)
