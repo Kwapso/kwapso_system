@@ -99,11 +99,34 @@
 // side column with it) taller. `ticket-detail-body.tsx`'s own header
 // carries the full account and the live proof numbers
 // (`${SCRATCH}/row-proof.json`).
+//
+// ROUND 28, ONE PAGE SCROLL, NO INNER SCROLLBAR, 19-20 Sep 2026 — a
+// dark-theme screenshot showed a SECOND scrollbar inside the ticket page,
+// above the band: rounds 24-27's own "ONE SCROLLING REGION" wrapper
+// (`flex-1 min-h-0 overflow-y-auto`) was a real `overflow:auto` box bounded
+// to whatever height the flex chain above it resolved to, so it scrolled
+// its OWN content once that content needed more room — restated as the
+// standing R91 (`no-nested-scroll`, "never need to scroll to see al
+// content!!!"). Fixed by REMOVING the bound rather than moving it: the
+// ROOT drops `min-h-0` (keeps `flex-1` — flexbox's own automatic minimum
+// size floors it to its own content, past the leftover space, without a
+// literal `min-h-full`'s blindness to the sibling head, which FAILED the
+// short-page proof by exactly the head's own height); the REGION drops
+// `flex-1`/`min-h-0`/`overflow-y-auto` entirely, content-sized like the
+// side column already was; the BAND drops `sticky` and its negative bottom
+// offset for `mt-auto`; and `app-shell.tsx`'s own
+// `has-[[data-slot=ticket-detail-body]]` growth rule is RETIRED, since
+// nothing here is sticky any more. `ticket-detail-body.tsx`'s own header
+// carries the full account and the live proof numbers
+// (`${SCRATCH}/onescroll-proof2.json`, after a failed `min-h-full`
+// candidate in `${SCRATCH}/onescroll-proof.json`).
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { describe, expect, it } from "vitest"
+
+import { stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
 
@@ -140,19 +163,17 @@ describe("R89 — footer-on-the-edge", () => {
     ).toBe(false)
   })
 
-  it("app-shell.tsx's page container opts OUT of the pane's own bottom inset when a ticket body is present (round 22b, unchanged)", () => {
+  it("app-shell.tsx's page container carries NO special growth for a ticket body any more (round 28 — the band is mt-auto, never sticky, so nothing needs to reach past the pane's own padding)", () => {
     const at = shell.indexOf("mx-auto flex w-full max-w-none")
     expect(at, "app-shell.tsx must still draw its one R29 page container as a flex box").toBeGreaterThan(-1)
     const tagEnd = shell.indexOf(">", at)
     const tag = shell.slice(Math.max(0, at - 400), tagEnd)
     expect(
-      tag.includes("has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-5))]"),
-      "below lg the container must grow by exactly the pane's own below-lg bottom padding (--space-5) when a ticket body is present"
-    ).toBe(true)
-    expect(
-      tag.includes("lg:has-[[data-slot=ticket-detail-body]]:h-[calc(100%+var(--space-6))]"),
-      "at lg the container must grow by exactly the pane's own lg bottom padding (--space-6) when a ticket body is present"
-    ).toBe(true)
+      tag.includes("has-[[data-slot=ticket-detail-body]]"),
+      "the has-[[data-slot=ticket-detail-body]] growth rule must be GONE — round 28 retires it, the container keeps its ordinary padding like every other record screen"
+    ).toBe(false)
+    expect(tag.includes("calc(100%+var(--space-5))"), "the below-lg growth calc must be gone too").toBe(false)
+    expect(tag.includes("calc(100%+var(--space-6))"), "the lg growth calc must be gone too").toBe(false)
   })
 
   it("record-chrome.tsx stops the head competing with a sibling body for the column's growth (unchanged)", () => {
@@ -235,9 +256,16 @@ describe("R89 — footer-on-the-edge", () => {
     const rootTag = body.slice(at, body.indexOf(">", at))
     expect(rootTag.includes("flex-col"), "the root must be a flex column").toBe(true)
     expect(rootTag.includes("flex-1"), "the root must grow (flex-1) against app-shell's own flex column").toBe(true)
-    expect(rootTag.includes("min-h-0"), "the root must allow itself to shrink below its own content height (min-h-0)").toBe(
-      true
-    )
+    // ROUND 28 — min-h-0 is GONE. Without it, flexbox's own "automatic
+    // minimum size" (min-height's initial value, `auto`) floors the root to
+    // its own CONTENT height once that exceeds the leftover space after the
+    // head — which is what lets the page grow past the fold and scroll as
+    // ONE region, instead of the root being clamped to a budget an inner
+    // `overflow-y-auto` region then had to scroll on its own.
+    expect(
+      rootTag.includes("min-h-0"),
+      "the root must NOT carry min-h-0 any more (round 28) — the automatic minimum size is what lets it grow past its own leftover-space floor instead of clamping and needing an inner scrollbar"
+    ).toBe(false)
     expect(
       rootTag.includes("gap-6"),
       "the root must carry gap-6 — round 26's panel gap between the scrolling region and the band, the same token every other pair of stacked panels uses"
@@ -250,12 +278,17 @@ describe("R89 — footer-on-the-edge", () => {
     expect(bandAt, "the root's own pinned band must exist, marked data-slot=\"ticket-footer-band\"").toBeGreaterThan(-1)
     const bandTagStart = body.lastIndexOf("<div", bandAt)
     const bandTag = body.slice(bandTagStart, body.indexOf(">", bandAt))
-    expect(bandTag.includes("sticky"), "the band must carry sticky — the belt-and-braces half of round 24's fix").toBe(true)
+    // ROUND 28 — sticky is GONE. The band is an ordinary flow child now;
+    // `mt-auto` is what pushes it to the root's own bottom edge when
+    // content is short (the root's own leftover space, per above), and it
+    // simply follows the region in normal flow when content is tall.
+    expect(bandTag.includes("sticky"), "sticky must NOT appear on the band any more (round 28) — the band is normal flow, mt-auto").toBe(false)
     expect(
-      bandTag.includes("bottom-[calc(-1*var(--space-5))]") && bandTag.includes("lg:bottom-[calc(-1*var(--space-6))]"),
-      "the band's sticky offset must be the round-23 negative, padding-compensated bottom, not bottom-0"
-    ).toBe(true)
-    expect(bandTag.includes("bottom-0"), "bottom-0 must NOT appear — it reintroduces the 24px gap round 23 already fixed").toBe(false)
+      bandTag.includes("bottom-[calc(-1*var(--space-5))]") || bandTag.includes("lg:bottom-[calc(-1*var(--space-6))]"),
+      "the round-23 negative, padding-compensated bottom offset must be GONE — nothing needs to reach past the pane's own padding any more"
+    ).toBe(false)
+    expect(bandTag.includes("bottom-0"), "bottom-0 must not appear either — the band is not positioned at all").toBe(false)
+    expect(bandTag.includes("mt-auto"), "the band must carry mt-auto — the ordinary flex 'footer at the bottom of a short page' trick, round 28").toBe(true)
     expect(bandTag.includes("flex-none"), "the band must be flex-none — never a share of the scroll region's budget").toBe(
       true
     )
@@ -428,21 +461,41 @@ describe("R89 — footer-on-the-edge", () => {
     expect(constBody.includes('fill={isAtLeastLg ? "absolute" : "block"}'), "TicketConversationPanel must be called with fill branching on isAtLeastLg").toBe(true)
   })
 
-  it("the ONE scrolling region wrapping both per-width branches is flex-1 min-h-0 overflow-y-auto, and is the root's other child besides the band", () => {
+  it("ROUND 28 — the region wrapping both per-width branches is a plain, content-sized block (NO flex-1/min-h-0/overflow-y-auto), and is the root's other child besides the band", () => {
     const fnAt = body.indexOf("export function TicketDetailBody")
     const returnAt = body.indexOf("return (", fnAt)
     const rootAt = body.indexOf('data-slot="ticket-detail-body"', returnAt)
-    const scrollAt = body.indexOf("overflow-y-auto", rootAt)
-    expect(scrollAt, "TicketDetailBody's own root must wrap a single overflow-y-auto scroll region").toBeGreaterThan(-1)
-    const scrollTagStart = body.lastIndexOf("<div", scrollAt)
-    const scrollTag = body.slice(scrollTagStart, body.indexOf(">", scrollAt))
-    expect(scrollTag.includes("flex-1"), "the scroll region must be flex-1").toBe(true)
-    expect(scrollTag.includes("min-h-0"), "the scroll region must be min-h-0").toBe(true)
-    expect(scrollTag.includes("overflow-y-auto"), "the scroll region must be overflow-y-auto").toBe(true)
+    const rootTagEnd = body.indexOf(">", rootAt)
+    // The region is the root's own FIRST child div, right after the root's
+    // own opening tag closes.
+    const regionTagStart = body.indexOf("<div", rootTagEnd)
+    const regionTagEnd = body.indexOf(">", regionTagStart)
+    const regionTag = body.slice(regionTagStart, regionTagEnd)
+    expect(
+      regionTag.includes("overflow-y-auto"),
+      "the region must NOT carry overflow-y-auto any more (round 28) — it is the inner scrollbar Aurora's dark-theme screenshot caught"
+    ).toBe(false)
+    expect(regionTag.includes("flex-1"), "the region must NOT carry flex-1 any more (round 28) — content-sized, like the side column already was").toBe(false)
+    expect(regionTag.includes("min-h-0"), "the region must NOT carry min-h-0 any more (round 28)").toBe(false)
 
     const fnEnd = body.indexOf("\n}\n", fnAt)
-    const rootBody = body.slice(body.indexOf(">", rootAt), fnEnd)
+    const rootBody = body.slice(rootTagEnd, fnEnd)
     const bandCount = (rootBody.match(/data-slot="ticket-footer-band"/g) || []).length
     expect(bandCount, "exactly one band in the root").toBe(1)
+
+    // NEITHER `TicketDetailBody`'s own root NOR its region wrapper carries
+    // overflow-y-auto any more — the ONE remaining scroller (the thread's
+    // own CardContent, R91's named exception) lives inside
+    // `TicketConversationPanel`, a SEPARATE function this component only
+    // ever CALLS (never inlines), so it can never appear in this slice.
+    // Comments stripped first — this file's own prose mentions
+    // "overflow-y-auto" many times describing history, which a raw
+    // substring count would wrongly catch.
+    const rootBodyStripped = stripComments(rootBody, { keepLength: true })
+    const overflowMatches = rootBodyStripped.match(/overflow-y-auto/g) || []
+    expect(
+      overflowMatches.length,
+      "TicketDetailBody's own JSX (root + region) must carry NO overflow-y-auto at all — the thread's scroller lives in a separate function it merely calls"
+    ).toBe(0)
   })
 })

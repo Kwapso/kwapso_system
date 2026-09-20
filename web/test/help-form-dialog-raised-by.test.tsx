@@ -150,3 +150,54 @@ describe("Raised by — a dropdown, sourced from the client's own contacts", () 
     expect(trigger.textContent).toContain("Otto Berg")
   })
 })
+
+// Aurora, 20 Sep 2026, verbatim: "we can't edit the first message — it's not
+// a description (that was the old model), so rather multiple messages under
+// the same ticket." The raise form keeps writing the opening message; the
+// edit form no longer shows or edits it at all.
+describe("The first message — raise only, not an edit field (Aurora, 20 Sep 2026)", () => {
+  it("does not render the description editor on an EDIT", async () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={vi.fn(async () => {})}
+        helpTypeOptions={["Bug"]}
+        teamId="team-1"
+        initial={EDIT_INITIAL}
+        helpId="help-1"
+      />
+    )
+    // Wait for the form to settle exactly as the tests above do, so this one
+    // is not racing the same account-contacts fetch.
+    await screen.findByText(/Marta Nilsson/)
+    expect(screen.queryByText("Description")).toBeNull()
+    // `Notes` (shared/web/notes-editor/notes-editor.tsx) is a contentEditable
+    // rich-text field, not an `<input>`/`<textarea>` — its placeholder is a
+    // `data-placeholder` attribute read by a CSS `content: attr(...)` rule,
+    // invisible to both `getByPlaceholderText` (real `placeholder` attribute
+    // only) and `getByText` (rendered text nodes only, and jsdom does not
+    // paint CSS generated content at all). Queried by its own `aria-label`
+    // (the same words as the field's label, one config) rather than a bare
+    // `[data-placeholder]` selector — Radix's own `SelectTrigger` (the
+    // "Raised by" contact combobox, right below this field) sets that exact
+    // attribute too, as its "no value chosen" state marker, and matched it.
+    expect(document.querySelector('[aria-label="Description"]')).toBeNull()
+  })
+
+  it("still renders the description editor on a RAISE", () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={vi.fn(async () => {})}
+        helpTypeOptions={["Bug"]}
+        teamId="team-1"
+      />
+    )
+    expect(screen.getByText("Description")).toBeTruthy()
+    const editor = document.querySelector('[aria-label="Description"]')
+    expect(editor).toBeTruthy()
+    expect(editor?.getAttribute("data-placeholder")).toMatch(/Tell us what's going on/)
+  })
+})

@@ -276,7 +276,7 @@ describe("The Appearance preview — a miniature of this very page (client rulin
     const railGroups = document.querySelectorAll('[data-slot="preview-rail-group"]')
     expect(railGroups.length, "three named rail groups").toBe(3)
     const railText = document.querySelector('[data-slot="preview-rail"]')?.textContent ?? ""
-    for (const destination of ["Tasks", "Meetings", "Knowledge", "Waves", "Apps", "Stories", "Accounts", "Tickets", "Contacts", "Inputs"]) {
+    for (const destination of ["Tasks", "Meetings", "Knowledge", "Waves", "Apps", "Backlog", "Accounts", "Tickets", "Contacts", "Inputs"]) {
       expect(railText.includes(destination), `the rail names the real destination "${destination}"`).toBe(true)
     }
     // Never a fabricated destination — the rail draws nothing this app does

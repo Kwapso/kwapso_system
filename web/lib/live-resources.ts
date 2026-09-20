@@ -246,6 +246,7 @@ export const listFetch = {
       primeCache(totalKey("stories-backlog", teamId), r.backlogTotal ?? 0)
       primeCache(totalKey("stories-completed", teamId), r.completedTotal ?? 0)
       primeCache(totalKey("stories-all", teamId), r.everyoneTotal ?? 0)
+      primeCache(totalKey("stories-reviews", teamId), r.reviewsTotal ?? 0)
       primeCache(cursorKey(storiesKey(teamId, view)), r.nextCursor)
       return r.stories
     }),

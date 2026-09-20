@@ -278,10 +278,101 @@ if (!/\{below \? byline : null\}/.test(src)) {
         );
       }
     }
+    /* ==========================================================================
+       6 · THE FACE IS NOT THE BYLINE — Aurora's 20 Sep 2026 ruling, verbatim:
+       "on chat, when there are multiple messages by the same person, keep
+       the name and date only on the bottom one, but show the avatar for
+       each." Section 5 above already renders bubble 1 (theirs, no byline)
+       WITH `initials: "AM"`, so it already proves the avatar can render on a
+       byline-less message — but only if the caller actually passes
+       `initials`/`image` there. The client-observed bug was a caller
+       (`kwapso_system/web/components/tickets/help-detail.tsx`, app-side, not
+       this file) that omitted `initials` on a run's earlier messages too,
+       reading an EARLIER version of this file's own doc comment ("pass
+       author/time/initials only on the last message of a run") as
+       permission to do that. This section pins the two things that make
+       that reading impossible going forward: the avatar renders on EVERY
+       message that carries `initials` or `image` regardless of `hasByline`,
+       and a message with neither carries no avatar — i.e. `hasAvatar` is
+       never derived from the byline fields. ========================================================================== */
+    const faceMessages = [
+      { id: "1", side: "theirs", initials: "AM", body: "First." },
+      {
+        id: "2",
+        side: "theirs",
+        author: "Aiko Morita",
+        time: "10:02",
+        image: "https://example.test/aiko.jpg",
+        body: "Second, same run.",
+      },
+      { id: "3", side: "mine", author: "Devon Cole", time: "10:05", initials: "DC", body: "Reply." },
+      // The old anti-pattern: no byline AND no face. Proves `hasAvatar`
+      // truly keys on initials/image alone — this bubble must be the ONLY
+      // one with no avatar, not because it lacks a byline (bubble 1 also
+      // lacks one) but because it was never given a face at all.
+      { id: "4", side: "theirs", body: "Third, no face supplied." },
+    ];
+    const faceRender = render(
+      "face independence, A(initials) A(image) B(initials) X(no face)",
+      h(TicketThread, {
+        messages: faceMessages,
+        bylinePlacement: "below",
+        composer: false,
+        label: "check",
+      }),
+    );
+    if (faceRender !== null) {
+      const faceBlocks = faceRender
+        .split('data-slot="thread-message"')
+        .slice(1)
+        .map((chunk) => chunk.split('data-slot="thread-message"')[0]);
+      if (faceBlocks.length !== 4) {
+        findings.push(
+          `${rel}: expected 4 rendered messages for the face-independence scenario, got ${faceBlocks.length}.`,
+        );
+      } else {
+        const expectAvatar = [true, true, true, false];
+        const expectByline = [false, true, true, false];
+        const expectImage = [false, true, false, false];
+        faceBlocks.forEach((block, i) => {
+          const n = i + 1;
+          const hasAvatar = block.includes('data-slot="avatar"');
+          if (hasAvatar !== expectAvatar[i]) {
+            findings.push(
+              `${rel}: bubble ${n} of the face-independence render ${hasAvatar ? "carries" : "is missing"} an ` +
+                `avatar — expected ${expectAvatar[i] ? "one (initials or image was given)" : "none (no face was given)"}.`,
+            );
+          }
+          const hasByline = block.includes('data-slot="thread-byline"');
+          if (hasByline !== expectByline[i]) {
+            findings.push(
+              `${rel}: bubble ${n} of the face-independence render ${hasByline ? "carries" : "is missing"} a ` +
+                "byline where the fixture did not vary — the avatar assertion above depends on this staying true.",
+            );
+          }
+          const hasImage = block.includes('data-slot="avatar-image"');
+          if (hasImage !== expectImage[i]) {
+            findings.push(
+              `${rel}: bubble ${n} of the face-independence render ${hasImage ? "carries" : "is missing"} an ` +
+                `<AvatarImage> — expected ${expectImage[i] ? "one (an image src was given)" : "none"}.`,
+            );
+          }
+        });
+        // Bubble 1 has no byline (like bubble 1 everywhere else in this
+        // file) but DOES have initials — this is the exact shape the client
+        // reported broken and the one the corrected doc comment now asks
+        // callers to produce.
+        if (!(expectAvatar[0] && !expectByline[0])) {
+          findings.push(`${rel}: the face-independence fixture no longer isolates "avatar, no byline" on bubble 1.`);
+        }
+      }
+    }
+
   } catch (e) {
     findings.push(
-      `${rel}: section 5 could not mount <TicketThread> at all (${e instanceof Error ? e.message : String(e)}) — ` +
-        "the bylinePlacement render path is unproven; fix the loader before trusting the static pins above.",
+      `${rel}: sections 5–6 could not mount <TicketThread> at all (${e instanceof Error ? e.message : String(e)}) — ` +
+        "the bylinePlacement and face-independence render paths are unproven; fix the loader before trusting the " +
+        "static pins above.",
     );
   } finally {
     if (server) await server.close();
@@ -300,5 +391,8 @@ console.log(
     "of a run) carries data-run=\"continued\" and the column applies the tightened --space-1 gap after it via a " +
     "[&>[data-run=continued]+*] margin rule, full --space-2h otherwise — and a mounted A, A, B \"below\" render " +
     "confirms only bubbles 2 and 3 carry a byline, bubble 1 is marked continued, and bubble 3's byline aligns to " +
-    "its own (mine) trailing edge.",
+    "its own (mine) trailing edge. Section 6 confirms the avatar is keyed on initials/image alone, independent of " +
+    "the byline: a byline-less message with a face still renders one (Aurora's 20 Sep 2026 ruling), a message with " +
+    "an image src renders an <AvatarImage>, and only a message given neither initials nor image renders no avatar " +
+    "at all.",
 );

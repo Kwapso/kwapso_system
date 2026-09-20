@@ -1044,6 +1044,11 @@ export function TriageQueue({
           onOpen={onOpen}
           label={t("Triage queue")}
           teamId={teamId}
+          // CLIENT RULING, 20 SEP 2026: "on tickets triage queue, under
+          // 'Raised by' add the raised-on date." Scoped to this one call
+          // site — see `raisedByShowsDate`'s own header on `TicketRowsTable`
+          // for why Open, Closed and All keep the 18 Sep separation.
+          raisedByShowsDate
           decide={{
             // "no header" — client, asked directly, and it is what her own
             // reference screenshot does. The component keeps the column

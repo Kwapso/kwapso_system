@@ -284,7 +284,7 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
   it("a nested COLLECTION keeps its name, because there it is the destination", () => {
     // "/accounts/CONFIA/stories" really is this client's stories — the level is
     // a place rather than a description of the record below it.
-    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Stories"])
+    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Backlog"])
   })
 
   it("clicking the client goes back to the client", () => {
@@ -368,7 +368,7 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
   })
 
   it("a flat address is untouched — one level still means what it meant", () => {
-    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Stories", "BERG-S0188"])
+    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Backlog", "BERG-S0188"])
   })
 })
 
@@ -450,14 +450,14 @@ describe("every screen carries its trail, and a top-level one carries a trail of
     // case (a record genuinely open, one level in, no ancestor) is asserted
     // here too, in the units `buildCrumbs` already speaks in. Same assertion as
     // the test just above; kept here as the paired negative case's neighbour.
-    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Stories", "BERG-S0188"])
+    expect(crumbs("/stories/ST1").map((c) => c.label)).toEqual(["Backlog", "BERG-S0188"])
   })
 
   it("still shows the trail on a nested collection — the client's own nesting feature", () => {
     // `/accounts/CONFIA/stories`: no record open at THIS level, but there is an
     // ancestor a plain nav item cannot reach on its own — the gate must not
     // blind itself to that case while fixing the flat one.
-    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Stories"])
+    expect(crumbs("/accounts/CONFIA/stories").map((c) => c.label)).toEqual(["Confia", "Backlog"])
   })
 
   it("shows nothing for a flat collection — the client's exact complaint", () => {

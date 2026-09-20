@@ -100,6 +100,20 @@ async function addStory(body: Record<string, unknown>): Promise<string> {
   return (found as { id: string }).id
 }
 
+/** A live ticket to hang a story off — the Enabler tests need one on hand
+ * (Aurora's ruling, 20 Sep 2026: "when a story's origin is Enabler, must
+ * select a related ticket"), the same door `takes its account, and its
+ * reference number, from the ticket it answers` (above) already calls. */
+async function seedTicket(): Promise<string> {
+  const res = (await (
+    await call(IDS.staffUser, "POST /api/content/help", {
+      description: "A ticket for the Enabler tests to point at",
+      accountId: IDS.victimAccount,
+    })
+  ).json()) as { tickets: { id: string }[] }
+  return res.tickets[0].id
+}
+
 beforeEach(() => {
   holder.db = buildSpineDb()
   // The victim's company carries a short code, which is what a reference number
@@ -179,18 +193,51 @@ describe("a story is what WE do", () => {
   })
 })
 
-// WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0094):
-// Client-requested / Internal, and the story TYPE list closed to Data / Tech /
-// Bug / Feature / Change the same day, Fix deactivated rather than deleted.
+// WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026, team migration 0094;
+// "Internal" renamed "Enabler" 20 Sep 2026, team migration 0106): Client-
+// requested / Enabler, and the story TYPE list closed to Data / Chore / Bug /
+// Feature / Change / Spike the same day ("Tech" renamed "Chore" and "Spike"
+// added 20 Sep 2026, migration 0106), Fix deactivated rather than deleted.
 describe("category, and a closed story type", () => {
   it("defaults category to Client-requested when none is sent", async () => {
     const id = await addStory({ title: "Say nothing about where this came from" })
     expect(storyRow(id).category).toBe("Client-requested")
   })
 
-  it("keeps the category actually sent", async () => {
-    const id = await addStory({ title: "Our own upkeep", category: "Internal" })
-    expect(storyRow(id).category).toBe("Internal")
+  it("keeps the category actually sent, with the ticket an Enabler now requires", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Our own upkeep", category: "Enabler", ticketId: ticket })
+    expect(storyRow(id).category).toBe("Enabler")
+  })
+
+  it("refuses an Enabler story with no ticket behind it (20 Sep 2026 ruling)", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/stories", {
+      title: "Enabler with nothing to point at",
+      storyType: "Chore",
+      category: "Enabler",
+      changesNoStep: true,
+    })
+    expect(res.status).toBe(400)
+    expect(
+      db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("Enabler with nothing to point at")
+    ).toEqual({ n: 0 })
+  })
+
+  it("update also refuses an Enabler with no ticket, and keeps the old value", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Edit into an Enabler", category: "Client-requested", ticketId: ticket })
+    // Re-pointing the SAME story at no ticket while switching it to Enabler —
+    // the rule reads the resolved fields on the write, not just a create.
+    const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
+      id,
+      title: "Edit into an Enabler",
+      storyType: "Chore",
+      changesNoStep: true,
+      category: "Enabler",
+      // ticketId omitted
+    })
+    expect(res.status).toBe(400)
+    expect(storyRow(id).category).toBe("Client-requested")
   })
 
   it("refuses a category that names no active vocabulary row", async () => {
@@ -214,11 +261,23 @@ describe("category, and a closed story type", () => {
     expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("Try the retired type")).toEqual({ n: 0 })
   })
 
-  it("accepts every one of the five active types", async () => {
-    for (const storyType of ["Data", "Tech", "Bug", "Feature", "Change"]) {
+  it("accepts every one of the six active types", async () => {
+    for (const storyType of ["Data", "Chore", "Bug", "Feature", "Change", "Spike"]) {
       const id = await addStory({ title: `Type check: ${storyType}`, storyType })
       expect(storyRow(id).story_type).toBe(storyType)
     }
+  })
+
+  it("refuses `Tech` — renamed `Chore` by team migration 0106, no longer creatable", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/stories", {
+      title: "Try the old word",
+      storyType: "Tech",
+      changesNoStep: true,
+    })
+    expect(res.status).toBe(400)
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM stories WHERE title = ?`).get("Try the old word")).toEqual({
+      n: 0,
+    })
   })
 
   it("update requires category — the door replaces every field it reads, never leaves one untouched", async () => {
@@ -248,17 +307,19 @@ describe("category, and a closed story type", () => {
     expect(storyRow(id).category).toBe("Client-requested")
   })
 
-  it("update carries a real category change through", async () => {
+  it("update carries a real category change through, with the ticket Enabler now requires", async () => {
+    const ticket = await seedTicket()
     const id = await addStory({ title: "Turns out this was our own idea", category: "Client-requested" })
     const res = await call(IDS.staffUser, "POST /api/content/stories/update", {
       id,
       title: "Turns out this was our own idea",
       storyType: "Feature",
       changesNoStep: true,
-      category: "Internal",
+      category: "Enabler",
+      ticketId: ticket,
     })
     expect(res.status).toBe(200)
-    expect(storyRow(id).category).toBe("Internal")
+    expect(storyRow(id).category).toBe("Enabler")
   })
 })
 

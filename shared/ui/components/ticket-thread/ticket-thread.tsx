@@ -127,9 +127,18 @@ export interface ThreadMessage {
   author?: React.ReactNode;
   /** Which organisation they speak for — ch27.10 draws it beside the name. */
   authorMeta?: React.ReactNode;
-  /** Initials for the avatar outside the bubble. */
+  /**
+   * Initials for the avatar outside the bubble. INDEPENDENT of the byline:
+   * pass this on EVERY message of a run, not only the last one — the avatar
+   * and the author/time line are two different signals (see
+   * `ThreadBylinePlacement` above, Aurora's 20 Sep 2026 ruling).
+   */
   initials?: React.ReactNode;
-  /** A photograph for the avatar. Falls back to `initials` when it fails. */
+  /**
+   * A photograph for the avatar. Falls back to `initials` when it fails.
+   * Same independence as `initials` — a run's earlier messages keep their
+   * own `image`/`initials` even though they carry no `author`/`time`.
+   */
   image?: string;
   /** Alt text for `image`. Empty is correct when the name is already beside it. */
   imageAlt?: string;
@@ -167,8 +176,22 @@ export interface ThreadMessage {
  * the bubble, aligned to the bubble's own side, for a caller drawing chat
  * "runs": several bubbles from one speaker with the byline only on the
  * last, and the earlier ones sitting closer together (see `ThreadMessage`
- * above — pass `author`/`time`/`initials` only on the last message of a
+ * above — pass `author`/`authorMeta`/`time` only on the last message of a
  * run to get both the placement and the tightened gap).
+ *
+ * THE FACE IS NOT THE BYLINE. Aurora's 20 Sep 2026 ruling, verbatim: "on
+ * chat, when there are multiple messages by the same person, keep the name
+ * and date only on the bottom one, but show the avatar for each." The run
+ * signal this component reads (`hasByline`, gating `data-run="continued"`)
+ * is built only from `author`/`authorMeta`/`time`/`internal` — never from
+ * `initials`/`image` — so a caller building a run passes `author`/
+ * `authorMeta`/`time` only on the LAST message and `initials`/`image` on
+ * EVERY message: the byline collapses to the last bubble, the avatar does
+ * not. AN EARLIER DOC HERE SAID THE OPPOSITE ("pass … `initials` only on
+ * the last message of a run") and at least one caller followed it, which is
+ * the exact bug the ruling reports — a run member with no byline showing no
+ * avatar either. That sentence was wrong and is corrected here; it was never
+ * what the render logic (`hasAvatar`, below) actually keyed on.
  */
 export type ThreadBylinePlacement = "above" | "below";
 
@@ -481,6 +504,12 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
             const side: ThreadSide = message.side ?? "theirs";
             const mine = side === "mine";
             const key = message.id ?? String(index);
+            // Deliberately independent of `hasByline` below — the avatar and
+            // the author/time line are two different signals (Aurora's 20
+            // Sep 2026 ruling: show the face on every bubble, keep the name
+            // and date on the run's last one only). A caller building runs
+            // passes `initials`/`image` on every message and restricts
+            // `author`/`authorMeta`/`time` to the last message of the run.
             const hasAvatar =
               message.initials !== undefined || message.image !== undefined;
             const hasByline =

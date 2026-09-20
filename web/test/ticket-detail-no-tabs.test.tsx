@@ -498,6 +498,13 @@ describe("?tab= still resolves — it scrolls instead of switching", () => {
 // message thread from dragging the whole row (and the side column with
 // it) taller. `ticket-detail-body.tsx`'s own header carries the full
 // account and the live proof numbers (`${SCRATCH}/row-proof.json`).
+//
+// ROUND 28, ONE PAGE SCROLL, NO INNER SCROLLBAR, 19-20 Sep 2026 — the region
+// wrapping this grid dropped its own `flex-1 min-h-0 overflow-y-auto`
+// (that WAS the inner scrollbar a dark-theme screenshot caught); the root
+// dropped `min-h-0` (keeping `flex-1`); the band dropped `sticky` for
+// `mt-auto`. See `ticket-detail-body.tsx`'s own header for the full
+// account and `${SCRATCH}/onescroll-proof2.json` for the live numbers.
 describe("at lg, the scroll region's own grid pairs the conversation with the side panels (R89 round 27)", () => {
   it("the grid and the side column are content-sized (no h-full/min-h-0/overflow-y-auto); the conversation cell is relative min-h-0, stretched by the grid to the side column's own height", async () => {
     openTicket()
@@ -520,14 +527,22 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     expect(conversationAnchor.className).toContain("min-h-0")
     expect(conversationAnchor.className).not.toContain("h-full")
 
+    // ROUND 28 (R89/R91) — the region wrapping the grid is a PLAIN,
+    // content-sized block now: no overflow-y-auto (the inner scrollbar
+    // Aurora's dark-theme screenshot caught), no flex-1/min-h-0 of its own.
     const scrollRegion = grid.parentElement as HTMLElement
-    expect(scrollRegion.className).toContain("overflow-y-auto")
-    expect(scrollRegion.className).toContain("flex-1")
-    expect(scrollRegion.className).toContain("min-h-0")
+    expect(scrollRegion.className).not.toContain("overflow-y-auto")
+    expect(scrollRegion.className).not.toContain("flex-1")
+    expect(scrollRegion.className).not.toContain("min-h-0")
 
     const ticketBodyRoot = scrollRegion.parentElement as HTMLElement
     expect(ticketBodyRoot.getAttribute("data-slot")).toBe("ticket-detail-body")
     expect(ticketBodyRoot.firstElementChild).toBe(scrollRegion)
+    // The ROOT itself still grows (flex-1) but no longer carries min-h-0 —
+    // flexbox's own automatic minimum size is what lets it grow past its
+    // own leftover-space floor instead of clamping to it.
+    expect(ticketBodyRoot.className).toContain("flex-1")
+    expect(ticketBodyRoot.className).not.toContain("min-h-0")
 
     // THE SIDE PANELS SHARE THE SAME GRID, ONE CELL, NATURAL HEIGHT,
     // NEVER SCROLLING (round 27 — the whole point of this round).
@@ -587,13 +602,14 @@ describe("at lg, the scroll region's own grid pairs the conversation with the si
     expect(ticketBodyRoot.lastElementChild).toBe(band)
     // ROUND 26 — the panel gap above the band (R89), by token.
     expect(ticketBodyRoot.className).toContain("gap-6")
-    expect(band.className).toContain("sticky")
-    // NOT bottom-0 — see ticket-detail-body.tsx's own header: sticky's
-    // offset anchors to the scrollport's PADDING edge, so bottom-0
-    // measured a 24px gap live at lg; the negative, padding-compensated
-    // offset is what actually reaches the pane's true bottom edge.
-    expect(band.className).toContain("bottom-[calc(-1*var(--space-5))]")
-    expect(band.className).toContain("lg:bottom-[calc(-1*var(--space-6))]")
+    // ROUND 28 — sticky is GONE. The band is normal flow now; `mt-auto` is
+    // the ordinary "footer at the bottom of a short page" flex trick,
+    // consuming whatever leftover space the root's own flex-1 was handed.
+    expect(band.className).not.toContain("sticky")
+    expect(band.className).not.toContain("bottom-[calc(-1*var(--space-5))]")
+    expect(band.className).not.toContain("lg:bottom-[calc(-1*var(--space-6))]")
+    expect(band.className).not.toContain("bottom-0")
+    expect(band.className).toContain("mt-auto")
     expect(band.className).toContain("flex-none")
     expect(band.className).toContain("w-full")
     // THE REAL FOOTER CARD (kit's own ink footer, CH27.8) lives inside it —

@@ -7507,6 +7507,102 @@ ALTER TABLE help_attachments ADD COLUMN help_thread_id TEXT REFERENCES help_thre
 CREATE INDEX idx_help_attachments_thread ON help_attachments (help_thread_id);
 `,
   },
+  {
+    // AURORA'S STORIES RULING, 20 SEP 2026 — the migration half of it. Two new
+    // columns and three vocabulary moves, all on `stories`/`selectable_data`,
+    // none of them touching a second table.
+    //
+    // TWO COLUMNS, BOTH NULLABLE, NEITHER BACKFILLED — the `story_type`
+    // precedent (0028's own header: "a column that refused to describe them
+    // would be a column that lied about what is in the table"), read the other
+    // way round: nobody can honestly say what 3,677 pre-existing stories'
+    // acceptance criteria or MoSCoW rank WERE, so both columns start empty
+    // rather than guessed.
+    //   • `acceptance_criteria` — a long-text field, same design as `detail`
+    //     (a Notes editor, TEXT_LIMITS.long at the door).
+    //   • `moscow` — one of Must/Should/Could/Won't (`MOSCOW_VALUES`,
+    //     shared/types.ts), a FIXED four-value methodology rather than a
+    //     team-editable dropdown, so — unlike `story_type`/`category` — there
+    //     is no `selectable_data` row for it and no `requireActiveSelectableValue`
+    //     call at the door: the four words are code, the same way
+    //     `STORY_STATUSES` is.
+    //
+    // THREE VOCABULARY MOVES, the 0094 pattern (rewrite the STORED word and the
+    // DROPDOWN row in the same statement, so a rename never leaves a record
+    // behind wearing a spelling the vocabulary has moved on from):
+    //   • Story type "Tech" → "Chore" — the client's own words: "Rename the
+    //     'Tech' story type to 'Chore'. A Chore is necessary work with no
+    //     direct user-visible value." `stories.story_type` is rewritten in the
+    //     same statement as the dropdown row, exactly as `storedWordColumns`
+    //     names it.
+    //   • Story type "Spike" — WHOLLY NEW, never a rename: "Add 'Spike' to the
+    //     story Type options — a time-boxed research or investigation task."
+    //     Inserted `is_default = 1`, protected the same way Data/Bug/Feature/
+    //     Change already are (0094's own header) — a sixth protected value,
+    //     which 0094's five were never meant to be a ceiling on, only a
+    //     hand-curated floor.
+    //   • Story category "Internal" → "Enabler" — "When a story's origin is
+    //     Enabler, must select a related ticket!" is the DOOR half (lib/
+    //     stories.ts `createStory`/`updateStory`); this is the word half, the
+    //     identical rewrite-in-place shape as Tech→Chore, one table along.
+    //
+    // ONE LABEL MOVE, NO RECORD TO REWRITE — Story status is a `"labels"`
+    // group (shared/selectable-homes.ts: "the CODE owns the states … the
+    // dropdown row supplies only the display word"), so unlike the three
+    // above, nothing on `stories` itself spells "Open" — the fixed key stays
+    // `open` (STORY_STATUSES, unchanged) and only the dropdown row's own
+    // WORD moves, to "Backlog" (Aurora: "Open becomes Backlog — the story
+    // exists but isn't scheduled yet"). The matching code-side label
+    // (`STORY_STATUS_LABEL.open`, web/components/work/work-panels.tsx) is
+    // changed in the same pass so the hardcoded fallback and this dropdown
+    // row never disagree about the word.
+    //
+    // IDEMPOTENT throughout, 0094/0097/0098's own discipline: every rename's
+    // WHERE matches nothing once the word has already moved, every INSERT is
+    // guarded `WHERE NOT EXISTS`, and every rewrite is guarded against a team
+    // that has already renamed its OWN target word out from under this
+    // migration (a `NOT EXISTS` on the destination spelling) so a re-run — or
+    // a team that got there by hand first — never produces two rows both
+    // reading the same word.
+    //
+    // NUMBERED 0106 — read live off `origin/main`'s own tail
+    // (`git fetch origin`, then the tail of this file on that ref) right
+    // before appending, per CLAUDE.md: 0105 is the highest version on both the
+    // local tree and `origin/main` as of 20 Sep 2026, so 0106 is the next free
+    // number on either.
+    version: "0106_stories_acceptance_criteria_moscow_spike_chore_enabler_backlog",
+    sql: `
+ALTER TABLE stories ADD COLUMN acceptance_criteria TEXT;
+ALTER TABLE stories ADD COLUMN moscow TEXT;
+
+-- STORY TYPE: Tech -> Chore, records first, then the dropdown row.
+UPDATE stories SET story_type = ${sqlString("Chore")} WHERE story_type = ${sqlString("Tech")};
+UPDATE selectable_data
+   SET value = ${sqlString("Chore")}, mark = ${sqlString("CR")}, updated_at = datetime('now')
+ WHERE type = ${sqlString("Story type")} AND value = ${sqlString("Tech")}
+   AND NOT EXISTS (SELECT 1 FROM selectable_data sd2 WHERE sd2.type = ${sqlString("Story type")} AND sd2.value = ${sqlString("Chore")});
+
+-- STORY TYPE: Spike, new and protected, never renamed from anything.
+INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString("Story type")}, ${sqlString("Spike")}, 1, ${sqlString("SP")}, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data WHERE type = ${sqlString("Story type")} AND value = ${sqlString("Spike")});
+
+-- STORY CATEGORY (ORIGIN): Internal -> Enabler, records first, then the row.
+UPDATE stories SET category = ${sqlString("Enabler")} WHERE category = ${sqlString("Internal")};
+UPDATE selectable_data
+   SET value = ${sqlString("Enabler")}, updated_at = datetime('now')
+ WHERE type = ${sqlString("Story category")} AND value = ${sqlString("Internal")}
+   AND NOT EXISTS (SELECT 1 FROM selectable_data sd2 WHERE sd2.type = ${sqlString("Story category")} AND sd2.value = ${sqlString("Enabler")});
+
+-- STORY STATUS LABEL: Open -> Backlog. A "labels" group (shared/selectable-
+-- homes.ts) — nothing on \`stories\` stores this word, so only the dropdown
+-- row moves; the fixed key underneath (\`open\`) is untouched.
+UPDATE selectable_data
+   SET value = ${sqlString("Backlog")}, updated_at = datetime('now')
+ WHERE type = ${sqlString("Story status")} AND value = ${sqlString("Open")}
+   AND NOT EXISTS (SELECT 1 FROM selectable_data sd2 WHERE sd2.type = ${sqlString("Story status")} AND sd2.value = ${sqlString("Backlog")});
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

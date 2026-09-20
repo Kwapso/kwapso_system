@@ -341,6 +341,9 @@ export function useScreenData({
       enabled ? totalKey("stories-completed", teamId as string) : null
     ),
     storiesEveryone: useCachedValue<number>(enabled ? totalKey("stories-all", teamId as string) : null),
+    // THE REVIEWS TAB'S OWN BADGE (Aurora's ruling, 20 Sep 2026) — the sixth,
+    // primed the same way the other five already are.
+    storiesReviews: useCachedValue<number>(enabled ? totalKey("stories-reviews", teamId as string) : null),
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
     // OUR OWN ADMIN, seven views and one progress pair — every number exact,

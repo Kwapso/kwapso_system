@@ -456,6 +456,7 @@ const ONE_STORY = {
   sprintId: null,
   sprintName: null,
   appId: null,
+  appName: null,
   processId: null,
   stepKey: null,
   changesNoStep: true,
@@ -471,6 +472,8 @@ const ONE_STORY = {
   closingNote: null,
   storyType: "Feature",
   category: "Client-requested",
+  acceptanceCriteria: null,
+  moscow: null,
   reviewNote: null,
   reviewFileUrl: null,
   reviewFileName: null,
@@ -499,6 +502,7 @@ function renderStories(stories: Story[], view: "now" | "planned" | "backlog" | "
         backlog: stories.length,
         completed: stories.length,
         all: stories.length,
+        reviews: stories.length,
       }}
       view={view}
       onViewChange={() => {}}

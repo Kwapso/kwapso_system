@@ -28,53 +28,25 @@
 // `orientation="horizontal"` chips. See help-stakeholders.tsx's own header
 // for the full account, including why the loop row is still READ-ONLY (no
 // "×" — `help_stakeholders` has no delete route).
+//
+// SUPERSEDED AGAIN, 20 Sep 2026 — Aurora, verbatim: "On ticket detail, remove
+// the pencil from the Stakeholders section (should be only on the edit
+// screen)." The "now also EDITABLE" clause two paragraphs up is retired: the
+// inline edit pen + `Select` this file used to prove (over a mocked
+// `tenancy.accountDetail`) is deleted from the component, not merely hidden.
+// The two tests that proved it are replaced below with tests proving the
+// opposite — no pen renders, ever, even when the old gating props are still
+// passed — because `raised_by_contact_id` now has exactly one door,
+// `help-form-dialog.tsx`'s own "Raised by" field on the ticket's edit screen.
+// Also 20 Sep 2026: "Avatars are always a round image" retires the square
+// band this suite otherwise never asserted on directly (it read `PersonCard`
+// through text and structure, never through `shape=`), so nothing here
+// needed to change for that ruling on its own.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-
-/** Radix measures itself and captures the pointer; jsdom does neither. Without
- * these the "Raised by" edit `Select` never mounts — the same polyfill
- * `toolbar-search-floor.test.tsx` uses for the identical reason. */
-beforeAll(() => {
-  Object.assign(window.HTMLElement.prototype, {
-    scrollIntoView: () => {},
-    hasPointerCapture: () => false,
-    releasePointerCapture: () => {},
-    setPointerCapture: () => {},
-  })
-  globalThis.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver
-})
-
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>()
-  return {
-    ...actual,
-    tenancy: {
-      ...actual.tenancy,
-      accountDetail: async () => ({
-        account: { id: "account-1", name: "Bergman & co" },
-        links: [
-          {
-            id: "link-1",
-            accountId: "account-1",
-            personAccountId: "contact-1",
-            personName: "Max Mustermann",
-            personLogoUrl: null,
-            relationship: null,
-            isMainStakeholder: true,
-            active: true,
-          },
-        ],
-      }),
-    },
-  }
-})
+import { cleanup, render, screen, within } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { HelpStakeholder } from "@shared/types"
 import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
@@ -150,12 +122,19 @@ describe("HelpStakeholders — Raised by, one tile", () => {
     expect(document.querySelectorAll('[data-slot="stakeholder-card"]').length).toBe(1)
   })
 
-  it("is a plain fact, not an editor, when the caller has not gated editing on", () => {
+  it("is a plain fact, not an editor — no pen at all", () => {
     render(<HelpStakeholders stakeholders={[AURORA, MAX]} />)
     expect(screen.queryByLabelText("Edit")).toBeNull()
   })
 
-  it("opens an editable dropdown from the edit pen when the caller gates it on, sourced from the ticket's own account contacts, and saves through the caller's callback", async () => {
+  // Aurora, 20 Sep 2026, verbatim: "On ticket detail, remove the pencil from
+  // the Stakeholders section (should be only on the edit screen)." This used
+  // to prove the OPPOSITE — that gating these props on drew an edit pen and
+  // an inline `Select` right here. There is no pen left to gate: the props
+  // are still accepted (the call site in help-detail.tsx still passes them —
+  // see help-stakeholders.tsx's own header) but change nothing about what
+  // renders, which is the point of this test.
+  it("draws no edit pen and no Select even when the old gating props are passed", () => {
     const onChange = vi.fn(async () => {})
     render(
       <HelpStakeholders
@@ -167,10 +146,12 @@ describe("HelpStakeholders — Raised by, one tile", () => {
         onChangeRaisedBy={onChange}
       />
     )
-    fireEvent.click(await screen.findByLabelText("Edit"))
-    const option = await screen.findByText((t) => t.includes("Max Mustermann"))
-    fireEvent.click(option)
-    expect(onChange).toHaveBeenCalledWith("contact-1")
+    expect(screen.queryByLabelText("Edit")).toBeNull()
+    expect(screen.queryByRole("combobox")).toBeNull()
+    // Not clickable either — the card is a fact, not a door.
+    const card = screen.getByText("Max Mustermann").closest('[data-slot="stakeholder-card"]') as HTMLElement
+    const content = card.firstElementChild as HTMLElement
+    expect(content.className).not.toContain("cursor-pointer")
   })
 
   it("takes no LOOP-picker props — StaffPillPicker/onAdd/canAdd/members are gone from its signature", () => {

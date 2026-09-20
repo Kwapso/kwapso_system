@@ -69,6 +69,10 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TicketThread, type ThreadAttachment } from "@shared/ui/components/ticket-thread/ticket-thread"
+// R88's TWO-SEGMENT BAR (Aurora, 20 Sep 2026, Related stories) — the kit's own
+// primitive; see the block below for why a green overlay div sits on top of
+// it rather than a second prop this component does not have.
+import { Progress } from "@shared/ui/components/progress/progress"
 import { TicketChips, ticketTitle } from "@shared/web/ticket-chips"
 import { RecordRef } from "@shared/web/record-ref"
 import { EditPenButton } from "@shared/web/edit-pen-button"
@@ -143,6 +147,12 @@ import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
+// THE SENDER'S PHOTO (Aurora, 20 Sep 2026: "in tickets I see the initials but
+// should see the avatar image") — the SAME seam `work-panels.tsx` already
+// reuses off this file's own `membersQ`: `members:<teamId>` lists every login
+// on the team, staff and portal client alike (`TeamMember.isClient`'s own
+// header), so one lookup answers both populations without a second read.
+import { memberFace } from "@/components/tickets/tickets-collection"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { ticketTypeIconName } from "@shared/ticket-types"
 import { Icon } from "@shared/web/screen-engine/icon"
@@ -162,6 +172,7 @@ import { totalKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
 import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
+import { orderChips } from "@shared/web/chip-order"
 import { useConfirm } from "@shared/web/use-confirm"
 import { TICKET_TYPE_GROUP } from "@shared/ticket-types"
 import {
@@ -966,9 +977,28 @@ export function HelpDetailScreen({
       // one above — an initial is a mark, not a name (help-stakeholders.tsx's
       // own note), so it draws from the whole name where one exists, client
       // contact and staff alike. Client ruling, 18 Sep 2026: "missing the
-      // avatars of the senders." Undefined off every reply but a run's own
-      // last, so the kit draws the avatar once per run.
-      initials: isLastOfRun ? nameInitials(r.authorName) : undefined,
+      // avatars of the senders."
+      //
+      // EVERY MESSAGE NOW, NOT ONLY A RUN'S LAST — Aurora, 20 Sep 2026,
+      // verbatim: "On chat, when there are multiple messages by the same
+      // person, keep the name and date only on the bottom one, but show the
+      // avatar for each." Kit v1.2.136's own `ThreadMessage` doc says the same
+      // thing the OLD comment here got backwards: "a run's earlier messages
+      // keep their own image/initials even though they carry no author/time"
+      // — `hasAvatar` (ticket-thread.tsx) keys on `initials`/`image` alone,
+      // never on the byline, so gating them to `isLastOfRun` was hiding the
+      // avatar on every bubble but the last instead of drawing it once per
+      // run "for free" as the old comment claimed.
+      initials: nameInitials(r.authorName),
+      // THE PHOTO — Aurora, 20 Sep 2026: "I see the initials but should see
+      // the avatar image." `memberFace` (tickets-collection.tsx) is the SAME
+      // lookup the ticket rows already use for a staff raiser's face, over
+      // the SAME `members:<teamId>` cache this screen already holds
+      // (`membersQ`, above): it lists every login on the team, staff and
+      // portal client alike, so one lookup answers both without a second
+      // read. `?? undefined` — `memberFace` can answer `null` (no picture on
+      // file); the kit's `image` is `string | undefined`, never `null`.
+      image: memberFace(membersQ.data, r.authorId) ?? undefined,
       time: isLastOfRun ? formatRelative(r.createdAt, t, lang) : undefined,
       // The reply as the reader asked for it: what was typed, or the translation
       // they pressed for. Never both, and never a stored rewrite of somebody's
@@ -1573,6 +1603,19 @@ export function HelpDetailScreen({
                       initials: nameInitials(
                         ticket.raisedByContactName || ticket.raiserName
                       ),
+                      // THE RAISER'S PHOTO (Aurora, 20 Sep 2026) — `memberFace`
+                      // over the SAME `raiserId` the initials line falls back
+                      // to, so this reads only when the bubble is actually
+                      // showing the raiser (nobody typed this message AS the
+                      // named contact — `raisedByContactName` is who it was
+                      // raised FOR, and this screen has no photo on file for
+                      // an account contact, only for a team login). Showing
+                      // the raiser's own face under a corrected contact's name
+                      // would be the wrong person's picture, so this stays
+                      // initials-only in that one case.
+                      image: ticket.raisedByContactName
+                        ? undefined
+                        : memberFace(membersQ.data, ticket.raiserId) ?? undefined,
                       body: <RichText html={translation.of(ticket.description)} />,
                     },
                     /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
@@ -1595,7 +1638,10 @@ export function HelpDetailScreen({
                       // Already gated to a run's own last reply above — see
                       // the RUNS comment on `replies`.
                       authorMeta: r.authorMeta,
+                      // `initials`/`image` carry on EVERY reply now, run
+                      // position or not — see the RUNS comment on `replies`.
                       initials: r.initials,
+                      image: r.image,
                       time: r.time,
                       body:
                         typeof r.body === "string" ? (
@@ -1703,6 +1749,7 @@ export function HelpDetailScreen({
                 onCreate={canWriteWork ? () => setStoryOpen(true) : undefined}
               />
             ) : (
+              <>
               <ul className="flex min-w-0 flex-col gap-2">
                 {storiesPreviewQ.data.map((s) => {
                   // THE STORY TYPE, AS A CHIP WITH ITS ICON (K26) — the same
@@ -1710,44 +1757,132 @@ export function HelpDetailScreen({
                   // reads (`storyTypeIconName`, @shared/story-types), never a
                   // colour: R86 reserves the one coloured chip for STATUS.
                   const typeIconName = storyTypeIconName(s.storyType)
+                  // R94 (chip-order, shared/web/chip-order.ts): id, status,
+                  // type — this row used to draw id, then type, then status
+                  // (CHIP_ORDER_EXEMPT's own former entry named the swap),
+                  // now routed through the one shared seam
+                  // `shared/web/ticket-chips.tsx`'s own row already uses, so
+                  // the order is the seam's property and not this JSX
+                  // sequence's. The id chip's kind carries the title link
+                  // bundled with it — the title is not itself a status/type
+                  // chip, and keeping it beside the id it names is the same
+                  // reading order the row had before this fix.
                   return (
                     <li key={s.id} className="flex min-w-0 flex-wrap items-center gap-2">
-                      <RecordRef value={s.ref} />
-                      <InAppLink
-                        href={`${host.base}/stories/${s.id}`}
-                        className="min-w-0 flex-1 basis-[12rem] truncate text-sm"
-                      >
-                        {s.title}
-                      </InAppLink>
-                      <Badge
-                        variant="secondary"
-                        size="pill"
-                        className="shrink-0"
-                        icon={typeIconName ? <Icon name={typeIconName} className="size-3.5 shrink-0" /> : undefined}
-                      >
-                        {s.storyType ?? "—"}
-                      </Badge>
-                      {/* THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot
-                          AND a fill: `variant="status" dot={…}` is the
-                          app's one status-chip shape. Kit ruling, 19 Sep
-                          2026, verbatim: "chips and pills always must have
-                          the background card or shape wherever they are …
-                          the type of ticket and the status need the card
-                          to have a background." `status` used to read
-                          `--pill-fill`, which resolved to `--card` and went
-                          invisible on this very row (byte-identical to
-                          `--background` in light); it now draws the same
-                          visible chip surface `secondary` (the type chip,
-                          above) already does. The DOT still carries the
-                          tone — this only ever changed the ground under
-                          it. Kit v1.2.128. */}
-                      <Badge variant="status" dot={storyStatusDotTone(s.status)} className="shrink-0">
-                        {t(STORY_STATUS_LABEL[s.status])}
-                      </Badge>
+                      {orderChips([
+                        {
+                          kind: "id",
+                          node: (
+                            <React.Fragment key="id">
+                              <RecordRef value={s.ref} />
+                              <InAppLink
+                                href={`${host.base}/stories/${s.id}`}
+                                className="min-w-0 flex-1 basis-[12rem] truncate text-sm"
+                              >
+                                {s.title}
+                              </InAppLink>
+                            </React.Fragment>
+                          ),
+                        },
+                        {
+                          kind: "status",
+                          // THE STATUS, AS THE ONE COLOURED CHIP (R86) — a dot
+                          // AND a fill: `variant="status" dot={…}` is the
+                          // app's one status-chip shape. Kit ruling, 19 Sep
+                          // 2026, verbatim: "chips and pills always must have
+                          // the background card or shape wherever they are …
+                          // the type of ticket and the status need the card
+                          // to have a background." `status` used to read
+                          // `--pill-fill`, which resolved to `--card` and went
+                          // invisible on this very row (byte-identical to
+                          // `--background` in light); it now draws the same
+                          // visible chip surface `secondary` (the type chip,
+                          // below) already does. The DOT still carries the
+                          // tone — this only ever changed the ground under
+                          // it. Kit v1.2.128.
+                          node: (
+                            <Badge key="status" variant="status" dot={storyStatusDotTone(s.status)} className="shrink-0">
+                              {t(STORY_STATUS_LABEL[s.status])}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          kind: "type",
+                          node: (
+                            <Badge
+                              key="type"
+                              variant="secondary"
+                              size="pill"
+                              className="shrink-0"
+                              icon={typeIconName ? <Icon name={typeIconName} className="size-3.5 shrink-0" /> : undefined}
+                            >
+                              {s.storyType ?? "—"}
+                            </Badge>
+                          ),
+                        },
+                      ])}
                     </li>
                   )
                 })}
               </ul>
+              {/* THE PROGRESS BAR — Aurora, 20 Sep 2026, verbatim: "after all
+                  stories show a progress bar with completed … show in
+                  progress and completed in the bar — completed as green, the
+                  first part, then the ones in progress in the in-progress
+                  color." Hidden at zero stories (R88's empty state stays the
+                  ONE thing an empty panel draws) — this whole block only
+                  renders inside the branch that already proved
+                  `storiesPreviewQ.data.length > 0`, so no extra empty check
+                  is needed here.
+
+                  TWO SEGMENTS, ONE KIT BAR. `shared/ui/components/progress`
+                  is a SINGLE-fill primitive — one track, one runner, no prop
+                  for a second colour (its own header: "the runner is
+                  CHARCOAL … never mango. Mango is a brand fill, never a
+                  status and never a data colour," with no exception carved
+                  out for a second status colour either) — and `shared/ui/`
+                  is a pinned dependency this lane may not edit. So the real
+                  kit `<Progress>` draws the TRACK and the DEFAULT charcoal
+                  fill, sized to "done + in progress" of the total (the
+                  in-progress colour, per the statuses ruling, is the same
+                  charcoal `--surface-inverse` the bar already draws by
+                  default — nothing to override there); a small `aria-hidden`
+                  `--success` (forest green, R32 token, the same one
+                  `Badge variant="success"` already reaches for) div is
+                  layered on top, covering only the DONE fraction. Net result
+                  reads exactly as asked: green, then charcoal, then empty
+                  track — using the kit's own bar rather than a hand-rolled
+                  track, and no shared/ui edit. `formatValue`/`label` are
+                  left off on purpose (kit's own guidance: a bar beside a
+                  caption that already says the number is noise) — the
+                  caption below carries the words. */}
+              {(() => {
+                const total = storiesPreviewQ.data.length
+                const doneCount = storiesPreviewQ.data.filter((s) => s.status === "done").length
+                const inProgressCount = storiesPreviewQ.data.filter(
+                  (s) => s.status === "in_progress"
+                ).length
+                return (
+                  <div className="flex flex-col gap-1">
+                    <div className="relative">
+                      <Progress value={((doneCount + inProgressCount) / total) * 100} />
+                      <div
+                        aria-hidden="true"
+                        className="bg-success absolute inset-y-0 start-0 rounded-[var(--radius-sm)]"
+                        style={{ width: `${(doneCount / total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      {/* Already catalogued and translated — the same entry
+                          `sprints-screen.tsx`, `web-portal/components/
+                          ticket-row.tsx` and `delivery-block.tsx` use for the
+                          identical "N of M done" fact. */}
+                      {t("{done} of {total} done", { done: doneCount, total })}
+                    </p>
+                  </div>
+                )
+              })()}
+              </>
             )}
           </EmptyGatedPanel>
         }

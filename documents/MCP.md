@@ -518,12 +518,21 @@ Today it covers:
     would rewrite what an already-published figure means. (A process version is
     cut BY HAND, one door, one caller — the owner's 24 Aug 2026 ruling; migration
     `0051` purged the never-wired automatic cut on sprint completion.)
-    A story has no priority field and no order to set: it sits in the sprint it
-    was sold inside, and that is what says when it is due. (Ranking one used to be
-    possible and was retired on 17 Aug 2026 — the owner's ruling, and the door
-    went with the tool.) No client login holds `work:*` and the doors refuse a
-    portal caller outright, so unlike the ticket doors the question "what if a
-    contact reaches this?" has a one-word answer.
+    A story has no ORDER to set: it sits in the sprint it was sold inside, and
+    that is what says when it is due. (Ranking one used to be possible and was
+    retired on 17 Aug 2026 — the owner's ruling, and the door went with the
+    tool.) It does carry a PRIORITY, as of 20 Sep 2026: `moscow`, one of Must /
+    Should / Could / Won't (a fixed methodology, never a team-editable
+    dropdown), optional and never backfilled onto a story written before the
+    field existed — a label for how important the work is, not an order for
+    when it happens. `acceptanceCriteria` writes down what "done" looks like,
+    the same long-text shape as `detail`, also optional and never backfilled.
+    `category` is Client-requested (the default) or Enabler (Kwapso-initiated
+    upkeep — renamed from Internal on 20 Sep 2026); an Enabler story must also
+    name `ticketId`, both `create_story` and `update_story` refuse with
+    `ticket_required` otherwise. No client login holds `work:*` and the doors
+    refuse a portal caller outright, so unlike the ticket doors the question
+    "what if a contact reaches this?" has a one-word answer.
   - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
     (`todos:create` / `:update` / `:delete` — what we need FROM a client), and
     `create_task`, `update_task`, `set_task_done` (`work:create` / `work:update` —

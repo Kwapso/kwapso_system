@@ -152,6 +152,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           backlog: totals.storiesBacklog,
           completed: totals.storiesCompleted,
           all: totals.storiesEveryone,
+          reviews: totals.storiesReviews,
         }}
         view={ctx.storyView}
         onViewChange={ctx.setStoryView}

@@ -1765,6 +1765,20 @@ export type TicketFace = {
    * missing answer rather than as a broken row — the same treatment `appName`
    * already gets one line up. */
   resolvedAt?: string | null
+  /** WHO CLOSED IT — client ruling, 20 Sep 2026: "on tickets tab 'Closed,'
+   * before 'Closed on' add 'Closed by.'" `HelpTicket` already carries this:
+   * `resolverId`/`resolverName` are read back off `help.resolver_id`/
+   * `help.resolver_name` (`shared/types.ts`'s own header on the pair — the
+   * columns had existed since the resolve write was built and simply were
+   * never selected until "a 'Resolved by' column" was first anticipated),
+   * stamped by `setStatus` on every resolve and cleared on every reopen
+   * (R17), so nothing in `workers/content` needed widening for this ruling —
+   * the fact was already on the wire, unread by any screen.
+   *
+   * OPTIONAL FOR THE SAME REASON `resolvedAt` ABOVE IS: `TriageWaiting`
+   * cannot yet have been resolved, so there is no resolver to ask about. */
+  resolverId?: string | null
+  resolverName?: string | null
   /** WHO RAISED IT (18 Sep 2026: "raised separate by and date! not in one
    * together") — the `raisedBy` column's face+name. TWO SHAPES, because the
    * two row types this table draws answer "who raised it" two different ways
@@ -1871,6 +1885,7 @@ export function TicketRowsTable<T extends TicketFace>({
   columns = TICKET_COLUMNS_DEFAULT,
   decide,
   members,
+  raisedByShowsDate,
 }: {
   rows: readonly T[]
   onOpen: (id: string) => void
@@ -1919,6 +1934,18 @@ export function TicketRowsTable<T extends TicketFace>({
    * a `raiserId` at all (`TicketFace`'s own header), so a caller with nothing
    * to resolve passes nothing rather than fetching a cache it never reads. */
   members?: TeamMember[]
+  /** A SECOND, MUTED LINE UNDER THE RAISER'S NAME CARRYING THE RAISED DATE —
+   * client ruling, 20 Sep 2026: "on tickets triage queue, under 'Raised by'
+   * add the raised-on date." Scoped to the ONE CALL SITE that asked for it
+   * (`TriageQueue`'s own list view): the 18 Sep 2026 ruling ("raised separate
+   * by and date! not in one together") still governs Open, Closed and All,
+   * so this cannot become the `raisedBy` cell's default without quietly
+   * reopening that ruling everywhere it was never asked to reopen. The date
+   * itself is `w.createdAt` through the identical `formatDate` the `created`
+   * column beside it already uses — the same fact, the same formatter, the
+   * same language, just also read where triage's own list already keeps eyes
+   * on who raised a row. */
+  raisedByShowsDate?: boolean
 }) {
   const { t, lang } = useLanguage()
   const span = columns.length + (decide ? 1 : 0)
@@ -1956,7 +1983,17 @@ export function TicketRowsTable<T extends TicketFace>({
     // rather than growing an "on" this ruling never asked for.
     raisedBy: t("Raised by"),
     created: t("Raised"),
-    closed: t("Closed"),
+    // "CLOSED BY" — client ruling, 20 Sep 2026: "on tickets tab 'Closed,'
+    // before 'Closed on' add 'Closed by.'" The column that used to draw the
+    // date alone now folds the resolver's own face+name above it (see the
+    // cell's own header for the R82 column-budget reasoning), so the header
+    // takes the wider name — the same move `AppTicketsPanel`'s identical
+    // table (work-panels.tsx) already made on 18 Sep 2026 when its own
+    // "Resolved date" column folded under "Resolved by". NOT YET IN THE
+    // CATALOGUE (R28): "Closed by" is a new English sentence — `npm run
+    // lang` must extract and seed it (`shared/i18n-seed.ts`) before this
+    // ships, the same as any other new copy.
+    closed: t("Closed by"),
   }
   return (
     <Table
@@ -2209,35 +2246,50 @@ export function TicketRowsTable<T extends TicketFace>({
               {columns.includes("raisedBy") && (
                 <TableCell className="text-muted-foreground">
                   {w.raiserName ? (
-                    <span className="flex items-center gap-2">
-                      {/* THE STAFF RAISER'S FACE (R35) — `memberFace`, one
-                          function up: `HelpTicket` carries no picture for
-                          `raiserId`, so it is resolved against the members
-                          cache this table's caller passes in. A CLIENT login
-                          raising their own ticket also has `raiserId` (an
-                          ordinary team member, `w.raiserIsClient`), and the
-                          same lookup finds their face too — the members
-                          cache holds every login on the team, not staff
-                          alone. */}
-                      <RecordMark
-                        picture={memberFace(members, w.raiserId)}
-                        name={w.raiserName}
-                        shape="round"
-                        size="choice"
-                      />
-                      <span className="min-w-0 truncate">
-                        {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        {/* THE STAFF RAISER'S FACE (R35) — `memberFace`, one
+                            function up: `HelpTicket` carries no picture for
+                            `raiserId`, so it is resolved against the members
+                            cache this table's caller passes in. A CLIENT login
+                            raising their own ticket also has `raiserId` (an
+                            ordinary team member, `w.raiserIsClient`), and the
+                            same lookup finds their face too — the members
+                            cache holds every login on the team, not staff
+                            alone. */}
+                        <RecordMark
+                          picture={memberFace(members, w.raiserId)}
+                          name={w.raiserName}
+                          shape="round"
+                          size="choice"
+                        />
+                        <span className="min-w-0 truncate">
+                          {w.raiserIsClient ? w.raiserName : staffNameFromSnapshot(w.raiserName)}
+                        </span>
                       </span>
+                      {/* THE RAISED-ON DATE, A SECOND LINE — `raisedByShowsDate`'s
+                          own header says why this is a prop rather than the
+                          cell's default: the 18 Sep ruling that split "who" from
+                          "when" into two columns still stands everywhere but the
+                          one call site that asked to fold them back. */}
+                      {raisedByShowsDate && (
+                        <span className="text-xs tabular-nums">{formatDate(w.createdAt, lang)}</span>
+                      )}
                     </span>
                   ) : w.raisedByContactName ? (
-                    <span className="flex items-center gap-2">
-                      <RecordMark
-                        picture={w.raisedByContactLogo}
-                        name={w.raisedByContactName}
-                        shape="round"
-                        size="choice"
-                      />
-                      <span className="min-w-0 truncate">{w.raisedByContactName}</span>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        <RecordMark
+                          picture={w.raisedByContactLogo}
+                          name={w.raisedByContactName}
+                          shape="round"
+                          size="choice"
+                        />
+                        <span className="min-w-0 truncate">{w.raisedByContactName}</span>
+                      </span>
+                      {raisedByShowsDate && (
+                        <span className="text-xs tabular-nums">{formatDate(w.createdAt, lang)}</span>
+                      )}
                     </span>
                   ) : (
                     "—"
@@ -2255,25 +2307,79 @@ export function TicketRowsTable<T extends TicketFace>({
                   {formatDate(w.createdAt, lang)}
                 </TableCell>
               )}
-              {/* THE DAY IT WAS CLOSED — client, 2026-09-09. Same ink, same
+              {/* THE DAY IT WAS CLOSED, AND WHO CLOSED IT — client, 2026-09-09
+                  for the date, and 20 Sep 2026 for the name: "on tickets tab
+                  'Closed,' before 'Closed on' add 'Closed by.'" Same ink, same
                   formatter and same language as the Raised column beside it,
                   because they are two spellings of one kind of fact and a
                   reader compares them going across the row.
 
+                  FOLDED INTO THIS ONE CELL RATHER THAN GIVEN A COLUMN OF ITS
+                  OWN, and that is R82 rather than a preference: the Closed tab
+                  already sits at the six-column ceiling (id, title, type,
+                  raisedBy, created, closed — `app` was already dropped for
+                  `raisedBy` on 18 Sep 2026, `helpTabColumns`'s own header has
+                  that reasoning), and R82's own prescription for a fact that
+                  arrives once a table is already at the ceiling is "fold the
+                  extra fact onto an existing column's own second line" — the
+                  identical technique this table's `raisedBy` cell now uses for
+                  the date beside it, one column over. So "Closed by" reads
+                  literally BEFORE "Closed on" here: the resolver's face and
+                  name on the first line, the date beneath it.
+
+                  THE FACE AND THE TRIM ARE THE RAISER CELL'S OWN (R35/R54):
+                  `memberFace` against the same members cache, and
+                  `staffNameFromSnapshot` — a resolver is always staff (closing
+                  a ticket is a staff action; SCOPE ch.06), never a client
+                  contact, so there is no second shape to draw here the way the
+                  raiser cell needs one.
+
                   THIS COLUMN ONLY EVER APPEARS ON A TAB PINNED TO THE
-                  `resolved` STAGE, and that is the whole reason it can be
-                  trusted: a reopen NULLs `resolved_at` (the owner's ruling of
-                  2026-09-06 — the closure survives in the activity trail, "closed
-                  on x, reopen on y, closed again on z"), so anywhere an open
-                  ticket could appear this cell would say "never closed" about a
+                  `resolved` STAGE, and that is the whole reason either fact can
+                  be trusted: a reopen NULLs `resolved_at`/`resolver_id`/
+                  `resolver_name` together (the owner's ruling of 2026-09-06 —
+                  the closure survives in the activity trail, "closed on x,
+                  reopen on y, closed again on z"), so anywhere an open ticket
+                  could appear this cell would say "never closed" about a
                   ticket that has been closed twice. `helpTabColumns` is what
                   makes that a rule rather than a call site being careful. The em
                   dash is the same treatment the App column gets: if one ever
                   does arrive empty it reads as a missing answer, not a broken
                   row. */}
               {columns.includes("closed") && (
-                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-                  {w.resolvedAt ? formatDate(w.resolvedAt, lang) : "—"}
+                <TableCell className="text-muted-foreground">
+                  {w.resolvedAt ? (
+                    <span className="flex flex-col gap-0.5">
+                      {w.resolverName && (
+                        <span className="flex items-center gap-2">
+                          <RecordMark
+                            picture={memberFace(members, w.resolverId)}
+                            name={w.resolverName}
+                            shape="round"
+                            size="choice"
+                          />
+                          <span className="min-w-0 truncate">
+                            {staffNameFromSnapshot(w.resolverName)}
+                          </span>
+                        </span>
+                      )}
+                      {/* THE DATE ALONE, AT FULL SIZE, WHEN THERE IS NO NAME TO
+                          SIT UNDER — a ticket resolved before `resolver_id`/
+                          `resolver_name` existed on the row (pre-migration)
+                          carries a `resolvedAt` with no resolver. Shrinking it
+                          to a "second line" size in that case would read as a
+                          typo rather than as a fact this row genuinely lacks. */}
+                      <span
+                        className={
+                          w.resolverName ? "text-xs tabular-nums whitespace-nowrap" : "tabular-nums whitespace-nowrap"
+                        }
+                      >
+                        {formatDate(w.resolvedAt, lang)}
+                      </span>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
               )}
               {decide && (

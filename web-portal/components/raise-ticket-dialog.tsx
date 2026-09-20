@@ -43,6 +43,8 @@ import type { AppModule } from "@shared/types"
 import { useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { DEFAULT_MODULE_ICON } from "@shared/module-icons"
 
 const descField = { ...defaultFieldConfig, label: "What do you need?", required: true }
 // WHICH PART OF WHICH SYSTEM (Aurora, 19 Aug 2026). ONE question, not two, and
@@ -154,7 +156,13 @@ export function RaiseTicketDialog({
                 <SelectGroup key={group.appName}>
                   <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium">{group.appName}</p>
                   {sortedOptions(group.modules, lang, (m) => m.name).map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
+                    // R93 — VISUAL ACCOMPANIES TEXT: a module carries its own
+                    // icon everywhere it is chosen, the same glyph its
+                    // gallery card draws (`modules-panel.tsx`'s
+                    // `icon={m.icon ?? DEFAULT_MODULE_ICON}`), through the
+                    // kit's own `SelectItem` `icon` slot — never a second,
+                    // ad-hoc rendering of the glyph.
+                    <SelectItem key={m.id} value={m.id} icon={<Icon name={m.icon ?? DEFAULT_MODULE_ICON} />}>
                       {m.mark ? `${m.mark} ` : ""}
                       {m.name}
                     </SelectItem>

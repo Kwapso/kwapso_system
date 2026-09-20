@@ -1208,6 +1208,55 @@ again, which is the only property that matters here.
   options array's own expression, never a line number. `RecordPicker` is
   OUT of this law's population — R35 already holds it to the same account
   through its own `picture`/`mark`/`face` type fields.
+- **R91 `no-nested-scroll`** — your module's screen scrolls as ONE page; no
+  element inside its content is a vertical scroll container
+  (`overflow-y-auto`/`overflow-auto`/`overflow-y-scroll`/`overflow-scroll`, or
+  a `max-h-*` paired with an `overflow` class) to reveal content that does not
+  fit. The only exceptions are a chat thread's own `CardContent`, the rail's
+  nav list, the assistant pane, and true overlays (dialogs, sheets, popovers,
+  listboxes). A real exception goes in `NO_NESTED_SCROLL_EXEMPT`
+  (`shared/rules/registry.ts`), keyed by the source expression, never a line
+  number. Horizontal `overflow-x-auto` on a table or board is not covered by
+  this law.
+- **R92 `main-excludes-secondary`** — if your module offers a MAIN person
+  picker (an assignee, a raiser, an account manager, an owner, a lead) and a
+  SEPARATE, SECONDARY people picker over the SAME pool (a "keep in the loop",
+  a reviewer list, a members list, a stakeholders list), narrow the secondary
+  picker's options through `withoutMain()` (`shared/web/without-main.ts`) so
+  the chosen main disappears from it. Does NOT apply to a "Main X" field
+  chosen FROM an already-narrowed secondary list (the main is meant to be a
+  member of that set, not excluded from it) — name the field `main<X>`, the
+  same tell this law's own census reads to leave that shape alone.
+  `web/test/main-excludes-secondary.test.ts` pairs a main/secondary picker in
+  one file by their shared source array; a real reason for skipping one goes
+  in `MAIN_EXCLUDES_SECONDARY_EXEMPT`, keyed by
+  `${file}#${mainField}+${secondaryField}`, never a line number.
+- **R93 `visual-accompanies-text`** — if your module offers a `<Select>` or
+  `<RecordPicker>` choosing over a MODULE (an `AppModule[]`-shaped array),
+  every option draws that module's own icon (`icon=` on the `<SelectItem>`,
+  or `icon:` in the `<RecordPicker>`'s option literal) via the same
+  `shared/module-icons.ts` vocabulary the module's own gallery card reads —
+  never text alone. The broader ruling ("every visual — avatar, icon or
+  colour — accompanies its text everywhere, except an avatar/logo inside a
+  CHIP") extends R90 for icons/colours generally; a status or ticket/story
+  TYPE colour is already covered by `status-owns-the-chip.test.ts` and
+  `status-stage-picker-dots.test.ts`, so this census stays scoped to modules
+  rather than re-litigating that population. `web/test/
+  visual-accompanies-text.test.ts` detects a module choice by its source
+  array's own name; a real reason for skipping one goes in
+  `VISUAL_ACCOMPANIES_TEXT_EXEMPT`, keyed by the source array's own
+  expression, never a line number.
+- **R94 `chip-order`** — if your module draws a row of chips on a record head
+  or a list row, build it through `orderChips()` (`shared/web/chip-order.ts`)
+  rather than hand-writing the JSX sequence: tag each chip with its `kind`
+  (`"id" | "status" | "type" | "mainParent" | "secondaryParent"`) and the
+  seam resolves the fixed order — id, status, type, main parent, secondary
+  parent — regardless of which kinds your record actually has. `web/test/
+  chip-order.test.ts` censuses any chip row carrying both an id chip
+  (`<RecordRef`) and a status chip (`variant="status"`/`ticketStatusCell(`)
+  for an `orderChips(` call; a real reason for skipping one goes in
+  `CHIP_ORDER_EXEMPT`, keyed by the id chip's own value expression, never a
+  line number.
 
 **The words** (the ones that catch every new module, every time)
 

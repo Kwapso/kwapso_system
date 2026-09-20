@@ -2117,6 +2117,12 @@ export type Story = {
   sprintId: string | null
   sprintName: string | null
   appId: string | null
+  /** THE SYSTEM'S OWN NAME, joined the same way `sprintName`/`ticketRef`
+   * already are — a story hangs off an app ALWAYS (CHECKLIST 6.1), so this is
+   * the one cross-link every row can draw without a second read. Read by the
+   * main backlog's own board card and by the record's own header chip
+   * (Aurora's chip-order ruling, 20 Sep 2026). */
+  appName: string | null
   processId: string | null
   /** WHICH STEP OF WHICH MAP THIS WORK CHANGED — a step KEY, so it means the same
    * step across every version of that map. A story cannot close without this or
@@ -2156,12 +2162,33 @@ export type Story = {
    * every story that existed before the column did, and the door defaults a
    * new one to 'Client-requested' when nothing is sent. */
   category: string
+  /** WHAT "DONE" LOOKS LIKE, WRITTEN DOWN — Aurora's ruling, 20 Sep 2026:
+   * "Add an 'acceptance criteria' field to stories (same design as
+   * 'Detail')." A long-text field, same Notes editor as `detail`, same
+   * TEXT_LIMITS.long at the door. Nullable and never backfilled — a story
+   * written before this field existed has none to guess at. */
+  acceptanceCriteria: string | null
+  /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — a FIXED
+   * four-value methodology, `MOSCOW_VALUES` below, never a team-editable
+   * dropdown the way `storyType`/`category` are. Nullable and never
+   * backfilled, for `acceptanceCriteria`'s own reason: nobody can honestly
+   * say what a pre-existing story's priority WAS. */
+  moscow: MoscowValue | null
   accountId: string | null
   createdAt: string
   updatedAt: string | null
   createdByName: string | null
   editedByName: string | null
 }
+
+/** THE FOUR MOSCOW RANKS, in their fixed priority order (Aurora's ruling, 20
+ * Sep 2026: "Add a MoSCoW priority field to every story, with four values:
+ * Must, Should, Could, Won't"). A closed, code-owned list — like
+ * `STORY_STATUSES` above, never a `selectable_data` group a team could widen
+ * or narrow — because MoSCoW is a fixed methodology, not a word this
+ * product's own vocabulary owns. */
+export const MOSCOW_VALUES = ["Must", "Should", "Could", "Won't"] as const
+export type MoscowValue = (typeof MOSCOW_VALUES)[number]
 
 /** THE STORIES SCREEN'S OWN TAB STRIP, ported from Tasks (`TASK_VIEWS`, above)
  * the same evening — the client's ruling, 15 Sep 2026: "for stories, we need
@@ -2187,8 +2214,19 @@ export type Story = {
  * the door (`MINE_VIEWS`, workers/content/src/routes/stories.ts) — the same
  * shape Tasks' own three MINE tabs take, "mine" including a story with no
  * assignee at all the way Tasks' does (`includeUnassigned`), because a client
- * database this old has plenty of history nobody has ever claimed. */
-export const STORY_VIEWS = ["open", "now", "planned", "backlog", "completed", "all"] as const
+ * database this old has plenty of history nobody has ever claimed.
+ *
+ * `reviews`, ADDED 20 Sep 2026 (Aurora's ruling: "add a tab for reviews,
+ * views Queue and List") — the same predicate `completed` uses
+ * (`status = 'done'`), on purpose: a review of finished work reads the exact
+ * same rows the Completed tab does, only shaped for a different question
+ * ("who did it, and when was it marked done" rather than "what's still
+ * mine"). Deliberately left OUT of `MINE_VIEWS`
+ * (`workers/content/src/routes/stories.ts`) — a review is a team-wide
+ * audit, not a personal list, so it takes the same `all`/Everyone's
+ * fallback: unnarrowed for a reader who holds `all_stories:read`, narrowed
+ * to their own name otherwise. */
+export const STORY_VIEWS = ["open", "now", "planned", "backlog", "completed", "all", "reviews"] as const
 export type StoryViewName = (typeof STORY_VIEWS)[number]
 
 /** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price. It

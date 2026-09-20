@@ -130,14 +130,16 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * never the PRIMARY mechanism this round leans on.
  *
  * `app-shell.tsx`'s own `has-[[data-slot=ticket-detail-body]]:h-[calc(…)]`
- * growth rule (round 22b) is unchanged and still load-bearing: it is what
- * lets THIS component's own flex-1 chain reach the vendored pane's true
- * border-box bottom rather than stopping short by its bottom padding,
- * whatever is pinned inside this root.
+ * growth rule (round 22b) — described here as it stood through round 27 —
+ * is RETIRED as of ROUND 28 (this file's own header, below): it existed
+ * only to let the STICKY band reach the pane's true border-box bottom past
+ * its own reserved padding, and round 28 drops `sticky` from the band
+ * entirely (`mt-auto`, normal flow), so nothing needs to reach past that
+ * padding any more.
  *
  * `data-slot="ticket-detail-body"` is this file's own marker — read by
- * `web/test/footer-on-the-edge.test.ts` (R89), by `app-shell.tsx`'s own
- * `has-[…]` rule, and by nothing else.
+ * `web/test/footer-on-the-edge.test.ts` (R89) and by nothing else now that
+ * `app-shell.tsx`'s own `has-[…]` rule is gone.
  *
  * ROUND 26, THE MARGIN CORRECTION, 19 Sep 2026. Aurora, reading the round-24/25
  * page back, verbatim: "ok, now the footer is at the bottom, but there's a law
@@ -248,7 +250,98 @@ export type TicketPanelName = keyof typeof TICKET_PANEL_ANCHOR
  * 900×800). 1440×900 and 1991×842 assistant-open are `lg` and untouched by
  * a below-`lg`-only fix — measured unchanged at 367.33px and 309.33px
  * conversation card height respectively, band 0px both, matching this
- * file's own round-24 proof (`${SCRATCH}/reproof15-results.json`). */
+ * file's own round-24 proof (`${SCRATCH}/reproof15-results.json`).
+ *
+ * ROUND 28 — ONE PAGE SCROLL, NO INNER SCROLLBAR (R89/R91), 19–20 Sep 2026.
+ * Aurora's dark-theme screenshot showed a SECOND scrollbar, inside the
+ * ticket page, above the band — this file's own "ONE SCROLLING REGION"
+ * wrapper (`flex-1 min-h-0 overflow-y-auto`, rounds 24–27) was a REAL
+ * `overflow: auto` box, bounded to whatever height the flex chain above it
+ * resolved to, so once the grid/stack inside it needed more room than that
+ * the box scrolled ITS OWN content instead of letting the page grow — a
+ * second scroller most of this file's own rounds were written explicitly
+ * to avoid at the BAND's position, never noticing they had built one at the
+ * REGION's. Her ruling, verbatim (18–19 Sep 2026, restated as the standing
+ * R91): "never need to scroll to see all content!!! (only exception chat
+ * compnents)" — one page scroll only, and R91's own exception list names
+ * this file's chat thread `CardContent` by name.
+ *
+ * FIXED BY REMOVING THE BOUND, NOT BY MOVING IT. Every earlier round bound
+ * the region so the band's position could be trusted; round 28 removes
+ * that bound and trusts flexbox's own "automatic minimum size" instead —
+ * the CSS spec's name for `min-height`'s initial value, `auto`, which
+ * resolves to a CONTENT-BASED FLOOR for a flex item along the main axis
+ * whenever nothing overrides it to `0`. Three edits, all in this file
+ * (`app-shell.tsx`'s own growth rule is the fourth, below):
+ *
+ *  1. THE ROOT drops `min-h-0`, keeping `flex-1` (grow=1, shrink=1,
+ *     basis=0%, Tailwind's own utility, unchanged). Without `min-h-0`
+ *     clamping it to zero, the root's own automatic minimum is its
+ *     CONTENT height — so it fills the leftover space after the head
+ *     (`RecordChrome`, `flex-none`) when content is short, exactly as
+ *     `flex-1` already did, and grows PAST that leftover space to its own
+ *     content height the moment content is taller — no percentage
+ *     arithmetic, no fight with the head sibling. (A literal `min-h-full`,
+ *     the first candidate this round tried by live injection, FAILED the
+ *     short-page proof below: `min-height: 100%` on a flex item resolves
+ *     against the WHOLE flex container, ignoring the head's own height
+ *     entirely, so the root was floored to the container's full height ON
+ *     TOP OF the head — overflowing by exactly the head's height. Dropping
+ *     `min-h-0` and trusting the automatic minimum instead has no such
+ *     blind spot, because it only ever floors the item to ITS OWN content,
+ *     never to a sibling-blind percentage.)
+ *  2. THE REGION (the "ONE SCROLLING REGION" wrapper, this component's
+ *     other child besides the band) drops `flex-1`/`min-h-0`/
+ *     `overflow-y-auto` entirely — an ordinary, content-sized block now,
+ *     exactly like the side column already was (round 27). Nothing here
+ *     scrolls; the grid/stack it holds paints at its own natural height.
+ *  3. THE BAND drops `sticky` and the round-23 negative, padding-
+ *     compensated `bottom` offset for `margin-top: auto` — the ordinary
+ *     "footer at the bottom of a short page" flex trick. As the root's own
+ *     LAST flex child, `mt-auto` consumes whatever leftover space the root
+ *     was handed (pushing the band to the root's own bottom edge, the
+ *     window's bottom for a short page) or simply sits right after the
+ *     region when content already filled that space (the tall-page case).
+ *  4. `app-shell.tsx`'s own `has-[[data-slot=ticket-detail-body]]:h-[calc(…)]`
+ *     growth rule (round 22b) is RETIRED — it existed only to let the
+ *     STICKY band reach past the pane's own reserved bottom padding, and
+ *     nothing here is sticky any more. The page container keeps its
+ *     ordinary padding now, so the ticket page ends on the pane's own
+ *     bottom padding exactly like every other record screen — proved below
+ *     against an account record's own last-card bottom.
+ *
+ * PROVED FIRST BY LIVE DOM/STYLE INJECTION against T0001 on staging, TWICE
+ * (`${SCRATCH}/onescroll-proof.json`, the failed `min-h-full` candidate;
+ * `${SCRATCH}/onescroll-proof2.json`, this construction), before touching
+ * source, at 1800×978, 1991×842 assistant open, 1440×900, 1280×800 and
+ * 760×900: after injection, the census of every element inside
+ * `[data-slot="ticket-detail-body"]` whose `scrollHeight` exceeds its
+ * `clientHeight` comes back EMPTY at all five widths (the pre-injection
+ * census, by contrast, always found exactly the old region wrapper,
+ * `scrollHeight`/`clientHeight` diffs of 360–1270px depending on width) —
+ * confirming the inner scrollbar is gone, not merely resized. At every
+ * width `screenBodyScrolls` is `true` (the ONE page scroller) and
+ * `docScrolls`/`threadScrolls` are `false` at rest; the band is the root's
+ * last child (`bandLast_PASS`) and sits flush with the screen body's own
+ * bottom (`bandVsBodyPx` within ±0.6px, matching an ordinary sub-pixel
+ * layout rounding); the conversation card's height matches the side
+ * column's exactly at `lg` (`heightsMatch_PASS`, A/B/D/E — F is 760×900,
+ * BELOW `lg`, where the two are stacked rather than paired, so the check
+ * does not apply there, unchanged from round 27's own proof). At 1991×842
+ * with the assistant open, injecting 40 extra thread bubbles left the
+ * root's own height UNCHANGED (1057.19px before and after,
+ * `pageHeightUnchanged_PASS`) with the ONE remaining scroller being the
+ * thread's own `card-content` (`scrollHeight`/`clientHeight` diff 1959px)
+ * — R91's own named exception, nothing else. At 1440×900, removing the
+ * three side cards and blanking the thread (simulating a genuinely SHORT
+ * ticket) landed the band's own bottom EXACTLY at the screen body's own
+ * bottom (`bandVsBodyPx: 0`, `bandAtWindowBottom_PASS: true`) — the
+ * `min-h-full` candidate had failed this exact check by ~196px, the head's
+ * own height. And against an account record's own detail page (a screen
+ * this construction does not touch), the last card's own bottom sat within
+ * ~1px of the screen body's own bottom at every one of the five widths —
+ * proving the ticket page's band now ends exactly where every other
+ * record screen's last card already does, "not special" by construction. */
 
 /** Tailwind's `lg` breakpoint (`64rem`, 1024px — confirmed against the
  * built CSS this session, `min-width:64rem`), the ONE number this
@@ -354,16 +447,23 @@ export function TicketDetailBody({
   return (
     <div
       data-slot="ticket-detail-body"
-      className="flex min-w-0 flex-1 min-h-0 flex-col gap-6"
+      className="flex min-w-0 flex-1 flex-col gap-6"
     >
-      {/* THE ONE SCROLLING REGION — everything except the band. Bounded by
-          construction: `flex-1 min-h-0 overflow-y-auto` against the root's
-          own definite height, so its own content (the grid or the stack)
-          can never grow past it — that boundedness is what keeps the band
-          below pinned at the true bottom without depending on `sticky`
-          alone (see this file's own header for the live proof that a
-          sticky element riding on an UNBOUNDED region rides down with it). */}
-      <div className="min-w-0 flex-1 min-h-0 overflow-y-auto">
+      {/* THE ONE NORMAL-FLOW REGION — everything except the band. ROUND 28
+          (R89/R91, see this file's own header): content-sized, like any
+          ordinary block — no `min-h-0`, no `overflow-y-auto` of its own.
+          The grid (or stack) it holds renders at its own natural height,
+          and the ROOT above (`flex-1`, no `min-h-0`) is what lets that
+          height win: flexbox's own "automatic minimum size" (`min-height`'s
+          initial value is `auto`, a content-based floor, whenever it is not
+          overridden to `0`) makes the root fill the leftover space after
+          the head when content is short, and grow PAST that leftover space
+          to its own content height the instant content is taller — no
+          percentage trick, no fight with the head sibling. The SCREEN's own
+          scroller (`[data-slot="screen-shell-body"]`) is what then scrolls
+          the whole page as ONE region when that happens, never a second,
+          nested one here. */}
+      <div className="min-w-0">
         {isAtLeastLg ? (
           // ROUND 27 — no `h-full`/`min-h-0` on the grid itself either: an
           // explicit-height grid container with one `auto` row would let
@@ -394,15 +494,26 @@ export function TicketDetailBody({
       </div>
       {/* THE BAND — LATEST ACTIVITY + RECORD, the kit's own ink footer,
           this component's `flex-none` LAST child, full content width.
-          `sticky` with the round-23 negative, padding-compensated offset
-          stays as BELT-AND-BRACES ONLY (never the primary mechanism — the
-          scrolling region above is bounded by construction instead), so
-          if the flex chain above it ever resolves wrong on some future
-          width/height/assistant-state combination, the band still cannot
-          leave the viewport. */}
+          ROUND 28 (R89/R91): NORMAL FLOW, `mt-auto`, never `sticky`/
+          `fixed`. The root's own `flex-1` (above) already fills the
+          leftover space after the head when the page is short, so
+          `margin-top: auto` on this, its last flex child, is the ordinary
+          "footer at the bottom of a short page" trick — it consumes
+          whatever leftover space the root was handed, pushing the band
+          down to the root's own bottom edge (the window's bottom, for a
+          short page). When content is instead taller than that leftover
+          space, the root has already grown to fit it (see the region
+          comment above), so the band simply sits right after the region,
+          at the true end of a page the browser now scrolls as ONE region —
+          no sticky offset, no negative padding compensation, because
+          nothing needs to reach past a pane's own reserved bottom padding
+          any more (`app-shell.tsx`'s `has-[[data-slot=ticket-detail-body]]`
+          growth rule is retired the same round: this page now ends on the
+          pane's own ordinary bottom padding, exactly like every other
+          record screen). */}
       <div
         data-slot="ticket-footer-band"
-        className="flex-none sticky z-[1] w-full bottom-[calc(-1*var(--space-5))] lg:bottom-[calc(-1*var(--space-6))]"
+        className="flex-none mt-auto w-full"
       >
         {footer}
       </div>

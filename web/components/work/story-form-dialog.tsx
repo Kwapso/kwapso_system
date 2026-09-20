@@ -66,7 +66,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
 import type { StoryAttachment } from "@shared/types"
-import { TITLE_MAX_CHARS } from "@shared/types"
+import { MOSCOW_VALUES, TITLE_MAX_CHARS } from "@shared/types"
 import { richTextValue } from "@shared/web/rich-text"
 import { pickedFileId, storedFileToUploadItem, usePickedFileItems } from "@shared/web/upload-items"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -86,14 +86,22 @@ export type StoryFormValues = {
   /** Data / Tech / Bug / Feature / Change — required (CHECKLIST 6.2, client
    * ruling 15 Sep 2026). */
   storyType: string
-  /** Client-requested / Internal (the same ruling) — required, defaults to
-   * Client-requested. */
+  /** Client-requested / Enabler (the same ruling, "Internal" renamed 20 Sep
+   * 2026) — required, defaults to Client-requested. An Enabler story must
+   * name a ticket (`ticketId` above) — Aurora's ruling, same day. */
   category: string
   /** Every map this work touches (CHECKLIST 6.5). */
   processIds: string[]
   /** …or the explicit statement that it touches none. Aurora's ruling: it has to
    * be CHOSEN, not left blank, so the door refuses an empty list without it. */
   changesNoStep: boolean
+  /** WHAT "DONE" LOOKS LIKE (Aurora's ruling, 20 Sep 2026: "same design as
+   * Detail") — optional, rich text. */
+  acceptanceCriteria: string
+  /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional;
+   * an empty string means "not set", the same convention every other
+   * optional pick on this form already reads. */
+  moscow: string
 }
 
 /** "Nothing chosen" as a real Select value: an empty string is not selectable in
@@ -155,6 +163,13 @@ const categoryField = {
   required: true,
 }
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
+// SAME DESIGN AS DETAIL (Aurora's ruling, 20 Sep 2026, verbatim): identical
+// field shape, one line down.
+const acceptanceCriteriaField = { ...defaultFieldConfig, label: "Acceptance criteria", required: false }
+// MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — never
+// required: every EXISTING story predates the field, so a value is a choice
+// rather than a gate.
+const moscowField = { ...defaultFieldConfig, label: "Priority", required: false }
 const sprintField = {
   ...defaultFieldConfig,
   label: "Sprint",
@@ -165,6 +180,12 @@ const ticketField = {
   label: "Tickets",
   required: false,
 }
+/** THE SAME FIELD, REQUIRED — Aurora's ruling, 20 Sep 2026, verbatim: "When a
+ * story's origin is Enabler, must select a related ticket!" Read at render
+ * time off `values.category` rather than baked into `ticketField` itself,
+ * because whether this is required changes as somebody picks a different
+ * category on the SAME open dialog. */
+const enablerTicketField = { ...ticketField, required: true }
 const processField = {
   ...defaultFieldConfig,
   label: "Processes",
@@ -329,9 +350,18 @@ export function StoryFormDialog({
           // — so it is the fact to read rather than a second flag saying the
           // same thing. Still an ordinary default: the field below stays
           // editable, same as `typeField`'s own "always answered" one field up.
-          category: fixedTicket ? "Client-requested" : "Internal",
+          //
+          // "INTERNAL" IS "ENABLER" NOW (20 Sep 2026 rename) — same default
+          // logic, new word, and the new word carries a new requirement (an
+          // Enabler needs a ticket, `ready` below), so a scratch create that
+          // opens on this default is not submittable until a ticket is
+          // picked or the category is switched — the ordinary shape of a
+          // form whose default answer is not yet a complete one.
+          category: fixedTicket ? "Client-requested" : "Enabler",
           processIds: [],
           changesNoStep: false,
+          acceptanceCriteria: "",
+          moscow: "",
         },
     open
   )
@@ -386,10 +416,20 @@ export function StoryFormDialog({
   // A story is describable once it has a name, a kind, and an answer about which
   // maps it changes — the same three the door insists on, so the button is never
   // enabled into a refusal.
+  //
+  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) rides the same READY flag
+  // rather than a separate disabled reason — the door's own refusal
+  // (`refuseEnablerWithNoTicket`, workers/content/src/lib/stories.ts) is the
+  // one place this is actually enforced; this only keeps the button from
+  // being enabled into that exact refusal, `resolveProcesses`'s own reason
+  // one field up. `fixedTicket` counts as a ticket — it is a real one, just
+  // not editable on this form (see its own doc above).
+  const effectiveTicketId = fixedTicket ? fixedTicket.id : values.ticketId
   const ready =
     values.title.trim() !== "" &&
     values.storyType !== "" &&
-    (values.changesNoStep || values.processIds.length > 0)
+    (values.changesNoStep || values.processIds.length > 0) &&
+    (values.category !== "Enabler" || effectiveTicketId !== "")
 
   // WHAT SOMEBODY PICKED, held until there is a story to hang it on.
   //
@@ -524,6 +564,8 @@ export function StoryFormDialog({
         category: values.category,
         processIds: values.changesNoStep ? [] : values.processIds,
         changesNoStep: values.changesNoStep,
+        acceptanceCriteria: richTextValue(values.acceptanceCriteria),
+        moscow: values.moscow,
       })
       // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `storyId` on an
       // edit, the id the create door just handed back otherwise.
@@ -677,6 +719,19 @@ export function StoryFormDialog({
           className="min-h-32"
         />
       </Field>
+      {/* ACCEPTANCE CRITERIA — Aurora's ruling, 20 Sep 2026: "same design as
+          Detail." The identical `Notes` editor, one field down. */}
+      <Field config={acceptanceCriteriaField} htmlFor="story-acceptance-criteria" className={fieldSpacing}>
+        <Notes
+          key={open ? "open" : "shut"}
+          aria-label={t(acceptanceCriteriaField.label)}
+          disabled={busy}
+          defaultValue={values.acceptanceCriteria}
+          onChange={(html) => setValues((s) => ({ ...s, acceptanceCriteria: html }))}
+          placeholder={t("What has to be true for this to count as done.")}
+          className="min-h-32"
+        />
+      </Field>
       {/* THE SCREENSHOT, beside the words that describe it. On BOTH halves of
           this dialog, which the header above makes a rule: one field, one code
           path, and the upload simply knows a different id on an edit. */}
@@ -741,7 +796,14 @@ export function StoryFormDialog({
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
-      <Field config={ticketField} htmlFor="story-ticket" className={fieldSpacing}>
+      {/* REQUIRED WHEN THE ORIGIN IS ENABLER (Aurora's ruling, 20 Sep 2026) —
+          `enablerTicketField`'s own doc says why this reads `values.category`
+          rather than a static config. */}
+      <Field
+        config={values.category === "Enabler" ? enablerTicketField : ticketField}
+        htmlFor="story-ticket"
+        className={fieldSpacing}
+      >
         {fixedTicket ? (
           <FactRow id="story-ticket" name={fixedTicket.label} />
         ) : (
@@ -879,6 +941,26 @@ export function StoryFormDialog({
           onValueChange={(v) => setValues((s) => ({ ...s, assigneeId: v }))}
           disabled={busy}
         />
+      </Field>
+      {/* MOSCOW — Aurora's ruling, 20 Sep 2026. Optional, so the group's own
+          "nothing chosen" state is a genuine third option, not one of the
+          four words — re-pressing the active segment clears it, the reverse
+          of the required Category group just below. */}
+      <Field config={moscowField} shape="group" htmlFor="story-moscow" className={fieldSpacing}>
+        <ToggleGroup
+          id="story-moscow"
+          type="single"
+          value={values.moscow}
+          onValueChange={(v) => setValues((s) => ({ ...s, moscow: v }))}
+          disabled={busy}
+          aria-label={t("Priority")}
+        >
+          {MOSCOW_VALUES.map((v) => (
+            <ToggleGroupItem key={v} value={v} disabled={busy}>
+              {v}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </Field>
       {/* CATEGORY, LAST AND PREFILLED — client ruling, 16 Sep 2026: "the
           client requested or internal should be at the very bottom and

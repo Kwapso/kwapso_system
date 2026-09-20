@@ -43,6 +43,7 @@ import { useLanguage, useT } from "@shared/web/language"
 import { sortedOptions } from "@shared/web/sorted-options"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
+import { orderChips } from "@shared/web/chip-order"
 
 /** Every list on this file narrows an already-loaded array in the browser, the
  * same shape `selectable-screen.tsx`'s own toolbar uses — Companies is truly
@@ -379,7 +380,7 @@ export function ContactTicketsPanel({
                 <RecordRef value={ticket.ref} />
                 <span className="min-w-0 truncate">{richTextPlain(ticket.description)}</span>
               </p>
-              {/* THE TYPE AND STATUS, AS REAL BADGES (chips-are-badges check C,
+              {/* THE STATUS AND TYPE, AS REAL BADGES (chips-are-badges check C,
                   Aurora's 19 Sep 2026 ruling: "the type of ticket and the
                   status need the card to have a background") — this line used
                   to fold both into the same joined, unstyled caption as the
@@ -387,23 +388,36 @@ export function ContactTicketsPanel({
                   function every other table-row status cell already routes
                   through (`web/components/deep-link/shape.tsx`), so this row
                   never re-invents it. The date stays plain text: it is not a
-                  categorical field and was never a chip in this app (R86). */}
+                  categorical field and was never a chip in this app (R86).
+                  ORDERED THROUGH `orderChips` (R94, shared/web/chip-order.ts):
+                  id (the ref chip, above, on its own line), then status,
+                  then type — the fixed order the law names, never a hand-kept
+                  sequence a future edit here can quietly re-shuffle. */}
               <p className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-                {ticket.helpType && (
-                  <Badge
-                    variant="secondary"
-                    size="pill"
-                    className="shrink-0"
-                    icon={
-                      ticketTypeIconName(ticket.helpType) ? (
-                        <Icon name={ticketTypeIconName(ticket.helpType)!} className="size-3.5 shrink-0" />
-                      ) : undefined
-                    }
-                  >
-                    {ticket.helpType}
-                  </Badge>
-                )}
-                {ticketStatusCell(ticket.status, t)}
+                {orderChips([
+                  {
+                    kind: "status",
+                    node: <React.Fragment key="status">{ticketStatusCell(ticket.status, t)}</React.Fragment>,
+                  },
+                  {
+                    kind: "type",
+                    node: ticket.helpType ? (
+                      <Badge
+                        key="type"
+                        variant="secondary"
+                        size="pill"
+                        className="shrink-0"
+                        icon={
+                          ticketTypeIconName(ticket.helpType) ? (
+                            <Icon name={ticketTypeIconName(ticket.helpType)!} className="size-3.5 shrink-0" />
+                          ) : undefined
+                        }
+                      >
+                        {ticket.helpType}
+                      </Badge>
+                    ) : null,
+                  },
+                ])}
                 {ticket.createdAt && (
                   <span className="text-muted-foreground truncate">{formatDate(ticket.createdAt, lang)}</span>
                 )}

@@ -29,7 +29,7 @@ import { Check, CheckSquare, PencilSimple } from "@shared/ui/foundations/icons"
 
 import { StoryFormDialog, type StoryFormValues } from "@/components/work/story-form-dialog"
 import { ReviewDialog, type ReviewFormValues } from "@/components/work/review-dialog"
-import { storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
+import { MoscowChip, storyTypeChip, useStoryFormOptions } from "@/components/work/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work/work-panels"
 import { storyStatusDotTone } from "@shared/status-tones"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
@@ -157,6 +157,7 @@ export function StoryDetailScreen({
   const translation = useHumanTranslation(teamId, [
     storyQ.data?.title,
     storyQ.data?.detail,
+    storyQ.data?.acceptanceCriteria,
     storyQ.data?.reviewNote,
     storyQ.data?.closingNote,
   ])
@@ -188,6 +189,8 @@ export function StoryDetailScreen({
       assigneeId: values.assigneeId || undefined,
       processIds: values.processIds,
       changesNoStep: values.changesNoStep,
+      acceptanceCriteria: values.acceptanceCriteria || undefined,
+      moscow: values.moscow || undefined,
     })
     refresh()
     toast.success(t("Story updated."))
@@ -246,6 +249,10 @@ export function StoryDetailScreen({
     // WHERE THIS WORK CAME FROM (client ruling, 15 Sep 2026) — beside Type,
     // the same overview list, so both halves of the ruling read together.
     { label: t("Category"), value: story.category },
+    // MOSCOW (Aurora's ruling, 20 Sep 2026) — the same coloured tag the
+    // backlog's own rows and cards draw, or a plain dash for the 3,677
+    // pre-existing stories with none set.
+    { label: t("Priority"), value: story.moscow ? <MoscowChip value={story.moscow} /> : "—" },
     { label: t("Reference"), value: story.ref || "—" },
     // R54: a story is agency work, so the assignee is one of ours.
     { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
@@ -287,6 +294,13 @@ export function StoryDetailScreen({
     {
       label: t("Detail"),
       value: story.detail ? <RichText html={translation.of(story.detail)} /> : "—",
+    },
+    // ACCEPTANCE CRITERIA — Aurora's ruling, 20 Sep 2026: "same design as
+    // Detail." Identical treatment, one row down: translated, then rendered
+    // as rich text.
+    {
+      label: t("Acceptance criteria"),
+      value: story.acceptanceCriteria ? <RichText html={translation.of(story.acceptanceCriteria)} /> : "—",
     },
     {
       label: t("Processes it changes"),
@@ -392,30 +406,48 @@ export function StoryDetailScreen({
       // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
       // took the eyebrow out of the full header); the breadcrumb above this
       // header is what names the record type now.
-      // D4: the type word and the reference, above the title.
-      recordNumber={story.ref || undefined}
-      collectionLabel={story.storyType || t("Story")}
-      // THE SECOND PILL, WITH A COLOUR (client ruling, 2026-08-31: "the status
-      // scheme is not only for tickets … map colors"). `storyStatusDotTone`
-      // (shared/status-tones.ts) reuses the same four-value enum the header's
-      // own stage stepper used to draw before the 2026-08-31 "nothing after
-      // chips" ruling removed it (see `actions`'s own note below) — this chip
-      // is now the only place that fact reads.
+      // NO D4 RECORD NUMBER / COLLECTION LABEL ANY MORE — Aurora's own chip-
+      // order ruling, 20 Sep 2026, verbatim: "on story detail, the chips in
+      // order: id, status, type, app (underlined), sprint (id, underlined)."
+      // The reference and the type word both MOVE into the chips row below
+      // (its first and third members) rather than living twice — once above
+      // the title through `recordNumber`/`collectionLabel`, once again as a
+      // chip — which is what drawing both at once would do.
       //
-      // THE THIRD PILL, "the most relevant container parent" (client ruling,
-      // 2026-08-31). The glossary's own words settle which of the three
-      // cross-links below is that one: "story: … it lives in a SPRINT" — the
-      // sprint is the story's literal container, so it is the chip; the app and
-      // the ticket had no chip of their own and are gone from the header
-      // entirely (see this file's own note further down).
+      // THE FIVE CHIPS, IN HER OWN ORDER:
+      //   1. id      — the story's own reference, the same mono badge every
+      //                other list row leads with (`storyLead`, stories-
+      //                screen.tsx).
+      //   2. status  — WITH A COLOUR (client ruling, 2026-08-31: "the status
+      //                scheme is not only for tickets … map colors").
+      //   3. type    — the identical icon+word chip the backlog's own rows
+      //                and cards draw (`storyTypeChip`).
+      //   4. app     — underlined because it is a link (her own words), the
+      //                cross-link this header carried nowhere until now.
+      //   5. sprint  — underlined, the same link this header already drew
+      //                one position later; "(id)" is UNDERSTOOD as "the
+      //                nested link a story detail can carry" the way the
+      //                app one now can, not a distinct id column — Sprint's
+      //                own reference is not yet a field this record reads.
       chips={
         <>
+          {story.ref && (
+            <Badge variant="secondary" className="font-mono">
+              {story.ref}
+            </Badge>
+          )}
           <Badge variant="status" dot={storyStatusDotTone(story.status)}>
             {STORY_STATUS_LABEL[story.status]}
           </Badge>
+          {storyTypeChip(story.storyType)}
+          {story.appId && story.appName ? (
+            <RecordChipLink href={`${host.base}/apps/${story.appId}`}>
+              <span className="underline">{story.appName}</span>
+            </RecordChipLink>
+          ) : null}
           {story.sprintId && story.sprintName ? (
             <RecordChipLink href={`${host.base}/sprints/${story.sprintId}`}>
-              {story.sprintName}
+              <span className="underline">{story.sprintName}</span>
             </RecordChipLink>
           ) : null}
           {/* THE FOLDED TRIGGER, ON THE CHIP ROW'S OWN LINE — same wiring as
@@ -570,6 +602,8 @@ export function StoryDetailScreen({
           category: story.category,
           processIds: story.processIds,
           changesNoStep: story.changesNoStep,
+          acceptanceCriteria: story.acceptanceCriteria ?? "",
+          moscow: story.moscow ?? "",
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}

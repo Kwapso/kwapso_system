@@ -76,6 +76,7 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
     sprintId: null,
     sprintName: null,
     appId: null,
+    appName: null,
     processId: null,
     stepKey: null,
     changesNoStep: true,
@@ -91,6 +92,8 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
     closingNote: null,
     storyType: "Feature",
     category: "Client-requested",
+    acceptanceCriteria: null,
+    moscow: null,
     reviewNote: null,
     reviewFileUrl: null,
     reviewFileName: null,
@@ -103,9 +106,16 @@ function story(partial: Partial<Story> & { id: string; title: string; rank: stri
   }
 }
 
-/** Every List row's own Story cell text, in the order they are painted. */
+/** Every List row's own Story cell text, in the order they are painted.
+ *
+ * THE SECOND `<td>`, NOT THE FIRST — Aurora's ruling, 20 Sep 2026: "On
+ * stories 'Planned,' add id as the first column. Same on the 'Backlog'
+ * tab." Backlog's own column order is now [ID, Story, Type, Category,
+ * Status, Sprint], so the title cell moved one column to the right. */
 const rowOrder = () =>
-  Array.from(document.querySelectorAll("tbody tr")).map((tr) => tr.querySelector("td")?.textContent ?? "")
+  Array.from(document.querySelectorAll("tbody tr")).map(
+    (tr) => tr.querySelectorAll("td")[1]?.textContent ?? ""
+  )
 
 function renderBacklog(stories: Story[]) {
   const teamId = `team-${++team}`
@@ -120,7 +130,7 @@ function renderBacklog(stories: Story[]) {
       recipe={BASE_RECIPES["stories.list"]}
       rights={{ work: { read: true, create: true, update: true } } as never}
       total={stories.length}
-      counts={{ now: 0, planned: 0, backlog: stories.length, completed: 0, all: 0 }}
+      counts={{ now: 0, planned: 0, backlog: stories.length, completed: 0, all: 0, reviews: 0 }}
       view="backlog"
       onViewChange={() => {}}
       canCreate
@@ -160,14 +170,18 @@ describe("Stories — Backlog's own List, the toolbar's sort (Order · Deadline)
     expect(headerButtons.length).toBe(0)
   })
 
-  it("draws a Story, Type, Category, Status and Sprint column, in that order — never a priority column", async () => {
+  it("draws an ID, Story, Type, Category, Status and Sprint column, in that order — never a priority column", async () => {
     const rows = [story({ id: "s1", title: "Columns", rank: "a0" })]
     renderBacklog(rows)
     await screen.findByText(/Columns/)
     const headers = Array.from(document.querySelectorAll("thead th")).map((th) => th.textContent)
     // TYPE JOINED THE ROW 2026-09-16 (client: "assign an icon to each type"),
     // its own column now rather than squeezed into the Story cell — see
-    // `MINE_COLUMNS`, stories-screen.tsx.
-    expect(headers).toEqual(["Story", "Type", "Category", "Status", "Sprint"])
+    // `MINE_COLUMNS`, stories-screen.tsx. ID JOINED IT FIRST, 20 Sep 2026
+    // (Aurora: "add id as the first column [...] Same on the 'Backlog'
+    // tab") — `PLANNED_BACKLOG_COLUMNS`. MoSCoW is deliberately NOT a
+    // seventh column here (R82's six-column ceiling) — it is a card tag and
+    // a toolbar filter/sort instead (`MOSCOW_DOT_TONE`/facet, same file).
+    expect(headers).toEqual(["ID", "Story", "Type", "Category", "Status", "Sprint"])
   })
 })

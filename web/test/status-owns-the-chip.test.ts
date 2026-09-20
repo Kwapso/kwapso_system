@@ -58,6 +58,7 @@ const FILES = [
   "web/components/tickets/help-form-dialog.tsx",
   "web/components/work/work-panels.tsx",
   "web/components/work/tasks-screen.tsx",
+  "web/components/work/stories-screen.tsx",
   "web-portal/components/ticket-row.tsx",
   "shared/web/ticket-chips.tsx",
 ]

@@ -4,10 +4,20 @@
 // shape: the byline ("Alaap · 45m ago") sits UNDER the bubble, aligned to the
 // bubble's own side, avatar beside it as before.
 //
+// AMENDED 20 Sep 2026 — Aurora, verbatim: "when there are multiple messages
+// by the same person, keep the name and date only on the bottom one, but
+// show the avatar for each." The paragraph below used to say `initials` was
+// gated to a run's own last reply exactly like `author`/`authorMeta`/`time` —
+// that was backwards from kit v1.2.136's own stated contract (`initials`/
+// `image` are independent of the byline), and it hid the avatar on every
+// bubble but the last instead of showing it once per run "for free" the way
+// the old comment claimed. `initials`/`image` now ride on EVERY reply;
+// `author`/`authorMeta`/`time` stay gated to the run's last.
+//
 // THE SPLIT. `help-detail.tsx` owns the RUN computation that decides which
-// reply in a consecutive same-author span carries the byline at all: a run
+// reply in a consecutive same-author span carries the BYLINE at all: a run
 // breaks on author id (never name, never a time gap), and only the run's
-// LAST reply carries `author`/`authorMeta`/`initials`/`time`, off
+// LAST reply carries `author`/`authorMeta`/`time`, off
 // `nameInitials`/`formatRelative`/`staffNameFromSnapshot`, fed to the kit's
 // `TicketThread` via its `messages` prop. THE PLACEMENT is the kit's own,
 // as of v1.2.133: `bylinePlacement="below"` (passed at the call site) moves
@@ -203,11 +213,16 @@ describe("the thread groups consecutive same-author replies into a run, and only
     expect(within(third).queryByText("Priya")).not.toBeNull()
     expect(within(third).queryByText("Alaap")).toBeNull()
 
-    // THE AVATAR — `hasAvatar` in the kit (ticket-thread.tsx) follows the
-    // same `initials`/`image` fields this block gates, so it is drawn once
-    // per run too: absent on bubble 1, present on bubble 2.
-    expect(first.querySelector('[data-slot="avatar-fallback"]')).toBeNull()
+    // THE AVATAR — Aurora, 20 Sep 2026, verbatim: "when there are multiple
+    // messages by the same person, keep the name and date only on the bottom
+    // one, but show the avatar for each." `hasAvatar` in the kit
+    // (ticket-thread.tsx) keys on `initials`/`image` alone, which
+    // `help-detail.tsx` now passes on EVERY reply regardless of run position
+    // — only `author`/`authorMeta`/`time` stay gated to a run's own last
+    // reply. So the avatar shows on all three bubbles, the byline on two.
+    expect(first.querySelector('[data-slot="avatar-fallback"]')).not.toBeNull()
     expect(second.querySelector('[data-slot="avatar-fallback"]')).not.toBeNull()
+    expect(third.querySelector('[data-slot="avatar-fallback"]')).not.toBeNull()
 
     // THE PLACEMENT — kit v1.2.133's `bylinePlacement="below"`, passed at the
     // call site. Bubble 1 carries no byline at all (checked above by text;

@@ -2,6 +2,81 @@
 
 ## Unreleased
 
+### Fixed — a run's earlier chat bubbles keep their face even with no byline, and the doc that told a caller otherwise is corrected — v1.2.136
+
+**THE RULINGS, VERBATIM, 20 Sep 2026.** Aurora:
+
+1. *"Avatars are always a round image ('Raised by' must be a round image
+   too)."*
+2. *"On chat, when there are multiple messages by the same person, keep the
+   name and date only on the bottom one, but show the avatar for each."*
+3. *"only show initials when there's no avatar."*
+
+**RULING 1 — AUDITED, NOTHING TO RETIRE IN THIS REPO.** The brief named a
+`PersonCard` with a `shape="square"` band added 18 Sep for stakeholder
+tiles. No `PersonCard` (or `GalleryCard`) exists anywhere in this kit —
+`shared/web/person-card.tsx`, `web/components/tickets/help-stakeholders.tsx`
+and `web/components/team/members-gallery.tsx` are `kwapso_system` app-side
+files this repository does not own and this release does not touch (filed
+as an app-side follow-up). Every kit-side face was already audited against
+ruling 1: `avatar.tsx`'s own `shape` variant defaults to `pill`; the only
+`shape="square"` call sites left (`compositions/screens/company-hub.tsx`'s
+company logo, `compositions/screens/invite-acceptance.tsx`'s account mark,
+`select.tsx`'s `SelectFace.shape`, `notifications.tsx`'s "the system" row)
+are all things, never a person; the rail's `MemberFace`/`MemberChip` and
+every other face-drawing composition (`comments.tsx`, `chat.tsx`,
+`notes.tsx`, `list.tsx`, `activity-feed.tsx`, `detail-view.tsx`,
+`screen-shell.tsx`) draws its face through `<Avatar>` at the pill default.
+Nothing changed here; the audit is the deliverable.
+
+**RULING 2 — THE FIX.** `ticket-thread.tsx`'s avatar (`hasAvatar`) was
+already keyed only on `message.initials`/`message.image`, never on the
+byline fields (`hasByline`) — the two were already independent in the
+render logic. The bug was this file's OWN doc comment on
+`ThreadBylinePlacement`, which told a caller building a run to *"pass
+`author`/`time`/`initials` only on the last message of a run"* — and at
+least one caller (`kwapso_system/web/components/tickets/help-detail.tsx`,
+app-side) read that literally and omitted `initials` on a run's earlier
+messages too, which hid their avatar along with their byline. The doc is
+corrected: `author`/`authorMeta`/`time` collapse to the last message of a
+run, `initials`/`image` stay on every message. `ThreadMessage.initials` and
+`.image` gain the same note. The render logic needed no change; the
+instruction that contradicted it did.
+
+**RULING 3 — ALREADY LAW, RE-CONFIRMED.** `AvatarFallback` still hides
+itself only on `status === "loaded"` (the v1.2.115 cached-image race fix,
+unchanged). `grep -rn "initials" components compositions | grep -v Avatar`
+found every composition that carries an `initials` prop
+(`detail-view.tsx`, `comments.tsx`, `chat.tsx`, `notes.tsx`, `list.tsx`,
+`activity-feed.tsx`, `notifications.tsx`, `rail.tsx`, `screen-shell.tsx`,
+`record-route.tsx`, `access-denied.tsx`, `new-empty-record.tsx`,
+`company-hub.tsx`, `select.tsx`) — every one of them hands the value to
+`<AvatarFallback>` and only mounts `<AvatarImage>` when a `src`/`image` is
+actually present; none draws initials as a bare string bypassing `Avatar`.
+No changes were needed.
+
+**VERIFIED.** `components/ticket-thread/check-ticket-thread.mjs` gains
+section 6: a mounted A(initials)/A(image, no byline is NOT the reason it
+lacks initials — this row HAS a byline)/B(initials)/X(no face at all)
+render proves the avatar renders whenever `initials` or `image` is given
+regardless of `hasByline`, an `<AvatarImage>` renders only when an image
+`src` was given, and only the message given neither carries no avatar at
+all. `verify/select-faces/page.tsx` gains a permanently-mounted
+`TicketThread` "A, A, B" run (bubble 1: no byline, initials only) beside
+the existing "Raised by" `Select` case, both read by a new
+`isCircle()` — a GEOMETRIC circle test (computed border-radius ≥ half the
+element's own rendered size) rather than a string match against `"50%"`,
+because the kit's own pill token is `999px`. Read live in the browser://
+bubble 1 (no byline) — `hasAvatar: true, isCircle: true`; bubble 2 (byline,
+photo) — `hasAvatar: true, hasImage: true, isCircle: true`; bubble 3
+(byline, initials) — `hasAvatar: true, isCircle: true`; the select
+trigger's own chosen face — `isCircle: true`.
+
+**Files:** `components/ticket-thread/ticket-thread.tsx` (doc only — no
+render-logic change), `components/ticket-thread/check-ticket-thread.mjs`
+(new section 6), `verify/select-faces/page.tsx` (thread run + `isCircle`
+measurement).
+
 ### Fixed — the docked assistant's narrow-width sheet is the one surface v1.2.132 missed — v1.2.134
 
 **THE REPORT.** A live proof, 19 Sep 2026, on top of v1.2.132's "chips and

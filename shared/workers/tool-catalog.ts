@@ -30,6 +30,7 @@ import { B, enumOf, N, obj, S, str } from "./tool-args"
 import { brand } from "../brand"
 import { MODULE_ICON_NAMES } from "../module-icons"
 import { canonicalModule } from "./query-grammar"
+import { MOSCOW_VALUES } from "../types"
 
 /** THE WORD A PERSON READS, never the alias the model was told it could type.
  * `describe_module`/`query_records` accept a module by any of its aliases
@@ -1195,12 +1196,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Write down one piece of work. `title`, `storyType` and one of `processIds`/`changesNoStep` are required; `category` defaults to Client-requested.",
     detail:
-      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Internal (Kwapso-initiated upkeep) — leave it off for the ordinary case. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket. `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it.",
+      "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Data, Tech, Bug, Feature, Change as seeded). `category` is Client-requested (the default, when a client ticket or ask is behind it) or Enabler (Kwapso-initiated upkeep — renamed from Internal on 20 Sep 2026) — leave it off for the ordinary case. An Enabler story must also name `ticketId`, the door refuses with 'ticket_required' otherwise. `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket (or the story is Enabler). `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it. `acceptanceCriteria` writes down what 'done' looks like — a long-text field, same design and limit as `detail`. `moscow` sets the MoSCoW priority, one of Must, Should, Could or Won't — optional, and (like `acceptanceCriteria`) never guessed at for a story written before either field existed.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
       {
         title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
+        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES),
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["title", "storyType"]
@@ -1219,6 +1221,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       appId: opt(i, "appId"),
       processId: opt(i, "processId"),
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
+      acceptanceCriteria: opt(i, "acceptanceCriteria"),
+      moscow: opt(i, "moscow"),
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),
@@ -1234,12 +1238,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     summary:
       "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and `category` are all required here, `processIds` replaces the set.",
     detail:
-      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Internal) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it.",
+      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `category` (Client-requested / Enabler) is required here even though create_story defaults it — this door replaces every field it reads and leaves none untouched. Switching to Enabler is refused here, not silently written, unless `ticketId` is also sent — the door answers 'ticket_required'. `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it. `acceptanceCriteria` and `moscow` are optional, same shape and limit as create_story (`moscow` one of Must, Should, Could or Won't), and are replaced whole like every other field here — leaving either off on an edit clears it rather than keeping the old value.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
       {
         id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
         processIds: { type: "array" }, storyType: S, category: S,
+        acceptanceCriteria: S, moscow: enumOf(MOSCOW_VALUES),
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
       ["id", "title", "storyType", "category"]
@@ -1255,6 +1260,8 @@ export const SHARED_TOOLS: SharedTool[] = [
       appId: opt(i, "appId"),
       processId: opt(i, "processId"),
       processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
+      acceptanceCriteria: opt(i, "acceptanceCriteria"),
+      moscow: opt(i, "moscow"),
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),

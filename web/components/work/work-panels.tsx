@@ -86,9 +86,20 @@ import { memberFace, ticketBoardCard, ticketStatusColumnTitles } from "@/compone
 import { ticketTitle } from "@shared/web/ticket-chips"
 
 /** The four states a story moves through, in the words a person reads. The
- * states the code trusts are STORY_STATUSES; this is only their spelling. */
+ * states the code trusts are STORY_STATUSES; this is only their spelling.
+ *
+ * "OPEN" RENAMED "BACKLOG" (Aurora's ruling, 20 Sep 2026, verbatim): "Open
+ * becomes Backlog (the story exists but isn't scheduled yet)." The fixed key
+ * underneath is untouched — still `open` — and team migration 0106 carries
+ * the identical word move onto the matching `Story status` dropdown row, so
+ * this hardcoded fallback and that team-editable label never disagree. The
+ * stories BOARD (`stories-screen.tsx`'s own `KANBAN_STATUS_LABEL`) draws a
+ * DIFFERENT word for this same status — "To Do" — deliberately: that is
+ * Aurora's own kanban-column ruling, the same day, and the two words answer
+ * two different questions ("what kind of thing is this" here, "which column
+ * does it sit in" there). */
 export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
-  open: "Open",
+  open: "Backlog",
   in_progress: "In progress",
   in_review: "In review",
   done: "Done",

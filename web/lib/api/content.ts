@@ -187,6 +187,11 @@ export type StoryWrite = {
   /** Fix / Feature / Change — REQUIRED (CHECKLIST 6.2), and editable on the
    * Dropdown values screen like every other vocabulary in the app. */
   storyType: string
+  /** WHAT "DONE" LOOKS LIKE (Aurora's ruling, 20 Sep 2026: "same design as
+   * Detail") — optional, rich text. */
+  acceptanceCriteria?: string
+  /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional. */
+  moscow?: string
 }
 
 /** The facets the work-log list door parses. */
@@ -665,6 +670,7 @@ export const content = {
         backlogTotal?: number
         completedTotal?: number
         everyoneTotal?: number
+        reviewsTotal?: number
       }>
     >(`/api/content/stories${listQuery(opts)}`),
   storyOne: (id: string) =>

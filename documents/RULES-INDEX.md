@@ -4,7 +4,7 @@
 
 This file answers WHERE a law is checked. It never restates WHAT a law says — that stays [RULES.md](../RULES.md)'s alone (README.md's own rule: one topic, one owner). Every path below was resolved on disk in the run that produced this file, never typed by hand, so a moved or renamed check file cannot leave a stale link behind — the generator would simply stop finding it and report the law UNRESOLVED instead.
 
-90 laws, 88 resolved to at least one check file, 2 unresolved.
+94 laws, 92 resolved to at least one check file, 2 unresolved.
 
 ## Architecture (27)
 
@@ -38,7 +38,7 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R73 | enforced | `registry-backed-exemptions` | `web/test/rules.test.ts` |
 | R76 | enforced | `protected-is-active` | *unresolved — see below* |
 
-## UI (54)
+## UI (58)
 
 | Law | Status | checkId | Checked in |
 |---|---|---|---|
@@ -96,6 +96,10 @@ This file answers WHERE a law is checked. It never restates WHAT a law says — 
 | R88 | enforced | `empty-state-single-door` | `web/test/empty-state-single-door.test.ts` |
 | R89 | enforced | `footer-on-the-edge` | `web/test/footer-on-the-edge.test.ts`<br>`web/test/ticket-detail-no-tabs.test.tsx`<br>`web/test/ticket-thread-composer-gap.test.tsx` |
 | R90 | enforced | `faces-in-choices` | `web/test/faces-in-choices.test.ts` |
+| R91 | enforced | `no-nested-scroll` | `web/test/no-nested-scroll.test.ts` |
+| R92 | enforced | `main-excludes-secondary` | `web/test/main-excludes-secondary.test.ts` |
+| R93 | enforced | `visual-accompanies-text` | `web/test/visual-accompanies-text.test.ts` |
+| R94 | enforced | `chip-order` | `web/test/chip-order.test.ts` |
 
 ## Workflow (2)
 

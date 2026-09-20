@@ -4395,20 +4395,6 @@ export const SEED: Catalogue = {
     ca: "«{name}» és massa gran. Adjunta un fitxer de fins a {size} MB.",
   },
 
-  /* 18 Sep 2026 — one more string `npm run lang` found with no seed entry for
-     de/es/ca: help-stakeholders.tsx's `SelectValue` placeholder for the
-     Raised by row, now a kit Select rather than a RecordPicker. It reuses the
-     exact root already settled twice over for this same relationship —
-     "Raised by" (Gemeldet von/Solicitado por/Sol·licitat per) and the hole
-     fragment "who raised it" (wer es gemeldet hat/quién lo planteó/qui ho va
-     plantejar) — so the placeholder reads as the same sentence the rest of
-     the form already says, not a fresh coinage. */
-  "Choose who raised it": {
-    de: "Wählen Sie, wer es gemeldet hat",
-    es: "Elige quién lo planteó",
-    ca: "Tria qui ho va plantejar",
-  },
-
   /* 19 Sep 2026 (Round 23) — three more strings `npm run lang` found with no
      seed entry for de/es/ca. "Waiting on you" is ticket-stages.tsx's own
      label for the one stage that used to render with no name at all (K53) —
@@ -4440,5 +4426,34 @@ export const SEED: Catalogue = {
     de: "Wählen Sie einen Kunden",
     es: "Elige una cuenta",
     ca: "Tria un compte",
+  },
+
+  /* 20 Sep 2026 (Round 28, stories model) — eight strings `npm run lang`
+     found with no seed entry for de/es/ca, the acceptance-criteria field,
+     the reviews tab and the two folded-header columns (tickets triage's
+     "Closed by" and stories' own "Completed by"/"Completed on") the round's
+     data-model change added. "Closed by" reuses the existing "von"/"por"/
+     "per" attribution register "Raised by"/"Resolved by" already carry, on
+     the SAME word "Closed on" already seeds ("Abgeschlossen am"/"Cerrado
+     el"/"Tancat el") — client ruling, 20 Sep 2026: "on tickets tab 'Closed,'
+     before 'Closed on' add 'Closed by.'" "Completed by"/"Completed on" are
+     the identical fold for a story reaching Done, off the existing "Done"
+     seed word (`stories-screen.tsx`'s reviews-queue chip row). "Done on" is
+     the story detail's own field label for the same date, off the same
+     word. "Who did it" is the reviews queue's plain column heading for the
+     assignee. "Reviews" is the new stories tab itself. "Acceptance
+     criteria" and its placeholder sentence "What has to be true for this to
+     count as done." are the new story field, same design as "Detail". */
+  "Closed by": { de: "Abgeschlossen von", es: "Cerrado por", ca: "Tancat per" },
+  "Completed by": { de: "Abgeschlossen von", es: "Completado por", ca: "Completat per" },
+  "Completed on": { de: "Abgeschlossen am", es: "Completado el", ca: "Completat el" },
+  "Done on": { de: "Erledigt am", es: "Hecho el", ca: "Fet el" },
+  "Reviews": { de: "Überprüfungen", es: "Revisiones", ca: "Revisions" },
+  "Who did it": { de: "Wer es gemacht hat", es: "Quién lo hizo", ca: "Qui ho va fer" },
+  "Acceptance criteria": { de: "Abnahmekriterien", es: "Criterios de aceptación", ca: "Criteris d'acceptació" },
+  "What has to be true for this to count as done.": {
+    de: "Was zutreffen muss, damit dies als erledigt gilt.",
+    es: "Qué tiene que cumplirse para que esto cuente como hecho.",
+    ca: "Què s'ha de complir perquè això compti com a fet.",
   },
 }

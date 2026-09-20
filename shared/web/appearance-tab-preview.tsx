@@ -326,7 +326,8 @@ function previewTokens(theme: "light" | "dark"): React.CSSProperties {
  */
 export const RAIL_GROUPS: readonly { heading: string; items: readonly string[] }[] = [
   { heading: "My work", items: ["Tasks", "Meetings", "Knowledge", "Logs"] },
-  { heading: "Build", items: ["Waves", "Apps", "Stories"] },
+  // "Stories" RENAMED "Backlog" — Aurora's ruling, 20 Sep 2026 (web/lib/pages.ts).
+  { heading: "Build", items: ["Waves", "Apps", "Backlog"] },
   { heading: "Accounts", items: ["Accounts", "Tickets", "Contacts", "Inputs"] },
 ]
 

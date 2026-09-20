@@ -5499,6 +5499,10 @@ describe("RULES — the laws of the base", () => {
       "empty-state-single-door", // R88: web/test/empty-state-single-door.test.ts — EmptyGatedPanel's own central guard, plus the title-row <AddButton> census over web/ + web-portal/, or named in EMPTY_STATE_SINGLE_DOOR_EXEMPT
       "footer-on-the-edge", // R89: web/test/footer-on-the-edge.test.ts — app-shell.tsx's own flex-col page container, ticket-detail-body.tsx's flex-1 min-h-0 root + one scrolling region per tree, the composer's own CardFooter (root's last child, flex-none/w-full/sticky with a negative padding-compensated bottom offset/bg-surface-panel) common to both trees, and the kit-Input-matched background class
       "faces-in-choices", // R90: web/test/faces-in-choices.test.ts — every <Select>/option list over people/contacts/accounts/apps (detected by its own option array's field names) carries the kit's face slot, or is named in FACES_IN_CHOICES_EXEMPT
+      "no-nested-scroll", // R91: web/test/no-nested-scroll.test.ts — every className's own string literal (plain, template, or reached through cn()/a ternary) over web/components + shared/web, scanned for a vertical-scroll class/style, or named in NO_NESTED_SCROLL_EXEMPT
+      "main-excludes-secondary", // R92: web/test/main-excludes-secondary.test.ts — every main (Select/RecordPicker/single-mode StaffPillPicker) + secondary (mode="multi" StaffPillPicker) picker pair in one file drawing from the same source array, checked for withoutMain()/an exclusion filter, or named in MAIN_EXCLUDES_SECONDARY_EXEMPT
+      "visual-accompanies-text", // R93: web/test/visual-accompanies-text.test.ts — every <Select>/<RecordPicker> choosing over a module-named source array carries the module's own icon (icon= / icon:), or is named in VISUAL_ACCOMPANIES_TEXT_EXEMPT
+      "chip-order", // R94: web/test/chip-order.test.ts — orderChips()'s own unit tests, plus a census over every id+status chip row (<RecordRef + variant="status"/ticketStatusCell() within one window) built through orderChips(), or named in CHIP_ORDER_EXEMPT
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

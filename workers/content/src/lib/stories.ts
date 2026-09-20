@@ -46,8 +46,10 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
 import {
+  MOSCOW_VALUES,
   STORY_STATUSES,
   TITLE_MAX_CHARS,
+  type MoscowValue,
   type Sprint,
   type Story,
   type StoryStatus,
@@ -100,6 +102,9 @@ type StoryRow = {
   closing_note: string | null
   story_type: string | null
   category: string
+  acceptance_criteria: string | null
+  moscow: string | null
+  app_name?: string | null
   review_note: string | null
   review_file_url: string | null
   review_file_name: string | null
@@ -117,7 +122,7 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
-  s.story_type, s.category, s.review_note, s.review_file_url, s.review_file_name,
+  s.story_type, s.category, s.acceptance_criteria, s.moscow, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -127,6 +132,11 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   (SELECT GROUP_CONCAT(sp2.process_id) FROM story_processes sp2 WHERE sp2.story_id = s.id) AS process_ids,
   (SELECT h.ref FROM help h WHERE h.id = s.ticket_id) AS ticket_ref,
   (SELECT sp.name FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_name,
+  -- THE SYSTEM'S OWN NAME — a story hangs off an app ALWAYS (CHECKLIST 6.1),
+  -- the identical one-subquery-per-row shape the two joins above already take,
+  -- so the main backlog's own card and the record's own header chip
+  -- (Aurora's chip-order ruling, 20 Sep 2026) never cost a second read.
+  (SELECT ap.name FROM apps ap WHERE ap.id = s.app_id) AS app_name,
   -- WHEN THIS IS DUE, AND WHY IT IS NOT A COLUMN ON THIS TABLE ANY MORE.
   -- A story is one piece of work inside a block that was sold with an end date
   -- on it, so the block's end date IS the story's deadline: two dates for one
@@ -164,9 +174,15 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
  * which is the same split `knowledge.ts` makes between `LIST_COLS` and
  * `DETAIL_COLS` for the same reason. */
 const STORY_LIST_COLS = (() => {
-  const listed = STORY_COLS.replace("s.detail,", "NULL AS detail,")
+  // `acceptance_criteria` rides `detail`'s own exemption — "same design as
+  // Detail" (Aurora's ruling, 20 Sep 2026) means the same weight on the page
+  // too, so a list draws neither and a by-id read (`getStory`) keeps both.
+  const listed = STORY_COLS.replace("s.detail,", "NULL AS detail,").replace(
+    "s.acceptance_criteria,",
+    "NULL AS acceptance_criteria,"
+  )
   if (listed === STORY_COLS)
-    throw new Error("STORY_COLS no longer selects `s.detail,` — the list/detail split is not being made")
+    throw new Error("STORY_COLS no longer selects `s.detail,`/`s.acceptance_criteria,` — the list/detail split is not being made")
   return listed
 })()
 
@@ -187,6 +203,7 @@ function toStory(r: StoryRow): Story {
     sprintId: r.sprint_id,
     sprintName: r.sprint_name,
     appId: r.app_id,
+    appName: r.app_name ?? null,
     processId: r.process_id,
     stepKey: r.step_key,
     changesNoStep: r.changes_no_step === 1,
@@ -205,6 +222,11 @@ function toStory(r: StoryRow): Story {
     // value the code does not recognise reads as the DEFAULT rather than as
     // `null as string`, which would be a lie against the type.
     category: r.category || "Client-requested",
+    acceptanceCriteria: r.acceptance_criteria,
+    // Never trust a value the code does not recognise — the same safe
+    // direction `status` above takes: an unrecognised or blank word reads as
+    // "not set" rather than a lie against the closed `MoscowValue` union.
+    moscow: (MOSCOW_VALUES as readonly string[]).includes(r.moscow ?? "") ? (r.moscow as MoscowValue) : null,
     reviewNote: r.review_note,
     reviewFileUrl: r.review_file_url,
     reviewFileName: r.review_file_name,
@@ -349,6 +371,10 @@ function storyViewSql(view: StoryViewName): { sql: string | null; todayCount: nu
       todayCount: 2,
     }
   if (view === "completed") return { sql: "s.status = 'done'", todayCount: 0 }
+  // "reviews" — Aurora's ruling, 20 Sep 2026: the identical predicate
+  // `completed` uses, so the tab reads the same finished work, shaped for a
+  // different question ("who did it, and when" rather than "what's mine").
+  if (view === "reviews") return { sql: "s.status = 'done'", todayCount: 0 }
   // "open" — the original default, unchanged: hide done, narrow nothing else.
   return { sql: "s.status <> 'done'", todayCount: 0 }
 }
@@ -475,6 +501,13 @@ export type StoryViewCounts = {
   backlog: number
   completed: number
   all: number
+  /** THE REVIEWS TAB'S OWN BADGE (Aurora's ruling, 20 Sep 2026) — the same
+   * count as `completed`, read a second time under its own name: the two
+   * tabs share a predicate (`status = 'done'`) but the caller narrowing can
+   * differ (Completed is always "mine"; Reviews follows the `all`/
+   * Everyone's fallback), so a second field keeps the two badges from ever
+   * being read off the wrong one by accident. */
+  reviews: number
 }
 
 export async function countStoryViews(
@@ -502,6 +535,7 @@ export async function countStoryViews(
        SUM(CASE WHEN s.status <> 'done' AND NOT ${storyOverdueSql()} AND ${storySprintUpcomingOrNoneSql()} THEN 1 ELSE 0 END) AS planned_n,
        COUNT(*) AS backlog_n,
        SUM(CASE WHEN s.status = 'done' THEN 1 ELSE 0 END) AS completed_n,
+       SUM(CASE WHEN s.status = 'done' THEN 1 ELSE 0 END) AS reviews_n,
        COUNT(*) AS all_n
      FROM ${boundedInner(
        `SELECT s.status, s.due_on, s.sprint_id, s.assignee_id FROM stories s${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""}`
@@ -519,6 +553,7 @@ export async function countStoryViews(
     backlog: n("backlog_n"),
     completed: n("completed_n"),
     all: n("all_n"),
+    reviews: n("reviews_n"),
   }
 }
 
@@ -585,6 +620,39 @@ export type StoryInput = {
    * Validated the same way `storyType` is — an active row in "Story
    * category", never a free string. */
   category?: unknown
+  /** WHAT "DONE" LOOKS LIKE — Aurora's ruling, 20 Sep 2026: "same design as
+   * Detail." Optional, TEXT_LIMITS.long at the door, same as `detail`. */
+  acceptanceCriteria?: unknown
+  /** MUST / SHOULD / COULD / WON'T (Aurora's ruling, 20 Sep 2026) — optional:
+   * every EXISTING story predates this field, so a value is never required,
+   * only ever checked against the closed `MOSCOW_VALUES` list when one is
+   * sent. */
+  moscow?: unknown
+}
+
+/** ONE OF MUST/SHOULD/COULD/WON'T, OR NOTHING SAID (Aurora's ruling, 20 Sep
+ * 2026). Unlike `storyType`/`category`, this is never checked against a
+ * `selectable_data` row — `MOSCOW_VALUES` is the closed, code-owned list
+ * itself, the same shape `STORY_STATUSES` already is. A blank/absent value is
+ * legitimate (every pre-existing story has one); anything else that is not
+ * one of the four exact words is a clean 400. */
+function optionalMoscow(raw: unknown): MoscowValue | null {
+  const value = optionalText(raw, "Priority", TEXT_LIMITS.short)
+  if (!value) return null
+  if (!(MOSCOW_VALUES as readonly string[]).includes(value))
+    throw new GuardError(400, "invalid_input", "Priority has to be Must, Should, Could or Won't.")
+  return value as MoscowValue
+}
+
+/** THE ENABLER RULE (Aurora's ruling, 20 Sep 2026, verbatim): "When a story's
+ * origin is Enabler, must select a related ticket!" Checked HERE, on the
+ * RESOLVED fields both doors already have in hand, rather than duplicated at
+ * each call site — `refuseUnstepped`'s own reason, one field along: there is
+ * more than one way to write a story's category (create, update), and both
+ * have to ask the identical question. */
+function refuseEnablerWithNoTicket(category: string, ticketId: string | null): void {
+  if (category === "Enabler" && !ticketId)
+    throw new GuardError(400, "ticket_required", "An Enabler story has to name the ticket it enables.")
 }
 
 /** WHICH MAPS — proved to be live processes in the caller's own team database,
@@ -859,6 +927,13 @@ export async function createStory(
   // the ordinary case rather than refusing (`StoryInput.category`'s own doc,
   // above says why this one field gets a default and `storyType` does not).
   const category = optionalText(input.category, "Category", TEXT_LIMITS.short) ?? "Client-requested"
+  // "SAME DESIGN AS DETAIL" (Aurora's ruling, 20 Sep 2026) — optional, the
+  // identical long-text limit `detail` above already reads.
+  const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
+  const moscow = optionalMoscow(input.moscow)
+  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — checked on the resolved
+  // words, before the wave below spends a round trip on anything else.
+  refuseEnablerWithNoTicket(category, ticketId ?? null)
 
   // ONE WAVE, NOT SIX TRIPS (shared/workers/parallel.ts). Every one of these
   // reads only the INPUT — not each other — so the six `await`s were sequential
@@ -905,9 +980,9 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, story_type, category, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, category, acceptance_criteria, moscow, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(category)}, ${sqlString(acceptanceCriteria)}, ${sqlString(moscow)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await setProcesses(cfg, guard, actor, id, processIds)
 
@@ -948,6 +1023,13 @@ export async function updateStory(
   // REQUIRED on an edit, unlike the create door — see `StoryInput.category`'s
   // own doc for why the two doors treat a blank differently.
   const category = requireText(input.category, "Category", TEXT_LIMITS.short)
+  const acceptanceCriteria = optionalText(input.acceptanceCriteria, "Acceptance criteria", TEXT_LIMITS.long) ?? null
+  const moscow = optionalMoscow(input.moscow)
+  // THE ENABLER RULE (Aurora's ruling, 20 Sep 2026) — read on the RESOLVED
+  // ticket, exactly as the create door does: this door replaces every field
+  // it reads (`StoryInput`'s own doc), so an edit that drops the ticket while
+  // switching to Enabler is refused here, not silently written.
+  refuseEnablerWithNoTicket(category, ticketId ?? null)
 
   // The account is re-derived rather than carried: re-pointing a story at another
   // ticket moves the work to that client's books, and the margin has to follow it.
@@ -969,7 +1051,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, category = ?, acceptance_criteria = ?, moscow = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -986,6 +1068,8 @@ export async function updateStory(
       sprintId,
       storyType,
       category,
+      acceptanceCriteria,
+      moscow,
       assignee?.id ?? null,
       assignee?.name ?? null,
       reviewer?.id ?? null,
@@ -1006,6 +1090,7 @@ export async function updateStory(
     { label: "Title", from: before.title, to: title },
     { label: "Type", from: before.story_type, to: storyType },
     { label: "Category", from: before.category, to: category },
+    { label: "Priority", from: before.moscow, to: moscow },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },

@@ -576,7 +576,13 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // of the old daily/My-work run it shared with Tasks, since the client's own
   // grouping puts it with the rest of the work engine rather than with the team's
   // day-to-day admin.
-  { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "build" },
+  // TITLED "BACKLOG" (Aurora's ruling, 20 Sep 2026: "Rename the 'Stories' tab
+  // to 'Backlog'"). The URL SEGMENT and the permission MODULE stay `stories`/
+  // `work` on purpose — the identical "the label may move, the segment and
+  // the module stay" split this file's own comment above already draws for
+  // Tickets/`help`, so nothing that already links to `/t/<team>/stories`
+  // breaks and no role's stored right needs touching.
+  { key: "stories", title: "Backlog", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "build" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is
   // an exact server total (R16) keyed off the same cache the list reads, so the

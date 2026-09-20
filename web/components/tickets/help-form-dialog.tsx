@@ -93,6 +93,7 @@ import { appStageMark } from "@shared/app-stages"
 import { isFeedbackTicketType, isValidationSprintType, ticketTypeIconName } from "@shared/ticket-types"
 import { sprintIsRunning } from "@shared/sprint-state"
 import type { AppModule, AppRow } from "@shared/types"
+import { DEFAULT_MODULE_ICON } from "@shared/module-icons"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { pickedFileId, usePickedFileItems } from "@shared/web/upload-items"
 import { useLanguage } from "@shared/web/language"
@@ -1198,8 +1199,14 @@ export function HelpFormDialog({
         // a client with no contacts on file) and false on a ticket that predates
         // the rule, so it never makes an existing ticket unsaveable. Client and
         // App remain unasked for.
+        // SIX TERMS NOW. `!isEdit &&` joined the description clause 20 Sep
+        // 2026 — the editor it used to gate no longer renders on an edit (see
+        // the field's own comment below), so refusing Submit over a value
+        // nobody can change any more would make an old, description-less
+        // import permanently unsaveable from this form. On a raise the clause
+        // is exactly what it always was.
         disabled:
-          !richTextValue(values.description) ||
+          (!isEdit && !richTextValue(values.description)) ||
           titleMissing ||
           typeMissing ||
           moduleMissing ||
@@ -1410,13 +1417,25 @@ export function HelpFormDialog({
           module belongs to one and the door refuses a pair that does not match —
           a picker that can only produce a refusal is worse than no picker.
           Changing the app CLEARS it, which is the one behaviour that keeps the
-          two honest: a section of the old app is not a section of the new one. */}
+          two honest: a section of the old app is not a section of the new one.
+
+          R93 — VISUAL ACCOMPANIES TEXT: the module's own icon rides beside its
+          name, the same glyph its gallery card draws (`modules-panel.tsx`'s
+          `icon={m.icon ?? DEFAULT_MODULE_ICON}`) and the same seam
+          `raise-ticket-dialog.tsx`'s module `<Select>` was wired through —
+          `icon:` here, through `PickerOption.icon` (a node, never `mark`'s
+          text slot: `RecordPicker` draws `RecordMark` in preference to `icon`
+          whenever `mark` is set, so the two cannot both show). */}
       <Field config={moduleField(moduleRequired)} htmlFor="help-module" className={fieldSpacing}>
         <RecordPicker
           id="help-module"
           value={values.moduleId || NONE}
           onChange={(moduleId) => setValues((v) => ({ ...v, moduleId }))}
-          options={sortedOptions(appModules, lang, (m) => m.name).map((m) => ({ value: m.id, label: m.name, mark: m.mark }))}
+          options={sortedOptions(appModules, lang, (m) => m.name).map((m) => ({
+            value: m.id,
+            label: m.name,
+            icon: <Icon name={m.icon ?? DEFAULT_MODULE_ICON} className="size-3.5" />,
+          }))}
           emptyOption={{ value: NONE, label: t("No module") }}
           placeholder={chosenAppId ? t("No module") : t("Choose an app first")}
           searchPlaceholder={t("Search modules…")}
@@ -1523,23 +1542,46 @@ export function HelpFormDialog({
           disabled={busy}
         />
       </Field>
-      <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
-        <Notes
-          key={open ? "open" : "shut"}
-          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
-          // the editable node itself, because the kit Field clones it onto its
-          // single child — and this is the label that id could never carry, since
-          // a label element's `for` attribute binds only to a labelable control
-          // and the editable node here is a plain div. Same words as the visible
-          // label, taken from the same config, so the two can never drift apart.
-          aria-label={t(descField.label)}
-          disabled={busy}
-          defaultValue={values.description}
-          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
-          placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
-          className="min-h-32"
-        />
-      </Field>
+      {/* THE FIRST MESSAGE — RAISE ONLY, NOT AN EDIT FIELD ANY MORE. Aurora,
+          20 Sep 2026, verbatim: "we can't edit the first message — it's not a
+          description (that was the old model), so rather multiple messages
+          under the same ticket." A ticket's opening text is message ONE of
+          its own thread (`help-detail.tsx`'s `TicketThread` already renders
+          it as the first "theirs" bubble, ahead of every reply — confirmed
+          reading that call site, unchanged here), not a field a later edit
+          rewrites in place; rewriting it after the fact would silently edit
+          history a colleague may already have replied to. So this editor
+          renders on a RAISE (`!isEdit`) only — the opening message is still
+          written here, once, when there is no ticket yet to reply on.
+
+          THE DOOR STILL ACCEPTS `description` ON AN EDIT (`onSubmit`'s own
+          type below, and `editTicket` in help-detail.tsx, both still declare
+          it required) — loosening either to optional is a change to a file
+          outside this one, so it is not made here. What IS this form's own
+          to fix: `values.description` cannot change during an edit any more
+          (this is its only editor, and it is gone), so `submit()`'s existing
+          `description: richTextValue(values.description)` already sends back
+          exactly the ticket's own untouched value on an edit — never a typed
+          change, because there is no longer anywhere to type one. */}
+      {!isEdit && (
+        <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
+          <Notes
+            key={open ? "open" : "shut"}
+            // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+            // the editable node itself, because the kit Field clones it onto its
+            // single child — and this is the label that id could never carry, since
+            // a label element's `for` attribute binds only to a labelable control
+            // and the editable node here is a plain div. Same words as the visible
+            // label, taken from the same config, so the two can never drift apart.
+            aria-label={t(descField.label)}
+            disabled={busy}
+            defaultValue={values.description}
+            onChange={(html) => setValues((v) => ({ ...v, description: html }))}
+            placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
+            className="min-h-32"
+          />
+        </Field>
+      )}
       {/* WHO ASKED (CHECKLIST 5.9), AS CHIPS (client, 2026-09-07: "the raise by,
           no dropdown but visible all chips"), and PLACED HERE ON PURPOSE. Her
           list of seven does not mention this field at all, so it keeps the slot

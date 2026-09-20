@@ -37,10 +37,10 @@ the concrete implementation, and its evidence.
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
 - [1. Colour and surface](#1-colour-and-surface) (C1 to C13)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L33)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L37)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
-- [4. Collections](#4-collections) (K1 to K54)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B23)
+- [4. Collections](#4-collections) (K1 to K55)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B27)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1561,6 +1561,12 @@ breakpoint reads the ticket screen's own width, not the assistant's.
 
 **Status: amended, in build, 19 Sep 2026.**
 
+**AMENDED 19 Sep 2026 ~13:30–13:40 (Round 27)** — the ticket page scrolls as ONE page; the dark band is a normal footer reached at the end of the page; the panel gap above it sits in normal flow, never sticky; the inner scrolling region is gone. Aurora's ruling, verbatim: *"still not!!! there should be double scroll in tickets detail to see the full content! / right cokumn display fully! / is this clear now! / amke this a rule, never need to scroll to see al content!!! (only exception chat compnents) / confirm you understand, or ask me if you dont / actually, ask me 5 questions to verify what you have to do."* The five questions and her answers: *"1. yes / 2. you reache it like normal footer. this is a law / 3. The conversation is exactly as tall as the right column and the chat scrolls inside it when longer. / 5. exceptions like chat, / implement with subagents and deploy"* (question 4, tables and boards, unanswered).
+
+**The outcome.** The ticket page is one scrolling region, not two. The dark band (Latest activity + Record) is reached at the very bottom of the page — where a normal footer sits, at the window's bottom when the page is short, and further down when the page is tall. The panel gap above it (24px from rule S1) sits in normal FLOW above the band, never in a sticky container, and the band itself is not sticky — only the tab strip pins above it. The side column and the conversation region scroll together as one page; there is no separate scrolling region inside the conversation card. The conversation card is exactly as tall as the side column, both measuring their own natural heights at lg, and the row resolves to whichever is taller. The single page scrolls when needed; nothing inside it scrolls of its own.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
 ---
 
 ### L32: any choice over a person, a contact, an account or an app shows the same face the lists show
@@ -1612,7 +1618,49 @@ carries no `face=`.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
+**AMENDED 19 Sep 2026 ~13:30–13:40 (Round 27)** — at lg the row is as tall as the right column, which never scrolls; the conversation matches it and the chat scrolls inside it when longer (confirmed by her answer 3, round 27). The two-column row's own height resolves to the side column's content height, never a flex `h-full` on the conversation cell — the side column declares its own natural height and the conversation takes that same height, scrolling only the thread inside the conversation card when the thread is taller than that measure. Below lg the single-column layout applies, with one page scroll and the conversation card keeping its 420px floor.
+
+**Status: amended, in build, 19 Sep 2026.**
+
 **Law.** None registered.
+
+### L34: never need to scroll to see all content
+
+**The rule (R91 `no-nested-scroll`).** Aurora's ruling, 19 Sep 2026 ~13:30–13:40, verbatim: *"never need to scroll to see all content!!! (only exception chat compnents)"* — stated as a standing law to be enforced everywhere. One page scroll only; no scroll area inside a page's content. When a section or component fits its own container, nothing scrolls. When it does not, the section itself becomes a bounded scrolling region with an explicit `overflow-y: auto` / `overflow-x: auto`, never the page scrolling one region and an inner section scrolling another. **Exceptions:** chat components (the conversation thread scrolls inside its card, by this rule's own L31/L33 shape); the rail's own list of sections (pinned height, scrolls on overflow); the assistant pane (one aside scrolling region); true overlays (dialogs, sheets, popovers, listboxes — a modal or a dropdown may scroll internally and holds no relation to the page's own scroll). **Not covered:** horizontal scroll on tables and boards — those await her answer to question 4 (Round 27), open.
+
+**Status: ruled, in build, 19 Sep 2026.**
+
+**Law.** [R91](../RULES.md) (`no-nested-scroll`).
+
+---
+
+### L35: when a main person is chosen, they disappear from the secondary picker over the same pool
+
+**The rule (R92 `main-excludes-secondary`).** Aurora's ruling, 20 Sep 2026, verbatim: *"Generally, always when selecting main/secondary people (staff, contacts, etc.): when I select the main, this person should not be available as secondary. E.g. when I select 'Raised by,' this person should disappear from the 'Keep in the loop' options. Make this law."* Two independent pickers over one shared pool — raised by / keep in the loop, assignee / reviewer, account manager / members, owner / stakeholders — the secondary picker excludes the chosen main's id through `withoutMain()` (`shared/web/without-main.ts`), rather than every call site re-deriving the `.filter()` by hand. **Not this shape:** a "Main X" field chosen FROM an already-narrowed secondary list (`app-form-dialog.tsx`'s "Main stakeholder", picked from the ticked "Stakeholders" checkboxes) — there the main is meant to be a member of the secondary set, the opposite relationship, and this law's own census leaves it alone by field name (`main<Something>Id` is never read as the "picked independently" shape).
+
+**Status: ruled and in build, 20 Sep 2026.**
+
+**Law.** [R92](../RULES.md) (`main-excludes-secondary`) — a source census, `web/test/main-excludes-secondary.test.ts`, pairing a single-value main picker with a `mode="multi"` secondary picker in one file by their shared source array, and requiring the secondary to call `withoutMain(` (or an equivalent exclusion `.filter()`), or be named in `MAIN_EXCLUDES_SECONDARY_EXEMPT`.
+
+---
+
+### L36: every avatar, icon or colour rides beside its text — filters, views and select components alike
+
+**The rule (R93 `visual-accompanies-text`).** Aurora's ruling, 20 Sep 2026, verbatim: *"When selecting a module, also show the module's icon. Make this law: always, if there's a visual (avatar, icon or color), it should always accompany the text everywhere (filters, views, select components…), the only exception being avatars/logos in chips."* Extends L32/R90's own face rule to icons and colours, on an entity that is not a person. Scoped to modules the day this law shipped — the one population this codebase can name without guessing a type from prose: every module array is `AppModule[]` (`shared/types.ts`), carries a real `icon` field, and the module's own gallery card already draws it. A status or ticket/story-type colour already has its own standing rule (K39/R86) and its own picker census, so this rule stays about the module gap her own words named rather than re-litigating that population. **The one named exception is her own:** an avatar or a logo inside a CHIP may still omit it.
+
+**Status: ruled and in build, 20 Sep 2026.**
+
+**Law.** [R93](../RULES.md) (`visual-accompanies-text`) — a source census, `web/test/visual-accompanies-text.test.ts`, over every `<Select>`/`<RecordPicker>` whose options map a module-named source array (in a file that imports `AppModule` from `@shared/types`, so a same-named-but-unrelated array is never caught), requiring the module's own icon (`icon=` on the `<SelectItem>`, or `icon:` in the option literal), or a name in `VISUAL_ACCOMPANIES_TEXT_EXEMPT`.
+
+---
+
+### L37: a record's chips draw in one fixed order — id, status, type, main parent, secondary parent
+
+**The rule (R94 `chip-order`).** Aurora's ruling, 20 Sep 2026, verbatim: *"On story detail, the chips in order: id, status, type, app (underlined), sprint (id, underlined). This must always be the order, everywhere, for other things too: 1 id, 2 status, 3 (if) type, 4 main parent, 5 secondary parent."* One seam, `orderChips()` (`shared/web/chip-order.ts`): every chip is tagged with which of the five kinds it is, and the seam sorts by that tag rather than the order a caller happened to write the JSX in. A kind simply absent from a given record (no type vocabulary, no secondary parent) is left out, never padded. Caught a real, live defect the day this law shipped: `contact-panels.tsx`'s "tickets raised for this contact" row drew the type chip before the status chip, the two swapped from this order, under a green build — fixed by routing the row through `orderChips`.
+
+**Status: ruled and in build, 20 Sep 2026.**
+
+**Law.** [R94](../RULES.md) (`chip-order`) — `orderChips()`'s own unit tests prove the resolved order; a source census, `web/test/chip-order.test.ts`, over every chip row carrying both an id chip (`<RecordRef`) and a status chip (`variant="status"`/`ticketStatusCell(`) within one reading window, requiring an `orderChips(` call, or a name in `CHIP_ORDER_EXEMPT`.
 
 ---
 
@@ -4671,6 +4719,35 @@ the inter-bubble gap inside a run relative to the gap between two different auth
 
 **Law.** None registered — a kit-only fix.
 
+### K55: an avatar draws on every message bubble, not only the run's last — and initials show only when there is no photo
+
+**The rule.** Aurora's ruling, 20 Sep 2026, verbatim: *"On chat, when there are multiple
+messages by the same person, keep the name and date only on the bottom one, but show the
+avatar for each."* And, the same round, over a ticket thread: *"On chat — and everywhere
+there's an avatar — only show initials when there's no avatar. For example, in tickets I
+see the initials but should see the avatar image."* Two independent facts about one bubble:
+the BYLINE (author + time, K54) collapses to the last message of a run; the AVATAR does not
+— it draws on every bubble, keyed off `initials`/`image` alone, never off whether that
+bubble carries a byline. And the avatar itself still follows G5's own fallback (picture,
+then initial) rather than showing both, or defaulting to initials when a picture exists.
+
+**The shape.** Two independent bugs, one ticket-thread call site (`help-detail.tsx`). First,
+`TicketThread`'s own run-suppression had been gating `initials`/`image` to `isLastOfRun`
+along with the byline, reading kit v1.2.133's own doc backwards — kit v1.2.136 restates it:
+a run's earlier messages "keep their own image/initials even though they carry no
+author/time", and `hasAvatar` (`shared/ui/components/ticket-thread/ticket-thread.tsx`) keys
+on `initials`/`image` alone. Fixed by passing both on every message, not only the run's
+last. Second, every reply's `image` was reading `null` (no photo lookup at all, initials-only
+by construction) — now sourced through `memberFace` (`tickets-collection.tsx`'s own seam,
+reused rather than rebuilt), the same `members:<teamId>` cache this screen already holds, so
+a staff or portal-client sender's real photo shows and initials draw only when `memberFace`
+truly has none.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None new — reinforces [G5](#g5-a-record-never-appears-without-its-face)/R35, a
+call-site fix rather than a new rule.
+
 ---
 
 ## 5. Buttons and actions
@@ -5512,6 +5589,118 @@ door when there is nothing yet.
 **Status: ruled, in build, 19 Sep 2026.**
 
 **Law.** None registered.
+
+### B24: avatars are always a round image, and "Raised by" is a smaller tile
+
+**The rule.** Aurora's ruling, 20 Sep 2026, verbatim: *"Avatars are always a round image
+('Raised by' must be a round image too)."* and *"Make 'Raised by' smaller — less height."*
+
+**The shape.** `RecordMark`'s own `shape="round"` is now the one shape every avatar in this
+app draws, the Raised-by tile included — the tile's own comment names the specific reason it
+needed saying: an earlier squared-corner carve-out on that one tile is gone with it. Height:
+the Stakeholders panel's Raised-by tile drops from `PersonCard`'s "band" default
+(`size="band"`, 56/72px face, `p-4` padding ≈ 104px total) to `size="row"` (36px face) inside
+a tighter `py-3` inset (≈ 60px total) — both kit spacing steps, not hand-picked pixels.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+### B25: the Stakeholders pencil moves to the edit screen only, related stories carry a two-colour progress bar, and a ticket's first message is never an edit field
+
+**The rule.** Three of Aurora's rulings, 20 Sep 2026, verbatim: *"On ticket detail, remove
+the pencil from the Stakeholders section (should be only on the edit screen)."*; *"On ticket
+detail, on the related-stories card, after all stories show a progress bar with completed
+(I'm even thinking: show in progress and completed in the bar — completed as green, the
+first part, then the ones in progress in the in-progress color)."*; and *"On add/edit
+tickets, we can't edit the first message — it's not a description (that was the old model),
+so rather multiple messages under the same ticket."*
+
+**The shape.** The Stakeholders panel (`help-stakeholders.tsx`) draws the Raised-by tile and
+the On-the-loop row as plain fact, no `onClick`/`cursor-pointer`, no pencil — editing
+`raised_by_contact_id` is reached only from the ticket's own edit screen
+(`help-form-dialog.tsx`'s Raised-by field). The related-stories card (`help-detail.tsx`)
+draws its progress bar as two layers over the kit's single-fill `<Progress>` primitive
+(whose own header forbids a second colour on it): the real bar sized to done + in-progress of
+the total, and a `bg-success` `aria-hidden` div absolutely positioned over the DONE fraction
+only, reading green, then charcoal, then empty track — hidden entirely at zero related
+stories ([R88](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-)). And
+the ticket's opening text renders as its own editor only on a raise (`!isEdit`); on an edit,
+message one is `TicketThread`'s own first "theirs" bubble, never a field an edit dialog
+rewrites in place — the write door still accepts `description` on an edit unchanged, only
+this form's own field is retired.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+### B26: the triage queue's Raised-by cell carries the raised-on date, and the Closed tab folds Closed-by into the Closed-on cell
+
+**The rule.** Aurora's ruling, 20 Sep 2026, verbatim: *"On tickets triage queue, under
+'Raised by' add the raised-on date."* and *"On tickets tab 'Closed,' before 'Closed on' add
+'Closed by.'"*
+
+**The shape.** `TriageQueue`'s own `TicketRowsTable` call site takes a new
+`raisedByShowsDate` prop, scoped to Triage alone — Open, Closed and All keep the 18 Sep
+separation of the date into its own column. **Decided (R82):** the Closed tab is already at
+the six-column ceiling (id, title, type, raisedBy, created, closed), so "Closed by" is not
+given a seventh column — it follows R82's own prescription for a fact arriving once a table
+is at the ceiling, "fold the extra fact onto an existing column's own second line", the
+identical technique the raiser cell already uses for its own date. The resolver's face + name
+(R35/R54, via `memberFace`) sits above the closed date in the same cell, "Closed by" reading
+literally before "Closed on".
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+### B27: the stories model round — statuses, tabs, kanban, new fields and icons (12 rulings, one round)
+
+**The rule.** Aurora's 20 Sep 2026 batch, restructuring the Stories model in one pass.
+Verbatim, item by item:
+
+1. *"Let's rename the story statuses: Scheduled becomes 'To Do (Selected for Sprint),'
+   Completed becomes 'Done,' Open becomes 'Backlog' (the story exists but isn't scheduled
+   yet)."* **Her words "Scheduled"/"Completed" had no referent** — the codebase's own status
+   keys were never `scheduled`/`completed`, only `open`/`in_progress`/`in_review`/`done`
+   (`shared/types.ts`'s `StoryStatus`) — so the rename landed on the keys that actually
+   exist: `open` → "Backlog" (`STORY_STATUS_LABEL`, `work-panels.tsx`), `done` unchanged as
+   "Done".
+2. *"Rename the 'Stories' tab to 'Backlog.'"* — done (`web/lib/pages.ts`'s `stories` nav
+   entry now titles "Backlog").
+3. *"In stories kanban, the columns are: In Progress, To Do, In Review."* —
+   `KANBAN_STATUSES`/`KANBAN_STATUS_LABEL` (`stories-screen.tsx`) now hold exactly these
+   three, a deliberately separate word set from `STORY_STATUS_LABEL` (the board answers
+   "which column", the ordinary label answers "what kind of thing").
+4. *"On stories/new, remove the 'done' column and expand the other three to full width —
+   only 3 instead of 4."* — the same `KANBAN_STATUSES` narrowing; Done is off the board.
+5. *"On stories 'Planned,' add id as the first column. Same on the 'Backlog' tab."* — done,
+   the standalone id column both tabs now share.
+6. *"On stories main, add a tab for reviews, views Queue and List. Columns: id, name, type,
+   app, who did it, date marked as done. For Queue, same chips as the story detail page
+   except sprint … title, description, completed by, completed on."* — done, the Reviews
+   tab with its Queue/List views (`stories-screen.tsx`).
+7. *"Add an 'acceptance criteria' field to stories (same design as 'Detail')."* — done,
+   `story-form-dialog.tsx`/`story-detail.tsx`, team migration 0106.
+8. *"Rename story origin 'Internal' to 'Enabler.'"* and *"When a story's origin is Enabler,
+   must select a related ticket!"* — done, `story-form-dialog.tsx`'s category field plus its
+   required-ticket validation.
+9. *"Add a MoSCoW priority field to every story … Render the priority as a colored tag on
+   each story card and let users filter and sort the backlog by it."* — done: `MoscowChip`
+   (R86 exemption, `COLOURED_CHIP_OK`), filterable and sortable (`stories-screen.tsx`).
+10. *"Add 'Spike' to the story Type options"*, *"Rename the 'Tech' story type to 'Chore.'"*
+    and *"For Bug, use the bug-beetle icon."* — done, `shared/story-types.ts`'s six-icon map
+    (team migration 0106 widens the protected set to six).
+11. *"On story detail, the chips in order: id, status, type, app (underlined), sprint (id,
+    underlined) … for other things too."* — this is R94/L37 above, already its own row and
+    not duplicated here.
+12. *"Inside stories and tickets, let's rename 'effort' to 'time log.'"* — **NOT FOUND in
+    the tree.** No "Time log"/"Effort" label change turned up in `stories-screen.tsx`,
+    `work-panels.tsx` or the ticket detail files this pass searched; still open.
+
+**Status: ruled, mostly in build, 20 Sep 2026 — item 12 (effort → time log) still open.**
+
+**Law.** None new beyond R86/R94, both already registered.
 
 ---
 
@@ -7866,15 +8055,15 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**223 rules.**
+**232 rules.**
 
 | Section | Rules |
 |---|---|
 | 1. Colour and surface | C1 to C13 (13) |
-| 2. Page layout and width | L1 to L33 (33) |
+| 2. Page layout and width | L1 to L37 (37) |
 | 3. Detail screens | D1 to D23 (23) |
-| 4. Collections | K1 to K54 (54) |
-| 5. Buttons and actions | B1 to B23 (23) |
+| 4. Collections | K1 to K55 (55) |
+| 5. Buttons and actions | B1 to B27 (27) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |
@@ -7919,7 +8108,9 @@ below is for finding one; it is not the source, and the R-number in each rule's 
 | R84 | [B17](#b17-mango-lives-only-in-the-title-component-every-other-button-is-black) | R85 | [W15](#w15-every-rail-destination-is-named-in-one-word) |
 | R86 | [K39](#k39-in-any-collection-the-one-coloured-chip-is-the-records-status) | R87 | [F18](#f18-a-title-fits-one-line-on-a-macbook-air) |
 | R88 | [D22](#d22-an-empty-section-draws-exactly-one-door-in-no-header-no-second-) | R89 | [L31](#l31-a-tickets-footer-sits-on-the-screens-own-bottom-edge-and-the-composer-wears-its-own-colour-full-width) |
-| R90 | [L32](#l32-any-choice-over-a-person-a-contact-an-account-or-an-app-shows-the-same-face-the-lists-show) | | |
+| R90 | [L32](#l32-any-choice-over-a-person-a-contact-an-account-or-an-app-shows-the-same-face-the-lists-show) | R91 | [L34](#l34-never-need-to-scroll-to-see-all-content) |
+| R92 | [L35](#l35-when-a-main-person-is-chosen-they-disappear-from-the-secondary-picker-over-the-same-pool) | R93 | [L36](#l36-every-avatar-icon-or-colour-rides-beside-its-text--filters-views-and-select-components-alike) |
+| R94 | [L37](#l37-a-records-chips-draw-in-one-fixed-order--id-status-type-main-parent-secondary-parent) | | |
 
 ### The seven files that carry most of it
 

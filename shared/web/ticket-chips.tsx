@@ -5,6 +5,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { RecordRef } from "@shared/web/record-ref"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
+import { orderChips } from "@shared/web/chip-order"
 
 /** THE CHIP LINE — the number, the type, the app, and — on the ticket
  * DETAIL screen only, since 17 Sep 2026 — the STATUS. (It carried a fourth
@@ -304,52 +305,77 @@ export function TicketChips({
   // shape the census itself recognises and the shape `InAppLink` uses for the
   // identical reason.
   const safeAppHref = safeHref(appHref ?? "")
+  // R94 (chip-order, shared/web/chip-order.ts): id, status, type, main
+  // parent, secondary parent — every one of the four chips this component
+  // ever draws is tagged with WHICH of those it is and handed to the one
+  // shared seam, so the order is a property of `orderChips` and can never
+  // drift one edit at a time the way a hand-written JSX sequence can. This
+  // ticket line has no secondary-parent chip (a sprint) of its own — that
+  // fact lives on the ticket's Overview facts instead, not this line.
   return (
     <span className="flex flex-wrap items-center gap-2">
-      {/* THE NUMBER, THROUGH THE ONE COMPONENT THAT DRAWS IT (record-ref.tsx).
-          This file used to spell the black chip out itself, and by 6 Sep 2026
-          three other surfaces spelled the same lozenge out beside it — two of
-          them carrying `shrink-0 tabular-nums` and this one not, which is drift
-          nobody would ever file as a bug. `RecordRef` also owns the absent case
-          ("A TICKET WITH NO NUMBER DRAWS NO CHIP", above): it returns nothing at
-          all for a null, so the guard that used to stand here is inside it now,
-          where every OTHER kind's row gets it for free. */}
-      <RecordRef value={ticket.ref} />
-      {statusDot}
-      {/* THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN CHILD —
-          client ruling, 18 Sep 2026 ("all chips / pills" need the leading-mark
-          gap "wether its a dot or an icno"): `badge.tsx`'s own header names
-          this exact chip as one of the two call sites the ruling was written
-          about (`tickets-collection.tsx`'s type cell is the other). A bare
-          JSX child is what `web/test/chips-are-badges.test.ts` now refuses
-          past Badge's own boundary. */}
-      <Badge variant="secondary" size="pill" icon={typeDot}>
-        {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. An
-            absent chip here would leave a hole where the other chips
-            have a fact. */}
-        {ticket.helpType ?? "—"}
-      </Badge>
-      {ticket.appId && ticket.appName && safeAppHref && (
-        /* THE BADGE IS THE ANCHOR — `asChild` hands the badge's classes,
-           `data-slot="badge"`, `data-dot` and ref to `AppLink`'s real `<a>`
-           through Radix `Slot`, and the kit's own `LINK_UNDERLINE` draws the
-           underline the client ruled on (18 Sep 2026, "when its a link make
-           it underlined (for exmaple the app name)"). No `className` on
-           `AppLink` any more: the alignment fix the old anchor-wraps-badge
-           shape needed (`inline-flex items-center`, so an inline anchor's
-           line box did not stand taller than the badge inside it — client:
-           "what's wrong with alignment chips??") is moot when the anchor IS
-           the badge and carries the badge's own `inline-flex … h-[…]`
-           classes, and the radius the shared focus ring follows is the
-           badge's own `rounded-pill` on the same element. This shape threw
-           on kit v1.2.118–120 and was swapped back in on v1.2.121 — the
-           header tells that story; `check-badge.mjs` section 6 in the kit
-           renders exactly this shape headlessly so it cannot regress
-           silently again. */
-        <Badge asChild variant="secondary" size="pill">
-          <AppLink href={safeAppHref}>{ticket.appName}</AppLink>
-        </Badge>
-      )}
+      {orderChips([
+        {
+          kind: "id",
+          // THE NUMBER, THROUGH THE ONE COMPONENT THAT DRAWS IT
+          // (record-ref.tsx). This file used to spell the black chip out
+          // itself, and by 6 Sep 2026 three other surfaces spelled the same
+          // lozenge out beside it — two of them carrying `shrink-0
+          // tabular-nums` and this one not, which is drift nobody would
+          // ever file as a bug. `RecordRef` also owns the absent case ("A
+          // TICKET WITH NO NUMBER DRAWS NO CHIP", above): it returns
+          // nothing at all for a null, so the guard that used to stand here
+          // is inside it now, where every OTHER kind's row gets it for
+          // free.
+          node: <RecordRef key="id" value={ticket.ref} />,
+        },
+        { kind: "status", node: <React.Fragment key="status">{statusDot}</React.Fragment> },
+        {
+          kind: "type",
+          // THE GLYPH RIDES BADGE'S OWN `icon` SLOT, NOT A PLAIN CHILD —
+          // client ruling, 18 Sep 2026 ("all chips / pills" need the
+          // leading-mark gap "wether its a dot or an icno"): `badge.tsx`'s
+          // own header names this exact chip as one of the two call sites
+          // the ruling was written about (`tickets-collection.tsx`'s type
+          // cell is the other). A bare JSX child is what
+          // `web/test/chips-are-badges.test.ts` now refuses past Badge's
+          // own boundary.
+          node: (
+            <Badge key="type" variant="secondary" size="pill" icon={typeDot}>
+              {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying
+                  so. An absent chip here would leave a hole where the other
+                  chips have a fact. */}
+              {ticket.helpType ?? "—"}
+            </Badge>
+          ),
+        },
+        {
+          kind: "mainParent",
+          node:
+            ticket.appId && ticket.appName && safeAppHref ? (
+              /* THE BADGE IS THE ANCHOR — `asChild` hands the badge's
+                 classes, `data-slot="badge"`, `data-dot` and ref to
+                 `AppLink`'s real `<a>` through Radix `Slot`, and the kit's
+                 own `LINK_UNDERLINE` draws the underline the client ruled
+                 on (18 Sep 2026, "when its a link make it underlined (for
+                 exmaple the app name)"). No `className` on `AppLink` any
+                 more: the alignment fix the old anchor-wraps-badge shape
+                 needed (`inline-flex items-center`, so an inline anchor's
+                 line box did not stand taller than the badge inside it —
+                 client: "what's wrong with alignment chips??") is moot when
+                 the anchor IS the badge and carries the badge's own
+                 `inline-flex … h-[…]` classes, and the radius the shared
+                 focus ring follows is the badge's own `rounded-pill` on the
+                 same element. This shape threw on kit v1.2.118–120 and was
+                 swapped back in on v1.2.121 — the header tells that story;
+                 `check-badge.mjs` section 6 in the kit renders exactly this
+                 shape headlessly so it cannot regress silently again. */
+              <Badge key="mainParent" asChild variant="secondary" size="pill">
+                <AppLink href={safeAppHref}>{ticket.appName}</AppLink>
+              </Badge>
+            ) : null,
+        },
+      ])}
     </span>
   )
 }

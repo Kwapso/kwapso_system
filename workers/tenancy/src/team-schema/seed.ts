@@ -269,16 +269,29 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // born after that migration has no reason to be handed a word the client
   // just retired.
   { type: "Story type", value: "Data", mark: "DA" },
-  { type: "Story type", value: "Tech", mark: "TC" },
+  // "TECH" RENAMED "CHORE", AND "SPIKE" ADDED — Aurora's ruling, 20 Sep 2026,
+  // verbatim: "Add 'Spike' to the story Type options — a time-boxed research
+  // or investigation task… not shippable features" and "Rename the 'Tech'
+  // story type to 'Chore'. A Chore is necessary work with no direct
+  // user-visible value." Team migration 0106 carries the identical rewrite to
+  // a team that already exists (Tech → Chore in place, Spike inserted new); a
+  // newborn team is simply handed the current six words rather than the old
+  // five plus a migration to run.
+  { type: "Story type", value: "Chore", mark: "CR" },
   { type: "Story type", value: "Bug", mark: "BG" },
   { type: "Story type", value: "Feature", mark: "FT" },
   { type: "Story type", value: "Change", mark: "CH" },
+  { type: "Story type", value: "Spike", mark: "SP" },
   // THE NEW FIELD BESIDE IT, same ruling: where a story came from. Protected,
   // like every other closed vocabulary a required field reads from (Ticket
   // status, Story status) — a team may reword either word, never switch it
   // off, because `stories.category` is never blank (team migration 0094).
+  // "INTERNAL" RENAMED "ENABLER" — Aurora's ruling, 20 Sep 2026: an Enabler
+  // story must name the ticket it enables (`createStory`/`updateStory`,
+  // workers/content/src/lib/stories.ts). Team migration 0106 carries the same
+  // rename to an existing team.
   { type: "Story category", value: "Client-requested" },
-  { type: "Story category", value: "Internal" },
+  { type: "Story category", value: "Enabler" },
   // Display-only labels for the five built-in states. The status the code trusts
   // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
   // on screen, and renaming one can never move a ticket.
@@ -330,7 +343,11 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // Display-only labels for the four story states. The states the code trusts
   // are STORY_STATUSES in shared/types.ts — rewording a row here can never move
   // a story, exactly as with the ticket labels above.
-  { type: "Story status", value: "Open" },
+  // "OPEN" RENAMED "BACKLOG" — Aurora's ruling, 20 Sep 2026: "Open becomes
+  // Backlog (the story exists but isn't scheduled yet)." The fixed key
+  // underneath stays `open`; team migration 0106 carries the identical word
+  // move to an existing team's own dropdown row.
+  { type: "Story status", value: "Backlog" },
   { type: "Story status", value: "In progress" },
   { type: "Story status", value: "In review" },
   { type: "Story status", value: "Done" },

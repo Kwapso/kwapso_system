@@ -185,7 +185,7 @@ describe("T3653 — every story gets a number at birth, account or not", () => {
       id: storyId,
       title: "Work against our own question",
       storyType: "Feature",
-      category: "Internal",
+      category: "Enabler",
       changesNoStep: true,
       ticketId,
     })

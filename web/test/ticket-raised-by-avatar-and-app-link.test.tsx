@@ -75,7 +75,46 @@ const MEMBERS: TeamMember[] = [
     joinedAt: "2026-01-01T00:00:00.000Z",
     createdByName: null,
   } as TeamMember,
+  {
+    userId: "usr_marta",
+    email: "marta@kwapso.com",
+    firstName: "Marta",
+    lastName: "Bergman Costa",
+    imageUrl: "https://example.test/marta.png",
+    roleId: "role_1",
+    roleTitle: "Admin",
+    isYou: false,
+    isAdmin: true,
+    isClient: false,
+    joinedAt: "2026-01-01T00:00:00.000Z",
+    createdByName: null,
+  } as TeamMember,
 ]
+
+// RESOLVED, AND BY SOMEBODY — client ruling, 20 Sep 2026: "on tickets tab
+// 'Closed,' before 'Closed on' add 'Closed by.'" `resolverId`/`resolverName`
+// were already on `HelpTicket`'s own wire shape (shared/types.ts), stamped by
+// `setStatus` on every resolve; nothing in `workers/content` needed widening.
+const RESOLVED_ROW: TicketFace = {
+  ...STAFF_ROW,
+  id: "help-3",
+  ref: "BERG-T0480",
+  resolvedAt: "2026-06-12T09:00:00.000Z",
+  resolverId: "usr_marta",
+  resolverName: "Marta Bergman Costa",
+}
+
+// A PRE-MIGRATION ROW: closed before `resolver_id`/`resolver_name` existed on
+// the table, so `resolvedAt` is set and neither resolver field is. The cell
+// must still say WHEN without inventing a WHO.
+const RESOLVED_ROW_NO_RESOLVER: TicketFace = {
+  ...STAFF_ROW,
+  id: "help-4",
+  ref: "BERG-T0481",
+  resolvedAt: "2026-06-12T09:00:00.000Z",
+  resolverId: null,
+  resolverName: null,
+}
 
 describe("memberFace — the one staff-raiser resolver (R35)", () => {
   it("resolves a member's own imageUrl by id", () => {
@@ -130,6 +169,126 @@ describe("the top-level ticket list draws a staff raiser's own face (client ruli
     const img = document.querySelector('img[src="https://example.test/petra.png"]')
     expect(img, "a client contact's own logo must still render").not.toBeNull()
     screen.getByText("Petra Ostwald")
+  })
+})
+
+describe("the triage queue's list stacks the raised date under Raised by (client ruling, 20 Sep 2026)", () => {
+  it("draws a muted second line with the raised date when raisedByShowsDate is set", () => {
+    render(
+      <TicketRowsTable
+        rows={[STAFF_ROW]}
+        onOpen={() => {}}
+        label="Triage queue"
+        teamId="team1"
+        columns={["raisedBy"]}
+        members={MEMBERS}
+        raisedByShowsDate
+      />
+    )
+    screen.getByText("Alex")
+    // STAFF_ROW.createdAt is "2026-08-18T09:00:00.000Z" — matched loosely on
+    // the day, the same tolerance `app-tickets-are-a-table.test.tsx` uses for
+    // an identical `formatDate` cell, so this stays green across timezones.
+    screen.getByText(/18/)
+  })
+
+  it("a client contact's Raised by cell gets the identical second line", () => {
+    render(
+      <TicketRowsTable
+        rows={[CLIENT_ROW]}
+        onOpen={() => {}}
+        label="Triage queue"
+        teamId="team1"
+        columns={["raisedBy"]}
+        members={MEMBERS}
+        raisedByShowsDate
+      />
+    )
+    screen.getByText("Petra Ostwald")
+    screen.getByText(/18/)
+  })
+
+  it("stays off by default — the 18 Sep 2026 by/date split is untouched on every other tab", () => {
+    render(
+      <TicketRowsTable
+        rows={[STAFF_ROW]}
+        onOpen={() => {}}
+        label="Tickets"
+        teamId="team1"
+        columns={["raisedBy", "created"]}
+        members={MEMBERS}
+      />
+    )
+    // Exactly one "18" on the row — the `created` column's own date — rather
+    // than a second copy folded into `raisedBy`.
+    expect(screen.getAllByText(/18/)).toHaveLength(1)
+  })
+})
+
+describe("the Closed tab folds Closed by above Closed on (client ruling, 20 Sep 2026)", () => {
+  it("names its header 'Closed by', never a bare 'Closed'", () => {
+    render(
+      <TicketRowsTable
+        rows={[RESOLVED_ROW]}
+        onOpen={() => {}}
+        label="Tickets"
+        teamId="team1"
+        columns={["closed"]}
+        members={MEMBERS}
+      />
+    )
+    expect(screen.getByRole("columnheader", { name: "Closed by" })).toBeTruthy()
+    expect(screen.queryByRole("columnheader", { name: "Closed" })).toBeNull()
+  })
+
+  it("draws the resolver's own face and first name (R35/R54) above the closed date", () => {
+    render(
+      <TicketRowsTable
+        rows={[RESOLVED_ROW]}
+        onOpen={() => {}}
+        label="Tickets"
+        teamId="team1"
+        columns={["closed"]}
+        members={MEMBERS}
+      />
+    )
+    const img = document.querySelector('img[src="https://example.test/marta.png"]')
+    expect(img, "the resolver's own face should render, not just their initial").not.toBeNull()
+    screen.getByText("Marta")
+    expect(
+      screen.queryByText("Marta Bergman Costa"),
+      "Closed by drew the untrimmed staff snapshot"
+    ).toBeNull()
+    screen.getByText(/12/)
+  })
+
+  it("falls back to the date alone for a pre-migration row with no resolver on it", () => {
+    render(
+      <TicketRowsTable
+        rows={[RESOLVED_ROW_NO_RESOLVER]}
+        onOpen={() => {}}
+        label="Tickets"
+        teamId="team1"
+        columns={["closed"]}
+        members={MEMBERS}
+      />
+    )
+    expect(document.querySelector("img"), "no resolver on the row means no face to draw").toBeNull()
+    screen.getByText(/12/)
+  })
+
+  it("draws an em dash for a ticket that has never been closed", () => {
+    render(
+      <TicketRowsTable
+        rows={[STAFF_ROW]}
+        onOpen={() => {}}
+        label="Tickets"
+        teamId="team1"
+        columns={["closed"]}
+        members={MEMBERS}
+      />
+    )
+    screen.getByText("—")
   })
 })
 

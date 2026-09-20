@@ -2,17 +2,18 @@
 // "Assign an icon to each type."
 //
 // A CODE MAP, NOT A COLUMN. `selectable_data` — the table `Story type` lives
-// on (shared/selectable-homes.ts) — has no icon column today, and the five
+// on (shared/selectable-homes.ts) — has no icon column today, and the six
 // words this maps are the PROTECTED set team migration `0094_story_type_and_
 // category` planted (`is_default = 1` on Data/Tech/Bug/Feature/Change, Fix
-// deactivated — documents/UI-RULEBOOK.md K26). A team may still RENAME any of
-// the five on the Choices screen — renaming a protected row is allowed,
-// `shared/ticket-types.ts`'s own header says why for its identical four — but
-// may neither add a sixth nor remove one of these. A closed, hand-curated five
-// is the same shape `shared/meeting-icons.ts` already argues for its own
-// closed eight: a migration is what widens FIVE, never a value this map has
-// to guess at, so a column and a migration would buy nothing a team could not
-// already do by renaming.
+// deactivated — documents/UI-RULEBOOK.md K26), widened to six by migration
+// `0106` (Aurora's 20 Sep 2026 ruling): Tech renamed Chore, Spike added new.
+// A team may still RENAME any of the six on the Choices screen — renaming a
+// protected row is allowed, `shared/ticket-types.ts`'s own header says why
+// for its identical four — but may neither add a seventh nor remove one of
+// these. A closed, hand-curated six is the same shape `shared/meeting-
+// icons.ts` already argues for its own closed eight: a migration is what
+// widens the set, never a value this map has to guess at, so a column and a
+// migration would buy nothing a team could not already do by renaming.
 //
 // KEYED THE SAME FORGIVING WAY `ticketTypeKey` IS (shared/ticket-types.ts) —
 // trim, lower-case, drop one trailing "s" — so a team that retypes "Bug" as
@@ -37,9 +38,9 @@
 //
 // Every name below is one of the kit's own Phosphor exports (fill weight,
 // shared/ui/foundations/icons), verified by hand against the kit's generated
-// exports (`ArrowsClockwise.svg`, `Bug.svg`, `Database.svg`, `Sparkle.svg`,
-// `Wrench.svg` all exist there) — the same verification `meeting-icons.ts`
-// records for its own eight.
+// exports (`ArrowsClockwise.svg`, `BugBeetle.svg`, `Database.svg`,
+// `Sparkle.svg`, `Wrench.svg`, `MagnifyingGlass.svg` all exist there) — the
+// same verification `meeting-icons.ts` records for its own eight.
 //
 // WHY NOT `pencil-simple` FOR CHANGE, THE OBVIOUS FIRST REACH (and the task's
 // own suggestion). CLAUDE.md's action-icon table fixes `PencilSimple` as
@@ -51,16 +52,30 @@
 // flight, a different concept in a different corner of the app, so there is
 // no collision in practice either.
 
-/** THE FIVE, KEYED BY THE SEEDED SPELLING LOWER-CASED, to the kit's own
+/** THE SIX, KEYED BY THE SEEDED SPELLING LOWER-CASED, to the kit's own
  * kebab-case name for the glyph. Not exported as a vocabulary of its own —
  * `storyTypes` (the live "Story type" rows) is still the one list a screen
- * reads, from `useStoryFormOptions`; this is only the glyph half. */
+ * reads, from `useStoryFormOptions`; this is only the glyph half.
+ *
+ * WIDENED TO SIX, 20 Sep 2026 (Aurora's ruling): "Tech" renamed "Chore" — the
+ * key moves with the word (team migration 0106 carries the same rename on
+ * every existing team's own dropdown row and every story already wearing the
+ * old word), the glyph does not, `wrench` fits a Chore's own definition
+ * ("dependency upgrades, refactors, config cleanup, data migrations") exactly
+ * as well as it fit Tech's. "Spike" is wholly new — `magnifying-glass`,
+ * verified against the kit's own generated exports
+ * (`MagnifyingGlass.svg` exists) — a time-boxed research task reads as
+ * looking closely at something before building it. Bug's own glyph moves
+ * too, same ruling, same day: "For Bug, use the bug-beetle icon" —
+ * `bug-beetle`, verified the same way (`BugBeetle.svg` exists), in place of
+ * the plainer `bug`. */
 export const STORY_TYPE_ICONS = {
   data: "database",
-  tech: "wrench",
-  bug: "bug",
+  chore: "wrench",
+  bug: "bug-beetle",
   feature: "sparkle",
   change: "arrows-clockwise",
+  spike: "magnifying-glass",
 } as const satisfies Record<string, string>
 
 export type StoryType = keyof typeof STORY_TYPE_ICONS

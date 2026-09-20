@@ -63,119 +63,72 @@
 // this file's header, above). So the loop chips carry no "×"; the row is the
 // same add-only fact it always was, drawn horizontally instead of as tiles.
 //
-// RAISED BY IS NOW EDITABLE, THROUGH THE FIELD THAT ALREADY SUPPORTS IT.
-// `origin: "raiser"` on a `HelpStakeholder` is `help.creator_id` — WHO LITERALLY
-// SUBMITTED THE TICKET — read straight off `workers/content/src/lib/
-// stakeholders.ts`: "raiser + current team admins + everyone @mentioned … are
-// DERIVED at read time (always recomputed, never stored)." There is no PATCH
-// route for `creator_id` anywhere in `lib/help.ts`, and there should not be —
-// it is an audit fact (who created this ROW), not a business attribute, and
-// making it editable would mean either lying about who wrote a ticket or
-// unpicking the locked HYBRID model above. What the door DOES already let a
-// staff caller correct is `raised_by_contact_id` — checklist 5.9, "who asked",
-// the account CONTACT a ticket was raised on behalf of (`help-form-dialog.tsx`'s
-// own `contactField`, already labelled "Raised by" there, already PATCHed
-// through `content.updateHelp`). So THIS is the field the edit pen opens: the
-// caller hands this component the ticket's own `raisedByContactId` +
-// `raisedByContactName` (plumbed from `help-detail.tsx` in one line, see its
-// own comment at the `<HelpStakeholders>` call site) and a save callback that
-// reuses the SAME `editTicket`/`content.updateHelp` door the edit form already
-// calls — no new door, no schema change. Where no contact has been named yet,
-// the tile falls back to showing the derived raiser (`origin: "raiser"`) as
-// today, so a ticket nobody has corrected still shows who submitted it.
+// THE EDIT PEN IS GONE FROM THIS CARD — Aurora's ruling, 20 Sep 2026, verbatim:
+// "On ticket detail, remove the pencil from the Stakeholders section (should
+// be only on the edit screen)." RETIRES the paragraph this one replaces (which
+// described the pen opening an inline `Select` right here, over a
+// `tenancy.accountDetail` read this file made itself): that inline editor is
+// deleted, not merely hidden, and this card goes back to being a plain fact —
+// no `onClick`, no `EditPenButton`, no local editing state, no account-detail
+// fetch of its own. `origin: "raiser"` is still `help.creator_id` — who
+// literally submitted the ticket — and is still never itself editable, for
+// the reason the retired paragraph gave (an audit fact, not a business
+// attribute, with no PATCH route). What WAS editable, `raised_by_contact_id`,
+// still is — the field just has exactly one door onto it now, the one that
+// was always the real one underneath: `help-form-dialog.tsx`'s own
+// `contactField` (labelled "Raised by" there too), reached by opening the
+// ticket's EDIT screen. This card only ever reused that same door through a
+// second, redundant surface; removing the second surface removes no
+// capability, only the duplicate path to it (and the extra `accountId`-gated
+// read that came with it).
 //
-// TEAM MEMBERS ARE NOT IN THIS PICKER'S POOL, and that is a conflict flagged
-// rather than papered over. `raised_by_contact_id` is a FOREIGN KEY onto this
-// team's `accounts` table (`account_type IN ('entity','individual')` —
-// DATA-MODEL.md § accounts), and the read that names it
-// (`SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id`)
-// assumes exactly that. A team member is a GLOBAL `users`/`team_members` row,
-// nothing to do with a team's own `accounts` table. Offering a colleague in
-// this Select would either silently fail to save (the door's own
-// `contactForTicket` refuses any id that is not a live account row linked to
-// the ticket's client) or require a real schema decision — a second nullable
-// column, or a polymorphic id — which is not a UI change and was not made
-// here. Widening the pool to include staff is a follow-up decision for
-// Aurora, with a side-by-side, not a unilateral migration from this lane.
+// `raisedByContactId`/`raisedByContactName` STILL ARRIVE HERE, unchanged —
+// this card still needs to know who to show, only not how to change it.
+// `accountId`, `canEditRaisedBy` and `onChangeRaisedBy` stay in this
+// component's own prop type, accepted and unused, because the call site in
+// `help-detail.tsx` still passes them (that file's own `<HelpStakeholders>`
+// call is outside this change's edit — a lane brief scoped to this file, this
+// one and person-card.tsx/members-gallery.tsx) and dropping them from the
+// type would be a breaking change this file cannot make alone. Removing the
+// three properties from the caller, and from this signature together, is a
+// one-line follow-up for whoever next opens help-detail.tsx's stakeholders
+// panel wiring.
 import * as React from "react"
 
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  type SelectFace,
-} from "@shared/ui/components/select/select"
 import type { HelpStakeholder } from "@shared/types"
 import { nameInitials } from "@/lib/identity"
 import { PersonCard } from "@shared/web/person-card"
-import { EditPenButton } from "@shared/web/edit-pen-button"
 import { useLanguage } from "@shared/web/language"
 import { staffNameFromSnapshot } from "@shared/staff-name"
-import { tenancy } from "@/lib/api"
-import { useCached } from "@shared/web/store"
-import { sortedOptions } from "@shared/web/sorted-options"
 
 export function HelpStakeholders({
   stakeholders,
-  /** The ticket's own client, when it has one — needed to read that client's
-   * contacts for the "Raised by" edit Select. `undefined`/`null` means the
-   * edit pen has nothing to open (no account, no contacts to pick from), the
-   * same gate `help-form-dialog.tsx`'s own contact row already stands down on. */
-  accountId,
   /** `help.raised_by_contact_id` / its name off the ticket row — see this
-   * file's header for why this, and not `origin: "raiser"`, is the editable
-   * half. */
+   * file's header for why this, and not `origin: "raiser"`, is the one that
+   * can be corrected (through `help-form-dialog.tsx` now, not here). */
   raisedByContactId,
   raisedByContactName,
-  /** Gates the edit pen and the card's own click — `help:update`, the same
-   * right that gates the ticket's own edit sheet (`canEdit` at the one call
-   * site, `help-detail.tsx`). Undefined/false: the tile is a fact, as before. */
-  canEditRaisedBy = false,
-  /** Saves through the EXISTING door — `help-detail.tsx` wires this to the
-   * same `editTicket`/`content.updateHelp` call its own edit form already
-   * makes, passing the ticket's current `description` alongside the new
-   * `raisedByContactId` (the door requires it). No new route. */
-  onChangeRaisedBy,
 }: {
   stakeholders: HelpStakeholder[]
+  /** ACCEPTED, UNUSED — see this file's header ("THE EDIT PEN IS GONE"). The
+   * call site still passes it; this card no longer reads a client's contacts
+   * itself. */
   accountId?: string | null
   raisedByContactId?: string | null
   raisedByContactName?: string | null
+  /** ACCEPTED, UNUSED — same note. Editing moved to `help-form-dialog.tsx`. */
   canEditRaisedBy?: boolean
+  /** ACCEPTED, UNUSED — same note. */
   onChangeRaisedBy?: (contactId: string) => Promise<void>
 }) {
-  const { t, lang } = useLanguage()
-  const [editingRaiser, setEditingRaiser] = React.useState(false)
-  const [savingRaiser, setSavingRaiser] = React.useState(false)
+  const { t } = useLanguage()
 
   // R54. `origin: "raiser"` is the one value here that can be a client
   // contact — every other way onto this list (an admin, a mention, a
   // colleague added by hand) is one of ours.
   const raiser = stakeholders.find((s) => s.origin === "raiser")
   const loop = stakeholders.filter((s) => s.origin !== "raiser")
-
-  // THE CONTACT LIST FOR THE EDIT SELECT — the same bounded, hard-capped read
-  // `help-form-dialog.tsx`'s own `contactField` makes, only fired once editing
-  // is actually reachable (a real account, and the caller's own gate on).
-  const detailQ = useCached(
-    canEditRaisedBy && accountId ? `account-detail:${accountId}` : null,
-    () => tenancy.accountDetail(accountId as string)
-  )
-  const contactChoices = (detailQ.data?.links ?? []).filter((l) => l.active)
-
-  async function saveRaisedBy(contactId: string) {
-    if (!onChangeRaisedBy) return
-    setSavingRaiser(true)
-    try {
-      await onChangeRaisedBy(contactId)
-    } finally {
-      setSavingRaiser(false)
-      setEditingRaiser(false)
-    }
-  }
 
   // THE RAISED-BY TILE'S FACE + NAME. The named contact wins when the ticket
   // has one; the derived raiser (whoever submitted it) is the fallback, same
@@ -185,99 +138,39 @@ export function HelpStakeholders({
     (raiser ? (raiser.origin === "raiser" ? raiser.name : staffNameFromSnapshot(raiser.name)) || raiser.email : null)
   const raiserPicture = raisedByContactName ? null : raiser?.imageUrl
 
-  const canOpenEditor = canEditRaisedBy && !!accountId && !!onChangeRaisedBy
-
-  // THE TRIGGER'S OWN FACE (kit v1.2.127's `face` slot). Aurora, verbatim:
-  // "every time there is an avatar, I want to also see it in the choice
-  // component, so I also want to see the avatars here." Radix cannot clone
-  // an option's own mark into the trigger, so the caller hands it the
-  // SELECTED contact's face directly — looked up in the same
-  // `contactChoices` the options below are drawn from, falling back to the
-  // tile's own already-derived `raiserPicture`/`raiserName` for the one case
-  // that list cannot answer: the ticket's `raisedByContactId` naming a
-  // contact this bounded read did not happen to include.
-  const selectedRaiserContact = contactChoices.find((l) => l.personAccountId === raisedByContactId)
-  const raisedByTriggerFace: SelectFace | undefined = raisedByContactId
-    ? {
-        src: (selectedRaiserContact?.personLogoUrl ?? raiserPicture) ?? undefined,
-        name: selectedRaiserContact?.personName ?? raiserName ?? undefined,
-      }
-    : undefined
-
   if (stakeholders.length === 0 && !raisedByContactId) {
     return <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
   }
 
   return (
     <div className="flex flex-col gap-[var(--space-3)]">
-      {/* RAISED BY — ONE TILE (client, 18 Sep 2026: "keep Raised by as one
-          tile"). `PersonCard`'s vertical/band shape is unchanged from the
-          17 Sep ruling; only the LOOP below moved. */}
+      {/* RAISED BY — ONE TILE, A PLAIN FACT NOW (Aurora, 20 Sep 2026: no pen
+          here any more — see this file's header). No `onClick`, no
+          `cursor-pointer`: editing `raised_by_contact_id` is reached from the
+          ticket's own edit screen (`help-form-dialog.tsx`'s "Raised by"
+          field) instead.
+
+          SMALLER, TOO — Aurora, 20 Sep 2026: "Make 'Raised by' smaller — less
+          height." `size="row"` (36px, one `RecordMark` step down from this
+          `PersonCard`'s own "band" default of 56/72px) and a tighter, still
+          token-based vertical inset (`py-3` = 0.75rem/12px a side, down from
+          `p-4`'s 1rem/16px) — both spacing steps, not hand-picked pixels.
+          BEFORE (band + p-4): 2 × 16px padding + a 72px face ≈ 104px.
+          AFTER (row + py-3): 2 × 12px padding + a 36px face = 60px. */}
       {(raiser || raisedByContactId) && (
         <Card data-slot="stakeholder-card" variant="raised">
-          <CardContent
-            className={
-              canOpenEditor && !editingRaiser
-                ? "relative flex flex-col gap-2 p-4 cursor-pointer"
-                : "relative flex flex-col gap-2 p-4"
-            }
-            // A PLAIN CLICK HANDLER, NOT `role="button"` — the card already
-            // nests a real interactive control (the edit pen, and the Select
-            // once open); a `role="button"` wrapper AROUND another control is
-            // the nested-interactive-element trap. The pen is the keyboard-
-            // reachable door; this is a mouse convenience on top of it.
-            onClick={canOpenEditor && !editingRaiser ? () => setEditingRaiser(true) : undefined}
-          >
-            {canOpenEditor && !editingRaiser ? (
-              // `EditPenButton`'s own `onClick` is `() => void` (no event) —
-              // it sits inside the card's own `onClick` (below) so a press
-              // fires both, which is harmless: both only ever set the same
-              // `editingRaiser` state to `true`.
-              <EditPenButton
-                label={t("Edit")}
-                onClick={() => setEditingRaiser(true)}
-                disabled={savingRaiser}
-                className="absolute top-2 right-2"
-              />
-            ) : null}
-            {editingRaiser ? (
-              <Select
-                defaultOpen
-                value={raisedByContactId ?? undefined}
-                onValueChange={(v) => void saveRaisedBy(v)}
-                onOpenChange={(open) => {
-                  if (!open) setEditingRaiser(false)
-                }}
-                disabled={savingRaiser}
-              >
-                <SelectTrigger aria-label={t("Raised by")} className="w-full" face={raisedByTriggerFace}>
-                  <SelectValue placeholder={t("Choose who raised it")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedOptions(contactChoices, lang, (l) => l.personName).map((l) => (
-                    <SelectItem
-                      key={l.personAccountId}
-                      value={l.personAccountId}
-                      face={{ src: l.personLogoUrl ?? undefined, name: l.personName }}
-                    >
-                      {l.personName}
-                      {l.isMainStakeholder ? ` — ${t("Main contact")}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <PersonCard
-                orientation="horizontal"
-                picture={raiserPicture}
-                mark={nameInitials(raiserName ?? "")}
-                markName={raiserName ?? undefined}
-                chip={
-                  <span className="text-micro text-muted-foreground uppercase">{t("Raised by")}</span>
-                }
-                title={<CardTitle className="text-sm">{raiserName}</CardTitle>}
-              />
-            )}
+          <CardContent className="flex flex-col gap-2 px-4 py-3">
+            <PersonCard
+              orientation="horizontal"
+              size="row"
+              picture={raiserPicture}
+              mark={nameInitials(raiserName ?? "")}
+              markName={raiserName ?? undefined}
+              chip={
+                <span className="text-micro text-muted-foreground uppercase">{t("Raised by")}</span>
+              }
+              title={<CardTitle className="text-sm">{raiserName}</CardTitle>}
+            />
           </CardContent>
         </Card>
       )}
