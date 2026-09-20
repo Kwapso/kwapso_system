@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### Added - TicketThread takes a slide-in edit escape hatch and a face that matches the actions button - v1.2.143
+
+Aurora, on the chat menu, verbatim: "make the avatar as big as this button.
+open the edit as slide in. can edit text and date and attachments." Two
+additions to `ThreadMessageActions`/`TicketThreadProps`, both opt in and
+both byte-identical to today's output when left out.
+
+`onEditRequest?: (id: string) => void`, the second way to edit. The inline
+textarea this component owns can hold only the message body, never the
+three fields the ruling asks for (text, date, attachments), so a caller
+that needs a real edit surface passes `onEditRequest` instead of `onEdit`:
+the Edit row calls it with the message's own id and this component opens
+nothing of its own, leaving the whole edit, whatever shape it needs, to
+the caller's own slide in. `onEditRequest` wins the moment it is given,
+even alongside `onEdit`, and draws the Edit row on its own so a caller
+that never wires `onEdit` at all still gets one.
+
+`faceSize?: "sm" | "md"` on `TicketThread`, defaulting to `"sm"`, `Avatar`'s
+existing 24px ruling-30 rung. `"md"` draws each bubble's face at 40px, the
+same height as the message-actions trigger (`size="icon"`,
+`--control-height-button`). 40 sits on no existing `Avatar` rung (24 / 32 /
+48), so `Avatar` gained one: `size="control"`, reading a new
+`--avatar-control` token (2.5rem), documented as a NAMED EXCEPTION to
+ruling 30's three-rung ladder rather than a fourth rung on it, since it
+exists for exactly one caller. The loading skeleton's own placeholder face
+follows `faceSize` too, so a "md" thread never flashes a smaller face
+while loading than the messages it is about to show.
+
+Both pinned in `check-ticket-thread.mjs` (Sections 8, 9 and 9b, the last
+one a live SSR mount proving the rendered class actually carries
+`size-[var(--avatar-control)]` at `faceSize="md"` and `size-[var(--avatar-sm)]`
+when the prop is left out); `Avatar`'s own `"control"` size and
+`--avatar-control` are pinned there too, read from `avatar.tsx` and
+`tokens.css` directly, so TicketThread's own check goes red the day either
+one drifts. Proved live: each pin was sabotaged in turn (the default
+`faceSize`, then `Avatar`'s `"control"` size) and the check failed naming
+the exact break, then both files were restored from a `cp` taken before
+the sabotage.
+
 ### Fixed - TicketThread's inline edit field no longer suppresses the shared focus ring - v1.2.142
 
 The app's focus-ring law (ruling 24: the ring is one rule in `styles.css` and

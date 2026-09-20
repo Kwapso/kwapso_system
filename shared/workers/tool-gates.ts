@@ -85,6 +85,10 @@ export const TOOL_GATES: Record<string, string> = {
   add_knowledge_source: "knowledge:create",
   update_knowledge_source: "knowledge:update",
   set_knowledge_source_active: "knowledge:delete",
+  // The same right as add_knowledge_source: adding a word to the team's own
+  // glossary is filing a source, the same act by another door (its own header,
+  // workers/content/src/lib/knowledge.ts, says why it is a separate door).
+  add_glossary_word: "knowledge:create",
   // It CREATES sources (mirrors of rows the caller can already read), so it is
   // gated as a create — the same right a person needs to fill the base by hand.
   sync_knowledge: "knowledge:create",
@@ -141,6 +145,7 @@ export const TOOL_GATES: Record<string, string> = {
   create_story: "work:create",
   update_story: "work:update",
   set_story_status: "work:update",
+  story_burndown: "work:read",
   create_sprint: "work:create",
   update_sprint: "work:update",
   complete_sprint: "work:update",
@@ -236,6 +241,9 @@ export const TOOL_GATES: Record<string, string> = {
   update_wave: "work:update",
   set_wave_active: "work:update",
   set_sprint_wave: "work:update",
+  // SAME RIGHT AS `update_wave`: how many days a phase type gets is a field on
+  // the wave, not a record of its own (Aurora's 20 Sep 2026 ruling).
+  update_wave_phase_days: "work:update",
   set_audit_date: "processes:update",
   // A CONNECTION IS A SIGNPOST, and an update to the map that carries it. Not
   // `create`: nothing is authored, and gating it behind create would mean a

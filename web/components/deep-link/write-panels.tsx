@@ -15,6 +15,7 @@ import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
 import { assignableMembers } from "@/lib/members"
 import { KnowledgeFormDialog } from "@/components/knowledge/knowledge-form-dialog"
 import { KnowledgeUploadDialog } from "@/components/knowledge/knowledge-upload-dialog"
+import { GlossaryFormDialog } from "@/components/knowledge/glossary-form-dialog"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { RoleFormDialog } from "@/components/team/role-form-dialog"
@@ -76,6 +77,8 @@ export type WritePanelsProps = Pick<
     | "createAccount"
     | "createKnowledge"
     | "editKnowledge"
+    | "createGlossaryWord"
+    | "editGlossaryWord"
     | "uploadKnowledgeFile"
     | "saveInternalRecord"
     | "setInternalActive"
@@ -135,6 +138,8 @@ export function WritePanels({
   createAccount,
   createKnowledge,
   editKnowledge,
+  createGlossaryWord,
+  editGlossaryWord,
   knowledgeQ,
   uploadKnowledgeFile,
   saveInternalRecord,
@@ -180,8 +185,13 @@ export function WritePanels({
   // already use — is what the form prefills from; the list row is only the
   // instant paint while it arrives.
   const knowledgeEditing = query.panel === "edit" && query.module === "knowledge" && !!query.id
+  // THE GLOSSARY'S OWN EDIT (?panel=edit&module=knowledge-glossary&id), the
+  // SAME id-keyed read below (a glossary entry is a knowledge source, so its
+  // one-record cache key is the identical `knowledge:one:<id>`), gated on its
+  // own module so the two dialogs never both think they own one query string.
+  const glossaryEditing = query.panel === "edit" && query.module === "knowledge-glossary" && !!query.id
   const knowledgeOneQ = useCached<KnowledgeSource | null>(
-    teamId && knowledgeEditing ? `knowledge:one:${query.id}` : null,
+    teamId && (knowledgeEditing || glossaryEditing) ? `knowledge:one:${query.id}` : null,
     () => content.knowledgeOne(query.id as string)
   )
   const knowledgeEditRow =
@@ -365,6 +375,26 @@ export function WritePanels({
             : undefined
         }
         onSubmit={(values) => editKnowledge(query.id as string, values)}
+      />
+
+      {/* Add a glossary word (?panel=add&module=knowledge-glossary), gated by
+          create, the Glossary tab's own "Add word" action. */}
+      <GlossaryFormDialog
+        open={query.panel === "add" && query.module === "knowledge-glossary" && can("knowledge", "create")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={teamId ? `knowledge-glossary:new:${teamId}` : undefined}
+        onSubmit={createGlossaryWord}
+      />
+
+      {/* Correct a glossary word (?panel=edit&module=knowledge-glossary&id),
+          gated by update, reached from the word's own row on the Glossary
+          tab. Waits on the same id-keyed read `knowledgeEditRow` above does. */}
+      <GlossaryFormDialog
+        open={glossaryEditing && !!knowledgeEditRow && can("knowledge", "update")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={query.id ? `knowledge-glossary:edit:${query.id}` : undefined}
+        initial={knowledgeEditRow ? { word: knowledgeEditRow.title, definition: knowledgeEditRow.body ?? "" } : undefined}
+        onSubmit={(values) => editGlossaryWord(query.id as string, values)}
       />
 
       {/* Upload a FILE into the knowledge base (?panel=upload&module=knowledge)

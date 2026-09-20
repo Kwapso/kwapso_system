@@ -1146,17 +1146,29 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     // R22 parity with POST /api/content/help/reply/update — Aurora's 20 Sep
-    // 2026 ruling's Edit half. Same fence as the door: the author may always
-    // change their own reply, past that `help:update` reaches every other
-    // one. No confirm — a plain word edit, same register as `reply_help_ticket`
-    // itself with no audience.
+    // 2026 ruling's Edit half, and her SAME-DAY follow-up ("open the edit as
+    // slide in. can edit text and date and attachments"), which is why `body`
+    // moved out of `required`: the door now takes any mix of text, date and
+    // files, so a tool call naming only one of the three is a real, whole
+    // edit rather than a narrowed one. Same fence as the door: the author may
+    // always change their own reply, past that `help:update` reaches every
+    // other one. No confirm, a plain word/date/file edit, same register as
+    // `reply_help_ticket` itself with no audience.
     name: "update_help_reply",
-    summary: "Change a reply already sent (`id`). Yours always; another author's needs the ticket edit right.",
+    summary: "Change a reply already sent (`id`): its `body`, `createdAt`, or `attachments` to add/remove.",
     detail:
-      "Change the text of a reply already sent, by its own id (from list_help_thread or the id a prior reply_help_ticket/update_help_reply call returned). You may always change a reply you wrote yourself; changing someone else's needs the ticket edit right (help:update), the same right resolve_help_ticket and archive_help_ticket already require. A client login may only ever change its own reply, never a staff one, whatever right it holds.",
+      "Change a reply already sent, by its own id (from list_help_thread or the id a prior reply_help_ticket/update_help_reply call returned). Every field but `id` is optional and only what you send moves: `body` rewrites the words, `createdAt` backdates the moment it was sent (an ISO date and time; refused if it names a moment that has not happened yet), and `attachments` is an object with an add list and a remove list of file ids (from list_help_attachments) to link onto or take off this one reply, an id must already be a live, unlinked file on this ticket to add, or already linked to this reply to remove. You may always change a reply you wrote yourself; changing someone else's needs the ticket edit right (help:update), the same right resolve_help_ticket and archive_help_ticket already require. A client login may only ever change its own reply, never a staff one, whatever right it holds.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/reply/update",
-    schema: obj({ id: S, body: S }, ["id", "body"]),
-    buildBody: (i) => ({ id: str(i, "id"), body: str(i, "body") }),
+    schema: obj({ id: S, body: S, createdAt: S, attachments: { type: "object" } }, ["id"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      body: str(i, "body") || undefined,
+      createdAt: str(i, "createdAt") || undefined,
+      attachments:
+        typeof i.attachments === "object" && i.attachments !== null && !Array.isArray(i.attachments)
+          ? i.attachments
+          : undefined,
+    }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit reply ${str(i, "id")}` },
   },
   {
@@ -1333,6 +1345,17 @@ export const SHARED_TOOLS: SharedTool[] = [
       confirm: false,
       summarize: (i) => `Set story ${str(i, "id")} to "${str(i, "status")}"`,
     },
+  },
+  {
+    name: "story_burndown",
+    summary:
+      "A phase's burndown series, by `phaseId`: one row per day (`remainingCount`, `idealCount`), `startTotal`, `hasPoints`. Refuses a phase with no dates.",
+    detail:
+      "The series a phase's burndown chart plots (round-28 ruling): `days`, one row per calendar day of the phase from its start date to its end date, each carrying `date`, `remainingCount` (stories not yet done, as of that day's end), `idealCount` (the straight line from the phase's `startTotal` on day one down to zero on the last day) and `remainingPoints` (null today, `hasPoints` is false because stories carry no points field yet, so the series counts stories rather than points until one exists). `startTotal` is how many stories sit in the phase, the total the ideal line falls from. A story pulled back out of done counts as remaining again from the day it moved, computed from its LATEST status event at or before each day, never from whether it was ever done. Refuses with 'phase_has_no_dates' when the phase has no start and end date set, there is nothing to plot a day-by-day series against.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/burndown",
+    schema: obj({ phaseId: S }, ["phaseId"]),
+    buildBody: (i) => ({ phaseId: str(i, "phaseId") }),
+    agent: { write: false, summarize: (i) => `Read the burndown for phase ${str(i, "phaseId")}` },
   },
   {
     name: "list_sprints",
@@ -2028,6 +2051,17 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Correct knowledge source ${str(i, "id")}` },
   },
   {
+    name: "add_glossary_word",
+    summary:
+      "Add one word to the team's own glossary (`title` the word, `body` its definition). List it back, kind glossary.",
+    detail:
+      "Add one word to the team's own glossary: `title` is the term, `body` is what it means (the same two field names add_knowledge_source takes, for the same concept). It becomes a searchable knowledge source right away, findable on the Glossary tab under Knowledge and in the assistant's own answers, exactly like a note somebody typed there by hand. Correct one afterward with update_knowledge_source, by the id this call returns. Read the glossary back with list_knowledge_sources, passing glossary as the kind.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/glossary",
+    schema: obj({ title: S, body: S }, ["title", "body"]),
+    buildBody: (i) => ({ title: str(i, "title"), body: str(i, "body") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add "${str(i, "title")}" to the glossary` },
+  },
+  {
     name: "sync_knowledge",
     summary:
       "Bring the knowledge base into step with the app's own rows, a slice at a time. Keep calling while `caughtUp` is false. Mainly for a first fill.",
@@ -2664,6 +2698,38 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ sprintId: S, waveId: S }, ["sprintId"]),
     buildBody: (i) => ({ sprintId: str(i, "sprintId"), waveId: sent(i, "waveId") }),
     agent: { write: true, confirm: false, summarize: () => "Move a phase between waves" },
+  },
+  {
+    // HOW MANY DAYS EACH PHASE TYPE GETS ON THIS WAVE. Aurora's ruling, 20 Sep
+    // 2026, verbatim: "on waves i am missing the settings (we'l adjust the
+    // duration of pahses in days)." Team migration 0109's own table
+    // (`wave_phase_days`), the door `POST /api/tenancy/waves/phase-days`
+    // opens beside `update_wave`'s own door for the same reason: it edits the
+    // same record, under the same right.
+    name: "update_wave_phase_days",
+    summary:
+      "Set how many days one or more phase types get on a wave (`waveId`, `days`: a list of {phaseType, days}). 1-365 days, whole numbers.",
+    detail:
+      "Set how many days one or more phase types get on a wave, by the wave's `waveId`. `days` is a list of {phaseType, days}, phaseType one of Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare (the Wave-lifecycle vocabulary, in that order), days a whole number from 1 to 365. Name any subset; the rest keep whatever they already carry, a row of their own or the placeholder default (Audit 5, Plan 5, Build 20, Pilot 10, Revision 10, Deploy 3, Hypercare 10 days, hers to adjust) get_wave fills in for a wave with no rows yet. Answers with all seven, in Wave-lifecycle order.",
+    binding: "TENANCY",
+    method: "POST",
+    path: "/api/tenancy/waves/phase-days",
+    schema: obj(
+      {
+        waveId: S,
+        days: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { phaseType: S, days: N },
+            required: ["phaseType", "days"],
+          },
+        },
+      },
+      ["waveId", "days"]
+    ),
+    buildBody: (i) => ({ waveId: str(i, "waveId"), days: Array.isArray(i.days) ? i.days : [] }),
+    agent: { write: true, confirm: false, summarize: (i) => `Set phase days for wave ${str(i, "waveId")}` },
   },
   {
     name: "set_audit_date",

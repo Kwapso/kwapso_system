@@ -35,6 +35,7 @@
 //   POST /api/content/stories             -> write one piece of work down
 //   POST /api/content/stories/update      -> edit a story
 //   POST /api/content/stories/status      -> move a story along its four states
+//   POST /api/content/stories/burndown    -> a phase's burndown series (GET-style POST, {phaseId})
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
@@ -72,6 +73,8 @@
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
 //   POST /api/content/knowledge/sync-google -> …and MY OWN Google material, as me
+//   POST /api/content/knowledge/glossary  -> add one word to the team's own glossary
+//   POST /api/content/knowledge/glossary/seed -> the 54-word seed, once, idempotent
 //   GET  /api/content/meetings            -> the meetings list (?id → one; account/app/purpose/view/q filters)
 //   POST /api/content/meetings            -> put a meeting on the meetings list
 //   POST /api/content/meetings/update     -> correct it / write the notes up
@@ -135,6 +138,7 @@ import {
   postStoryAttachment,
   postStoryAttachmentRemove,
   postStoryAttachmentUpdate,
+  postStoryBurndown,
   postStoryStatus,
   postUpdateSprint,
   postUpdateStory,
@@ -170,9 +174,11 @@ import {
   getKnowledgeMap,
   getKnowledgeShape,
   getKnowledgeSync,
+  postAddGlossaryWord,
   postCreateKnowledge,
   postKnowledgeSync,
   postKnowledgeSyncGoogle,
+  postSeedGlossary,
   postSetKnowledgeActive,
   postUpdateKnowledge,
   postStreamKnowledgeFile,
@@ -426,6 +432,13 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/stories": { handler: postCreateStory, kind: "mutation" },
   "POST /api/content/stories/update": { handler: postUpdateStory, kind: "mutation" },
   "POST /api/content/stories/status": { handler: postStoryStatus, kind: "mutation" },
+  // A READ shaped as a POST (the phase id travels as a body field, Aurora's own
+  // "GET-style POST"), kind: "housekeeping", the same classification
+  // "POST /api/content/uploads/presign" carries below, for the same reason: it
+  // is a POST because of what it CARRIES, not because it changes anything, so
+  // there is no row to publish a ping about (publish-seam.test.ts's own
+  // HOUSEKEEPING list names it).
+  "POST /api/content/stories/burndown": { handler: postStoryBurndown, kind: "housekeeping" },
   "GET /api/content/stories/attachments": { handler: getStoryAttachments, kind: "read" },
   "POST /api/content/stories/attachments": { handler: postStoryAttachment, kind: "mutation" },
   "POST /api/content/stories/attachments/update": { handler: postStoryAttachmentUpdate, kind: "mutation" },
@@ -505,6 +518,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/knowledge/upload-confirm": { handler: postConfirmKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
   "POST /api/content/knowledge/active": { handler: postSetKnowledgeActive, kind: "mutation" },
+  // The team's own vocabulary: one word at a time from the Glossary tab's own
+  // "Add word" dialog, and the idempotent 54-word seed the tab runs the first
+  // time it is opened empty.
+  "POST /api/content/knowledge/glossary": { handler: postAddGlossaryWord, kind: "mutation" },
+  "POST /api/content/knowledge/glossary/seed": { handler: postSeedGlossary, kind: "mutation" },
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a
   // coarse ping: a slice touches many rows and no one row is the change).
   "POST /api/content/knowledge/sync": { handler: postKnowledgeSync, kind: "mutation" },

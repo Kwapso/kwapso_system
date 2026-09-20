@@ -197,6 +197,10 @@ export function traceFor(
     // pieces the assistant reads from it are.
     case "add_knowledge_source":
       return { path: seg(teamId, "knowledge"), highlight: "main" }
+    // A glossary word lands on its own tab, not the "All" list the plain
+    // source add above drives to.
+    case "add_glossary_word":
+      return { path: `${seg(teamId, "knowledge")}?tab=glossary`, highlight: "main" }
     case "update_knowledge_source":
     case "set_knowledge_source_active":
       return { path: `${seg(teamId, "knowledge")}/${str(input, "id")}`, highlight: "main" }
@@ -285,6 +289,11 @@ export function traceFor(
     case "update_wave":
     case "set_wave_active":
       return { path: `${seg(teamId, "waves")}/${str(input, "id")}`, highlight: "main" }
+    // Its own case: the door's body field is `waveId` (R22 pins the tool's
+    // schema to that same name), not `id` like its `update_wave`/
+    // `set_wave_active` siblings above.
+    case "update_wave_phase_days":
+      return { path: `${seg(teamId, "waves")}/${str(input, "waveId")}`, highlight: "main" }
     case "set_sprint_wave":
       return { path: seg(teamId, "waves"), highlight: "main" }
     case "update_process":

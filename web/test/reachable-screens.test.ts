@@ -650,7 +650,13 @@ describe("the screens are reachable", () => {
     /** field -> the tools that send it, and the doors they send it to. */
     const written = new Map<string, { tools: string[]; doors: Set<string> }>()
     for (const tool of SHARED_TOOLS) {
-      if (tool.method !== "POST" || !tool.buildBody) continue
+      // POST with a buildBody is a proxy for "this stores something", and it
+      // stopped being one the day a READ tool arrived on a POST door (story_burndown:
+      // round-28 ruling, a GET-style POST because the phase id travels as a body
+      // field). `agent.write` is the tool's own answer to whether it stores
+      // anything at all, so a read shaped as a POST is excluded the same way a
+      // GET already is, rather than joining a census about what a machine can WRITE.
+      if (tool.method !== "POST" || !tool.buildBody || !tool.agent.write) continue
       for (const field of sends(tool)) {
         const entry = written.get(field) ?? { tools: [], doors: new Set<string>() }
         entry.tools.push(tool.name)

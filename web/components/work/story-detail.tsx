@@ -324,7 +324,7 @@ export function StoryDetailScreen({
         // screen that captures time". The tab was already here and called Time;
         // Work logs is the word the glossary and the section both use now.
         value: "time",
-        label: t("Work logs"),
+        label: t("Time logs"),
         icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,

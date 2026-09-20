@@ -30,8 +30,13 @@ describe("the knowledge tab strip is built from the kind vocabulary, with counts
     // never a second, hand-copied list of kinds.
     expect(src).toMatch(/import\s*\{\s*KNOWLEDGE_KIND,\s*KNOWLEDGE_KIND_ICON\s*\}\s*from\s*"@\/components\/deep-link\/shape"/)
     expect(src, "walks the vocabulary's own keys").toMatch(/Object\.keys\(KNOWLEDGE_KIND\)/)
+    // "glossary" IS EXCLUDED FROM THIS DERIVATION ON PURPOSE (20 Sep 2026):
+    // the Glossary tab is drawn by hand, always present, so it can seed
+    // itself the first time it is opened at a zero count, the one kind
+    // that must be reachable BEFORE the data that would otherwise draw its
+    // tab exists. See the knowledgeTabs array itself, just below.
     expect(src, "a kind with none today draws no tab — the data decides, not the code").toMatch(
-      /\.filter\(\(k\)\s*=>\s*\(byKind\[k\]\s*\?\?\s*0\)\s*>\s*0\)/
+      /\.filter\(\(k\)\s*=>\s*k !== "glossary" && \(byKind\[k\]\s*\?\?\s*0\)\s*>\s*0\)/
     )
     expect(src, "the label is the app's own word for the kind").toMatch(/label:\s*KNOWLEDGE_KIND\[k\]/)
     expect(src, "the glyph is the app's own icon for the kind").toMatch(/icon:\s*KNOWLEDGE_KIND_ICON\[k\]/)
@@ -94,12 +99,23 @@ describe('"All" is the default tab', () => {
     expect(kindTabsSpreadAt, "the kind tabs are spread in").toBeGreaterThan(tabsAt)
     expect(allAt, "All leads the array, before the kind tabs").toBeLessThan(kindTabsSpreadAt)
 
+    // GLOSSARY IS DRAWN BY HAND, BETWEEN THE TWO (20 Sep 2026); see the
+    // "excluded from this derivation" note above: it is never one of the
+    // derived kindTabs, so it has to sit in the array by name, after "all"
+    // and before the `...kindTabs` spread.
+    const glossaryAt = src.indexOf('value: "glossary"', tabsAt)
+    expect(glossaryAt, '"glossary" is declared by hand').toBeGreaterThan(allAt)
+    expect(glossaryAt, "before the derived kind tabs").toBeLessThan(kindTabsSpreadAt)
+
     // TEAM SCOPE ONLY (17 Sep 2026) — this screen now also draws the app
     // record's own gallery (`KnowledgeGalleryScope`'s "app" branch), which has
     // no kind-tab strip at all (its own file header says why), so the "all"
     // fallback is gated on `scope.kind === "team"` rather than unconditional.
-    expect(src, "an unbadged/absent tab value falls through to \"all\"").toMatch(
-      /const activeTab = scope\.kind === "team" && scope\.tab && byKind\[scope\.tab\] \? scope\.tab : "all"/
+    // "glossary" IS THE ONE EXCEPTION TO "an unbadged tab falls back to all"
+    // (20 Sep 2026): it is the one tab that must stay open at a zero count,
+    // for the seed to have anywhere to run.
+    expect(src, "an unbadged/absent tab value falls through to \"all\", except \"glossary\"").toMatch(
+      /const activeTab =\s*\n?\s*scope\.kind === "team" && scope\.tab && \(scope\.tab === "glossary" \|\| byKind\[scope\.tab\]\) \? scope\.tab : "all"/
     )
     // THE URL AGREES — pressing back onto the default omits `?tab=` entirely,
     // the same shape accounts-screen.tsx's own Active/Inactive/All strip uses.

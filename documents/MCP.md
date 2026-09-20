@@ -132,7 +132,7 @@ Confirm the live list with `tools/list` (it's generated, so it's always current)
 Today it covers:
 
 - **Read** — 63 of the 179 tools answer on a GET (counted from the live
-  catalogue, 15 Sep 2026), and 183 of the doors in the
+  catalogue, 15 Sep 2026), and 181 of the doors in the
   census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
@@ -276,7 +276,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **271 doors, 204 with a tool, 67 with a written reason**, the
+  red build. Today: **275 doors, 207 with a tool, 68 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
@@ -318,7 +318,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 204, **180 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 207, **183 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -434,13 +434,17 @@ Today it covers:
     `set_audit_date`, `connect_processes`, `disconnect_processes` (all need
     `processes:*`).
   - waves, `list_waves`, `get_wave`, `create_wave`, `update_wave`,
-    `set_wave_active`, `set_sprint_wave` (all need `work:*`). A WAVE is what a
+    `set_wave_active`, `set_sprint_wave`, `update_wave_phase_days` (all need
+    `work:*`). A WAVE is what a
     client bought: several phases sold together. It carries NO price — what a
     wave costs is deliberately out of this module's first version — and its dates
     are DERIVED from the phases inside it, so `set_sprint_wave` re-dates both the
     wave a phase joined and the one it left. Two phases whose dates overlap are
     reported and never refused: the overlap is real, and a door that said no would
-    be enforcing a rule nobody agreed to. `set_audit_date` moves the day a map's savings are measured
+    be enforcing a rule nobody agreed to. `update_wave_phase_days` sets how many
+    days one or more phase types get on a wave (Aurora's 20 Sep 2026 ruling), a
+    whole number of days from 1 to 365 per phase type; a wave with no rows of its
+    own reads the placeholder defaults. `set_audit_date` moves the day a map's savings are measured
     FROM, which changes every figure on it and on the client's own portal while
     changing not one minute of their work — so it confirms before it writes.
     `connect_processes` is LOOSE by ruling: the last step of one map is very
@@ -490,13 +494,26 @@ Today it covers:
 
     **`update_help_reply` / `delete_help_reply`** (team migration 0108, Aurora's
     20 Sep 2026 chat-edit-pencil ruling) mirror the app's own edit/copy/delete
-    menu on a reply — R22 parity with `POST /api/content/help/reply/update` and
+    menu on a reply, R22 parity with `POST /api/content/help/reply/update` and
     `POST /api/content/help/reply/delete`. Both share ONE fence: the reply's own
-    author may always change it, and past that `help:update` — the same right
-    `resolve_help_ticket` and `archive_help_ticket` already require — reaches
+    author may always change it, and past that `help:update` (the same right
+    `resolve_help_ticket` and `archive_help_ticket` already require) reaches
     every other member's reply too. `delete_help_reply` is a soft delete, same
     as `archive_help_ticket`: nothing is removed, the reply and its activity
     entry survive, it only stops showing in the thread. Neither sends email.
+
+    **`update_help_reply` gained `createdAt` and `attachments` on 20 Sep 2026**,
+    the same day's follow-up ruling ("open the edit as slide in. can edit text
+    and date and attachments"). Every field but `id` is now optional, so a call
+    naming only one of them is still a whole edit: `body` rewrites the words,
+    `createdAt` backdates the moment it was sent (an ISO date and time, refused
+    if it names a moment that has not happened yet), and `attachments` is an
+    object with an `add` list and a `remove` list of file ids (from
+    `list_help_attachments`) to link onto or take off this one reply. An id must
+    already be a live, unlinked file on this ticket to add, or already linked to
+    this reply to remove; either refusal names the file rather than dropping it
+    silently. The activity row this door writes says what changed in plain
+    words: text, date, files, or a mix.
 
     **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the six
     stages are reached by something HAPPENING rather than by anybody choosing
@@ -548,6 +565,13 @@ Today it covers:
     `ticket_required` otherwise. No client login holds `work:*` and the doors
     refuse a portal caller outright, so unlike the ticket doors the question
     "what if a contact reaches this?" has a one-word answer.
+  - `story_burndown` (`work:read`), a phase's burndown series (round-28 ruling,
+    team migration 0110): one row per calendar day of the phase, the count still
+    remaining and the ideal straight-line count for that day, plus the phase's
+    starting total. It is a READ shaped as a POST because the phase id travels
+    as a body field rather than a query string, and it refuses a phase with no
+    start/end dates in words rather than guessing a range. `hasPoints` is false
+    today, stories carry no points field yet, so the series counts stories.
   - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
     (`todos:create` / `:update` / `:delete` — what we need FROM a client), and
     `create_task`, `update_task`, `set_task_done` (`work:create` / `work:update` —
@@ -617,6 +641,11 @@ Today it covers:
     same acts a person has on the Knowledge screen, gated by the same
     `knowledge:create` / `:update` / `:delete` rights — so a token whose role cannot
     take a source away cannot ask the assistant to take one away either.
+    `add_glossary_word` (Aurora's Glossary tab, 20 Sep 2026) is the same right,
+    `knowledge:create`, through its own door: a word is always team-wide, so it
+    takes only `title` (the word) and `body` (its definition), never the generic
+    door's filing fields. Correct or take one away with the two tools above; read
+    the glossary back through `list_knowledge_sources`, `kind` set to `glossary`.
     `sync_knowledge` brings the base into step with the app's own rows one bounded
     slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
     same unattended. `sync_google_knowledge` does the same for the Google material

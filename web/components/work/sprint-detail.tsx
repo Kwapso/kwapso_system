@@ -44,6 +44,7 @@ import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
+import { PhaseBurndownPanel } from "@/components/work/phase-burndown-panel"
 import { sprintStatusBadge } from "@/components/work/sprints-screen"
 import { invalidateFindsOf } from "@/components/records/paged-find"
 import { OverviewList } from "@/components/records/overview-list"
@@ -448,6 +449,16 @@ export function SprintDetailScreen({
                     <p className="text-sm">{sprint.goalSummary}</p>
                   </div>
                 )}
+                {/* THE BURNDOWN (round-28 ruling), directly under the goal
+                    band and above the story list, the same reading order the
+                    reference artifact lays out: what the phase is for, how
+                    it's tracking, then the work itself. */}
+                <PhaseBurndownPanel
+                  sprintId={sprintId}
+                  startsOn={sprint.startsOn}
+                  endsOn={sprint.endsOn}
+                  storyCount={sprint.storyCount}
+                />
                 <StoriesPanel
                   marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
                   ownerKind="sprint"

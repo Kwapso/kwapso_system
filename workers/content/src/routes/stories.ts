@@ -49,6 +49,7 @@ import {
   listStories,
   setSprintComplete,
   setStoryStatus,
+  storyBurndown,
   STORY_SORTS,
   updateSprint,
   updateStory,
@@ -344,6 +345,29 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
       await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
   }
   return storyMutationReply(cfg, guard, storyFilterFrom(new URL(request.url)), id)
+}
+
+/** POST /api/content/stories/burndown, the series a phase's burndown chart
+ * plots: one row per calendar day of the phase, the remaining count (and
+ * points, once a points column exists), and the ideal straight line from the
+ * starting total to zero (round-28 ruling, "Build a visual artifact that
+ * renders this per sprint and updates the remaining-work line each day as
+ * stories move to Completed").
+ *
+ * `work:read`, and a POST rather than a GET because the phase id travels as a
+ * body field (Aurora's own spelling of the door, "GET-style POST"): a read
+ * door in every other sense (no gate beyond `work:read`, no `publishChange`,
+ * `kind: "housekeeping"` in the route table) that happens to arrive by POST.
+ *
+ * Refuses a phase with no start/end dates, in words, rather than guessing a
+ * range: `storyBurndown` throws `phase_has_no_dates` and the central catch
+ * maps it to a plain 400. */
+export async function postStoryBurndown(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard, body } = await gatedBody<{ phaseId?: unknown }>(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  const phaseId = requireText(body.phaseId, "Phase", TEXT_LIMITS.short)
+  const burndown = await storyBurndown(cfg, guard, phaseId)
+  return json(burndown)
 }
 
 /* ---------------------------------- sprints --------------------------------- */

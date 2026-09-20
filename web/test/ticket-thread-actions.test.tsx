@@ -9,8 +9,11 @@
 //   · ANOTHER member, with no ticket edit right (`help:update`), sees Copy
 //     only — the menu still draws (Copy needs no permission), Edit and
 //     Delete simply do not;
-//   · pressing Edit's Save calls the update door (`content.updateHelpReply`)
-//     with the reply's own id and the new body;
+//   · pressing Edit opens the app's own slide-in sheet (`reply-edit-sheet.tsx`,
+//     Aurora's SAME-DAY follow-up ruling: "open the edit as slide in. can
+//     edit text and date and attachments"), never the kit's own inline
+//     textarea, and Save calls the update door (`content.updateHelpReply`)
+//     with the reply's own id and only the field that changed;
 //   · pressing Delete asks first (`useConfirm`'s own dialog — this app's
 //     house pattern, not the kit's `overlays/delete-confirmation`) and only
 //     calls the delete door (`content.deleteHelpReply`) once that is
@@ -226,18 +229,44 @@ describe("another member, with no ticket edit right, gets Copy only", () => {
   })
 })
 
-describe("Edit calls the update door", () => {
-  it("Save calls updateHelpReply with the reply's own id and the edited body", async () => {
+// EDIT OPENS A SLIDE-IN SHEET, Aurora's SAME-DAY follow-up ruling on the
+// chat message menu: "open the edit as slide in. can edit text and date and
+// attachments." The kit's own inline textarea (an "Edit message" textbox
+// drawn in place of the bubble) can hold only the body, so this screen wires
+// `onEditRequest` (kit v1.2.143) instead of `onEdit`, and the kit draws no
+// inline editor of its own at all. This file proves the WIRING at the
+// `TicketThread` call site: Edit opens the sheet and not the kit's inline
+// editor, Save reaches the same `updateHelpReply` door with only the field
+// that changed, and Cancel calls nothing.
+describe("Edit opens a slide-in sheet, not the kit's own inline editor", () => {
+  it("Save calls the update door with only the changed field", async () => {
     const [own] = await renderThread()
     await openMessageActions(own)
     fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }))
 
-    const field = await waitFor(() => screen.getByRole("textbox", { name: "Edit message" }))
+    // NO INLINE TEXTAREA: the kit's own editor never opens.
+    expect(screen.queryByRole("textbox", { name: "Edit message" })).toBeNull()
+
+    const field = await waitFor(() => screen.getByRole("textbox", { name: "Reply text" }))
     fireEvent.change(field, { target: { value: "My corrected words" } })
-    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }))
 
     await waitFor(() => expect(updateHelpReply).toHaveBeenCalledTimes(1))
-    expect(updateHelpReply).toHaveBeenCalledWith("reply-own", "My corrected words")
+    // ONLY WHAT CHANGED: the date and the attachments were left untouched,
+    // so neither rides the call (reply-edit-sheet.tsx's own `save`).
+    expect(updateHelpReply).toHaveBeenCalledWith("reply-own", { body: "My corrected words" })
+  })
+
+  it("Cancel closes the sheet and calls nothing", async () => {
+    const [own] = await renderThread()
+    await openMessageActions(own)
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }))
+
+    await waitFor(() => screen.getByRole("textbox", { name: "Reply text" }))
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Reply text" })).toBeNull())
+    expect(updateHelpReply).not.toHaveBeenCalled()
   })
 })
 

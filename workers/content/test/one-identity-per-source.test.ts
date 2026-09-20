@@ -155,7 +155,7 @@ describe("R68 — one identity per source", () => {
     },
   ]
 
-  it("every INSERT into knowledge_sources that claims an origin folds OR pre-checks — three sites, pinned", () => {
+  it("every INSERT into knowledge_sources that claims an origin folds OR pre-checks, four sites, pinned", () => {
     const files = sourceFiles(CONTENT_SRC, { extensions: [".ts"], skipTests: true })
     const INSERT_START = /INSERT INTO knowledge_sources\b/
 
@@ -174,19 +174,23 @@ describe("R68 — one identity per source", () => {
     }
 
     // THE BLINDNESS TRIPWIRE, pinned to an exact number rather than "> 0" —
-    // a fourth INSERT site appearing or one of the three vanishing is a
+    // a fifth INSERT site appearing or one of the four vanishing is a
     // decision somebody makes deliberately, not a silent drift in what this
-    // law covers.
+    // law covers. Three became four on 20 Sep 2026: the Glossary tab's own
+    // `createGlossaryEntry` (knowledge.ts) is a third "no origin" writer,
+    // exempt the same way the typed-note create already is: a glossary word
+    // is typed, never mirrored, so its INSERT names no `origin_table` either.
     // Sorted before comparing: the walk order sourceFiles() returns is a
     // filesystem detail, and the POPULATION being pinned is which files and
     // how many sites, not which order the directory happened to list them.
     expect(
       sites.map((s) => s.file).sort(),
-      "expected exactly three INSERT INTO knowledge_sources sites under workers/content/src/ — " +
+      "expected exactly four INSERT INTO knowledge_sources sites under workers/content/src/, " +
         "if this list changed on purpose, update the pinned count with it"
     ).toEqual(
       [
         "lib/knowledge.ts", // the typed-note create — no origin, exempt
+        "lib/knowledge.ts", // the glossary word create, no origin, exempt
         "lib/knowledge.ts", // the uploaded-file create — claims an origin, pre-checks
         "lib/knowledge-ingest.ts", // the generic sweep — claims an origin, folds
       ].sort()

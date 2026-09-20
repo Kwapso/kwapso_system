@@ -261,7 +261,7 @@ describe("the ticket detail draws no tabs", () => {
 })
 
 describe("the two-column body renders all four panels", () => {
-  it("draws the conversation, Related stories, Work logs and Stakeholders together — nothing behind a click", async () => {
+  it("draws the conversation, Related stories, Time logs and Stakeholders together, nothing behind a click", async () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
 
@@ -273,8 +273,8 @@ describe("the two-column body renders all four panels", () => {
     // RELATED STORIES — the panel's own title.
     expect(screen.getByText("Related stories")).toBeTruthy()
 
-    // WORK LOGS — the panel's own title.
-    expect(screen.getByText("Work logs")).toBeTruthy()
+    // TIME LOGS, the panel's own title.
+    expect(screen.getByText("Time logs")).toBeTruthy()
 
     // STAKEHOLDERS — the panel's own title, and the people pill inside it.
     expect(screen.getByText("Stakeholders")).toBeTruthy()
@@ -287,7 +287,7 @@ describe("the two-column body renders all four panels", () => {
     openTicket()
     await screen.findByRole("heading", { level: 1 })
     const stories = screen.getByText("Related stories").closest('[data-slot="card"]')
-    const time = screen.getByText("Work logs").closest('[data-slot="card"]')
+    const time = screen.getByText("Time logs").closest('[data-slot="card"]')
     const stakeholders = screen.getByText("Stakeholders").closest('[data-slot="card"]')
     const conversation = (document.querySelector('[data-slot="ticket-thread"]') as HTMLElement).closest(
       '[data-slot="card"]'

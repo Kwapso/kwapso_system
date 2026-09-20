@@ -209,6 +209,12 @@ export const TAB_ICONS: Record<string, IconName> = {
   open: "hourglass-high",
   done: "check",
   all: "asterisk",
+  // THE GLOSSARY TAB under Knowledge (Aurora's ruling, 20 Sep 2026), drawn by
+  // hand rather than derived from KNOWLEDGE_KIND_ICON like the other kind
+  // tabs beside it (knowledge-screen.tsx's own header says why), so its
+  // value is a literal this census can see and needs its own line here.
+  // Same glyph KNOWLEDGE_KIND_ICON.glossary carries.
+  glossary: "book-open-text",
   active: "check-circle",
   inactive: "prohibit",
   archived: "archive",

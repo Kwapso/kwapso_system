@@ -41,7 +41,13 @@ import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@sha
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
+import {
+  idBatches,
+  LIST_HARD_CAP,
+  PHASE_BURNDOWN_MAX_DAYS,
+  PHASE_BURNDOWN_STORY_CAP,
+  STORY_PROCESS_CAP,
+} from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { rankAtTop } from "@shared/workers/rank"
@@ -1212,6 +1218,31 @@ async function refuseUnreviewable(
     )
 }
 
+/** A STORY REMEMBERS ITS STAGES, team migration 0110's own writer, shaped
+ * exactly like a ticket's (`help-stages.ts`'s `recordStatusEvent`): written
+ * AFTER the UPDATE that moved the row, and only when that UPDATE genuinely
+ * moved one (R17: a zero-row move is not an event). Round-28 ruling: a
+ * burndown chart per phase needs to know, per day, how many stories are still
+ * open, and cycle time needs to know how long a story sat in each status,
+ * both read off this one history, so one writer serves both. */
+async function recordStoryStatusEvent(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  storyId: string,
+  from: string | null,
+  to: string,
+  at: string
+): Promise<void> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO story_status_events (id, story_id, from_status, to_status, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [ulid(), storyId, from, to, at, actor.id, actor.email, actor.name]
+  )
+}
+
 export async function setStoryStatus(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1262,6 +1293,7 @@ export async function setStoryStatus(
   if (!changed[0])
     return { moved: false, story: toStory(story), ticketId: before.ticket_id, accountId: before.account_id }
 
+  await recordStoryStatusEvent(cfg, guard, actor, id, before.status, status, now)
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Story ${status === "done" ? "done" : "updated"}`,
     description: `${actor.name} set ${before.ref ?? "a story"} to ${status.replace("_", " ")}`,
@@ -1295,6 +1327,7 @@ export async function storyProgressFlip(
     [now, actor.id, actor.email, actor.name, storyId]
   )
   if (!changed[0]) return { moved: false }
+  await recordStoryStatusEvent(cfg, guard, actor, storyId, "open", "in_progress", now)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Story in progress",
     description: `${actor.name} started working on this`,
@@ -1302,6 +1335,135 @@ export async function storyProgressFlip(
     relatedRowId: storyId,
   })
   return { moved: true }
+}
+
+/* --------------------------------- burndown --------------------------------- */
+
+/** One day of a phase burndown chart. */
+export type StoryBurndownDay = {
+  /** the calendar day, YYYY-MM-DD */
+  date: string
+  /** stories not yet done, as of the END of this day */
+  remainingCount: number
+  /** null when the team's stories carry no points field: `hasPoints` says so
+   * once for the whole series rather than per day */
+  remainingPoints: number | null
+  /** the straight line from `startTotal` on day one to zero on the last day */
+  idealCount: number
+}
+
+export type StoryBurndown = {
+  days: StoryBurndownDay[]
+  /** how many stories sit in the phase today, the count the ideal line falls
+   * from, and the denominator every day's remaining count is read against */
+  startTotal: number
+  /** ALWAYS false today: `stories` carries no points column (BUILD-1 §2 never
+   * asked for one). Read here rather than hardcoded on the caller, so the day a
+   * points column lands this flips with no second place to remember. */
+  hasPoints: boolean
+}
+
+/** Enumerate the calendar days from `startsOn` to `endsOn`, inclusive, both
+ * given as `YYYY-MM-DD` (or an ISO instant carrying one, only the date part is
+ * read). Capped at `PHASE_BURNDOWN_MAX_DAYS` (R14): a phase this product sells
+ * runs for weeks, not years, so the cap is a refusal ceiling on a typo'd date
+ * rather than a bound anything legitimate approaches. */
+function phaseDayRange(startsOn: string, endsOn: string): string[] {
+  const start = Date.parse(`${startsOn.slice(0, 10)}T00:00:00.000Z`)
+  const end = Date.parse(`${endsOn.slice(0, 10)}T00:00:00.000Z`)
+  const days: string[] = []
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return days
+  for (let t = start; t <= end && days.length < PHASE_BURNDOWN_MAX_DAYS; t += 86_400_000) {
+    days.push(new Date(t).toISOString().slice(0, 10))
+  }
+  return days
+}
+
+/** GET /api/content/stories/burndown's own read (round-28 ruling): the series a
+ * phase's burndown chart plots, computed at read time from `story_status_events`
+ * rather than pre-drawn or cached per day, the same "recompute, never store a
+ * picture" the artifact itself specifies.
+ *
+ * REMAINING ON A DAY is stories in the phase minus those whose LATEST status
+ * event at or before that day's end reads `done`. Latest, not "has a done
+ * event ever": a story moved back out of done (reopened) counts as remaining
+ * again from the day it moved, which a plain "ever reached done" would miss.
+ * A story with no event at all by that day (still `open`, never touched) is
+ * remaining, the honest reading of an empty history. */
+export async function storyBurndown(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  sprintId: string
+): Promise<StoryBurndown> {
+  const sprintRows = await d1Query<{ starts_on: string | null; ends_on: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT starts_on, ends_on FROM sprints WHERE id = ? LIMIT 1`,
+    [sprintId]
+  )
+  const sprint = sprintRows[0]
+  if (!sprint) throw new GuardError(404, "sprint_not_found", "That phase doesn't exist.")
+  if (!sprint.starts_on || !sprint.ends_on)
+    throw new GuardError(
+      400,
+      "phase_has_no_dates",
+      "This phase has no start and end dates set, so there's nothing to burn down. Add them on the phase's Edit form first."
+    )
+
+  const storyRows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14: a phase is a block of sold work, bounded at PHASE_BURNDOWN_STORY_CAP.
+    `SELECT id FROM stories WHERE sprint_id = ? LIMIT ${PHASE_BURNDOWN_STORY_CAP}`,
+    [sprintId]
+  )
+  const storyIds = storyRows.map((s) => s.id)
+  const startTotal = storyIds.length
+
+  // EVERY EVENT for every story in the phase, oldest first, batched under D1's
+  // bound-parameter ceiling (D1_MAX_BOUND_PARAMS) rather than one IN(...) with as
+  // many placeholders as the phase has stories.
+  const eventsByStory = new Map<string, { to_status: string; created_at: string }[]>()
+  if (storyIds.length) {
+    for (const batch of idBatches(storyIds)) {
+      const rows = await d1Query<{ story_id: string; to_status: string; created_at: string }>(
+        cfg,
+        guard.databaseId,
+        `SELECT story_id, to_status, created_at FROM story_status_events
+          WHERE story_id IN (${batch.map(() => "?").join(", ")})
+          ORDER BY story_id, created_at, id`,
+        batch
+      )
+      for (const r of rows) {
+        const list = eventsByStory.get(r.story_id) ?? []
+        list.push({ to_status: r.to_status, created_at: r.created_at })
+        eventsByStory.set(r.story_id, list)
+      }
+    }
+  }
+
+  const days = phaseDayRange(sprint.starts_on, sprint.ends_on)
+  const lastIndex = days.length - 1
+
+  const series: StoryBurndownDay[] = days.map((date, i) => {
+    const dayEnd = `${date}T23:59:59.999Z`
+    let remaining = 0
+    for (const id of storyIds) {
+      const events = eventsByStory.get(id) ?? []
+      // the LATEST event at or before this day's end. Events are oldest first,
+      // so the last one that still qualifies is the latest.
+      let latest: string | null = null
+      for (const e of events) {
+        if (e.created_at > dayEnd) break
+        latest = e.to_status
+      }
+      if (latest !== "done") remaining++
+    }
+    const idealCount = lastIndex <= 0 ? 0 : Math.round((startTotal * (1 - i / lastIndex)) * 100) / 100
+    return { date, remainingCount: remaining, remainingPoints: null, idealCount }
+  })
+
+  return { days: series, startTotal, hasPoints: false }
 }
 
 /* ---------------------------------- sprints --------------------------------- */

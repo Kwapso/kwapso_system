@@ -54,6 +54,7 @@
 //   POST /api/tenancy/waves/update        -> rename it / re-word what it is for
 //   POST /api/tenancy/waves/active        -> switch it off, or bring it back
 //   POST /api/tenancy/waves/sprint        -> put a sprint in a wave, or take it out
+//   POST /api/tenancy/waves/phase-days    -> set how many days each phase type gets
 //   POST /api/tenancy/processes/audit-date -> move the day the saving measures from
 //   POST /api/tenancy/processes/link       -> connect one map to another (loose)
 //   POST /api/tenancy/processes/unlink     -> take that connection away
@@ -138,6 +139,7 @@ import {
   postCreateWave,
   postUpdateWave,
   postWaveActive,
+  postWavePhaseDays,
   postWaveSprint,
 } from "./routes/waves"
 import type { Env } from "./env"
@@ -364,6 +366,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/waves/update": { handler: postUpdateWave, kind: "mutation" },
   "POST /api/tenancy/waves/active": { handler: postWaveActive, kind: "mutation" },
   "POST /api/tenancy/waves/sprint": { handler: postWaveSprint, kind: "mutation" },
+  "POST /api/tenancy/waves/phase-days": { handler: postWavePhaseDays, kind: "mutation" },
   "POST /api/tenancy/processes/audit-date": { handler: postAuditDate, kind: "mutation" },
   "POST /api/tenancy/processes/link": { handler: postLinkProcesses, kind: "mutation" },
   "POST /api/tenancy/processes/unlink": { handler: postUnlinkProcesses, kind: "mutation" },

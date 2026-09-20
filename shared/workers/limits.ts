@@ -493,6 +493,18 @@ export const WORK_LOG_GROUP_CAP = 50
  * with as many placeholders as somebody types. */
 export const STORY_PROCESS_CAP = 20
 
+/** Stories one phase's burndown may read (round-28 ruling, team migration 0110).
+ * A phase is a block of SOLD work; nothing legitimate approaches this, and the
+ * cap makes the `IN (...)` read over every story's status history a bounded
+ * statement, the same argument `STORY_PROCESS_CAP` makes above it. */
+export const PHASE_BURNDOWN_STORY_CAP = LIST_HARD_CAP
+
+/** Calendar days one phase's burndown chart may plot (round-28 ruling). A year
+ * is already longer than any phase this product sells; the cap exists so a
+ * typo'd end date (a stray year) cannot ask the door to build a day-by-day
+ * series with no ceiling, a REFUSAL CEILING on the read, not a page size. */
+export const PHASE_BURNDOWN_MAX_DAYS = 366
+
 /** Bytes one file attached to a ticket may carry, before base64. The same 10 MB a
  * to-do's evidence gets (routes/todos.ts) — the ask is the same ask, "a photo of
  * the thing I mean", and two different ceilings for the same act is two different

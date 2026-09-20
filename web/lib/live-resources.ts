@@ -1748,6 +1748,20 @@ export const TEAM_RESOURCES: Record<
       helpStagesKey(id),
       `help-mine:${t}`,
       insightsKey(t),
+      // …AND THE TRIAGE QUEUE'S OWN CACHED ANSWER (Aurora, 20 Sep 2026: "canot
+      // be, i still have 428 to trigae but only 15 open?"). `triage:${t}` used
+      // to drop only on a `triage_duty` ping (naming somebody's week) and
+      // never on a `help` one, so the moment a colleague resolved, closed or
+      // put away a ticket anywhere OTHER than this screen's own Accept/Assign/
+      // Plan, the cached total sitting on the Triage tab's badge and inside
+      // this queue never heard about it. `needsTriage` (workers/content/src/
+      // lib/triage.ts) has always excluded a resolved or archived ticket
+      // correctly AT THE DOOR: the drift was never in what the door counts,
+      // it was in how long a stale answer could keep being shown for. The
+      // MAX_CACHE_AGE_MS ceiling (shared/web/store.ts) would have caught up in
+      // ten minutes on its own; a screen somebody was actually looking at
+      // should not have to wait that long to agree with the tickets beside it.
+      triageKey(t),
       ...recordCountDeps("help"),
     ],
     // …and every per-account slice of the ticket list — a contact's Tickets tab

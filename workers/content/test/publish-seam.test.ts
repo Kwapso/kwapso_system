@@ -35,6 +35,11 @@ const HOUSEKEEPING = [
   // carries a body and must not sit in a URL, not because it changes state.
   // The row is written later by the module's own door, which publishes there.
   "POST /api/content/uploads/presign",
+  // A phase's burndown series (round-28 ruling, team migration 0110). A read,
+  // work:read, no `publishChange`, shaped as a POST because the phase id
+  // travels as a body field rather than a query string ("GET-style POST",
+  // Aurora's own words); there is no row it changes and so nothing to ping.
+  "POST /api/content/stories/burndown",
   // "THE BYTES ARE UP" — the third step of the same upload. It LOOKS (`head`)
   // and answers the reference; it writes no row, no object and no counter.
   // The module's own door writes the row and publishes there, exactly as it

@@ -32,6 +32,7 @@ import { useT } from "@shared/web/language"
 import type { Translate } from "@shared/web/format"
 import type { AccountFormValues } from "@/components/accounts/account-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
+import type { GlossaryFormValues } from "@/components/knowledge/glossary-form-dialog"
 import type { KnowledgeSource } from "@shared/types"
 import type { KnowledgeLinkRead } from "@/lib/api/content"
 import { isVideoLink } from "@shared/media-links"
@@ -387,6 +388,40 @@ export function useScreenActions(teamId: string | null) {
     [teamId, t]
   )
 
+  // ADD ONE WORD TO THE TEAM'S OWN GLOSSARY, a sibling of `createKnowledge`
+  // above, through the glossary's own dedicated door (see `createGlossaryEntry`'s
+  // own header, workers/content/src/lib/knowledge.ts, for why it is not that
+  // door with a `kind` flag). Same cache move: the list PAGES, so a create
+  // re-pulls page one rather than guessing where the new row sorts.
+  const createGlossaryWord = React.useCallback(
+    async (values: GlossaryFormValues) => {
+      if (!teamId) return
+      await contentApi.createGlossaryWord({ title: values.word, body: values.definition })
+      primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
+      toast.success(t('"{word}" was added to the glossary.', { word: values.word }))
+    },
+    [teamId, t]
+  )
+
+  // Correct a word already in the glossary, the row-level counterpart above,
+  // through the SAME generic `updateKnowledge` door `editKnowledge` already
+  // uses: a glossary entry is neither mirrored nor file-backed, so the door's
+  // own "typed note" branch (updateSource's else branch) already rewrites its
+  // title and body in full. Patches the one row rather than re-pulling page one.
+  const editGlossaryWord = React.useCallback(
+    async (id: string, values: GlossaryFormValues) => {
+      const { source } = await contentApi.updateKnowledge({ id, title: values.word, body: values.definition })
+      if (source && teamId) {
+        primeCache(`knowledge:one:${id}`, source)
+        const cur = readCache<KnowledgeSource[]>(knowledgeKey(teamId))
+        if (cur) primeCache(knowledgeKey(teamId), cur.map((s) => (s.id === id ? source : s)))
+        invalidate(recordActivityKey("knowledge_sources", id))
+      }
+      toast.success(t("Word updated."))
+    },
+    [teamId, t]
+  )
+
   // THE AGENCY'S OWN HOUSEKEEPING — one writer for the four record kinds, because
   // they are one shape: a create or an edit against a CAPPED list, whose door
   // hands back the whole (small) collection, so the actor's cache is primed
@@ -426,6 +461,8 @@ export function useScreenActions(teamId: string | null) {
     createAccount,
     createKnowledge,
     editKnowledge,
+    createGlossaryWord,
+    editGlossaryWord,
     uploadKnowledgeFile,
     saveInternalRecord,
     setInternalActive,

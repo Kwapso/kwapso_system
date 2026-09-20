@@ -170,6 +170,7 @@ import { WorkLogsPanel } from "@/components/work/work-logs-panel"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
+import { ReplyEditSheet } from "@/components/tickets/reply-edit-sheet"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { appsKey, listFetch, totalKey, triageKey } from "@/lib/live-resources"
 import { useLanguage } from "@shared/web/language"
@@ -513,9 +514,15 @@ export function HelpDetailScreen({
   // "one per screen serves all of them", not "one per screen, full stop"; a
   // reply removal mid-conversation and the ticket's own archive are two
   // different destructive acts and must not share one open/close state).
-  // Edit carries no confirm — the kit's own inline editor (Save/Cancel) is
-  // already the ask.
+  // Edit carries no confirm: the sheet's own Cancel (below) is already the
+  // way out.
   const { ask: askDeleteReply, run: runDeleteReply, dialog: deleteReplyDialog } = useConfirm()
+  // THE REPLY BEING EDITED, OR NONE. Aurora's 20 Sep 2026 follow-up ruling
+  // ("open the edit as slide in. can edit text and date and attachments").
+  // The kit's own inline textarea can hold only the body, so Edit now opens
+  // `<ReplyEditSheet>` instead (kit v1.2.143's `actions.onEditRequest`); the
+  // id is enough, the sheet reads the reply itself off `repliesQ.data`.
+  const [editingReplyId, setEditingReplyId] = React.useState<string | null>(null)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total titles the panel
@@ -834,24 +841,17 @@ export function HelpDetailScreen({
     await content.removeHelpAttachment(helpId, attachmentId)
   }
 
-  /** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half
-   * (kit v1.2.139's `TicketThread.actions.onEdit`, wired below on the thread's
-   * `messages` — see the JSX for why every reply's `body` has to be the plain
-   * string rather than the `<RichText>` node the bubble otherwise draws: the
-   * kit's own inline editor seeds itself from `typeof message.body ===
-   * "string"`, and there is no second, string-only slot to hand it one). The
-   * door's own fence (`assertMayChangeReply`, workers/content/src/lib/help.ts)
-   * is what actually decides whether this call succeeds; this just carries it
-   * and reconciles the thread with what came back. Fire-and-forget from the
-   * kit's own side (`saveEdit` closes the editor the instant it calls this,
-   * with no promise to await), so a refusal is told here, not there. */
-  async function editReply(id: string, newBody: string): Promise<void> {
-    try {
-      const { replies: fresh } = await content.updateHelpReply(id, newBody)
-      primeCache(`help-thread:${helpId}`, fresh)
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that reply."))
-    }
+  /** CHANGE A REPLY ALREADY SENT, Aurora's 20 Sep 2026 ruling, both halves
+   * (the chat edit pencil, kit v1.2.139's `TicketThread.actions.onEdit`, and
+   * her SAME-DAY follow-up, "open the edit as slide in. can edit text and
+   * date and attachments", kit v1.2.143's `actions.onEditRequest`). The Edit
+   * row now opens `<ReplyEditSheet>` (below the thread's JSX) rather than
+   * the kit's own inline textarea, which could hold only the body and never
+   * the date or the files this ruling also asks for; the sheet reads and
+   * saves the reply itself (reply-edit-sheet.tsx), and `onSaved` here only
+   * reconciles this screen's own cache with what came back. */
+  function requestReplyEdit(id: string): void {
+    setEditingReplyId(id)
   }
 
   /** TAKE A REPLY BACK OUT — the Delete half of the same ruling
@@ -1793,6 +1793,11 @@ export function HelpDetailScreen({
                   // before it) is already carried by `replies` above and by
                   // the kit's own `data-run`-keyed gap rule.
                   bylinePlacement="below"
+                  // Aurora, 20 Sep 2026, on the chat message menu: "make the
+                  // avatar as big as this button" (the message-actions
+                  // trigger). Kit v1.2.143's `faceSize="md"` draws every
+                  // face at 40px, the trigger's own `size="icon"` height.
+                  faceSize="md"
                   banner={
                     ticket.sourceScreen ? (
                       <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
@@ -1873,23 +1878,27 @@ export function HelpDetailScreen({
                       // logged beside the one that comment already names, not a
                       // choice this file is making for its own reasons.
                       body: r.body,
-                      // AURORA'S 20 SEP 2026 RULING — the chat edit pencil:
+                      // AURORA'S 20 SEP 2026 RULING, the chat edit pencil:
                       // "make it like p4 wth the 3 options menu (edit,
-                      // copy/delete)". Copy needs no handler to work (the kit's
-                      // own doc on `ThreadMessageActions`) — it is set
+                      // copy/delete)", and her SAME-DAY follow-up ("open the
+                      // edit as slide in. can edit text and date and
+                      // attachments"). Copy needs no handler to work (the
+                      // kit's own doc on `ThreadMessageActions`), it is set
                       // unconditionally so every reply draws the trigger at
                       // all. Edit/Delete are the reply's OWN fence: the person
                       // who wrote it always, and past that whoever already
-                      // holds the ticket edit right (`canEdit`, defined above —
+                      // holds the ticket edit right (`canEdit`, defined above,
                       // the same `help:update` the door itself checks,
-                      // `assertMayChangeReply`, workers/content/src/lib/help.ts)
-                      // — never a client login here, because this screen is
-                      // staff-only.
+                      // `assertMayChangeReply`, workers/content/src/lib/help.ts),
+                      // never a client login here, because this screen is
+                      // staff-only. `onEditRequest` (kit v1.2.143) wins over
+                      // the kit's own inline editor and draws the Edit row on
+                      // its own, so no `onEdit` is passed at all.
                       actions: {
                         onCopy: () => { toast.success(t("Copied.")) },
                         ...(r.authorId === myUserId || canEdit
                           ? {
-                              onEdit: (id: string, newBody: string) => { void editReply(id, newBody) },
+                              onEditRequest: (id: string) => { requestReplyEdit(id) },
                               onDelete: (id: string) => { confirmDeleteReply(id) },
                             }
                           : {}),
@@ -2161,7 +2170,7 @@ export function HelpDetailScreen({
           // `workLogAddRef` opener — is the one door.
           canSeeTime ? (
             <EmptyGatedPanel
-              title={t("Work logs")}
+              title={t("Time logs")}
               empty={workLogsEmpty}
               action={
                 canLogTime ? (
@@ -2335,6 +2344,13 @@ export function HelpDetailScreen({
 
       {archiveDialog}
       {deleteReplyDialog}
+      <ReplyEditSheet
+        open={editingReplyId !== null}
+        onOpenChange={(o) => { if (!o) setEditingReplyId(null) }}
+        ticketId={helpId}
+        reply={repliesData.find((r) => r.id === editingReplyId) ?? null}
+        onSaved={(fresh) => primeCache(`help-thread:${helpId}`, fresh)}
+      />
     </>
   )
 }

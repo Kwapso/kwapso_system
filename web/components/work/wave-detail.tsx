@@ -53,6 +53,7 @@ import {
 import { ApiFailure } from "@/lib/api"
 import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
+import { WavePhaseDaysPanel } from "@/components/work/wave-phase-days-panel"
 import { SprintTypeGlyph, sprintTypeHasGlyph } from "@/lib/sprint-type-icon"
 import { content as contentApi } from "@/lib/api/content"
 import { sliceKey } from "@/components/work/work-panels"
@@ -62,7 +63,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Sprint } from "@shared/types"
-import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
+import type { Wave, WaveOverlap, WavePhaseDay, WaveSprint } from "@shared/waves"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
@@ -86,7 +87,7 @@ export function WaveDetailScreen({
   // list row does not carry — the sprints, the clashes, and the goal — and its
   // dates move when a SPRINT moves, which is a change the list row alone could
   // not answer.
-  const waveQ = useCached<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[] }>(
+  const waveQ = useCached<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[]; phaseDays: WavePhaseDay[] }>(
     waveOneKey(waveId),
     () => wavesApi.one(waveId)
   )
@@ -171,6 +172,23 @@ export function WaveDetailScreen({
     }
   }
 
+  /** THE SETTINGS PANEL'S OWN SAVE (Aurora, 20 Sep 2026: "on waves i am
+   * missing the settings"). Only the rows the panel actually changed are
+   * sent, through the same door `postUpdateWave`'s sibling opens
+   * (workers/tenancy/src/routes/waves.ts, `POST /api/tenancy/waves/phase-days`). */
+  async function savePhaseDays(rows: { phaseType: string; days: number }[]): Promise<void> {
+    setBusy(true)
+    try {
+      await wavesApi.setPhaseDays({ waveId, days: rows })
+      refresh()
+      toast.success(t("Phase days changed."))
+    } catch (e) {
+      toast.error(e instanceof ApiFailure ? e.message : t("That didn't save. Try again, and tell us if it keeps happening."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
   // the rollout from help-detail (73414c58). No empty branch: this door never
   // returns a null record, only data or an error.
@@ -189,7 +207,7 @@ export function WaveDetailScreen({
     )
   if (waveQ.data === undefined)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
-  const { wave, sprints, overlaps } = waveQ.data
+  const { wave, sprints, overlaps, phaseDays } = waveQ.data
 
   const sprintNeedle = sprintQuery.trim().toLowerCase()
   const sprintDirMul = sprintSort.dir === "desc" ? -1 : 1
@@ -515,7 +533,22 @@ export function WaveDetailScreen({
                 )}
               </div>
             )
-          return <OverviewList items={overviewItems} />
+          return (
+            <div className="flex flex-col gap-6">
+              <OverviewList items={overviewItems} />
+              {/* SETTINGS: HOW MANY DAYS EACH PHASE TYPE GETS (Aurora, 20 Sep
+                  2026: "on waves i am missing the settings"). Alongside the
+                  wave's other Overview panels, same tab, same Card pattern
+                  sprint-detail.tsx's own "Work inside it" band takes. */}
+              <WavePhaseDaysPanel
+                teamId={teamId}
+                phaseDays={phaseDays}
+                canEdit={canEdit}
+                busy={busy}
+                onSave={savePhaseDays}
+              />
+            </div>
+          )
         }}
       />
 

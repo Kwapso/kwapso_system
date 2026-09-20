@@ -136,9 +136,30 @@ export type TriageView = {
     moduleMark: string | null
     /** WHO ASKED, and their face. Null until somebody has said who — which is
      * one of the four readiness gaps, so a card missing this is a card whose
-     * Accept is refused anyway, and the empty chip is the honest picture. */
+     * Accept is refused anyway, and the empty chip is the honest picture.
+     * This is the CLIENT CONTACT the ticket is FOR, never the actor who typed
+     * it in: see `raiserId`/`raiserName` below for that other half. */
     raisedByContactName: string | null
     raisedByContactLogo: string | null
+    /** THE ACTOR WHO RAISED IT, `help.creator_id`/`creator_name`, the same
+     * pair `TICKET_COLS` (`lib/help.ts`) already hands the ordinary ticket
+     * list, and missing here until 20 Sep 2026: `TicketRowsTable`'s own
+     * `raisedBy` cell (`tickets-collection.tsx`) has always preferred this
+     * over `raisedByContactName`, "a `HelpTicket` row names the ACTOR who
+     * raised it … a `TriageWaiting` row carries no such actor", but a row
+     * where staff raised the ticket on nobody's behalf (`raisedByContactId`
+     * null, the ordinary case per SCOPE ch.07: "220 of 221 seeded historical
+     * requests are staff-raised") had neither fact to show, and the LIST
+     * view's cell rendered empty. NOT REDACTED the way `help.ts`'s own
+     * `hideRaiser` redacts it for a portal login: this door refuses a
+     * portal caller outright (`refusePortalCaller`, `routes/triage.ts`),
+     * so the client-facing case `hideRaiser` exists for cannot arrive here. */
+    raiserId: string | null
+    raiserName: string | null
+    /** R54's own trim needs this to tell a staff name from a contact's full
+     * one: `raiserIsClient`, the identical `EXISTS (… portal_users …)`
+     * subselect `TICKET_COLS` already runs on the same column. */
+    raiserIsClient: boolean
     /** BOTH TITLES, never one standing in for the other — `HelpTicket`'s own
      * ruling, and the reason is the same here: 788 tickets from Glide exist
      * only in German, and a card that showed `titleEn ?? ""` would have named
@@ -230,6 +251,9 @@ export async function needsTriage(
     module_mark: string | null
     raised_by_contact_name: string | null
     raised_by_contact_logo: string | null
+    creator_id: string | null
+    creator_name: string | null
+    raiser_is_client: number
     title_de: string | null
     title_en: string | null
   }>(
@@ -264,7 +288,14 @@ export async function needsTriage(
             (SELECT m.name FROM app_modules m WHERE m.id = help.module_id) AS module_name,
             (SELECT m.mark FROM app_modules m WHERE m.id = help.module_id) AS module_mark,
             (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
-            (SELECT a.logo_url FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_logo
+            (SELECT a.logo_url FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_logo,
+            creator_id, creator_name,
+            -- THE ACTOR WHO RAISED IT, the identical pair (and the identical
+            -- portal_users EXISTS subselect) TICKET_COLS (lib/help.ts)
+            -- already reads for the ordinary ticket list, added 20 Sep 2026
+            -- so a staff-raised ticket with no client contact (the majority
+            -- case, SCOPE ch.07) still names somebody in the raisedBy cell.
+            EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client
        FROM help
       WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
@@ -302,6 +333,9 @@ export async function needsTriage(
       moduleMark: r.module_mark,
       raisedByContactName: r.raised_by_contact_name,
       raisedByContactLogo: r.raised_by_contact_logo,
+      raiserId: r.creator_id,
+      raiserName: r.creator_name,
+      raiserIsClient: r.raiser_is_client === 1,
       titleDe: r.title_de,
       titleEn: r.title_en,
     })),

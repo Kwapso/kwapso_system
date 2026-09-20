@@ -50,7 +50,14 @@ const call = (userId: string, route: string, body?: unknown, query = "") => {
 
 type TriageBody = {
   onDuty: { userId: string; userName: string | null } | null
-  waiting: { id: string; days: number }[]
+  waiting: {
+    id: string
+    days: number
+    raiserId?: string | null
+    raiserName?: string | null
+    raiserIsClient?: boolean
+    raisedByContactName?: string | null
+  }[]
   total: number
 }
 
@@ -155,6 +162,23 @@ describe("what has been sitting", () => {
     expect(body.waiting[0].days).toBeGreaterThanOrEqual(TRIAGE_AFTER_DAYS)
   })
 
+  // REPROOF 20, ITEM 4 (this repo's proof numbering; task item 1): the LIST
+  // view's "Raised by" cell rendered an empty
+  // `<td>` for a staff-raised ticket. `ticketAgedDays` raises the ticket as
+  // `IDS.staffUser` ("Staff") and sets no `raised_by_contact_id`, which is
+  // the majority shape (SCOPE ch.07): a ticket with nobody to fall back to
+  // needs the ACTOR who raised it on the row, and until this fix the door's
+  // `waiting` rows never carried one at all.
+  it("carries the raiser's own id and name on every waiting row, even with no client contact", async () => {
+    const id = await ticketAgedDays("A request from the other company", TRIAGE_AFTER_DAYS + 1)
+    const body = (await (await call(IDS.staffUser, "GET /api/content/triage")).json()) as TriageBody
+    const row = body.waiting.find((w) => w.id === id)
+    expect(row?.raisedByContactName ?? null).toBeNull()
+    expect(row?.raiserId).toBe(IDS.staffUser)
+    expect(row?.raiserName).toBe("Staff")
+    expect(row?.raiserIsClient).toBe(false)
+  })
+
   it("leaves an ARCHIVED ticket out — putting one away is having looked at it", async () => {
     const id = await ticketAgedDays("Put away deliberately", TRIAGE_AFTER_DAYS + 2)
     await call(IDS.staffUser, "POST /api/content/help/archive", { id, archived: true })
@@ -163,6 +187,26 @@ describe("what has been sitting", () => {
     db().exec(`UPDATE help SET status = 'new' WHERE id = '${id}'`)
     const body = (await (await call(IDS.staffUser, "GET /api/content/triage")).json()) as TriageBody
     expect(body.waiting).toHaveLength(0)
+    expect(body.total).toBe(0)
+  })
+
+  // AURORA'S RULING A, 20 SEP 2026, VERBATIM: "canot be, i still have 428 to
+  // trigae but only 15 open?" The number waiting for triage cannot exceed the
+  // number of open tickets: a resolved or closed ticket never needs triage,
+  // WHATEVER ITS TRIAGE FIELDS SAY. This is the "whatever its triage fields
+  // say" half: a ticket aged well past the line, missing every one of the four
+  // readiness fields (`shared/triage-readiness.ts`'s own `TRIAGE_REQUIRES`),
+  // still leaves the list the moment it is resolved: the predicate is
+  // `status`, never the gap columns, so a closed ticket can never be "still
+  // missing a type" its way back onto this screen.
+  it("leaves a RESOLVED (closed) ticket out, even with every readiness field still empty", async () => {
+    const id = await ticketAgedDays("Closed with nothing filled in", TRIAGE_AFTER_DAYS + 2)
+    db().exec(
+      `UPDATE help SET status = 'resolved', help_type = NULL, account_id = NULL, app_id = NULL,
+         raised_by_contact_id = NULL WHERE id = '${id}'`
+    )
+    const body = (await (await call(IDS.staffUser, "GET /api/content/triage")).json()) as TriageBody
+    expect(body.waiting.map((w) => w.id)).not.toContain(id)
     expect(body.total).toBe(0)
   })
 })

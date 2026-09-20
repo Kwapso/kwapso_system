@@ -7863,6 +7863,156 @@ ALTER TABLE help_threads ADD COLUMN editor_name TEXT;
 ALTER TABLE help_threads ADD COLUMN deactivated_at TEXT;
 `,
   },
+  {
+    // WAVE SETTINGS, HOW MANY DAYS EACH PHASE TYPE GETS. Aurora's ruling, 20
+    // Sep 2026, verbatim: "on waves i am missing the settings (we'l adjust
+    // the duration of pahses in days)." A wave's own Settings panel
+    // (web/components/work/wave-detail.tsx) lets whoever holds the wave
+    // update right set, per PHASE TYPE (`shared/sprint-types.ts`'s
+    // `PHASE_TYPES`: Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare,
+    // in that order), how many days that kind of phase is expected to run.
+    //
+    // ONE ROW PER (WAVE, PHASE TYPE) THAT HAS EVER BEEN SET, never seven rows
+    // seeded the moment a wave is sold: a wave born today carries no rows
+    // here at all, and the placeholder defaults (Audit 5, Plan 5, Build 20,
+    // Pilot 10, Revision 10, Deploy 3, Hypercare 10 days, round numbers,
+    // hers to adjust) are filled in by the READ (`getWave`,
+    // workers/tenancy/src/lib/waves.ts), never written to the table. So this
+    // migration seeds nothing, on purpose: a default that lived as a row
+    // would need a backfill across every wave that already exists, and would
+    // drift the moment the placeholder numbers above are revisited before
+    // anyone has touched a real wave's own settings.
+    //
+    // NO DEACTIVATE COLUMN. Unlike `waves` itself or `internal_role_rates`,
+    // a phase-days row is not a record somebody puts away, it is a number
+    // that gets corrected in place (an UPSERT on the unique pair below) or
+    // simply never set, so it carries only the creator/editor audit pair
+    // this schema already gives an editable value with no lifecycle of its
+    // own (`client_tool_prices`, a few hundred lines up, is the nearest
+    // shape, minus its own dated-row history: a phase-days number has no
+    // "as of" to preserve, only a current one).
+    //
+    // NUMBERED 0109, read live off `origin/main`'s own tail (`git fetch
+    // origin`, then the tail of this file on that ref) right before
+    // appending, per CLAUDE.md: 0108 is the highest version on both the
+    // local tree and `origin/main` as of 20 Sep 2026, so 0109 is the next
+    // free number.
+    version: "0109_waves_carry_days_per_phase_type",
+    sql: `
+CREATE TABLE wave_phase_days (
+  id TEXT PRIMARY KEY,
+  wave_id TEXT NOT NULL REFERENCES waves (id),
+  phase_type TEXT NOT NULL,
+  days INTEGER NOT NULL CHECK (days >= 1 AND days <= 365),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_wave_phase_days_wave_type ON wave_phase_days (wave_id, phase_type);
+`,
+  },
+  {
+    // A STORY REMEMBERS ITS STAGES, the same seam 0066 gave a ticket, given to a
+    // story. Aurora's round-28 ruling is two asks read as one: a BURNDOWN chart
+    // per phase/sprint (work remaining against an ideal line, updated as stories
+    // move to Done) and CYCLE TIME (how long a story sits in each status),
+    // "captured automatically via timestamps on those status changes." Both read
+    // off the same history, so this is one table, not two.
+    //
+    // SHAPED LIKE `help_status_events` (0066), on purpose: `story_id`,
+    // `from_status`, `to_status`, `created_at` plus the usual actor triple.
+    // Nothing this table needs is different from what the ticket's own history
+    // already proved out.
+    //
+    // ── WHERE `in_progress`'S TIMESTAMP COMES FROM ──────────────────────────
+    //
+    // Aurora, asked whether status history exists today, corrected herself in the
+    // same breath: "it kind of does. In the old system, we were only using work
+    // logs, so when it entered in progress, it's on the start of the first
+    // related work log." So the RUNTIME seam (`workers/content/src/lib/
+    // stories.ts`) writes a real event the moment `setStoryStatus`/
+    // `storyProgressFlip` actually moves a row, at the real "now" of that move,
+    // same as 0066's ticket events. This migration's own BACKFILL, for
+    // stories that were already past `open` before this table existed, reaches
+    // for the same fact she named: the start of the story's FIRST work log,
+    // falling back to the story's own `created_at` when it has none.
+    //
+    // ── THE BACKFILL, THREE PASSES, EACH GUARDED SEPARATELY ─────────────────
+    //
+    // A story sitting at `in_progress`, `in_review` or `done` today passed
+    // through `in_progress` to get there, so ALL THREE get that first event. A
+    // story at `in_review` or `done` also gets its `in_review`/`done` event, at
+    // `updated_at` (her own words: "for done stories one event into done at
+    // updated_at" and the same for in_review), not `closed_at`, even though
+    // `stories.closed_at` exists and would read slightly more precisely for a
+    // `done` row: her instruction named `updated_at` for both, and a backfill is
+    // not the place to improve on a ruling. `from_status` on each backfilled row
+    // is the ordinary predecessor in the fixed lifecycle (open, then in_progress,
+    // then in_review, then done), a straight-line guess, same honesty as 0069's
+    // NULL actor columns: nobody chose it, a migration reconstructed it.
+    //
+    // EACH PASS GUARDS ON ITS OWN `(story_id, to_status)`, never on the whole
+    // table, so a story already carrying a REAL `in_progress` event (written by
+    // the runtime seam between this migration landing and a re-run) is left
+    // alone rather than doubled, and a re-run after a partial failure completes
+    // only the passes still missing their row, the same `NOT EXISTS` idiom 0069
+    // uses for exactly that reason.
+    //
+    // NO POINTS COLUMN TO CARRY. `stories` has no story-points field (BUILD-1 §2
+    // never asked for one), so the burndown door this table feeds counts stories
+    // rather than points until one exists, read off THIS table, not decided
+    // here.
+    version: "0110_stories_keep_their_status_history",
+    sql: `
+CREATE TABLE story_status_events (
+  id TEXT PRIMARY KEY,
+  story_id TEXT NOT NULL REFERENCES stories (id),
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE INDEX idx_story_status_events_story ON story_status_events (story_id, created_at, id);
+
+-- PASS 1: in_progress, at the start of the story's first work log (or its own
+-- created_at with none), for every story that is in_progress, in_review or done
+-- today.
+INSERT INTO story_status_events (id, story_id, from_status, to_status, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), s.id, 'open', 'in_progress',
+       COALESCE(
+         (SELECT MIN(w.started_at) FROM work_logs w
+           WHERE w.target_table = 'stories' AND w.target_id = s.id),
+         s.created_at
+       ),
+       NULL, NULL, NULL
+  FROM stories s
+ WHERE s.status IN ('in_progress', 'in_review', 'done')
+   AND NOT EXISTS (
+     SELECT 1 FROM story_status_events e
+      WHERE e.story_id = s.id AND e.to_status = 'in_progress'
+   );
+
+-- PASS 2: in_review, at updated_at, for every story that is in_review today.
+INSERT INTO story_status_events (id, story_id, from_status, to_status, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), s.id, 'in_progress', 'in_review',
+       COALESCE(s.updated_at, s.created_at), NULL, NULL, NULL
+  FROM stories s
+ WHERE s.status = 'in_review'
+   AND NOT EXISTS (
+     SELECT 1 FROM story_status_events e
+      WHERE e.story_id = s.id AND e.to_status = 'in_review'
+   );
+
+-- PASS 3: done, at updated_at, for every story that is done today.
+INSERT INTO story_status_events (id, story_id, from_status, to_status, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), s.id, 'in_review', 'done',
+       COALESCE(s.updated_at, s.created_at), NULL, NULL, NULL
+  FROM stories s
+ WHERE s.status = 'done'
+   AND NOT EXISTS (
+     SELECT 1 FROM story_status_events e
+      WHERE e.story_id = s.id AND e.to_status = 'done'
+   );
+`,
+  },
 ]
 
 /** 0088's SQL. See the migration's own header (above, in TEAM_MIGRATIONS) for

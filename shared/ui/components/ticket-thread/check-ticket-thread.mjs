@@ -26,6 +26,13 @@
          thread sets on a byline-less message, not a per-message magic
          number.
 
+   SECTIONS 8–9b, ADDED LATER, pin two more of Aurora's rulings on the same
+   message-actions menu: `onEditRequest?: (id: string) => void` (8), the
+   slide-in-editing escape hatch that wins over `onEdit` and opens no
+   inline editor of its own; and `faceSize?: "sm" | "md"` (9, mounted at
+   9b), which draws each bubble's face at Avatar's own new `"control"` size
+   (40, `--avatar-control`) to match the message-actions trigger's height.
+
    SECTIONS 1–4 ARE STATIC, matching this kit's other `check-*.mjs` files —
    no jsdom/testing-library in this repository, so most of this is read from
    the source directly. SECTION 5 MOUNTS the component (vite SSR +
@@ -205,8 +212,14 @@ for (const gate of [
 
 // EDIT AND DELETE EACH GATE ON THEIR OWN HANDLER; COPY NEVER DOES — see
 // ThreadMessageActions's own header for why Copy needs no handler to draw.
-if (!/effectiveActions\.onEdit \? \(/.test(src)) {
-  findings.push(`${rel} does not gate the Edit row on effectiveActions.onEdit being present.`);
+// The Edit gate reads EITHER onEdit or onEditRequest (Section 8 pins the
+// "onEditRequest wins when both are given" branch this same row's onSelect
+// carries) — a caller that wired only onEditRequest must still get a row.
+if (!/effectiveActions\.onEdit \|\| effectiveActions\.onEditRequest \? \(/.test(src)) {
+  findings.push(
+    `${rel} does not gate the Edit row on effectiveActions.onEdit || effectiveActions.onEditRequest being ` +
+      "present — a caller that wired only onEditRequest would get no Edit row at all.",
+  );
 }
 if (!/effectiveActions\.onDelete \? \(/.test(src)) {
   findings.push(`${rel} does not gate the Delete row on effectiveActions.onDelete being present.`);
@@ -258,6 +271,77 @@ if (!fs.existsSync(CHECK_ACTIONS_FILE)) {
     "verify/ticket-thread-below/check-actions.mjs is missing — the real-pointer-click proof for the " +
       "message-actions menu (Radix's own trigger opens on pointer-down, not a synthetic click) must stay on disk.",
   );
+}
+
+/* ============================================================================
+   8 · THE SECOND WAY TO EDIT — Aurora, on the same menu, a later ruling:
+   "open the edit as slide in. can edit text and date and attachments."
+   `ThreadMessageActions`'s own "TWO WAYS TO EDIT" doc carries the full
+   argument; this pins the construction: onEditRequest, when given, wins
+   over onEdit and this component opens no inline editor for it.
+   ========================================================================= */
+if (!/onEditRequest\?:\s*\(id: string\) => void;/.test(src)) {
+  findings.push(`${rel}'s ThreadMessageActions does not declare onEditRequest?: (id: string) => void.`);
+}
+if (!/if \(effectiveActions\.onEditRequest\) \{\s*\n\s*effectiveActions\.onEditRequest\(key\);\s*\n\s*\} else \{\s*\n\s*startEdit\(key, message\.body\);\s*\n\s*\}/.test(src)) {
+  findings.push(
+    `${rel}'s Edit row onSelect does not branch on effectiveActions.onEditRequest first (calling it and NOT ` +
+      "startEdit) before falling back to startEdit — onEditRequest must win when both are given, and must never " +
+      "also open the inline editor.",
+  );
+}
+
+/* ============================================================================
+   9 · THE FACE MATCHES THE BUTTON — Aurora, verbatim: "make the avatar as
+   big as this button." `faceSize?: "sm" | "md"` on TicketThreadProps,
+   defaulting to "sm" (today's behaviour, unchanged when left out); "md"
+   reads a new Avatar size, "control" (40, `--avatar-control`), matching
+   the message-actions trigger's own `size="icon"` (`--control-height-
+   button`). `Avatar`'s own file and tokens.css carry the size itself —
+   this only pins that TicketThread reaches for it correctly.
+   ========================================================================= */
+if (!/faceSize\?:\s*"sm" \| "md";/.test(src)) {
+  findings.push(`${rel} does not declare faceSize?: "sm" | "md" on TicketThreadProps.`);
+}
+if (!/faceSize = "sm",/.test(src)) {
+  findings.push(`${rel} does not default faceSize to "sm" — every existing caller that never passed faceSize ` +
+    "would silently render a different face size than before this prop existed.");
+}
+if (!/<Avatar size=\{faceSize === "md" \? "control" : "sm"\} className="flex-none">/.test(src)) {
+  findings.push(
+    `${rel}'s message avatar does not read size={faceSize === "md" ? "control" : "sm"} — the per-message face ` +
+      "would not follow the faceSize prop.",
+  );
+}
+if (!/faceSize === "md" \? "size-\[var\(--avatar-control\)\]" : "size-\[var\(--avatar-sm\)\]"/.test(src)) {
+  findings.push(
+    `${rel}'s loading skeleton does not switch its own size on faceSize — a "md" thread would flash a smaller ` +
+      "face while loading, then jump larger once the first message renders.",
+  );
+}
+const AVATAR_FILE = path.join(HERE, "..", "avatar", "avatar.tsx");
+const TOKENS_FILE = path.join(HERE, "..", "..", "foundations", "tokens", "tokens.css");
+if (!fs.existsSync(AVATAR_FILE)) {
+  findings.push("components/avatar/avatar.tsx is missing — TicketThread's faceSize=\"md\" has no Avatar size to read.");
+} else {
+  const avatarSrc = fs.readFileSync(AVATAR_FILE, "utf8");
+  if (!/control:\s*"size-\[var\(--avatar-control\)\]\s+text-sm"/.test(avatarSrc)) {
+    findings.push(
+      'components/avatar/avatar.tsx no longer declares a "control" avatarVariants size reading ' +
+        "size-[var(--avatar-control)] — TicketThread's faceSize=\"md\" has nowhere to point.",
+    );
+  }
+}
+if (!fs.existsSync(TOKENS_FILE)) {
+  findings.push("foundations/tokens/tokens.css is missing — --avatar-control has no token file to live in.");
+} else {
+  const tokensSrc = fs.readFileSync(TOKENS_FILE, "utf8");
+  if (!/--avatar-control:\s*2\.5rem;/.test(tokensSrc)) {
+    findings.push(
+      "foundations/tokens/tokens.css no longer declares --avatar-control: 2.5rem — Avatar's \"control\" size " +
+        "and the message-actions trigger (--control-height-button, also 2.5rem) would stop matching.",
+    );
+  }
 }
 
 /* ============================================================================
@@ -502,11 +586,55 @@ if (!fs.existsSync(CHECK_ACTIONS_FILE)) {
       }
     }
 
+    /* ==========================================================================
+       9b · THE FACE SIZE, MOUNTED. Section 9's static pins prove the source
+       reads the right identifiers; this proves the rendered markup actually
+       carries the right class at both faceSize values, on the same fixture
+       (one message, one avatar) so the only variable is the prop itself.
+       ========================================================================== */
+    const faceSizeMessage = [{ id: "1", side: "theirs", initials: "AM", body: "One." }];
+    const faceSizeDefault = render(
+      "faceSize omitted",
+      h(TicketThread, { messages: faceSizeMessage, composer: false, label: "check" }),
+    );
+    const faceSizeSm = render(
+      "faceSize sm",
+      h(TicketThread, { messages: faceSizeMessage, faceSize: "sm", composer: false, label: "check" }),
+    );
+    const faceSizeMd = render(
+      "faceSize md",
+      h(TicketThread, { messages: faceSizeMessage, faceSize: "md", composer: false, label: "check" }),
+    );
+    if (faceSizeDefault !== null && faceSizeSm !== null && faceSizeDefault !== faceSizeSm) {
+      findings.push(
+        `${rel}: omitting faceSize does not render byte-identically to faceSize="sm" — the default must change ` +
+          "nothing about today's output.",
+      );
+    }
+    if (faceSizeDefault !== null && !faceSizeDefault.includes("size-[var(--avatar-sm)]")) {
+      findings.push(
+        `${rel}: the default (faceSize omitted) render does not carry size-[var(--avatar-sm)] on the avatar — ` +
+          "today's 24px face must be unchanged.",
+      );
+    }
+    if (faceSizeMd !== null && !faceSizeMd.includes("size-[var(--avatar-control)]")) {
+      findings.push(
+        `${rel}: faceSize="md" does not render an avatar carrying size-[var(--avatar-control)] — the face is not ` +
+          "actually reaching the 40px control-matched size.",
+      );
+    }
+    if (faceSizeMd !== null && faceSizeMd.includes("size-[var(--avatar-sm)]")) {
+      findings.push(
+        `${rel}: faceSize="md" still renders an avatar carrying size-[var(--avatar-sm)] — the 24px class must be ` +
+          "fully replaced, not merely added alongside the 40px one.",
+      );
+    }
+
   } catch (e) {
     findings.push(
-      `${rel}: sections 5–6 could not mount <TicketThread> at all (${e instanceof Error ? e.message : String(e)}) — ` +
-        "the bylinePlacement and face-independence render paths are unproven; fix the loader before trusting the " +
-        "static pins above.",
+      `${rel}: sections 6–9b could not mount <TicketThread> at all (${e instanceof Error ? e.message : String(e)}) — ` +
+        "the bylinePlacement, face-independence and faceSize render paths are unproven; fix the loader before " +
+        "trusting the static pins above.",
     );
   } finally {
     if (server) await server.close();
@@ -532,5 +660,10 @@ console.log(
     "1 is marked continued, and bubble 3's byline aligns to its own (mine) trailing edge. Section 7 confirms the " +
     "avatar is keyed on initials/image alone, independent of the byline: a byline-less message with a face still " +
     "renders one (Aurora's 20 Sep 2026 ruling), a message with an image src renders an <AvatarImage>, and only a " +
-    "message given neither initials nor image renders no avatar at all.",
+    "message given neither initials nor image renders no avatar at all. Section 8 pins the second way to edit: " +
+    "onEditRequest?: (id: string) => void on ThreadMessageActions, drawing the Edit row on its own and, when " +
+    "given, winning over onEdit so no inline editor opens for it. Section 9 (static) and 9b (mounted) pin " +
+    "faceSize?: \"sm\" | \"md\" on TicketThreadProps, defaulting to \"sm\" (byte-identical to omitting it) and " +
+    "reading Avatar's own \"control\" size (--avatar-control, 40, matching the message-actions trigger's " +
+    "size=\"icon\") on \"md\", for both the per-message avatar and the loading skeleton.",
 );

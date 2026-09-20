@@ -15,7 +15,10 @@
    THE LAW THIS FILE OBEYS
    · Ruling 30: SQUARE FOR A THING, PILL FOR A PERSON, at 24 / 32 / 48
      (`--avatar-sm` / `--avatar-md` / `--avatar-lg`), and `flex: none` at
-     every size so a mark never squeezes inside a tight row.
+     every size so a mark never squeezes inside a tight row. `size="control"`
+     (40, `--avatar-control`) is a later, NAMED EXCEPTION to this ladder —
+     Aurora, on TicketThread's message-actions menu: "make the avatar as big
+     as this button" — never a fourth rung a caller reaches for by habit.
    · TWO initials, never three. A string fallback is cut to two characters by
      this component rather than by the call site, because 45 call sites cannot
      each be trusted to remember. A node fallback (a module icon) passes
@@ -102,6 +105,17 @@ const avatarVariants = cva(
          * holds. Mapping logged as GAPS-F AVA-3.
          */
         lg: "size-[var(--avatar-lg)] text-sm",
+        /**
+         * 40 · `--avatar-control`, a NAMED EXCEPTION to ruling 30's 24/32/48
+         * ladder, not a fourth rung on it — see that token's own comment in
+         * tokens.css. Exists for exactly one caller, `TicketThread`'s
+         * `faceSize="md"` (Aurora: "make the avatar as big as this
+         * button"), so a face can sit beside a `size="icon"` button
+         * (`--control-height-button`) at the SAME height. Initials at
+         * `text-sm`, the same step `lg` reads — 40 sits far closer to lg's
+         * 48 than to md's 32, and two initials read better a step up.
+         */
+        control: "size-[var(--avatar-control)] text-sm",
       },
       variant: {
         /** `.kw-avatar` — raised paper, normal ink. */

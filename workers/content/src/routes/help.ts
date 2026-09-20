@@ -8,7 +8,7 @@
 
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { afterResponse } from "@shared/workers/parallel"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { MENTIONS_LIMIT, TICKET_ATTACHMENT_CAP } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
@@ -587,24 +587,80 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   return json({ replies, total })
 }
 
-/** POST /api/content/help/reply/update — change a reply already sent (help:read,
+/** POST /api/content/help/reply/update, change a reply already sent (help:read,
  * the same open `postHelpReply` uses: any member who can see the ticket may
  * open the door, and the FENCE that decides whether THIS reply is theirs to
  * change lives one level down, in `updateReply`/`assertMayChangeReply`,
- * lib/help.ts). Aurora's 20 Sep 2026 ruling, the Edit half — p1's placement (a
- * control beside the bubble, hidden until hover) and p4's contents (a menu:
+ * lib/help.ts). Aurora's 20 Sep 2026 ruling, the Edit half (p1's placement, a
+ * control beside the bubble, hidden until hover, and p4's contents, a menu:
  * edit / copy / delete), now shipped as `TicketThread`'s `actions` prop (kit
- * v1.2.139).
+ * v1.2.139), and her follow-up ruling the SAME day ("open the edit as slide
+ * in. can edit text and date and attachments"), which is why every field below
+ * is OPTIONAL: the sheet sends only what actually changed.
+ *
+ * `body` is optional now, so a caller changing only the date or only the
+ * files sends no text at all; when it IS sent, blank-after-trim reads as "no
+ * change" the same way `optionalText` treats every other field, so a
+ * would-be-blank body simply leaves the words untouched rather than emptying
+ * them.
+ *
+ * `createdAt` is an ISO moment, normalised the way `optionalMoment`
+ * normalises every date at this boundary, and refused OUTRIGHT if it names a
+ * moment that has not happened yet: a reply cannot be backdated past "now".
+ *
+ * `attachments` mirrors `postHelpReply`'s own `attachmentIds` shape (de-duped,
+ * bounded at TICKET_ATTACHMENT_CAP, each id text-checked) read TWICE: `add`
+ * for files joining the reply, `remove` for files leaving it. The proof that
+ * an id is really available to add, or really already on this reply to
+ * remove, lives one level down in `updateReply`, the same "prove it against
+ * the row, never trust the caller" shape `addReply` uses for its own list.
  *
  * NO EMAIL. The two doors that email a client are named and counted in
  * `postResolveHelp`'s own header ("the second and last thing in the product
- * that emails one") — a reply CHANGING its own words is not a third. */
+ * that emails one"): a reply CHANGING its own words, date or files is not a
+ * third. */
 export async function postHelpReplyUpdate(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; body?: string }>(request, env, "help", "read")
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: string
+    body?: string
+    createdAt?: unknown
+    attachments?: { add?: unknown; remove?: unknown }
+  }>(request, env, "help", "read")
   const id = requireText(body.id, "Reply", TEXT_LIMITS.short)
-  const replyBody = requireText(body.body, "Reply", TEXT_LIMITS.long)
+  const replyBody = optionalText(body.body, "Reply", TEXT_LIMITS.long)
+
+  // DATE: parsed and normalised the same way every other moment at this
+  // boundary is, then held to one more rule this field alone carries, never
+  // in the future.
+  let createdAt: string | undefined
+  if (body.createdAt !== undefined && body.createdAt !== null) {
+    createdAt = optionalMoment(body.createdAt, "Date")
+    if (createdAt !== undefined && Date.parse(createdAt) > Date.now())
+      return fail(400, "invalid_input", "That date hasn't happened yet.")
+  }
+
+  // ATTACHMENTS: the same de-dupe + cap + text-check `postHelpReply`'s own
+  // `attachmentIds` carries, read twice.
+  const addIds = Array.isArray(body.attachments?.add)
+    ? [...new Set((body.attachments!.add as unknown[]).filter((x): x is string => typeof x === "string"))]
+    : []
+  const removeIds = Array.isArray(body.attachments?.remove)
+    ? [...new Set((body.attachments!.remove as unknown[]).filter((x): x is string => typeof x === "string"))]
+    : []
+  if (addIds.length > TICKET_ATTACHMENT_CAP || removeIds.length > TICKET_ATTACHMENT_CAP)
+    return fail(400, "too_many", `A reply can carry up to ${TICKET_ATTACHMENT_CAP} files.`)
+  for (const attachmentId of [...addIds, ...removeIds]) requireText(attachmentId, "Attachment", TEXT_LIMITS.short)
+
+  if (replyBody === undefined && createdAt === undefined && !addIds.length && !removeIds.length)
+    return fail(400, "invalid_input", "Nothing to update.")
+
   const scope = await callerScope(cfg, guard)
-  const { helpId, accountId } = await updateReply(cfg, guard, scope, actor, id, replyBody)
+  const { helpId, accountId } = await updateReply(cfg, guard, scope, actor, id, {
+    body: replyBody,
+    createdAt,
+    addAttachmentIds: addIds,
+    removeAttachmentIds: removeIds,
+  })
   await publishChange(env, guard.teamId, "help_threads", id, "edit", accountId ?? undefined)
   const [replies, total] = await Promise.all([
     listReplies(cfg, guard, scope, helpId),

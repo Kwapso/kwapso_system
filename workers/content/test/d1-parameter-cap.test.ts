@@ -150,6 +150,15 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // is de-duped first. Fifty placeholders, plus the one for `help_id`.
       "content/src/lib/help.ts: attachIds":
         `the ids a reply claims, capped at TICKET_ATTACHMENT_CAP (50) by addReply's own guard, well inside D1's cap`,
+      // PROVEN THE SAME WAY, one function along: Aurora's 20 Sep 2026 "can
+      // edit text and date and attachments" ruling gave `updateReply` its own
+      // `addAttachmentIds`/`removeAttachmentIds`, each de-duped and refused
+      // past TICKET_ATTACHMENT_CAP (50) by the SAME shape guard, two lines
+      // above the first `IN (...)` either list reaches.
+      "content/src/lib/help.ts: addIds":
+        `the ids updateReply is asked to link, capped at TICKET_ATTACHMENT_CAP (50) by its own guard, well inside D1's cap`,
+      "content/src/lib/help.ts: removeIds":
+        `the ids updateReply is asked to unlink, capped at TICKET_ATTACHMENT_CAP (50) by its own guard, well inside D1's cap`,
       "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
         "Derived from HELP_STATUSES, fixed at author time.",
@@ -184,6 +193,8 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "the people named on one app, capped at APP_PEOPLE_CAP (50) by the door before the lib sees it",
       "content/src/lib/stakeholders.ts: batch":
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
+      "content/src/lib/stories.ts: batch":
+        "the phase burndown's own event read (team migration 0110), one slice of idBatches, bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":
         "the same: a slice of idBatches, bounded by the cap it exists to respect",
       // The third one, and the one that proves the suite earns its keep: the

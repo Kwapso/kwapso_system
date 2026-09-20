@@ -21,7 +21,7 @@ import type { D1Rest } from "@shared/workers/d1-rest"
 import type { Env } from "../env"
 import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
 import { ModelError } from "@shared/workers/model-failure"
-import { fenceToolResult, TOOL_RESULT_TAG } from "@shared/workers/model-text"
+import { fenceToolResult, stripForbiddenDashes, TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import { extractAttachmentText, type ChatAttachment } from "./attachments"
 import { chipForService, servicesForChips } from "@shared/knowledge-chips"
 import { refusesOutboundMoney } from "@shared/workers/money-taint"
@@ -287,6 +287,13 @@ export const SYSTEM = [
   // checkbox, a footnote or a nested numbered list is invented markup that
   // arrives as literal characters, so none of them is advertised.
   "HOW TO LAY A REPLY OUT. Answer first, in one sentence, then the detail — never open with a preamble about what you are about to do. Say only what was asked: the shortest complete answer wins, and a reply that runs past a screen had better be a list of real things rather than paragraphs of throat-clearing. Then SHAPE it, because the app renders your markdown properly. Leave a BLANK LINE between paragraphs, and keep a paragraph to two or three sentences — a wall of text is the one thing the reader cannot skim. Use '- ' bullets for a handful of points, '1. ' for an order, and '## ' for a heading when a longer answer has genuine sections. When you are laying out rows and columns that the drawn-block catalogue below does not cover — or when you have already spent this reply's one block — use a markdown table: a header row, then a '|---|---|' row under it (without that row it arrives as raw pipes), then one row each. Use **bold** for the one figure or name the reader is looking for, and `backticks` for a value copied exactly from the data. That is the whole set — anything else is not rendered and reaches them as stray punctuation. None of this is permission to write more: the same answer, laid out, is the goal.",
+  // R95: "no em dash, anywhere a person reads." A live reply once wrote the
+  // law's own example sentence, verbatim, with a real em dash in it. Stated
+  // here as a plain instruction, and backstopped by a sanitizer on the
+  // outgoing text itself (`stripForbiddenDashes`, shared/workers/model-text.ts)
+  // for the times a request is not enough: the same two-layer defence the
+  // fence around a tool result gets, one function over.
+  "Never write an em dash or an en dash, the long dash characters some keyboards and autocorrect insert on their own. Use a comma, a colon, or a period instead, and a plain hyphen with no space either side for a numeric range (2024-2026, not 2024 to 2026's longer cousin).",
   // R54, THE ASSISTANT'S HALF. The screens shorten a colleague's name where they
   // draw one; you are the one surface that composes its own sentences, so the
   // rule has to be said rather than applied. It is said about the OUTPUT and not
@@ -848,7 +855,10 @@ async function failureWrapUp(
     const reply = await model.complete([...convo, ask], tools)
     if (tally) tally.tokens = addTokens(tally.tokens, reply.usage)
     const text = reply.text?.trim()
-    if (text) return text
+    // R95: this text is say()'d straight into the live bubble by both
+    // callers below, so it gets the same cleaning `reply.text` gets on the
+    // main turn's own model call, one function up.
+    if (text) return stripForbiddenDashes(text)
   } catch {
     /* fall through to the canned note */
   }
@@ -1922,14 +1932,30 @@ async function runPlanLoop(
         // The thinking goes to the panel's own strip and nowhere near `spoke`:
         // scratch work is not the assistant having said something.
         const onThought = (d: string) => emit!({ t: "thought", d })
+        // R95, AT THE WIRE: each delta is cleaned before it leaves this
+        // process, not after the turn's full text has been assembled. A
+        // streamed reply is on the reader's screen chunk by chunk, well
+        // before `reply.text` below ever holds the whole answer.
+        // `stripForbiddenDashes` (shared/workers/model-text.ts) is
+        // self-contained per call, so a forbidden mark split across two
+        // deltas still cannot survive: each half falls through to that
+        // function's own catch-all rather than the paired rule either half
+        // alone cannot see.
         reply = await inTime(model.stream!(convo, toolsNow(), (d) => {
-          emit!({ t: "text", d: (first && spoke ? "\n\n" : "") + d })
+          emit!({ t: "text", d: (first && spoke ? "\n\n" : "") + stripForbiddenDashes(d) })
           first = false
           spoke = true
         }, onThought))
       } else {
         reply = await inTime(model.complete(convo, toolsNow()))
       }
+      // R95, ON THE AGGREGATE TOO: `reply.text` feeds `finalAnswerText`,
+      // `appendMessage` (the saved history a person reopens the thread to),
+      // and the confirm panel's own `assistantText`. Cleaned exactly once,
+      // here, so none of those has to remember to ask again. The streaming
+      // path above already cleaned what the reader saw live; this covers
+      // the non-streaming path and every reader of the stored answer.
+      if (reply.text) reply.text = stripForbiddenDashes(reply.text)
       // Every model turn's tokens land on this command's one usage row — the
       // cache read/write split included, which is the whole measurement.
       opts.tally.tokens = addTokens(opts.tally.tokens, reply.usage)

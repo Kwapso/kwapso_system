@@ -134,19 +134,44 @@ export type ThreadSide = "mine" | "theirs";
  * `onInternalChange` already hold elsewhere in this kit.
  *
  * COPY NEEDS NO HANDLER TO WORK. `navigator.clipboard.writeText` runs
- * unconditionally the moment the row renders at all (any one of the three
+ * unconditionally the moment the row renders at all (any one of the four
  * being set is enough to draw the trigger, and Copy is the one item that
  * always appears once it does); `onCopy` is a told-you, not a permission.
- * `onEdit`/`onDelete` gate their OWN row — a menu with a Delete item nobody
- * wired would commit to nothing.
+ * `onEdit`/`onEditRequest`/`onDelete` gate their OWN row — a menu with a
+ * Delete item nobody wired would commit to nothing.
+ *
+ * TWO WAYS TO EDIT, and a caller picks one. Aurora, on the same menu, a
+ * later ruling: "open the edit as slide in. can edit text and date and
+ * attachments" — three fields the inline textarea this component owns
+ * cannot hold. `onEditRequest`, when given, WINS: the Edit row calls it
+ * with the message's own id and opens nothing here, so the call site's own
+ * slide-in owns the whole edit (text, date, attachments, whatever else it
+ * needs) rather than this component guessing at a shape for three fields
+ * it has no other opinion about. `onEdit` keeps today's inline-textarea
+ * behaviour exactly as it always has, for a caller that never reaches for
+ * `onEditRequest`.
  */
 export interface ThreadMessageActions {
   /**
    * Puts the bubble into an inline editor seeded with its own body (Save /
    * Cancel underneath) and is called with the message's own id and the
-   * edited text once Save is pressed. Absent, no Edit row.
+   * edited text once Save is pressed. Absent, no Edit row — unless
+   * `onEditRequest` is given, which draws the row on its own.
+   *
+   * Stood down the moment `onEditRequest` is ALSO given: that one wins, this
+   * component opens no inline editor, and `onEdit` here is simply unused for
+   * as long as `onEditRequest` is present. See `onEditRequest`'s own doc.
    */
   onEdit?: (id: string, newBody: string) => void;
+  /**
+   * The OTHER way to edit — see this type's own header, "TWO WAYS TO EDIT".
+   * When present, the Edit row calls this instead of opening the inline
+   * textarea, with the message's own id and nothing else: what happens next
+   * (a slide-in, a route, anything) is entirely the call site's. Draws the
+   * Edit row on its own, so a caller reaching only for `onEditRequest` (no
+   * `onEdit` at all) still gets one.
+   */
+  onEditRequest?: (id: string) => void;
   /** Told after the body was copied to the clipboard — see this type's own header. */
   onCopy?: (id: string) => void;
   /**
@@ -277,6 +302,20 @@ export interface TicketThreadProps
    * nothing about today's output.
    */
   bylinePlacement?: ThreadBylinePlacement;
+  /**
+   * How big each bubble's own face is. Defaults to `"sm"`, `Avatar`'s 24px
+   * ruling-30 rung and today's behaviour: leaving this unset changes
+   * nothing about today's output. `"md"` draws `Avatar size="control"`
+   * instead, 40px, the same height as the message-actions trigger
+   * (`size="icon"`, `--control-height-button`) — Aurora, on that same menu:
+   * "make the avatar as big as this button." The row is a plain flex row
+   * (`items-end`, `gap-2` between the face and the bubble column), so a
+   * taller face reflows the row rather than needing its own offset math;
+   * the byline (above or below, per `bylinePlacement`) and the run gap
+   * between messages both live inside the bubble column, untouched by the
+   * face's own width or height at either size.
+   */
+  faceSize?: "sm" | "md";
   /**
    * A band above the composer — an approval strip, a status line, a notice
    * that the conversation is closed. A node, so whatever the composition puts
@@ -460,6 +499,7 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
       className,
       messages,
       bylinePlacement = "above",
+      faceSize = "sm",
       banner,
       composer = true,
       value,
@@ -565,7 +605,10 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
             >
               <Skeleton
                 announce={false}
-                className="size-[var(--avatar-sm)] shrink-0"
+                className={cn(
+                  faceSize === "md" ? "size-[var(--avatar-control)]" : "size-[var(--avatar-sm)]",
+                  "shrink-0",
+                )}
               />
               <Skeleton
                 variant="card"
@@ -694,8 +737,12 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                 >
                   {hasAvatar ? (
                     /* `.kw-comment__avatar` — 24, pill, raised paper, micro
-                       at weight 500. `Avatar size="sm"` is that exactly. */
-                    <Avatar size="sm" className="flex-none">
+                       at weight 500. `Avatar size="sm"` is that exactly, and
+                       `faceSize`'s default keeps it so. `faceSize="md"`
+                       reads `Avatar size="control"` instead (40, matching
+                       the message-actions trigger) — see this prop's own
+                       doc on `TicketThreadProps`. */
+                    <Avatar size={faceSize === "md" ? "control" : "sm"} className="flex-none">
                       {message.image ? (
                         <AvatarImage src={message.image} alt={message.imageAlt ?? ""} />
                       ) : null}
@@ -826,10 +873,19 @@ const TicketThread = React.forwardRef<HTMLDivElement, TicketThreadProps>(
                                 <DotsThree size={16} aria-hidden="true" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align={mine ? "end" : "start"}>
-                                {effectiveActions.onEdit ? (
+                                {effectiveActions.onEdit || effectiveActions.onEditRequest ? (
                                   <DropdownMenuItem
                                     icon={<PencilSimple size={16} aria-hidden="true" />}
-                                    onSelect={() => { startEdit(key, message.body); }}
+                                    onSelect={() => {
+                                      // `onEditRequest` wins when both are given — see
+                                      // `ThreadMessageActions`'s own "TWO WAYS TO EDIT" doc.
+                                      // This component opens no inline editor for it.
+                                      if (effectiveActions.onEditRequest) {
+                                        effectiveActions.onEditRequest(key);
+                                      } else {
+                                        startEdit(key, message.body);
+                                      }
+                                    }}
                                   >
                                     {editActionLabel}
                                   </DropdownMenuItem>

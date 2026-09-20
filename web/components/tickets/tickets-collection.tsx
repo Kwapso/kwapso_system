@@ -1814,14 +1814,19 @@ export type TicketFace = {
    *     colleague and named in full for a client contact
    *     (`app-tickets-are-a-table.test.tsx` already proves this pair on the
    *     app tab's own identical column).
-   *   • `TriageWaiting` — the queue's own door read — carries no such actor;
-   *     it carries `raisedByContactName`/`raisedByContactLogo`, the client
-   *     contact the ticket is FOR, which is the fact the triage card already
-   *     shows as "who asked" (`workers/content/src/lib/triage.ts`).
+   *   • `TriageWaiting`, the queue's own door read, carries BOTH now (added
+   *     20 Sep 2026): `raiserId`/`raiserName`/`raiserIsClient`, the same actor
+   *     pair `HelpTicket` carries, AND `raisedByContactName`/
+   *     `raisedByContactLogo`, the client contact the ticket is FOR, which is
+   *     the fact the triage card already shows as "who asked"
+   *     (`workers/content/src/lib/triage.ts`). It needed both: the majority of
+   *     tickets are staff-raised with no client contact at all (SCOPE ch.07),
+   *     and the cell rendered empty for every one of them until the actor
+   *     joined the row.
    *
-   * Both optional, and the cell prefers the first when it is there (a
-   * `HelpTicket` row) and falls back to the second (a `TriageWaiting` row) —
-   * see the cell's own comment below. */
+   * Both optional on `TicketFace` (a caller with neither still type-checks),
+   * and the cell prefers the actor when it is there and falls back to the
+   * contact, see the cell's own comment below. */
   raiserId?: string | null
   raiserName?: string | null
   raiserIsClient?: boolean

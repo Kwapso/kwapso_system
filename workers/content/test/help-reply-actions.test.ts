@@ -88,6 +88,25 @@ async function activityTypes(relatedRowId: string): Promise<string[]> {
   return rows.map((r) => r.type)
 }
 
+/** A LIVE, UNLINKED file on the victim's own ticket, inserted directly rather
+ * than through the upload door (which wants real bytes): the same shape
+ * `addReply`'s own attachmentIds proof expects: kind = 'file',
+ * help_thread_id NULL, deactivated_at NULL. */
+function insertUnlinkedFile(id: string, label: string): void {
+  db()
+    .prepare(
+      `INSERT INTO help_attachments (id, help_id, kind, label, url, created_at, creator_id, creator_email, creator_name)
+       VALUES (?, ?, 'file', ?, '/media/x', '2026-01-01T00:00:00.000Z', ?, 'staff@kwapso.app', 'Staff')`
+    )
+    .run(id, IDS.victimTicket, label, IDS.staffUser)
+}
+
+function attachmentRow(id: string): { help_thread_id: string | null; deactivated_at: string | null } {
+  return db()
+    .prepare(`SELECT help_thread_id, deactivated_at FROM help_attachments WHERE id = ?`)
+    .get(id) as { help_thread_id: string | null; deactivated_at: string | null }
+}
+
 beforeEach(() => {
   holder.db = buildSpineDb()
   db().exec(`
@@ -225,5 +244,125 @@ describe("delete_help_reply — a removed reply is gone from the thread, not fro
 
     const deleteAgain = await call(IDS.staffUser, "POST /api/content/help/reply/delete", { id })
     expect(deleteAgain.status).toBe(404)
+  })
+})
+
+// Aurora's SAME-DAY follow-up ruling ("open the edit as slide in. can edit
+// text and date and attachments") widened update_help_reply past the body.
+// Four groups below: the date can move but never into the future, the SAME
+// fence gates a date or a file change and not only text, an attachment can
+// join or leave a reply, and a call with nothing in it is refused rather than
+// silently accepted as a no-op edit.
+
+describe("update_help_reply: the date can move, but never into the future", () => {
+  it("a date change persists and reads back", async () => {
+    const id = await reply(IDS.staffUser, "will be backdated")
+    const past = "2026-01-02T03:04:05.000Z"
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id, createdAt: past })
+    expect(res.status, await res.clone().text()).toBe(200)
+    const data = (await res.json()) as { replies: { id: string; createdAt: string }[] }
+    expect(data.replies.find((r) => r.id === id)?.createdAt).toBe(past)
+
+    const row = db().prepare(`SELECT created_at FROM help_threads WHERE id = ?`).get(id) as { created_at: string }
+    expect(row.created_at).toBe(past)
+    expect(await activityTypes(id)).toEqual(["Reply edited"])
+  })
+
+  it("refuses a date in the future", async () => {
+    const id = await reply(IDS.staffUser, "will not be postdated")
+    const future = new Date(Date.now() + 60_000 * 60 * 24).toISOString()
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id, createdAt: future })
+    expect(res.status).toBe(400)
+  })
+
+  it("refuses a date that doesn't parse", async () => {
+    const id = await reply(IDS.staffUser, "will not parse")
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id, createdAt: "not-a-date" })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe("update_help_reply: the ticket edit right also gates a date or file change, not only text", () => {
+  it("a colleague with no help:update right may not backdate someone else's reply", async () => {
+    const id = await reply(IDS.staffUser, "the admin's own words")
+    const res = await call(LIMITED_STAFF, "POST /api/content/help/reply/update", {
+      id,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("a colleague with no help:update right may not add a file to someone else's reply", async () => {
+    const id = await reply(IDS.staffUser, "the admin's own words, again")
+    insertUnlinkedFile("F_LIMITED_TEST", "blocked.png")
+    const res = await call(LIMITED_STAFF, "POST /api/content/help/reply/update", {
+      id,
+      attachments: { add: ["F_LIMITED_TEST"] },
+    })
+    expect(res.status).toBe(403)
+    // Refused before any write: the file stays exactly where it was.
+    expect(attachmentRow("F_LIMITED_TEST").help_thread_id).toBeNull()
+  })
+})
+
+describe("update_help_reply: attachments can join or leave a reply", () => {
+  it("adds a live, unlinked file already on the ticket", async () => {
+    const id = await reply(IDS.staffUser, "carries a file")
+    insertUnlinkedFile("F_ADD_1", "screenshot.png")
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id, attachments: { add: ["F_ADD_1"] } })
+    expect(res.status, await res.clone().text()).toBe(200)
+    const data = (await res.json()) as { replies: { id: string; attachments?: { id: string }[] }[] }
+    expect(data.replies.find((r) => r.id === id)?.attachments?.map((a) => a.id)).toEqual(["F_ADD_1"])
+    expect(attachmentRow("F_ADD_1").help_thread_id).toBe(id)
+    expect(await activityTypes(id)).toEqual(["Reply edited"])
+  })
+
+  it("refuses to add a made-up or foreign file id, nothing is half-linked", async () => {
+    const id = await reply(IDS.staffUser, "cannot claim someone else's file")
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", {
+      id,
+      attachments: { add: ["NO_SUCH_FILE"] },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("removes a file already on the reply, deactivated, not deleted", async () => {
+    const id = await reply(IDS.staffUser, "will lose a file")
+    insertUnlinkedFile("F_REMOVE_1", "will-be-removed.png")
+    const addRes = await call(IDS.staffUser, "POST /api/content/help/reply/update", {
+      id,
+      attachments: { add: ["F_REMOVE_1"] },
+    })
+    expect(addRes.status, await addRes.clone().text()).toBe(200)
+
+    const removeRes = await call(IDS.staffUser, "POST /api/content/help/reply/update", {
+      id,
+      attachments: { remove: ["F_REMOVE_1"] },
+    })
+    expect(removeRes.status, await removeRes.clone().text()).toBe(200)
+    const data = (await removeRes.json()) as { replies: { id: string; attachments?: { id: string }[] }[] }
+    expect(data.replies.find((r) => r.id === id)?.attachments ?? []).toEqual([])
+
+    const row = attachmentRow("F_REMOVE_1")
+    expect(row.deactivated_at).not.toBeNull()
+    expect(row.help_thread_id).toBe(id) // NOTHING ON A TICKET IS EVER REMOVED
+  })
+
+  it("refuses to remove a file that isn't linked to this reply", async () => {
+    const id = await reply(IDS.staffUser, "nothing to remove")
+    insertUnlinkedFile("F_FOREIGN_1", "not-linked.png")
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", {
+      id,
+      attachments: { remove: ["F_FOREIGN_1"] },
+    })
+    expect(res.status).toBe(400)
+  })
+})
+
+describe("update_help_reply: a call with nothing in it is refused, not silently accepted", () => {
+  it("refuses a call with no body, date or attachment change at all", async () => {
+    const id = await reply(IDS.staffUser, "already fine")
+    const res = await call(IDS.staffUser, "POST /api/content/help/reply/update", { id })
+    expect(res.status).toBe(400)
   })
 })

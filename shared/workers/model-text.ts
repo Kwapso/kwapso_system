@@ -258,3 +258,58 @@ export function stripFenceEcho(text: string): string {
     // one — otherwise a clean answer arrives full of holes where the tags were.
     .replace(/\n{3,}/g, "\n\n")
 }
+
+/* --------------------------- R95, model output side ------------------------ */
+
+/** R95: "no em dash, anywhere a person reads." The system prompt asks the
+ * model never to write one, but a prompt is a request, not a guarantee, and
+ * the same sentence the law names as the example, verbatim, once reached a
+ * live reply: "Hi there. Great to see you [em dash] how can I help you
+ * today." So the forbidden mark is cleaned at the boundary too, the same
+ * argument `stripFenceEcho` makes one function up: untrusted text (and a
+ * model's own habits are exactly that) is cleaned where it leaves this
+ * process, not hoped away in the prompt that produced it.
+ *
+ * TWO SHAPES, because the mark means two different things depending on what
+ * sits beside it, and one plain hyphen cannot read both ways at once:
+ *
+ *   - between two digits, it is a RANGE ("2024[em dash]2026") and becomes a
+ *     plain hyphen with no added space ("2024-2026") - the shortest spelling
+ *     that still reads as one span;
+ *   - with a space on either side, it is a SENTENCE BREAK ("Great to see you
+ *     [em dash] how can I help") and becomes a comma ("Great to see you, how
+ *     can I help") - the punctuation R95's own rule names ("use commas,
+ *     colons or periods").
+ *
+ * WHATEVER IS LEFT, a plain hyphen is the fallback (never left unrewritten) -
+ * a forbidden mark with neither a digit nor a space beside it is still
+ * forbidden, and R95 carries no exemption for a shape nobody anticipated.
+ *
+ * EN DASH (U+2013) IS HELD TO THE SAME RULE AS EM DASH (U+2014) - R95's own
+ * sentence again: "en dash is held to the same standard as em dash in
+ * prose." One function, two codepoints, so the two cannot drift apart the
+ * way two separate rewrites could. */
+// BUILT FROM CODE POINTS, NEVER TYPED AS A LITERAL GLYPH: a file whose whole
+// job is to name the two forbidden marks should not itself be a source that
+// carries either one. `EN_DASH`/`EM_DASH` are the two characters this
+// function exists to remove, spelled the one way a file that removes them
+// can still hold them: as numbers.
+const EN_DASH = String.fromCharCode(0x2013)
+const EM_DASH = String.fromCharCode(0x2014)
+const FORBIDDEN_DASH = new RegExp(`[${EN_DASH}${EM_DASH}]`)
+
+export function stripForbiddenDashes(text: string): string {
+  if (!text || !FORBIDDEN_DASH.test(text)) return text
+  const cls = `[${EN_DASH}${EM_DASH}]`
+  return text
+    // A RANGE FIRST, before the spaced rule below can mistake its own zero-
+    // width match for one: "2024-2026" needs no space either side of the
+    // hyphen it becomes.
+    .replace(new RegExp(`(\\d)${cls}(\\d)`, "g"), "$1-$2")
+    // A SENTENCE BREAK, surrounded by whitespace on both sides - collapsed to
+    // one comma and one space, whatever ran either side of the mark.
+    .replace(new RegExp(`\\s+${cls}\\s+`, "g"), ", ")
+    // WHATEVER IS STILL LEFT (no digit, no surrounding space - a shape this
+    // function did not anticipate) still may not reach a reader unrewritten.
+    .replace(new RegExp(cls, "g"), "-")
+}

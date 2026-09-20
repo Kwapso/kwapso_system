@@ -47,6 +47,7 @@ import {
   setSprintWave,
   setWaveActive,
   updateWave,
+  updateWavePhaseDays,
 } from "../lib/waves"
 import type { Env } from "../env"
 
@@ -214,4 +215,27 @@ export async function postWaveSprint(request: Request, env: Env): Promise<Respon
       await publishChange(env, guard.teamId, "waves", id, "edit", result.accountId ?? undefined)
   }
   return json({ ok: true, moved: result.moved, overlaps: result.overlaps })
+}
+
+/** POST /api/tenancy/waves/phase-days, how many days each phase type gets on
+ * this wave. Aurora's ruling, 20 Sep 2026, verbatim: "on waves i am missing
+ * the settings (we'l adjust the duration of pahses in days)." Same right as
+ * `postUpdateWave`, because it is the same wave being edited. `days` names
+ * any subset of the seven phase types; `updateWavePhaseDays` validates each
+ * row (a phase type this team's own vocabulary carries, a whole number of
+ * days from 1 to 365) and upserts it, one statement per row, on the (wave,
+ * phase type) unique pair the migration itself polices. */
+export async function postWavePhaseDays(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard, actor, body } = await gatedBody<{ waveId?: unknown; days?: unknown }>(
+    request,
+    env,
+    "work",
+    "update"
+  )
+  const scope = await agencyScope(cfg, guard)
+  const waveId = requireText(body.waveId, "Wave", TEXT_LIMITS.short)
+  const days = (Array.isArray(body.days) ? body.days : []) as { phaseType: unknown; days: unknown }[]
+  const { accountId, phaseDays } = await updateWavePhaseDays(cfg, guard, scope, actor, { id: waveId, days })
+  await publishChange(env, guard.teamId, "waves", waveId, "edit", accountId)
+  return json({ ok: true, phaseDays })
 }

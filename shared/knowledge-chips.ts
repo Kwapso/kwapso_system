@@ -116,10 +116,11 @@ export const SOURCE_CHIPS: readonly SourceChip[] = [
     services: [],
   },
   // WHAT SOMEBODY WROTE OR UPLOADED ON PURPOSE — a note typed into the knowledge
-  // base, a file added to it, and the articles that outlived the Learning module.
-  // Somebody typed or uploaded these INTO the base; there is no live service
-  // behind them to switch off.
-  { key: "articles", kinds: ["note", "file", "article"], services: [] },
+  // base, a file added to it, the articles that outlived the Learning module, and
+  // the team's own glossary words (also typed here, never mirrored, the same
+  // reason "note" sits in this chip). Somebody typed or uploaded these INTO the
+  // base; there is no live service behind them to switch off.
+  { key: "articles", kinds: ["note", "file", "article", "glossary"], services: [] },
 ] as const
 
 /** Every chip key, for a schema's allow-list and for the screen's default. */

@@ -62,6 +62,7 @@ import { CountedAbove } from "@/components/records/counted-tabs"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
+import { GlossaryList } from "@/components/knowledge/glossary-list"
 import { KNOWLEDGE_KIND, KNOWLEDGE_KIND_ICON } from "@/components/deep-link/shape"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
@@ -172,6 +173,43 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
   // web/test/hooks-order.test.ts exists to catch.
   const byKind = useCachedValue<Record<string, number>>(knowledgeByKindKey(teamId)) ?? {}
 
+  // THE GLOSSARY'S OWN SEED, the first time the tab is opened on a team that
+  // has none yet. HOISTED HERE, beside `byKind` and for the identical reason
+  // (its own comment above): every value this reads (`scope.tab`, `scope.kind`,
+  // `can`, `teamId`) is safe before the loading/error returns below, so the
+  // hook itself never has to be.
+  //
+  // GUARDED BY A REF, NOT BY "is it empty". The door
+  // (`POST /api/content/knowledge/glossary/seed`) is idempotent on its own
+  // (matched by word, workers/content/src/lib/knowledge.ts's own
+  // `seedGlossaryEntries`), so asking twice costs nothing but a wasted round
+  // trip; the ref is only what stops this effect asking every render while
+  // the tab stays open. Reset per team, so switching teams can seed the next
+  // one.
+  // `scope.tab` only exists on the "team" variant of `KnowledgeGalleryScope`
+  // (the app scope draws no tab strip at all, this file's own header says
+  // why), read into a plain, always-defined local so both the effect body
+  // and its own dependency array below can name it without narrowing.
+  const scopeTab = scope.kind === "team" ? scope.tab : undefined
+  const seededGlossaryFor = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (scopeTab !== "glossary") return
+    if (!teamId || !can("knowledge", "create")) return
+    if (seededGlossaryFor.current === teamId) return
+    seededGlossaryFor.current = teamId
+    contentApi
+      .seedGlossary()
+      .then((r) => {
+        if (r.created > 0) invalidate(knowledgeKey(teamId))
+      })
+      .catch(() => {
+        // A failed seed is silent and retryable: leaving the ref cleared means
+        // the next time this tab is opened (or this effect re-runs) it simply
+        // tries again, same as if it had never run.
+        if (seededGlossaryFor.current === teamId) seededGlossaryFor.current = null
+      })
+  }, [scopeTab, teamId, can])
+
   const knowledgeQ = isApp ? appKnowledgeQ : scope.knowledgeQ
   if (knowledgeQ.error) return <LoadError what="the knowledge base" />
   if (knowledgeQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -199,8 +237,16 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
   // with zero sources today draws no tab; `KNOWLEDGE_KIND`'s own declaration
   // order (shape.tsx) gives a stable order to filter down from, never the
   // order sources happen to load in. TEAM ONLY.
+  //
+  // "glossary" IS EXCLUDED HERE ON PURPOSE. Every other kind's tab is allowed
+  // to not exist until a source of it does; the Glossary tab is the one place
+  // that would be a chicken-and-egg trap, nothing can BECOME the first
+  // glossary word until the tab that seeds them can be opened. So it is drawn
+  // by hand, always, just below "All", never derived from a count that starts
+  // at zero (kindTabsSpreadAt in web/test/knowledge-kind-tabs.test.tsx notes
+  // the same reason).
   const kindTabs = Object.keys(KNOWLEDGE_KIND)
-    .filter((k) => (byKind[k] ?? 0) > 0)
+    .filter((k) => k !== "glossary" && (byKind[k] ?? 0) > 0)
     .map((k) => ({
       value: k,
       label: KNOWLEDGE_KIND[k] ?? k,
@@ -212,16 +258,32 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
   const allBadge = formatCount(total)
   const knowledgeTabs = [
     { value: "all", label: t("All"), icon: "asterisk", badge: allBadge, badgeVariant: "" as const },
+    {
+      value: "glossary",
+      label: t("Glossary"),
+      icon: KNOWLEDGE_KIND_ICON.glossary ?? "book-open-text",
+      badge: formatCount(byKind.glossary),
+      badgeVariant: "" as const,
+    },
     ...kindTabs,
   ]
   // "ALL" IS DEFAULT — a tab value that no longer badges anything (an
   // unrecognised `?tab=`, or a kind whose last source just left) falls
-  // through to it rather than to a tab the strip cannot draw.
-  const activeTab = scope.kind === "team" && scope.tab && byKind[scope.tab] ? scope.tab : "all"
+  // through to it rather than to a tab the strip cannot draw. "glossary" is
+  // the one tab value ALWAYS accepted even at a zero count, for the reason
+  // `kindTabs`'s own filter above gives.
+  const activeTab =
+    scope.kind === "team" && scope.tab && (scope.tab === "glossary" || byKind[scope.tab]) ? scope.tab : "all"
   // "app" NEVER SHOWS THE SHAPE VIEW — the whole-base picture answers a
   // different question ("where is the knowledge, and where is there none")
   // than one app's own tab ever asks (this file's own header says the rest).
   const knowledgeView = scope.kind === "team" ? scope.knowledgeView : "list"
+  // THE GLOSSARY TAB DEFAULTS TO ALPHABETICAL. "Title" (KNOWLEDGE_SORTS.title)
+  // is the natural reading order there, still an ordinary SortControl (R53) a
+  // person can leave for "recently changed" like every other tab. Named here,
+  // not inline on <PagedFind> below, so the tag's own props stay short.
+  const knowledgeDefaultSort =
+    scope.kind === "team" && activeTab === "glossary" ? "title" : COLLECTION_SORTS.knowledge.defaultSort
 
   const listKey = isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)
 
@@ -316,7 +378,7 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
           `STICKY_FOLDER_TABS`. */}
       <PagedFind<KnowledgeSource>
         sorts={translatedSorts("knowledge", t)}
-        defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
+        defaultSort={knowledgeDefaultSort}
         restingEmpty={loadedSources.length === 0}
         listKey={isApp ? sliceKey("knowledge-app", scope.appId) : knowledgeKey(teamId)}
         fixed={isApp ? { appId: scope.appId } : activeTab === "all" ? undefined : { kind: activeTab }}
@@ -371,7 +433,12 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
             : undefined
         }
         actions={() =>
-          canCreateKnowledge ? (
+          !canCreateKnowledge ? null : scope.kind === "team" && activeTab === "glossary" ? (
+            <AddButton
+              label={t("Add a word")}
+              onClick={() => scope.go(scope.sectionPath, { tab: "glossary", panel: "add", module: "knowledge-glossary" })}
+            />
+          ) : (
             <>
               <Button
                 variant="secondary"
@@ -386,7 +453,7 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
                 onClick={() => scope.kind === "team" && scope.go(scope.sectionPath, { panel: "add", module: "knowledge" })}
               />
             </>
-          ) : null
+          )
         }
         // THE NESTED CARD — the app scope's own toolbar and rows read as ONE
         // panel, the identical wrapper every other app-record collection uses
@@ -405,6 +472,52 @@ export function KnowledgeScreen({ scope, t, can }: { scope: KnowledgeGalleryScop
           }
           const rows = found.active ? found.rows : loadedSources
           if (rows === null) return <Skeleton variant="list" lines={4} />
+          // THE GLOSSARY'S OWN SHAPE, a word and its definition read better as
+          // a LIST (R80) than as `KnowledgeSourceCard`'s mark/title/chip/line
+          // grid, which was built for a document, a ticket mirror, a meeting.
+          // NEVER RE-FILTERED WHILE A FIND IS RUNNING (R14): `found.rows` is
+          // already the door's own answer to `fixed={{kind:"glossary"}}`
+          // above, kind and all, so narrowing it again in the browser would
+          // be asking the exact question R14's own law forbids. Only the
+          // RESTING branch (`!found.active`) needs the kind filter, because
+          // `loadedSources` there is the WHOLE base, unlike every other tab's
+          // own resting branch, which never narrows by kind at all.
+          if (scope.kind === "team" && activeTab === "glossary") {
+            const glossaryRows = found.active ? rows : rows.filter((s) => s.kind === "glossary")
+            return (
+              <>
+                {glossaryRows.length === 0 ? (
+                  <CollectionEmptyState
+                    title={t("Nothing in the glossary yet.")}
+                    description={t(
+                      "The words this team uses, and what each one means. Add one, and the assistant can answer from it too."
+                    )}
+                    filtered={found.active}
+                    onCreate={
+                      canCreateKnowledge
+                        ? () => scope.go(scope.sectionPath, { tab: "glossary", panel: "add", module: "knowledge-glossary" })
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <GlossaryList
+                    rows={glossaryRows}
+                    teamId={teamId}
+                    canEdit={can("knowledge", "update")}
+                    canDelete={can("knowledge", "delete")}
+                    onEdit={(id) =>
+                      scope.go(scope.sectionPath, { tab: "glossary", panel: "edit", module: "knowledge-glossary", id })
+                    }
+                  />
+                )}
+                <LoadMore
+                  listKey={found.listKey ?? listKey}
+                  label={t("Load more words")}
+                  fetchPage={found.fetchPage}
+                />
+              </>
+            )
+          }
           return (
             <>
               {rows.length === 0 ? (

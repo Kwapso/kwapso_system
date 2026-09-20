@@ -40,6 +40,7 @@ import {
   countSources,
   countSourceKinds,
   createFileSource,
+  createGlossaryEntry,
   createSource,
   getSource,
   KNOWLEDGE_KINDS,
@@ -49,11 +50,13 @@ import {
   secondLook,
   retrieve,
   revisitUnhealthySources,
+  seedGlossaryEntries,
   setSourceActive,
   unhealthySourceCount,
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
+import { GLOSSARY_ENTRIES } from "@shared/glossary-seed"
 import { writeAnswer } from "../lib/knowledge-compose"
 import { readShortlist } from "../lib/knowledge-reader"
 import { extractFile, unreadableNote } from "../lib/knowledge-files"
@@ -1049,4 +1052,43 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
     revisited: revisit.revisited,
     recovered: revisit.recovered,
   })
+}
+
+/** POST /api/content/knowledge/glossary, add ONE word to the team's own
+ * glossary. A dedicated door rather than a `kind` flag on the generic
+ * `POST /api/content/knowledge` (see `createGlossaryEntry`'s own header):
+ * a glossary word is always team-wide, so it takes only the two fields that
+ * differ, `title` (the word) and `body` (the definition). */
+export async function postAddGlossaryWord(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ title?: unknown; body?: unknown }>(
+    request,
+    env,
+    "knowledge",
+    "create"
+  )
+  await refusePortalCaller(cfg, guard)
+  // R20, positionally, at the read site. `createGlossaryEntry` validates
+  // both fields again on its own (the same double-check every other create
+  // door here already carries, postUpdateKnowledge's own `body.title` line
+  // beside it), because the census wants the check where the field is READ,
+  // not only where it eventually lands.
+  requireText(body.title, "Word", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
+  requireText(body.body, "Definition", TEXT_LIMITS.long)
+  const id = await createGlossaryEntry(env, cfg, guard, actor, { title: body.title, body: body.body })
+  await publishChange(env, guard.teamId, "knowledge", id, "add")
+  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+}
+
+/** POST /api/content/knowledge/glossary/seed, the team's first 54 words, once.
+ * Idempotent (matched on the trimmed, lower-cased word, `seedGlossaryEntries`'s
+ * own header), so opening the Glossary tab a second time, or on a second tab in
+ * another window, never duplicates a word, it only ever fills in what is
+ * still missing. Gated on `knowledge:create`, the same right that lets a person
+ * add a source at all. */
+export async function postSeedGlossary(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard } = await gated(request, env, "knowledge", "create")
+  await refusePortalCaller(cfg, guard)
+  const { created, skipped } = await seedGlossaryEntries(env, cfg, guard, actor, GLOSSARY_ENTRIES)
+  if (created > 0) await publishChange(env, guard.teamId, "knowledge")
+  return json({ created, skipped, total: await countSources(cfg, guard) })
 }

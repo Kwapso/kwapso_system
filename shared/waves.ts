@@ -114,3 +114,30 @@ export type WaveOverlap = {
   secondId: string
   secondName: string
 }
+
+/** ONE PHASE TYPE'S DURATION ON THIS WAVE, IN DAYS. Aurora's ruling, 20 Sep
+ * 2026, verbatim: "on waves i am missing the settings (we'l adjust the
+ * duration of pahses in days)." Set on the wave's own Settings panel
+ * (web/components/work/wave-detail.tsx) by whoever holds the wave update
+ * right. `getWave` (workers/tenancy/src/lib/waves.ts) always answers with
+ * exactly seven of these, one per `PHASE_TYPES` name, filling in
+ * `PHASE_DAY_DEFAULTS` below wherever the wave carries no row of its own. */
+export type WavePhaseDay = {
+  phaseType: string
+  days: number
+}
+
+/** THE PLACEHOLDER DEFAULT, PER PHASE TYPE, A NEW WAVE STARTS FROM. Round
+ * numbers Aurora named as a starting point on the same ruling, hers to
+ * adjust per wave on the Settings panel; never written to a row until she
+ * does, so a wave born today carries none of these as real rows at all.
+ * Keyed by `PhaseTypeArt.name` (`shared/sprint-types.ts`'s `PHASE_TYPES`). */
+export const PHASE_DAY_DEFAULTS: Record<string, number> = {
+  Audit: 5,
+  Plan: 5,
+  Build: 20,
+  Pilot: 10,
+  Revision: 10,
+  Deploy: 3,
+  Hypercare: 10,
+}

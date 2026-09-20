@@ -2949,15 +2949,42 @@ async function assertMayChangeReply(
   )
 }
 
-/** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half.
- * `body` arrives already validated (`requireText`, the route's own boundary,
- * TEXT_LIMITS.long — the same cap a NEW reply is held to). Stamps the SAME
+/** WHAT `updateReply` WILL CHANGE, every field optional, because the sheet
+ * (Aurora's 20 Sep 2026 "make the avatar as big as this button... can edit
+ * text and date and attachments" ruling) sends only what actually moved. The
+ * two attachment lists are the SAME shape `addReply`'s own `attachmentIds`
+ * is: ids the route has already de-duped, bounded (TICKET_ATTACHMENT_CAP) and
+ * text-checked, read twice, once for files joining this reply and once for
+ * files leaving it. */
+export type ReplyChanges = {
+  body?: string
+  createdAt?: string
+  addAttachmentIds?: string[]
+  removeAttachmentIds?: string[]
+}
+
+/** CHANGE A REPLY ALREADY SENT, Aurora's 20 Sep 2026 ruling, the Edit half,
+ * now covering the text, the moment it was sent, and its own files. `body`
+ * and `createdAt` arrive already validated at the boundary (`optionalText`/
+ * `optionalMoment`, the route's own job); `createdAt`, if present, has also
+ * already been proved not in the future there, so a reply cannot be
+ * backdated past a moment that has not happened. Stamps the SAME
  * `updated_at`/`editor_*` audit block `updateTicket` stamps on the ticket
- * itself, one table along (team migration 0108) — the words move, and the row
- * says who moved them and when, exactly as every other edit in this file does.
+ * itself, one table along (team migration 0108): the words move, and the row
+ * says who moved them and when, exactly as every other edit in this file
+ * does.
+ *
+ * ATTACHMENTS, PROVED AGAINST THE ROW THE SAME WAY `addReply` PROVES ITS OWN.
+ * An id joining the reply must be a LIVE, UNLINKED, file-kind row already on
+ * THIS TICKET, never trusted from the caller (someone else's ticket, an
+ * already-linked row or a deactivated one all fail this the same way a
+ * made-up id does); an id LEAVING the reply must already be linked to THIS
+ * reply and still live. Leaving one is a deactivate, never a delete, the same
+ * shape `removeAttachment` uses one door along, so a file taken off an edit
+ * can still be found in the ticket's own audit trail.
  *
  * Returns the ticket id (for the route's own `listReplies`/`countReplies`
- * refresh) and its account (for the live ping's targeting) — the write path
+ * refresh) and its account (for the live ping's targeting): the write path
  * already read both resolving the fence, so the route does not pay a second
  * round trip for either. */
 export async function updateReply(
@@ -2966,22 +2993,87 @@ export async function updateReply(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  body: string
+  changes: ReplyChanges
 ): Promise<{ helpId: string; accountId: string | null }> {
   const row = await replyOrThrow(cfg, guard, scope, id)
   await assertMayChangeReply(cfg, guard, scope, row)
   const ticket = await ticketOrThrow(cfg, guard, scope, row.help_id)
   const now = new Date().toISOString()
+
+  const addIds = [...new Set(changes.addAttachmentIds ?? [])]
+  const removeIds = [...new Set(changes.removeAttachmentIds ?? [])]
+  // CAPPED HERE TOO, not only at the route: the same TICKET_ATTACHMENT_CAP
+  // guard `addReply` carries two lines above ITS OWN `IN (...)`, so the
+  // placeholder count this function ever binds cannot exceed the cap even if
+  // a caller inside this file reaches `updateReply` without going through
+  // the door's own check first.
+  if (addIds.length > TICKET_ATTACHMENT_CAP || removeIds.length > TICKET_ATTACHMENT_CAP)
+    throw new GuardError(400, "too_many", `A reply can carry up to ${TICKET_ATTACHMENT_CAP} files.`)
+
+  if (addIds.length) {
+    const owned = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id FROM help_attachments
+        WHERE help_id = ? AND help_thread_id IS NULL AND deactivated_at IS NULL AND kind = 'file'
+          AND id IN (${addIds.map(() => "?").join(", ")})`,
+      [row.help_id, ...addIds]
+    )
+    if (owned.length !== addIds.length)
+      throw new GuardError(400, "invalid_input", "One of those files isn't yours to attach here.")
+  }
+  if (removeIds.length) {
+    const owned = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id FROM help_attachments
+        WHERE help_thread_id = ? AND deactivated_at IS NULL AND kind = 'file'
+          AND id IN (${removeIds.map(() => "?").join(", ")})`,
+      [id, ...removeIds]
+    )
+    if (owned.length !== removeIds.length)
+      throw new GuardError(400, "invalid_input", "One of those files isn't on this reply.")
+  }
+
+  const sets = [`updated_at = ${sqlString(now)}`, `editor_id = ${sqlString(actor.id)}`, `editor_name = ${sqlString(actor.name)}`]
+  if (changes.body !== undefined) sets.push(`message_body = ${sqlString(changes.body)}`)
+  if (changes.createdAt !== undefined) sets.push(`created_at = ${sqlString(changes.createdAt)}`)
+
+  // THE LINK/UNLINK RIDE THE SAME SCRIPT AS THE UPDATE, one round trip, the
+  // same "one script, one transaction" shape `addReply` uses for its own
+  // insert + link. The predicates repeat what the SELECTs above already
+  // proved, so two concurrent edits racing to claim or drop the same row land
+  // on whichever one the database serializes first, never both.
+  const linkSql = addIds.length
+    ? `\nUPDATE help_attachments SET help_thread_id = ${sqlString(id)}
+        WHERE help_id = ${sqlString(row.help_id)} AND help_thread_id IS NULL
+          AND id IN (${addIds.map((a) => sqlString(a)).join(", ")});`
+    : ""
+  const unlinkSql = removeIds.length
+    ? `\nUPDATE help_attachments SET deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)},
+         deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}
+        WHERE help_thread_id = ${sqlString(id)} AND deactivated_at IS NULL
+          AND id IN (${removeIds.map((a) => sqlString(a)).join(", ")});`
+    : ""
+
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE help_threads SET message_body = ${sqlString(body)}, updated_at = ${sqlString(now)},
-       editor_id = ${sqlString(actor.id)}, editor_name = ${sqlString(actor.name)}
-     WHERE id = ${sqlString(id)};`
+    `UPDATE help_threads SET ${sets.join(", ")} WHERE id = ${sqlString(id)};${linkSql}${unlinkSql}`
   )
+
+  // THE ACTIVITY ROW SAYS WHAT CHANGED, IN PLAIN WORDS, never a bare "edited"
+  // that leaves a reader to guess between a wording fix, a backdated moment
+  // and a swapped file. Named in the order the door itself reads the fields.
+  const parts: string[] = []
+  if (changes.body !== undefined) parts.push("text")
+  if (changes.createdAt !== undefined) parts.push("date")
+  if (addIds.length || removeIds.length) parts.push("files")
+  const whatChanged = parts.length ? ` (${parts.join(", ")})` : ""
+
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Reply edited",
-    description: `${actor.name} edited a reply on ${ticket.ref ?? "a ticket"}`,
+    description: `${actor.name} edited a reply on ${ticket.ref ?? "a ticket"}${whatChanged}`,
     relatedTable: "help_threads",
     relatedRowId: id,
   })

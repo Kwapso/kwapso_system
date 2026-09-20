@@ -32,6 +32,7 @@ import type {
   RunningTimer,
   Sprint,
   Story,
+  StoryBurndown,
   Task,
   TaskViewName,
   TeamPulse,
@@ -290,6 +291,15 @@ export type TriageWaiting = {
   moduleMark: string | null
   raisedByContactName: string | null
   raisedByContactLogo: string | null
+  /** THE ACTOR WHO RAISED IT, `help.creator_id`/`creator_name`, the same pair
+   * `HelpTicket` carries as `raiserId`/`raiserName` (added 20 Sep 2026: this
+   * door refuses a client login outright, so there is no redaction to worry
+   * about the way `HelpTicket`'s `hideRaiser` does). `TicketRowsTable`'s own
+   * `raisedBy` cell already prefers this over `raisedByContactName`; a
+   * staff-raised ticket with no client contact had neither fact until now. */
+  raiserId: string | null
+  raiserName: string | null
+  raiserIsClient: boolean
   /** Both titles, never one standing in for the other — `HelpTicket`'s own
    * ruling: 788 tickets from Glide exist only in German. */
   titleDe: string | null
@@ -633,13 +643,20 @@ export const content = {
       ...post({ helpId, body, taggedUserIds, attachmentIds }),
       keepalive: leaving === true,
     }),
-  /** CHANGE A REPLY ALREADY SENT — Aurora's 20 Sep 2026 ruling, the Edit half
-   * of the chat edit pencil (kit v1.2.139's `TicketThread.actions.onEdit`).
-   * The door's own fence (workers/content/src/lib/help.ts,
-   * `assertMayChangeReply`) is the one that actually decides whether this
-   * caller may touch this one reply; this is just the wire. */
-  updateHelpReply: (id: string, body: string) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply/update", post({ id, body })),
+  /** CHANGE A REPLY ALREADY SENT, Aurora's 20 Sep 2026 ruling, both halves:
+   * the chat edit pencil (kit v1.2.139's `TicketThread.actions.onEdit`) and
+   * the SAME-DAY follow-up ("open the edit as slide in. can edit text and
+   * date and attachments", kit v1.2.143's `actions.onEditRequest`). Every
+   * field is optional and only what is sent moves, the same shape the door
+   * itself now takes (workers/content/src/routes/help.ts). The door's own
+   * fence (workers/content/src/lib/help.ts, `assertMayChangeReply`) is the
+   * one that actually decides whether this caller may touch this one reply;
+   * this is just the wire. */
+  updateHelpReply: (
+    id: string,
+    changes: { body?: string; createdAt?: string; attachments?: { add?: string[]; remove?: string[] } }
+  ) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply/update", post({ id, ...changes })),
   /** TAKE A REPLY BACK OUT — the Delete half of the same ruling
    * (`TicketThread.actions.onDelete`). Nothing is deleted server-side
    * (deactivate-never-delete); the door's response is the thread with that
@@ -753,6 +770,14 @@ export const content = {
   }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/update", post(input)),
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
+  /** A phase's burndown series (round-28 ruling): one row per calendar day of
+   * the phase, the count still remaining, the ideal straight-line count for
+   * that day, and (once a points column exists) the points remaining;
+   * `hasPoints` says whether that day is worth drawing. A GET-style POST: the
+   * phase id travels as a body field, and the door refuses a phase with no
+   * start/end dates with a plain message rather than guessing a range. */
+  storyBurndown: (phaseId: string) =>
+    api<StoryBurndown>("/api/content/stories/burndown", post({ phaseId })),
 
   /* -------------------- what a story shows for itself ----------------------- */
   /** The files and links on a story. A story needs at least one before it can go
@@ -1188,6 +1213,20 @@ export const content = {
     api<{ source: KnowledgeSource | null; total: number }>(
       "/api/content/knowledge/active",
       post({ id, active })
+    ),
+  /** ADD ONE WORD TO THE TEAM'S OWN GLOSSARY. `title` is the word, `body` its
+   * definition. Reused by `editKnowledge`'s own door (`updateKnowledge` above)
+   * for correcting one: a glossary entry is a plain typed source once it
+   * exists, so only its CREATE needed a shape of its own. */
+  createGlossaryWord: (input: { title: string; body: string }) =>
+    api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge/glossary", post(input)),
+  /** THE 54-WORD SEED, ONCE, IDEMPOTENT. Called by the Glossary tab itself
+   * the first time it is opened; safe to call again, it only ever fills in
+   * what is missing (`seedGlossaryEntries`, workers/content/src/lib/knowledge.ts). */
+  seedGlossary: () =>
+    api<{ created: number; skipped: number; total: number }>(
+      "/api/content/knowledge/glossary/seed",
+      post({})
     ),
   /** One bounded slice of the sweep. `caughtUp` false means there is more to do —
    * the screen calls again rather than waiting a quarter of an hour. */

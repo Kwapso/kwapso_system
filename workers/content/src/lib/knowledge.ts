@@ -222,6 +222,15 @@ export const KNOWLEDGE_KINDS = [
   "dropdown",
   // Who at a client can open the portal, filed in that client's own compartment.
   "portal_login",
+  // THE APP'S OWN VOCABULARY, one row per WORD, never one row for the whole
+  // list (unlike "dropdown" above, which is one source per list). Aurora's
+  // ruling, 20 Sep 2026: "identifying which words we use and their
+  // definitions... this will let our users search there, but should be part
+  // of the knowledge base and feed the assistant." Typed here (`createGlossaryEntry`
+  // below), the same way a "note" is, team-wide, no account, no mirror, so
+  // it needed nothing new in `toSource`'s own coercion. Seeded once per team
+  // by `POST /api/content/knowledge/glossary/seed` (routes/knowledge.ts).
+  "glossary",
 ] as const
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number]
 
@@ -1653,6 +1662,83 @@ export async function createSource(
  * measures it and the way the validator refuses it. */
 function byteLength(text: string | null): number {
   return text ? new TextEncoder().encode(text).length : 0
+}
+
+/** WRITE ONE GLOSSARY WORD, a sibling of `createSource` rather than a flag on
+ * it, for the same reason `createFileSource` is one: the shape genuinely
+ * differs. A glossary entry is always team-wide (no account, no app limit, no
+ * "only me"), so it skips every field `readInput` exists to validate for a
+ * generic source, and it is never a video link. Kept separate rather than
+ * widening `SourceInput` with a `kind` field, which would put a body field on
+ * the generic create door the machine surface (`add_knowledge_source`) would
+ * then have to expose and forward for no caller of that tool (R22), a
+ * dedicated door for a dedicated shape.
+ *
+ * Reused by BOTH callers, the UI's own "Add word" dialog (one word at a time)
+ * and the idempotent seed (`seedGlossaryEntries` below, one call per missing
+ * word), so there is exactly one place a glossary row is ever written. */
+export async function createGlossaryEntry(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  input: { title: unknown; body: unknown }
+): Promise<string> {
+  const title = requireText(input.title, "Word", TITLE_MAX_CHARS) // R87: title-length (RULES.md)
+  const body = requireText(input.body, "Definition", TEXT_LIMITS.long)
+  const id = ulid()
+  const now = new Date().toISOString()
+  const summary = buildSummary({ noun: "glossary word", title, accountName: null, detail: body })
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO knowledge_sources (id, kind, compartment, title, summary, body, body_bytes,
+       shared_with, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'glossary', ?, ?, ?, ?, ?, 'agency', ?, ?, ?, ?)`,
+    [id, AGENCY_COMPARTMENT, title, summary, body, byteLength(body), now, actor.id, actor.email, actor.name]
+  )
+  await indexOneSource(env, cfg, guard, id)
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Knowledge source added",
+    description: `${actor.name} added "${title}" to the glossary`,
+    relatedTable: "knowledge_sources",
+    relatedRowId: id,
+  })
+  return id
+}
+
+/** THE 54-WORD SEED, IDEMPOTENT. Reads the glossary compartment's OWN titles
+ * once, then writes only the words missing from it, so a team that presses
+ * "Glossary" a second time, or that has already typed a correction to one
+ * word, never gets a duplicate row for it. Matched on the trimmed,
+ * lower-cased title: the door refuses two glossary rows for "Wave" and
+ * "wave " to read as two different words. */
+export async function seedGlossaryEntries(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  entries: readonly { word: string; definition: string }[]
+): Promise<{ created: number; skipped: number }> {
+  const existing = await d1Query<{ title: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT title FROM knowledge_sources WHERE kind = 'glossary' AND compartment = ?`,
+    [AGENCY_COMPARTMENT]
+  )
+  const have = new Set(existing.map((r) => r.title.trim().toLowerCase()))
+  let created = 0
+  let skipped = 0
+  for (const entry of entries) {
+    if (have.has(entry.word.trim().toLowerCase())) {
+      skipped++
+      continue
+    }
+    await createGlossaryEntry(env, cfg, guard, actor, { title: entry.word, body: entry.definition })
+    have.add(entry.word.trim().toLowerCase())
+    created++
+  }
+  return { created, skipped }
 }
 
 /** WRITE A SOURCE FROM AN UPLOADED FILE, and index whatever words came out of

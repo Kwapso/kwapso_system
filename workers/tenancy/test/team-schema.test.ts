@@ -63,6 +63,55 @@ describe("buildTeamSeed", () => {
   })
 })
 
+// REPROOF 20, ITEM 2: an Admin login on a live team (staging's own "Smoke
+// team") was seen with the Contacts gallery toggle but no add button, which
+// `contacts-screen.tsx` gates on `rights.contacts?.create`. `buildTeamSeed`
+// above already proves every NEW team's Admin gets it (`"Admin gets every
+// switch"`); the other way a team could be missing it is an OLD one, born
+// before `contacts` existed as a module. Migration 0024's own retrofit
+// clause is the only thing that ever backfills it for a team like that
+// (`workers/tenancy/src/team-schema/migrations.ts`, "0024_contacts_and_
+// company_shape": "Existing teams: the locked Admin role gains the new
+// module in full"). Replayed here rather than trusted by reading: an Admin
+// role written BEFORE 0024 ran (no `contacts` row at all, exactly what a
+// team born under an older schema looks like) still ends up with full
+// `contacts` rights once every migration has played forward. This proves
+// the CODE path is sound. It does not reach the Smoke team's own database,
+// so it cannot say whether that specific team ever had 0024 applied; if it
+// did not, that is a migration state gap on one team's data, not a defect
+// here (`documents/OPERATIONS.md`'s "teamsChecked: 0 means too early, not
+// done").
+describe("the 0024 retrofit backfills contacts:create for an Admin role that predates it", () => {
+  it("an Admin role inserted with no 'contacts' row ends up with full rights after every migration replays", () => {
+    const db = new DatabaseSync(":memory:")
+    const cut = TEAM_MIGRATIONS.findIndex((m) => m.version.startsWith("0024_"))
+    expect(cut, "migration 0024 not found, has it been renumbered?").toBeGreaterThan(0)
+    // EVERYTHING BEFORE 0024, exactly as a team born under that older schema
+    // would have it.
+    for (const m of TEAM_MIGRATIONS.slice(0, cut)) db.exec(m.sql)
+    // A HAND-WRITTEN ADMIN ROLE, standing in for `buildTeamSeed`'s own insert
+    // on a team old enough that `contacts` was never on the sheet it was
+    // born with: deliberately no `role_permissions` row for 'contacts' at
+    // all, the same absence 0024's own `WHERE NOT EXISTS` clause is written
+    // for.
+    const adminRoleId = "01ADMIN_PRE_0024"
+    db.exec(
+      `INSERT INTO member_roles (id, title, description, is_default, created_at, creator_id, creator_email, creator_name)
+       VALUES ('${adminRoleId}', 'Admin', 'Default role, full access, can''t be edited.', 1, '2026-01-01', 'u1', 'a@x.com', 'Actor');`
+    )
+    // 0024 ITSELF, AND EVERYTHING AFTER: 0086 later renames `can_edit` to
+    // `can_update`, so replaying the whole tail is what proves the CURRENT
+    // schema still ends up right, not merely the schema as it stood in
+    // August.
+    for (const m of TEAM_MIGRATIONS.slice(cut)) db.exec(m.sql)
+    const row = db
+      .prepare(`SELECT can_read, can_create, can_update, can_delete FROM role_permissions WHERE role_id = ? AND module = 'contacts'`)
+      .get(adminRoleId) as { can_read: number; can_create: number; can_update: number; can_delete: number } | undefined
+    expect(row, "the Admin role has no 'contacts' row at all after every migration").toBeDefined()
+    expect([row?.can_read, row?.can_create, row?.can_update, row?.can_delete]).toEqual([1, 1, 1, 1])
+  })
+})
+
 describe("sqlString", () => {
   it("doubles single quotes and handles null", () => {
     expect(sqlString("it's")).toBe("'it''s'")

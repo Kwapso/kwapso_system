@@ -63,11 +63,19 @@ export const SEED: Catalogue = {
   // 2026); see the comment beside its `time` entry in web/lib/pages.ts for
   // the alternatives still awaiting her pick.
   "Work logs": { de: "Zeiterfassung", es: "Registros de tiempo", ca: "Registres de temps" },
+  // AMENDED 20 Sep 2026, round 28, verbatim: "Inside stories and tickets, let's
+  // rename 'effort' to 'time log.'" Only the STORY and TICKET record's own
+  // panel/tab now say this; task and meeting detail keep "Work logs" above.
+  // See documents/UI-RULEBOOK.md row B27.
+  "Time logs": { de: "Zeitprotokoll", es: "Registro de tiempo", ca: "Registre de temps" },
   Hours: { de: "Stunden", es: "Horas", ca: "Hores" },
   // RENAMED FROM "Knowledge base" — R85, the same ruling: "'Knowledge Base':
   // reduce it to 'Knowledge'." The route (/knowledge) and every identifier
   // are unchanged.
   Knowledge: { de: "Wissen", es: "Conocimiento", ca: "Coneixement" },
+  // THE GLOSSARY TAB, Aurora's ruling, 20 Sep 2026: "Add a tab to Knowledge
+  // with a glossary."
+  Glossary: { de: "Glossar", es: "Glosario", ca: "Glossari" },
   Settings: { de: "Einstellungen", es: "Ajustes", ca: "Configuració" },
   Home: { de: "Start", es: "Inicio", ca: "Inici" },
   Members: { de: "Mitglieder", es: "Miembros", ca: "Membres" },
@@ -4449,6 +4457,8 @@ export const SEED: Catalogue = {
   "Each person decides this for themselves. It is stored against your own account and not the team's. Today the only way to set it is to ask the assistant, which is a gap rather than a design.": { de: "Jede Person entscheidet das für sich selbst. Es wird gegen Ihr eigenes Konto gespeichert und nicht das des Teams. Heute ist der einzige Weg, es einzustellen, den Assistenten zu fragen, was eine Lücke ist und keine Absicht.", es: "Cada persona decide esto por sí misma. Se guarda contra tu propia cuenta y no la del equipo. Hoy la única forma de configurarlo es pedírselo al asistente, lo cual es un vacío y no un diseño.", ca: "Cada persona decideix això per si mateixa. Es desa contra el teu propi compte i no el de l'equip. Avui l'única manera de configurar-ho és demanar-ho a l'assistent, cosa que és un buit i no un disseny." },
   "Nothing happens on its own here. The timer is not stopped and no time is written. It is a question the app asks you, and you answer it three ways.": { de: "Hier passiert nichts von selbst. Der Timer wird nicht gestoppt und keine Zeit wird geschrieben. Es ist eine Frage, die die App Ihnen stellt, und Sie beantworten sie auf drei Arten.", es: "Aquí nada ocurre por sí solo. El cronómetro no se detiene y no se registra ningún tiempo. Es una pregunta que la app te hace, y la respondes de tres formas.", ca: "Aquí no passa res per si sol. El cronòmetre no s'atura i no es registra cap temps. És una pregunta que l'app et fa, i la respons de tres maneres." },
   "That can be right. It is saved either way. Change a phase's dates if it is not.": { de: "Das kann stimmen. Es wird so oder so gespeichert. Ändern Sie die Daten einer Phase, wenn nicht.", es: "Eso puede ser correcto. Se guarda de todos modos. Cambia las fechas de una fase si no lo es.", ca: "Això pot ser correcte. Es desa de totes maneres. Canvia les dates d'una fase si no ho és." },
+  "Phase days changed.": { de: "Phasentage geändert.", es: "Días de fase cambiados.", ca: "Dies de fase canviats." },
+  "days": { de: "Tage", es: "días", ca: "dies" },
   "The gathering cannot be switched off. It is what the fault record is made of. The email already is: it is addressed to nobody on purpose, and the faults are read here instead.": { de: "Das Sammeln lässt sich nicht abschalten. Daraus besteht der Fehlerdatensatz. Die E-Mail ist es bereits: Sie ist absichtlich an niemanden adressiert, und die Fehler werden stattdessen hier gelesen.", es: "La recopilación no se puede desactivar. Es de lo que está hecho el registro de fallos. El correo ya lo es: está dirigido a nadie a propósito, y los fallos se leen aquí en su lugar.", ca: "La recopilació no es pot desactivar. Això és de què està fet el registre de fallades. El correu ja ho és: està adreçat a ningú expressament, i les fallades es llegeixen aquí en lloc d'això." },
 
   /* ── The message-delete strings the reply-actions menu (kit v1.2.139) needs
@@ -4456,8 +4466,56 @@ export const SEED: Catalogue = {
    * session; the app source's own English carries an em dash on one of them
    * (R95 flags it separately, see this pass's own report). ─────────────── */
   "Couldn't remove that reply.": { de: "Diese Antwort konnte nicht entfernt werden.", es: "No se pudo eliminar esa respuesta.", ca: "No s'ha pogut eliminar aquesta resposta." },
-  "Couldn't update that reply.": { de: "Diese Antwort konnte nicht aktualisiert werden.", es: "No se pudo actualizar esa respuesta.", ca: "No s'ha pogut actualitzar aquesta resposta." },
   "Delete this reply?": { de: "Diese Antwort löschen?", es: "¿Eliminar esta respuesta?", ca: "Vols eliminar aquesta resposta?" },
   "It stops showing in this conversation. Nothing is deleted: the reply and its history stay exactly as they are.": { de: "Es verschwindet nur aus dieser Unterhaltung. Nichts wird gelöscht, die Antwort und ihr Verlauf bleiben genau so erhalten.", es: "Deja de mostrarse en esta conversación. No se elimina nada, la respuesta y su historial se mantienen tal cual.", ca: "Deixa de mostrar-se en aquesta conversa. No s'elimina res, la resposta i el seu historial es mantenen tal com estan." },
   "Removed.": { de: "Entfernt.", es: "Eliminado.", ca: "Eliminat." },
+
+  /* ── The reply edit SHEET's own strings (Aurora's same-day follow-up
+   * ruling: "open the edit as slide in. can edit text and date and
+   * attachments"), replacing the inline-editor-only "Couldn't update that
+   * reply." this seed used to carry (that key is gone: the sheet's own
+   * failure toast reads "Couldn't save that reply." instead). ───────────── */
+  "Edit reply": { de: "Antwort bearbeiten", es: "Editar respuesta", ca: "Edita la resposta" },
+  "Reply text": { de: "Antworttext", es: "Texto de la respuesta", ca: "Text de la resposta" },
+  "Sent at": { de: "Gesendet am", es: "Enviado el", ca: "Enviat el" },
+  "Attachments": { de: "Anhänge", es: "Adjuntos", ca: "Adjunts" },
+  "Couldn't save that reply.": { de: "Diese Antwort konnte nicht gespeichert werden.", es: "No se pudo guardar esa respuesta.", ca: "No s'ha pogut desar aquesta resposta." },
+
+  /* ── The phase Burndown panel's own strings (round-28 ruling, team
+   * migration 0110). "Burndown" stays as one word across all three
+   * languages, the same call the seed already makes for "Wave": a product
+   * term the agency and its German clients already say in English. ─────── */
+  "Burndown": { de: "Burndown", es: "Burndown", ca: "Burndown" },
+  "Chart unit": { de: "Diagrammeinheit", es: "Unidad del gráfico", ca: "Unitat del gràfic" },
+  "Count": { de: "Anzahl", es: "Recuento", ca: "Recompte" },
+  "Ideal": { de: "Ideal", es: "Ideal", ca: "Ideal" },
+  "Points": { de: "Punkte", es: "Puntos", ca: "Punts" },
+  "Remaining": { de: "Verbleibend", es: "Restante", ca: "Restant" },
+  "This phase has no start and end dates set, so there's nothing to burn down.": { de: "Diese Phase hat kein Start- und Enddatum, daher gibt es nichts abzutragen.", es: "Esta fase no tiene fecha de inicio ni de fin, así que no hay nada que representar.", ca: "Aquesta fase no té data d'inici ni de fi, així que no hi ha res a representar." },
+  "Work remaining in the phase against the ideal pace.": { de: "Verbleibende Arbeit in der Phase im Vergleich zum idealen Tempo.", es: "Trabajo restante en la fase frente al ritmo ideal.", ca: "Feina restant a la fase davant el ritme ideal." },
+
+  /* ── The Glossary tab under Knowledge (Aurora's ruling, 20 Sep 2026):
+   * "Add a tab to Knowledge with a glossary... this will let our users
+   * search there, but should be part of the knowledge base and feed the
+   * assistant." ───────────────────────────────────────────────────────── */
+  "Add a word": { de: "Wort hinzufügen", es: "Añadir palabra", ca: "Afegeix una paraula" },
+  "Correct this word": { de: "Dieses Wort korrigieren", es: "Corregir esta palabra", ca: "Corregeix aquesta paraula" },
+  "\"{word}\" was added to the glossary.": { de: "„{word}“ wurde zum Glossar hinzugefügt.", es: "«{word}» se ha añadido al glosario.", ca: "«{word}» s'ha afegit al glossari." },
+  "Couldn't add this word to the glossary.": { de: "Dieses Wort konnte nicht zum Glossar hinzugefügt werden.", es: "No se pudo añadir esta palabra al glosario.", ca: "No s'ha pogut afegir aquesta paraula al glossari." },
+  "Couldn't save this word.": { de: "Dieses Wort konnte nicht gespeichert werden.", es: "No se pudo guardar esta palabra.", ca: "No s'ha pogut desar aquesta paraula." },
+  "Definition": { de: "Definition", es: "Definición", ca: "Definició" },
+  "Load more words": { de: "Weitere Wörter laden", es: "Cargar más palabras", ca: "Carrega més paraules" },
+  "Nothing in the glossary yet.": { de: "Noch nichts im Glossar.", es: "Aún no hay nada en el glosario.", ca: "Encara no hi ha res al glossari." },
+  "The words this team uses, and what each one means. Add one, and the assistant can answer from it too.": { de: "Die Wörter, die dieses Team verwendet, und was sie bedeuten. Füge eines hinzu, und auch der Assistent kann daraus antworten.", es: "Las palabras que usa este equipo, y qué significa cada una. Añade una, y el asistente también podrá responder a partir de ella.", ca: "Les paraules que utilitza aquest equip, i què vol dir cadascuna. Afegeix-ne una, i l'assistent també hi podrà respondre." },
+  "Take this away": { de: "Entfernen", es: "Quitar", ca: "Treu-ho" },
+  "Take this word away": { de: "Dieses Wort entfernen", es: "Quitar esta palabra", ca: "Treu aquesta paraula" },
+  "Take this word away?": { de: "Dieses Wort entfernen?", es: "¿Quitar esta palabra?", ca: "Vols treure aquesta paraula?" },
+  "The assistant stops reading it right away. Nothing is deleted, so you can bring it back any time from the knowledge base.": { de: "Der Assistent liest es ab sofort nicht mehr. Nichts wird gelöscht, du kannst es jederzeit über die Wissensdatenbank zurückholen.", es: "El asistente deja de leerla de inmediato. No se elimina nada, puedes recuperarla en cualquier momento desde la base de conocimiento.", ca: "L'assistent deixa de llegir-la de seguida. No s'elimina res, la pots recuperar en qualsevol moment des de la base de coneixement." },
+  "Word": { de: "Wort", es: "Palabra", ca: "Paraula" },
+  "Word updated.": { de: "Wort aktualisiert.", es: "Palabra actualizada.", ca: "Paraula actualitzada." },
+  "Words and their definitions become part of the knowledge base: searchable here, and read by the assistant.": { de: "Wörter und ihre Definitionen werden Teil der Wissensdatenbank: hier durchsuchbar, und vom Assistenten gelesen.", es: "Las palabras y sus definiciones pasan a formar parte de la base de conocimiento: buscables aquí, y leídas por el asistente.", ca: "Les paraules i les seves definicions passen a formar part de la base de coneixement: cercables aquí, i llegides per l'assistent." },
+  // "Wave" stays as one word across all three languages, the same call the
+  // seed already makes for "Burndown": a product term this app already says
+  // in English.
+  "e.g. Wave": { de: "z. B. Wave", es: "p. ej. Wave", ca: "p. ex. Wave" },
 }

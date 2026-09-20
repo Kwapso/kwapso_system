@@ -11,7 +11,7 @@
 // these paths may ever appear on the portal gateway's allow-list.
 
 import { api } from "@shared/web/api"
-import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
+import type { Wave, WaveOverlap, WavePhaseDay, WaveSprint } from "@shared/waves"
 
 /* ------------------------------ the cache keys -----------------------------
  *
@@ -52,10 +52,12 @@ export const waves = {
     return api<{ waves: Wave[]; total: number }>(`/api/tenancy/waves${qs ? `?${qs}` : ""}`)
   },
 
-  /** One wave, the sprints in it, and any clash between their dates — three
+  /** One wave, the sprints in it, any clash between their dates, and how many
+   * days each phase type gets on it (always seven rows, defaults filled in
+   * where nobody has set one, `PHASE_DAY_DEFAULTS`, shared/waves.ts). Four
    * answers in one round trip because they are one screen. */
   one: (id: string) =>
-    api<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[] }>(
+    api<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[]; phaseDays: WavePhaseDay[] }>(
       `/api/tenancy/waves/one?id=${encodeURIComponent(id)}`
     ),
 
@@ -81,6 +83,15 @@ export const waves = {
    * already landed by the time the screen reads it. */
   setSprint: (input: { sprintId: string; waveId: string | null }) =>
     api<{ ok: true; moved: boolean; overlaps: WaveOverlap[] }>("/api/tenancy/waves/sprint", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  /** How many days one or more phase types get on this wave (the Settings
+   * panel, Aurora's 20 Sep 2026 ruling). `days` names any subset of the
+   * seven; the rest keep whatever they already carry. */
+  setPhaseDays: (input: { waveId: string; days: { phaseType: string; days: number }[] }) =>
+    api<{ ok: true; phaseDays: WavePhaseDay[] }>("/api/tenancy/waves/phase-days", {
       method: "POST",
       body: JSON.stringify(input),
     }),

@@ -320,6 +320,9 @@ export const KNOWLEDGE_KIND_ICON: Record<string, string> = {
   email: "envelope",
   event: "calendar",
   message: "chat-teardrop",
+  // The team's own vocabulary, typed here rather than mirrored (see
+  // `KNOWLEDGE_KINDS`'s own "glossary" entry, workers/content/src/lib/knowledge.ts).
+  glossary: "book-open-text",
 }
 
 // SHORTENED, ONE WORD (OR THE SHORTEST NOUN) PER KIND — the client's ruling,
@@ -372,6 +375,13 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   person: "Colleagues",
   dropdown: "Choices",
   portal_login: "Logins",
+  // The team's own vocabulary (Aurora's ruling, 20 Sep 2026); its own tab is
+  // built by hand in knowledge-screen.tsx rather than derived like the tabs
+  // above (it must be reachable while empty, so the Glossary tab can seed
+  // itself), but the word still lives here: every OTHER reader of a source's
+  // kind (a card, the Type filter) is this map, and a glossary source is no
+  // exception to that.
+  glossary: "Glossary",
 }
 
 /* -------------------------------- meetings -------------------------------- */

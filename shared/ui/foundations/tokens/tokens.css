@@ -1303,6 +1303,13 @@
   --avatar-sm: 1.5rem;    /* 24 */
   --avatar-md: 2rem;      /* 32 */
   --avatar-lg: 3rem;      /* 48 */
+  /* A NAMED EXCEPTION TO RULING 30'S THREE-RUNG LADDER, not a fourth rung on
+     it. Aurora, on TicketThread's message-actions menu: "make the avatar as
+     big as this button" — the message-action button is `size="icon"`
+     (`--control-height-button`), and ruling 30's ladder has no rung there.
+     `TicketThread`'s `faceSize="md"` is the one caller; `--avatar-control`
+     exists so that caller reads a token instead of a literal 2.5rem. */
+  --avatar-control: 2.5rem; /* 40 — matches --control-height-button */
 
   /* CH11's two stated avatar companions, so no composition re-invents them
      (GAPS-KIT-BC AVA-B2). The ring is the artifact's

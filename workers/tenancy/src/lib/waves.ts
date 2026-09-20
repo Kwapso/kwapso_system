@@ -50,7 +50,8 @@ import { d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
-import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
+import { PHASE_DAY_DEFAULTS, type Wave, type WaveOverlap, type WavePhaseDay, type WaveSprint } from "@shared/waves"
+import { PHASE_TYPES } from "@shared/sprint-types"
 import { GuardError, type MemberGuard } from "./permissions"
 
 /* ------------------------------- the shapes -------------------------------
@@ -60,7 +61,7 @@ import { GuardError, type MemberGuard } from "./permissions"
  * is defined, and so a screen importing from either place gets the same type
  * rather than a copy that can drift. */
 
-export type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
+export type { Wave, WaveOverlap, WavePhaseDay, WaveSprint } from "@shared/waves"
 
 /* ------------------------------ the audit block ---------------------------- */
 
@@ -293,7 +294,7 @@ export async function getWave(
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[] } | null> {
+): Promise<{ wave: Wave; sprints: WaveSprint[]; overlaps: WaveOverlap[]; phaseDays: WavePhaseDay[] } | null> {
   const fence = accountScopeClause(scope, "w.account_id")
   const where = [fence.sql, `w.id = ${sqlString(id)}`].filter(Boolean).join(" AND ")
   const rows = await d1Query<WaveRow>(
@@ -306,12 +307,90 @@ export async function getWave(
       LIMIT 1`
   )
   if (!rows.length) return null
-  // Independent reads of the same wave — one wait, not 2.
-  const [sprints, overlaps] = await Promise.all([
+  // Independent reads of the same wave: one wait, not 3.
+  const [sprints, overlaps, phaseDays] = await Promise.all([
     listWaveSprints(cfg, guard, id),
     waveOverlaps(cfg, guard, id),
+    getWavePhaseDays(cfg, guard, id),
   ])
-  return { wave: toWave(rows[0]), sprints, overlaps }
+  return { wave: toWave(rows[0]), sprints, overlaps, phaseDays }
+}
+
+/* --------------------------------- settings --------------------------------
+ *
+ * HOW MANY DAYS EACH PHASE TYPE GETS ON THIS WAVE. Aurora's ruling, 20 Sep
+ * 2026: "on waves i am missing the settings (we'l adjust the duration of
+ * pahses in days)." No account fence of its own here: both functions below
+ * take a WAVE id already proved to be one the caller may read or write
+ * (`getWave` above / `updateWavePhaseDays` below, which fences through
+ * `ownerOf` exactly as `updateWave` does), so a phase-days row is fenced by
+ * the wave it names rather than fencing itself a second time. */
+
+/** ONE ROW PER PHASE TYPE, ALWAYS SEVEN, in `PHASE_TYPES` order. A wave
+ * that has never had this settings panel touched answers with the
+ * placeholder defaults (`PHASE_DAY_DEFAULTS`, shared/waves.ts) rather than
+ * an empty list, so the screen always has seven rows to draw. */
+async function getWavePhaseDays(cfg: D1Rest, guard: MemberGuard, waveId: string): Promise<WavePhaseDay[]> {
+  const rows = await d1Query<{ phase_type: string; days: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT phase_type, days FROM wave_phase_days WHERE wave_id = ${sqlString(waveId)}`
+  )
+  const set = new Map(rows.map((r) => [r.phase_type, Number(r.days)]))
+  return PHASE_TYPES.map((p) => ({ phaseType: p.name, days: set.get(p.name) ?? PHASE_DAY_DEFAULTS[p.name] ?? 1 }))
+}
+
+/** A phase type's days, 1 to 365 and always a whole number, the same
+ * "clean 400, never a silent round" shape `priceCents`
+ * (workers/content/src/lib/stories.ts) takes for a phase's own price. */
+function phaseDaysValue(raw: unknown, phaseType: string): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || !Number.isInteger(raw))
+    throw new GuardError(400, "invalid_input", `The days for ${phaseType} must be a whole number.`)
+  if (raw < 1 || raw > 365)
+    throw new GuardError(400, "invalid_input", `The days for ${phaseType} must be between 1 and 365.`)
+  return raw
+}
+
+/** SET HOW MANY DAYS ONE OR MORE PHASE TYPES GET ON THIS WAVE. An UPSERT per
+ * row on the (wave, phase type) pair the migration's own unique index polices
+ * (CONCURRENCY.md: the uniqueness rides the write, never a count-then-insert
+ * two clicks could both pass). `input.days` may name any subset of the seven
+ * phase types; the rest keep whatever they already carry (a row of their own,
+ * or the placeholder default). */
+export async function updateWavePhaseDays(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  input: { id: string; days: { phaseType: unknown; days: unknown }[] }
+): Promise<{ accountId: string; phaseDays: WavePhaseDay[] }> {
+  const accountId = await ownerOf(cfg, guard, "waves", input.id)
+  if (!accountId) throw new GuardError(404, "not_found", "That's not there anymore.")
+  assertAccountInScope(scope, accountId)
+  if (!Array.isArray(input.days) || !input.days.length)
+    throw new GuardError(400, "invalid_input", "At least one phase's days are required.")
+  const known = new Set(PHASE_TYPES.map((p) => p.name))
+  const now = new Date().toISOString()
+  for (const row of input.days) {
+    const phaseType = typeof row.phaseType === "string" ? row.phaseType : ""
+    if (!known.has(phaseType))
+      throw new GuardError(400, "invalid_input", "That's not a phase type this team uses.")
+    const days = phaseDaysValue(row.days, phaseType)
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `INSERT INTO wave_phase_days (id, wave_id, phase_type, days, ${AUDIT_CREATE})
+       VALUES (${sqlString(ulid())}, ${sqlString(input.id)}, ${sqlString(phaseType)}, ${days}, ${auditCreateValues(actor, now)})
+       ON CONFLICT(wave_id, phase_type) DO UPDATE SET days = excluded.days, ${auditEditSet(actor, now)}`
+    )
+  }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "updated",
+    description: "Phase days changed",
+    relatedTable: "waves",
+    relatedRowId: input.id,
+  })
+  return { accountId, phaseDays: await getWavePhaseDays(cfg, guard, input.id) }
 }
 
 /** The sprints in one wave. Fenced by the WAVE, which the caller has already

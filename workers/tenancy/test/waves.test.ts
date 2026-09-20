@@ -55,7 +55,9 @@ import {
   setSprintWave,
   setWaveActive,
   updateWave,
+  updateWavePhaseDays,
 } from "../src/lib/waves"
+import { PHASE_TYPES } from "@shared/sprint-types"
 import { buildSpineDb, IDS } from "./spine-harness"
 
 const cfg = { accountId: "a", apiToken: "t" } as never
@@ -491,5 +493,92 @@ describe("two identical packages are two waves", () => {
         goal: null,
       })
     ).resolves.toMatchObject({ id: expect.any(String) })
+  })
+})
+
+// HOW MANY DAYS EACH PHASE TYPE GETS (Aurora, 20 Sep 2026: "on waves i am
+// missing the settings (we'l adjust the duration of pahses in days)"). Team
+// migration 0109's own table, real SQLite, real lib functions, same shape as
+// every describe block above.
+describe("a wave's phase days", () => {
+  it("answers with all seven phase types, in PHASE_TYPES order, before anybody has set one", async () => {
+    const id = await aWave()
+    const { phaseDays } = await readWave(id)
+    expect(phaseDays.map((p) => p.phaseType)).toEqual(PHASE_TYPES.map((p) => p.name))
+    // The placeholder defaults, hers to adjust (shared/waves.ts PHASE_DAY_DEFAULTS).
+    expect(phaseDays.find((p) => p.phaseType === "Audit")?.days).toBe(5)
+    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(20)
+    expect(phaseDays.find((p) => p.phaseType === "Hypercare")?.days).toBe(10)
+  })
+
+  it("sets a subset and leaves the rest at their defaults", async () => {
+    const id = await aWave()
+    const { phaseDays } = await updateWavePhaseDays(cfg, guard, staff, actor, {
+      id,
+      days: [{ phaseType: "Build", days: 30 }],
+    })
+    expect(phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(30)
+    expect(phaseDays.find((p) => p.phaseType === "Audit")?.days).toBe(5) // untouched, still the default
+
+    // Reading the wave back agrees.
+    expect((await readWave(id)).phaseDays.find((p) => p.phaseType === "Build")?.days).toBe(30)
+  })
+
+  it("upserts on the same phase type rather than doubling the row (the migration's own unique pair)", async () => {
+    const id = await aWave()
+    await updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Build", days: 30 }] })
+    await updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Build", days: 45 }] })
+    const rows = db()
+      .prepare(`SELECT days FROM wave_phase_days WHERE wave_id = ? AND phase_type = 'Build'`)
+      .all(id) as { days: number }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0].days).toBe(45)
+  })
+
+  it("refuses a phase type this team's vocabulary does not carry", async () => {
+    const id = await aWave()
+    await expect(
+      updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Enhancement", days: 5 }] })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+  })
+
+  it("refuses a non-integer, and refuses out of the 1-365 range", async () => {
+    const id = await aWave()
+    await expect(
+      updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Plan", days: 2.5 }] })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+    await expect(
+      updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Plan", days: 0 }] })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+    await expect(
+      updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Plan", days: 366 }] })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_input" })
+  })
+
+  it("writes one activity row, 'Phase days changed', on the wave", async () => {
+    const id = await aWave()
+    const before = historyRows(id)
+    await updateWavePhaseDays(cfg, guard, staff, actor, { id, days: [{ phaseType: "Pilot", days: 12 }] })
+    expect(historyRows(id)).toBe(before + 1)
+    // Matched by DESCRIPTION rather than "latest by created_at": the create's
+    // own "Sold the wave…" row and this one can share the same
+    // millisecond-resolution timestamp, which makes an ORDER BY created_at
+    // DESC tiebreak indeterminate.
+    const row = db()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM activity
+          WHERE related_table = 'waves' AND related_row_id = ? AND description = 'Phase days changed'`
+      )
+      .get(id) as { n: number }
+    expect(row.n).toBe(1)
+  })
+
+  it("a client login cannot read or write another client's phase days", async () => {
+    const id = await aWave()
+    const burglar = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
+    await expect(getWave(cfg, guard, burglar, id)).resolves.toBeNull()
+    await expect(
+      updateWavePhaseDays(cfg, guard, burglar, actor, { id, days: [{ phaseType: "Plan", days: 5 }] })
+    ).rejects.toMatchObject({ status: 404 })
   })
 })

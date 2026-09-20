@@ -40,7 +40,7 @@ the concrete implementation, and its evidence.
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L38)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
 - [4. Collections](#4-collections) (K1 to K55)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B30)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B35)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -1167,6 +1167,13 @@ amendments above were held to.
 **Status: reported a sixth time, 18 Sep 2026 (Round 20); open pending a live, side-by-side
 proof against the content strip rather than a further isolated fix to the assistant one.**
 
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed the
+assistant strip's inactive tabs live: the shape sits behind the active tab, not in front of it
+(closed under [B30](#b30-two-kit-fixes-read-together-the-assistant-strip-and-the-chat-message-menu-v12138v12139)'s
+kit v1.2.138 fix).
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
 ### L20: the assistant strip drags conversations only; History and "+" are pinned last and never move
 
 **The rule.** The client's ruling, 16 Sep 2026, verbatim: *"Recreate the drag behavior on
@@ -1677,6 +1684,11 @@ carries no `face=`.
 **Status: ruled and in build, 20 Sep 2026.**
 
 **Law.** [R95](../RULES.md) (`no-em-dash`) — a source census, `web/test/no-em-dash.test.ts`, six censuses (the catalogue, the seed, the front doors' own import closure read at `visitStrings()`'s seven positions, `shared/web/` read the same way directly off disk, the email template plus every derived send site, and the glossary), each stripped of comments first with `stripComments` and each carrying its own tripwire.
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed the law
+live: no em dash anywhere a person reads.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
 
 ---
 
@@ -4409,6 +4421,11 @@ Contrast verified across 14 ground×palette combinations.
 
 **Status: ruled, in build, 19 Sep 2026 (kit v1.2.132).**
 
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the status badge's own fill reads distinct from the card ground it sits on.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
 ---
 
 ### K40: the roles matrix toolbar is search, module-name sort and a status facet; every row wears its module's icon; a locked cell is drawn, not captioned
@@ -5599,6 +5616,11 @@ dialog keeps its own separate, explicitly-typed read of individuals, unaffected.
 
 **Status: amended, in build, 20 Sep 2026.**
 
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+Accounts lists companies only, and every person lives on Contacts.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
 **Law.** None registered.
 
 ### B23: Contacts gets a Gallery/List toggle and its own add door
@@ -5617,6 +5639,11 @@ door when there is nothing yet.
 
 **Status: ruled, in build, 19 Sep 2026.**
 
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+Contacts carries its Gallery/List toggle and its own add door.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
 **Law.** None registered.
 
 ### B24: avatars are always a round image, and "Raised by" is a smaller tile
@@ -5632,6 +5659,11 @@ the Stakeholders panel's Raised-by tile drops from `PersonCard`'s "band" default
 a tighter `py-3` inset (≈ 60px total) — both kit spacing steps, not hand-picked pixels.
 
 **Status: ruled, in build, 20 Sep 2026.**
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the Raised-by card is shorter.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
 
 **Law.** None registered.
 
@@ -5694,6 +5726,11 @@ repeats the raised date under Raised by" block: exactly one date on a row carryi
 
 **Status: amended, in build, 20 Sep 2026.**
 
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the triage list view carries no date under Raised by.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
 **Law.** None registered.
 
 ### B27: the stories model round — statuses, tabs, kanban, new fields and icons (12 rulings, one round)
@@ -5739,8 +5776,23 @@ Verbatim, item by item:
 12. *"Inside stories and tickets, let's rename 'effort' to 'time log.'"* — **NOT FOUND in
     the tree.** No "Time log"/"Effort" label change turned up in `stories-screen.tsx`,
     `work-panels.tsx` or the ticket detail files this pass searched; still open.
+    **AMENDED 20 Sep 2026, same day.** Nothing in the app was ever labelled "Effort": the
+    thing she means is the section that lists the hours logged against a record, which the
+    app calls Work log(s). The reading: inside a STORY or a TICKET, "Work log" becomes
+    "Time log" and "Work logs" becomes "Time logs", the tab label (`story-detail.tsx`), the
+    panel title (`help-detail.tsx`), and the matching test assertions
+    (`ticket-detail-no-tabs.test.tsx`). The rail entry "Hours" (the whole team's logs screen,
+    R85) is a different ruling and stays "Hours", untouched. Task and meeting detail keep
+    "Work logs" too; only these two records' own screens said "Effort" to her. Door names,
+    the data model and the glossary term ("Work log", `shared/glossary.ts`) are unchanged,
+    only the words a person reads on these two screens changed.
 
-**Status: ruled, mostly in build, 20 Sep 2026 — item 12 (effort → time log) still open.**
+**Status: ruled, mostly in build, 20 Sep 2026. Item 12 (effort to time log) landed same day.**
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the Stories nav entry reads Backlog.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
 
 **Law.** None new beyond R86/R94, both already registered.
 
@@ -5807,7 +5859,20 @@ mapping was never turned into a `PHASE_TYPE_DOT_TONE` export with no reader — 
 worse than no table, and re-deciding the mapping later costs nothing this draft wouldn't also
 cost now.
 
-**Status: ruled, in build, 20 Sep 2026. The colour DECIDE above is still open for her pick.**
+**DECIDED 20 Sep 2026 (Round 30): icons, no colours.** Aurora's ruling, verbatim: *"i am
+thinking well do icons instead of colors. colors bekongin status & stages."* The Deploy-black,
+Hypercare-grey proposal above is declined: the Phase type vocabulary stays icon-only, as it
+already stood; colour belongs to status and to stage alone (R86). `PHASE_TYPE_DOT_TONE` is not
+built.
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the Sprint-to-Phase rename with the P0000 reference id (ruling 1), the seven Phase types
+shown with her own definitions wherever the type is picked (ruling 4), and the Phase Goal
+field with the story's "contributes to the goal" flag (ruling 2).
+
+**Status: ruled, in build, 20 Sep 2026. The colour DECIDE above is decided, 20 Sep 2026
+(Round 30): icons, no colours. Renamed round, Phase types and the Phase Goal field
+validated, 20 Sep 2026 (Round 30).**
 
 **Law.** None registered.
 
@@ -5836,7 +5901,21 @@ through it (`triagedRungMoment`, `web/components/tickets/ticket-stages.tsx`). Sc
 the one rung and the one status she named: an open ticket missing an earlier span is a
 different, unasked question, and a reopened ticket is too.
 
-**Status: ruled, in build, 20 Sep 2026.**
+**Amended by B31, 20 Sep 2026.** The third quote above ("if a ticket is closed already ... of
+course it went through triage") named the same volume complaint Aurora returned to, sharper,
+the same day: *"canot be, i still have 428 to trigae but only 15 open?"* Nothing in this row's
+own shape actually changed what the Triage tab's badge or the queue's own total COUNTED: only
+the Store button, the stage head and the Triaged rung moved. The undercount's real source is
+fixed under B31, not here.
+
+**Status: ruled, in build, 20 Sep 2026. The triage-volume complaint quoted above is amended by
+B31 the same day.**
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the Store button is gone, and a ticket's own head, at the triage stage, offers the same
+decision the queue offers.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
 
 **Law.** None registered.
 
@@ -5868,6 +5947,198 @@ corner (P1's placement, hidden until hover or focus, always visible on a coarse 
 trigger opens Edit/Copy/Delete in that order (P4's contents). Edit swaps the bubble for an
 inline field seeded from its own text, Copy always fires (a told-you, not a gated action),
 Delete is gated and gets no confirmation of its own, that is the caller's job.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**VALIDATED 20 Sep 2026 (Round 30).** Aurora reviewed staging this round and confirmed live:
+the assistant strip's inactive tabs sit behind the panel, and the shut opener is 40×40px,
+the same size as the rail handle.
+
+**Status: validated, 20 Sep 2026 (Round 30).**
+
+**Law.** None registered.
+
+### B31: the triage volume figure excludes resolved and closed tickets everywhere it is counted, and the triage list view draws no per-row buttons
+
+**The rule.** Two of Aurora's rulings, 20 Sep 2026, verbatim. Reviewing staging: *"canot be, i
+still have 428 to trigae but only 15 open?"* The number of tickets waiting for triage cannot
+exceed the number of open tickets. A resolved or closed ticket never needs triage, whatever its
+triage fields say. And, on the same screen's other surface: *"on tickets triage list view have
+no buttons at all (rmeov ethe accept/store/all)"* The triage LIST view (the table, not the queue
+card view) shows no action buttons per row at all.
+
+**The volume figure.** `needsTriage` (`workers/content/src/lib/triage.ts`) and the door it backs
+(`GET /api/content/triage`, `workers/content/src/routes/triage.ts`) already select
+`status = 'new' AND archived_at IS NULL` and nothing else: a resolved or archived ticket was
+never in the set this door counts, whatever its four readiness fields (type, client, app,
+raised-by) say. `workers/content/test/triage.test.ts` now pins exactly that: a ticket aged well
+past the three-working-day line, resolved, with every readiness field cleared, leaves both the
+list and the total. The 428-vs-15 gap was never in what the door counted; it was in how long a
+STALE answer could keep being shown. `TEAM_RESOURCES.help` (`web/lib/live-resources.ts`) dropped
+the cached `triage:<team>` answer on a `triage_duty` ping (naming somebody's week) but never on a
+`help` ping, so a ticket resolved, closed or put away anywhere other than this exact screen's
+own Accept/Assign/Plan left the Triage tab's badge and this queue's own total unmoved until the
+ten-minute `MAX_CACHE_AGE_MS` ceiling (`shared/web/store.ts`) caught up on its own. `triageKey(t)`
+now rides `help`'s own `deps`, so any ticket write drops the cached triage answer immediately,
+the same live-sync guarantee (R15) every other derived count on this screen already carries.
+
+**The list view.** `TriageQueue`'s `triageView === "list"` branch
+(`web/components/tickets/triage-queue.tsx`) drew a fifth `decide` column on `TicketRowsTable`
+with the row's own Accept/Assign/Plan button (`triageAct`) and a people-row strip beneath it,
+opened by the button when the verb needed a person. Both are gone, along with the one piece of
+state (`rowPicker`) that only existed to track which row's strip was open. `TicketRowsTable`
+draws its `decide` column only when a caller passes one: the table is called with nothing in
+that slot now, exactly as it already was on every other tab (Open, Closed, All). The queue's own
+one-ticket-at-a-time card view is untouched and keeps its Accept/Assign/Plan decision, its Skip
+and its Undo: her ruling names the LIST, not the card.
+`web/test/triage-list-view-no-buttons.test.tsx` is new and drives both bodies: the list view's
+table carries no button beyond the row's own ordinary title link (identical on every tab), and
+the card view still draws its decision and Skip.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**FACT, the 428.** Aurora's item 9 above, verbatim, *"canot be, i still have 428 to trigae but
+only 15 open?"*, is answered here as fact, not yet as a rule. On the Kwapso team, 428 tickets
+sit in status `new`: 320 came in through the Glide import, 103 were raised by Alaap, and 335
+are of type Extra, most of them from May to August 2026. A decision is open on what to do with
+them; nothing here decides it.
+
+**Law.** None registered.
+
+### B33: a story's own decision surface already asks for no assignee, there was no queue behaviour to replicate
+
+**The rule.** Aurora, verbatim, 20 Sep 2026: *"on sotries, when acce`ting i have to assigna a
+perosn right? rpelicate the quee behaviour for all buttons in the detail screen. maybe i am
+worng here."*
+
+**The finding.** She is right to have asked and the answer is: no, not on stories. There is no
+"Accept" word or concept anywhere in the stories module, and neither of a story's two moves,
+"Ready for review" (open/in_progress to in_review) and "Done" (in_review to done), both on the
+story detail head, `web/components/work/story-detail.tsx`, ever reads or writes an
+`assigneeId`. The door behind both, `setStoryStatus`
+(`workers/content/src/lib/stories.ts`), refuses a `done` move to anybody but the app's own team
+lead and refuses it while a checklist step is unfinished; it does not ask who the story belongs
+to, and a story has never required an assignee at creation either (`story-form-dialog.tsx`'s
+own `assigneeField` is `required: false`). The Stories "Reviews" tab's own "Queue" sub-view
+(`ReviewsQueue`, `web/components/work/stories-screen.tsx`) is a same-named but unrelated
+thing: a read-only list of stories already at `done`, one card each, whose only behaviour is
+opening the story's detail screen. It carries no Accept/Assign button of its own, on the card
+or in the Reviews List's table columns, so there was no queue decision to replicate onto the
+detail head. The board's own drag-to-status write (`moveStatus`, same file) calls the identical
+door with the identical two arguments, no assignee, so all three surfaces already agree.
+**The behaviour she was recalling is real, just on a different screen.** Tickets' own Triage
+Queue opens a people row before accepting an Issue ("Assign") or a Request ("Plan"), and that
+queue behaviour was unified onto the ticket detail head the same day, on her own ruling quoted
+in `web/components/tickets/tickets-collection.tsx` (see B29 above). That file belongs to a
+different lane and is untouched here.
+
+**The shape.** No door or component changed. Inventing an assignee requirement the doors do
+not enforce would have been the bug this row exists to avoid. `web/test/story-accept-asks-no-assignee.test.tsx`
+is new and drives the story detail head's two buttons end to end, proving neither call carries
+an assignee and the "Done" move matches the board's own door call exactly.
+
+**Status: answered, no build change, 20 Sep 2026.**
+
+**Law.** None registered.
+
+### B32: waves get a Settings panel, days per phase type
+
+**The rule.** Aurora, verbatim, 20 Sep 2026: *"on waves i am missing the settings (we'l adjust
+the duration of pahses in days)."*
+
+**The shape.** A wave's own Settings panel (`web/components/work/wave-phase-days-panel.tsx`,
+drawn on `wave-detail.tsx`'s Overview tab, alongside its other panels) gives whoever holds the
+wave update right seven rows, one per `PHASE_TYPES` name (`shared/sprint-types.ts`, the
+Wave-lifecycle order: Audit, Plan, Build, Pilot, Revision, Deploy, Hypercare), each with that
+type's own icon and a number-of-days field, Save and Cancel underneath. Read only for a caller
+without the right.
+
+The days are the wave's own. Team migration 0109 adds `wave_phase_days`
+(`workers/tenancy/src/team-schema/migrations.ts`): wave_id, phase_type, days, the creator and
+editor audit pair, one row per (wave, phase type) that has actually been set, never seven rows
+seeded the moment a wave is sold. A wave with no rows of its own reads placeholder defaults
+instead (Audit 5, Plan 5, Build 20, Pilot 10, Revision 10, Deploy 3, Hypercare 10 days), hers to
+adjust, said so in the migration's own comment. `POST /api/tenancy/waves/phase-days`
+(`workers/tenancy/src/routes/waves.ts`) gates on the same `work:update` right `update_wave`'s
+own door takes, validates each row (a phase type this team's own vocabulary carries, a whole
+number of days from 1 to 365) and writes an activity row, "Phase days changed," on the wave.
+The MCP surface carries the identical capability, `update_wave_phase_days`
+(`shared/workers/tool-catalog.ts`, `documents/MCP.md` §3).
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+---
+
+### B34: a Glossary tab under Knowledge, the app's own words and their definitions
+
+**The rule.** Aurora, verbatim, 20 Sep 2026: *"Add a tab to Knowledge with a glossary, and
+craft me an artifact identifying which words we use and their definitions. Choose which
+words you think worthy of being there, for example story, wave, acceptance criteria,
+ticket, etc. We'll iterate on definitions, but I want to identify the words already; this
+will let our users search there, but should be part of the knowledge base and feed the
+assistant."*
+
+**The shape.** A Glossary tab sits beside the Knowledge screen's own kind-tab strip (K2),
+always drawn, never derived from a count the way the other tabs are, because it has to be
+reachable at a zero count to seed itself. Its 54 starting words (`shared/glossary-seed.ts`)
+become team-wide `knowledge_sources` rows of a new kind, `glossary`
+(`createGlossaryEntry`/`seedGlossaryEntries`, `workers/content/src/lib/knowledge.ts`),
+an ordinary knowledge source, listed alphabetically (`KNOWLEDGE_SORTS.title`), searchable
+through the same door every other source is, and read by the assistant the same way, one
+passage among the rest `ask_knowledge` already returns. Seeded once per team, idempotently,
+the first time a person with the knowledge create right opens the tab
+(`POST /api/content/knowledge/glossary/seed`); a word is added by hand from the same tab
+(`POST /api/content/knowledge/glossary`, and its own MCP tool, `add_glossary_word`,
+`shared/workers/tool-catalog.ts`, `documents/MCP.md` §3), corrected and taken away through
+the knowledge base's own existing doors, gated by the same `knowledge:create` /
+`:update` / `:delete` rights every other source already carries.
+
+**Status: ruled, in build, 20 Sep 2026.**
+
+**Law.** None registered.
+
+---
+
+### B35: a burndown chart per phase, and cycle time read off the same status history
+
+**The rule.** Aurora, verbatim, 20 Sep 2026: *"Add a burndown chart to each sprint/cycle.
+A burndown chart plots work remaining (story points or story count) on the Y-axis against
+the days of the cycle on the X-axis, with a straight "ideal" line from the starting total
+down to zero so the team can see whether they're ahead or behind. Build a visual artifact
+that renders this per sprint and updates the remaining-work line each day as stories move
+to Completed."*
+
+Asked how cycle time (how long a story sits in each status) should be captured, she ruled:
+*"capture this automatically via timestamps on those status changes."* Asked whether any
+status history exists for stories today, she corrected herself in the same breath:
+*"No status history exists for stories today: actually, it kind of does. In the old
+system, we were only using work logs, so when it entered in progress, it's on the start of
+the first related work log. Does that make sense?"*
+
+**The shape.** One history table under both asks, the same way `help_status_events` (team
+migration 0066) already serves a ticket's stage history: `story_status_events`
+(`story_id`, `from_status`, `to_status`, `created_at`, the usual actor triple), team
+migration 0110. Every runtime status writer (`setStoryStatus`, `storyProgressFlip` in
+`workers/content/src/lib/stories.ts`) records a row the moment it genuinely moves one
+(R17: a zero-row move writes no event either). The migration's own BACKFILL reaches for
+the fact she named: a story already past `open` gets an `in_progress` event at the start
+of its first work log, or its own `created_at` with none; a story at `in_review` or `done`
+gets that event too, at `updated_at`.
+
+The chart reads `POST /api/content/stories/burndown` (`{phaseId}`), a GET-style POST
+(the phase id travels as a body field): one row per calendar day of the phase, the
+REMAINING count (stories whose latest status event at or before that day is not `done`,
+a story pulled back out of done counts as remaining again, computed from the latest event
+rather than "ever reached done"), the IDEAL straight line from the phase's starting total
+to zero on the last day, and the starting total itself. `hasPoints` is false today,
+`stories` carries no points column yet, so the series counts stories until one exists, and
+the count/points toggle stays off until it does. Drawn on the phase detail
+(`sprint-detail.tsx`'s Stories tab, directly under the phase goal band and above the story
+list) through the kit's own `Chart` (`type="line"`, two series: the remaining line in ink,
+the ideal line in a lighter tone), empty through `EmptyGatedPanel` (R88) when the phase has
+no start/end dates or no stories at all.
 
 **Status: ruled, in build, 20 Sep 2026.**
 
@@ -8226,7 +8497,7 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**236 rules.**
+**241 rules.**
 
 | Section | Rules |
 |---|---|
@@ -8234,7 +8505,7 @@ the last of these, verbatim: *"Validated."*
 | 2. Page layout and width | L1 to L38 (38) |
 | 3. Detail screens | D1 to D23 (23) |
 | 4. Collections | K1 to K55 (55) |
-| 5. Buttons and actions | B1 to B30 (30) |
+| 5. Buttons and actions | B1 to B35 (35) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |

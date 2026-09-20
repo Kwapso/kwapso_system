@@ -344,11 +344,6 @@ export function TriageQueue({
      which is why it is written beside it rather than folded into the accept
      handler and forgotten on the way back. */
   const [assigned, setAssigned] = React.useState<string[]>([])
-  /* WHICH LIST ROW IS MID-DECISION — the client chose L3, the strip that opens
-     beneath the row, over a panel or a dialog. One id, not a set: two open
-     strips would be two half-made decisions on screen at once, and the row
-     leaves as soon as one is finished anyway. */
-  const [rowPicker, setRowPicker] = React.useState<string | null>(null)
   /** Which one-row picker is open, if either. One value rather than two
    * booleans: they are alternatives (the type row and the people row cannot
    * both be the answer to what Accept is waiting for), and two booleans is two
@@ -1044,63 +1039,20 @@ export function TriageQueue({
            file rather than properties of the card (`narrowTriage` /
            `triageFacets` / `TRIAGE_SORTS`), so the queue and the list are one
            question answered twice and cannot disagree about what is in the pile
-           or what order it is in. */
-        <TicketRowsTable
-          rows={inOrder}
-          onOpen={onOpen}
-          label={t("Triage queue")}
-          teamId={teamId}
-          decide={{
-            // "no header" — client, asked directly, and it is what her own
-            // reference screenshot does. The component keeps the column
-            // announced to a screen reader either way.
-            header: "",
-            cell: (w) =>
-              canTriage && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={busy || w.missing.length > 0}
-                  title={w.missing.length > 0 ? gapsSentence(w) : undefined}
-                  // `stopPropagation` because the row itself opens the ticket.
-                  // Without it, deciding would also navigate away from the list
-                  // the decision was made in.
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const a = triageAct(w.helpType, t)
-                    if (a.assigns) setRowPicker((r) => (r === w.id ? null : w.id))
-                    else void accept(w)
-                  }}
-                >
-                  {triageAct(w.helpType, t).label}
-                </Button>
-              ),
-            // THE PEOPLE ROW, BENEATH ITS OWN ROW — the client picked L3 over a
-            // panel and a dialog, knowing it pushes the rows below it down. Only
-            // ever under an Issue or a Request, the two verbs that need a
-            // person: Accept never opens anything (an Extra takes the same
-            // path since the Store button was removed, 20 Sep 2026), which is
-            // why half a list of tickets is pressed straight through.
-            // Returning `null` for every other row is what tells the table
-            // there is no strip to draw.
-            strip: (w) =>
-              rowPicker === w.id ? (
-                <RecordPicker
-                  layout="row"
-                  ariaLabel={t("Who is picking this up?")}
-                  value=""
-                  onChange={(v) => {
-                    setRowPicker(null)
-                    void accept(w, v)
-                  }}
-                  options={peopleFor(w.appId)}
-                  searchPlaceholder={t("Who is picking this up?")}
-                  emptyText={t("Nobody on this team can be given work yet.")}
-                  disabled={busy}
-                />
-              ) : null,
-          }}
-        />
+           or what order it is in.
+
+           NO `decide` COLUMN ANY MORE. Aurora's ruling, 20 Sep 2026, verbatim:
+           "on tickets triage list view have no buttons at all (remove the
+           accept/store/all)." The list view used to carry a fifth column with
+           the row's own Accept/Assign/Plan button and the people-row strip
+           beneath it (`triageAct`, the same verb the card uses); both are gone
+           now, and with them the one piece of state that only existed to track
+           which row's people-picker was open (`rowPicker`). The decision stays
+           reachable exactly one way: open the ticket, or use the card view
+           above. `decide` is optional on `TicketRowsTable` precisely so a caller
+           with nothing to decide in this column passes nothing, the same as
+           every other tab (Open, Closed, All) already does. */
+        <TicketRowsTable rows={inOrder} onOpen={onOpen} label={t("Triage queue")} teamId={teamId} />
       ) : (
         <Queue
           /* OPEN AND SKIP, SIDE BY SIDE — client, twice: "open button next to

@@ -2211,6 +2211,30 @@ export type Story = {
 export const MOSCOW_VALUES = ["Must", "Should", "Could", "Won't"] as const
 export type MoscowValue = (typeof MOSCOW_VALUES)[number]
 
+/** What `POST /api/content/stories/burndown` answers with, the series a
+ * phase's burndown chart plots (round-28 ruling): "a burndown chart plots
+ * work remaining … against the days of the cycle … with a straight 'ideal'
+ * line from the starting total down to zero," recomputed at read time from
+ * `story_status_events` (team migration 0110) rather than pre-drawn. */
+export type StoryBurndownDay = {
+  /** the calendar day, YYYY-MM-DD */
+  date: string
+  /** stories not yet done, as of the END of this day */
+  remainingCount: number
+  /** null while `hasPoints` is false, stories carry no points field yet */
+  remainingPoints: number | null
+  /** the straight line from `startTotal` on day one to zero on the last day */
+  idealCount: number
+}
+
+export type StoryBurndown = {
+  days: StoryBurndownDay[]
+  /** how many stories sit in the phase, the count the ideal line falls from */
+  startTotal: number
+  /** true once a points column exists on `stories`. Always false today. */
+  hasPoints: boolean
+}
+
 /** THE STORIES SCREEN'S OWN TAB STRIP, ported from Tasks (`TASK_VIEWS`, above)
  * the same evening — the client's ruling, 15 Sep 2026: "for stories, we need
  * to recreate a bit of tasks... different tabs where you can see: overdue or
