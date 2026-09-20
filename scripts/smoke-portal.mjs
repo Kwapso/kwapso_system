@@ -821,12 +821,69 @@ let MY_TICKET
   const thread = await portal(`/api/content/help/thread?id=${MY_TICKET.id}`, {}, client)
   ok("they can read the conversation on it", thread.ok && Array.isArray(thread.body?.replies), `status ${thread.status}`)
 
+  const myReplyBody = `PORTAL SMOKE · ${new Date().toISOString()}`
   const replied = await portalPost(
     "/api/content/help/reply",
-    { helpId: MY_TICKET.id, body: `PORTAL SMOKE · ${new Date().toISOString()}` },
+    { helpId: MY_TICKET.id, body: myReplyBody },
     client
   )
   ok("they can answer their own thread", replied.ok, `status ${replied.status}`)
+
+  // THE CHAT EDIT PENCIL (team migration 0108, Aurora's 20 Sep 2026 ruling).
+  // Same client, same reply, right after posting it: the author may always
+  // change their own words. Found by the exact body just sent, the same way
+  // MY_TICKET itself is found above by FIX.myTicket.
+  const MY_REPLY = (replied.body?.replies ?? []).find((r) => r.body === myReplyBody)
+  if (!MY_REPLY?.id) stop("posted a reply but could not find it in the thread that came back")
+
+  const myReplyEditedBody = `PORTAL SMOKE · edited ${new Date().toISOString()}`
+  const replyEdited = await portalPost(
+    "/api/content/help/reply/update",
+    { id: MY_REPLY.id, body: myReplyEditedBody },
+    client
+  )
+  ok(
+    "they can edit their own reply, and the new words read back",
+    replyEdited.ok && (replyEdited.body?.replies ?? []).some((r) => r.id === MY_REPLY.id && r.body === myReplyEditedBody),
+    `status ${replyEdited.status} ${JSON.stringify(replyEdited.body).slice(0, 160)}`
+  )
+
+  // A REPLY THEY DID NOT WRITE, on their OWN account (never seeded by this
+  // script: THEIR_TICKET's bait reply belongs to a different company and is
+  // fenced away entirely, a 404 at the ticket level, not the 403 assertMayChangeReply
+  // answers here). Only run when the thread already carries one in reach.
+  // `authorIsClient` survives the R54 redaction that hides a staff author's id
+  // and name from a portal reader, so false is the client's own signal for
+  // a reply the agency wrote.
+  const notMyReply = (replyEdited.body?.replies ?? []).find((r) => r.authorIsClient === false)
+  if (notMyReply?.id) {
+    const foreignEdit = await portalPost(
+      "/api/content/help/reply/update",
+      { id: notMyReply.id, body: "PORTAL SMOKE · this must never land" },
+      client
+    )
+    ok(
+      "they cannot edit a reply on their own ticket that they did not write",
+      foreignEdit.status === 403,
+      `status ${foreignEdit.status} ${JSON.stringify(foreignEdit.body).slice(0, 160)}`
+    )
+    const foreignDelete = await portalPost("/api/content/help/reply/delete", { id: notMyReply.id }, client)
+    ok(
+      "and cannot delete it either",
+      foreignDelete.status === 403,
+      `status ${foreignDelete.status} ${JSON.stringify(foreignDelete.body).slice(0, 160)}`
+    )
+  }
+
+  const replyDeleted = await portalPost("/api/content/help/reply/delete", { id: MY_REPLY.id }, client)
+  ok("they can take their own reply back out", replyDeleted.ok, `status ${replyDeleted.status}`)
+
+  const replyDeletedAgain = await portalPost("/api/content/help/reply/delete", { id: MY_REPLY.id }, client)
+  ok(
+    "a second delete on the same reply is refused as already gone",
+    replyDeletedAgain.status === 404,
+    `status ${replyDeletedAgain.status} ${JSON.stringify(replyDeletedAgain.body).slice(0, 160)}`
+  )
 
   // Correcting the wording and re-ranking are the two powers SCOPE ch.07 gives
   // the account over its own requests. Both are governed by the LOCK, so a
