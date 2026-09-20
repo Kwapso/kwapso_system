@@ -316,6 +316,64 @@ describe("category is derived from the ticket, never chosen (Aurora's ruling, 21
     expect(res.status).toBe(200)
     expect(storyRow(id).category).toBe("Enabler")
   })
+
+  // THE READ PATH, NOT JUST THE WRITE PATH -- a live proof of commit dc8e76b2
+  // found 328 stories on the Kwapso team whose STORED `category` column
+  // disagreed with their ticket link (back-filled before B43 existed, never
+  // re-derived once it landed): B0004 carried no ticket and still read
+  // "Client-requested" because the screen showed the stored word instead of
+  // deriving it. The cases above all assert the WRITTEN column; these assert
+  // what a caller reading the row back over the door actually sees.
+  it("a row stored Client-requested with no ticket reads Enabler off the door", async () => {
+    const id = await addStory({ title: "Stored wrong, no ticket" })
+    expect(storyRow(id).category).toBe("Enabler")
+    // Corrupt the stored column directly -- the exact shape the 328 old rows
+    // were in: a category column that disagrees with `ticket_id`.
+    db().exec(`UPDATE stories SET category = 'Client-requested' WHERE id = '${id}'`)
+    expect(storyRow(id).category).toBe("Client-requested") // the corruption took
+
+    const byId = (await (await call(IDS.staffUser, "GET /api/content/stories", undefined, `?id=${id}`)).json()) as {
+      stories: { id: string; category: string }[]
+    }
+    expect(byId.stories[0]?.category).toBe("Enabler")
+
+    const listed = (await (await call(IDS.staffUser, "GET /api/content/stories", undefined, "?view=all")).json()) as {
+      stories: { id: string; category: string }[]
+    }
+    expect(listed.stories.find((s) => s.id === id)?.category).toBe("Enabler")
+  })
+
+  it("a row stored Enabler with a ticket linked reads Client-requested off the door", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Stored wrong, has a ticket", ticketId: ticket })
+    expect(storyRow(id).category).toBe("Client-requested")
+    db().exec(`UPDATE stories SET category = 'Enabler' WHERE id = '${id}'`)
+    expect(storyRow(id).category).toBe("Enabler") // the corruption took
+
+    const byId = (await (await call(IDS.staffUser, "GET /api/content/stories", undefined, `?id=${id}`)).json()) as {
+      stories: { id: string; category: string }[]
+    }
+    expect(byId.stories[0]?.category).toBe("Client-requested")
+  })
+
+  // THE FILTER AGREES WITH THE ROW. `STORY_COLS`'s CASE is the one seam both
+  // read: a plain list and an id-narrowed list see the identical fact for the
+  // identical row, so a facet built off either page can never disagree with
+  // what the row itself shows.
+  it("the ticket-narrowed filter agrees with the by-id read on the same row's category", async () => {
+    const ticket = await seedTicket()
+    const id = await addStory({ title: "Filter agrees with row", ticketId: ticket })
+    db().exec(`UPDATE stories SET category = 'Enabler' WHERE id = '${id}'`) // stored word wrong on purpose
+
+    const byId = (await (await call(IDS.staffUser, "GET /api/content/stories", undefined, `?id=${id}`)).json()) as {
+      stories: { id: string; category: string }[]
+    }
+    const byTicket = (await (
+      await call(IDS.staffUser, "GET /api/content/stories", undefined, `?ticketId=${ticket}`)
+    ).json()) as { stories: { id: string; category: string }[] }
+    expect(byId.stories[0]?.category).toBe("Client-requested")
+    expect(byTicket.stories.find((s) => s.id === id)?.category).toBe(byId.stories[0]?.category)
+  })
 })
 
 // THE RULE THE SAVINGS MATHS HANGS OFF (.plans/BUILD-1 §2): "a story cannot close

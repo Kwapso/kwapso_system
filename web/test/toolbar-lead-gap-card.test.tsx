@@ -1695,9 +1695,18 @@ describe("R83, decision B -- the <Tabs> root's own gap-6/gap-7 is zeroed for a t
 
   it('CSS: globals.css carries the exact zero-gap rule on [data-slot="tabs"]:has(...), unconditionally (no @media wrapper, so the same rule applies at every width, lg and below alike)', () => {
     const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    // TOLERANT OF A JOINED SECOND SELECTOR, 21 Sep 2026 -- the collection-frame
+    // extension (further down this file) comma-joins a second selector onto
+    // this SAME rule rather than opening a second one, so the card selector's
+    // own closing paren is no longer always followed straight by `{` -- it may
+    // be followed by `, <second selector> {` instead. `(?:,[\s\S]*?)?` makes
+    // that join optional rather than assumed, so this proof still reads as
+    // "the card selector zeroes the gap" whether or not anything else is
+    // joined to it; the joined-selector shape ITSELF is proved separately,
+    // by name, in the collection-frame describe block below.
     const rule = new RegExp(
       String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
-        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*(?:,[\s\S]*?)?\{\s*gap:\s*0px\s*;\s*\}`
     )
     expect(
       css,
@@ -1762,5 +1771,149 @@ describe("R83, decision B -- the <Tabs> root's own gap-6/gap-7 is zeroed for a t
     expect(preFix, "the pre-fix stylesheet (card lead alone, no root-gap override) must not match today's rule").not.toMatch(
       rule
     )
+  })
+
+  // ==========================================================================
+  // A LIVE PROOF OF COMMIT dc8e76b2 -- THE KIT'S OWN CollectionFrame IS A
+  // DIFFERENT SHAPE, NEVER REACHED ABOVE. `ZERO_GAP_SELECTOR` keys on THIS
+  // app's own `[data-slot="card"]`/`[data-slot="card-content"]` wrapper
+  // (`<CollectionCard>`, published by `<ToolbarRow>`'s own `data-slot=
+  // "toolbar-row-pin"` one level down) -- never the vendored kit's own
+  // `CollectionFrame` (shared/ui/components/collection-frame/collection-
+  // frame.tsx), whose panel is `[data-slot="collection-frame-panel"]` and
+  // whose toolbar is `[data-slot="collection-frame-toolbar"]`, no
+  // `[data-slot="card"]` anywhere in that subtree. The app detail's Phases
+  // tab (`SprintsPanel`, work-panels.tsx, drawn through `useKitPanel`) is
+  // exactly this shape, and measured LIVE, still carried the untouched 24/
+  // 32px gap this whole describe block exists to zero: 32px at 1440, 24px at
+  // 760, against 20px on a main list.
+  // ==========================================================================
+  const COLLECTION_FRAME_ZERO_GAP_SELECTOR =
+    '[data-slot="tabs"]:has(> [data-tab-pane][data-state="active"] [data-slot="collection-frame"]:first-child [data-slot="collection-frame-toolbar"]:first-child)'
+
+  /** The kit's own `CollectionFrame` shape, reproduced as a fixture rather
+   * than mounting the real vendored component (the same restraint every
+   * other fixture in this file already takes for `<PagedFind>`/
+   * `<CollectionCard>`): `collection-frame` > `collection-frame-stack` >
+   * `collection-frame-panel` > `collection-frame-toolbar` first, exactly the
+   * nesting `collection-frame.tsx`'s own JSX carries when neither a heading
+   * nor a `band` is passed -- SprintsPanel's own case. */
+  function CollectionFrameTabbedFixture({ frameActive }: { frameActive: boolean }) {
+    return (
+      <TabsView
+        className={STICKY_TABS}
+        config={{
+          ...defaultTabsConfig,
+          tabs: [
+            { value: "phases", label: "Phases", icon: "", badge: "", badgeVariant: "" },
+            { value: "facts", label: "Overview", icon: "", badge: "", badgeVariant: "" },
+          ],
+        }}
+        value={frameActive ? "phases" : "facts"}
+        renderPanel={(t) =>
+          t.value === "phases" ? (
+            <section data-slot="collection-frame">
+              <div data-slot="collection-frame-stack" className="flex min-w-0 flex-col">
+                <div data-slot="collection-frame-panel">
+                  <div data-slot="collection-frame-toolbar">the toolbar</div>
+                  <div data-testid="rows">the rows</div>
+                </div>
+              </div>
+            </section>
+          ) : (
+            <div data-testid="facts">fact rows, prose, nothing a toolbar draws</div>
+          )
+        }
+      />
+    )
+  }
+
+  it("DOM: a real STICKY_TABS-classed <Tabs> root, with the collection-frame tab active, matches the collection-frame selector globals.css carries", () => {
+    render(<CollectionFrameTabbedFixture frameActive={true} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    expect(tabsRoot, 'TabsView must render the kit\'s Tabs root, data-slot="tabs"').toBeTruthy()
+
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    expect(activePane, "the active pane must carry both data-tab-pane and data-state=active").toBeTruthy()
+    const frame = activePane!.querySelector('[data-slot="collection-frame"]')
+    expect(frame === activePane!.firstElementChild, "the collection frame must be the active pane's own first child").toBe(
+      true
+    )
+    const toolbar = frame!.querySelector('[data-slot="collection-frame-toolbar"]')
+    expect(
+      toolbar === toolbar?.parentElement?.firstElementChild,
+      "the collection-frame toolbar must be its own parent's first child -- no band drawn above it"
+    ).toBe(true)
+
+    expect(
+      tabsRoot.matches(COLLECTION_FRAME_ZERO_GAP_SELECTOR),
+      "the real, rendered <Tabs> root must match the collection-frame selector globals.css keys the gap override on"
+    ).toBe(true)
+
+    // THE CARD SELECTOR MUST NOT ALSO CLAIM THIS -- the two selectors are
+    // joined on one rule (same `{ gap: 0px }` block), never a coincidence:
+    // this fixture carries no `[data-slot="card"]` anywhere, so the FIRST
+    // selector in the rule has nothing here to match either.
+    expect(
+      tabsRoot.matches(ZERO_GAP_SELECTOR),
+      "the card selector must not match a pane that never draws a [data-slot=\"card\"] at all"
+    ).toBe(false)
+  })
+
+  it("DOM: the SAME fixture, with the fact-rows tab active instead, does NOT match the collection-frame selector", () => {
+    render(<CollectionFrameTabbedFixture frameActive={false} />)
+
+    const tabsRoot = document.querySelector('[data-slot="tabs"]') as HTMLElement
+    const activePane = document.querySelector('[data-tab-pane][data-state="active"]')
+    expect(activePane!.querySelector('[data-testid="facts"]'), "the active pane must be the fact-rows one").toBeTruthy()
+
+    // No forceMount on this app's own Tabs (shared/ui/components/tabs/
+    // tabs.tsx) -- the inactive Phases pane is not mounted at all, so there
+    // is nothing here for an unguarded :has() to have falsely matched.
+    expect(
+      document.querySelector('[data-slot="collection-frame"]'),
+      "with the fact-rows tab active, the Phases pane's own collection frame is not mounted at all"
+    ).toBeNull()
+
+    expect(
+      tabsRoot.matches(COLLECTION_FRAME_ZERO_GAP_SELECTOR),
+      "a Tabs root whose ACTIVE pane starts with fact rows must not match the collection-frame selector either"
+    ).toBe(false)
+  })
+
+  it('CSS: globals.css joins the collection-frame selector to the card selector on the SAME rule, one `{ gap: 0px }` block, comma-separated', () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, "utf8")
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*,\s*` +
+        String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="collection-frame"\]:first-child\s+` +
+        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(
+      css,
+      "web/app/globals.css must carry both selectors, comma-joined, on the SAME rule this suite's DOM proofs above render and match -- two selectors sharing one declaration, never two separate rules that could drift apart"
+    ).toMatch(rule)
+  })
+
+  it("RED PROOF: the card-only rule (this describe block's own pre-extension shape) does not satisfy the joined-selector CSS proof above", () => {
+    const cardOnly = `
+      [data-slot="tabs"]:has(
+          > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
+            > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child
+        ) {
+        gap: 0px;
+      }
+    `
+    const rule = new RegExp(
+      String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="card"\]:first-child\s*` +
+        String.raw`>\s*\[data-slot="card-content"\]\s*>\s*\[data-slot="toolbar-row-pin"\]:first-child\s*\)\s*,\s*` +
+        String.raw`\[data-slot="tabs"\]:has\(\s*>\s*\[data-tab-pane\]\[data-state="active"\]\s+\[data-slot="collection-frame"\]:first-child\s+` +
+        String.raw`\[data-slot="collection-frame-toolbar"\]:first-child\s*\)\s*\{\s*gap:\s*0px\s*;\s*\}`
+    )
+    expect(
+      cardOnly,
+      "a rule missing the collection-frame selector must not read as today's extended, two-selector rule"
+    ).not.toMatch(rule)
   })
 })

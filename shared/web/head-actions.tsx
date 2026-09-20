@@ -82,10 +82,12 @@
 // row of standalone buttons beside the title — `web/components/work/
 // task-detail.tsx` and `web/components/work/story-detail.tsx` both draw
 // `RecordTimerButton` the identical way, beside their own primary/secondary
-// buttons and `EditPenButton`. None of the three is wired to this file yet
-// (only the ticket head is, this lane's own scope); the other two are named
-// here as the next screens to move onto it, not rebuilt as part of this
-// change. `account-detail.tsx`, `contact-detail.tsx`, `app-detail.tsx`,
+// buttons and `EditPenButton`. All three are wired to this file now -- the
+// ticket head first, `story-detail.tsx` and `task-detail.tsx` joined it, each
+// pairing its own `HeadActionsFoldMenu` (narrow) with a `RecordActionsMenu`
+// carrying the same `overflow` (wide), so a menu-only action (Archive on a
+// ticket, Edit on a story, Delete on a task) is reachable whether or not the
+// fold is showing. `account-detail.tsx`, `contact-detail.tsx`, `app-detail.tsx`,
 // `knowledge-detail.tsx`, `meeting-detail.tsx`, `process-detail.tsx`,
 // `member-screen.tsx`, `sprint-detail.tsx` and `wave-detail.tsx` all pass
 // their own `actions` to `RecordScreen` too — every one of them a candidate

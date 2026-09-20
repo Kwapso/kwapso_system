@@ -148,7 +148,19 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
-  s.story_type, s.category, s.acceptance_criteria, s.build_notes, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
+  -- CATEGORY IS DERIVED ON EVERY READ, NEVER TRUSTED OFF THE STORED COLUMN
+  -- (Aurora's ruling, 21 Sep 2026, B43, verbatim: "If it's related to a
+  -- ticket, it's 'Client Requested.' If not, not."). The column still exists
+  -- and \`deriveCategory\` (below) still WRITES it on create/update so it stays
+  -- a mirror for anyone reading the table directly, but a SELECT never reads
+  -- it back: this CASE recomputes the same fact off \`s.ticket_id\`, so a row
+  -- whose stored word drifted from its ticket (328 of them on the Kwapso
+  -- team, back-filled before B43 existed) reads correctly regardless. Kept in
+  -- the SELECT list under the same \`category\` name so \`toStory\` and every
+  -- caller of \`STORY_COLS\`/\`STORY_LIST_COLS\` need no change at all -- the
+  -- correction lives in exactly one place.
+  (CASE WHEN s.ticket_id IS NOT NULL THEN 'Client-requested' ELSE 'Enabler' END) AS category,
+  s.story_type, s.acceptance_criteria, s.build_notes, s.moscow, s.contributes_to_goal, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
   -- A story list that made a query per story to learn its processes would be
@@ -258,11 +270,14 @@ function toStory(r: StoryRow): Story {
     closedAt: r.closed_at,
     closingNote: r.closing_note,
     storyType: r.story_type,
-    // A ROW BACK-FILLED BY MIGRATION SHOULD NEVER BE NULL (team migration 0094),
-    // but the safe direction is the same one `status` above already takes: a
-    // value the code does not recognise reads as the DEFAULT rather than as
-    // `null as string`, which would be a lie against the type.
-    category: r.category || "Client-requested",
+    // ALREADY DERIVED, IN SQL (`STORY_COLS`'s own CASE on `s.ticket_id`,
+    // above) -- `r.category` is never the stored column here, it is the fact
+    // recomputed off the ticket link on every read (B43). The `|| "Enabler"`
+    // is belt-and-braces for a row read by anything that bypasses that CASE
+    // (there is none left), the same safe-default direction `status` above
+    // takes: an unrecognised or missing value reads as the fact a story with
+    // no ticket already carries, never a lie against the type.
+    category: r.category || "Enabler",
     acceptanceCriteria: r.acceptance_criteria,
     buildNotes: r.build_notes,
     // Never trust a value the code does not recognise — the same safe

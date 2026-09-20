@@ -475,10 +475,47 @@
    through the plain descendant combinator between `[data-tab-pane]` and
    `[data-slot="card"]:first-child`.
 
-   Proved by `web/test/toolbar-lead-gap-card.test.tsx`. */
+   Proved by `web/test/toolbar-lead-gap-card.test.tsx`.
+
+   EXTENDED, A LIVE PROOF OF COMMIT dc8e76b2 -- this rule's own `[data-slot=
+   "card"]` shape is this app's own wrapper (`<ToolbarRow>`/`<PagedFind>`'s
+   `data-slot="toolbar-row-pin"` one level down, published by `<CollectionCard>`),
+   never the one the vendored kit's `CollectionFrame` draws for a pane opened
+   through `useKitPanel` -- the app detail's Phases tab among them
+   (`SprintsPanel`, `web/components/work/work-panels.tsx`). That pane's first
+   child is `[data-slot="collection-frame"]`, its toolbar is `[data-slot=
+   "collection-frame-toolbar"]` (the same element `[data-slot="collection-
+   frame"] [data-slot="collection-frame-panel"]`, above, already retargets to
+   `--toolbar-lead-gap`), and neither carries a `[data-slot="card"]` anywhere
+   in the subtree -- so this rule never matched it and the STRIP's own
+   untouched `gap-6`/`gap-7` (the very number this whole rule exists to zero)
+   kept landing on top of that already-correct padding. Measured live: 32px at
+   1440, 24px at 760, against 20px on a main list drawing the same census --
+   the exact 24/32px this rule's own header names as "a second, untouched"
+   number. A SECOND SELECTOR on the SAME rule, comma-joined rather than a
+   second declaration block, because both shapes zero the identical property
+   for the identical reason and a reader should see that as one law, not two.
+   `:first-child` on `[data-slot="collection-frame"]` keeps this to a pane
+   whose collection genuinely LEADS, the same restraint the card selector
+   above already applies; `:first-child` on `[data-slot="collection-frame-
+   toolbar"]` keeps it to a panel whose toolbar is its own first content (no
+   `[data-slot="collection-frame-band"]` -- the archive tab's own slot -- drawn
+   above it), the identical "toolbar first" test the card half makes with
+   `[data-slot="toolbar-row-pin"]:first-child`. A plain descendant combinator
+   between the frame and its toolbar, not a chain of `>` through `collection-
+   frame-stack`/`collection-frame-panel`, because those two are the kit's own
+   implementation detail (`shared/ui/components/collection-frame/collection-
+   frame.tsx`) and this app has no business hard-coding its layer count.
+
+   Extended by `web/test/toolbar-lead-gap-card.test.tsx`'s own DOM proof
+   (`Element.matches`, the collection-frame shape). */
 [data-slot="tabs"]:has(
     > [data-tab-pane][data-state="active"] [data-slot="card"]:first-child
       > [data-slot="card-content"] > [data-slot="toolbar-row-pin"]:first-child
+  ),
+[data-slot="tabs"]:has(
+    > [data-tab-pane][data-state="active"] [data-slot="collection-frame"]:first-child
+      [data-slot="collection-frame-toolbar"]:first-child
   ) {
   gap: 0px;
 }

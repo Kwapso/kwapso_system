@@ -36,7 +36,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/t
 
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { OverviewList } from "@/components/records/overview-list"
-import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
+import { RecordScreen, RecordActionsMenu, STICKY_TABS, RECORD_TABS_CONFIG, type RecordAction } from "@/components/records/record-chrome"
 import { HeadActionsFoldMenu, HEAD_ACTIONS_ROW_CLASS, type HeadActionItem } from "@shared/web/head-actions"
 import { RecordTimerButton, useRecordTimerAction } from "@/components/shell/timer-bar"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
@@ -214,15 +214,40 @@ export function TaskDetailScreen({
     })
   }
 
+  // DELETE, AT EVERY WIDTH -- a live proof of commit dc8e76b2 found this action
+  // unreachable at wide widths: it lived only inside `foldedActions`, and
+  // `HeadActionsFoldMenu`'s own wrapper (`data-slot="head-actions-fold"`,
+  // shared/web/head-actions.tsx) is `@min-[44rem]:hidden` BY DESIGN -- the fold
+  // is a narrow-width answer to a crowded row, not a second home for an act
+  // that has no standalone button. The ticket head's own Archive (help-
+  // detail.tsx) and the story head's own Edit (story-detail.tsx) both already
+  // carry a `RecordActionsMenu` in the WIDE row for exactly this reason -- a
+  // persistent "..." that stays visible whether or not the fold is showing.
+  // This head had none: Delete never had a standalone button (Aurora's 21 Sep
+  // 2026 ruling, "i need delete actino for tasks on the ... button"), so
+  // above the fold's own breakpoint it had nowhere to be at all. `overflow`
+  // is that persistent menu's own item list, reused inside `foldedActions`
+  // below exactly the way `help-detail.tsx`'s `overflow` is -- one array,
+  // never two copies of what Delete does.
+  const overflow: RecordAction[] = canEdit
+    ? [
+        {
+          key: "delete",
+          label: t("Delete"),
+          icon: <Trash className="size-3.5" />,
+          destructive: true,
+          onSelect: confirmDeleteTask,
+        },
+      ]
+    : []
+
   /* THE FOLD — same shape as `help-detail.tsx`'s own ("h3, and aign the menu
    * to the chips"): below `shared/web/head-actions.tsx`'s own breakpoint,
    * Done/Reopen, the timer and Edit all leave their standalone controls and
    * join the ONE "…" trigger that moves into the chip row, PLUS Delete,
    * which never had a standalone button of its own. Same order the wide row
    * draws its three in — the tick-off, then the timer, then edit — with
-   * Delete last, red, and pushed below a separator by the menu itself. This
-   * head had no overflow menu at all before this fold: the "…" trigger only
-   * exists below the breakpoint. */
+   * Delete last, red, and pushed below a separator by the menu itself. */
   const foldedActions: HeadActionItem[] = [
     // THE MAIN HEAD ACTION, FIRST — Aurora's 21 Sep 2026 ruling: the tick-off
     // is "the main buton", so it leads the row (and this menu) rather than
@@ -252,21 +277,7 @@ export function TaskDetailScreen({
           },
         ]
       : []),
-    // DELETE — Aurora's 21 Sep 2026 ruling, the same right Edit and the tick
-    // already gate on (`canEdit` is `work:update`, the door `deleteTask`
-    // gates on too). Red, and pushed below a separator by
-    // `HeadActionsFoldMenu` itself (its own `destructive` grouping).
-    ...(canEdit
-      ? [
-          {
-            key: "delete",
-            label: t("Delete"),
-            icon: <Trash className="size-3.5" />,
-            destructive: true,
-            onSelect: confirmDeleteTask,
-          },
-        ]
-      : []),
+    ...overflow,
   ]
   const overviewItems = [
     { label: t("Status"), value: done ? t("Done") : t("Open") },
@@ -454,6 +465,13 @@ export function TaskDetailScreen({
               standalone Edit control in this app already draws (RecordActionsMenu's
               own trigger, work-logs-panel.tsx, time-panel.tsx). */}
           {canEdit && !done && <EditPenButton onClick={() => setEditing(true)} label={t("Edit")} />}
+          {/* THE PERSISTENT "..." -- Delete's only home at wide widths, the same
+              `RecordActionsMenu` the ticket head (`help-detail.tsx`) and the
+              story head (`story-detail.tsx`) already carry in this exact
+              slot, beside the fold's own copy in the chip row above. Renders
+              nothing when `overflow` is empty (the component's own rule),
+              so a caller with no right to delete draws no empty trigger. */}
+          <RecordActionsMenu actions={overflow} />
         </div>
       }
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink

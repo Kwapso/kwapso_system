@@ -28,6 +28,8 @@ import {
   type HeadActionItem,
 } from "@shared/web/head-actions"
 import { clampRecordHeading, TITLE_ACTIONS_SPLIT } from "@shared/web/record-heading"
+import { RecordActionsMenu } from "@/components/records/record-chrome"
+import { Trash } from "@shared/ui/foundations/icons"
 
 beforeAll(() => {
   // Radix's dropdown-menu primitive reads these during open/close; jsdom has
@@ -176,6 +178,67 @@ describe("the ticket head passes its actions through the shared component", () =
     const actionsBlock = src.slice(start, end)
     expect(actionsBlock).not.toMatch(/(?:^|["\s])absolute(?:["\s]|$)/)
     expect(actionsBlock).not.toMatch(/position:\s*absolute/)
+  })
+})
+
+// ============================================================================
+// DELETE, AT EVERY WIDTH -- a live proof of commit dc8e76b2. Tasks' own Delete
+// (Aurora, 21 Sep 2026, "i need delete actino for tasks on the ... button")
+// lived ONLY inside `foldedActions`, and this file's own `HeadActionsFoldMenu`
+// wrapper is `@min-[44rem]:hidden` BY DESIGN -- the fold is the narrow answer,
+// never a second home for an act with no standalone button. The ticket head's
+// own Archive already carries a persistent `RecordActionsMenu` in the WIDE
+// row for exactly that reason (`help-detail.tsx`); `task-detail.tsx` had none.
+// ============================================================================
+describe("the task head -- Delete is reachable at every width, not only the fold", () => {
+  const src = read("web/components/work/task-detail.tsx")
+
+  it("imports RecordActionsMenu and renders it inside the wide HEAD_ACTIONS_ROW_CLASS row, not only the fold", () => {
+    expect(src).toMatch(/RecordActionsMenu/)
+    const wideRowStart = src.indexOf('<div data-slot="head-actions-row" className={HEAD_ACTIONS_ROW_CLASS}>')
+    expect(wideRowStart, "the wide actions row is where this test expects it").toBeGreaterThan(-1)
+    const wideRowEnd = src.indexOf("</div>", wideRowStart)
+    const wideRow = src.slice(wideRowStart, wideRowEnd)
+    // The persistent menu lives in the WIDE row itself -- the row that is
+    // `@min-[44rem]:flex`, never `hidden` at that width -- not only inside
+    // `HeadActionsFoldMenu`'s own `@min-[44rem]:hidden` wrapper.
+    expect(wideRow).toMatch(/<RecordActionsMenu actions=\{overflow\}/)
+  })
+
+  it("the wide row's own RecordActionsMenu carries the same `overflow` the fold also spreads -- one Delete, not two definitions", () => {
+    expect(src).toMatch(/const overflow: RecordAction\[\] = canEdit/)
+    expect(src).toMatch(/\.\.\.overflow,?\s*\n\s*\]/)
+    // Delete is built once, inside `overflow`, never a second literal object
+    // repeated for the wide row.
+    const deleteMentions = src.match(/key:\s*"delete"/g) ?? []
+    expect(deleteMentions.length).toBe(1)
+  })
+
+  it("behaviourally: the same shape task-detail.tsx builds renders a More button whose opened menu lists Delete", async () => {
+    // NOT the whole screen (task-detail.tsx pulls in the timer bar, activity,
+    // form options and the running-timers cache -- real hooks this suite has
+    // no reason to fake). This exercises the REAL `RecordActionsMenu`, the
+    // real component the wide row now mounts, fed the exact item shape
+    // `task-detail.tsx`'s own `overflow` builds (source-proven above) -- the
+    // same technique this file already uses for `HeadActionsFoldMenu` itself
+    // (JSDOM never evaluates `@container`, so there is nothing to "make"
+    // wide; what is provable is that the persistent trigger this width is
+    // supposed to keep actually opens a menu that lists Delete).
+    const overflow = [
+      { key: "delete", label: "Delete", icon: <Trash className="size-3.5" />, destructive: true, onSelect: () => {} },
+    ]
+    render(<RecordActionsMenu actions={overflow} />)
+    const trigger = screen.getByRole("button", { name: "More actions" })
+    fireEvent.pointerDown(trigger, { button: 0, pointerId: 1 })
+    fireEvent.pointerUp(trigger, { button: 0, pointerId: 1 })
+    fireEvent.click(trigger)
+    const item = await waitFor(() => screen.getByRole("menuitem", { name: "Delete" }))
+    expect(item.className).toMatch(/text-destructive/)
+  })
+
+  it("renders nothing when there is nothing to delete -- the same empty rule every RecordActionsMenu follows", () => {
+    const { container } = render(<RecordActionsMenu actions={[]} />)
+    expect(container.innerHTML).toBe("")
   })
 })
 
