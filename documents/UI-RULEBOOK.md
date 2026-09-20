@@ -40,7 +40,7 @@ the concrete implementation, and its evidence.
 - [2. Page layout and width](#2-page-layout-and-width) (L1 to L38)
 - [3. Detail screens](#3-detail-screens) (D1 to D23)
 - [4. Collections](#4-collections) (K1 to K55)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B35)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B36)
 - [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F18)
 - [7. Typography](#7-typography) (T1 to T9)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S7)
@@ -6144,6 +6144,37 @@ no start/end dates or no stories at all.
 
 **Law.** None registered.
 
+### B36: the Waves screen's default view drew no door on a team with zero waves
+
+**The defect.** Found by a proof on staging, 20 Sep 2026. A team with no waves at all
+lands on the Waves screen's DEFAULT view (Timeline, both tabs,
+`waves-screen.tsx`'s own `useRemembered<WaveView>("view", "timeline")`), and had no
+way at all to sell the first wave. The toolbar carrying "Sell a wave" was correctly
+withdrawn (R50: no toolbar at all over an empty collection), but `RecordTimeline`'s own
+`emptyBody`, the body Timeline fell into, is a plain sentence with no door, and
+`RecordCalendar`'s `emptyText` carried the identical gap. Only the List view (reachable
+from the All tab, never the screen's own default) fell through to `CollectionEmptyState`
+and its "Add the first": one working door on a screen with three bodies, none of them
+the one a person actually landed on.
+
+**The fix.** R88 (empty-state-single-door) already names the register; this screen just
+was not reaching it from two of its three views. `all.length === 0` (the tab/account
+scoped collection itself, never the search-narrowed `rows`) is hoisted above the
+per-view branches in `waves-screen.tsx`, so Timeline, Calendar and List all draw the
+identical `CollectionEmptyState`: title, description, and the one door, gated on the
+create right and on there being a client to sell to (`canCreate && clients.length > 0`),
+exactly the real-world gate the toolbar's own button already carried. A reader without
+the right sees the sentence and no button, R88's own second clause. The toolbar stays
+withdrawn (R50, untouched). The FILTERED zero (a search or facet narrowing a non-empty
+collection to nothing) is unaffected: Timeline and Calendar keep their own "no match in
+this window" sentence, and List's `CollectionEmptyState filtered` still stands, now
+provably reachable only when the collection is not the genuinely empty case above.
+
+**Status: fixed, 20 Sep 2026.**
+
+**Law.** R88 (`empty-state-single-door`), reinforced. No new registry entry: the
+existing law's own register was simply not wired to two of the screen's three views.
+
 ---
 
 ## 6. Forms and dialogs
@@ -8497,7 +8528,7 @@ the last of these, verbatim: *"Validated."*
 
 ## Rule index
 
-**241 rules.**
+**242 rules.**
 
 | Section | Rules |
 |---|---|
@@ -8505,7 +8536,7 @@ the last of these, verbatim: *"Validated."*
 | 2. Page layout and width | L1 to L38 (38) |
 | 3. Detail screens | D1 to D23 (23) |
 | 4. Collections | K1 to K55 (55) |
-| 5. Buttons and actions | B1 to B35 (35) |
+| 5. Buttons and actions | B1 to B36 (36) |
 | 6. Forms and dialogs | F1 to F18 (18) |
 | 7. Typography | T1 to T9 (9) |
 | 8. Spacing and the scale setting | S1 to S7 (7) |

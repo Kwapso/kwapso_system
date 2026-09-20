@@ -926,6 +926,31 @@ export function WaveCollection({
         {wavesLoading ? (
           // ROWS ONLY — the toolbar above is already real.
           <Skeleton variant="list" lines={4} />
+        ) : all.length === 0 ? (
+          // R88, EMPTY-STATE SINGLE DOOR, every view alike. Live defect,
+          // proved on staging 20 Sep 2026: on a team with zero waves the
+          // toolbar above is already gone (R50, the `all.length > 0` gate on
+          // `<WaveFinder>`), and Timeline, the DEFAULT view on both tabs,
+          // used to fall straight into `RecordTimeline`'s own `emptyBody`, a
+          // sentence with no door. A reader landing here had no way at all to
+          // sell the first wave short of guessing there was a List tab
+          // hiding one. Hoisted above the per-view branches so Timeline,
+          // Calendar and List all draw the identical register B36 names.
+          // Reads `all` (the tab/account-scoped collection itself), never
+          // `rows` (the same collection after a search/filter narrows it):
+          // a search that narrows a non-empty collection to zero is R62's
+          // FILTERED zero, below, not this one. `clients.length > 0` is the
+          // same real-world gate the toolbar's own button carried (a wave
+          // needs a client to sell it to); `canCreate` withdraws the door
+          // outright for a reader without the right, leaving only the
+          // sentence, R88's second clause.
+          <CollectionEmptyState
+            title={t("No waves yet.")}
+            description={t(
+              "A wave is a package of phases an account bought: sell it first, plan the phases inside it afterwards."
+            )}
+            onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
+          />
         ) : view === "timeline" && weekWindow ? (
           // T3 — ONE BAR PER WAVE, cut into its own sprints. See
           // `record-timeline.tsx`'s own header for why this reads through a
@@ -963,27 +988,14 @@ export function WaveCollection({
             }
           />
         ) : rows.length === 0 ? (
-          asking ? (
-            /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON (client,
-               2026-09-09). A bare grey line beside the full register one branch
-               down; one body now, and "Sell a wave" is withdrawn by the
-               component while a search is narrowing the list. */
-            <CollectionEmptyState filtered title={t("No waves yet.")} />
-          ) : (
-            // GENUINELY EMPTY — R50's own carve-out (composition 27.21): the
-            // toolbar above is gone, so this is the only "Sell a wave" left
-            // on screen. `clients.length > 0` is the same real-world gate the
-            // toolbar's own button carried (a wave needs a client to sell it
-            // to) — offering a button that would open a dialog with nowhere
-            // to point would be worse than none.
-            <CollectionEmptyState
-              title={t("No waves yet.")}
-              description={t(
-                "A wave is a package of phases an account bought: sell it first, plan the phases inside it afterwards."
-              )}
-              onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
-            />
-          )
+          /* R62, THE SAME REGISTER, MINUS THE ADD BUTTON (client,
+             2026-09-09). `all.length === 0` is handled above, so reaching
+             this branch means the collection holds waves and a search or
+             filter narrowed THIS (List) view to zero of them: `selectWaves`
+             only ever removes a row for a reason `waveQueryIsActive` already
+             names, so `all.length > 0` here means the zero is always the
+             filtered one, never the genuine one. */
+          <CollectionEmptyState filtered title={t("No waves yet.")} />
         ) : (
           // LIST (All tab only) — R80's shape, through `RecordTable`.
           <RecordTable
